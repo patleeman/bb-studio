@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyOps, compact, firstFit, placeAt } from "./ops";
-import { EMPTY_LAYOUTS, LIMITS, normalizeSource, type DashboardDoc } from "./shared";
+import { applyOps, compact, deriveLayout, firstFit, placeAt, viewLayouts } from "./ops";
+import { breakpointFor, EMPTY_LAYOUTS, LIMITS, normalizeSource, type DashboardDoc } from "./shared";
 
 let n = 0;
 const ctx = { newId: () => `w${++n}`, hasType: (id: string) => id === "wt_known" };
@@ -17,6 +17,44 @@ describe("layout", () => {
     const layout = placeAt([{ i: "a", x: 0, y: 0, w: 4, h: 2 }, { i: "b", x: 0, y: 2, w: 4, h: 2 }], { i: "b", x: 0, y: 0, w: 4, h: 2 }, 12);
     expect(layout.find((item) => item.i === "b")).toMatchObject({ y: 0 });
     expect(layout.find((item) => item.i === "a")).toMatchObject({ y: 2 });
+  });
+});
+
+describe("responsive layouts", () => {
+  // Three stat tiles across, then a wide table and a narrow list.
+  const lg = [
+    { i: "a", x: 0, y: 0, w: 3, h: 3 }, { i: "b", x: 3, y: 0, w: 3, h: 3 }, { i: "c", x: 6, y: 0, w: 3, h: 3 },
+    { i: "t", x: 0, y: 3, w: 8, h: 6 }, { i: "l", x: 8, y: 3, w: 4, h: 6 },
+  ];
+
+  it("md: tiles at least half width, rounded up, in lg reading order", () => {
+    const md = deriveLayout(lg, "md");
+    expect(md.map(({ i, x, y, w, h }) => [i, x, y, w, h])).toEqual([
+      ["a", 0, 0, 4, 3], ["b", 4, 0, 4, 3], ["c", 0, 3, 4, 3], ["t", 0, 6, 6, 6], ["l", 0, 12, 4, 6],
+    ]);
+  });
+
+  it("sm: every tile full width, stacked in lg reading order, heights kept", () => {
+    const sm = deriveLayout(lg, "sm");
+    expect(sm.map(({ i, x, y, w, h }) => [i, x, y, w, h])).toEqual([
+      ["a", 0, 0, 4, 3], ["b", 0, 3, 4, 3], ["c", 0, 6, 4, 3], ["t", 0, 9, 4, 6], ["l", 0, 15, 4, 6],
+    ]);
+  });
+
+  it("re-derives squeezed legacy md/sm layouts but keeps arranged ones", () => {
+    const legacy = { lg, md: lg.map((item) => ({ ...item, x: 0, w: Math.round((item.w * 8) / 12) })), sm: lg.map((item) => ({ ...item, x: 0, w: Math.max(2, Math.round((item.w * 4) / 12)) })) };
+    const view = viewLayouts(legacy);
+    expect(view.sm.every((item) => item.w === 4)).toBe(true);
+    expect(view.md.find((item) => item.i === "a")!.w).toBe(4);
+    const arranged = { lg, md: deriveLayout(lg, "md").map((item) => (item.i === "t" ? { ...item, w: 8 } : item)), sm: deriveLayout(lg, "sm") };
+    expect(viewLayouts(arranged)).toEqual(arranged);
+    expect(viewLayouts({ lg, md: [], sm: [] }).sm).toHaveLength(5);
+  });
+
+  it("picks the breakpoint from the container width", () => {
+    expect(breakpointFor(1400)).toBe("lg");
+    expect(breakpointFor(800)).toBe("md");
+    expect(breakpointFor(560)).toBe("sm");
   });
 });
 

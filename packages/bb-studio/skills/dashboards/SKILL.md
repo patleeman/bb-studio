@@ -30,7 +30,7 @@ Link to one as `[Name](/plugins/studio/studio/dashboards/<dashboard-id>)`.
 | --- | --- |
 | `stat` | a number; an array of numbers (last is the value, all form the sparkline); or `{value, delta, trend: up|down|flat, series, caption}`. Options: `label`, `unit`, `prefix`, `decimals`, `field`, `invert`. |
 | `line`, `bar`, `area`, `pie` | rows, e.g. `[{"day": "Mon", "visits": 12}]`. Options: `x`, `series`, `stacked`, `unit`. |
-| `table` | rows, or `{columns, rows}`. Options: `columns`, `maxRows`. |
+| `table` | rows, or `{columns, rows}`. Options: `columns`, `maxRows`, `wrapColumns` (long text truncates on one line unless its column is listed here). Rows past the tile's height scroll. |
 | `list` | `[{title, link, summary, date}]`, strings, or a feed `{items}` (RSS lands here). |
 | `ticker` | `[{label, value, delta}]` or strings. |
 | `note` | none: `options.markdown`. |

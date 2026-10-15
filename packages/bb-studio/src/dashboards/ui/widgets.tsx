@@ -1,6 +1,6 @@
 // The built-in widgets. Each reads its data value and options leniently:
 // shapes it doesn't know show a short note instead of failing the dashboard.
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Icon, cn } from "@bb-studio/kit/ui";
 import { openAppPath, studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
@@ -217,24 +217,57 @@ export const columnLabel = (key: string) => (/^[a-z][a-z0-9_]*$/.test(key) ? `${
 
 const cellText = (value: unknown) => (value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : typeof value === "number" ? new Intl.NumberFormat().format(value) : String(value));
 
+/**
+ * A tile body that scrolls when its content is taller or wider than the tile,
+ * with a fade at the bottom while more rows sit below the fold.
+ */
+export function ScrollBody({ kind, children }: { kind: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (el) setMore(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
+  useEffect(() => {
+    measure();
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, [measure, children]);
+  return (
+    <div className="absolute inset-0">
+      <div ref={ref} className="h-full overflow-auto overscroll-contain [scrollbar-width:thin]" data-widget-body={kind} data-scroll-body onScroll={measure}>{children}</div>
+      {more ? <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card to-transparent" data-scroll-more /> : null}
+    </div>
+  );
+}
+
 function TableWidget({ widget, value }: WidgetProps) {
   const table = tableOf(value, widget.options);
   if (!table) return <Empty icon="Rows2" title="No rows yet" />;
+  const wrap = new Set(Array.isArray(widget.options.wrapColumns) ? widget.options.wrapColumns.map((each) => str(each)) : []);
   return (
-    <div className="h-full min-h-0 overflow-auto" data-widget-body="table">
+    <ScrollBody kind="table">
       <table className="w-full border-collapse text-xs">
-        <thead className="sticky top-0 bg-card">
-          <tr>{table.columns.map((column) => <th key={column} scope="col" className="border-b border-border px-3 py-1.5 text-left font-medium text-muted-foreground">{columnLabel(column)}</th>)}</tr>
+        <thead className="sticky top-0 z-[1] bg-card">
+          <tr>{table.columns.map((column) => <th key={column} scope="col" title={columnLabel(column)} className="max-w-[16rem] truncate whitespace-nowrap border-b border-border px-3 py-1.5 text-left font-medium text-muted-foreground">{columnLabel(column)}</th>)}</tr>
         </thead>
         <tbody>
           {table.rows.map((row, index) => (
             <tr key={index} className="hover:bg-state-hover">
-              {row.map((cell, column) => <td key={column} className={cn("border-b border-border/50 px-3 py-1.5 text-foreground", typeof cell === "number" && "text-right tabular-nums")}>{cellText(cell)}</td>)}
+              {row.map((cell, column) => {
+                const text = cellText(cell);
+                const wraps = wrap.has(table.columns[column] ?? "");
+                return <td key={column} title={wraps ? undefined : text || undefined} className={cn("border-b border-border/50 px-3 py-1.5 text-foreground", wraps ? "min-w-[12rem] whitespace-normal break-words" : "max-w-[16rem] truncate whitespace-nowrap", typeof cell === "number" && "text-right tabular-nums")}>{text}</td>;
+              })}
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollBody>
   );
 }
 
@@ -268,7 +301,8 @@ function ListWidget({ widget, value }: WidgetProps) {
   if (!items.length) return <Empty icon="ListView" title="The list is empty" />;
   const max = Math.max(1, num(widget.options.maxItems) ?? 50);
   return (
-    <ul className="h-full min-h-0 divide-y divide-border/60 overflow-auto" data-widget-body="list">
+    <ScrollBody kind="list">
+    <ul className="divide-y divide-border/60">
       {items.slice(0, max).map((item, index) => (
         <li key={index} className="px-3 py-2">
           <div className="flex items-baseline gap-2">
@@ -281,6 +315,7 @@ function ListWidget({ widget, value }: WidgetProps) {
         </li>
       ))}
     </ul>
+    </ScrollBody>
   );
 }
 

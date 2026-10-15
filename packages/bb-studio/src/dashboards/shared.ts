@@ -64,6 +64,8 @@ export const BREAKPOINT_NAMES = ["lg", "md", "sm"] as const;
 export type Breakpoint = (typeof BREAKPOINT_NAMES)[number];
 /** Minimum container width (px) for each breakpoint. */
 export const BREAKPOINTS: Record<Breakpoint, number> = { lg: 1100, md: 700, sm: 0 };
+/** The breakpoint react-grid-layout picks for a container this wide. */
+export const breakpointFor = (width: number): Breakpoint => (width >= BREAKPOINTS.lg ? "lg" : width >= BREAKPOINTS.md ? "md" : "sm");
 export const COLS: Record<Breakpoint, number> = { lg: 12, md: 8, sm: 4 };
 export const ROW_HEIGHT = 36;
 export const GRID_MARGIN = 12;
@@ -117,7 +119,7 @@ export const WIDGETS: Record<WidgetType, WidgetInfo> = {
   },
   table: {
     label: "Table", icon: "Rows2", description: "Rows and columns.",
-    data: "an array of objects, or {columns: string[], rows: array[]}", options: "columns? (keys to show, in order), maxRows?",
+    data: "an array of objects, or {columns: string[], rows: array[]}", options: "columns? (keys to show, in order), maxRows?, wrapColumns? (keys whose long text wraps; others truncate on one line)",
     w: 6, h: 6, usesData: true,
   },
   list: {

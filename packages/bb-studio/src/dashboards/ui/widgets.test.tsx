@@ -60,6 +60,19 @@ describe("built-in widgets render", () => {
     expect(el.textContent).toContain("1,200");
   });
 
+  it("table: rows scroll inside the tile and long text truncates", async () => {
+    const long = "A very long description that should not wrap the row";
+    const el = await show({ ...widget("table"), options: { wrapColumns: ["notes"] } }, [{ name: long, notes: long }]);
+    const body = el.querySelector("[data-widget-body=table]")!;
+    expect(body.hasAttribute("data-scroll-body")).toBe(true);
+    expect(body.className).toContain("overflow-auto");
+    expect(el.querySelector("thead")!.className).toContain("sticky");
+    const [name, notes] = [...el.querySelectorAll("td")];
+    expect(name!.className).toContain("truncate");
+    expect(name!.getAttribute("title")).toBe(long);
+    expect(notes!.className).toContain("whitespace-normal");
+  });
+
   it("list: feed items with safe links", async () => {
     const el = await show(widget("list"), { items: [{ title: "One", link: "https://a.example/1", date: "2026-10-01T00:00:00Z" }, { title: "Two", link: "javascript:alert(1)" }] });
     const links = [...el.querySelectorAll("a")];

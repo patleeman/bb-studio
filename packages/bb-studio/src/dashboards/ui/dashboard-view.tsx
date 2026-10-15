@@ -6,8 +6,9 @@ import { ResponsiveGridLayout, useContainerWidth, type Layout, type ResponsiveLa
 import { toast } from "sonner";
 import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, ICON_BUTTON, Icon, ItemHeader, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { ago, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetType, type WidgetTypeView, type WidgetView } from "../shared";
+import { ago, breakpointFor, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetType, type WidgetTypeView, type WidgetView } from "../shared";
 import type { WidgetTheme } from "./custom-frame";
+import { viewLayouts } from "../ops";
 import { sampleOp } from "./samples";
 import { ApprovalDialog } from "./approval-dialog";
 import { ApprovalCard, SettingsSheet } from "./settings-sheet";
@@ -99,15 +100,16 @@ export function DashboardBoard({ dashboard, state, leading }: {
   const now = useMinuteClock();
   const theme = useWidgetTheme();
   const { width, containerRef, mounted } = useContainerWidth({ initialWidth: 1200 });
-  const [layouts, setLayouts] = useState<Layouts>(dashboard.layouts);
-  const latest = useRef<Layouts>(dashboard.layouts);
+  const shown = useMemo(() => viewLayouts(dashboard.layouts), [dashboard.layouts]);
+  const [layouts, setLayouts] = useState<Layouts>(shown);
+  const latest = useRef<Layouts>(shown);
   const dragging = useRef(false);
   // The server's layout wins unless the user is mid-drag.
   useEffect(() => {
     if (dragging.current) return;
-    latest.current = dashboard.layouts;
-    setLayouts(dashboard.layouts);
-  }, [dashboard.layouts]);
+    latest.current = shown;
+    setLayouts(shown);
+  }, [shown]);
   useEffect(() => {
     if (!picking && !settingsFor) return;
     void state.rpc.call("dashboards.widgetTypes", null).then(({ types }) => setLibrary(types as WidgetTypeView[])).catch(() => {});
@@ -233,7 +235,7 @@ const pick = (item: { i: string; x: number; y: number; w: number; h: number }) =
 
 /** A tile's body size in pixels, for charts and custom widgets. */
 function sizeOf(layouts: Layouts, id: string, width: number): { width: number; height: number } {
-  const breakpoint = width >= BREAKPOINTS.lg ? "lg" : width >= BREAKPOINTS.md ? "md" : "sm";
+  const breakpoint = breakpointFor(width);
   const item = layouts[breakpoint].find((each) => each.i === id);
   const cols = COLS[breakpoint];
   const colWidth = (width - GRID_MARGIN * (cols + 1)) / cols;

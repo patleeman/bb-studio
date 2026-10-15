@@ -91,12 +91,64 @@ function compactAround(layout: LayoutItem[], pinned: string): LayoutItem[] {
   return placed;
 }
 
-/** A size on the 12-column grid, scaled to another breakpoint's columns. */
+/**
+ * A size on the 12-column grid, at another breakpoint: on md a tile is at
+ * least half the width (rounded up), on sm every tile is full width.
+ */
 export function scaleWidth(w: number, breakpoint: Breakpoint): number {
   const cols = COLS[breakpoint];
   if (breakpoint === "lg") return Math.min(cols, w);
-  const scaled = Math.round((w * cols) / COLS.lg);
-  return Math.min(cols, Math.max(breakpoint === "sm" ? 2 : 1, scaled));
+  if (breakpoint === "sm") return cols;
+  return Math.min(cols, Math.max(Math.ceil(cols / 2), Math.ceil((w * cols) / COLS.lg)));
+}
+
+/** The width older versions derived md and sm tiles with (a straight scale). */
+const legacyWidth = (w: number, breakpoint: Breakpoint) => Math.min(COLS[breakpoint], Math.max(breakpoint === "sm" ? 2 : 1, Math.round((w * COLS[breakpoint]) / COLS.lg)));
+
+/** An md or sm layout derived from lg: tiles in lg reading order, widened, packed top to bottom. */
+export function deriveLayout(lg: readonly LayoutItem[], breakpoint: Breakpoint): LayoutItem[] {
+  if (breakpoint === "lg") return lg.map((item) => ({ ...item }));
+  const cols = COLS[breakpoint];
+  const placed: LayoutItem[] = [];
+  for (const item of [...lg].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const w = scaleWidth(item.w, breakpoint);
+    // Never above the tile before it, so reading order holds.
+    const last = placed.at(-1);
+    const fit = firstFit(placed, w, item.h, cols);
+    const pos = last && (fit.y < last.y || (fit.y === last.y && fit.x < last.x)) ? firstFitFrom(placed, w, item.h, cols, last) : fit;
+    placed.push({ i: item.i, ...pos, w, h: item.h });
+  }
+  return placed;
+}
+
+function firstFitFrom(layout: readonly LayoutItem[], w: number, h: number, cols: number, after: LayoutItem): { x: number; y: number } {
+  const bottom = layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
+  for (let y = after.y; y <= bottom; y++) {
+    for (let x = y === after.y ? after.x + after.w : 0; x + w <= cols; x++) {
+      const probe = { i: "\u0000", x, y, w, h };
+      if (!layout.some((item) => collides(probe, item))) return { x, y };
+    }
+  }
+  return { x: 0, y: bottom };
+}
+
+/**
+ * The layouts to show. md and sm layouts that older versions derived from lg
+ * by straight scaling (narrow, squeezed tiles) are derived again; a layout
+ * the user arranged stays as it is.
+ */
+export function viewLayouts(layouts: Layouts): Layouts {
+  const lg = new Map(layouts.lg.map((item) => [item.i, item]));
+  const next = { ...layouts };
+  for (const breakpoint of ["md", "sm"] as const) {
+    const items = layouts[breakpoint];
+    const legacy = items.length > 0 && items.every((item) => {
+      const source = lg.get(item.i);
+      return source !== undefined && item.w === legacyWidth(source.w, breakpoint);
+    }) && items.some((item) => item.w !== scaleWidth(lg.get(item.i)!.w, breakpoint));
+    if (legacy || (!items.length && layouts.lg.length)) next[breakpoint] = deriveLayout(layouts.lg, breakpoint);
+  }
+  return next;
 }
 
 /** Widgets in grid order: the lg layout, top to bottom, left to right. */
@@ -118,6 +170,10 @@ export function repairLayouts(doc: DashboardDoc): Layouts {
     const cols = COLS[breakpoint];
     const seen = new Set<string>();
     const kept: LayoutItem[] = [];
+    if (breakpoint !== "lg" && !(doc.layouts[breakpoint] ?? []).length && next.lg.length) {
+      next[breakpoint] = deriveLayout(next.lg, breakpoint);
+      continue;
+    }
     for (const item of doc.layouts[breakpoint] ?? []) {
       if (!ids.has(item.i) || seen.has(item.i)) continue;
       seen.add(item.i);
