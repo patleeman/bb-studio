@@ -49,6 +49,13 @@ test("Jev receives the running task and the new message as data", async () => {
   assert.equal(state.message, "Actually, use SQLite instead.");
 });
 
+test("a Jev steer at the default threshold steers; below it, it waits", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(jevAnswer("steer", 0.5)));
+  assert.equal((await askJev({ zenApiKey: "k" }, situation, signal(), env)).action, "steer");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(jevAnswer("steer", 0.49)));
+  assert.equal((await askJev({ zenApiKey: "k" }, situation, signal(), env)).action, "followup");
+});
+
 test("an uncertain Jev steer becomes a follow-up", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(jevAnswer("steer", 0.5)));
   const verdict = await askJev({ zenApiKey: "k", steerConfidence: 0.7 }, situation, signal(), env);

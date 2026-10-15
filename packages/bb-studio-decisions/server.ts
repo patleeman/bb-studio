@@ -127,7 +127,7 @@ export default async function plugin(bb: BbPluginApi) {
     steerConfidence: {
       type: "number",
       label: "Smart Queue: minimum confidence to steer",
-      default: 0.7,
+      default: 0.5,
       experimental_schema: z.number().min(0).max(1),
       description: "A value from 0 to 1. An uncertain steer becomes a follow-up. Other plugins apply their own thresholds.",
     },

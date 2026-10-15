@@ -27,7 +27,9 @@ model setup still serves other plugins.
 1. **Jev** answers first. Smart Queue sends Jev the thread title, your last
    three requests, the last 2,000 characters of assistant output, and the new
    message. Jev returns `steer` or `followup` with a confidence. A steer below
-   the confidence threshold (default 0.7) becomes a follow-up.
+   the confidence threshold (default 0.5) becomes a follow-up. Jev steers
+   anything about the current task, feedback included, and queues only a
+   clearly separate next task or a bare acknowledgment.
 2. **The fallback model** answers when no Jev provider does. It asks the same
    question in a hidden, temporary thread in BB's Personal project, on the
    thread's machine, and deletes the thread afterwards. By default it uses the
@@ -126,7 +128,7 @@ Open **Settings → Plugins → Studio Decisions**, or use `bb plugin config sma
 | `typesafeModel` | `jev-latest` | Dropdown: `jev-latest`, `jev-preview`, or `jev-1.13.0` to pin that version. |
 | `customJevEndpoint`, `customJevApiKey`, `customJevApiKeyCommand`, `customJevHeaders`, `customJevModel` | — | Your own System One endpoint. See [Jev providers](#jev-providers). |
 | `jevTimeoutMs` | `5000` | Deadline for each provider attempt, 250 to 15000 ms, for every caller. |
-| `steerConfidence` | `0.7` | Smart Queue's minimum Jev confidence to steer. |
+| `steerConfidence` | `0.5` | Smart Queue's minimum Jev confidence to steer. |
 | `batchConfidence` | `0.5` | Smart Queue's minimum Jev confidence to send a follow-up in the same turn as the next one. `1` sends each on its own. |
 
 Below the form, two sections complete the page:
