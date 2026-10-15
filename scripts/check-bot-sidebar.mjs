@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
- * End-to-end check of Studio's sticky sidebar (packages/bb-studio/src/ui/bot/threadListSwitch.ts)
- * on a staged BB. It clicks through every kind of Bots list entry (the Bot's
- * chat, each runner, the Recent rows, a worker thread, an archived runner's
- * thread), reloads after each, and asserts the sidebar never leaves the Bots
- * list. The Bot rail item lands on the window's last Bot thread (the Bot's
- * chat in a fresh window; a runner opened from the Bots list after Home),
- * with the Bots list. Then Home on the rail must bring BB's list back, and a
- * thread opened from BB's list must keep it.
+ * End-to-end check of Studio's sidebar list (packages/bb-studio/src/ui/bot/threadListSwitch.ts)
+ * on a staged BB. The list is always the Bots list (`studio/bot`: Threads, then
+ * Bots) except on the Studio panel (/plugins/studio/studio and below, but not
+ * the Bot page /plugins/studio/studio/bot…), where it is `studio/studio-items`.
+ * It checks the rail has no Bot item, clicks through every kind of Bots list
+ * entry (the Bot's chat, each runner, the Recent rows, a worker thread, an
+ * archived runner's thread), reloading after each, and asserts the sidebar
+ * never leaves the Bots list. Home on the rail and a thread opened from the
+ * Threads section keep it; the Studio panel switches to the Studio items list,
+ * and leaving it (to a thread or the Bot page) switches back.
  *
  *   node scripts/staged-bb.mjs start
  *   . "$TMPDIR/bb-studio-staged/capture.env"
@@ -17,12 +19,13 @@
 import { rm } from "node:fs/promises";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
 import { projectId, pluginRpc, bbCli, sleep } from "./capture/bb.mjs";
-import { BOT_PATH, LIST_PREF, ORBIT_TITLES, SIDEBAR, botFixtures, clickHome, dismissProblems, openFromBbList } from "./capture/captures/bb-studio-bot.mjs";
+import { BOT_PATH, LIST_PREF, ORBIT_TITLES, SIDEBAR, THREADS, botFixtures, clickHome, dismissProblems, openFromBbList } from "./capture/captures/bb-studio-bot.mjs";
 
 if (!projectId) throw new Error("Set BB_CAPTURE_PROJECT_ID (source the staged BB's capture.env).");
 const fixtures = botFixtures({ projectId, pluginRpc, bbCli, sleep });
 const BOTS = "studio/bot";
-const NATIVE = "thread-list/thread-list";
+const STUDIO = "studio/studio-items";
+const STUDIO_PATH = "/plugins/studio/studio";
 const results = [];
 
 const pref = async () => JSON.parse(await bbCli(["settings", "ui", "get", LIST_PREF]));
@@ -44,13 +47,13 @@ const watch = (client, want) => client.evaluate(`(() => {
   return true;
 })()`);
 
-/** Waits for `want` ("bots" or "native") in the DOM and the preference, then holds it for `holdMs` without a flip. */
+/** Waits for `want` ("bots" or "studio") in the DOM and the preference, then holds it for `holdMs` without a flip. */
 async function expectList(client, want, label, holdMs = 3000) {
   const started = Date.now();
   for (;;) {
     const bots = await client.poll(`!!document.querySelector('${SIDEBAR}')`);
     const value = await pref();
-    const ok = want === "bots" ? bots === true && value === BOTS : bots === false && value === NATIVE && await client.poll(`!!document.querySelector('[data-sidebar="sidebar"]')`);
+    const ok = want === "bots" ? bots === true && value === BOTS : bots === false && value === STUDIO;
     if (ok) break;
     if (Date.now() - started > 30000) throw new Error(`${label}: wanted ${want}, the sidebar has ${bots ? "the Bots list" : "no Bots list"} and ${LIST_PREF} is ${value} (${await path(client)})`);
     await sleep(250);
@@ -59,7 +62,7 @@ async function expectList(client, want, label, holdMs = 3000) {
   const end = Date.now() + holdMs;
   while (Date.now() < end) {
     const value = await pref();
-    if (value !== (want === "bots" ? BOTS : NATIVE)) throw new Error(`${label}: ${LIST_PREF} flipped to ${value}`);
+    if (value !== (want === "bots" ? BOTS : STUDIO)) throw new Error(`${label}: ${LIST_PREF} flipped to ${value}`);
     await sleep(400);
   }
   const flips = await client.evaluate("window.__sidebarFlips");
@@ -74,7 +77,7 @@ async function step(client, want, label) {
   await sleep(1500);
   if ((await path(client)) !== at) throw new Error(`${label}: the reload moved from ${at} to ${await path(client)}`);
   await expectList(client, want, `${label} (after reload)`);
-  results.push(`${want === "bots" ? "Bots" : "BB's"} list kept: ${label} ${at}, reloaded`);
+  results.push(`${want === "bots" ? "Bots" : "Studio items"} list kept: ${label} ${at}, reloaded`);
   process.stdout.write(`  ok  ${label}  ${at}\n`);
 }
 
@@ -112,8 +115,13 @@ async function clickRow(client, selector, label, threadId) {
   }
 }
 
-/** Clicks the Bot item on BB's rail; false when this BB has none. */
-const clickRailBot = (client) => client.evaluate(`(() => { const button = document.querySelector('nav[aria-label="Primary navigation"] [aria-label="Bot"]'); if (button) { button.click(); return true; } return false; })()`);
+/** Throws if BB's rail has a Bot item. */
+const assertNoRailBot = (client) => client.evaluate(`(() => {
+  const rail = document.querySelector('nav[aria-label="Primary navigation"]');
+  if (!rail) throw new Error("No rail");
+  if ([...rail.querySelectorAll("button, a")].some((each) => (each.getAttribute("aria-label") ?? each.textContent.trim()) === "Bot")) throw new Error("The rail still has a Bot item");
+  return true;
+})()`);
 
 /** Waits for `threadId`'s page. */
 async function waitForThread(client, threadId, label) {
@@ -141,17 +149,19 @@ try {
   await bbCli(["thread", "archive", inbox.threadId]);
   archived = inbox.threadId;
 
-  // A fresh window: start on Home, then the Bot page from the rail (its URL if this BB has no Bot rail item).
+  // A fresh window: Home has the Bots list, the rail no Bot item.
   await client.navigate("/");
   await client.evaluate(`(() => { sessionStorage.clear(); return true; })()`);
   await client.navigate("/");
   await dismissProblems(client);
-  const railBot = await clickRailBot(client);
-  if (!railBot) await client.navigate(BOT_PATH);
-  // A fresh window has no last Bot thread: the Bot page lands on the Bot's chat.
-  await waitForThread(client, bot.threadId, "The Bot rail item in a fresh window");
+  await assertNoRailBot(client);
+  results.push("The rail has no Bot item");
+  await step(client, "bots", "Home in a fresh window");
+  // The Bot page lands on the Bot's chat with the Bots list.
+  await client.navigate(BOT_PATH);
+  await waitForThread(client, bot.threadId, "The Bot page in a fresh window");
   await client.waitForSelector(SIDEBAR, 30000);
-  await step(client, "bots", railBot ? "Bot rail item (the Bot's chat)" : "Bot page (the Bot's chat)");
+  await step(client, "bots", "Bot page (the Bot's chat)");
 
   await clickRow(client, `${SIDEBAR} [data-testid=bot-main]`, "the Bot's chat", bot.threadId);
   await step(client, "bots", "Bot chat");
@@ -163,24 +173,14 @@ try {
     await step(client, "bots", `runner ${runner.name}${runner.threadId === archived ? " (archived thread)" : ""}`);
   }
 
-  // The Bot rail item lands on the last Bot thread: a runner opened from the Bots list, then Home.
+  // Home on the rail from a runner keeps the Bots list.
   const live = runners.find((runner) => runner.threadId && runner.threadId !== archived);
   if (!live) throw new Error("No runner with a live thread");
   await openGroup(client, "Runners");
   await clickRow(client, `${SIDEBAR} section[aria-label="Runners"] button[data-runner="${live.id}"]`, `runner ${live.name}`, live.threadId);
   await expectList(client, "bots", `runner ${live.name}`, 500);
   await clickHome(client);
-  await expectList(client, "native", "Home on the runner", 500);
-  if (!(await clickRailBot(client))) throw new Error("This BB has no Bot rail item");
-  await waitForThread(client, live.threadId, "The Bot rail item after Home");
-  await step(client, "bots", `Bot rail item: back on runner ${live.name}`);
-  // Back doesn't return to the Bot page (which would land on the thread again).
-  await client.evaluate("history.back(), true");
-  await sleep(1500);
-  if ((await path(client)).replace(/\/+$/, "") === BOT_PATH) throw new Error("Back from the landed thread returned to the bare Bot page");
-  results.push(`Back from the landed thread went to ${await path(client)}, not the Bot page`);
-  await client.evaluate("history.forward(), true");
-  await waitForThread(client, live.threadId, "Forward to the runner");
+  await step(client, "bots", `Home on runner ${live.name}`);
 
   await openGroup(client, "Recent");
   const recent = await client.evaluate(`[...document.querySelectorAll('${SIDEBAR} section[aria-label="Recent"] button[data-thread]')].slice(0, 3).map((row) => ({ id: row.dataset.thread, title: row.title }))`);
@@ -196,12 +196,25 @@ try {
   await clickRow(client, `${SIDEBAR} button[data-thread="${worker.id}"]`, "worker thread", worker.id);
   await step(client, "bots", `worker: ${worker.title}`);
 
-  // Home on the rail: a different destination, BB's list.
+  // Home keeps the Bots list; a thread opened from the Threads section too.
   await clickHome(client);
-  await step(client, "native", "Home");
-  // A thread opened from BB's list keeps BB's list.
+  await step(client, "bots", "Home");
+  await client.waitForSelector(THREADS, 30000);
   await openFromBbList(client, ORBIT_TITLES[0]);
-  await step(client, "native", `BB's list: ${ORBIT_TITLES[0]}`);
+  await step(client, "bots", `Threads section: ${ORBIT_TITLES[0]}`);
+
+  // The Studio panel has the Studio items list; leaving it to a thread brings the Bots list back.
+  await client.navigate(STUDIO_PATH);
+  await step(client, "studio", "Studio panel");
+  await client.navigate(`/threads/${worker.id}`);
+  await waitForThread(client, worker.id, "Leaving the Studio panel for a thread");
+  await step(client, "bots", "thread after the Studio panel");
+  // ...and leaving it for the Bot page too.
+  await client.navigate(STUDIO_PATH);
+  await step(client, "studio", "Studio panel again");
+  await client.navigate(BOT_PATH);
+  await client.waitForSelector(SIDEBAR, 30000);
+  await step(client, "bots", "Bot page after the Studio panel");
 
   process.stdout.write(`\nPASS: ${results.length} steps\n${results.map((line) => `  ${line}`).join("\n")}\n`);
 } finally {
