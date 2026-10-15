@@ -41,7 +41,7 @@ import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
 import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadPanel } from "./src/ui/bot/SideThreads";
 import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
-import { mountReplyInThreadVisibility, openSideThread, REPLY_IN_THREAD_TITLE } from "./src/ui/bot/reply-in-thread";
+import { mountSideThreadRows, openSideThread, REPLY_IN_THREAD_TITLE } from "./src/ui/bot/reply-in-thread";
 import { BotThreadList, ThreadListSwitcher } from "./src/ui/bot/BotSidebar";
 import { StudioThreadList } from "./src/ui/StudioSidebar";
 import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
@@ -154,8 +154,9 @@ export default definePluginApp((app) => {
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Beside a Bot's thread, the "Bot info" panel action shows the Bot page's Info.
   app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
-  // Side threads on a Bot's replies (src/bot-side-threads.ts): the row under
-  // each reply, and the side thread in a tab beside the chat.
+  // Side threads on a Bot's replies (src/bot-side-threads.ts): the side thread
+  // in a tab beside the chat. Replies the Bot wrote before Studio drew the rows
+  // itself may end with the directive, which now draws nothing.
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "Reply in thread" in a Bot reply's action bar, hidden on other threads and your own messages.
@@ -173,7 +174,8 @@ export default definePluginApp((app) => {
       }
     },
   });
-  app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountReplyInThreadVisibility(signal) });
+  // The action only on a Bot chat's replies, and "2 replies · 5m" under each reply with a side thread.
+  app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountSideThreadRows(signal) });
   // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
   // and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });

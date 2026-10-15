@@ -3,12 +3,13 @@
 // everything the chat knew up to there and nothing after. A reply has at most
 // one side thread; replying again opens the same one.
 //
-// Where it shows: the Bot ends each reply with `::bot-thread{}` (its
-// instructions, BOT_THREAD_INSTRUCTIONS). On the web that directive renders
-// "Reply in thread" under the reply, then "🧵 2 replies · 5m" once a side thread
-// has replies; either opens the side thread in a tab beside the chat. BB has no
-// per-message slot a plugin can draw into, and the directive is one, on stable
-// BB. iOS draws the same row under any Bot reply with a side thread.
+// Where it shows: Studio draws it, without the Bot's help. On the web, each
+// Bot reply's action bar has "Reply in thread", and a reply with a side
+// thread gets "2 replies · 5m" under it, both from a content script that
+// finds replies by BB's data-timeline-row-id (src/ui/bot/reply-in-thread.ts);
+// either opens the side thread in a tab beside the chat. iOS draws its own.
+// Bots were once told to end replies with `::bot-thread{}` for the web row;
+// older replies still carry it, and its directive now draws nothing.
 //
 // The fork is hidden (it lives under its reply, not in BB's thread list) and
 // isn't Bot-owned work (src/bot-owned.ts): it's the user's conversation with
@@ -21,20 +22,16 @@
 // from its timeline when it goes idle: BB also reports an idle while a fork
 // is set up, and the fork's own timeline holds only its new messages.
 //
-// The fork keeps its source's session instructions, marker included, and
-// Studio's later instructions don't reach it. So the fork is made with an
-// agent-only seed (SIDE_THREAD_INSTRUCTIONS) telling it what it is and to
-// leave the marker out; the seed starts no turn. Should a reply still carry
-// `::bot-thread{}`, bot_side_threads says the thread isn't a Bot's chat and
-// the directive draws nothing.
+// The fork keeps its source's session instructions, and Studio's later
+// instructions don't reach it. So the fork is made with an agent-only seed
+// (SIDE_THREAD_INSTRUCTIONS) telling it what it is; the seed starts no turn.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
 type Sdk = BbPluginApi["sdk"];
 
 export const BOT_THREAD_DIRECTIVE = "bot-thread";
-export const BOT_THREAD_INSTRUCTIONS = `End every reply except [PASS] with the line \`::${BOT_THREAD_DIRECTIVE}{}\` on its own, before the ::next line when you write one. It lets the user answer that reply in a side thread. Don't mention it.`;
-export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here. Here you can read about yourself but not change yourself: your name, look and profile, your skills, your Memory page, your runners and schedules, or pausing and stopping stay with your main chat. When the user asks for one of those, say it's done from your main chat, and don't attempt it another way. Your earlier replies end with ::bot-thread{}; that's for your main chat only, so don't write it here.";
+export const SIDE_THREAD_INSTRUCTIONS = "This is a side thread: the user forked your chat at one of your replies to talk about it. Stay on that reply's topic. Your main chat doesn't see this thread, so it won't know what you decide here. Here you can read about yourself but not change yourself: your name, look and profile, your skills, your Memory page, your runners and schedules, or pausing and stopping stay with your main chat. When the user asks for one of those, say it's done from your main chat, and don't attempt it another way. Some of your earlier replies end with ::bot-thread{}; don't write it.";
 
 export const SIDE_THREADS_TABLE = `CREATE TABLE bot_side_threads (
        thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, source_thread_id TEXT NOT NULL, message_id TEXT NOT NULL,

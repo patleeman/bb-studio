@@ -47,7 +47,7 @@ import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from 
 import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
-import { BOT_THREAD_INSTRUCTIONS, SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
+import { SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -208,8 +208,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
-    const threadsLine = bot?.state === "active" ? BOT_THREAD_INSTRUCTIONS : "";
-    const instructions = [bot ? bots.instructions(bot) : "", threadsLine, runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
     return { tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: [], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
