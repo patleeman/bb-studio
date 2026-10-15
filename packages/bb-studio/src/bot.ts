@@ -1096,8 +1096,9 @@ export class Bots {
       this.startedThreads(threadId),
       this.deps.sdk.threads.list({ archived: false, includeHidden: true, limit: 200 }).catch(() => [] as ListedThread[]),
     ]);
-    const visible = recent.filter((thread) => !hiddenFork(thread));
     const owned = botId ? this.deps.ownedThreads?.(botId) ?? new Set<string>() : new Set<string>();
+    // A fork the user handed the Bot is hidden now too, but it's the Bot's.
+    const visible = recent.filter((thread) => owned.has(thread.id) || !hiddenFork(thread));
     const startedIds = new Set(started.map((thread) => thread.id));
     const runs = visible.filter((thread) => owned.has(thread.id) && !startedIds.has(thread.id) && thread.id !== threadId);
     return [...started, ...runs, ...descendants(visible, new Set([...started, ...runs].map((thread) => thread.id).filter((id) => id !== threadId)))];

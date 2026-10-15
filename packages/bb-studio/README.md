@@ -1238,7 +1238,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   creation and can group under project headings (kept on this device).
   Sub-threads, hidden threads and the Bots list's own threads stay out. Each
   row has BB's thread menu (right-click or ⋯) and Archive on hover;
-  ⌘-click or middle-click opens a row in a split.
+  ⌘-click or middle-click opens a row in a split. Drag a row onto a bot
+  under **Bots** to hand the thread to it: the thread moves under that bot
+  with the threads it spawns later (`bot_thread_adopt`). A thread in one
+  bot's list drags onto another bot the same way; a bot's own chat and its
+  runners stay put.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the

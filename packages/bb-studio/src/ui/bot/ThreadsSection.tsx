@@ -7,6 +7,7 @@
 // Sub-threads and hidden threads stay out, and so does every thread the Bots
 // section shows (bot_listed_threads). Each row has BB's own thread menu
 // (right-click or the hover ⋯) and Archive on hover, with rename in place.
+// A row drags onto a Bot in the Bots section to hand the thread to it.
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
@@ -23,6 +24,8 @@ import { useMemo, useState } from "react";
 import { useLive } from "../live";
 
 type Thread = PluginSidebarThread;
+/** The drag type of a thread row: its id, dropped on a Bot to hand it over (BotSidebar.tsx). */
+export const THREAD_DRAG = "application/x-studio-thread";
 export type ThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
 
 const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
@@ -222,6 +225,8 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
         href={thread.href}
         data-sidebar-thread-id={thread.id}
         aria-current={active ? "page" : undefined}
+        draggable={!renaming}
+        onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "copyMove"; }}
         onClick={(event) => { event.preventDefault(); if (!renaming) open(thread.id, event.metaKey || event.ctrlKey); }}
         onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); open(thread.id, true); } }}
         className={cn("group/thread-row flex min-w-0 flex-col rounded-md py-1 pr-1 pl-2 text-sm", active ? "bg-state-active" : "hover:bg-state-hover")}

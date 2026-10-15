@@ -556,3 +556,28 @@ test("a Bot's Info by id (its ⓘ, Bot info) isn't redirected", async () => {
   expect(state.toThread).not.toHaveBeenCalled();
   expect(container.querySelector("[data-testid=bot-info-status]")).not.toBeNull();
 });
+
+test("a thread dragged from Threads onto a bot's row moves under that bot", async () => {
+  state.pathname = "/plugins/pages/pages";
+  state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: dot, run: null }, bot_activity: empty, bot_listed_threads: { threadIds: [] } };
+  state.sidebarThreads = { status: "ready", sections: [], archivedPage: null, projects: [{ id: "proj_a", name: "Orbit" }], threads: [{
+    id: "thr_mine", projectId: "proj_a", parentThreadId: null, isHidden: false, isArchived: false, isPinned: false, pinSortKey: null, isUnread: false,
+    hasPendingInteraction: false, indicator: "none", status: "idle", runtimeStatus: "idle", updatedAt: Date.now(), latestAttentionAt: 0, href: "/projects/proj_a/threads/thr_mine",
+  }] };
+  await show(<BotThreadList {...listProps} />);
+  // jsdom has no DataTransfer: a stand-in carries the row's data from dragstart to drop.
+  const data = new Map<string, string>();
+  const dataTransfer = { setData: (type: string, value: string) => data.set(type, value), getData: (type: string) => data.get(type) ?? "", get types() { return [...data.keys()]; }, effectAllowed: "", dropEffect: "" };
+  const drag = (el: Element, type: string) => { const event = Object.assign(new Event(type, { bubbles: true, cancelable: true }), { dataTransfer }); el.dispatchEvent(event); return event; };
+  const row = container.querySelector('[data-sidebar-thread-id="thr_mine"]')!;
+  expect(row.getAttribute("draggable")).toBe("true");
+  act(() => { drag(row, "dragstart"); });
+  const target = container.querySelector('[data-testid=bot-row][data-bot="bot_scout"]')!.parentElement!;
+  let over!: Event;
+  act(() => { over = drag(target, "dragover"); });
+  expect(over.defaultPrevented).toBe(true);
+  expect(target.hasAttribute("data-drop-over")).toBe(true);
+  await act(async () => { drag(target, "drop"); });
+  expect(state.call).toHaveBeenCalledWith("bot_thread_adopt", { botId: "bot_scout", threadId: "thr_mine" });
+  expect(target.hasAttribute("data-drop-over")).toBe(false);
+});

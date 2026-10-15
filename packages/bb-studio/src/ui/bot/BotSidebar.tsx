@@ -9,17 +9,20 @@
 // own list; so does a Bot's row, which opens its chat, with the Bot info
 // panel action open beside it. Each Bot's ⓘ opens its Info: beside the chat
 // on its thread (the Bot info panel action), else its Bot page.
+// A thread dragged onto a Bot's row (from Threads, or another Bot's list)
+// moves under that Bot (bot_thread_adopt).
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
+import { toast } from "sonner";
 import type { BotActivityView, BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
-import { useLive } from "../live";
+import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
-import { ArchiveButton, RenameInput, ThreadsSection } from "./ThreadsSection";
+import { ArchiveButton, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
@@ -176,11 +179,38 @@ function InfoButton({ bot, onThread, onNavigate, always = false }: { bot: BotSum
   );
 }
 
+/** A Bot's row as a drop target: a thread dropped on it moves under the Bot. */
+function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(event: DragEvent): void; onDragLeave(event: DragEvent): void; onDrop(event: DragEvent): void } } {
+  const call = useCall();
+  const [over, setOver] = useState(false);
+  const dragged = (event: DragEvent) => event.dataTransfer.types.includes(THREAD_DRAG);
+  return {
+    over,
+    props: {
+      onDragOver: (event) => { if (!dragged(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setOver(true); },
+      onDragLeave: (event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false); },
+      onDrop: (event) => {
+        setOver(false);
+        const threadId = event.dataTransfer.getData(THREAD_DRAG);
+        if (!threadId) return;
+        event.preventDefault();
+        call("bot_thread_adopt", { botId: bot.id, threadId }).then(
+          () => toast.success(`Moved to ${bot.name}`),
+          (error: unknown) => toast.error(`Couldn't move it to ${bot.name}: ${error instanceof Error ? error.message : String(error)}`),
+        );
+      },
+    },
+  };
+}
+const DROP_RING = "ring-2 ring-inset ring-[var(--bot-accent,var(--ring))]";
+
 /** A Bot that isn't selected: one row that opens its chat, and its ⓘ. */
 function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
   const openBot = useOpenBot(onNavigate);
+  const drop = useThreadDrop(bot);
   return (
-    <div className="group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover">
+    <div {...drop.props} data-drop-over={drop.over || undefined} style={{ "--bot-accent": bot.color ?? colorForName(bot.name) } as CSSProperties}
+      className={`group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover ${drop.over ? DROP_RING : ""}`}>
       <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name} onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left">
         <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={22} provider={botProvider(bot)} />
@@ -218,12 +248,13 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
+  const drop = useThreadDrop(bot);
 
   return (
     <div className="flex flex-col" style={accent}>
       {/* The bot: its row opens its chat as a BB thread; ⓘ opens its Info. */}
       {/* Tinted in the Bot's color only while its chat (or an earlier conversation of it) is the open thread. */}
-      <div className="group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover" style={chatOpen ? { background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" } : undefined}>
+      <div {...drop.props} data-drop-over={drop.over || undefined} className={`group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover ${drop.over ? DROP_RING : ""}`} style={chatOpen ? { background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" } : undefined}>
       <button type="button" aria-current={chatOpen ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${status}`}
         onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
@@ -313,6 +344,7 @@ function Row({ thread, active, onOpen }: { thread: BotThreadView; depth: number;
   const tone = toneOf(thread);
   return (
     <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
+      draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
       <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`} role="img" aria-label={TONE_LABEL[tone]} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{thread.title}</span>

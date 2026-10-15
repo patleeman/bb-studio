@@ -33,7 +33,7 @@ async function setup() {
   const skip = new Set<string>();
   const owned = new BotOwnedThreads({ db, sdk: bb.sdk, bots: () => bots, skip: () => skip, sweepDelayMs: 0 });
   dispose.push(async () => owned.dispose());
-  return { owned, threads, add, update, automations, runs, skip, db, callRpc };
+  return { owned, threads, add, update, automations, runs, skip, db, callRpc, bots };
 }
 
 /** Patrick's data: the Bot's child made an automation; each run is a top-level thread. */
@@ -168,4 +168,32 @@ it("tells which Bot a thread belongs to: its chain, what it owns, what Studio hi
   x.db.prepare("INSERT INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES ('thr_runner', 'bot_main', 'runner', 1)").run();
   expect(x.owned.ownerOf("thr_runner")).toBe("bot_main");
   for (const id of ["thr_user", "thr_fork", "thr_user_run", "thr_nope"]) expect(x.owned.ownerOf(id)).toBeNull();
+});
+
+it("adopts a thread the user hands a Bot: hidden, owned with what it spawns, and moved from another Bot", async () => {
+  const x = await setup();
+  seedChief(x);
+  x.bots.push({ id: "bot_scout", chain: ["thr_scout"] });
+  x.add({ id: "thr_scout", title: "Scout" });
+  await x.owned.sweep();
+  await x.owned.adopt("thr_user", "bot_scout");
+  expect(x.threads.get("thr_user")?.visibility).toBe("hidden");
+  expect(x.owned.ownerOf("thr_user")).toBe("bot_scout");
+  expect(x.owned.owned("bot_scout").has("thr_user")).toBe(true);
+  // What it spawns later is the Bot's too, at once and on a sweep.
+  x.add({ id: "thr_user_child", parentThreadId: "thr_user" });
+  await x.owned.created(x.threads.get("thr_user_child")!);
+  expect(x.owned.ownerOf("thr_user_child")).toBe("bot_scout");
+  await x.owned.sweep();
+  expect(x.owned.ownerOf("thr_user")).toBe("bot_scout");
+  // A thread another Bot spawned moves, and leaves that Bot.
+  await x.owned.adopt("thr_g3hgcvzv2n", "bot_scout");
+  expect(x.owned.ownerOf("thr_g3hgcvzv2n")).toBe("bot_scout");
+  expect(x.owned.owned("bot_main").has("thr_g3hgcvzv2n")).toBe(false);
+  await x.owned.sweep();
+  expect(x.owned.ownerOf("thr_g3hgcvzv2n")).toBe("bot_scout");
+  // A Bot's chat and a runner stay put.
+  await expect(x.owned.adopt("thr_k3mtxc4nju", "bot_scout")).rejects.toThrow(/another bot's chat/);
+  x.skip.add("thr_run_untitled");
+  await expect(x.owned.adopt("thr_run_untitled", "bot_scout")).rejects.toThrow(/runner/);
 });
