@@ -81,6 +81,20 @@ BB application in a staged environment before handoff.
   on its own data directory and ports, installs every plugin from GitHub at a
   pushed commit, seeds a demo project, and writes a `capture.env` to source
   before capturing. `node scripts/staged-bb.mjs stop` removes it.
+- Keep test agent runs out of Patrick's real session history. Agents that run
+  in a staged BB save transcripts to the provider's home folder, and those
+  folders are archived and searched as his own conversations. Staged runs once
+  added over 1,200 fake ORBIT-42 sessions that had to be deleted.
+  - Start staged BBs only through `scripts/staged-bb.mjs`, using
+    `BB_STAGED_DIR` and `BB_STAGED_PORT` for extra instances. It gives Codex
+    its own `CODEX_HOME` inside the instance and shares only `auth.json`
+    through a symlink. Don't launch `bb-app` with your own environment.
+  - Claude Code isn't isolated yet: staged runs still write to
+    `~/.claude/projects`. Prefer Codex for staged fixtures, and keep Claude
+    Code handoffs in captures to the minimum the screenshot needs.
+  - If you add a script that runs agents outside a staged BB, give it a
+    separate provider home, or use a mode that saves nothing, such as
+    `codex exec --ephemeral`.
 - For Electron-native checks, follow [native desktop staging](docs/native-desktop-staging.md).
   Never launch the installed `/Applications` app as a test fixture. A separate
   data directory and `--user-data-dir` do not isolate its updater. Use an owned
