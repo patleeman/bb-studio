@@ -2,7 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import {
-  ARCHIVE_AFTER_MS, CURATOR_EVERY_MS, CURATOR_IDLE_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, reviewPrompt,
+  ARCHIVE_AFTER_MS, CURATOR_EVERY_MS, CURATOR_IDLE_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
   SkillLearning, STALE_AFTER_MS, tallyTurns, type LearningSkill, type SkillState,
 } from "./skill-learning";
 
@@ -71,6 +71,50 @@ it("gives a review fork only the skill tools and Memory page tools, and a lesson
   expect(prompt).toMatch(/merge it into one rule/);
   expect(prompt).toMatch(/reply exactly \[PASS\]/);
   expect(prompt).toMatch(/pg1/);
+});
+
+it("tells a review its bridge tools work even when Claude Code calls them disconnected", () => {
+  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools", approval: false });
+  expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill_list,.*mcp__bb-bridge__pages_edit"\)/);
+  expect(gaveUpOnTools("I couldn't save anything: the skill and Memory page tools are disconnected in this session, so nothing was written.")).toBe(true);
+  expect(gaveUpOnTools("Couldn't save anything: the bot skill and Pages tools are disconnected in this session.")).toBe(true);
+  expect(gaveUpOnTools("[PASS]")).toBe(false);
+  expect(gaveUpOnTools("Nothing new worth keeping.")).toBe(false);
+  expect(gaveUpOnTools(null)).toBe(false);
+});
+
+it("nudges a review that gave up on its tools once, then records what it wrote", async () => {
+  const x = await setup();
+  const log = vi.fn();
+  (x.learning as unknown as { deps: { log: unknown } }).deps.log = log;
+  expect(await x.learning.start("bot_main", "review")).toBe(true);
+  await x.learning.active("fork1");
+  await x.learning.idle(x.threads.get("fork1")!, "Nothing saved: the skill tools are disconnected in this session.");
+  // Still running: it got the follow-up instead of being closed.
+  expect(x.send).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: RETRY_PROMPT })] }));
+  expect((await x.learning.view("bot_main")).reviewing).toBe(true);
+  expect(x.archive).not.toHaveBeenCalled();
+  // Its retry saves a skill.
+  await x.learning.active("fork1");
+  x.learning.noteWrite("fork1", "saved");
+  await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, lastReview: { result: "Saved 1 skill" } });
+  expect(log).not.toHaveBeenCalled();
+});
+
+it("nudges only once: a second give-up closes the review and logs the reply", async () => {
+  const x = await setup();
+  const log = vi.fn();
+  (x.learning as unknown as { deps: { log: unknown } }).deps.log = log;
+  await x.learning.start("bot_main", "review");
+  const sends = x.send.mock.calls.length;
+  for (let i = 0; i < 2; i++) {
+    await x.learning.active("fork1");
+    await x.learning.idle(x.threads.get("fork1")!, "The tools are disconnected.");
+  }
+  expect(x.send.mock.calls.length).toBe(sends + 1);
+  expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, lastReview: { result: "Nothing to save" } });
+  expect(log).toHaveBeenCalledWith(expect.stringMatching(/wrote nothing but replied: The tools are disconnected/));
 });
 
 async function setup() {

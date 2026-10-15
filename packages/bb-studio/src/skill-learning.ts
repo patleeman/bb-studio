@@ -166,6 +166,23 @@ export function curatorPlan(skills: readonly { name: string; state: SkillState; 
   return plan;
 }
 
+/**
+ * A fork's Claude Code session starts with the Bot's history, which lists the
+ * bridge's tools, before the fork's own bridge connection is up. Claude Code
+ * then notes that every mcp__bb-bridge__* tool "is no longer available (MCP
+ * server disconnected)", and a cheap review model takes that at its word and
+ * gives up, though ToolSearch finds the tools and they work.
+ */
+const TOOLS_CONNECTED = `These tools are on the bb-bridge MCP server (mcp__bb-bridge__<name>) and they work here. If a note says bb-bridge disconnected or its tools are no longer available, it's stale: load them with ToolSearch ("select:${REVIEW_TOOLS.map((name) => `mcp__bb-bridge__${name}`).join(",")}") and call them.`;
+
+/** The follow-up a review gets, once, when it gave up on its tools. */
+export const RETRY_PROMPT = `Your tools are connected now. Load them with ToolSearch ("select:${REVIEW_TOOLS.map((name) => `mcp__bb-bridge__${name}`).join(",")}"), do the review and reply as asked: one short line, or exactly [PASS].`;
+
+/** A reply that says the review's tools weren't there, rather than that nothing was worth saving. */
+export function gaveUpOnTools(text: string | null): boolean {
+  return !!text && /\b(disconnected|not (?:available|connected)|unavailable|no longer available|can'?t (?:access|reach|use|call) (?:the |my )?(?:skill|tools|bb-bridge))/i.test(text);
+}
+
 /** The review fork's prompt. */
 export function reviewPrompt(input: { name: string; memoryPageId: string | null; reason: "tools" | "user" | "both" | "manual"; approval: boolean }): string {
   const why = input.reason === "user" ? "You've had a run of turns with the user since the last review." : input.reason === "manual" ? "The user asked for a review." : "You did a run of tool work since you last saved a skill.";
@@ -185,6 +202,7 @@ export function reviewPrompt(input: { name: string; memoryPageId: string | null;
     "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape; heed them.",
     "",
     `Use only ${REVIEW_TOOLS.join(", ")}. Don't run commands, edit files, message anyone or start threads.${input.approval ? " Your skill changes wait for the user's approval." : ""}`,
+    TOOLS_CONNECTED,
     "When you're done, reply with one short line saying what you saved. If nothing is worth saving, reply exactly [PASS].",
   ].filter((line) => line !== null).join("\n");
 }
@@ -195,6 +213,7 @@ export function consolidatePrompt(name: string): string {
     `Skill curator for ${JSON.stringify(name)}. The user doesn't see this thread. Read your skills (bot_skill_list, then bot_skill_view each one that might overlap).`,
     "Where two or more cover the same kind of task, merge them into one class-level skill: write or patch the one that stays, then delete the others. Keep every rule that still holds; drop repeats.",
     "Don't touch skills that don't overlap. Don't delete a pinned skill. Don't run commands or start threads.",
+    TOOLS_CONNECTED,
     "Reply with one short line saying what you merged, or exactly [PASS] when nothing overlaps.",
   ].join("\n");
 }
@@ -245,6 +264,8 @@ export class SkillLearning {
   private readonly starting = new Set<string>();
   /** Review forks that have started their turn: a fork is idle before the prompt lands, and that idle isn't the end. */
   private readonly started = new Set<string>();
+  /** Review forks already told once that their tools are connected. */
+  private readonly retried = new Set<string>();
   /** Threads being counted now, so two idles don't count the same events. */
   private readonly counting = new Set<string>();
 
@@ -473,6 +494,13 @@ export class SkillLearning {
       fresh.memory ? "Updated Memory" : "",
     ].filter(Boolean);
     // [PASS] (or any reply without a write) saved nothing; the writes are what count.
+    // The tools looked disconnected to it (TOOLS_CONNECTED): tell it once they're there, and wait for that turn.
+    if (!parts.length && gaveUpOnTools(text) && !this.retried.has(fresh.thread_id)) {
+      this.retried.add(fresh.thread_id);
+      const sent = await this.deps.sdk.threads.send({ threadId: fresh.thread_id, mode: "auto", input: [{ type: "text", text: RETRY_PROMPT, mentions: [] }] } as never).then(() => true, () => false);
+      if (sent) return;
+    }
+    this.retried.delete(fresh.thread_id);
     const result = parts.length ? parts.join(" · ") : fresh.kind === "consolidate" ? "Nothing to merge" : "Nothing to save";
     if (!parts.length && text && !isPassOutput(text)) this.deps.log?.(`Skill review ${fresh.thread_id} wrote nothing but replied: ${text.slice(0, 200)}`);
     await this.close(fresh, result);
