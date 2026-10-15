@@ -9,6 +9,8 @@ export const PLUGIN_ID = "pages";
 export const HOST_PLUGIN_ID = "studio";
 /** Where a page opens: a Studio tab. The old /plugins/pages/pages/<id> still resolves. */
 export const PAGES_ROOT = "/plugins/studio/studio/pages";
+/** A page id, such as `pg_…`. */
+export const isPageId = (value: string) => /^pg_[\w-]+$/.test(value);
 export const pagePath = (pageId: string) => `${PAGES_ROOT}/${encodeURIComponent(pageId)}`;
 export const REALTIME_CHANNEL = "pages";
 export const SYNC_PATH = "/pages/sync";

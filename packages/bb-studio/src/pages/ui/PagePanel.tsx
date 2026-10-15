@@ -1,61 +1,18 @@
 import { untitled } from "@bb-studio/kit/format";
-import { useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo, useState } from "react";
-import { ThreadItemsPanel, openAppPath } from "@bb-studio/kit/app";
+import { openAppPath } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
-import { pagePath, PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
-import type { rpcContract } from "../contract";
+import { pagePath } from "../constants";
 import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
 import { MissingPageRecovery } from "./MissingPageRecovery";
-import { usePageProvider } from "./provider";
 import { relativeTime } from "./shared";
 import { NoteActions } from "./notes/NoteActions";
 
-/** What the `page` thread panel tab is opened with: a page. */
-export type PagePanelParams = { pageId: string };
-
-function pageIdFrom(params: PluginThreadPanelProps["params"]): string | null {
-  if (!params || typeof params !== "object" || Array.isArray(params)) return null;
-  const { pageId } = params as Record<string, unknown>;
-  return typeof pageId === "string" && pageId ? pageId : null;
-}
-
 /**
- * Pages in a thread's workbench: the thread's pages and recent ones, and New
- * makes one linked to the thread. Opened with a page, as a reply's card does,
- * it shows that page in the same live editor as the Pages view, with a way
- * back to the list. It brings the editor, so app.tsx loads it when first opened.
+ * A page in the thread's Studio tab: the same live editor as the Pages view,
+ * with a way back to the collection. It brings the editor, so the tab loads
+ * it when first shown.
  */
-export function PagePanel({ threadId, params }: PluginThreadPanelProps) {
-  const rpc = useRpc<typeof rpcContract>();
-  const call = usePageProvider();
-  const [chatPageId, setChatPageId] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    rpc.call("pages.chatPage", { threadId }).then(
-      (result) => live && setChatPageId(result.page?.id ?? null),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [rpc, threadId]);
-  const linkedIds = useMemo(() => (chatPageId ? [chatPageId] : []), [chatPageId]);
-  return (
-    <ThreadItemsPanel
-      threadId={threadId}
-      pluginId={PLUGIN_ID}
-      kind="page"
-      channel={REALTIME_CHANNEL}
-      call={call}
-      initialId={pageIdFrom(params)}
-      linkedIds={linkedIds}
-      renderItem={(id, { backLabel, onBack }) => <PageTab key={id} pageId={id} backLabel={backLabel} onBack={onBack} />}
-    />
-  );
-}
-
-function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
+export function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
   const { page, refetch } = usePanelPage(pageId);
 
   if (page === null) return <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={refetch} onBack={onBack} backLabel={backLabel ? `Back to ${backLabel}` : undefined} />;
@@ -93,4 +50,3 @@ function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: st
   );
 }
 
-export default PagePanel;

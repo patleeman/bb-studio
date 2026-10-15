@@ -28,7 +28,6 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
 vi.mock("@bb-studio/kit/app", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => <span />, Tooltip: ({ children }: { children: unknown }) => children }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock("../PageCard", () => ({ PAGE_TAB: "page" }));
 
 import { clearMovedText, expandLabel, ExpandToPage, NotesInProgress } from "./composer";
 
@@ -88,7 +87,7 @@ describe("Expand to page", () => {
     await act(async () => { button.click(); });
     expect(state.call).toHaveBeenCalledWith("notes.create", expect.objectContaining({ threadId: "thr_1", text: "Ana: ship Friday" }));
     expect(state.composer.replace).toHaveBeenCalledTimes(1);
-    expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "page", title: note.title, params: { pageId: "pg_1" } });
+    expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "studio", title: note.title, params: { kind: "page", id: "pg_1" } });
     expect(button.getAttribute("aria-label")).toBe("Add to notes in progress");
   });
 
@@ -125,7 +124,7 @@ describe("Notes in progress", () => {
     const chip = host.querySelector<HTMLElement>("[data-notes-in-progress] button")!;
     expect(chip.textContent).toBe("Notes in progressOct 13, 2:05 PM · Weekly sync");
     act(() => chip.click());
-    expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "page", title: note.title, params: { pageId: "pg_1" } });
+    expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "studio", title: note.title, params: { kind: "page", id: "pg_1" } });
   });
 
   it("goes when the note is resolved", async () => {

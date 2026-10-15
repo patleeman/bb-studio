@@ -7,13 +7,12 @@ import { useEffect, useState } from "react";
 import type { rpcContract } from "../contract";
 import { chatMarkdown } from "./page-preview";
 import { usePanelPage } from "./use-panel-page";
-import { pagePath } from "../constants";
+import { isPageId, pagePath } from "../constants";
 import { relativeTime } from "./shared";
+import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
 
-/** The workbench tab's action id; reply cards open it with `{ pageId }`. */
-export const PAGE_TAB = "page";
 
-export const isPageId = (value: string) => /^pg_[\w-]+$/.test(value);
+export { isPageId };
 
 // A remounted card reuses the text the last one read for the same edit.
 const markdowns = new Map<string, { updatedAt: number; markdown: string }>();
@@ -70,7 +69,7 @@ export function PageCard({ attributes }: PluginMessageDirectiveProps) {
       body={<PageBody markdown={markdown} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
-        if (!navigate.openThreadPanel({ actionId: PAGE_TAB, title, params: { pageId: id } }))
+        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title, params: itemParams("page", id) }))
           openAppPath(pagePath(id));
       }}
     />

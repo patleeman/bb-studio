@@ -1,9 +1,10 @@
 // The `::design{id="dsn_…"}` card in a reply: the newest round's screens,
-// under a header that opens the design in the thread's Design tab.
+// under a header that opens the design in the thread's Studio tab.
 import { ItemDirectiveCard, openAppPath, remember } from "@bb-studio/kit/app";
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { DESIGN_ICON, DESIGN_TAB, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
+import { DESIGN_ICON, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
 import { useDesign } from "./use-design";
+import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
 
 /** Screens a card shows from the newest round. */
 export const PREVIEW_SCREENS = 3;
@@ -60,7 +61,7 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
       body={<DesignPreview design={design} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
-        if (!navigate.openThreadPanel({ actionId: DESIGN_TAB, title: name, params: { designId: id } }))
+        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title: name, params: itemParams("design", id) }))
           openAppPath(designHref(id));
       }}
     />

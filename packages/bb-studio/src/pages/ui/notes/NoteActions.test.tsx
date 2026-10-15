@@ -32,7 +32,6 @@ vi.mock("@bb-studio/kit/ui", () => ({
   DialogContent: Pass, DialogHeader: Pass, DialogTitle: Pass, DialogDescription: Pass, DialogFooter: Pass,
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock("../PageCard", () => ({ PAGE_TAB: "page" }));
 
 import { defaultSendMode, NoteActions } from "./NoteActions";
 

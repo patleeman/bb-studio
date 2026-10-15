@@ -1,5 +1,5 @@
 // The `::drawing{id="…"}` card in a reply: the drawing's picture, under a
-// header that opens it in the thread's Drawings tab. It doesn't load
+// header that opens it in the thread's Studio tab. It doesn't load
 // Excalidraw: the picture is the server's thumbnail.
 import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard, THUMBNAIL, remember, openAppPath } from "@bb-studio/kit/app";
@@ -7,8 +7,9 @@ import { relativeTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
-import { DRAW_ICON, DRAWING_UPDATE_TYPE, DRAWINGS_TAB, REALTIME_CHANNEL, drawingHref, isDrawingId, thumbnailUrl } from "../shared";
+import { DRAW_ICON, DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref, isDrawingId, thumbnailUrl } from "../shared";
 import { drawingName } from "./drawing-card";
+import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
 
 type DrawingMeta = NonNullable<z.infer<(typeof rpcContract)["drawings.getDrawingMeta"]["output"]>["drawing"]>;
 
@@ -53,7 +54,7 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
       details={`Drawing · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
       onOpen={() => {
         // The workbench when there is one; Studio otherwise.
-        if (!navigate.openThreadPanel({ actionId: DRAWINGS_TAB, title: name, params: { drawingId: id } }))
+        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title: name, params: itemParams("drawing", id) }))
           openAppPath(drawingHref(id));
       }}
     />

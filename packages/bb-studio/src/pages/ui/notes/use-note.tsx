@@ -5,7 +5,7 @@ import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
 import type { NoteView, rpcContract } from "../../notes-contract";
-import { PAGE_TAB } from "../PageCard";
+import { itemParams, STUDIO_TAB } from "../../../ui/studio-tab/model";
 
 export type NotesRpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -59,7 +59,7 @@ export function useOpenNote(): { openNote(note: NoteView): void; anchor: ReactNo
   const navigate = useBbNavigate();
   const { open, anchor } = useOpenTarget();
   const openNote = useCallback((note: NoteView) => {
-    if (navigate.openThreadPanel({ actionId: PAGE_TAB, title: note.title, params: { pageId: note.pageId } })) return;
+    if (navigate.openThreadPanel({ actionId: STUDIO_TAB, title: note.title, params: itemParams("page", note.pageId) })) return;
     open({ kind: "path", path: note.href, title: note.title }, "split");
   }, [navigate, open]);
   return { openNote, anchor };

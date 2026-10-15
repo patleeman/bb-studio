@@ -22,6 +22,23 @@ address for the workspace. Old list addresses, such as a kind's (`/plugins/studi
 open the new tab page on that kind.
 Right-click a tab for Close, Close others, Close tabs to the right, Close all in
 the pane, splits, moves to another pane, Rename, and Copy link.
+
+### The Studio tab in a thread
+
+A thread's side panel has one **Studio** tab (**+ → Studio**) for every kind
+that opens beside the chat: pages, drawings, designs, dashboards and
+artifacts. It opens on the thread's collection: **This thread** (items made
+or linked in it, and the page it was started from), then **Recent** in the
+thread's project. Search covers every kind, and the chips above the list
+filter to one. An item opens in place in its kind's editor, with a back
+arrow to the collection. **New** offers each kind that can be made here,
+makes the item in the thread's project and links it to the thread. The
+save icon opens Artifacts' save picker for the latest reply's files. Reply
+cards and **Expand to page** open the Studio tab on their item
+(`{ kind, id }` params). Kinds turned off in **Setup → Kinds** don't appear.
+The old per-kind tabs (Pages, Drawings, Design, Dashboards, Artifacts) are
+still in BB's launcher only so tabs BB restored from before keep working;
+each opens the Studio tab on what it showed.
 Double-click a tab, or press F2 on it, to rename its item. The tab row shows
 the item's own tools and status, such as a page saving or a recording paused;
 the tab names the item, so its title isn't repeated, and Chat isn't offered.
@@ -155,14 +172,14 @@ The compact page header at 390 pixels, with **Item actions** open.
   its reply shows the page's card (`::page{id="…"}`). The card shows the
   page's text inline, read-only, and updates as the page changes. The chevron
   hides or shows the text; the choice is remembered for every Studio card.
-  Click the title or the arrow to open the page in a **Pages** tab in the
-  thread's workbench, beside the chat. Where there's no workbench, it opens
+  Click the title or the arrow to open the page in the thread's **Studio**
+  tab, beside the chat. Where there's no workbench, it opens
   in the main area.
-- **In a thread's workbench.** The **Pages** tab lists the thread's pages
-  (the ones made or changed in it, and the page it was started from), then
-  the project's recent ones. **New** makes a page in the thread's project and links it to
-  the thread in Studio. A page opens in its live editor, with a link to the
-  full page.
+- **In a thread's workbench.** The **Studio** tab (see Workspace) lists the
+  thread's pages with its other items (the ones made or changed in it, and
+  the page it was started from), then the project's recent ones. **New →
+  Page** makes a page in the thread's project and links it to the thread in
+  Studio. A page opens in its live editor, with a link to the full page.
 - **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
   embed cards for links, BB threads, and other pages. Paste a link on an
   empty line to turn it into a card; web links fetch their title,
@@ -238,7 +255,7 @@ told not to.
 
 When a message grows into meeting notes, **Expand to page** in a thread's
 composer (the ⤢ button beside the microphone) moves the draft into a temp
-page and opens it in the thread's side panel, beside the chat.
+page and opens it in the thread's Studio tab, beside the chat.
 
 ![Meeting notes typed into a thread's composer, with the Expand to page tooltip](assets/notes-expand.png)
 
@@ -411,7 +428,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   `send(label, data)`, which puts an @artifact pill holding that data in the
   thread's composer. A playground's HTML works unchanged as an artifact.
   In a chat card the page's frame fits its height (120–640 px).
-- **Save from a thread.** **Artifacts** in the thread panel launcher lists the
+- **Save from a thread.** The save icon in the thread's **Studio** tab lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.
 - **Agent tools and skill.** `artifacts_save`, `artifacts_list` and
@@ -468,10 +485,11 @@ open. Recapture with
   BB's active theme.
 - **Card in the agent's reply.** When an agent makes or changes a drawing,
   its reply shows a card (`::drawing{id="…"}`) with the picture, name and
-  element count. It opens the drawing in the thread's **Drawings** tab beside
+  element count. It opens the drawing in the thread's **Studio** tab beside
   the chat, or in Studio without a workbench.
-- **Thread tab.** **Drawings** lists the drawings made or changed in that
-  thread, then the project's recent ones. **New** makes one in the thread's
+- **Thread tab.** The **Studio** tab lists the drawings made or changed in
+  that thread with its other items, then the project's recent ones; the
+  **Drawings** chip shows only drawings. **New → Drawing** makes one in the thread's
   project and links it to the thread. In the editor, **Attach** adds the
   drawing to the conversation as an image. So does the composer's `+` menu,
   **Drawing**. Neither sends a message.
@@ -559,8 +577,8 @@ The same deck presented with Play and moved on with →: "Why it matters",
   **Comment** mode, pin a note to an element; **Send to agent** posts it, with
   the element's selector and markup, to the design's thread.
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
-  first screens. It opens the design in the thread's **Design** tab beside
-  the chat; opened without a design, the tab lists the thread's designs.
+  first screens. It opens the design in the thread's **Studio** tab beside
+  the chat; back from it, the tab lists the thread's items, designs among them.
 - **Questions.** `design_ask` shows a form in the thread (choices, multi,
   short answers, 1–5 scales, each with "Decide for me"); the answers return
   as the tool's result.
@@ -633,9 +651,9 @@ refused.
   archive, duplicate, templates and **Export → Dashboard JSON**.
   `/plugins/studio/studio/dashboards` opens the library filtered to them.
   **Setup → Kinds** turns them off (their data stays; nothing refreshes).
-- **In a thread.** The thread workbench's **Dashboards** tab lists the
-  dashboards made or edited in that thread, then recent ones; search finds
-  any. One opens beside the conversation with its toolbar and grid, sized to
+- **In a thread.** The thread's **Studio** tab lists the dashboards made or
+  edited in that thread with its other items, then recent ones; search finds
+  any, and the **Dashboards** chip shows only dashboards. One opens beside the conversation with its toolbar and grid, sized to
   the panel (so a narrow panel gets the 8- or 4-column layout). An open tab
   counts as viewing: widgets refresh and scripts can be approved there.
 - **The grid.** [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)

@@ -1,5 +1,5 @@
 // One design's canvas, shown in two places: full screen in the main area
-// (a Studio tab) and as the Design tab in a
+// (a Studio tab) and in the Studio tab of a
 // thread's workbench, beside the conversation. Rounds stack newest first;
 // each round's options sit in a row, each a sandboxed frame of its screen at
 // the size it was designed for.

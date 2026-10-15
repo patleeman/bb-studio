@@ -27,11 +27,11 @@ export interface BuiltinKind {
 }
 
 export const BUILTIN_KINDS: readonly BuiltinKind[] = [
-  { kind: "page", pluginId: "pages", label: "Pages", covers: "Pages, the thread's Pages tab, page cards and the thread header's page link." },
-  { kind: "drawing", pluginId: "excalidraw", label: "Drawings", covers: "Drawings, the thread's Drawings tab, drawing cards and the composer's + → Drawing." },
+  { kind: "page", pluginId: "pages", label: "Pages", covers: "Pages, pages in the thread's Studio tab, page cards and the thread header's page link." },
+  { kind: "drawing", pluginId: "excalidraw", label: "Drawings", covers: "Drawings, drawings in the thread's Studio tab, drawing cards and the composer's + → Drawing." },
   { kind: "recording", pluginId: "talk", label: "Recordings and dictation", covers: "Recordings, the recorder, dictation, hold-to-talk, recording cards and Talk models." },
-  { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, the thread's Artifacts tab and artifact cards." },
-  { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, the thread's Design tab and design cards." },
+  { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, artifacts and the save picker in the thread's Studio tab, and artifact cards." },
+  { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, designs in the thread's Studio tab, and design cards." },
   { kind: "dashboard", pluginId: "dashboards", label: "Dashboards", covers: "Dashboards, their agent tools and the refreshing of their widgets' data." },
 ];
 

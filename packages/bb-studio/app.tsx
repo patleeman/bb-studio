@@ -9,19 +9,19 @@ import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
 import { BUILTIN_ROUTES, builtinSegment, CHATS_PATH, legacyChatPath, STUDIO_ROOT } from "./src/builtins";
 import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
-import { SavePicker } from "./src/artifacts/ui/save-picker";
-import { ARTIFACTS_TAB, isArtifactId, SAVE_ICON } from "./src/artifacts/shared";
-import { DRAW_ICON, DRAWINGS_TAB, isDrawingId, PICKER_ID } from "./src/draw/shared";
+import { isArtifactId } from "./src/artifacts/shared";
+import { isDrawingId, PICKER_ID } from "./src/draw/shared";
 import { DrawingDirective } from "./src/draw/ui/drawing-directive";
 import { ExcalidrawPicker } from "./src/draw/ui/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-registration";
-import { DESIGN_ICON, DESIGN_TAB, isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
+import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
-import { DASHBOARD_ICON, DASHBOARD_KIND, DASHBOARD_TAB, isDashboardId } from "./src/dashboards/shared";
+import { isDashboardId } from "./src/dashboards/shared";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
-import { isPageId, PAGE_TAB, PageCard } from "./src/pages/ui/PageCard";
+import { isPageId, PageCard } from "./src/pages/ui/PageCard";
+import { aliasParams, enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
 import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
 import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
@@ -92,14 +92,8 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
 };
 
-/** The thread's Pages tab; it brings the page editor, so it loads when first opened. */
-const PagesTab = lazy(() => import("./src/pages/ui/PagePanel"));
-/** The thread's Drawings tab; it brings Excalidraw, so it loads when first opened. */
-const DrawingsTab = lazy(() => import("./src/draw/ui/drawings-tab"));
-/** The thread's Design tab, with the canvas; loaded when first opened. */
-const DesignTab = lazy(() => import("./src/design/ui/design-tab"));
-/** The thread's Dashboards tab, with the grid and charts; loaded when first opened. */
-const DashboardsTab = lazy(() => import("./src/dashboards/ui/dashboard-tab"));
+/** The thread's Studio tab; its kinds' editors load when an item opens. */
+const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
@@ -177,17 +171,38 @@ export default definePluginApp((app) => {
   // another provider drops its composer entry. Read once per window load.
   const kinds = readKindsSnapshot();
   const on = (kind: string) => !kinds.off.has(kind);
-  // Pages (built in; docs/merging-add-ons.md): the thread's Pages tab, the
+  // The thread's Studio tab: one workbench tab for every kind that opens
+  // beside the chat (src/ui/studio-tab). Reply cards open it with
+  // `{ kind, id }`; its collection lists only the kinds that are on.
+  const tabKinds = enabledKinds(kinds.off);
+  if (tabKinds.length) {
+    app.slots.threadPanelAction({
+      id: STUDIO_TAB,
+      title: "Studio",
+      icon: STUDIO_TAB_ICON,
+      layout: "flush",
+      run: async ({ openPanel }) => { await openPanel({ title: "Studio" }); },
+      component: (props) => <Suspense fallback={null}><StudioTab {...props} /></Suspense>,
+    });
+    // The old per-kind tabs (page, excalidraw, design, dashboards,
+    // save-to-studio). BB persists open panel tabs by action id and its SDK
+    // can't hide an action from the launcher, so they stay registered as thin
+    // redirects: a restored tab shows the Studio tab on the item it had, or on
+    // that kind (Artifacts: the save picker). Drop these once old tabs are gone.
+    for (const info of tabKinds) {
+      app.slots.threadPanelAction({
+        id: info.legacyAction,
+        title: info.plural,
+        icon: info.icon,
+        layout: "flush",
+        component: (props) => <Suspense fallback={null}><StudioTab {...props} initial={aliasParams(info.legacyAction, props.params)} /></Suspense>,
+      });
+    }
+  }
+  // Pages (built in; docs/merging-add-ons.md): the Studio tab's pages, the
   // `::page{id="pg_…"}` card in replies, the header link back to a page a
   // thread was started from, and opening a page Talk dictated into.
   if (on("page")) {
-    app.slots.threadPanelAction({
-      id: PAGE_TAB,
-      title: "Pages",
-      icon: "studio/pages",
-      layout: "flush",
-      component: (props) => <Suspense fallback={null}><PagesTab {...props} /></Suspense>,
-    });
     app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
     app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
     // Notes (src/pages/notes.ts): the composer's Expand to page, which moves
@@ -203,21 +218,12 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
   // Explore (built in, as it was in Pages): the Next row and "along the way" findings.
   registerExploreApp(app);
-  // Artifacts (built in; docs/merging-add-ons.md): the thread panel that saves
-  // a reply's files, and the `::artifact{id="art_…"}` card in replies.
-  if (on("artifact")) app.slots.threadPanelAction({ id: ARTIFACTS_TAB, title: "Artifacts", icon: SAVE_ICON, layout: "flush", component: SavePicker });
+  // Artifacts (built in; docs/merging-add-ons.md): in the Studio tab, and its
+  // save picker for a reply's files; and the `::artifact{id="art_…"}` card in replies.
   app.slots.messageDirective({ id: "artifact", component: whenOn(kinds, "artifact", ArtifactCard) });
-  // Drawings (built in): the thread's Drawings tab, the `::drawing{id="…"}`
+  // Drawings (built in): in the Studio tab, the `::drawing{id="…"}`
   // card, and the composer's `+` → Drawing, which attaches one as a PNG.
   if (on("drawing")) {
-    app.slots.threadPanelAction({
-      id: DRAWINGS_TAB,
-      title: "Drawings",
-      icon: DRAW_ICON,
-      layout: "flush",
-      run: async ({ openPanel }) => { await openPanel({ title: "Drawings" }); },
-      component: (props) => <Suspense fallback={null}><DrawingsTab {...props} /></Suspense>,
-    });
     if (!kinds.routedAway.has("drawing")) {
       app.composer.customize(createExcalidrawComposerCustomization((scope) => {
         void import("./src/draw/ui/attach").then(({ attachFromComposer }) => attachFromComposer(scope));
@@ -227,31 +233,10 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "drawing", component: whenOn(kinds, "drawing", DrawingDirective) });
   // Kept while off, so a picker an agent opened earlier can still be answered.
   app.slots.pendingInteraction({ id: PICKER_ID, component: ExcalidrawPicker });
-  // Designs (built in): the thread's Design tab, the `::design{id="dsn_…"}`
+  // Designs (built in): in the Studio tab, the `::design{id="dsn_…"}`
   // card, and the question form design_ask opens in the composer.
-  if (on("design")) {
-    app.slots.threadPanelAction({
-      id: DESIGN_TAB,
-      title: "Design",
-      icon: DESIGN_ICON,
-      layout: "flush",
-      run: async ({ openPanel }) => { await openPanel({ title: "Design" }); },
-      component: (props) => <Suspense fallback={null}><DesignTab {...props} /></Suspense>,
-    });
-  }
   app.slots.messageDirective({ id: "design", component: whenOn(kinds, "design", DesignCard) });
   app.slots.pendingInteraction({ id: QUESTIONS_RENDERER, component: QuestionFormView });
-  // Dashboards (built in): the thread's Dashboards tab, beside the conversation.
-  if (on(DASHBOARD_KIND)) {
-    app.slots.threadPanelAction({
-      id: DASHBOARD_TAB,
-      title: "Dashboards",
-      icon: DASHBOARD_ICON,
-      layout: "flush",
-      run: async ({ openPanel }) => { await openPanel({ title: "Dashboards" }); },
-      component: (props) => <Suspense fallback={null}><DashboardsTab {...props} /></Suspense>,
-    });
-  }
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.

@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { PagePanel } from "./PagePanel";
+import { PageTab } from "./PagePanel";
 import { TitleRecovery } from "./page-title";
 
 const state = vi.hoisted(() => ({ download: vi.fn(), retry: vi.fn(), read: vi.fn(), refetch: vi.fn(), options: [] as unknown[], failed: false, recovered: true }));
@@ -21,12 +21,9 @@ vi.mock("./connection", () => ({ PageConnection: class {
   retryRecovery = state.read;
 } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn(async () => ({ page: null })) }) }));
-// Like the real list, opened with a page it shows that page.
 vi.mock("@bb-studio/kit/app", () => ({
   PAGE_TITLE: "",
   SECTION_TITLE: "",
-  ThreadItemsPanel: ({ initialId, renderItem }: { initialId: string | null; renderItem(id: string, options: { backLabel: string; onBack(): void }): unknown }) =>
-    initialId ? renderItem(initialId, { backLabel: "Pages", onBack: () => {} }) : null,
 }));
 vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => null }));
 vi.mock("./shared", () => ({ relativeTime: () => "now" }));
@@ -53,7 +50,7 @@ afterEach(async () => {
   for (const draft of recovery.memory()) recovery.remove(draft);
   localStorage.clear();
 });
-async function render() { await act(async () => { root.render(<PagePanel {...({ threadId: "thr_one", params: { pageId: "pg_deleted" } } as any)} />); }); }
+async function render() { await act(async () => { root.render(<PageTab pageId="pg_deleted" backLabel="Studio" onBack={() => {}} />); }); }
 async function click(text: string) {
   await act(async () => {
     const button = [...container.querySelectorAll("button")].find(node => node.textContent?.includes(text));
