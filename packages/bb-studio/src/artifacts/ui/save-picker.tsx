@@ -41,7 +41,7 @@ export function SavePicker(props: PluginThreadPanelProps) {
 function SavePickerView({ threadId, params }: PluginThreadPanelProps) {
   const [openId, setOpenId] = useState<string | null>(() => pickerArtifactId(params));
   const back = useCallback(() => setOpenId(null), []);
-  if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} />;
+  if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} threadId={threadId} />;
   const seq = pickerSeq(params);
   // Another reply is another list: start its selection afresh.
   return <PickerList key={`${threadId}:${seq}`} threadId={threadId} seq={seq} onOpen={setOpenId} />;

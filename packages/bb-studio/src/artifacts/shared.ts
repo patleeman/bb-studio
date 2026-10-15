@@ -25,10 +25,28 @@ export function artifactHref(id: string): string {
 /** What an HTML preview's quote script posts to the viewer; `text` is null when nothing is selected. */
 export const SELECTION_MESSAGE = "bb-artifact-selection";
 
-/** `quote` adds, to HTML, the script that tells the viewer what's selected. */
-export function contentUrl(artifactId: string, versionId: string, options: { download?: boolean; quote?: boolean } = {}): string {
+/** What a live HTML artifact and its viewer post each other (src/artifacts/live). */
+export const LIVE_MESSAGE = "bb-artifact-live";
+/** Realtime channel: live artifacts' state and the agent's commands. */
+export const LIVE_CHANNEL = "artifacts-live";
+
+/**
+ * `quote` adds, to HTML, the script that tells the viewer what's selected;
+ * `live` adds `window.playground` with the artifact's state and the theme.
+ */
+export function contentUrl(artifactId: string, versionId: string, options: { download?: boolean; quote?: boolean; live?: "light" | "dark" } = {}): string {
   const query = `artifact=${encodeURIComponent(artifactId)}&version=${encodeURIComponent(versionId)}`;
-  return `/api/v1/plugins/studio/http/artifacts/content?${query}${options.download ? "&download=1" : ""}${options.quote ? "&quote=1" : ""}`;
+  return `/api/v1/plugins/studio/http/artifacts/content?${query}${options.download ? "&download=1" : ""}${options.quote ? "&quote=1" : ""}${options.live ? `&live=${options.live}` : ""}`;
+}
+
+/** A mention of a take a live artifact sent to the agent: `<artifact id>/take/<take id>`. */
+export function takeMentionId(artifactId: string, takeId: string): string {
+  return `${artifactId}/take/${takeId}`;
+}
+
+export function parseTakeMentionId(id: string): { artifactId: string; takeId: string } | null {
+  const match = /^(art_[0-9a-z]{16})\/take\/(take_[0-9a-f]{16})$/.exec(id);
+  return match ? { artifactId: match[1]!, takeId: match[2]! } : null;
 }
 
 const ID = /^art_[0-9a-z]{16}$/;

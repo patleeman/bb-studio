@@ -244,6 +244,8 @@ export class ArtifactStore {
       const removed = this.db.prepare("DELETE FROM artifacts WHERE id = ?").run(id).changes > 0;
       if (removed) {
         this.db.prepare("DELETE FROM artifact_versions WHERE artifact_id = ?").run(id);
+        // Live HTML artifacts' tables (src/artifacts/live/store.ts).
+        for (const table of ["artifact_live_state", "artifact_live_events", "artifact_takes"]) this.db.prepare(`DELETE FROM ${table} WHERE artifact_id = ?`).run(id);
         this.db
           .prepare("DELETE FROM artifact_blobs WHERE sha256 NOT IN (SELECT DISTINCT sha256 FROM artifact_versions)")
           .run();

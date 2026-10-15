@@ -9,6 +9,7 @@ import { Markdown, experimental_SourceCode as SourceCode, useRpc } from "@get-bb
 import type { rpcContract } from "../contract";
 import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../shared";
 import { AreaBox, useImageArea, type Picked } from "./artifact-quote";
+import { LiveHtmlFrame } from "./live-frame";
 
 export type ArtifactVersion = {
   id: string;
@@ -49,6 +50,7 @@ export function ArtifactBody({
   view,
   dense = false,
   onArea,
+  threadId = null,
 }: {
   artifactId: string;
   version: ArtifactVersion;
@@ -57,6 +59,8 @@ export function ArtifactBody({
   dense?: boolean;
   /** An area of an image was picked. */
   onArea?: (picked: Picked) => void;
+  /** Where a live HTML page's takes go: the thread whose composer gets them. */
+  threadId?: string | null;
 }) {
   const src = contentUrl(artifactId, version.id);
   const [retry, setRetry] = useState(0);
@@ -96,16 +100,7 @@ export function ArtifactBody({
     );
   }
   if (version.type === "html" && view === "preview") {
-    return (
-      <iframe
-        key={version.id}
-        title={version.name}
-        src={contentUrl(artifactId, version.id, { quote: true })}
-        sandbox="allow-scripts"
-        referrerPolicy="no-referrer"
-        className="size-full border-0 bg-white"
-      />
-    );
+    return <LiveHtmlFrame key={version.id} artifactId={artifactId} versionId={version.id} name={version.name} threadId={threadId} />;
   }
   if (version.type === "pdf") {
     // Chrome's PDF viewer won't load in a sandboxed frame; the route only

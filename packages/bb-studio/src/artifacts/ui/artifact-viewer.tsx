@@ -37,8 +37,11 @@ export function ArtifactViewer({
   artifactId,
   backLabel,
   onBack,
+  threadId,
 }: {
   artifactId: string;
+  /** The thread it's open beside, which a live page's takes go to; else the thread it was saved from. */
+  threadId?: string;
   backLabel: string;
   /** `replace` when leaving because the artifact is gone. */
   onBack: (replace?: boolean) => void;
@@ -274,6 +277,7 @@ export function ArtifactViewer({
           version={version}
           view={canToggle ? view : "preview"}
           onArea={confirmDelete ? undefined : pickArea}
+          threadId={threadId ?? artifact.sourceThreadId}
         />
       </div>
       {picked && !confirmDelete ? (

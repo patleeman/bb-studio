@@ -11,7 +11,7 @@ import { ARTIFACT_ICON, ARTIFACTS_TAB, ARTIFACT_UPDATE_TYPE, REALTIME_CHANNEL, a
 
 type Artifact = NonNullable<z.infer<(typeof rpcContract)["artifacts.get"]["output"]>["artifact"]>;
 
-export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
+export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProps) {
   const id = attributes.id ?? "";
   const valid = isArtifactId(id);
   const rpc = useRpc<typeof rpcContract>();
@@ -50,7 +50,7 @@ export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
       body={version.type === "other" ? undefined : (
         // A player is a row high; other previews get room.
         <div className={version.type === "audio" ? "" : "h-80"}>
-          <ArtifactBody artifactId={artifact.id} version={version} view="preview" dense />
+          <ArtifactBody artifactId={artifact.id} version={version} view="preview" dense threadId={message.threadId} />
         </div>
       )}
       details={<>{TYPE_LABELS[version.type]} · {formatBytes(version.size)}{artifact.versions > 1 ? ` · v${version.number}` : ""} · Saved to Studio</>}

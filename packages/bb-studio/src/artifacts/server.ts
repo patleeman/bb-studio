@@ -20,6 +20,9 @@ import { z } from "zod";
 import { rpcContract, type artifactSchema, type candidateSchema } from "./contract";
 import { artifactBackupHandlers } from "./server/backup";
 import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./server/content";
+import { LIVE_TOOLS, LIVE_USAGE, registerLive } from "./live/server";
+import { withLiveScript } from "./live/shim";
+import { LiveStore } from "./live/store";
 import { importedFile } from "./server/import-file";
 import { mentionContext } from "./server/mention";
 import { pageMarkdown } from "./server/page";
@@ -44,6 +47,7 @@ import {
   formatBytes,
   isTextType,
   mimeFor,
+  parseTakeMentionId,
   titleFromName,
 } from "./shared";
 
@@ -54,6 +58,7 @@ export const ARTIFACTS_USAGE = [
   "  show <id>                                             Print a text artifact's contents",
   "  export <id> [path] [--force]                          Copy an artifact into this thread's workspace (or a path you give)",
   "  delete <id>                                           Delete an artifact and all its versions",
+  ...LIVE_USAGE,
 ].join("\n");
 
 /** The viewer shows at most this much text; Download has the rest. */
@@ -96,7 +101,7 @@ function directive(id: string): string {
   return `::artifact{id="${id}"}`;
 }
 
-export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_read"];
+export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_read", ...LIVE_TOOLS];
 
 export interface BuiltinArtifacts {
   store: ArtifactStore;
@@ -112,6 +117,8 @@ export interface BuiltinArtifacts {
 /** Registers artifacts' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
 export function registerArtifacts(bb: BbPluginApi, db: Database.Database): BuiltinArtifacts {
   const store = new ArtifactStore(db);
+  const liveStore = new LiveStore(db);
+  const liveServer = registerLive(bb, liveStore, store);
 
   const studio = studioSchemas(z);
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
@@ -133,8 +140,10 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
     return artifact;
   }
 
-  /** What an `@artifact` mention gives the agent. */
+  /** What an `@artifact` mention gives the agent; a live artifact's take is mentioned as `<id>/take/<take id>`. */
   function mention(id: string): string {
+    const take = parseTakeMentionId(id);
+    if (take) return liveServer.takeContext(take.artifactId, take.takeId);
     const artifact = mustGet(id);
     return mentionContext({
       id: artifact.id,
@@ -377,14 +386,19 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
   // A version's bytes, for images, the HTML and PDF viewers, and Download.
   // Headers (a sandbox CSP on everything that isn't a real PDF) are in
   // src/server/content.ts. `quote=1` adds the script that reports selected
-  // text to the viewer, for HTML.
+  // text to the viewer, for HTML; `live=light|dark` adds `window.playground`
+  // with the artifact's current state (src/artifacts/live), so it isn't cached.
   bb.http.route("GET", "/artifacts/content", (context) => {
     const version = store.version(context.req.query("artifact") ?? "", context.req.query("version") ?? "");
     const bytes = version ? store.bytes(version.sha256) : null;
     if (!version || !bytes) return context.text("Not found", 404);
     const quote = context.req.query("quote") === "1" && versionType(version) === "html";
-    const body = quote ? withQuoteScript(new Uint8Array(bytes)) : new Uint8Array(bytes);
+    const theme = context.req.query("live");
+    const live = (theme === "light" || theme === "dark") && versionType(version) === "html" ? theme : null;
+    let body = quote ? withQuoteScript(new Uint8Array(bytes)) : new Uint8Array(bytes);
+    if (live) body = withLiveScript(body, liveStore.state(version.artifact_id).state, live);
     const headers = contentHeaders(version, body, { download: context.req.query("download") === "1" });
+    if (live) headers["cache-control"] = "no-store";
     // Audio and video players fetch in ranges, and seek with them.
     const media = versionType(version) === "audio" || versionType(version) === "video";
     return media ? rangeResponse(body, headers, context.req.header("range")) : serveBytes(body, headers);
@@ -492,6 +506,8 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
   // Studio's is `studio`, so `bb artifacts …` went with the old plugin.
   const cli = {
     async run(argv: string[], ctx: { threadId?: string | null; cwd?: string | null }) {
+      const liveResult = await liveServer.cli(argv);
+      if (liveResult) return liveResult;
       const [cmd, ...rest] = argv;
       const flags = parseFlags(rest, ["thread", "force"]);
       switch (cmd) {
@@ -576,6 +592,9 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
     provider: artifactProvider({ store, changed }),
     backup: artifactBackupHandlers(z, { db, store, changed }),
     cli: (argv, ctx) => cli.run(argv, ctx),
-    dispose: () => changeBus.dispose(),
+    dispose: () => {
+      changeBus.dispose();
+      liveServer.dispose();
+    },
   };
 }

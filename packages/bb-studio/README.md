@@ -393,6 +393,12 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   editable title, the artifact's chat, Copy, Download, and a menu with Open
   source thread, Save as page, Versions, Move to and Delete. Select text or
   drag over an image to **Send to thread**.
+- **Live HTML.** An HTML artifact's page gets `window.playground`, the same
+  API as BB playgrounds: shared state that persists per artifact and syncs to
+  every open copy, theme changes, an event log, actions an agent can run
+  (`artifacts_live`, or `bb studio artifacts state|watch|actions|do`), and
+  `send(label, data)`, which puts an @artifact pill holding that data in the
+  thread's composer. A playground's HTML works unchanged as an artifact.
 - **Save from a thread.** **Artifacts** in the thread panel launcher lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.

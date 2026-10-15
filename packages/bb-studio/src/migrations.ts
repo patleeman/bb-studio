@@ -1,4 +1,5 @@
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
+import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
 import { DRAWING_TABLES } from "./draw/server/store";
 import { DESIGN_MIGRATIONS } from "./design/server/store";
 import { TALK_MIGRATIONS } from "./talk/server/store";
@@ -365,4 +366,6 @@ export const MIGRATIONS = [
   SIDE_THREADS_TABLE,
   // Side threads are BB side chats now, a new one each time: a reply can have several.
   SIDE_THREADS_MANY,
+  // Live HTML artifacts (src/artifacts/live): shared state, event log and takes.
+  ARTIFACT_LIVE_TABLES,
 ];

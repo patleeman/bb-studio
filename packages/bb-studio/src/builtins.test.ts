@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
 import { ARTIFACT_TABLES, ArtifactStore } from "./artifacts/server/store";
 import { artifactProvider } from "./artifacts/server/provider";
 import { STUDIO_BUILTINS } from "@bb-studio/kit/contract";
@@ -68,6 +69,7 @@ describe("the hub with a built-in kind", () => {
   function setup(installed: string[]) {
     const db = new Database(":memory:");
     db.exec(ARTIFACT_TABLES);
+    db.exec(ARTIFACT_LIVE_TABLES);
     const store = new ArtifactStore(db);
     store.save({ name: "notes.md", mime: "text/markdown", bytes: new Uint8Array(Buffer.from("# Notes")), projectId: null, by: "agent" });
     const calls: string[] = [];
