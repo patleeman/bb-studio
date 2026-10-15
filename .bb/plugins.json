@@ -18,10 +18,6 @@
     {
       "name": "studio-code",
       "source": "./packages/bb-studio-code"
-    },
-    {
-      "name": "external-agents",
-      "source": "./packages/bb-studio-agents"
     }
   ]
 }

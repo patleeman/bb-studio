@@ -451,42 +451,6 @@ test("Bot info opens beside a Bot's chat once each time the chat opens, not agai
   state.call.mockImplementation(async () => ({}));
 });
 
-const providers = { installed: true, providers: [
-  { id: "hermes", displayName: "Hermes", logoUrl: null, status: "ready", message: "ok", models: [{ id: "hermes-agent", displayName: "hermes-agent", isDefault: true }], permissionModes: ["accept-edits", "full"] },
-  { id: "openclaw", displayName: "OpenClaw", logoUrl: null, status: "disabled", message: "OpenClaw is off. Turn it on in Studio Agents settings.", models: [] },
-  { id: "grok", displayName: "Grok", logoUrl: null, status: "ready", message: "ok", models: [{ id: "grok-4", displayName: "grok-4", isDefault: true }, { id: "grok-3", displayName: "grok-3", isDefault: false }], permissionModes: ["full"] },
-] };
-
-test("Import bot: picks a ready provider and model, shows the rest as not configured, and creates an external bot", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_external_providers: providers };
-  state.call.mockImplementation((async () => ({ bot: { ...dot, id: "bot_g", primary: false } })) as never);
-  await show(<BotThreadList {...listProps} />);
-  await act(async () => click(container.querySelector('[data-testid="bot-import"]')));
-  const radio = (id: string) => container.querySelector(`[data-provider="${id}"][role="radio"]`) as HTMLButtonElement;
-  expect(radio("hermes").getAttribute("aria-checked")).toBe("true");
-  // Hermes takes accept edits (the default) or full access.
-  expect((container.querySelector('select[aria-label="Permissions"]') as HTMLSelectElement).value).toBe("accept-edits");
-  expect(radio("openclaw").disabled).toBe(true);
-  expect(radio("openclaw").textContent).toContain("Not configured");
-  await act(async () => click(radio("grok")));
-  const model = container.querySelector('select[aria-label="Model"]') as HTMLSelectElement;
-  expect(model.value).toBe("grok-4");
-  expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement).value).toBe("Grok");
-  await act(async () => button("Import").click());
-  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "Grok", external: { providerId: "grok", model: "grok-4", permissionMode: "full" } }));
-  state.call.mockImplementation((async () => ({})) as never);
-});
-
-test("Import bot links to Studio Agents settings when no provider is ready", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_external_providers: { installed: true, providers: providers.providers.map((each) => ({ ...each, status: "disabled", models: [] })) } };
-  await show(<BotThreadList {...listProps} />);
-  await act(async () => click(container.querySelector('[data-testid="bot-import"]')));
-  expect(button("Import").disabled).toBe(true);
-  const { openAppPath } = await import("@bb-studio/kit/app");
-  act(() => button("Set up a provider in Studio Agents settings").click());
-  expect(openAppPath).toHaveBeenCalledWith("/settings/plugins/external-agents");
-});
-
 test("an external bot shows its provider's logo and hides Memory, skills and runners with a note", async () => {
   const herm = { ...dot, id: "bot_h", name: "Herm", primary: false, kind: "external", providerId: "hermes", model: "hermes-agent" };
   state.pathname = "/plugins/studio/studio/bot/bot_h";

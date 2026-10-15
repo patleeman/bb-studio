@@ -62,21 +62,20 @@ describe("classify", () => {
 
 describe("buildSetup", () => {
   it("lists every add-on with its status, checks and the commands left", async () => {
-    const plugins = allInstalled().filter((each) => !["external-agents", "mobile"].includes(each.id)).map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("other")]);
     const summary = await buildSetup(sdk, health({
       problems: [problem("smart-decisions", "degraded", "No Jev provider is set up"), problem("other", "broken", "Stopped")],
       healthy: [{ pluginId: "studio-code", pluginName: "Studio Code", titles: ["code-server found"] }],
     }));
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
-    expect(byId["external-agents"]).toMatchObject({ status: "not-installed", command: "bb plugin install external-agents@bb-studio --yes", summary: expect.stringMatching(/^External agent providers/) });
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
     expect(byId.studio).toMatchObject({ status: "disabled", command: "bb plugin enable studio" });
     expect(byId["smart-decisions"]).toMatchObject({ status: "needs-setup", command: null });
     expect(byId["smart-decisions"]!.problems.map((each) => each.title)).toEqual(["No Jev provider is set up"]);
     expect(byId["studio-code"]).toMatchObject({ status: "installed", passed: ["code-server found"] });
-    expect(summary.commands).toEqual(["bb plugin install external-agents@bb-studio --yes", "bb plugin enable studio"]);
-    expect(summary.installAll).toBe("bb plugin install external-agents@bb-studio --yes");
+    expect(summary.commands).toEqual(["bb plugin enable studio"]);
+    expect(summary.installAll).toBeNull();
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
     expect(summary.checkedAt).toBe(1000);
   });
@@ -104,8 +103,8 @@ describe("SetupService", () => {
 
   it("installs from the bb-studio marketplace with the source BB resolved, and reports failures", async () => {
     const fake = fakeSdk([plugin("studio")], { installFails: ["studio-code"] });
-    const result = await service(fake).install(["external-agents", "studio-code"]);
-    expect(fake.calls).toEqual(["install external-agents@bb-studio confirmed"]);
+    const result = await service(fake).install(["mobile", "studio-code"]);
+    expect(fake.calls).toEqual(["install mobile@bb-studio confirmed"]);
     expect(result.failures).toEqual([{ id: "studio-code", error: "permission denied" }]);
     await expect(service(fake).install(["not-ours"])).resolves.toMatchObject({ failures: [{ id: "not-ours", error: expect.stringContaining("isn't a BB Studio add-on") }] });
   });
@@ -113,8 +112,8 @@ describe("SetupService", () => {
   it("refuses an incompatible add-on", async () => {
     const fake = fakeSdk([]);
     fake.raw.plugins.catalog.installPlan.mockResolvedValueOnce({ kind: "marketplace", compatible: false, incompatibleReason: "Needs BB 0.50" as never, resolvedSource: {} as never });
-    const result = await service(fake).install(["external-agents"]);
-    expect(result.failures).toEqual([{ id: "external-agents", error: "Needs BB 0.50" }]);
+    const result = await service(fake).install(["mobile"]);
+    expect(result.failures).toEqual([{ id: "mobile", error: "Needs BB 0.50" }]);
     expect(fake.raw.plugins.catalog.install).not.toHaveBeenCalled();
   });
 
@@ -146,17 +145,17 @@ describe("retired Studio Reactions", () => {
 
 describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
-    const plugins = allInstalled().filter((each) => each.id !== "external-agents").map((each) => (each.id === "studio-code" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio-code" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("studio-tables")]);
     const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("smart-decisions", "degraded", "No Jev provider is set up"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
-    expect(text).toMatch(/ {2}not installed +external-agents +Studio Agents: External agent providers/);
+    expect(text).toMatch(/ {2}not installed +mobile +Studio Mobile:/);
     expect(text).toMatch(/ {2}disabled +studio-code +Studio Code:/);
     expect(text).toMatch(/ {2}needs setup +smart-decisions +Studio Decisions:.*\n +degraded: No Jev provider is set up\. Add a key/);
     expect(text).toMatch(/ {2}ok +studio +Studio:/);
     expect(text).toContain("Retired plugins still installed\n  studio-tables");
     expect(text).toContain("Then remove it: bb plugin remove studio-tables");
-    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin install external-agents@bb-studio --yes\n  bb plugin enable studio-code")).toBe(true);
+    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin enable studio-code")).toBe(true);
   });
 
   it("says when there's nothing left to run", async () => {
@@ -181,10 +180,10 @@ describe("SetupService install", () => {
       active--;
     });
     const service = new SetupService({ sdk, health: async () => health() });
-    const [first, second] = await Promise.all([service.install(["studio", "external-agents"]), service.install(["external-agents", "studio-code"])]);
+    const [first, second] = await Promise.all([service.install(["studio", "mobile"]), service.install(["mobile", "studio-code"])]);
     expect(first.failures).toEqual([]);
     expect(second.failures).toEqual([]);
-    expect(calls).toEqual(["install external-agents", "install studio-code"]);
+    expect(calls).toEqual(["install mobile", "install studio-code"]);
     expect(overlapped).toBe(false);
   });
 });

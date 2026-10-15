@@ -110,6 +110,15 @@ export const RETIRED: readonly RetiredPlugin[] = [
       return "Studio hasn't copied its settings yet. Run bb plugin reload studio, then check again.";
     },
   },
+  {
+    id: "external-agents",
+    name: "Studio Agents",
+    why: "Studio no longer lists external agents or offers Import bot, and Studio Agents gets no more updates. A bot you imported earlier keeps working while it stays installed.",
+    kept: "Your Studio bots. Bots imported from Hermes, OpenClaw, Grok or Dot keep their threads but stop answering once it's removed.",
+    deleted: REMOVED,
+    before: [],
+    blocker: async () => null,
+  },
 ];
 
 const RETIRED_IDS = new Set(RETIRED.map((plugin) => plugin.id));

@@ -19,5 +19,4 @@ export const ADDONS: readonly AddOn[] = [
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "smart-decisions", displayName: "Studio Decisions", description: "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions." },
   { id: "studio-code", displayName: "Studio Code", description: "Part of BB Studio. VS Code as BB's editor: each thread gets its own VS Code on its worktree, and code files open there. Run by a local code-server." },
-  { id: "external-agents", displayName: "Studio Agents", description: "Part of BB Studio. External agent providers for Studio bots: Hermes, OpenClaw and Grok, plus experimental ChatGPT Dot." },
 ];

@@ -1189,12 +1189,6 @@ bb studio reindex
 
 ![Two bots: Scout selected and expanded in the Bots list under Dot, the primary; the Bot page is Scout's Info: Checks in weekdays at 18:00, Open chat, Pause and Stop, Memory and Skills, its own Check-in (Weekdays 6:00 PM) and Skill curator under Automations, and Activity](assets/bot-two.png)
 
-![Import bot: the dialog over Dot's Info lists Hermes (picked, Ready) and Grok (Ready) with their logos, OpenClaw and Dot as Not configured with a pointer to Studio Agents settings, the model hermes-fixture, Accept edits, and a name, shape and color for the new bot](assets/bot-import.png)
-
-![An imported Hermes bot's Info: its avatar carries the Hermes logo in the Bots list and on the page; Runs on Hermes · hermes-fixture, and a note that its memory and tools live on Hermes, so Studio's Memory page, skills and runners don't reach it](assets/bot-external.png)
-
-![An imported Grok bot's chat, opened from its row as BB's thread page: the Grok logo on its avatar, Dot, Scout, Relay and Hermes listed above it, and its first reply streamed from the staged xAI fixture](assets/bot-external-grok.png)
-
 ![Switch model… on Relay's Info, a staged bot whose thread was handed off from Codex to Claude Code Opus and then switched in place to Sonnet: the dialog says Now on Claude Code · claude-sonnet-5-5 over BB's own provider/model picker set to Sonnet 5.5](assets/bot-switch-model.png)
 
 ![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads, each titled Relay, are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
@@ -1689,28 +1683,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `bot_runner_delete`, `bot_runner_seen`, `bot_runner_adopt`. The Bot's
     tools: `runner_create`, `runner_update`, `runner_pause`,
     `runner_resume`, `runner_delete`, `runner_list`, `runner_run_now`.
-- **External bots** (**Import bot**, the ⤓ beside **+** over the Bots list):
-  a bot whose thread runs on an external agent through
-  [Studio Agents](../bb-studio-agents/README.md): Hermes, OpenClaw, Grok or
-  the experimental Dot. The dialog lists those providers with their state
-  from Studio Agents' `health` RPC (Ready, Not configured, Offline, Needs a
-  key, Not installed) and links to Studio Agents settings when none is
-  ready. Pick one, its model (OpenClaw: its Gateway agent), a name, shape
-  and color, and its **Permissions** (only the modes the provider supports;
-  Accept edits by default, Grok is Full access only), all for its first
-  thread; `bot_create` with `external: { providerId, model, permissionMode }`
-  starts that thread (`bot_external_providers` lists the choices with their
-  `permissionModes`). Your first bot is always a Studio bot.
-  - **What works**: its chat, the Bots sidebar, sub-threads, Needs you,
-    check-ins (Studio's automation sends its thread the check-in message),
-    Pause, Resume and Stop. Its avatar carries the provider's logo.
-  - **What doesn't**: Studio's Memory page, bot skills, runners and the
-    `bot_*`/Studio tools can't reach a remote agent, so the bot gets none:
-    Info and its ⋯ menu say "Runs on Hermes — its memory and tools live
-    there.", and `bot_memory`, `bot_skill_write`, `bot_runner_create` and
-    `bot_runner_adopt` refuse an external bot. Its instructions only say who
-    it is. A Studio backup doesn't carry the provider yet: a restored
-    external bot comes back as a Studio bot.
+- **External bots**: Studio no longer lists the Studio Agents plugin or
+  offers Import bot. A bot made earlier on an external agent (Hermes,
+  OpenClaw, Grok or Dot) keeps working where that plugin is still
+  installed: its chat, sub-threads, check-ins, Pause, Resume and Stop work,
+  Info says "Runs on …", and Studio's Memory page, skills, runners and
+  `bot_*` tools don't reach it (`bot_external_providers` still reports the
+  providers).
 - **Model is the thread's**: a bot follows its current thread, and the
   provider and model are that thread's (`bot_get` reads them off BB). BB keeps
   a thread on one provider for life: `threads.update` changes only its model

@@ -19,7 +19,6 @@ import { useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
-import { ImportBotDialog } from "./ImportBot";
 import { ArchiveButton, RenameInput, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
@@ -129,7 +128,6 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
   const bots = list.data?.bots ?? [];
   const selected = creating ? null : view.data?.bot ?? null;
   useEffect(() => { if (selected) rememberBot(selected.id); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [importing, setImporting] = useState(false);
   // No Bot yet, once the list says so: a row for the welcome, not a message.
   const none = !bots.length && !!list.data && !list.error;
   return (
@@ -139,10 +137,7 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
         <span className="min-w-0 flex-1">Bots</span>
         <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
           className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-3.5" /></button>
-        <button type="button" aria-label="Import bot" title="Import bot from an external agent" data-testid="bot-import" onClick={() => setImporting(true)}
-          className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Download" className="size-3.5" /></button>
       </div>
-      {importing ? <ImportBotDialog onClose={() => setImporting(false)} /> : null}
       {(creating && bots.length) || none ? (
         <button type="button" aria-current={creating || !threadId ? "page" : undefined} data-testid="bot-new-row" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
           className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-state-hover aria-[current=page]:bg-state-active">
