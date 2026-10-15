@@ -18,3 +18,15 @@ describe("opening a file with VS Code as the default", () => {
     expect(shouldAutoOpen({ kind: "thread-storage", threadId: "thr_1" })).toBe(false);
   });
 });
+
+describe("one trip to VS Code per open", () => {
+  it("sends a click once, not again when the file tab remounts, and again for a new click", async () => {
+    const { claimOpen } = await import("./file-opener");
+    const first = { startLineNumber: 7, endLineNumber: 12 };
+    expect(claimOpen("thr_a", "src/x.ts", first)).toBe(true);
+    expect(claimOpen("thr_a", "src/x.ts", first)).toBe(false);
+    expect(claimOpen("thr_a", "src/x.ts", { startLineNumber: 7, endLineNumber: 12 })).toBe(true);
+    expect(claimOpen("thr_b", "src/x.ts", null)).toBe(true);
+    expect(claimOpen("thr_b", "src/x.ts", null)).toBe(false);
+  });
+});
