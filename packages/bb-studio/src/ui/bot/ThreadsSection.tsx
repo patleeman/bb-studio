@@ -7,7 +7,8 @@
 // Sub-threads and hidden threads stay out, and so does every thread the Bots
 // section shows (bot_listed_threads). Each row has BB's own thread menu
 // (right-click or the hover ⋯) and Archive on hover, with rename in place.
-// A row drags onto a Bot in the Bots section to hand the thread to it.
+// A row drags onto a Bot in the Bots section to hand the thread to it; a
+// row from a Bot's list dropped here takes the thread back (bot_thread_release).
 import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
@@ -20,12 +21,15 @@ import {
   useSidebarThreadShortcut,
   type PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import { useMemo, useState } from "react";
-import { useLive } from "../live";
+import { useMemo, useState, type DragEvent } from "react";
+import { toast } from "sonner";
+import { useCall, useLive } from "../live";
 
 type Thread = PluginSidebarThread;
 /** The drag type of a thread row: its id, dropped on a Bot to hand it over (BotSidebar.tsx). */
 export const THREAD_DRAG = "application/x-studio-thread";
+/** Set as well on a row from a Bot's list: only those drop on Threads. */
+export const BOT_THREAD_DRAG = "application/x-studio-bot-thread";
 export type ThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
 
 const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
@@ -127,8 +131,27 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
   const [view, setView] = useThreadsView();
   const rows = useMemo(() => listedThreads(state.threads, botThreads, view.sort), [state.threads, botThreads, view.sort]);
   const projects = useMemo(() => new Map(state.projects.map((project) => [project.id, project.name])), [state.projects]);
+  // A Bot's thread dropped here comes back to the user.
+  const call = useCall();
+  const [over, setOver] = useState(false);
+  const fromBot = (event: DragEvent) => event.dataTransfer.types.includes(BOT_THREAD_DRAG);
+  const drop = {
+    onDragOver: (event: DragEvent) => { if (!fromBot(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setOver(true); },
+    onDragLeave: (event: DragEvent) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false); },
+    onDrop: (event: DragEvent) => {
+      setOver(false);
+      const threadId = fromBot(event) ? event.dataTransfer.getData(THREAD_DRAG) : "";
+      if (!threadId) return;
+      event.preventDefault();
+      call("bot_thread_release", { threadId }).then(
+        () => toast.success("Moved to your threads"),
+        (error: unknown) => toast.error(`Couldn't take it back: ${error instanceof Error ? error.message : String(error)}`),
+      );
+    },
+  };
   return (
-    <section aria-label="Threads" data-testid="threads-section" className="flex flex-col gap-0.5 px-1.5 pb-3">
+    <section aria-label="Threads" data-testid="threads-section" {...drop} data-drop-over={over || undefined}
+      className={cn("flex flex-col gap-0.5 rounded-md px-1.5 pb-3", over && "ring-2 ring-inset ring-ring")}>
       <div className="flex h-7 items-center gap-1 pl-2 text-[11px] font-medium text-muted-foreground">
         <button type="button" aria-expanded={!closed} onClick={() => setClosed(!closed)} className="group flex min-w-0 flex-1 items-center gap-1 text-left hover:text-foreground">
           <span className="truncate">Threads</span>

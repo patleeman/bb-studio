@@ -27,7 +27,9 @@
 // The user can also hand a Bot a thread (drag it onto the Bot in the
 // sidebar: adopt). It's hidden and recorded as "adopted"; that wins over any
 // other owner, and what the thread spawns is the Bot's too. The Bot's chat
-// gets a line saying so (handed).
+// gets a line saying so (handed). Dragged back onto Threads, the user takes
+// it back (release): shown again and recorded as "released", so it's no
+// Bot's, nor is what it spawns, and no sweep hides it again.
 //
 // Studio records each thread it hid (bot_hidden_threads) and never hides a
 // thread twice: a thread the user made visible again stays visible, the
@@ -131,6 +133,11 @@ export class BotOwnedThreads {
     return new Map((this.deps.db.prepare("SELECT thread_id, bot_id FROM bot_hidden_threads WHERE reason = 'adopted'").all() as { thread_id: string; bot_id: string }[]).map((row) => [row.thread_id, row.bot_id]));
   }
 
+  /** Threads the user took back from a Bot. */
+  private released(): Set<string> {
+    return new Set((this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads WHERE reason = 'released'").all() as { thread_id: string }[]).map((row) => row.thread_id));
+  }
+
   private recorded(): Set<string> {
     return new Set((this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads").all() as { thread_id: string }[]).map((row) => row.thread_id));
   }
@@ -138,7 +145,7 @@ export class BotOwnedThreads {
   /** The threads a Bot owns (as last seen), its chain left out: Activity lists them under it. */
   owned(botId: string): Set<string> {
     const ids = new Set([...this.owners].filter(([, bot]) => bot === botId).map(([id]) => id));
-    for (const row of this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads WHERE bot_id = ?").all(botId) as { thread_id: string }[]) ids.add(row.thread_id);
+    for (const row of this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads WHERE bot_id = ? AND reason != 'released'").all(botId) as { thread_id: string }[]) ids.add(row.thread_id);
     for (const [id, bot] of this.adopted()) if (bot !== botId) ids.delete(id);
     for (const id of this.chains().keys()) ids.delete(id);
     return ids;
@@ -146,7 +153,8 @@ export class BotOwnedThreads {
 
   /** Every thread any Bot has: its chain, the threads it owns as last seen, and the ones Studio hid for it. */
   all(): Set<string> {
-    return new Set([...this.chains().keys(), ...this.owners.keys(), ...this.recorded()]);
+    const released = this.released();
+    return new Set([...this.chains().keys(), ...this.owners.keys(), ...[...this.recorded()].filter((id) => !released.has(id))]);
   }
 
   /**
@@ -157,7 +165,7 @@ export class BotOwnedThreads {
   ownerOf(threadId: string): string | null {
     const chained = this.chains().get(threadId) ?? this.adopted().get(threadId) ?? this.owners.get(threadId);
     if (chained) return chained;
-    const row = this.deps.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ?").get(threadId) as { bot_id: string } | undefined;
+    const row = this.deps.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ? AND reason != 'released'").get(threadId) as { bot_id: string } | undefined;
     return row?.bot_id ?? null;
   }
 
@@ -179,6 +187,19 @@ export class BotOwnedThreads {
     const title = thread.title || thread.titleFallback || "Untitled thread";
     await this.deps.handed?.({ id: threadId, title, projectId: (thread as { projectId?: string | null }).projectId ?? null }, botId).catch((error) => this.deps.log?.(`Couldn't tell the bot about ${threadId}: ${(error as Error)?.message ?? error}`));
     return { botId };
+  }
+
+  /** The user takes a thread back from its Bot: shown in BB's list again, and no Bot's from now on. */
+  async release(threadId: string): Promise<{ ok: true }> {
+    const bot = this.ownerOf(threadId);
+    if (!bot) throw new Error("That thread isn't a bot's.");
+    if (this.chains().has(threadId)) throw new Error("That's the bot's own chat; it stays with the bot.");
+    if (this.deps.skip?.().has(threadId)) throw new Error("That's a runner; it stays with its bot.");
+    await this.deps.sdk.threads.update({ threadId, visibility: "visible" } as never);
+    this.deps.db.prepare("INSERT INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'released', ?) ON CONFLICT (thread_id) DO UPDATE SET reason = excluded.reason, hidden_at = excluded.hidden_at").run(threadId, bot, Date.now());
+    this.owners.delete(threadId);
+    this.deps.changed?.();
+    return { ok: true };
   }
 
   /** Hides it once and records that Studio did; false when BB refused (the next sweep tries again). */
@@ -254,7 +275,10 @@ export class BotOwnedThreads {
   private async run(): Promise<number> {
     const chains = this.chains();
     if (!chains.size) return 0;
-    const [threads, automations] = await Promise.all([this.threads(), this.automations()]);
+    const [listed, automations] = await Promise.all([this.threads(), this.automations()]);
+    // A thread the user took back is no Bot's, and nothing reaches the Bot through it.
+    const released = this.released();
+    const threads = listed.filter((thread) => !released.has(thread.id));
     // Adopted threads seed ownership as a chain does, and keep their Bot.
     const adopted = this.adopted();
     const seeds = new Map([...adopted, ...chains]);

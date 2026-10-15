@@ -202,3 +202,29 @@ it("adopts a thread the user hands a Bot: hidden, owned with what it spawns, and
   x.skip.add("thr_run_untitled");
   await expect(x.owned.adopt("thr_run_untitled", "bot_scout")).rejects.toThrow(/runner/);
 });
+
+it("releases a thread the user takes back: shown again, no Bot's, and what it spawns stays the user's through sweeps", async () => {
+  const x = await setup();
+  seedChief(x);
+  await x.owned.sweep();
+  // A thread the Bot spawned, and one the user had handed it.
+  await x.owned.adopt("thr_user", "bot_main");
+  for (const id of ["thr_g3hgcvzv2n", "thr_user"]) {
+    await x.owned.release(id);
+    expect(x.threads.get(id)?.visibility).toBe("visible");
+    expect(x.owned.ownerOf(id)).toBeNull();
+    expect(x.owned.owned("bot_main").has(id)).toBe(false);
+    expect(x.owned.all().has(id)).toBe(false);
+  }
+  x.add({ id: "thr_released_child", parentThreadId: "thr_g3hgcvzv2n" });
+  await x.owned.created(x.threads.get("thr_released_child")!);
+  await x.owned.sweep();
+  for (const id of ["thr_g3hgcvzv2n", "thr_user", "thr_released_child"]) expect(x.threads.get(id)?.visibility).toBe("visible");
+  expect(x.owned.ownerOf("thr_released_child")).toBeNull();
+  // Handed back again, it's the Bot's again.
+  await x.owned.adopt("thr_user", "bot_main");
+  expect(x.owned.ownerOf("thr_user")).toBe("bot_main");
+  // The Bot's chat and threads no Bot owns don't release.
+  await expect(x.owned.release("thr_k3mtxc4nju")).rejects.toThrow(/own chat/);
+  await expect(x.owned.release("thr_fork")).rejects.toThrow(/isn't a bot's/);
+});

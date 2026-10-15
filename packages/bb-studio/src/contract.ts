@@ -514,6 +514,8 @@ export const rpcContract = defineRpcContract({
   bot_thread_owner: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string().nullable() }) },
   /** Hands a thread to a Bot (dropped on it in the sidebar): it moves under the Bot, out of BB's thread list. */
   bot_thread_adopt: { input: z.object({ botId: z.string().min(1).max(100), threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string() }) },
+  /** Takes a thread back from its Bot (dropped on Threads in the sidebar): back in BB's thread list, and no Bot's from now on. */
+  bot_thread_release: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ ok: z.literal(true) }) },
   /** A check-in preset: sets the schedule and adds its one-line instruction to the Memory page's Check-in section. */
   bot_checkin_preset: { input: z.object({ botId, preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */

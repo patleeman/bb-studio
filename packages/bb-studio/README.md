@@ -1243,8 +1243,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   with the threads it spawns later (`bot_thread_adopt`), and the bot's chat
   gets a 📥 line linking it, which the bot answers with a line or two on
   what the thread is about and whether it waits on anyone. A thread in one
-  bot's list drags onto another bot the same way; a bot's own chat and its
-  runners stay put.
+  bot's list drags onto another bot the same way, or back onto **Threads**
+  to take it back (`bot_thread_release`): it's in BB's list again and no
+  bot's, nor are the threads it spawns, until you hand it over again. A
+  bot's own chat and its runners stay put.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the

@@ -10,7 +10,8 @@
 // panel action open beside it. Each Bot's ⓘ opens its Info: beside the chat
 // on its thread (the Bot info panel action), else its Bot page.
 // A thread dragged onto a Bot's row (from Threads, or another Bot's list)
-// moves under that Bot (bot_thread_adopt).
+// moves under that Bot (bot_thread_adopt); one from a Bot's list dropped on
+// Threads comes back to the user (ThreadsSection.tsx).
 import { Icon } from "@bb-studio/kit/ui";
 import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
@@ -22,7 +23,7 @@ import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
-import { ArchiveButton, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
+import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
@@ -344,7 +345,7 @@ function Row({ thread, active, onOpen }: { thread: BotThreadView; depth: number;
   const tone = toneOf(thread);
   return (
     <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
-      draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
+      draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
       <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`} role="img" aria-label={TONE_LABEL[tone]} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{thread.title}</span>

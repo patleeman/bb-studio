@@ -581,3 +581,23 @@ test("a thread dragged from Threads onto a bot's row moves under that bot", asyn
   expect(state.call).toHaveBeenCalledWith("bot_thread_adopt", { botId: "bot_scout", threadId: "thr_mine" });
   expect(target.hasAttribute("data-drop-over")).toBe(false);
 });
+
+test("a thread dragged from a bot's list onto Threads comes back; a Threads row dropped there does nothing", async () => {
+  state.pathname = "/plugins/pages/pages";
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, completed: [thread("thr_done", "Done work")] }, bot_listed_threads: { threadIds: [] } };
+  await show(<BotThreadList {...listProps} />);
+  const data = new Map<string, string>();
+  const dataTransfer = { setData: (type: string, value: string) => data.set(type, value), getData: (type: string) => data.get(type) ?? "", get types() { return [...data.keys()]; }, effectAllowed: "", dropEffect: "" };
+  const drag = (el: Element, type: string) => { const event = Object.assign(new Event(type, { bubbles: true, cancelable: true }), { dataTransfer }); el.dispatchEvent(event); return event; };
+  const section = container.querySelector('[data-testid="threads-section"]')!;
+  // Only a Bot's thread drops here.
+  data.set("application/x-studio-thread", "thr_mine");
+  expect(drag(section, "dragover").defaultPrevented).toBe(false);
+  data.clear();
+  act(() => { drag(container.querySelector('[data-thread="thr_done"]')!, "dragstart"); });
+  let over!: Event;
+  act(() => { over = drag(section, "dragover"); });
+  expect(over.defaultPrevented).toBe(true);
+  await act(async () => { drag(section, "drop"); });
+  expect(state.call).toHaveBeenCalledWith("bot_thread_release", { threadId: "thr_done" });
+});
