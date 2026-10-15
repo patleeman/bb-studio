@@ -56,24 +56,6 @@ export class WorkspaceStore {
     return row ? decode(row) : null;
   }
 
-  /**
-   * The workspace Code's page opens: the one last opened (or else changed),
-   * live and with folders. A thread's worktree workspace only when nothing else.
-   */
-  recent(): Workspace | null {
-    const row = this.db
-      .prepare("SELECT * FROM code_workspaces WHERE archived = 0 AND folders != '[]' ORDER BY thread_id IS NOT NULL, COALESCE(opened_at, updated_at) DESC LIMIT 1")
-      .get() as Row | undefined;
-    return row ? decode(row) : null;
-  }
-
-  /** Workspaces not archived, the one last opened first: Code's switcher. */
-  recentList(): Workspace[] {
-    return (this.db
-      .prepare("SELECT * FROM code_workspaces WHERE archived = 0 ORDER BY COALESCE(opened_at, updated_at) DESC")
-      .all() as Row[]).map(decode);
-  }
-
   /** The thread a workspace's review goes to: its own thread, else the one whose VS Code tab last showed it. */
   reviewThread(id: string): string | null {
     const row = this.db.prepare("SELECT thread_id, review_thread_id FROM code_workspaces WHERE id = ?").get(id) as { thread_id: string | null; review_thread_id: string | null } | undefined;

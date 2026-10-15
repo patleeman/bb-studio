@@ -1,6 +1,5 @@
-// Studio Code: a workspace for the seeded project, open full-page on Code's
-// own page (with its switcher in the title bar), and the same editor beside a
-// thread. The editor is a cross-origin
+// Studio Code: the thread's VS Code beside a conversation, open to the
+// thread's own folder. The editor is a cross-origin
 // frame, so its contents are read through an isolated world in that frame,
 // not from BB's page; what the editor shows is checked through the bridge
 // (editorState), which reports what VS Code itself has on screen.
@@ -29,13 +28,6 @@ async function waitFor(sleep, what, check, timeoutMs = 120000) {
 
 const explorer = `[...document.querySelectorAll(".explorer-folders-view .label-name")].map((label) => label.textContent)`;
 
-/** A workspace for the seeded project, open to its folder (the Orbit checkout). */
-async function makeWorkspace(pluginRpc, projectId) {
-  const { workspace } = await pluginRpc("studio-code", "create", { projectId });
-  if (workspace.folders.length !== 1) throw new Error("The workspace didn't start with its project's folder");
-  return { ...workspace, href: `/plugins/studio-code/workspaces/${workspace.id}` };
-}
-
 /** Waits for VS Code to show the project and the bridge to connect, then reveals lines and checks the editor has them. */
 async function revealIn(client, pluginRpc, sleep, id, startLine, endLine) {
   await waitFor(sleep, "VS Code showing the project", async () => {
@@ -56,25 +48,6 @@ export default ({ projectId, pluginRpc, sleep }) => [
   {
     id: "studio-code", packageDir: "bb-studio-code", privateSidebar: true,
     setup: async (client) => {
-      const item = await makeWorkspace(pluginRpc, projectId);
-      const cleanup = async () => {
-        await pluginRpc("studio-code", "stop", { id: item.id }).catch(() => {});
-        await pluginRpc("studio-code", "archive", { id: item.id, archived: true }).catch(() => {});
-      };
-      try {
-        await client.navigate(item.href);
-        // Code's own page, not a Studio tab: the switcher names the workspace.
-        await waitFor(sleep, "Code's page with its workspace switcher", () => client.evaluate(`location.pathname === ${JSON.stringify(item.href)} && !!document.querySelector('button[aria-label="Switch workspace"]') && !!document.querySelector('input[aria-label="Workspace name"], [aria-label="Workspace name"]')`));
-        await revealIn(client, pluginRpc, sleep, item.id, 8, 18);
-        // Laid out for BB: VS Code's side bar on the right, no title bar.
-        if (!(await inEditor(client, `document.querySelector(".part.sidebar")?.classList.contains("right")`))) throw new Error("VS Code's side bar isn't on the right");
-      } catch (error) { await cleanup(); throw error; }
-      return cleanup;
-    },
-  },
-  {
-    id: "studio-code-thread", packageDir: "bb-studio-code", fileName: "staged-thread.png", privateSidebar: true,
-    setup: async (client) => {
       // The thread that ran in the Orbit checkout, so it has a folder for VS Code.
       const workspaceThreadId = process.env.BB_CAPTURE_WORKSPACE_THREAD_ID;
       if (!workspaceThreadId) throw new Error("Set BB_CAPTURE_WORKSPACE_THREAD_ID (staged-bb.mjs seeds it) to capture VS Code beside a thread.");
@@ -82,7 +55,6 @@ export default ({ projectId, pluginRpc, sleep }) => [
       const cleanup = async () => {
         if (!id) return;
         await pluginRpc("studio-code", "stop", { id }).catch(() => {});
-        await pluginRpc("studio-code", "archive", { id, archived: true }).catch(() => {});
       };
       try {
         await client.navigate(`/projects/${projectId}/threads/${workspaceThreadId}`);
@@ -93,13 +65,15 @@ export default ({ projectId, pluginRpc, sleep }) => [
         await client.evaluate(`(() => { const button = [...document.querySelectorAll("button")].find((each) => each.getAttribute("aria-label")?.startsWith("Open new tab")); if (!button) throw new Error("No new-tab button"); button.click(); })()`);
         await sleep(800);
         await client.clickButtonText("VS Code");
-        // The tab opens the thread's own folder as a workspace, made on first open.
+        // The tab opens the thread's own folder, its VS Code made on first open.
         await waitFor(sleep, "the thread's worktree workspace", async () => {
           const { workspace } = await pluginRpc("studio-code", "threadWorkspace", { threadId: workspaceThreadId });
           id = workspace?.id ?? null;
           return !!id;
         });
         await revealIn(client, pluginRpc, sleep, id, 13, 15);
+        // Laid out for BB: VS Code's side bar on the right, no title bar.
+        if (!(await inEditor(client, `document.querySelector(".part.sidebar")?.classList.contains("right")`))) throw new Error("VS Code's side bar isn't on the right");
         // The chat and the editor side by side.
         if (!(await client.hasText("Pick a database for the todo app"))) throw new Error("The thread isn't beside the editor");
       } catch (error) { await cleanup(); throw error; }

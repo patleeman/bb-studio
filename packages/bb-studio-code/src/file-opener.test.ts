@@ -5,33 +5,16 @@ vi.mock("@bb-studio/kit/app", () => ({ BAR_BUTTON: "", Icon: () => null }));
 vi.mock("@bb-studio/kit/format", () => ({ errorMessage: String }));
 
 describe("opening a file with VS Code as the default", () => {
-  const rpcWith = (workspace: unknown, fail = false) => {
-    const calls: string[] = [];
-    return { calls, rpc: { call: async (method: string) => { calls.push(method); if (fail) throw new Error("down"); return { workspace }; } } };
-  };
-
-  it("leaves BB's preview alone and makes nothing when the thread has no workspace", async () => {
-    const { openIfWorkspace } = await import("./file-opener");
-    const { calls, rpc } = rpcWith(null);
-    const open = vi.fn();
-    expect(await openIfWorkspace(rpc as never, "thr_1", open)).toBe(false);
-    expect(open).not.toHaveBeenCalled();
-    expect(calls).toEqual(["threadWorkspace"]);
+  it("goes straight to the thread's VS Code for files in the thread's folder or on its host", async () => {
+    const { shouldAutoOpen } = await import("./file-opener");
+    expect(shouldAutoOpen({ kind: "workspace", threadId: "thr_1" })).toBe(true);
+    expect(shouldAutoOpen({ kind: "host", threadId: "thr_1" })).toBe(true);
   });
 
-  it("sends the file to VS Code when the thread already has a workspace", async () => {
-    const { openIfWorkspace } = await import("./file-opener");
-    const { rpc } = rpcWith({ id: "ws_1" });
-    const open = vi.fn();
-    expect(await openIfWorkspace(rpc as never, "thr_1", open)).toBe(true);
-    expect(open).toHaveBeenCalledOnce();
-  });
-
-  it("stays on BB's preview when Studio Code can't answer", async () => {
-    const { openIfWorkspace } = await import("./file-opener");
-    const { rpc } = rpcWith(null, true);
-    const open = vi.fn();
-    expect(await openIfWorkspace(rpc as never, "thr_1", open)).toBe(false);
-    expect(open).not.toHaveBeenCalled();
+  it("stays on BB's preview with no thread, or for thread storage", async () => {
+    const { shouldAutoOpen } = await import("./file-opener");
+    expect(shouldAutoOpen({ kind: "workspace", threadId: null })).toBe(false);
+    expect(shouldAutoOpen({ kind: "host", threadId: null })).toBe(false);
+    expect(shouldAutoOpen({ kind: "thread-storage", threadId: "thr_1" })).toBe(false);
   });
 });

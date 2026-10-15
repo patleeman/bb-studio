@@ -1,12 +1,12 @@
 // bb-studio-code — server entry.
 //
-// A workspace is Code's own (not a Studio item): a title, the project it
-// belongs to, and the folders VS Code opens. Opening one starts code-server
-// for it (src/server/runtime.ts); the app shows that editor in a frame.
+// VS Code is the editor: each thread gets one workspace, its own worktree,
+// shown in the thread's VS Code tab. Opening it starts code-server for it
+// (src/server/runtime.ts); the app shows that editor in a frame.
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { defineItemMention, mustGet } from "@bb-studio/kit/server";
+import { mustGet } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Activity } from "./src/server/activity";
@@ -16,7 +16,7 @@ import { installBridge } from "./src/server/bridge-extension";
 import { editOnDisk, editOutcome, editSchema } from "./src/server/edits";
 import { contained, listDir, readText } from "./src/server/files";
 import { chipFor, relatedWorkspaces } from "./src/server/chip";
-import { browseFolders, sensitiveFolder } from "./src/server/folders";
+import { sensitiveFolder } from "./src/server/folders";
 import { applyLayoutEverywhere, applyThemeEverywhere } from "./src/server/settings";
 import type { BbTheme } from "./src/theme";
 import { CodeServers } from "./src/server/runtime";
@@ -96,9 +96,6 @@ export default function plugin(bb: BbPluginApi) {
   bb.onDispose(() => clearTimeout(reloaded));
   const must = (id: string) => mustGet((key) => store.get(key), id, "Workspace not found.");
 
-  /** The reply card that opens the workspace beside the chat. */
-  const card = (id: string) => `Put this line on its own in your reply so the user can open the workspace beside the chat:\n::workspace{id="${id}"}`;
-
   /** The thread's working folder, when it's on the machine running BB. */
   const threadFolder = async (threadId: string) => {
     const thread = (await bb.sdk.threads.get({ threadId, include: "environment" })) as {
@@ -144,22 +141,11 @@ export default function plugin(bb: BbPluginApi) {
     return workspace;
   };
 
-  const projects = async () =>
-    (await bb.sdk.projects.list({ includePersonal: true })).flatMap((project) => {
-      const path = (project.sources.find((source) => source.isDefault) ?? project.sources[0])?.path;
-      return path ? [{ id: project.id, name: project.name, path }] : [];
-    });
-
   bb.rpc.register(codeContract, {
     get: ({ id }) => ({ workspace: store.get(id), status: servers.status(id) }),
-    update: async ({ id, title, folders, share }) => {
+    update: ({ id, share }) => {
       must(id);
-      const workspace = store.update(id, {
-        ...(share !== undefined ? { share } : {}),
-        ...(title !== undefined ? { title } : {}),
-        ...(folders !== undefined ? { folders: await checkFolders(folders) } : {}),
-      });
-      if (folders !== undefined) await servers.sync(workspace);
+      const workspace = store.update(id, { share });
       changes.changed(id);
       return { workspace };
     },
@@ -167,33 +153,6 @@ export default function plugin(bb: BbPluginApi) {
       const workspace = must(id);
       store.markOpened(id);
       return { status: await servers.open(workspace) };
-    },
-    recent: async () => {
-      const existing = store.recent();
-      if (existing) return { workspace: existing };
-      const project = (await projects())[0];
-      const empty = store.list().find((workspace) => !workspace.archived);
-      if (!project && empty) return { workspace: empty };
-      const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
-      const workspace = store.create({ title: project?.name ?? "Workspace", projectId: project?.id ?? null, folders });
-      changes.changed(workspace.id);
-      return { workspace };
-    },
-    list: () => ({ workspaces: store.recentList() }),
-    create: async ({ title, projectId }) => {
-      const project = projectId ? (await projects()).find((candidate) => candidate.id === projectId) : undefined;
-      const folders = project ? await checkFolders([project.path]).catch(() => []) : [];
-      const workspace = store.create({ title: title ?? project?.name ?? "Workspace", projectId: project?.id ?? null, folders });
-      store.markOpened(workspace.id);
-      changes.changed(workspace.id);
-      return { workspace };
-    },
-    archive: ({ id, archived }) => {
-      must(id);
-      if (archived) servers.stop(id);
-      const workspace = store.update(id, { archived });
-      changes.changed(id);
-      return { workspace };
     },
     stop: ({ id }) => ({ status: servers.stop(must(id).id) }),
     threadWorkspace: ({ threadId }) => ({ workspace: store.forThread(threadId) ?? null }),
@@ -205,7 +164,6 @@ export default function plugin(bb: BbPluginApi) {
       return { entries: await listDir(folders, path) };
     },
     readFile: async ({ id, path }) => readText(safeFolders(must(id)), path),
-    browseFolders: ({ path, showHidden }) => browseFolders(path, homedir(), showHidden),
     viewedFrom: ({ id, threadId }) => { must(id); store.setReviewThread(id, threadId); return { ok: true as const }; },
     editorState: ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
     threadChip: async ({ threadId }) => ({
@@ -218,7 +176,6 @@ export default function plugin(bb: BbPluginApi) {
       await contained(safeFolders(workspace), file);
       return { shown: bridges.send(id, { type: "show", path: file, startLine, endLine: Math.max(endLine ?? startLine, startLine) }) };
     },
-    projects: async () => ({ projects: await projects() }),
     syncTheme: async (next) => {
       const key = JSON.stringify(next);
       if (key === themeKey) return { changed: false };
@@ -231,70 +188,17 @@ export default function plugin(bb: BbPluginApi) {
     },
   });
 
-  /** Agents name folders the user didn't pick: VS Code keeps trust on for them. */
-  const untrust = (workspace: Workspace) => {
-    if (!workspace.trusted) return workspace;
-    const next = store.update(workspace.id, { trusted: false });
-    // Its server skipped trust; restart without that. The open view reopens it.
-    if (servers.status(workspace.id).state !== "stopped") servers.stop(workspace.id);
-    return next;
-  };
-
-  const summary = (workspace: Workspace) =>
-    `${workspace.id}\t${workspace.title}${workspace.threadId ? " (thread worktree)" : ""}\t${workspace.folders.join(", ") || "no folders"}`;
-  bb.agents.registerTool({
-    name: "code_workspaces_list",
-    description: "List the user's VS Code workspaces (Studio Code): id, title and folders.",
-    parameters: z.object({}),
-    execute: () => store.list().filter((workspace) => !workspace.archived).map(summary).join("\n") || "No workspaces.",
-  });
   bb.agents.registerTool({
     name: "code_workspace_open",
     description:
-      "Give the user a VS Code workspace beside the chat. With no folders, it opens this thread's own worktree, so the user can review and edit your changes. With folders (full paths on the computer running BB), it makes a new workspace for them. Returns a card line for your reply.",
-    parameters: z.object({
-      folders: z.array(z.string().trim().min(1).max(4096)).max(50).optional(),
-      title: z.string().trim().min(1).max(200).optional(),
-    }),
-    execute: async ({ folders, title }, ctx) => {
-      let workspace: Workspace;
-      if (folders?.length) {
-        workspace = store.create({ title: title ?? "Workspace", projectId: ctx.projectId ?? null, folders: await checkFolders(folders), trusted: false });
-        changes.changed(workspace.id);
-      } else {
-        workspace = await forThread(ctx.threadId);
-        if (title && title !== workspace.title) {
-          workspace = store.update(workspace.id, { title });
-          changes.changed(workspace.id);
-        }
-      }
-      return `${summary(workspace)}\n${card(workspace.id)}`;
+      "Open VS Code beside the chat on this thread's own worktree, so the user can review and edit your changes. Each thread has one; this makes it the first time. The user opens it from the thread's VS Code tab.",
+    parameters: z.object({}),
+    execute: async (_input, ctx) => {
+      const workspace = await forThread(ctx.threadId);
+      return `This thread's VS Code is ready on ${workspace.folders.join(", ") || "no folder"}. The user sees it in the thread's VS Code tab.`;
     },
   });
-  bb.agents.registerTool({
-    name: "code_workspace_set_folders",
-    description: "Replace a workspace's folders (full paths on the computer running BB). An open VS Code updates without reloading.",
-    parameters: z.object({ id: z.string().min(1).max(100), folders: z.array(z.string().trim().min(1).max(4096)).min(1).max(50) }),
-    execute: async ({ id, folders }) => {
-      untrust(must(id));
-      const workspace = store.update(id, { folders: await checkFolders(folders) });
-      await servers.sync(workspace);
-      changes.changed(id);
-      return `${summary(workspace)}\n${card(id)}`;
-    },
-  });
-  // `@` and a workspace's name in a composer: its folders, for the agent.
-  bb.ui.registerMentionProvider(
-    defineItemMention({
-      id: "workspace",
-      label: "Workspaces",
-      search: ({ query }) =>
-        store.list()
-          .filter((workspace) => !workspace.archived && `${workspace.title}\n${workspace.folders.join("\n")}`.toLowerCase().includes(query.toLowerCase()))
-          .map((workspace) => ({ id: workspace.id, title: workspace.title, subtitle: workspace.folders.join(" · ") || "No folders" })),
-      resolve: (id) => ({ context: `VS Code workspace "${must(id).title}" (${id}). Folders:\n${must(id).folders.map((folder) => `- ${folder}`).join("\n")}` }),
-    }),
-  );
+
   // ---- The agent and the user's editor --------------------------------------
 
   /** Per-thread caches keep their newest entries only. */
@@ -342,7 +246,7 @@ export default function plugin(bb: BbPluginApi) {
     name: "code_editor_state",
     description: "What the user has open in VS Code (Studio Code) right now: the file, the lines on screen, their selection, errors, and files with unsaved changes.",
     parameters: z.object({}),
-    execute: async (_input, ctx) => contextFor(ctx.threadId, ctx.projectId ?? null, await threadPath(ctx.threadId)) ?? "The user has no VS Code workspace open for this thread right now.",
+    execute: async (_input, ctx) => contextFor(ctx.threadId, ctx.projectId ?? null, await threadPath(ctx.threadId)) ?? "The user has no VS Code open for this thread right now.",
   });
 
   /**
@@ -379,14 +283,14 @@ export default function plugin(bb: BbPluginApi) {
     }),
     execute: async ({ path, startLine, endLine }, ctx) => {
       const found = await target(path, ctx);
-      if (!found) return `None of the user's workspaces holds ${path}. Open one for its folder with code_workspace_open first.`;
+      if (!found) return `${path} isn't in this thread's worktree, so VS Code can't show it.`;
       const { workspace, file, name } = found;
       const start = startLine ?? 1;
       const end = Math.max(endLine ?? start, start);
       const where = `${name} ${start === end ? `line ${start}` : `lines ${start}–${end}`}`;
       if (bridges.send(workspace.id, { type: "show", path: file, startLine: start, endLine: end }))
         return `Showing ${where} in the user's VS Code ("${workspace.title}").`;
-      return `The user's VS Code for "${workspace.title}" isn't open. It will jump to ${where} when they open it.\n${card(workspace.id)}`;
+      return `The user's VS Code for "${workspace.title}" isn't open. It will jump to ${where} when they open the thread's VS Code tab.`;
     },
   });
 
@@ -400,7 +304,7 @@ export default function plugin(bb: BbPluginApi) {
     }),
     execute: async ({ path, edits }, ctx) => {
       const found = await target(path, ctx);
-      if (!found) return `None of the user's workspaces holds ${path}. Edit it with your own tools, or open a workspace for its folder with code_workspace_open first.`;
+      if (!found) return `${path} isn't in this thread's worktree or an open VS Code. Edit it with your own tools.`;
       const { workspace, file, name } = found;
       const result = await bridges.request(workspace.id, { type: "edit", path: file, edits }, EDIT_TIMEOUT_MS);
       const outcome = editOutcome(result);
@@ -413,7 +317,7 @@ export default function plugin(bb: BbPluginApi) {
       // No editor on screen: the same edits, on disk, unless an editor holds
       // unsaved changes to the file, which saving there would overwrite.
       if (bridges.unsaved(workspace.id).includes(file))
-        throw new Error(`The user's editor has unsaved changes in ${name} but isn't on screen, so neither it nor the file on disk was changed. Ask them to open the workspace, then try again.`);
+        throw new Error(`The user's editor has unsaved changes in ${name} but isn't on screen, so neither it nor the file on disk was changed. Ask them to open the thread's VS Code tab, then try again.`);
       await editOnDisk(file, safeFolders(workspace), edits);
       return `No editor was open, so the ${edits.length === 1 ? "edit went" : `${edits.length} edits went`} to ${name} on disk.`;
     },
@@ -552,7 +456,7 @@ export default function plugin(bb: BbPluginApi) {
         const items = comments.pending(workspaceId);
         if (!items.length) throw new Error("There are no comments to submit.");
         const target = await reviewTarget(workspaceId);
-        if (!target) throw new Error("Open this workspace beside a chat first (its VS Code tab), so the review knows which agent to go to.");
+        if (!target) throw new Error("Open this editor from a thread's VS Code tab first, so the review knows which agent to go to.");
         const text = reviewMessage({ workspace: workspace.title, items, shown: (path) => shown(path, workspace.folders) });
         await bb.sdk.threads.send({ threadId: target.threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }] } as never);
         comments.markSent(workspaceId, target.threadId);
@@ -598,7 +502,7 @@ export default function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.configure(() => ({
-    tools: ["code_workspaces_list", "code_workspace_open", "code_workspace_set_folders", "code_editor_state", "code_show", "code_edit", "code_comments", "code_comment_reply"],
+    tools: ["code_workspace_open", "code_editor_state", "code_show", "code_edit", "code_comments", "code_comment_reply"],
     skills: ["studio-code"],
   }));
 }

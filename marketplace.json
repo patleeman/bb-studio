@@ -85,7 +85,7 @@
     {
       "id": "studio-code",
       "displayName": "Studio Code",
-      "description": "Part of BB Studio. VS Code workspaces in your projects: open one or more folders in a full editor, run by a local code-server.",
+      "description": "Part of BB Studio. VS Code as BB's editor: each thread gets its own VS Code on its worktree, and code files open there. Run by a local code-server.",
       "icon": {
         "url": "./packages/bb-studio-code/assets/icon.svg"
       },

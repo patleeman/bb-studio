@@ -1,31 +1,23 @@
 ---
 name: studio-code
-description: Use whenever code is better shown than pasted. That covers walking the user through code ("walk me through", "how does X work", "show me where"), explaining or reviewing code, pointing at a bug, pairing or co-editing files with them, and showing them a change you made. Also use when they mention their editor, VS Code, a workspace (/plugins/studio-code/workspaces/… or @ a workspace), or "this line", "here" or "my selection". It opens a VS Code workbench beside the chat, points their editor at lines, and types edits into their open files.
+description: Use whenever code is better shown than pasted. That covers walking the user through code ("walk me through", "how does X work", "show me where"), explaining or reviewing code, pointing at a bug, pairing or co-editing files with them, and showing them a change you made. Also use when they mention their editor, VS Code, or "this line", "here" or "my selection". It opens the thread's VS Code beside the chat, points their editor at lines, and types edits into their open files.
 ---
 
 # Studio Code: the workbench beside the chat
 
-Studio Code puts a real VS Code next to the conversation. You and the user can look at the same code. You can move their editor to the lines you mean, and type into their files while they watch. Reach for it whenever you want to show code instead of pasting it into the chat: walkthroughs, explanations, reviews, bug hunts, and editing a file together.
+Studio Code puts a real VS Code next to the conversation: one per thread, open to the thread's own worktree. It's the user's editor in BB; code files they click open there. You and the user can look at the same code. You can move their editor to the lines you mean, and type into their files while they watch. Reach for it whenever you want to show code instead of pasting it into the chat: walkthroughs, explanations, reviews, bug hunts, and editing a file together.
 
-Don't open it for work the user won't look at. You can read and change files with your own tools without a workbench.
+Don't open it for work the user won't look at. You can read and change files with your own tools without it.
 
-## Getting a workbench open
+## Getting VS Code open
 
-- **Your own changes, or your worktree:** call `code_workspace_open` with no folders. It opens this thread's working folder, made the first time and reused after that, so the user sees exactly what you're working on.
-- **Other folders** (the user's main checkout, another repo): call `code_workspace_open` with `folders` and a `title`. Folders are full paths on the computer running BB. Use `code_workspaces_list` to find a workspace they already have.
-- Each call returns a card line. Put it on its own line in your reply, once:
-
-  ```
-  ::workspace{id="<workspace-id>"}
-  ```
-
-  The user opens it with one click, beside the chat.
-- The tools below only reach files inside an open workspace's folders. If the user's workspace opens their checkout and you edit in your own worktree, they won't see your changes there. Open your worktree for that.
+- Call `code_workspace_open`. It makes sure this thread has its VS Code, open to your working folder, so the user sees exactly what you're working on. The user opens it from the thread's **VS Code** tab.
+- The tools below only reach files in that worktree (or in a VS Code the user already has open on them). There are no other folders to open.
 - `code_editor_state` tells you whether their editor is open and what's on screen. If nothing is open yet, `code_show` waits and jumps there when they open it.
 
 ## What you know each turn
 
-When the user has a workspace open, every turn starts with what they're looking at: the file, the lines on screen, their selection (with its text), errors and warnings, and files with unsaved changes. "This", "here", "it" and "this line" usually mean their selection or the file in front of them. Use that before asking which code they mean. `code_editor_state` gives the latest view mid-turn.
+When the user has the thread's VS Code open, every turn starts with what they're looking at: the file, the lines on screen, their selection (with its text), errors and warnings, and files with unsaved changes. "This", "here", "it" and "this line" usually mean their selection or the file in front of them. Use that before asking which code they mean. `code_editor_state` gives the latest view mid-turn.
 
 ## Pointing at code: `code_show`
 
@@ -79,11 +71,9 @@ While you work, their editor can follow along. The status bar shows what you're 
 
 | Tool | Use |
 |---|---|
-| `code_workspace_open` | Open your worktree (no folders) or other folders; returns the card. |
-| `code_workspaces_list` | Find the user's workspaces. |
-| `code_workspace_set_folders` | Change a workspace's folders; the open editor updates live. |
+| `code_workspace_open` | Make sure this thread's VS Code exists, open to your worktree. |
 | `code_editor_state` | What they have open now: file, lines on screen, selection, errors, unsaved files. |
 | `code_show` | Move their editor to lines and highlight them. |
 | `code_edit` | Type edits into their open file; one undo step; merges with unsaved changes. |
-
-Link to a workspace as `/plugins/studio-code/workspaces/<workspace-id>`; it opens on Code's own page (workspaces are not Studio items).
+| `code_comments` | Open review comments sent to you. |
+| `code_comment_reply` | Answer a review comment, and resolve it. |

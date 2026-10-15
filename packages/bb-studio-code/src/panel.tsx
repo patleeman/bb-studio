@@ -1,108 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, ICON_BUTTON, Icon, StudioBar } from "@bb-studio/kit/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
-import { FolderPicker } from "./folder-picker";
 import { themeChanges, useThemeSync } from "./theme-sync";
-import { CHANNEL, CODE_ICON, HIDDEN_RELEASE_MS, PANEL_PATH, isWorkspaceId, type CodeContract, type ServerStatus, type Workspace } from "./shared";
-
-/** What Code's page shows for a path: a workspace, or the root, which opens the latest one. */
-export function panelRoute(subPath: string): { kind: "workspace"; id: string } | { kind: "root" } {
-  const [id = ""] = subPath.split("/").filter(Boolean);
-  return isWorkspaceId(id) ? { kind: "workspace", id } : { kind: "root" };
-}
-
-/** Code's page at a workspace: VS Code full-page, with the switcher in the title bar. */
-export function CodePanel({ subPath }: { subPath: string }) {
-  const route = panelRoute(subPath);
-  if (route.kind === "root") return <RecentWorkspace />;
-  return <WorkspaceView key={route.id} id={route.id} page />;
-}
-
-/**
- * Code's root: finds (or makes) the workspace last used and moves to its
- * page, within Code's own panel. Not retained, so each visit to the root
- * mounts it afresh and moves on once.
- */
-export function RecentWorkspace() {
-  const rpc = useRpc<CodeContract>();
-  const navigate = useBbNavigate();
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setError("");
-    rpc.call("recent", null).then(
-      ({ workspace }) => { if (live) navigate.toPluginPanel(PANEL_PATH, { subPath: workspace.id, replace: true }); },
-      (cause) => { if (live) setError(errorMessage(cause)); },
-    );
-    return () => { live = false; };
-  }, [rpc, navigate, attempt]);
-  return (
-    <div className="studio-root flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center text-foreground">
-      {error ? (
-        <>
-          <p role="alert" className="text-sm text-destructive">{error}</p>
-          <button type="button" className={BAR_BUTTON} onClick={() => setAttempt((n) => n + 1)}>Try again</button>
-        </>
-      ) : (
-        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" /> Opening VS Code…
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * The switcher in Code's title bar: the workspace's name, then a menu of the
- * others (last opened first), a new one, and archiving this one.
- */
-function WorkspaceSwitcher({ workspace, onRename, onArchive }: { workspace: Workspace; onRename(title: string): void; onArchive(): void }) {
-  const rpc = useRpc<CodeContract>();
-  const navigate = useBbNavigate();
-  const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
-  const load = () => void rpc.call("list", null).then((result) => setWorkspaces(result.workspaces), () => setWorkspaces([]));
-  const go = (id: string) => navigate.toPluginPanel(PANEL_PATH, { subPath: id });
-  const create = () => void rpc.call("create", {}).then(({ workspace: made }) => go(made.id), (error) => toast.error(errorMessage(error)));
-  const others = (workspaces ?? []).filter((each) => each.id !== workspace.id);
-  return (
-    <div className="flex min-w-0 items-center gap-0.5">
-      <BarTitle title={workspace.title} label="Workspace name" placeholder="Untitled workspace" onRename={(title) => { if (title) onRename(title); }} />
-      <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
-        <DropdownMenuTrigger asChild>
-          <button type="button" className={ICON_BUTTON} title="Switch workspace" aria-label="Switch workspace">
-            <Icon name="ChevronDown" className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-72">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-          {workspaces === null ? (
-            <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
-          ) : others.length ? (
-            others.map((each) => (
-              <DropdownMenuItem key={each.id} onSelect={() => go(each.id)}>
-                <Icon name={CODE_ICON} className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate" title={each.folders.join("\n")}>{each.title || "Untitled workspace"}</span>
-              </DropdownMenuItem>
-            ))
-          ) : (
-            <DropdownMenuItem disabled>No other workspaces</DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={create}>
-            <Icon name="Plus" className="size-4 shrink-0" /> New workspace…
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={onArchive}>
-            <Icon name="Archive" className="size-4 shrink-0" /> Archive this workspace
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
+import { CHANNEL, HIDDEN_RELEASE_MS, type CodeContract, type ServerStatus, type Workspace } from "./shared";
 
 /**
  * VS Code answers on the computer running BB, at 127.0.0.1. Only a BB page
@@ -161,18 +64,13 @@ const STATUS_TEXT: Record<ServerStatus["state"], string> = {
   failed: "VS Code couldn't start.",
 };
 
-export function WorkspaceView({ id, page = false }: {
-  id: string;
-  /** On Code's page: the title bar with the switcher. Beside a thread the tab is VS Code alone, with no bar. */
-  page?: boolean;
-}) {
-  const navigate = useBbNavigate();
+/** A workspace's VS Code, alone in the thread's tab with no bar. */
+export function WorkspaceView({ id }: { id: string }) {
   const rpc = useRpc<CodeContract>();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [loadError, setLoadError] = useState("");
   const [version, setVersion] = useState(0);
-  const [editing, setEditing] = useState(false);
   const embed = canEmbedEditor(window.location.hostname);
   useThemeSync(embed);
   // VS Code takes new colors on load; reloading keeps its open files.
@@ -184,16 +82,14 @@ export function WorkspaceView({ id, page = false }: {
   }, []);
   const body = useRef<HTMLDivElement>(null);
   const shown = useShown(body);
-  // After Stop, the user starts it again; otherwise a visible view opens it.
-  const [userStopped, setUserStopped] = useState(false);
   // Out of sight for a while, the frame lets go so VS Code's idle timer runs.
   const [released, setReleased] = useState(false);
-  // Coming back to the view asks for the editor again: forget an earlier
-  // Stop, and allow one more try after a failure.
+  // A visible view opens the editor. Coming back to the view allows one more
+  // try after a failure.
   const [retried, setRetried] = useState(false);
   const wasShown = useRef(shown);
   useEffect(() => {
-    if (shown && !wasShown.current) { setUserStopped(false); setRetried(false); }
+    if (shown && !wasShown.current) setRetried(false);
     wasShown.current = shown;
   }, [shown]);
   useEffect(() => {
@@ -228,27 +124,19 @@ export function WorkspaceView({ id, page = false }: {
   const open = () => {
     if (opening.current) return;
     opening.current = true;
-    setUserStopped(false);
     void rpc.call("open", { id }).then(
       (result) => setStatus(result.status),
       (error) => toast.error(errorMessage(error)),
     ).finally(() => { opening.current = false; });
   };
-  const stop = () => {
-    setUserStopped(true);
-    void rpc.call("stop", { id }).then((result) => setStatus(result.status), (error) => toast.error(errorMessage(error)));
-  };
   useEffect(() => {
-    if (!embed || !shown || userStopped || !workspace?.folders.length) return;
+    if (!embed || !shown || !workspace?.folders.length) return;
     if (status?.state === "stopped") open();
     else if (status?.state === "failed" && !retried) { setRetried(true); open(); }
-  }, [embed, shown, userStopped, retried, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [embed, shown, retried, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const update = (changes: { title?: string; folders?: string[]; share?: boolean }) =>
-    rpc.call("update", { id, ...changes }).then(
-      (result) => { setWorkspace(result.workspace); return true; },
-      (error) => { toast.error(errorMessage(error)); return false; },
-    );
+  const update = (changes: { share: boolean }) =>
+    rpc.call("update", { id, ...changes }).then((result) => setWorkspace(result.workspace), (error) => toast.error(errorMessage(error)));
 
   if (!workspace)
     return (
@@ -258,57 +146,15 @@ export function WorkspaceView({ id, page = false }: {
     );
 
   const url = status?.state === "running" ? status.url : null;
-  // A visible view starts VS Code itself, so until it's up (or the user
-  // stopped it, or it failed for good) it's on its way: a spinner, not a button.
+  // A visible view starts VS Code itself, so until it's up (or it failed for
+  // good) it's on its way: a spinner, not a button.
   const waiting = !status || status.state === "installing" || status.state === "starting" || status.state === "running"
-    || (embed && !userStopped && (status.state === "stopped" || (status.state === "failed" && !retried)));
+    || (embed && (status.state === "stopped" || (status.state === "failed" && !retried)));
   const password = status?.state === "running" ? status.password : null;
-  const showFolders = embed && (editing || !workspace.folders.length);
-  // Archived: Code's root opens the next workspace.
-  const archive = () => void rpc.call("archive", { id, archived: true }).then(
-    () => navigate.toPluginPanel(PANEL_PATH, { replace: true }),
-    (error) => toast.error(errorMessage(error)),
-  );
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      {page && (
-        <StudioBar>
-          <div className="flex min-w-0 flex-1 items-center">
-            <WorkspaceSwitcher workspace={workspace} onRename={(title) => void update({ title })} onArchive={archive} />
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            {embed && (
-              <>
-              <button
-                type="button"
-                className={ICON_BUTTON}
-                title={workspace.share ? "Agents see what you have open here (file, selection, errors). Click to stop sharing." : "Agents don't see what you have open here. Click to share it with this workspace's threads."}
-                aria-label={workspace.share ? "Stop sharing your editor with agents" : "Share your editor with agents"}
-                aria-pressed={workspace.share}
-                onClick={() => void update({ share: !workspace.share })}
-              >
-                <Icon name={workspace.share ? "Eye" : "EyeOff"} className="size-4" />
-              </button>
-              <button type="button" className={ICON_BUTTON} title="Folders in this workspace" aria-label="Folders" aria-pressed={showFolders} onClick={() => setEditing((value) => !value)}>
-                <Icon name="FolderEdit" className="size-4" />
-              </button>
-              </>
-            )}
-            {url ? (
-              <>
-                <button type="button" className={ICON_BUTTON} title="Open VS Code in a browser window" aria-label="Open in browser" onClick={() => { if (password) signIn(url, password, "_blank"); }}>
-                  <Icon name="ExternalLink" className="size-4" />
-                </button>
-                <button type="button" className={ICON_BUTTON} title="Stop VS Code" aria-label="Stop" onClick={stop}>
-                  <Icon name="Square" className="size-4" />
-                </button>
-              </>
-            ) : null}
-          </div>
-        </StudioBar>
-      )}
-      {/* Without the bar, sharing still has to be visible and easy to stop. */}
-      {!page && workspace.share ? (
+      {/* With no bar, sharing still has to be visible and easy to stop. */}
+      {workspace.share ? (
         <div role="status" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
           <Icon name="Eye" className="size-3.5 shrink-0" />
           <span className="min-w-0 flex-1 truncate">Agents can see your open file, selection and errors.</span>
@@ -317,7 +163,6 @@ export function WorkspaceView({ id, page = false }: {
           </button>
         </div>
       ) : null}
-      {showFolders && page && <FolderEditor folders={workspace.folders} onChange={(folders) => update({ folders })} />}
       <div ref={body} className="relative min-h-0 flex-1">
         {!embed ? (
           <FileBrowser workspace={workspace} />
@@ -391,65 +236,5 @@ function EditorFrame({ id, url, password, label }: { id: string; url: string; pa
       className="absolute inset-0 size-full border-0"
       allow="clipboard-read; clipboard-write"
     />
-  );
-}
-
-function FolderEditor({ folders, onChange }: { folders: string[]; onChange(folders: string[]): Promise<boolean> }) {
-  const rpc = useRpc<CodeContract>();
-  const [projects, setProjects] = useState<{ id: string; name: string; path: string }[]>([]);
-  const [path, setPath] = useState("");
-  const [picking, setPicking] = useState(false);
-  useEffect(() => {
-    void rpc.call("projects", null).then((result) => setProjects(result.projects), () => undefined);
-  }, [rpc]);
-  const add = async (folder: string) => {
-    if (folder.trim() && (await onChange([...folders, folder.trim()]))) setPath("");
-  };
-  const unused = projects.filter((project) => !folders.includes(project.path));
-  return (
-    <section aria-label="Folders" className="space-y-3 border-b border-border px-4 py-3 text-sm">
-      {folders.length ? (
-        <ul className="space-y-1">
-          {folders.map((folder) => (
-            <li key={folder} className="flex items-center gap-2">
-              <Icon name="Folder" className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate font-mono text-xs" title={folder}>{folder}</span>
-              <button type="button" className={ICON_BUTTON} title="Remove from workspace" aria-label={`Remove ${folder}`} onClick={() => void onChange(folders.filter((other) => other !== folder))}>
-                <Icon name="X" className="size-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-muted-foreground">Add the folders this workspace opens. VS Code shows them side by side.</p>
-      )}
-      <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); void add(path); }}>
-        <input
-          aria-label="Folder path"
-          value={path}
-          onChange={(event) => setPath(event.currentTarget.value)}
-          placeholder="/full/path/to/folder or ~/folder"
-          className="h-8 min-w-60 flex-1 rounded-md border border-border bg-background px-2 font-mono text-xs"
-        />
-        <button type="submit" className={BAR_BUTTON} disabled={!path.trim()}>
-          <Icon name="FolderPlus" className="size-4" /> Add
-        </button>
-        <button type="button" className={BAR_BUTTON} aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
-          <Icon name="FolderOpen" className="size-4" /> Browse…
-        </button>
-        {unused.length > 0 && (
-          <select
-            aria-label="Add a project's folder"
-            value=""
-            onChange={(event) => { if (event.currentTarget.value) void add(event.currentTarget.value); }}
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-          >
-            <option value="">Add a project…</option>
-            {unused.map((project) => <option key={project.id} value={project.path}>{project.name}</option>)}
-          </select>
-        )}
-      </form>
-      {picking && <FolderPicker exclude={folders} onCancel={() => setPicking(false)} onPick={(folder) => { void add(folder).then(() => setPicking(false)); }} />}
-    </section>
   );
 }

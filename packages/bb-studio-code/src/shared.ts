@@ -8,29 +8,18 @@ import { bbThemeSchema } from "./theme";
 const defineRpcContract = <const Contract extends PluginRpcContract>(contract: Contract): Contract => contract;
 
 export const PLUGIN_ID = "studio-code";
-/** The nav panel: /plugins/studio-code/workspaces, and workspaces/<id> for one. */
-export const PANEL_PATH = "workspaces";
 export const CODE_ICON = "Code";
 /** Realtime channel; payload `{ id }` when a workspace or its server changed. */
 export const CHANNEL = "studio-code-changed";
 export const ID_PREFIX = "cws";
-/** The workbench tab's action id; reply cards open it with `{ workspaceId }`. */
+/** The thread's VS Code tab's action id. */
 export const CODE_TAB = "code";
 /** VS Code stops after this long with no editor open. */
 export const IDLE_TIMEOUT_SECONDS = 30 * 60;
 /** A view out of sight this long lets go of its editor, so the idle timer can run. */
 export const HIDDEN_RELEASE_MS = 5 * 60 * 1000;
 
-export function workspaceHref(id: string): string {
-  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
-}
-
-export function isWorkspaceId(id: string): boolean {
-  return id.startsWith(`${ID_PREFIX}_`);
-}
-
 const id = z.string().min(1).max(100);
-const folder = z.string().trim().min(1).max(4096);
 
 export const workspaceSchema = z.object({
   id,
@@ -89,33 +78,13 @@ export const codeContract = defineRpcContract({
     output: z.object({ workspace: workspaceSchema.nullable(), status: serverStatusSchema }),
   },
   update: {
-    input: z.object({ id, title: z.string().trim().max(200).optional(), folders: z.array(folder).max(50).optional(), share: z.boolean().optional() }),
+    input: z.object({ id, share: z.boolean() }),
     output: z.object({ workspace: workspaceSchema }),
   },
   /** Installs code-server if needed and starts this workspace's server. */
   open: {
     input: z.object({ id }),
     output: z.object({ status: serverStatusSchema }),
-  },
-  /** The workspace Code's page opens: the latest, or a new one for a project's folder. */
-  recent: {
-    input: z.null(),
-    output: z.object({ workspace: workspaceSchema }),
-  },
-  /** Code's switcher: workspaces not archived, the one last opened first. */
-  list: {
-    input: z.null(),
-    output: z.object({ workspaces: z.array(workspaceSchema) }),
-  },
-  /** A new workspace: a project's folder, or none yet (its page then asks for folders). */
-  create: {
-    input: z.object({ title: z.string().trim().min(1).max(200).optional(), projectId: z.string().max(100).nullable().optional() }),
-    output: z.object({ workspace: workspaceSchema }),
-  },
-  /** Archives a workspace (stopping its VS Code), or brings it back. */
-  archive: {
-    input: z.object({ id, archived: z.boolean() }),
-    output: z.object({ workspace: workspaceSchema }),
   },
   stop: {
     input: z.object({ id }),
@@ -135,16 +104,6 @@ export const codeContract = defineRpcContract({
   listDir: {
     input: z.object({ id, path: z.string().max(4096) }),
     output: z.object({ entries: z.array(z.object({ name: z.string(), path: z.string(), dir: z.boolean() })) }),
-  },
-  /** A folder's subfolders, for the folder picker; null starts at home. */
-  browseFolders: {
-    input: z.object({ path: z.string().max(4096).nullable(), showHidden: z.boolean() }),
-    output: z.object({
-      path: z.string(),
-      parent: z.string().nullable(),
-      choosable: z.boolean(),
-      folders: z.array(z.object({ name: z.string(), path: z.string(), choosable: z.boolean() })),
-    }),
   },
   readFile: {
     input: z.object({ id, path: z.string().max(4096) }),
@@ -179,11 +138,6 @@ export const codeContract = defineRpcContract({
     input: bbThemeSchema,
     /** `changed`: the workspaces' settings were rewritten, so open editors should reload. */
     output: z.object({ changed: z.boolean() }),
-  },
-  /** BB's projects with a local folder, to pick from. */
-  projects: {
-    input: z.null(),
-    output: z.object({ projects: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })) }),
   },
 });
 export type CodeContract = typeof codeContract;
