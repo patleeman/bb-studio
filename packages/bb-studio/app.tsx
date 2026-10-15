@@ -21,7 +21,7 @@ import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
 import { isPageId, PageCard } from "./src/pages/ui/PageCard";
-import { aliasParams, enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
+import { enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
 import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
 import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
@@ -184,20 +184,6 @@ export default definePluginApp((app) => {
       run: async ({ openPanel }) => { await openPanel({ title: "Studio" }); },
       component: (props) => <Suspense fallback={null}><StudioTab {...props} /></Suspense>,
     });
-    // The old per-kind tabs (page, excalidraw, design, dashboards,
-    // save-to-studio). BB persists open panel tabs by action id and its SDK
-    // can't hide an action from the launcher, so they stay registered as thin
-    // redirects: a restored tab shows the Studio tab on the item it had, or on
-    // that kind (Artifacts: the save picker). Drop these once old tabs are gone.
-    for (const info of tabKinds) {
-      app.slots.threadPanelAction({
-        id: info.legacyAction,
-        title: info.plural,
-        icon: info.icon,
-        layout: "flush",
-        component: (props) => <Suspense fallback={null}><StudioTab {...props} initial={aliasParams(info.legacyAction, props.params)} /></Suspense>,
-      });
-    }
   }
   // Pages (built in; docs/merging-add-ons.md): the Studio tab's pages, the
   // `::page{id="pg_…"}` card in replies, the header link back to a page a

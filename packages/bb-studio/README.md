@@ -37,8 +37,8 @@ save icon opens Artifacts' save picker for the latest reply's files. Reply
 cards and **Expand to page** open the Studio tab on their item
 (`{ kind, id }` params). Kinds turned off in **Setup → Kinds** don't appear.
 The old per-kind tabs (Pages, Drawings, Design, Dashboards, Artifacts) are
-still in BB's launcher only so tabs BB restored from before keep working;
-each opens the Studio tab on what it showed.
+gone; one of them still open from before shows as unavailable, so close it
+and open Studio.
 Double-click a tab, or press F2 on it, to rename its item. The tab row shows
 the item's own tools and status, such as a page saving or a recording paused;
 the tab names the item, so its title isn't repeated, and Chat isn't offered.
