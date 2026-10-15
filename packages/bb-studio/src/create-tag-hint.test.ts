@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TAG_DESCRIPTION, tagHint, withTagHint } from "./create-tag-hint";
 
 describe("create tools' tag hint", () => {
-  const tool = (name: string, result: unknown) => ({ name, description: "Make a thing.", execute: async () => result });
+  const tool = (name: string, result: unknown) => ({ name, description: "Make a thing.", execute: async (_input: never, _ctx: never) => result });
 
   it("tells create tools to reuse tags and lists the existing ones after a text result", async () => {
     const wrapped = withTagHint(tool("pages_create", "Created page."), () => ["research", "q4"]);
