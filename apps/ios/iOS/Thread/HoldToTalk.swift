@@ -177,6 +177,8 @@ struct HoldToTalkMic: View {
     let tap: () -> Void
     /// Resets when the hold ends any way, including a cancelled gesture.
     @GestureState private var holding = false
+    /// When the last hold ended, so its release doesn't also count as a tap.
+    @State private var heldUntil: Date?
 
     var body: some View {
         Image(systemName: talk.isActive ? "mic.fill" : "mic")
@@ -189,7 +191,14 @@ struct HoldToTalkMic: View {
             // A 44pt target around the 36pt circle.
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
-            .gesture(
+            // The tap on its own, beside the hold: composed with `exclusively`,
+            // SwiftUI (iOS 27) never ended the tap, so the mic did nothing.
+            .onTapGesture {
+                // A hold's release can end a tap too; that one isn't a tap.
+                if let heldUntil, Date.now.timeIntervalSince(heldUntil) < 0.5 { return }
+                talk.tap(dictate: tap)
+            }
+            .simultaneousGesture(
                 LongPressGesture(minimumDuration: 0.25)
                     .sequenced(before: DragGesture(minimumDistance: 0))
                     .updating($holding) { value, holding, _ in
@@ -201,9 +210,10 @@ struct HoldToTalkMic: View {
                         if let drag { talk.drag(drag.translation) }
                     }
                     .onEnded { _ in talk.release() }
-                    .exclusively(before: TapGesture().onEnded { talk.tap(dictate: tap) })
             )
-            .onChange(of: holding) { _, holding in if !holding { talk.holdLost() } }
+            .onChange(of: holding) { _, holding in
+                if !holding { heldUntil = .now; talk.holdLost() }
+            }
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("composerMic")
             .accessibilityLabel("Dictate")

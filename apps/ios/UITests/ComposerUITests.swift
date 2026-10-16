@@ -1,6 +1,30 @@
 import XCTest
 
 final class ComposerUITests: XCTestCase {
+    /// A tap on the composer's mic opens dictation, in the Bot chat (local fixture, no server).
+    func testMicTapOpensDictation() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
+        app.launch()
+        let mic = app.descendants(matching: .any)["composerMic"].firstMatch
+        XCTAssertTrue(mic.waitForExistence(timeout: 20))
+        mic.tap()
+        XCTAssertTrue(app.navigationBars["Dictation"].waitForExistence(timeout: 5), "Tapping the mic didn't open dictation")
+        let shot = XCUIScreen.main.screenshot()
+        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-composer-mic.png"))
+    }
+
+    /// Holding the mic talks; letting go doesn't also count as a tap.
+    func testMicHoldDoesNotOpenDictation() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
+        app.launch()
+        let mic = app.descendants(matching: .any)["composerMic"].firstMatch
+        XCTAssertTrue(mic.waitForExistence(timeout: 20))
+        mic.press(forDuration: 1.2)
+        XCTAssertFalse(app.navigationBars["Dictation"].waitForExistence(timeout: 2), "A hold opened dictation")
+    }
+
     func testCommandsAndContextMenu() throws {
         let threadId = try XCTUnwrap(scratchThread())
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
