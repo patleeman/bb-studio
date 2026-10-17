@@ -24,15 +24,17 @@
 // Once the cache has expired Studio doesn't ping again: that would pay the
 // full write the user's next message pays anyway. A user message makes the
 // cache warm again and resumes warming. Nothing is sent in the first
-// 5 minutes after Studio starts.
+// 5 minutes after Studio starts, unless the cache would expire by then: a
+// reload just before a ping was due (plugin development reloads Studio often)
+// then sends it 2 minutes before expiry, but not in the first 30 seconds.
 //
 // Compaction before expiry (compactBeforeExpiry, on by default): when warming
 // stops for the idle cutoff while the cache is still warm, Studio compacts the
 // chat once instead of the ping that would have been due (55 minutes after the
 // last turn). Compaction reads the history from the warm cache, so the user's
 // next message writes a short summary instead of the whole history. It's once
-// per idle stretch (bot_cache_compactions; a new user message starts another)
-// and follows the same rules as a ping: not in overage, cold, small or busy.
+// per idle stretch (bot_cache_compactions; a new user message starts another;
+// the "/compact" it sends isn't one) and follows the same rules as a ping: not in overage, cold, small or busy.
 //
 // Pings are as quiet as BB allows. The message is agent-only, so BB shows no
 // user row; the Bot's "[PASS]" reply still shows on the desktop (BB has no
@@ -60,6 +62,8 @@ export const CACHE_TTL_MS = 60 * 60_000;
 /** OpenAI keeps a prompt cache for minutes; a cold estimate past this. */
 const SHORT_TTL_MS = 5 * 60_000;
 export const STARTUP_GRACE_MS = 5 * 60_000;
+/** The shortest wait after startup, when the cache would expire within STARTUP_GRACE_MS. */
+export const STARTUP_MIN_MS = 30_000;
 /** A ping's own tokens: the message and the reply written to the cache, and "[PASS]". */
 const PING_TAIL_TOKENS = 120;
 const PING_OUTPUT_TOKENS = 10;
@@ -80,7 +84,7 @@ export type WarmDecision =
 
 export interface WarmInput {
   now: number;
-  /** When Studio started; nothing is sent before STARTUP_GRACE_MS after it. */
+  /** When Studio started; nothing is sent before STARTUP_GRACE_MS after it (STARTUP_MIN_MS when the cache expires sooner). */
   startedAt: number;
   settings: WarmSettings;
   botState: "active" | "paused" | "stopped";
@@ -110,7 +114,8 @@ export function decideWarm(input: WarmInput): WarmDecision {
   if (now >= expires - 60_000) return { action: "off", reason: "cold" };
   if (input.overage) return { action: "off", reason: "overage" };
   const due = input.lastTurnAt + PING_EVERY_MS;
-  const grace = input.startedAt + STARTUP_GRACE_MS;
+  // A reload just before expiry shortens the startup wait to 2 minutes before it.
+  const grace = Math.max(input.startedAt + STARTUP_MIN_MS, Math.min(input.startedAt + STARTUP_GRACE_MS, expires - 2 * 60_000));
   // A cache that expires before Studio may send is lost.
   if (grace >= expires - 60_000) return { action: "off", reason: "cold" };
   if (input.lastUserAt == null || now - input.lastUserAt >= settings.idleHours * HOUR) {
@@ -168,14 +173,16 @@ export function isPingRequest(data: unknown): boolean {
  * A client/turn/requested event's data is a message from the user: sent as
  * the user, not by another thread, with something the user sees. Studio's
  * notices (runner reports, watchers) carry an agent-only note and check-ins
- * start "Check-in for", so neither counts; pings are agent-only.
+ * start "Check-in for", so neither counts; pings are agent-only. A bare
+ * "/compact" isn't either: it's how Studio's compaction before expiry (and
+ * Compact) reaches the chat, and counting it would start a new idle stretch.
  */
 export function isUserRequest(data: unknown): boolean {
   const request = data as Requested | null;
   if (!request || request.initiator !== "user" || request.senderThreadId || !Array.isArray(request.input)) return false;
   if (request.input.some((part) => part.visibility === "agent-only")) return false;
   const text = request.input.find((part) => part.type === "text")?.text ?? "";
-  if (/^Check-in for /.test(text)) return false;
+  if (/^Check-in for /.test(text) || text.trim() === "/compact") return false;
   return request.input.length > 0;
 }
 
@@ -392,7 +399,7 @@ export class BotCacheWarmer {
     let sent = 0;
     try {
       const now = this.now();
-      if (now < this.startedAt + STARTUP_GRACE_MS) return 0;
+      if (now < this.startedAt + STARTUP_MIN_MS) return 0;
       // A ping that never reported idle (BB restarted, the event was lost) is done.
       for (const [threadId, pending] of this.pending) if (now - pending.sentAt > 15 * 60_000) this.pending.delete(threadId);
       for (const bot of this.deps.bots()) {

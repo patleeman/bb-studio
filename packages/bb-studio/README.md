@@ -1559,7 +1559,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   5 minutes there), while the Bot is paused or stopped, and while the chat
   is busy; there are no waking hours. Your next message resumes it. An expired cache isn't pinged (that would pay the write your
   next message pays anyway), and nothing is sent in the first 5 minutes
-  after Studio starts. Only Claude models are warmed; OpenAI's cache can't
+  after Studio starts, unless the cache would expire by then: a reload just
+  before a ping was due sends it 2 minutes before expiry (but not in the
+  first 30 seconds). Only Claude models are warmed; OpenAI's cache can't
   be kept for an hour, so those chats only get the estimates.
   - **What you see**: the ping is an agent-only message, so BB shows no user
     row, and it tells the Bot to reply exactly `[PASS]`. That reply still
@@ -1577,7 +1579,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     next ping would have been due (55 minutes after the last turn), through
     the same path as **Compact**. Compaction reads the history from the warm
     cache, so your next message writes a short summary instead of the whole
-    history. Once per idle stretch (a message from you starts a new one),
+    history. Once per idle stretch (a message from you starts a new one;
+    the `/compact` it sends doesn't),
     and never in overage, on a cold, small or busy chat, or with warming
     off. The chip shows when it will compact or when it did, and the
     cold-send banner doesn't show the size from before compaction.

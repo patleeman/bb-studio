@@ -2,7 +2,7 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BotCacheWarmer, breakEvenHours, CACHE_TTL_MS, coldSendUsd, decideWarm, DEFAULT_WARM, formatTokens, formatUsd, inOverage,
-  isPingRequest, isUserRequest, PING_EVERY_MS, PING_TEXT, pingUsd, STARTUP_GRACE_MS, warmingPerHourUsd, warmSendUsd, type WarmInput,
+  isPingRequest, isUserRequest, PING_EVERY_MS, PING_TEXT, pingUsd, STARTUP_GRACE_MS, STARTUP_MIN_MS, warmingPerHourUsd, warmSendUsd, type WarmInput,
 } from "./bot-cache";
 import { MODEL_PRICES, priceFor } from "./bot-prices";
 import { rpcContract } from "./contract";
@@ -67,9 +67,20 @@ describe("decideWarm", () => {
   });
 
   it("sends nothing in the first 5 minutes after startup", () => {
-    expect(decideWarm(base({ startedAt: T0 - MIN, lastTurnAt: T0 - 56 * MIN }))).toEqual({ action: "off", reason: "cold" });
     expect(decideWarm(base({ startedAt: T0 - MIN, lastTurnAt: T0 - 52 * MIN }))).toEqual({ action: "wait", at: T0 - MIN + STARTUP_GRACE_MS, reason: "startup" });
     expect(decideWarm(base({ startedAt: T0 - 5 * MIN, lastTurnAt: T0 - 55 * MIN }))).toEqual({ action: "ping" });
+  });
+
+  it("shortens the startup wait to 2 minutes before expiry when a reload lands just before a ping", () => {
+    // Studio reloaded 13 seconds after the ping was due: it pings 2 minutes before expiry, not never.
+    const reload = { startedAt: T0, lastTurnAt: T0 - 55 * MIN - 13_000 };
+    expect(decideWarm(base(reload))).toEqual({ action: "wait", at: reload.lastTurnAt + CACHE_TTL_MS - 2 * MIN, reason: "startup" });
+    expect(decideWarm(base({ ...reload, now: reload.lastTurnAt + CACHE_TTL_MS - 2 * MIN }))).toEqual({ action: "ping" });
+    // Never in the first 30 seconds: a reload 90 seconds before expiry loses the cache.
+    expect(decideWarm(base({ startedAt: T0, lastTurnAt: T0 - 58.5 * MIN }))).toEqual({ action: "off", reason: "cold" });
+    expect(decideWarm(base({ startedAt: T0 - 15_000, lastTurnAt: T0 - 58.5 * MIN }))).toEqual({ action: "wait", at: T0 + STARTUP_MIN_MS - 15_000, reason: "startup" });
+    // Compaction before expiry gets the same shortened wait.
+    expect(decideWarm(base({ ...reload, lastUserAt: T0 - 4 * HOUR }))).toEqual({ action: "compact", at: reload.lastTurnAt + CACHE_TTL_MS - 2 * MIN });
   });
 
 });
@@ -116,6 +127,9 @@ describe("pings and user messages", () => {
     expect(isUserRequest({ ...user, input: [{ type: "text", text: "Check-in for \"Dot\": read your Memory page" }] })).toBe(false);
     expect(isUserRequest({ ...user, senderThreadId: "thr_runner" })).toBe(false);
     expect(isUserRequest({ ...user, initiator: "agent" })).toBe(false);
+    // Studio's compaction before expiry sends "/compact" as the user; it isn't the user writing.
+    expect(isUserRequest({ ...user, input: [{ type: "text", text: "/compact" }] })).toBe(false);
+    expect(isUserRequest({ ...user, input: [{ type: "text", text: "/compact is that a command?" }] })).toBe(true);
   });
 
   it("aren't user turns for Learn from work", () => {
