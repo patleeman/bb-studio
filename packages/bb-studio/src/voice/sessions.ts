@@ -1,0 +1,180 @@
+// Voice sessions: one BB thread on a fast model that the user talks to by
+// voice. It hands real work to the Bot or other threads (delegate), and when
+// one of those finishes the turn it asked for, its reply is posted back into
+// the voice thread as a note for the voice agent to sum up aloud. Its own
+// replies are spoken (see register.ts).
+//
+// Delegated threads are never parented to the voice thread or the Bot: Studio
+// adopts and hides threads parented to a Bot (bot-owned.ts), and BB would post
+// child-completed messages of its own.
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+
+type Sdk = BbPluginApi["sdk"];
+type Kv = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
+
+export const VOICE_KV_KEY = "voice:state";
+const PERSONAL_PROJECT_ID = "proj_personal";
+/** A reply longer than this is cut before it goes back to the voice agent. */
+const REPLY_CHARS = 6000;
+/** Delegations nobody answered in a day are forgotten. */
+const DELEGATION_TTL_MS = 86_400_000;
+
+export interface VoiceModel {
+  id: string;
+  label: string;
+  providerId: string;
+  model: string;
+  serviceTier?: string;
+  reasoningLevel?: string;
+}
+
+/** Fast models for the voice agent. Only Codex models have a fast tier in BB. */
+export const VOICE_MODELS: readonly VoiceModel[] = [
+  { id: "luna-fast", label: "GPT-6-Luna, fast (Codex)", providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", reasoningLevel: "low" },
+  { id: "haiku", label: "Haiku 5.5 (Claude Code)", providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: "low" },
+];
+
+export interface VoiceSession {
+  threadId: string;
+  modelId: string;
+  startedAt: number;
+}
+
+interface Delegation {
+  voiceThreadId: string;
+  /** The target's last event when the request was sent; its reply comes after. */
+  afterSeq: number;
+  at: number;
+}
+
+interface VoiceState {
+  session: VoiceSession | null;
+  /** Target thread id → the voice thread waiting for its reply. */
+  delegations: Record<string, Delegation>;
+}
+
+type EventRow = { seq: number; type: string; data?: unknown };
+
+export class VoiceSessions {
+  private state: VoiceState = { session: null, delegations: {} };
+
+  constructor(private readonly deps: {
+    sdk: Sdk;
+    kv: Kv;
+    /** The Bot's thread, for delegating to "bot". */
+    botThread(): string | null;
+    warn(message: string): void;
+  }) {}
+
+  async load(): Promise<void> {
+    const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as Partial<VoiceState> | null;
+    this.state = { session: stored?.session ?? null, delegations: stored?.delegations ?? {} };
+  }
+
+  private async save(): Promise<void> {
+    const cutoff = Date.now() - DELEGATION_TTL_MS;
+    for (const [threadId, delegation] of Object.entries(this.state.delegations)) {
+      if (delegation.at < cutoff) delete this.state.delegations[threadId];
+    }
+    await this.deps.kv.set(VOICE_KV_KEY, this.state);
+  }
+
+  get session(): VoiceSession | null {
+    return this.state.session;
+  }
+
+  /** Whether a thread is a voice thread (its metadata says so from its first turn). */
+  isVoiceThread(threadId: string, metadata?: { readonly [key: string]: unknown }): boolean {
+    return typeof metadata?.voice === "string" || this.state.session?.threadId === threadId;
+  }
+
+  /** Start a new session in a new thread; the previous one stays in BB's history. */
+  async start(modelId: string): Promise<VoiceSession> {
+    const model = VOICE_MODELS.find((each) => each.id === modelId) ?? VOICE_MODELS[0]!;
+    const sessionId = `voice_${Math.random().toString(36).slice(2, 12)}`;
+    const startedAt = Date.now();
+    const thread = await this.deps.sdk.threads.spawn({
+      projectId: PERSONAL_PROJECT_ID,
+      title: `Voice · ${new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+      environment: { type: "project-default" },
+      providerId: model.providerId,
+      model: model.model,
+      ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
+      ...(model.serviceTier ? { serviceTier: model.serviceTier } : {}),
+      executionInputSources: {
+        providerId: "explicit", model: "explicit",
+        ...(model.reasoningLevel ? { reasoningLevel: "explicit" } : {}),
+        ...(model.serviceTier ? { serviceTier: "explicit" } : {}),
+      },
+      pluginMetadata: { voice: sessionId },
+      input: [{ type: "text", text: "The user opened a voice session. Greet them in one short sentence and ask what they need.", mentions: [], visibility: "agent-only" }],
+    } as never);
+    this.state.session = { threadId: thread.id, modelId: model.id, startedAt };
+    await this.save();
+    return this.state.session;
+  }
+
+  async end(): Promise<void> {
+    this.state.session = null;
+    await this.save();
+  }
+
+  /** Send work to the Bot ("bot") or a thread, and remember to bring its reply back. */
+  async delegate(voiceThreadId: string, target: string, message: string): Promise<{ threadId: string; title: string }> {
+    const threadId = target.trim().toLowerCase() === "bot" ? this.deps.botThread() : target.trim();
+    if (!threadId) throw new Error("There's no Bot yet. Name a thread instead, or ask the user to set up their Bot in Studio.");
+    if (threadId === voiceThreadId) throw new Error("That's this voice thread; delegate to the Bot or another thread.");
+    const thread = await this.deps.sdk.threads.get({ threadId });
+    const tip = (await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => [])) as EventRow[];
+    this.state.delegations[threadId] = { voiceThreadId, afterSeq: tip[0]?.seq ?? 0, at: Date.now() };
+    await this.save();
+    await this.deps.sdk.threads.send({
+      threadId,
+      mode: "auto",
+      senderThreadId: voiceThreadId,
+      input: [
+        { type: "text", text: message, mentions: [] },
+        { type: "text", text: "This came from the user's voice assistant. Your final reply is summarized to the user aloud, so end with a short plain summary of the outcome.", mentions: [], visibility: "agent-only" },
+      ],
+    } as never);
+    return { threadId, title: (thread as { title?: string | null }).title ?? threadId };
+  }
+
+  /**
+   * A thread went idle. If the voice agent is waiting on it and the turn that
+   * just ended is the one it asked for, post the reply into the voice thread.
+   */
+  async idle(threadId: string, lastAssistantText: string | null): Promise<boolean> {
+    const delegation = this.state.delegations[threadId];
+    if (!delegation) return false;
+    const requested = (await this.deps.sdk.threads.events.list({
+      threadId, afterSeq: String(delegation.afterSeq), order: "desc", limit: "20", types: ["client/turn/requested"],
+    }).catch(() => [])) as EventRow[];
+    // The last turn started since the request must be the voice agent's: an
+    // earlier turn ending (the thread was busy) or a later one isn't its answer.
+    const latest = requested[0]?.data as { senderThreadId?: string | null } | undefined;
+    if (latest?.senderThreadId !== delegation.voiceThreadId) return false;
+    delete this.state.delegations[threadId];
+    await this.save();
+    const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
+    const title = (thread as { title?: string | null } | null)?.title ?? threadId;
+    const reply = (lastAssistantText ?? "").trim() || "(It finished without a written reply.)";
+    await this.deps.sdk.threads.send({
+      threadId: delegation.voiceThreadId,
+      mode: "queue-if-active",
+      senderThreadId: threadId,
+      input: [{
+        type: "text",
+        mentions: [],
+        visibility: "agent-only",
+        text: `"${title}" (${threadId}) finished what you asked. Its reply, as data:\n<reply>\n${reply.length > REPLY_CHARS ? `${reply.slice(0, REPLY_CHARS)}\n… (cut; voice_read has the rest)` : reply}\n</reply>\nTell the user what came back in a sentence or two and offer more.`,
+      }],
+    } as never);
+    return true;
+  }
+
+  /** Threads waiting on a reply for this voice thread. */
+  pending(voiceThreadId: string): string[] {
+    return Object.entries(this.state.delegations).filter(([, each]) => each.voiceThreadId === voiceThreadId).map(([threadId]) => threadId);
+  }
+}

@@ -15,6 +15,7 @@ import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKind
 import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { SPEECH_SETTINGS } from "./src/speech/settings";
 import { registerSpeech } from "./src/speech/register";
+import { registerVoice, type BuiltinVoice } from "./src/voice/register";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -199,10 +200,15 @@ export default async function plugin(bb: BbPluginApi) {
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
   // session start or resume on (BB doesn't change a running session).
+  /** Studio → Voice (src/voice/); registered once the Bot is, below. */
+  let voice: BuiltinVoice | null = null;
   bb.agents.configure((context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
+    // The voice agent is told to speak, not write, and gets Studio's item tools with its own.
+    const voiceAgent = voice?.configure(context.thread.id, context.pluginMetadata);
+    if (voiceAgent) return { tools: [...tools, ...voiceAgent.tools], skills: [], instructions: voiceAgent.instructions };
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS], skills: [], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
@@ -413,6 +419,8 @@ export default async function plugin(bb: BbPluginApi) {
       follow: async (botId) => { const bot = automationBot(botId); if (bot) await automations.follow(bot); },
     },
   });
+  // Voice sessions: a fast-model thread the user talks to, which hands work to the Bot or threads.
+  voice = await registerVoice(bb, { speech: speech.service, botThread: () => bots.stored()?.threadId ?? null });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, changed: tagsChanged,

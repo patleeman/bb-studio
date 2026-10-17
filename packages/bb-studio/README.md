@@ -1935,6 +1935,33 @@ bb studio speech say "Done. Two tests fail." --out reply.mp3 [--model <id>] [--v
 Clients (Setup's sample, and the voice features to come) call the
 `speech.prepare` RPC for a piece of text and play the URL it returns.
 
+## Voice
+
+**Studio → Voice** (`/plugins/studio/studio/voice`, or *Studio: Voice* in the
+command palette) is a spoken conversation with BB. You talk with Talk's mic or
+your hold-to-talk key; a fast voice agent answers in a sentence or two, and
+its replies are spoken with [Speech](#speech).
+
+- **A session is one thread** in the Personal project, on a fast model:
+  GPT-6-Luna on Codex's fast tier (default) or Haiku 5.5 on Claude Code. The
+  page shows it with BB's own chat, so the transcript, history and composer
+  are the usual ones. **End session** leaves the thread in BB's history; the
+  next session starts a new one.
+- **Written for listening.** The agent is told to answer in short spoken
+  sentences with no markdown, lists or code, and to say numbers and paths as
+  a person would. What's spoken is cleaned of any markdown that slips through.
+- **It hands work off.** `voice_delegate` sends a request to the Bot
+  (`bot`) or any thread, as the voice thread. When that thread finishes the
+  turn it was asked for, Studio posts its reply back into the voice thread as
+  a note, and the agent sums it up aloud. It checks that the finished turn is
+  the one it asked for, so a busy thread's other work isn't mistaken for the
+  answer. `voice_threads` lists threads and `voice_read` reads one's latest
+  reply. Delegated threads aren't parented to the voice thread or the Bot.
+- **Speaking.** When the voice agent replies, the server cuts the reply into
+  pieces and starts making their audio at once, then tells the open Voice page
+  to play them. **Speak replies** turns this on or off per device, **Stop
+  speaking** cuts it off, and starting to dictate stops it too.
+
 ## Backup and restore
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one
