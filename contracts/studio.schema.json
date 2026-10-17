@@ -26148,6 +26148,727 @@
         ],
         "additionalProperties": false
       }
+    },
+    "speech.state": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "openrouter",
+              "custom",
+              "local"
+            ]
+          },
+          "engines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "openrouter",
+                    "custom",
+                    "local"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "openRouterKey": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "local": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "unsupported",
+                  "not-installed",
+                  "installing",
+                  "stopped",
+                  "starting",
+                  "ready",
+                  "failed"
+                ]
+              },
+              "installed": {
+                "type": "boolean"
+              },
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "log": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "installed",
+              "detail",
+              "log",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "engine",
+          "engines",
+          "model",
+          "voice",
+          "instructions",
+          "speed",
+          "endpoint",
+          "openRouterKey",
+          "problem",
+          "local"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "speech.update": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "openrouter",
+              "custom",
+              "local"
+            ]
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2.5
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "voice": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "openrouter",
+              "custom",
+              "local"
+            ]
+          },
+          "engines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "openrouter",
+                    "custom",
+                    "local"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "openRouterKey": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "local": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "unsupported",
+                  "not-installed",
+                  "installing",
+                  "stopped",
+                  "starting",
+                  "ready",
+                  "failed"
+                ]
+              },
+              "installed": {
+                "type": "boolean"
+              },
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "log": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "installed",
+              "detail",
+              "log",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "engine",
+          "engines",
+          "model",
+          "voice",
+          "instructions",
+          "speed",
+          "endpoint",
+          "openRouterKey",
+          "problem",
+          "local"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "speech.models": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "pricePerMillionChars": {
+                  "type": "number"
+                },
+                "voices": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "voiceNames": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "voices"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "speech.local": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "install",
+              "start",
+              "stop"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "openrouter",
+              "custom",
+              "local"
+            ]
+          },
+          "engines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "openrouter",
+                    "custom",
+                    "local"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "openRouterKey": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "local": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "unsupported",
+                  "not-installed",
+                  "installing",
+                  "stopped",
+                  "starting",
+                  "ready",
+                  "failed"
+                ]
+              },
+              "installed": {
+                "type": "boolean"
+              },
+              "detail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "log": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "installed",
+              "detail",
+              "log",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "engine",
+          "engines",
+          "model",
+          "voice",
+          "instructions",
+          "speed",
+          "endpoint",
+          "openRouterKey",
+          "problem",
+          "local"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "speech.prepare": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "voice": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voice.state": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "speechProblem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversational": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on",
+          "pending",
+          "speechProblem",
+          "conversational"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voice.set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "threadId",
+          "on"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "speechProblem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversational": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on",
+          "pending",
+          "speechProblem",
+          "conversational"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voice.conversational": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "threadId",
+          "on"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "speechProblem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversational": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on",
+          "pending",
+          "speechProblem",
+          "conversational"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voice.new": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "modelId": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "StudioItem": {

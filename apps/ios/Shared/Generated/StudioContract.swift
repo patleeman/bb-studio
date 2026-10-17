@@ -231,6 +231,15 @@ public enum Studio {
     public static let dashboards_widgetTypes = "dashboards.widgetTypes"
     public static let dashboards_saveWidgetType = "dashboards.saveWidgetType"
     public static let dashboards_deleteWidgetType = "dashboards.deleteWidgetType"
+    public static let speech_state = "speech.state"
+    public static let speech_update = "speech.update"
+    public static let speech_models = "speech.models"
+    public static let speech_local = "speech.local"
+    public static let speech_prepare = "speech.prepare"
+    public static let voice_state = "voice.state"
+    public static let voice_set = "voice.set"
+    public static let voice_conversational = "voice.conversational"
+    public static let voice_new = "voice.new"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -720,6 +729,28 @@ public enum Studio {
   public typealias DashboardsSaveWidgetType = DashboardsSaveWidgetTypeOutput
 
   public typealias DashboardsDeleteWidgetType = DashboardsDeleteWidgetTypeOutput
+
+  public typealias SpeechStateInput = StudioJSONValue
+
+  public typealias SpeechState = SpeechStateOutput
+
+  public typealias SpeechUpdate = SpeechUpdateOutput
+
+  public typealias SpeechModelsInput = StudioJSONValue
+
+  public typealias SpeechModels = SpeechModelsOutput
+
+  public typealias SpeechLocal = SpeechLocalOutput
+
+  public typealias SpeechPrepare = SpeechPrepareOutput
+
+  public typealias VoiceState = VoiceStateOutput
+
+  public typealias VoiceSet = VoiceSetOutput
+
+  public typealias VoiceConversational = VoiceConversationalOutput
+
+  public typealias VoiceNew = VoiceNewOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -19369,6 +19400,655 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public enum SpeechStateOutputEngine: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpeechStateOutputEnginesItemId: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechStateOutputEnginesItem: Sendable, Hashable, Codable {
+    public var id: SpeechStateOutputEnginesItemId?
+    public var label: String?
+
+    public init(id: SpeechStateOutputEnginesItemId? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public enum SpeechStateOutputLocalState: Sendable, Hashable, Codable {
+    case unsupported
+    case not_installed
+    case installing
+    case stopped
+    case starting
+    case ready
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "unsupported": self = .unsupported
+      case "not-installed": self = .not_installed
+      case "installing": self = .installing
+      case "stopped": self = .stopped
+      case "starting": self = .starting
+      case "ready": self = .ready
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .unsupported: try container.encode("unsupported")
+      case .not_installed: try container.encode("not-installed")
+      case .installing: try container.encode("installing")
+      case .stopped: try container.encode("stopped")
+      case .starting: try container.encode("starting")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechStateOutputLocal: Sendable, Hashable, Codable {
+    public var state: SpeechStateOutputLocalState?
+    public var installed: Bool?
+    public var detail: String?
+    public var log: [String]?
+    public var url: String?
+
+    public init(state: SpeechStateOutputLocalState? = nil, installed: Bool? = nil, detail: String? = nil, log: [String]? = nil, url: String? = nil) {
+      self.state = state
+      self.installed = installed
+      self.detail = detail
+      self.log = log
+      self.url = url
+    }
+  }
+
+  public struct SpeechStateOutput: Sendable, Hashable, Codable {
+    public var engine: SpeechStateOutputEngine?
+    public var engines: [SpeechStateOutputEnginesItem]?
+    public var model: String?
+    public var voice: String?
+    public var instructions: String?
+    public var speed: Double?
+    public var endpoint: String?
+    public var openRouterKey: Bool?
+    public var problem: String?
+    public var local: SpeechStateOutputLocal?
+
+    public init(engine: SpeechStateOutputEngine? = nil, engines: [SpeechStateOutputEnginesItem]? = nil, model: String? = nil, voice: String? = nil, instructions: String? = nil, speed: Double? = nil, endpoint: String? = nil, openRouterKey: Bool? = nil, problem: String? = nil, local: SpeechStateOutputLocal? = nil) {
+      self.engine = engine
+      self.engines = engines
+      self.model = model
+      self.voice = voice
+      self.instructions = instructions
+      self.speed = speed
+      self.endpoint = endpoint
+      self.openRouterKey = openRouterKey
+      self.problem = problem
+      self.local = local
+    }
+  }
+
+  public enum SpeechUpdateInputEngine: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechUpdateInput: Sendable, Hashable, Codable {
+    public var engine: SpeechUpdateInputEngine?
+    public var endpoint: String?
+    public var speed: Double?
+    public var model: String?
+    public var voice: String?
+    public var instructions: String?
+
+    public init(engine: SpeechUpdateInputEngine? = nil, endpoint: String? = nil, speed: Double? = nil, model: String? = nil, voice: String? = nil, instructions: String? = nil) {
+      self.engine = engine
+      self.endpoint = endpoint
+      self.speed = speed
+      self.model = model
+      self.voice = voice
+      self.instructions = instructions
+    }
+  }
+
+  public enum SpeechUpdateOutputEngine: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpeechUpdateOutputEnginesItemId: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechUpdateOutputEnginesItem: Sendable, Hashable, Codable {
+    public var id: SpeechUpdateOutputEnginesItemId?
+    public var label: String?
+
+    public init(id: SpeechUpdateOutputEnginesItemId? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public enum SpeechUpdateOutputLocalState: Sendable, Hashable, Codable {
+    case unsupported
+    case not_installed
+    case installing
+    case stopped
+    case starting
+    case ready
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "unsupported": self = .unsupported
+      case "not-installed": self = .not_installed
+      case "installing": self = .installing
+      case "stopped": self = .stopped
+      case "starting": self = .starting
+      case "ready": self = .ready
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .unsupported: try container.encode("unsupported")
+      case .not_installed: try container.encode("not-installed")
+      case .installing: try container.encode("installing")
+      case .stopped: try container.encode("stopped")
+      case .starting: try container.encode("starting")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechUpdateOutputLocal: Sendable, Hashable, Codable {
+    public var state: SpeechUpdateOutputLocalState?
+    public var installed: Bool?
+    public var detail: String?
+    public var log: [String]?
+    public var url: String?
+
+    public init(state: SpeechUpdateOutputLocalState? = nil, installed: Bool? = nil, detail: String? = nil, log: [String]? = nil, url: String? = nil) {
+      self.state = state
+      self.installed = installed
+      self.detail = detail
+      self.log = log
+      self.url = url
+    }
+  }
+
+  public struct SpeechUpdateOutput: Sendable, Hashable, Codable {
+    public var engine: SpeechUpdateOutputEngine?
+    public var engines: [SpeechUpdateOutputEnginesItem]?
+    public var model: String?
+    public var voice: String?
+    public var instructions: String?
+    public var speed: Double?
+    public var endpoint: String?
+    public var openRouterKey: Bool?
+    public var problem: String?
+    public var local: SpeechUpdateOutputLocal?
+
+    public init(engine: SpeechUpdateOutputEngine? = nil, engines: [SpeechUpdateOutputEnginesItem]? = nil, model: String? = nil, voice: String? = nil, instructions: String? = nil, speed: Double? = nil, endpoint: String? = nil, openRouterKey: Bool? = nil, problem: String? = nil, local: SpeechUpdateOutputLocal? = nil) {
+      self.engine = engine
+      self.engines = engines
+      self.model = model
+      self.voice = voice
+      self.instructions = instructions
+      self.speed = speed
+      self.endpoint = endpoint
+      self.openRouterKey = openRouterKey
+      self.problem = problem
+      self.local = local
+    }
+  }
+
+  public struct SpeechModelsOutputModelsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var pricePerMillionChars: Double?
+    public var voices: [String]?
+    public var voiceNames: [String: String]?
+
+    public init(id: String? = nil, name: String? = nil, pricePerMillionChars: Double? = nil, voices: [String]? = nil, voiceNames: [String: String]? = nil) {
+      self.id = id
+      self.name = name
+      self.pricePerMillionChars = pricePerMillionChars
+      self.voices = voices
+      self.voiceNames = voiceNames
+    }
+  }
+
+  public struct SpeechModelsOutput: Sendable, Hashable, Codable {
+    public var models: [SpeechModelsOutputModelsItem]?
+
+    public init(models: [SpeechModelsOutputModelsItem]? = nil) {
+      self.models = models
+    }
+  }
+
+  public enum SpeechLocalInputAction: Sendable, Hashable, Codable {
+    case install
+    case start
+    case stop
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "install": self = .install
+      case "start": self = .start
+      case "stop": self = .stop
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .install: try container.encode("install")
+      case .start: try container.encode("start")
+      case .stop: try container.encode("stop")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechLocalInput: Sendable, Hashable, Codable {
+    public var action: SpeechLocalInputAction?
+
+    public init(action: SpeechLocalInputAction? = nil) {
+      self.action = action
+    }
+  }
+
+  public enum SpeechLocalOutputEngine: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpeechLocalOutputEnginesItemId: Sendable, Hashable, Codable {
+    case openrouter
+    case custom
+    case local
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "openrouter": self = .openrouter
+      case "custom": self = .custom
+      case "local": self = .local
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .openrouter: try container.encode("openrouter")
+      case .custom: try container.encode("custom")
+      case .local: try container.encode("local")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechLocalOutputEnginesItem: Sendable, Hashable, Codable {
+    public var id: SpeechLocalOutputEnginesItemId?
+    public var label: String?
+
+    public init(id: SpeechLocalOutputEnginesItemId? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public enum SpeechLocalOutputLocalState: Sendable, Hashable, Codable {
+    case unsupported
+    case not_installed
+    case installing
+    case stopped
+    case starting
+    case ready
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "unsupported": self = .unsupported
+      case "not-installed": self = .not_installed
+      case "installing": self = .installing
+      case "stopped": self = .stopped
+      case "starting": self = .starting
+      case "ready": self = .ready
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .unsupported: try container.encode("unsupported")
+      case .not_installed: try container.encode("not-installed")
+      case .installing: try container.encode("installing")
+      case .stopped: try container.encode("stopped")
+      case .starting: try container.encode("starting")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpeechLocalOutputLocal: Sendable, Hashable, Codable {
+    public var state: SpeechLocalOutputLocalState?
+    public var installed: Bool?
+    public var detail: String?
+    public var log: [String]?
+    public var url: String?
+
+    public init(state: SpeechLocalOutputLocalState? = nil, installed: Bool? = nil, detail: String? = nil, log: [String]? = nil, url: String? = nil) {
+      self.state = state
+      self.installed = installed
+      self.detail = detail
+      self.log = log
+      self.url = url
+    }
+  }
+
+  public struct SpeechLocalOutput: Sendable, Hashable, Codable {
+    public var engine: SpeechLocalOutputEngine?
+    public var engines: [SpeechLocalOutputEnginesItem]?
+    public var model: String?
+    public var voice: String?
+    public var instructions: String?
+    public var speed: Double?
+    public var endpoint: String?
+    public var openRouterKey: Bool?
+    public var problem: String?
+    public var local: SpeechLocalOutputLocal?
+
+    public init(engine: SpeechLocalOutputEngine? = nil, engines: [SpeechLocalOutputEnginesItem]? = nil, model: String? = nil, voice: String? = nil, instructions: String? = nil, speed: Double? = nil, endpoint: String? = nil, openRouterKey: Bool? = nil, problem: String? = nil, local: SpeechLocalOutputLocal? = nil) {
+      self.engine = engine
+      self.engines = engines
+      self.model = model
+      self.voice = voice
+      self.instructions = instructions
+      self.speed = speed
+      self.endpoint = endpoint
+      self.openRouterKey = openRouterKey
+      self.problem = problem
+      self.local = local
+    }
+  }
+
+  public struct SpeechPrepareInput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var model: String?
+    public var voice: String?
+    public var instructions: String?
+
+    public init(text: String? = nil, model: String? = nil, voice: String? = nil, instructions: String? = nil) {
+      self.text = text
+      self.model = model
+      self.voice = voice
+      self.instructions = instructions
+    }
+  }
+
+  public struct SpeechPrepareOutput: Sendable, Hashable, Codable {
+    public var url: String?
+
+    public init(url: String? = nil) {
+      self.url = url
+    }
+  }
+
+  public struct VoiceStateInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct VoiceStateOutput: Sendable, Hashable, Codable {
+    public var on: Bool?
+    public var pending: [String]?
+    public var speechProblem: String?
+    public var conversational: Bool?
+
+    public init(on: Bool? = nil, pending: [String]? = nil, speechProblem: String? = nil, conversational: Bool? = nil) {
+      self.on = on
+      self.pending = pending
+      self.speechProblem = speechProblem
+      self.conversational = conversational
+    }
+  }
+
+  public struct VoiceSetInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var on: Bool?
+
+    public init(threadId: String? = nil, on: Bool? = nil) {
+      self.threadId = threadId
+      self.on = on
+    }
+  }
+
+  public struct VoiceSetOutput: Sendable, Hashable, Codable {
+    public var on: Bool?
+    public var pending: [String]?
+    public var speechProblem: String?
+    public var conversational: Bool?
+
+    public init(on: Bool? = nil, pending: [String]? = nil, speechProblem: String? = nil, conversational: Bool? = nil) {
+      self.on = on
+      self.pending = pending
+      self.speechProblem = speechProblem
+      self.conversational = conversational
+    }
+  }
+
+  public struct VoiceConversationalInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var on: Bool?
+
+    public init(threadId: String? = nil, on: Bool? = nil) {
+      self.threadId = threadId
+      self.on = on
+    }
+  }
+
+  public struct VoiceConversationalOutput: Sendable, Hashable, Codable {
+    public var on: Bool?
+    public var pending: [String]?
+    public var speechProblem: String?
+    public var conversational: Bool?
+
+    public init(on: Bool? = nil, pending: [String]? = nil, speechProblem: String? = nil, conversational: Bool? = nil) {
+      self.on = on
+      self.pending = pending
+      self.speechProblem = speechProblem
+      self.conversational = conversational
+    }
+  }
+
+  public struct VoiceNewInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var modelId: String?
+
+    public init(projectId: String? = nil, modelId: String? = nil) {
+      self.projectId = projectId
+      self.modelId = modelId
+    }
+  }
+
+  public struct VoiceNewOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 

@@ -8,4 +8,6 @@ import { rpcContract as recordings } from "./talk/shared/contract";
 import { rpcContract as pages } from "./pages/contract";
 import { rpcContract as dashboards } from "./dashboards/contract";
 import { rpcContract as notes } from "./pages/notes-contract";
-export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards });
+import { speechContract as speech } from "./speech/contract";
+import { voiceContract as voice } from "./voice/contract";
+export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...speech, ...voice });
