@@ -347,7 +347,8 @@ function CompactSpeech({ state, models, model, busy, error, playing, update, loc
                       <SelectTrigger className={MENU_TRIGGER} aria-label="Speech model"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {model ? null : <SelectItem value={state.model}>{state.model}</SelectItem>}
-                        {models.map((each) => <SelectItem key={each.id} value={each.id}>{each.name}{price(each)}</SelectItem>)}
+                        {/* "Fish Audio: Drama 3" reads as "Drama 3" here; the list is grouped by maker already. */}
+                        {models.map((each) => <SelectItem key={each.id} value={each.id}>{each.name.replace(/^[^:]{1,40}:\s*/, "")}{price(each).replace(" chars", "")}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   ) : <span className="truncate px-2 text-xs text-foreground">{models ? state.model : "Loading…"}</span>}
@@ -389,7 +390,7 @@ function CompactSpeech({ state, models, model, busy, error, playing, update, loc
               {MENU_SPEEDS.map((speed) => (
                 <button key={speed} type="button" aria-pressed={state.speed === speed} disabled={busy} onClick={() => update({ speed })}
                   className={cn("h-6 flex-1 rounded px-1 text-xs tabular-nums outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
-                    state.speed === speed ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                    state.speed === speed ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground")}>
                   {speed}×
                 </button>
               ))}
