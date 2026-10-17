@@ -4,7 +4,7 @@
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LocalSpeechStatus, speechContract, SpeechState } from "../../speech/contract";
 import { Speaker, type SpeakerState } from "../../speech/speaker";
 
@@ -30,12 +30,12 @@ const LOCAL_LABELS: Record<LocalSpeechStatus["state"], string> = {
 };
 
 /** Studio's own voice server: install it, see it start, read why it failed. */
-function LocalVoices({ local, busy, onAction }: { local: LocalSpeechStatus; busy: boolean; onAction(action: "install" | "start" | "stop"): void }) {
+function LocalVoices({ local, busy, label, onAction }: { local: LocalSpeechStatus; busy: boolean; label: string; onAction(action: "install" | "start" | "stop"): void }) {
   const showLog = local.log.length > 0 && (local.state === "installing" || local.state === "failed" || local.state === "starting");
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="w-20 shrink-0 text-xs text-foreground">Server</span>
+        <span className={label}>Server</span>
         <span className="text-xs text-foreground">{LOCAL_LABELS[local.state]}</span>
         {local.state === "not-installed" || (local.state === "failed" && !local.installed) ? (
           <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("install")}>{local.state === "failed" ? "Install again" : "Install"}</Button>
@@ -60,7 +60,12 @@ function LocalVoices({ local, busy, onAction }: { local: LocalSpeechStatus; busy
   );
 }
 
-export function SpeechSection() {
+/**
+ * Setup's Speech section. `compact` is the same controls for a small popover
+ * (the voice menu in a thread's composer): no heading or frame, fields that
+ * fill the width, and the sample's text fixed.
+ */
+export function SpeechSection({ compact = false, onState }: { compact?: boolean; onState?(state: SpeechState): void } = {}) {
   const rpc = useRpc<typeof speechContract>();
   const [state, setState] = useState<SpeechState | null>(null);
   const [models, setModels] = useState<Model[] | null>(null);
@@ -110,6 +115,11 @@ export function SpeechSection() {
 
   // The sample plays at the saved speed, so you hear what replies will sound like.
   useEffect(() => { if (state) speaker.setRate(state.speed); }, [speaker, state]);
+  const onStateRef = useRef(onState);
+  onStateRef.current = onState;
+  useEffect(() => { if (state) onStateRef.current?.(state); }, [state]);
+  const field = compact ? "h-8 min-w-0 flex-1 text-xs" : "h-8 w-80 text-xs";
+  const label = compact ? "w-16 shrink-0 text-xs text-foreground" : "w-20 shrink-0 text-xs text-foreground";
 
   const update = async (change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions" | "speed">>) => {
     setBusy(true);
@@ -138,17 +148,21 @@ export function SpeechSection() {
   const model = models?.find((each) => each.id === state?.model);
   return (
     <section className="flex flex-col gap-2" aria-label="Speech">
-      <h2 className="text-sm font-medium text-foreground">Speech</h2>
-      <p className="text-xs text-muted-foreground">
-        The voice Studio speaks with. Play a sample to choose by ear; changes apply to the next thing spoken.
-      </p>
+      {compact ? null : (
+        <>
+          <h2 className="text-sm font-medium text-foreground">Speech</h2>
+          <p className="text-xs text-muted-foreground">
+            The voice Studio speaks with. Play a sample to choose by ear; changes apply to the next thing spoken.
+          </p>
+        </>
+      )}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {!state ? <p className="text-xs text-muted-foreground">Loading speech settings…</p> : (
-        <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+        <div className={compact ? "flex flex-col gap-2.5" : "flex flex-col gap-3 rounded-md border border-border p-3"}>
           <label className="flex min-w-0 items-center gap-2">
-            <span className="w-20 shrink-0 text-xs text-foreground">Engine</span>
+            <span className={label}>Engine</span>
             <Select value={state.engine} disabled={busy} onValueChange={(engine) => void update({ engine: engine as SpeechState["engine"] })}>
-              <SelectTrigger className="h-8 w-64 text-xs" aria-label="Speech engine"><SelectValue /></SelectTrigger>
+              <SelectTrigger className={compact ? field : "h-8 w-64 text-xs"} aria-label="Speech engine"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {state.engines.map((engine) => <SelectItem key={engine.id} value={engine.id}>{engine.label}</SelectItem>)}
               </SelectContent>
@@ -156,10 +170,10 @@ export function SpeechSection() {
           </label>
           {state.engine === "custom" ? (
             <label className="flex min-w-0 items-center gap-2">
-              <span className="w-20 shrink-0 text-xs text-foreground">Endpoint</span>
+              <span className={label}>Endpoint</span>
               <Input
                 key={state.endpoint}
-                className="h-8 w-80 text-xs"
+                className={field}
                 defaultValue={state.endpoint}
                 placeholder="http://127.0.0.1:8000/v1"
                 aria-label="Custom speech endpoint"
@@ -167,7 +181,7 @@ export function SpeechSection() {
               />
             </label>
           ) : null}
-          {state.engine === "local" ? <LocalVoices local={state.local} busy={busy} onAction={(action) => void localAction(action)} /> : null}
+          {state.engine === "local" ? <LocalVoices local={state.local} busy={busy} label={label} onAction={(action) => void localAction(action)} /> : null}
           {state.problem && state.engine === "local" ? null : state.problem ? (
             <p className="text-xs text-foreground">
               {state.problem}
@@ -176,10 +190,10 @@ export function SpeechSection() {
           ) : (
             <>
               <label className="flex min-w-0 items-center gap-2">
-                <span className="w-20 shrink-0 text-xs text-foreground">Model</span>
+                <span className={label}>Model</span>
                 {models?.length ? (
                   <Select value={state.model} disabled={busy} onValueChange={(id) => void update({ model: id, voice: "" })}>
-                    <SelectTrigger className="h-8 w-80 text-xs" aria-label="Speech model"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={field} aria-label="Speech model"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {model ? null : <SelectItem value={state.model}>{state.model}</SelectItem>}
                       {models.map((each) => <SelectItem key={each.id} value={each.id}>{each.name}{price(each)}</SelectItem>)}
@@ -188,7 +202,7 @@ export function SpeechSection() {
                 ) : (
                   <Input
                     key={state.model}
-                    className="h-8 w-80 text-xs"
+                    className={field}
                     defaultValue={state.model}
                     placeholder={models ? "Model name" : "Loading models…"}
                     aria-label="Speech model"
@@ -197,10 +211,10 @@ export function SpeechSection() {
                 )}
               </label>
               <label className="flex min-w-0 items-center gap-2">
-                <span className="w-20 shrink-0 text-xs text-foreground">Voice</span>
+                <span className={label}>Voice</span>
                 {model?.voices?.length ? (
                   <Select value={state.voice || DEFAULT_VOICE} disabled={busy} onValueChange={(voice) => void update({ voice: voice === DEFAULT_VOICE ? "" : voice })}>
-                    <SelectTrigger className="h-8 w-80 text-xs" aria-label="Speech voice"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={field} aria-label="Speech voice"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={DEFAULT_VOICE}>{model.voiceNames ? `Default: ${model.voiceNames[model.voices[0]!]?.split(" · ")[0] ?? "first"}` : "Model default"}</SelectItem>
                       {state.voice && !model.voices.includes(state.voice) ? <SelectItem value={state.voice}>{state.voice}</SelectItem> : null}
@@ -210,7 +224,7 @@ export function SpeechSection() {
                 ) : (
                   <Input
                     key={`${state.model}:${state.voice}`}
-                    className="h-8 w-80 text-xs"
+                    className={field}
                     defaultValue={state.voice}
                     placeholder={state.engine === "local" ? "Model default, or the path of a recording to clone" : "Model default, or a voice ID"}
                     aria-label="Speech voice"
@@ -219,10 +233,10 @@ export function SpeechSection() {
                 )}
               </label>
               <label className="flex min-w-0 items-center gap-2">
-                <span className="w-20 shrink-0 text-xs text-foreground">Delivery</span>
+                <span className={label}>Delivery</span>
                 <Input
                   key={state.instructions}
-                  className="h-8 w-80 text-xs"
+                  className={field}
                   defaultValue={state.instructions}
                   placeholder="Warm and calm, a little brisk"
                   aria-label="Speech delivery"
@@ -230,7 +244,7 @@ export function SpeechSection() {
                 />
               </label>
               <label className="flex min-w-0 items-center gap-2">
-                <span className="w-20 shrink-0 text-xs text-foreground">Speed</span>
+                <span className={label}>Speed</span>
                 <Select value={String(state.speed)} disabled={busy} onValueChange={(value) => void update({ speed: Number(value) })}>
                   <SelectTrigger className="h-8 w-32 text-xs" aria-label="Speech speed"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -239,7 +253,7 @@ export function SpeechSection() {
                 </Select>
               </label>
               <div className="flex min-w-0 flex-col gap-2">
-                <Textarea className="min-h-16 text-xs" value={sample} onChange={(event) => setSample(event.target.value)} aria-label="Sample text" />
+                {compact ? null : <Textarea className="min-h-16 text-xs" value={sample} onChange={(event) => setSample(event.target.value)} aria-label="Sample text" />}
                 <div>
                   <Button size="sm" variant="outline" disabled={!sample.trim()} onClick={() => void play()}>
                     {playing === "idle" ? "Play sample" : playing === "loading" ? "Loading… (stop)" : "Stop"}

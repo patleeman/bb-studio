@@ -1984,8 +1984,12 @@ piece being read is lit in the transcript. Recapture with
 `BB_CAPTURE_ONLY=studio-voice`; it needs Codex signed in and
 `OPENROUTER_API_KEY` set when the staged BB starts.
 
-- **Turning it on.** The speaker button in a thread's composer, or *Voice
-  mode: turn on or off in this thread* in the command palette. In a new
+- **Turning it on, and the voice menu.** The speaker button in a thread's
+  composer opens the voice menu: voice mode's switch for the thread, and
+  Speech's settings in small (engine, including **On this Mac** with its
+  Install and server status, model, voice, delivery, speed and Play sample),
+  the same ones as Setup → Speech. *Voice mode: turn on or off in this
+  thread* in the command palette switches it directly. In a new
   thread's composer the same spot starts a **New voice chat**, as does the
   *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
   current project (the Personal project otherwise), in the project's main

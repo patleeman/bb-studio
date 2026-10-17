@@ -5,7 +5,8 @@
 // Stop). While you talk, your words stream into the input phrase by phrase and
 // are sent when you finish; while the agent speaks, the piece being read
 // lights up in the transcript. New voice chat starts a thread with it on.
-import { Icon, Tooltip } from "@bb-studio/kit/ui";
+import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "@bb-studio/kit/ui";
+import { SpeechSection } from "../../ui/setup/SpeechSection";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useComposer, useRealtime, useRpc, useSdk, type PluginAppBuilder, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -45,7 +46,12 @@ function useSpeechSpeed() {
     voicePlayer.setRate(next);
     rpc.call("speech.update", { speed: next }).catch((error: unknown) => toast.error("Couldn't save the speed", { description: errorMessage(error) }));
   }, [rpc]);
-  return { speed, change };
+  /** The speed was saved elsewhere (the voice menu): just follow it. */
+  const follow = useCallback((next: number) => {
+    setSpeed(next);
+    voicePlayer.setRate(next);
+  }, []);
+  return { speed, change, follow };
 }
 
 const ACTION_BUTTON =
@@ -93,7 +99,7 @@ function VoiceControls() {
 
 function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerApi; threadId: string }) {
   const { on, set } = useVoiceMode(threadId);
-  const { speed, change: changeSpeed } = useSpeechSpeed();
+  const { speed, change: changeSpeed, follow: followSpeed } = useSpeechSpeed();
   const snapshot = useVoiceSnapshot();
   const talkState = useTalkState();
   const sdk = useSdk();
@@ -150,7 +156,7 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     voicePlayer.play(threadId, spoken.urls, spoken.pieces).catch((error: unknown) => toast.error("Couldn't play the reply", { description: errorMessage(error) }));
   });
 
-  const label = on ? "Voice mode on: replies are spoken. Turn off" : "Voice mode: speak replies aloud";
+  const label = on ? "Voice mode is on: voice settings" : "Voice mode: speak replies aloud";
   return (
     <>
       {on && listening ? (
@@ -176,11 +182,32 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
           </Tooltip>
         </span>
       ) : null}
-      <Tooltip label={label} side="top">
-        <button type="button" aria-label={label} aria-pressed={on} className={`${ACTION_BUTTON} ${on ? "bg-primary/15 text-primary hover:text-primary" : ""}`} onClick={() => void set(!on)}>
-          <Icon name={on ? "studio/speaker" : "studio/speaker-off"} className="size-4" />
-        </button>
-      </Tooltip>
+      <Popover>
+        <Tooltip label={label} side="top">
+          <PopoverTrigger asChild>
+            <button type="button" aria-label={label} className={`${ACTION_BUTTON} ${on ? "bg-primary/15 text-primary hover:text-primary" : ""}`}>
+              <Icon name={on ? "studio/speaker" : "studio/speaker-off"} className="size-4" />
+            </button>
+          </PopoverTrigger>
+        </Tooltip>
+        <PopoverContent side="top" align="end" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
+          <div className="mb-3 flex items-center gap-2 border-b border-border pb-3">
+            <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Voice mode</span>
+            <span className="text-xs text-muted-foreground">{on ? "Replies are spoken" : "Off in this thread"}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={on}
+              aria-label={on ? "Turn voice mode off in this thread" : "Turn voice mode on in this thread"}
+              onClick={() => void set(!on)}
+              className={cn("relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-primary" : "bg-muted")}
+            >
+              <span className={cn("inline-block size-3 rounded-full bg-background shadow transition-transform", on ? "translate-x-3.5" : "translate-x-0.5")} />
+            </button>
+          </div>
+          <SpeechSection compact onState={(state) => followSpeed(state.speed)} />
+        </PopoverContent>
+      </Popover>
     </>
   );
 }

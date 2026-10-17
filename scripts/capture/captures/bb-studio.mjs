@@ -525,7 +525,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     setup: async (client) => {
       const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
+      await client.waitForAriaButton("Voice mode is on: voice settings", 30000);
       // The greeting is spoken first; stop it and ask a question.
       await client.waitForAriaButton("Stop speaking", 120000);
       await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
@@ -538,6 +538,30 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`).catch(() => {});
       };
     },
+  },
+  {
+    // The voice menu: the composer's speaker button opens voice mode's switch
+    // and Speech's settings, on OpenRouter with Fish Drama 3's named voices.
+    id: "studio-voice-menu",
+    packageDir: "bb-studio",
+    fileName: "voice-menu.png",
+    setup: async (client) => {
+      await pluginRpc("studio", "speech.update", { engine: "openrouter", model: "fish-audio/drama-3", voice: "", speed: 1.25 });
+      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      await client.waitForAriaButton("Voice mode is on: voice settings", 30000);
+      await client.evaluate(`document.querySelector('[aria-label="Voice mode is on: voice settings"]').click()`);
+      await client.waitForText("Replies are spoken", 10000);
+      await client.waitForText("Hannah", 30000);
+      await client.waitForText("1.25×");
+      await client.waitForText("Play sample");
+      await sleep(400);
+      return async () => { await pluginRpc("studio", "speech.update", { speed: 1 }); };
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const box = document.querySelector('[data-radix-popper-content-wrapper] section[aria-label="Speech"]').closest('[data-radix-popper-content-wrapper]').getBoundingClientRect();
+      return { x: Math.max(0, box.left - 16), y: Math.max(0, box.top - 16), width: box.width + 32, height: box.height + 32 + 80, scale: 2 };
+    })()`),
   },
   {
     id: "studio-setup",
