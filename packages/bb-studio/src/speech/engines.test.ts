@@ -45,6 +45,11 @@ describe("speech engines", () => {
     await expect(openRouterEngine("sk", fetchImpl).synthesize({ text: "Hi.", model: "x", voice: "nobody" })).rejects.toThrow(/404 voice not found/);
   });
 
+  it("treats a 200 with no audio as a failure, as mlx-audio answers a bad voice", async () => {
+    const { fetchImpl } = fakeFetch(() => new Response(new Uint8Array([]), { headers: { "content-type": "audio/mp3" } }));
+    await expect(customEngine("http://127.0.0.1:8000/v1", undefined, fetchImpl).synthesize({ text: "Hi.", model: "kokoro", voice: "alloy" })).rejects.toThrow(/no audio for kokoro in voice alloy/);
+  });
+
   it("refuses a response that isn't audio", async () => {
     const { fetchImpl } = fakeFetch(() => Response.json({ ok: true }));
     await expect(openRouterEngine("sk", fetchImpl).synthesize({ text: "Hi.", model: "x", voice: "" })).rejects.toThrow(/not audio/);

@@ -88,11 +88,38 @@ function openAiCompatible(options: OpenAiCompatibleOptions): SpeechEngine {
       if (!response.body) throw new Error(`${options.label} returned no audio.`);
       const contentType = response.headers.get("content-type") ?? "audio/mpeg";
       const mimeType = contentType.split(";")[0]!.trim();
-      if (mimeType === "audio/pcm" || mimeType === "audio/l16") return { mimeType: "audio/wav", body: pcmToWav(response.body, contentType) };
       if (!mimeType.startsWith("audio/")) throw new Error(`${options.label} returned ${mimeType}, not audio: ${await errorText(response)}`);
-      return { mimeType, body: response.body };
+      // Some servers (mlx-audio) answer a bad voice or format with 200 and no audio.
+      const body = await nonEmpty(response.body, `${options.label} returned no audio for ${request.model}${request.voice ? ` in voice ${request.voice}` : ""}; check the model and voice.`);
+      if (mimeType === "audio/pcm" || mimeType === "audio/l16") return { mimeType: "audio/wav", body: pcmToWav(body, contentType) };
+      return { mimeType, body };
     },
   };
+}
+
+/** The stream unchanged, once it has shown a first non-empty chunk; throws if it ends without one. */
+async function nonEmpty(stream: ReadableStream<Uint8Array>, message: string): Promise<ReadableStream<Uint8Array>> {
+  const reader = stream.getReader();
+  let first: Uint8Array | undefined;
+  for (;;) {
+    const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
+    if (done) throw new Error(message);
+    if (value?.length) { first = value; break; }
+  }
+  let sentFirst = false;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (!sentFirst) {
+        sentFirst = true;
+        controller.enqueue(first!);
+        return;
+      }
+      const { done, value } = await reader.read();
+      if (done) controller.close();
+      else controller.enqueue(value);
+    },
+    cancel: (reason) => reader.cancel(reason),
+  });
 }
 
 /** Raw 16-bit PCM as a streaming WAV: a header with an open-ended length, then the samples as they come. */
