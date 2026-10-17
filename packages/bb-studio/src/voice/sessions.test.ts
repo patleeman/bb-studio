@@ -9,6 +9,7 @@ function setup(options: { events?: Record<string, { seq: number; type: string; d
   const sent: Sent[] = [];
   const events = options.events ?? {};
   const sdk = {
+    system: { config: async () => ({ primaryHostId: "host_main" }) },
     threads: {
       spawn: async (args: Record<string, unknown>) => { spawned.push(args); return { id: "thr_voice" }; },
       get: async ({ threadId }: { threadId: string }) => ({ id: threadId, title: `Title of ${threadId}` }),
@@ -35,11 +36,11 @@ describe("VoiceSessions", () => {
   it("starts a voice chat in a new thread on the fast model, with voice on", async () => {
     const { sessions, kv, spawned } = setup();
     expect(await sessions.start("luna-fast", "proj_app")).toBe("thr_voice");
-    expect(spawned[0]).toMatchObject({ projectId: "proj_app", environment: { type: "host", workspace: { type: "unmanaged", path: null } }, providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", executionInputSources: { serviceTier: "explicit" }, pluginMetadata: { voice: "on" } });
+    expect(spawned[0]).toMatchObject({ projectId: "proj_app", environment: { type: "host", hostId: "host_main", workspace: { type: "unmanaged", path: null } }, providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", executionInputSources: { serviceTier: "explicit" }, pluginMetadata: { voice: "on" } });
     expect((kv.get(VOICE_KV_KEY) as { threads: string[] }).threads).toEqual(["thr_voice"]);
     expect(sessions.isOn("thr_voice")).toBe(true);
     await sessions.start("luna-fast");
-    expect(spawned[1]).toMatchObject({ projectId: "proj_personal" });
+    expect(spawned[1]).toMatchObject({ projectId: "proj_personal", environment: { type: "project-default" } });
   });
 
   it("turns voice mode on and off in any thread", async () => {

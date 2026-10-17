@@ -91,11 +91,12 @@ export class VoiceSessions {
   /** A new voice chat: a thread on a fast model with voice on, in the given project (the Personal project otherwise). */
   async start(modelId: string, projectId: string | null = null): Promise<string> {
     const model = VOICE_MODELS.find((each) => each.id === modelId) ?? VOICE_MODELS[0]!;
+    // A project's main checkout, never a new worktree: a voice chat talks and hands work off.
+    const hostId = projectId ? (await this.deps.sdk.system.config()).primaryHostId : null;
     const thread = await this.deps.sdk.threads.spawn({
       projectId: projectId ?? PERSONAL_PROJECT_ID,
       title: "New voice chat",
-      // The project's main checkout, never a new worktree: a voice chat talks and hands work off.
-      environment: { type: "host", workspace: { type: "unmanaged", path: null } },
+      environment: hostId ? { type: "host", hostId, workspace: { type: "unmanaged", path: null } } : { type: "project-default" },
       providerId: model.providerId,
       model: model.model,
       ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
