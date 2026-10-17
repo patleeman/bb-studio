@@ -46,24 +46,19 @@ struct VoiceModeButton: View {
     }
 }
 
-/// Over the composer while voice mode has something going on: you talking
-/// (red dot, time, your level) or the agent speaking (its level, the speed,
-/// and Stop). The desktop's pill beside the mic.
-struct VoiceStatusBar: View {
-    @ObservedObject var voice: ThreadVoice
+/// Over the composer while you dictate inline or talk in voice mode: a red
+/// dot, the time, your level, and what ends it (✓ finish, ✕ cancel). The
+/// desktop's pill beside the mic.
+struct TalkStatusBar: View {
     @ObservedObject var talk: HoldToTalk
-    @ObservedObject var player: VoicePlayer
 
     var body: some View {
         Group {
-            if voice.on, talk.isActive || talk.state == .sending {
+            if talk.inline, talk.isActive || talk.state == .sending {
                 listening
-            } else if player.isPlaying(in: voice.threadId) {
-                speaking
             }
         }
         .animation(.snappy, value: talk.state)
-        .animation(.snappy, value: player.phase)
     }
 
     private var listening: some View {
@@ -81,20 +76,52 @@ struct VoiceStatusBar: View {
             Spacer(minLength: 0)
             if talk.state == .handsFree {
                 Button("Cancel", action: talk.cancel).font(.subheadline.weight(.semibold))
+            } else if talk.state == .dictating {
+                Button(action: talk.cancel) {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(.fill.secondary, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel dictation")
+                .accessibilityIdentifier("dictationCancel")
+                Button(action: talk.release) {
+                    Image(systemName: "checkmark").font(.footnote.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color.accentColor, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(talk.voice ? "Finish and send" : "Finish dictation")
+                .accessibilityIdentifier("dictationFinish")
             }
         }
         .modifier(VoiceStatusCard())
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("voiceListening")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("talkListening")
     }
 
     private var listeningLabel: String {
         switch talk.state {
         case .cancelling: "Release to cancel"
         case .handsFree: "Listening · tap mic to send"
-        case .sending: "Sending what you said…"
+        case .dictating: "Listening"
+        case .sending: talk.cancelled ? "Cancelling…" : talk.voice ? "Sending what you said…" : "Transcribing…"
         default: "Listening · release to send"
         }
+    }
+}
+
+/// Over the composer while a reply is spoken: its level, the speed, and Stop.
+struct VoiceStatusBar: View {
+    @ObservedObject var voice: ThreadVoice
+    @ObservedObject var player: VoicePlayer
+
+    var body: some View {
+        Group {
+            if player.isPlaying(in: voice.threadId) { speaking }
+        }
+        .animation(.snappy, value: player.phase)
     }
 
     private var speaking: some View {

@@ -1,20 +1,47 @@
 import XCTest
 
 final class ComposerUITests: XCTestCase {
-    /// A tap on the composer's mic opens dictation, in the Bot chat (local fixture, no server).
-    func testMicTapOpensDictation() throws {
+    /// A tap on the composer's mic dictates inline, in New thread against a
+    /// server that has Studio (`TEST_RUNNER_BBGO_QA_SERVER`; nothing is sent):
+    /// no sheet, the mic turns active, Listening with ✓ and ✕ over the
+    /// composer. ✕ puts back what was typed; ✓ transcribes into the field.
+    func testMicTapDictatesInline() throws {
+        guard let server = ProcessInfo.processInfo.environment["BBGO_QA_SERVER"] else { throw XCTSkip("no server with Studio") }
         let app = XCUIApplication()
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://new"]
         app.launch()
+        let field = app.textViews["What should the agent do?"]
+        XCTAssertTrue(field.waitForExistence(timeout: 20))
+        field.tap()
+        field.typeText("Typed first")
         let mic = app.descendants(matching: .any)["composerMic"].firstMatch
-        XCTAssertTrue(mic.waitForExistence(timeout: 20))
+        XCTAssertTrue(mic.waitForExistence(timeout: 5))
+
+        // ✕ cancels and puts back what was typed.
         mic.tap()
-        XCTAssertTrue(app.navigationBars["Dictation"].waitForExistence(timeout: 5), "Tapping the mic didn't open dictation")
+        let listening = app.descendants(matching: .any)["talkListening"].firstMatch
+        XCTAssertTrue(listening.waitForExistence(timeout: 5), "Listening shows over the composer")
+        XCTAssertTrue(app.buttons["dictationFinish"].waitForExistence(timeout: 5), "✓")
+        XCTAssertEqual(mic.label, "Finish dictation", "the mic finishes the dictation now")
+        XCTAssertFalse(app.navigationBars["Dictation"].exists, "no dictation sheet")
+        sleep(2)
         let shot = XCUIScreen.main.screenshot()
-        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-composer-mic.png"))
+        try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-composer-dictation.png"))
+        app.buttons["dictationCancel"].tap()
+        XCTAssertTrue(waitGone(listening, 30), "✕ ends it")
+        XCTAssertEqual(field.value as? String, "Typed first", "what was typed is back")
+
+        // ✓ finishes: Transcribing… until Talk has it, then the field is the typed text and any words.
+        mic.tap()
+        XCTAssertTrue(app.buttons["dictationFinish"].waitForExistence(timeout: 5))
+        sleep(3)
+        app.buttons["dictationFinish"].tap()
+        XCTAssertTrue(waitGone(listening, 120), "the dictation finishes")
+        XCTAssertTrue((field.value as? String)?.hasPrefix("Typed first") == true, "it stays in the field, unsent")
+        XCTAssertTrue(app.navigationBars["New thread"].exists, "nothing was sent")
     }
 
-    /// Holding the mic talks; letting go doesn't also count as a tap.
+    /// Holding the mic talks; letting go doesn't also count as a tap, and doesn't dictate inline.
     func testMicHoldDoesNotOpenDictation() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
@@ -23,6 +50,16 @@ final class ComposerUITests: XCTestCase {
         XCTAssertTrue(mic.waitForExistence(timeout: 20))
         mic.press(forDuration: 1.2)
         XCTAssertFalse(app.navigationBars["Dictation"].waitForExistence(timeout: 2), "A hold opened dictation")
+        XCTAssertFalse(app.buttons["dictationFinish"].exists, "A hold started an inline dictation")
+    }
+
+    private func waitGone(_ element: XCUIElement, _ timeout: TimeInterval) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if !element.exists { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return !element.exists
     }
 
     func testCommandsAndContextMenu() throws {

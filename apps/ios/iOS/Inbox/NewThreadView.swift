@@ -12,8 +12,10 @@ struct NewThreadView: View {
     @State private var baseBranch = ""
     @State private var text: String
     @State private var attachments: [PendingAttachment] = []
-    @State private var dictating = false
     @StateObject private var dictation = DictationGate()
+    /// The mic: tap to dictate into the message, inline; hold to talk it in.
+    @StateObject private var talk = HoldToTalk(threadId: nil)
+    @State private var talkTyped: String?
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
@@ -54,10 +56,16 @@ struct NewThreadView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
             }
-            .onAppear { focused = true }
-            .sheet(isPresented: $dictating) {
-                DictationView(threadId: nil, autoStart: true, gate: dictation) { text += (text.isEmpty ? "" : " ") + $0 }
+            .onAppear {
+                focused = true
+                // There's no thread to send to yet: what you say goes in the message.
+                let insert: (String) -> Void = { spoken in text = TalkDraft.finished(spoken, typed: &talkTyped, draft: text) }
+                talk.insert = insert
+                talk.send = insert
             }
+            .modifier(TalkDraft(talk: talk, draft: $text, typed: $talkTyped))
+            .modifier(TalkLifecycle(talk: talk))
+            .onChange(of: talk.error) { _, error in if let error { self.error = error } }
             .sheet(isPresented: $creatingProject) {
                 NewProjectView { project in
                     if !projects.contains(where: { $0.id == project.id }) { projects.append(project) }
@@ -106,9 +114,10 @@ struct NewThreadView: View {
                     .frame(height: 32)
                     .background(.fill.tertiary, in: .capsule)
             }
+            TalkStatusBar(talk: talk)
             ComposerBar(
                 text: $text, focused: $focused, attachments: $attachments, placeholder: "What should the agent do?", maxLines: 10,
-                dictate: { dictating = true }, dictation: dictation
+                dictate: { talk.startDictation() }, talk: talk, dictation: dictation
             ) {
                 agentMenu
             } send: {

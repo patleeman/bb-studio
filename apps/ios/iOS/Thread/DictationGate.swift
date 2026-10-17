@@ -72,7 +72,7 @@ struct DictationState: Equatable {
     static func talk(_ state: HoldToTalk.State) -> Event {
         switch state {
         case .idle: .inserted(.talk)
-        case .recording, .cancelling, .handsFree: .listening(.talk)
+        case .recording, .cancelling, .handsFree, .dictating: .listening(.talk)
         case .sending: .transcribing(.talk)
         }
     }

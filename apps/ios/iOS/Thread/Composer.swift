@@ -94,7 +94,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var placeholder = "Message"
     var maxLines = 6
     let dictate: () -> Void
-    /// Hold the mic to talk and send; tapping it still dictates.
+    /// The mic: tap to dictate inline, hold to talk and send. Without it, the mic calls `dictate`.
     var talk: HoldToTalk?
     /// Opens the draft on a whole screen; shown only when set.
     var expand: (() -> Void)?
@@ -105,8 +105,6 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var toPage: ComposerPageAction? = nil
     /// Voice mode's speaker, just before the mic; nil where Studio has no voice mode.
     var voice: VoiceModeButton? = nil
-    /// Talking covers the field, so the draft stays put; voice mode streams what you say into it instead.
-    var talkCoversField = true
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -122,7 +120,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             }
             .padding(.top, 4)
             .overlay {
-                if let talk { TalkOverlay(talk: talk, dictation: dictation, covers: talkCoversField) }
+                if let talk { TalkOverlay(talk: talk, dictation: dictation) }
             }
             .overlay(alignment: .topTrailing) {
                 if let expand {
@@ -156,7 +154,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                 }
                 if let voice { voice }
                 if let talk {
-                    HoldToTalkMic(talk: talk, tap: dictate)
+                    HoldToTalkMic(talk: talk)
                 } else {
                     Button(action: dictate) {
                         Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)
@@ -185,16 +183,17 @@ struct ComposerPageAction {
     var run: () -> Void
 }
 
-/// Covers the field while talking, so the draft underneath stays put.
+/// Covers the field while holding to talk, so the draft underneath stays put.
+/// An inline dictation (or any talk in voice mode) streams into the field
+/// instead, with its status over the composer (`TalkStatusBar`).
 private struct TalkOverlay: View {
     @ObservedObject var talk: HoldToTalk
     /// Holds Send while a talk records or transcribes.
     let dictation: DictationGate?
-    var covers = true
 
     var body: some View {
         Group {
-            if covers, talk.state != .idle {
+            if !talk.inline, talk.state != .idle {
                 HoldToTalkStatus(talk: talk, cancel: talk.cancel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .background(.background.secondary, in: .rect(cornerRadius: 16))

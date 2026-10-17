@@ -14,8 +14,8 @@ struct ThreadView: View {
     /// Voice mode: the speaker beside the mic, and spoken replies.
     @StateObject private var voice: ThreadVoice
     @ObservedObject private var player = VoicePlayer.shared
-    /// What was typed before talking in voice mode; what you say goes in after it.
-    @State private var voiceTyped: String?
+    /// What was typed before an inline dictation or a talk in voice mode; what you say goes in after it.
+    @State private var talkTyped: String?
     /// The message the piece being spoken is lit up in.
     @State private var readAlongRow: String?
     @State private var editingVoice = false
@@ -30,7 +30,6 @@ struct ThreadView: View {
     @State private var handoffStatus: (text: String, working: Bool)?
     @State private var attachments: [PendingAttachment] = []
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var dictating = false
     @State private var showingWeb = false
     @State private var editingFull = false
     @State private var finding = false
@@ -115,12 +114,6 @@ struct ThreadView: View {
         }
         .sheet(item: $reviewingPlan, onDismiss: { Task { await model.loadPlanReview() } }) { review in
             PlanReviewSheet(review: review) { await model.loadPlanReview() }
-        }
-        .sheet(isPresented: $dictating) {
-            DictationView(threadId: model.threadId, autoStart: true, gate: dictation) { text in
-                draft = draft.isEmpty ? text : draft + " " + text
-                composerFocused = true
-            }
         }
         .sheet(isPresented: $pickingSendTime) {
             SendTimePicker { date in
@@ -272,13 +265,20 @@ struct ThreadView: View {
             notes.detach()
         }
         .modifier(VoiceHooks(voice: voice, talk: talk, player: player, rows: model.rows, running: model.thread?.isRunning == true,
-                             dictating: dictating, draft: $draft, voiceTyped: $voiceTyped, readAlongRow: $readAlongRow, editingVoice: $editingVoice))
+                             readAlongRow: $readAlongRow, editingVoice: $editingVoice))
+        .modifier(TalkDraft(talk: talk, draft: $draft, typed: $talkTyped))
         .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
-        .modifier(TalkLifecycle(talk: talk, dictating: dictating))
+        .modifier(TalkLifecycle(talk: talk))
         .onAppear {
             talk.send = { [model, voice] text in
                 if voice.on { return sendSpoken(text) }
                 Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+            }
+            talk.insert = { [model] text in
+                let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
+                draft = next
+                // Saved here too: a dictation finished as the thread closes lands after its view is gone.
+                Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
             }
             takeActionButton()
         }
@@ -734,8 +734,8 @@ struct ThreadView: View {
     private func takeActionButton() {
         guard answersActionButton, app.botTalkPending else { return }
         app.botTalkPending = false
-        // Dictation and voice chat own the microphone while they're open.
-        guard !dictating, app.sheet == nil else { return }
+        // A sheet over the thread owns the microphone while it's open.
+        guard app.sheet == nil else { return }
         talk.toggleHandsFree()
     }
 
@@ -767,9 +767,7 @@ struct ThreadView: View {
     /// once, with the conversational note for the agent. Mentions and files
     /// can't go that way, so then it waits in the composer for Send.
     private func sendSpoken(_ heard: String) {
-        let typed = voiceTyped ?? draft
-        voiceTyped = nil
-        let text = VoiceText.join(typed: typed, heard: heard).trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = TalkDraft.finished(heard, typed: &talkTyped, draft: draft).trimmingCharacters(in: .whitespacesAndNewlines)
         guard mentions.isEmpty, attachments.isEmpty else {
             draft = text
             return
@@ -971,8 +969,9 @@ struct ThreadView: View {
             if let note = notes.note, !editing {
                 NotesInProgressChip(note: note) { notes.editing = note }
             }
+            TalkStatusBar(talk: talk)
             if voice.available == true {
-                VoiceStatusBar(voice: voice, talk: talk, player: player)
+                VoiceStatusBar(voice: voice, player: player)
             }
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
                 MentionSuggestions(query: query, threadId: model.threadId, projectId: model.thread?.projectId, pick: insert)
@@ -984,13 +983,12 @@ struct ThreadView: View {
             ComposerBar(
                 text: $draft, focused: $composerFocused, attachments: $attachments,
                 placeholder: botChrome.map { "Message \($0.bot.name)" } ?? "Message",
-                dictate: { dictating = true }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
+                dictate: { talk.startDictation() }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
                 clear: botChrome != nil, dictation: dictation,
                 toPage: canUseNotes && !editing ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
-                voice: voice.available == true && !editing ? VoiceModeButton(voice: voice) { editingVoice = true } : nil,
-                talkCoversField: !voice.on
+                voice: voice.available == true && !editing ? VoiceModeButton(voice: voice) { editingVoice = true } : nil
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .disabled(handoffStatus?.working == true)
@@ -1210,8 +1208,8 @@ struct ChatSkeleton: View {
     }
 }
 
-/// Voice mode's links to the rest of the thread: talking cuts off a reply and
-/// streams what you say into the draft; the piece being spoken is lit up in
+/// Voice mode's links to the rest of the thread: talking cuts off a reply;
+/// the piece being spoken is lit up in
 /// its message; an open voice thread keeps going with the screen locked.
 private struct VoiceHooks: ViewModifier {
     @ObservedObject var voice: ThreadVoice
@@ -1219,9 +1217,6 @@ private struct VoiceHooks: ViewModifier {
     @ObservedObject var player: VoicePlayer
     let rows: [TimelineRow]
     let running: Bool
-    let dictating: Bool
-    @Binding var draft: String
-    @Binding var voiceTyped: String?
     @Binding var readAlongRow: String?
     @Binding var editingVoice: Bool
 
@@ -1240,22 +1235,8 @@ private struct VoiceHooks: ViewModifier {
                 if player.threadId == voice.threadId { player.stop() }
             }
             .onChange(of: voice.on, initial: true) { _, on in talk.voice = on }
-            .onChange(of: talk.state) { _, state in
-                if talk.isActive {
-                    // Starting to talk cuts the reply off.
-                    if player.isActive { player.stop() }
-                    if voice.on, voiceTyped == nil { voiceTyped = draft }
-                } else if state == .idle, let typed = voiceTyped {
-                    // Cancelled, or nothing was heard: back to what was typed.
-                    voiceTyped = nil
-                    draft = typed
-                }
-            }
-            .onChange(of: talk.heard) { _, heard in
-                guard voice.on, let typed = voiceTyped, !heard.isEmpty else { return }
-                draft = VoiceText.join(typed: typed, heard: heard)
-            }
-            .onChange(of: dictating) { _, on in if on, player.isActive { player.stop() } }
+            // Starting to talk cuts the reply off.
+            .onChange(of: talk.isActive) { _, active in if active, player.isActive { player.stop() } }
             .onChange(of: player.piece) { _, piece in readAlongRow = target(piece) }
             .task(id: "\(voice.on) \(voice.available == true) \(running)") { voice.report(running: running) }
     }
