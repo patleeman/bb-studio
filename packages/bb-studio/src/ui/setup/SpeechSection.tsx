@@ -1,10 +1,10 @@
 // The Speech section of the Setup page: which engine, model and voice Studio
 // speaks with, and a sample to choose by ear. Keys live in Studio's plugin
 // settings, where BB keeps secrets. See src/speech/.
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@bb-studio/kit/ui";
+import { Button, cn, Icon, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, Tooltip } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LocalSpeechStatus, speechContract, SpeechState } from "../../speech/contract";
 import { Speaker, type SpeakerState } from "../../speech/speaker";
 
@@ -65,7 +65,7 @@ function LocalVoices({ local, busy, label, onAction }: { local: LocalSpeechStatu
  * (the voice menu in a thread's composer): no heading or frame, fields that
  * fill the width, and the sample's text fixed.
  */
-export function SpeechSection({ compact = false, onState }: { compact?: boolean; onState?(state: SpeechState): void } = {}) {
+export function SpeechSection({ compact = false, onState, children }: { compact?: boolean; onState?(state: SpeechState): void; children?: ReactNode } = {}) {
   const rpc = useRpc<typeof speechContract>();
   const [state, setState] = useState<SpeechState | null>(null);
   const [models, setModels] = useState<Model[] | null>(null);
@@ -146,6 +146,14 @@ export function SpeechSection({ compact = false, onState }: { compact?: boolean;
   };
 
   const model = models?.find((each) => each.id === state?.model);
+  if (compact) {
+    return (
+      <CompactSpeech state={state} models={models} model={model ?? null} busy={busy} error={error} playing={playing}
+        update={(change) => void update(change)} localAction={(action) => void localAction(action)} play={() => void play()}>
+        {children}
+      </CompactSpeech>
+    );
+  }
   return (
     <section className="flex flex-col gap-2" aria-label="Speech">
       {compact ? null : (
@@ -263,6 +271,131 @@ export function SpeechSection({ compact = false, onState }: { compact?: boolean;
             </>
           )}
         </div>
+      )}
+    </section>
+  );
+}
+
+/** The voice menu's quiet borderless dropdown. */
+const MENU_TRIGGER = "h-7 w-auto max-w-[13rem] min-w-0 justify-end gap-1 border-0 bg-transparent px-2 text-xs shadow-none hover:bg-state-hover focus:ring-0 focus-visible:ring-1 [&>span]:truncate";
+const MENU_ROW = "flex h-8 min-w-0 items-center gap-2";
+const MENU_LABEL = "w-16 shrink-0 text-xs text-muted-foreground";
+const MENU_SPEEDS = [1, 1.25, 1.5, 1.75, 2];
+
+/** Speech in the voice menu: label-and-value rows like a menu, speed as one tap, the sample on the voice row. */
+function CompactSpeech({ state, models, model, busy, error, playing, update, localAction, play, children }: {
+  state: SpeechState | null;
+  models: Model[] | null;
+  model: Model | null;
+  busy: boolean;
+  error: string | null;
+  playing: SpeakerState;
+  update(change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions" | "speed">>): void;
+  localAction(action: "install" | "start" | "stop"): void;
+  play(): void;
+  children?: ReactNode;
+}) {
+  const voiceName = (voice: string) => model?.voiceNames?.[voice]?.split(" · ")[0] ?? voice;
+  const ready = state && !state.problem;
+  return (
+    <section className="flex flex-col" aria-label="Speech">
+      {children ? <div className="pb-2.5">{children}</div> : null}
+      {error ? <p className="pb-2 text-xs text-destructive">{error}</p> : null}
+      {!state ? <p className="py-2 text-xs text-muted-foreground">Loading…</p> : (
+        <>
+          <div className="flex flex-col border-t border-border py-1.5">
+            <div className={MENU_ROW}>
+              <span className={MENU_LABEL}>Engine</span>
+              <span className="flex-1" />
+              <Select value={state.engine} disabled={busy} onValueChange={(engine) => update({ engine: engine as SpeechState["engine"] })}>
+                <SelectTrigger className={MENU_TRIGGER} aria-label="Speech engine"><SelectValue /></SelectTrigger>
+                <SelectContent>{state.engines.map((engine) => <SelectItem key={engine.id} value={engine.id}>{engine.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            {state.engine === "local" ? (
+              <div className={MENU_ROW}>
+                <span className={MENU_LABEL}>Server</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{LOCAL_LABELS[state.local.state]}</span>
+                {state.local.state === "not-installed" || (state.local.state === "failed" && !state.local.installed) ? (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy} onClick={() => localAction("install")}>{state.local.state === "failed" ? "Install again" : "Install"}</Button>
+                ) : state.local.installed && (state.local.state === "stopped" || state.local.state === "failed") ? (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy} onClick={() => localAction("start")}>Start</Button>
+                ) : null}
+              </div>
+            ) : null}
+            {state.engine === "local" && state.local.state === "not-installed" ? (
+              <p className="pb-1 text-xs leading-relaxed text-muted-foreground">About 1.3 GB, into Studio's data folder. Voices stay on this Mac.</p>
+            ) : null}
+            {state.engine === "local" && (state.local.state === "installing" || state.local.state === "failed") && state.local.log.length ? (
+              <pre className="mb-1 max-h-24 overflow-auto rounded bg-muted p-2 text-[11px] leading-4 text-muted-foreground">{state.local.log.slice(-6).join("\n")}</pre>
+            ) : null}
+            {state.engine === "custom" ? (
+              <div className={MENU_ROW}>
+                <span className={MENU_LABEL}>Endpoint</span>
+                <Input key={state.endpoint} className="h-7 min-w-0 flex-1 border-0 bg-transparent px-2 text-right text-xs shadow-none hover:bg-state-hover" defaultValue={state.endpoint} placeholder="http://127.0.0.1:8000/v1" aria-label="Custom speech endpoint"
+                  onBlur={(event) => { if (event.target.value.trim() !== state.endpoint) update({ endpoint: event.target.value.trim() }); }} />
+              </div>
+            ) : null}
+            {state.problem && state.engine !== "local" ? <p className="pb-1 text-xs leading-relaxed text-muted-foreground">{state.problem}</p> : null}
+            {ready ? (
+              <>
+                <div className={MENU_ROW}>
+                  <span className={MENU_LABEL}>Model</span>
+                  <span className="flex-1" />
+                  {models?.length ? (
+                    <Select value={state.model} disabled={busy} onValueChange={(id) => update({ model: id, voice: "" })}>
+                      <SelectTrigger className={MENU_TRIGGER} aria-label="Speech model"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {model ? null : <SelectItem value={state.model}>{state.model}</SelectItem>}
+                        {models.map((each) => <SelectItem key={each.id} value={each.id}>{each.name}{price(each)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : <span className="truncate px-2 text-xs text-foreground">{models ? state.model : "Loading…"}</span>}
+                </div>
+                <div className={MENU_ROW}>
+                  <span className={MENU_LABEL}>Voice</span>
+                  <span className="flex-1" />
+                  {model?.voices?.length ? (
+                    <Select value={state.voice || DEFAULT_VOICE} disabled={busy} onValueChange={(voice) => update({ voice: voice === DEFAULT_VOICE ? "" : voice })}>
+                      <SelectTrigger className={MENU_TRIGGER} aria-label="Speech voice"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={DEFAULT_VOICE}>{model.voiceNames ? `${voiceName(model.voices[0]!)} (default)` : "Model default"}</SelectItem>
+                        {state.voice && !model.voices.includes(state.voice) ? <SelectItem value={state.voice}>{state.voice}</SelectItem> : null}
+                        {model.voices.map((voice) => <SelectItem key={voice} value={voice}>{model.voiceNames?.[voice] ?? voice}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input key={`${state.model}:${state.voice}`} className="h-7 min-w-0 flex-1 border-0 bg-transparent px-2 text-right text-xs shadow-none hover:bg-state-hover" defaultValue={state.voice} placeholder="Default" aria-label="Speech voice"
+                      onBlur={(event) => { if (event.target.value.trim() !== state.voice) update({ voice: event.target.value.trim() }); }} />
+                  )}
+                  <Tooltip label={playing === "idle" ? "Play a sample" : "Stop"} side="top">
+                    <button type="button" aria-label={playing === "idle" ? "Play a sample" : "Stop the sample"} onClick={play}
+                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
+                      <Icon name={playing === "idle" ? "Play" : "Square"} className="size-3.5" />
+                    </button>
+                  </Tooltip>
+                </div>
+                <div className={MENU_ROW}>
+                  <span className={MENU_LABEL}>Delivery</span>
+                  <Input key={state.instructions} className="h-7 min-w-0 flex-1 border-0 bg-transparent px-2 text-right text-xs shadow-none placeholder:text-muted-foreground/60 hover:bg-state-hover" defaultValue={state.instructions} placeholder="Natural" aria-label="Speech delivery"
+                    onBlur={(event) => { if (event.target.value.trim() !== state.instructions) update({ instructions: event.target.value.trim() }); }} />
+                </div>
+              </>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 border-t border-border pt-2.5" role="group" aria-label="Speech speed">
+            <span className={MENU_LABEL}>Speed</span>
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5 rounded-md bg-muted/60 p-0.5">
+              {MENU_SPEEDS.map((speed) => (
+                <button key={speed} type="button" aria-pressed={state.speed === speed} disabled={busy} onClick={() => update({ speed })}
+                  className={cn("h-6 flex-1 rounded px-1 text-xs tabular-nums outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
+                    state.speed === speed ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+                  {speed}×
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </section>
   );

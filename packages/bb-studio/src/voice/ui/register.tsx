@@ -218,24 +218,25 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
           </Tooltip>
           <PopoverContent side="top" align="end" className="p-0">
             {/* Portaled out of Studio's root: Studio's styles apply only inside its scope. */}
-            <div data-bb-plugin="studio" data-bb-plugin-root="" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
-              <label className="mb-3 flex items-start gap-2 border-b border-border pb-3">
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-xs font-medium text-foreground">Conversational replies</span>
-                  <span className="text-xs text-muted-foreground">Tell the agent you're talking: short spoken answers, no markdown.</span>
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={conversational}
-                  aria-label="Conversational replies"
-                  onClick={() => void setConversational(!conversational)}
-                  className={cn("relative mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", conversational ? "bg-primary" : "bg-muted")}
-                >
-                  <span className={cn("inline-block size-3 rounded-full bg-background shadow transition-transform", conversational ? "translate-x-3.5" : "translate-x-0.5")} />
-                </button>
-              </label>
-              <SpeechSection compact onState={(state) => followSpeed(state.speed)} />
+            <div data-bb-plugin="studio" data-bb-plugin-root="" className="w-[20rem] max-w-[calc(100vw-1rem)] px-3 py-2.5">
+              <SpeechSection compact onState={(state) => followSpeed(state.speed)}>
+                <div className="flex items-center gap-2">
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-xs font-medium text-foreground">Conversational replies</span>
+                    <span className="truncate text-xs text-muted-foreground">Short spoken answers, no markdown</span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={conversational}
+                    aria-label="Conversational replies"
+                    onClick={() => void setConversational(!conversational)}
+                    className={cn("relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", conversational ? "bg-primary" : "bg-muted")}
+                  >
+                    <span className={cn("inline-block size-3 rounded-full bg-background shadow transition-transform", conversational ? "translate-x-3.5" : "translate-x-0.5")} />
+                  </button>
+                </div>
+              </SpeechSection>
             </div>
           </PopoverContent>
         </Popover>

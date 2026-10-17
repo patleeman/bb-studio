@@ -555,7 +555,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await client.waitForText("Conversational replies", 10000);
       await client.waitForText("Hannah", 30000);
       await client.waitForText("1.25×");
-      await client.waitForText("Play sample");
+      await client.waitForAriaButton("Play a sample");
       await sleep(400);
       return async () => { await pluginRpc("studio", "speech.update", { speed: 1 }); };
     },
