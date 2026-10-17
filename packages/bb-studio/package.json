@@ -35,7 +35,9 @@
         "talk": "./icons/talk.svg",
         "pages": "./icons/pages.svg",
         "explore": "./icons/explore.svg",
-        "dashboard": "./icons/dashboard.svg"
+        "dashboard": "./icons/dashboard.svg",
+        "speaker": "./icons/speaker.svg",
+        "speaker-off": "./icons/speaker-off.svg"
       }
     },
     "server": "./server.ts",

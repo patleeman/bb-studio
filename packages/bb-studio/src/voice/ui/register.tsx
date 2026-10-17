@@ -54,7 +54,7 @@ function VoiceControls() {
     return (
       <Tooltip label="New voice chat" side="top">
         <button type="button" aria-label="New voice chat" className={ACTION_BUTTON} onClick={() => newVoiceChat(scope.projectId)}>
-          <Icon name="AudioLines" fallback="Volume2" />
+          <Icon name="studio/talk" />
         </button>
       </Tooltip>
     );
@@ -136,14 +136,14 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
           <span className="max-sm:hidden">{snapshot.playing === "loading" ? "Getting ready" : "Speaking"}</span>
           <Tooltip label="Stop speaking" side="top">
             <button type="button" aria-label="Stop speaking" className={ACTION_BUTTON} onClick={() => voicePlayer.stop()}>
-              <Icon name="Square" fallback="X" />
+              <Icon name="Square" />
             </button>
           </Tooltip>
         </span>
       ) : null}
       <Tooltip label={label} side="top">
         <button type="button" aria-label={label} aria-pressed={on} className={`${ACTION_BUTTON} ${on ? "bg-primary/15 text-primary hover:text-primary" : ""}`} onClick={() => void set(!on)}>
-          <Icon name={on ? "Volume2" : "VolumeX"} fallback="Volume2" />
+          <Icon name={on ? "studio/speaker" : "studio/speaker-off"} />
         </button>
       </Tooltip>
     </>
