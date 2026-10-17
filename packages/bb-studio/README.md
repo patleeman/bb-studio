@@ -2002,9 +2002,9 @@ piece being read is lit in the transcript. Recapture with
 
   ![Live BB screenshot of the voice menu above a thread's composer](assets/voice-menu.png)
 
-  Captured from a staged BB: the voice menu open above a voice chat's
-  composer, with voice mode on, OpenRouter's Fish Drama 3 and its default
-  voice Hannah, and speed 1.25×. Recapture with
+  Captured from a staged BB: the voice menu, opened from the caret beside
+  a voice chat's speaker button, with Conversational replies on, OpenRouter's
+  Fish Drama 3 and its default voice Hannah, and speed 1.25×. Recapture with
   `BB_CAPTURE_ONLY=studio-voice-menu`. In a new
   thread's composer the same spot starts a **New voice chat**, as does the
   *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
