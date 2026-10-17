@@ -1912,6 +1912,26 @@ it needs `OPENROUTER_API_KEY` set when the staged BB starts.
     more. Models that make only raw PCM (Gemini) are wrapped as WAV.
   - **Custom endpoint** points at any server with the same API, such as a
     local mlx-audio or fish-speech server.
+  - **On this Mac (local)** needs no account and keeps text and audio on the
+    Mac. **Install** in Setup → Speech (or `bb studio speech local install`)
+    puts mlx-audio 0.5.9 and its pinned dependencies in a venv in Studio's
+    data folder, using [uv](https://docs.astral.sh/uv/) (install it first with
+    `curl -LsSf https://astral.sh/uv/install.sh | sh` or `brew install uv`).
+    Studio then runs mlx-audio's server on 127.0.0.1 while the local engine
+    is chosen or after it first speaks, restarts it with backoff if it
+    crashes, and stops it when you change engines. Models download on first
+    use into the same folder. Apple silicon Macs only; other hosts show why
+    it's unavailable. The models, all with weights licensed for commercial
+    use:
+    - **Kokoro 82M** (default, voice `af_heart`): 0.4 GB, fast, 54 voices
+      (American `a…`, British `b…`).
+    - **Qwen3-TTS 1.7B 8-bit**: 3 GB, more natural, and follows the
+      **Delivery** line. Nine voices, such as `ryan` and `serena`.
+    - **Chatterbox Turbo**: 3 GB. Set the voice to the path of a recording
+      on the BB host to clone it.
+
+    Changing the model unloads the previous one, since the server keeps every
+    model it loads in memory.
 - **Setup → Speech** picks the engine, model (with its price per million
   characters) and voice (from the model's list, or typed in). An optional
   **Delivery** line ("Warm and calm, a little brisk") goes to models that take
@@ -1930,6 +1950,9 @@ it needs `OPENROUTER_API_KEY` set when the staged BB starts.
 bb studio speech status            # engine, model, voice, and what's missing
 bb studio speech models            # the engine's models, prices and voices
 bb studio speech say "Done. Two tests fail." --out reply.mp3 [--model <id>] [--voice <name>]
+bb studio speech local status      # the local server: installed, running, its log
+bb studio speech local install     # install or update mlx-audio (waits until done)
+bb studio speech local start       # start it now; `stop` stops it until next use
 ```
 
 Clients (Setup's sample, and the voice features to come) call the
@@ -1941,6 +1964,14 @@ Clients (Setup's sample, and the voice features to come) call the
 command palette) is a spoken conversation with BB. You talk with Talk's mic or
 your hold-to-talk key; a fast voice agent answers in a sentence or two, and
 its replies are spoken with [Speech](#speech).
+
+![Live BB screenshot of Studio → Voice in a session on GPT-6-Luna, speaking its reply](assets/voice.png)
+
+Captured from a staged BB: a real session on GPT-6-Luna (Codex's fast tier).
+It greeted the user, was asked for a release name, answered in one sentence,
+and is speaking that reply (**Stop speaking** shows while it plays). Recapture
+with `BB_CAPTURE_ONLY=studio-voice`; it needs Codex signed in and
+`OPENROUTER_API_KEY` set when the staged BB starts.
 
 - **A session is one thread** in the Personal project, on a fast model:
   GPT-6-Luna on Codex's fast tier (default) or Haiku 5.5 on Claude Code. The

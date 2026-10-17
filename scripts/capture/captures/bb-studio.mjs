@@ -472,6 +472,37 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
+    // Studio → Voice: a real session on GPT-6-Luna (Codex's fast tier), asked
+    // a question, its reply spoken with Speech. Needs Codex signed in and
+    // OPENROUTER_API_KEY in the staged BB's environment.
+    id: "studio-voice",
+    packageDir: "bb-studio",
+    fileName: "voice.png",
+    setup: async (client) => {
+      await pluginRpc("studio", "voice.end", null);
+      await client.navigate("/plugins/studio/studio/voice");
+      await client.waitForText("Talk to BB and hear the answers.", 30000);
+      await client.clickButtonText("Start a voice session");
+      // The agent greets the user; that reply is spoken.
+      await client.waitForText("End session", 30000);
+      const { session } = await pluginRpc("studio", "voice.state", null);
+      if (!session) throw new Error("No voice session started");
+      await client.waitForText("Stop speaking", 120000);
+      await client.evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Stop speaking")?.click()`);
+      await bbCli(["thread", "tell", session.threadId, "In one sentence: what's a good name for a release about offline mode?"]);
+      await client.waitForText("Stop speaking", 180000);
+      await client.evaluate(`(() => {
+        const error = document.querySelector(".text-destructive");
+        if (error) throw new Error("Voice shows an error: " + error.textContent);
+        return true;
+      })()`);
+      await sleep(600);
+      return async () => {
+        await client.evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Stop speaking")?.click()`).catch(() => {});
+      };
+    },
+  },
+  {
     id: "studio-setup",
     packageDir: "bb-studio",
     fileName: "plugin-setup.png",
