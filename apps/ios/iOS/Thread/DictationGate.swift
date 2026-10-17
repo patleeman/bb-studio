@@ -183,10 +183,11 @@ struct DictationSendStatus: View {
 
     var body: some View {
         if let label = gate.state.label {
+            // The red mic already says it's listening; a spinner shows the words landing. VoiceOver reads the label.
             HStack(spacing: 4) {
                 if gate.state.phase == .transcribing { ProgressView().controlSize(.mini) }
-                Text(label).lineLimit(1)
             }
+            .accessibilityLabel(label)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize()

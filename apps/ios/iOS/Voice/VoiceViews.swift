@@ -69,13 +69,20 @@ struct TalkStatusBar: View {
                 Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.primary)
                     .frame(minWidth: 34, alignment: .leading)
             }
+            // No words beside the controls: the dot, time and level say it; VoiceOver reads the label.
             LevelBars(tint: .red) { talk.state == .sending ? 0 : talk.level }
-            Text(listeningLabel)
-                .foregroundStyle(talk.state == .cancelling ? Color.secondary : .primary)
-                .lineLimit(1)
+                .accessibilityElement()
+                .accessibilityLabel(listeningLabel)
+            if talk.state == .sending { ProgressView().controlSize(.small) }
             Spacer(minLength: 0)
             if talk.state == .handsFree {
-                Button("Cancel", action: talk.cancel).font(.subheadline.weight(.semibold))
+                Button(action: talk.cancel) {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(.fill.secondary, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel")
             } else if talk.state == .dictating {
                 Button(action: talk.cancel) {
                     Image(systemName: "xmark").font(.footnote.weight(.bold))
@@ -127,9 +134,10 @@ struct VoiceStatusBar: View {
     private var speaking: some View {
         HStack(spacing: 10) {
             LevelBars(tint: .accentColor) { player.level }
-            Text(player.phase == .loading ? "Getting ready…" : player.rowId == nil ? "Speaking" : "Reading aloud")
-                .lineLimit(1)
+                .accessibilityElement()
+                .accessibilityLabel(player.phase == .loading ? "Getting ready…" : player.rowId == nil ? "Speaking" : "Reading aloud")
                 .accessibilityIdentifier("voiceSpeaking")
+            if player.phase == .loading { ProgressView().controlSize(.small) }
             Spacer(minLength: 0)
             Button(VoiceText.speedLabel(voice.speed)) { voice.cycleSpeed() }
                 .font(.subheadline.weight(.semibold).monospacedDigit())

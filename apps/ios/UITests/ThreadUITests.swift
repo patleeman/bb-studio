@@ -442,7 +442,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertEqual(voice.value as? String, "On", "voice mode is on in a new voice chat")
 
         // The agent's greeting is spoken: Studio's audio downloads and plays.
-        let speaking = app.staticTexts["voiceSpeaking"]
+        let speaking = app.descendants(matching: .any)["voiceSpeaking"].firstMatch
         XCTAssertTrue(speaking.waitForExistence(timeout: 120), "the greeting plays")
         XCTAssertTrue(wait(60) { speaking.label == "Speaking" }, "the greeting's audio loaded")
         shot("voice-greeting")

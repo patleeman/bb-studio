@@ -333,15 +333,21 @@ struct HoldToTalkStatus: View {
         HStack(spacing: 10) {
             Circle().fill(talk.state == .cancelling ? Color.gray : .red).frame(width: 8, height: 8)
                 .opacity(talk.state == .sending ? 0.4 : 1)
+                .accessibilityLabel(label)
             if let startedAt = talk.startedAt {
                 Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.secondary)
             }
-            Text(label)
-                .foregroundStyle(talk.state == .cancelling ? Color.secondary : .primary)
-                .lineLimit(1)
+            // No words: the dot (grey to cancel), time and spinner say it; VoiceOver reads the label.
+            if talk.state == .sending { ProgressView().controlSize(.small) }
             Spacer(minLength: 0)
             if talk.state == .handsFree {
-                Button("Cancel", action: cancel).font(.subheadline.weight(.semibold))
+                Button(action: cancel) {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold))
+                        .frame(width: 30, height: 30)
+                        .background(.fill.secondary, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel")
             }
         }
         .font(.subheadline)
