@@ -315,7 +315,7 @@ function CompactSpeech({ state, models, model, busy, error, playing, update, loc
             {state.engine === "local" ? (
               <div className={MENU_ROW}>
                 <span className={MENU_LABEL}>Server</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{LOCAL_LABELS[state.local.state]}</span>
+                <span className="min-w-0 flex-1 truncate px-2 text-right text-xs text-foreground">{LOCAL_LABELS[state.local.state]}</span>
                 {state.local.state === "not-installed" || (state.local.state === "failed" && !state.local.installed) ? (
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy} onClick={() => localAction("install")}>{state.local.state === "failed" ? "Install again" : "Install"}</Button>
                 ) : state.local.installed && (state.local.state === "stopped" || state.local.state === "failed") ? (
