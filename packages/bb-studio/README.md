@@ -1984,12 +1984,21 @@ piece being read is lit in the transcript. Recapture with
 `BB_CAPTURE_ONLY=studio-voice`; it needs Codex signed in and
 `OPENROUTER_API_KEY` set when the staged BB starts.
 
-- **Turning it on, and the voice menu.** The speaker button in a thread's
-  composer opens the voice menu: voice mode's switch for the thread, and
-  Speech's settings in small (engine, including **On this Mac** with its
-  Install and server status, model, voice, delivery, speed and Play sample),
-  the same ones as Setup → Speech. *Voice mode: turn on or off in this
-  thread* in the command palette switches it directly.
+- **Turning it on, and the voice menu.** The speaker in a thread's composer
+  is a split button, like Send: the speaker turns voice mode on or off for
+  the thread (or *Voice mode: turn on or off in this thread* in the command
+  palette), and the caret beside it opens the voice menu. The menu has
+  **Conversational replies** (on by default) and Speech's settings in small:
+  engine, including **On this Mac** with its Install and server status,
+  model, voice, delivery, speed and Play sample, the same ones as Setup →
+  Speech.
+- **Conversational replies.** A thread's instructions only reach a running
+  session at its next start, so voice mode also sends a hidden note (the
+  agent sees it, you don't) with each message it sends for you: you spoke
+  this, answer in a few short spoken sentences, no markdown. Typed messages
+  get the same guidance from the thread's instructions. Off, a thread in
+  voice mode keeps writing as it does (its replies are still spoken); a new
+  voice chat is always conversational.
 
   ![Live BB screenshot of the voice menu above a thread's composer](assets/voice-menu.png)
 

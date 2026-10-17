@@ -51,6 +51,9 @@ describe("VoiceSessions", () => {
     expect(sessions.isOn("thr_code")).toBe(true);
     await sessions.set("thr_code", false);
     expect(sessions.isOn("thr_code")).toBe(false);
+    expect(sessions.conversational).toBe(true);
+    await sessions.setConversational(false);
+    expect(sessions.conversational).toBe(false);
     // A new voice chat's first turn comes before Studio has stored it.
     expect(sessions.isOn("thr_new", { voice: "on" })).toBe(true);
   });

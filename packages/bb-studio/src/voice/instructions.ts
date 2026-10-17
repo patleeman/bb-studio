@@ -28,6 +28,9 @@ ${HOW_TO_SPEAK}
 If the user asks you to hand something off instead:
 ${HANDING_OFF}`;
 
+/** Sent, unseen by the user, with each message voice mode sends for you: instructions only reach a running session at its next start. */
+export const VOICE_TURN_NOTE = "Voice mode is on: the user spoke this and will hear your reply. Answer conversationally, in a few short spoken sentences, with no markdown, lists or code.";
+
 /** Text as it should be heard: markdown marks, code and links reduced to words. */
 export function speakable(text: string): string {
   return text

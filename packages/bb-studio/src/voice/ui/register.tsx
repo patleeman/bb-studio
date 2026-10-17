@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { talk, useTalkState } from "../../talk/ui/controller";
 import type { speechContract } from "../../speech/contract";
 import type { voiceContract } from "../contract";
+import { VOICE_TURN_NOTE } from "../instructions";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "../shared";
 import { useVoiceSnapshot, voicePlayer } from "./state";
 
@@ -61,10 +62,24 @@ const ACTION_BUTTON =
 function useVoiceMode(threadId: string) {
   const rpc = useRpc<typeof voiceContract>();
   const { on } = useVoiceSnapshot();
+  const [conversational, setConversationalState] = useState(true);
   useEffect(() => {
     let live = true;
-    rpc.call("voice.state", { threadId }).then((state) => { if (live) voicePlayer.setOn(threadId, state.on); }, () => {});
+    rpc.call("voice.state", { threadId }).then((state) => {
+      if (!live) return;
+      voicePlayer.setOn(threadId, state.on);
+      setConversationalState(state.conversational);
+    }, () => {});
     return () => { live = false; };
+  }, [rpc, threadId]);
+  const setConversational = useCallback(async (next: boolean) => {
+    setConversationalState(next);
+    try {
+      setConversationalState((await rpc.call("voice.conversational", { threadId, on: next })).conversational);
+    } catch (error) {
+      setConversationalState(!next);
+      toast.error("Couldn't change that", { description: errorMessage(error) });
+    }
   }, [rpc, threadId]);
   const set = useCallback(async (next: boolean) => {
     voicePlayer.setOn(threadId, next);
@@ -77,7 +92,7 @@ function useVoiceMode(threadId: string) {
       toast.error("Couldn't change voice mode", { description: errorMessage(error) });
     }
   }, [rpc, threadId]);
-  return { on: on[threadId] ?? false, set };
+  return { on: on[threadId] ?? false, set, conversational, setConversational };
 }
 
 /** Beside the mic: voice mode and its pill in a thread; New voice chat in a new thread's composer. */
@@ -98,7 +113,9 @@ function VoiceControls() {
 }
 
 function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerApi; threadId: string }) {
-  const { on, set } = useVoiceMode(threadId);
+  const { on, set, conversational, setConversational } = useVoiceMode(threadId);
+  const conversationalRef = useRef(conversational);
+  conversationalRef.current = conversational;
   const { speed, change: changeSpeed, follow: followSpeed } = useSpeechSpeed();
   const snapshot = useVoiceSnapshot();
   const talkState = useTalkState();
@@ -140,7 +157,9 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
         return;
       }
       current.replace({ text: "", mentions: [] });
-      sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }] } as never)
+      // The guidance rides along unseen: instructions only reach a running session at its next start.
+      const note = conversationalRef.current ? [{ type: "text", text: VOICE_TURN_NOTE, mentions: [], visibility: "agent-only" }] : [];
+      sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }, ...note] } as never)
         .catch((error: unknown) => {
           current.replace({ text, mentions: [] });
           toast.error("Couldn't send what you said", { description: errorMessage(error) });
@@ -156,7 +175,7 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     voicePlayer.play(threadId, spoken.urls, spoken.pieces).catch((error: unknown) => toast.error("Couldn't play the reply", { description: errorMessage(error) }));
   });
 
-  const label = on ? "Voice mode is on: voice settings" : "Voice mode: speak replies aloud";
+  const label = on ? "Voice mode on: replies are spoken. Turn off" : "Voice mode: speak replies aloud";
   return (
     <>
       {on && listening ? (
@@ -182,35 +201,45 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
           </Tooltip>
         </span>
       ) : null}
-      <Popover>
+      {/* A split button, like Send: the speaker turns voice mode on or off; the caret opens its settings. */}
+      <span className={cn("inline-flex h-8 shrink-0 items-center rounded-md", on ? "bg-primary/15 text-primary" : "")}>
         <Tooltip label={label} side="top">
-          <PopoverTrigger asChild>
-            <button type="button" aria-label={label} className={`${ACTION_BUTTON} ${on ? "bg-primary/15 text-primary hover:text-primary" : ""}`}>
-              <Icon name={on ? "studio/speaker" : "studio/speaker-off"} className="size-4" />
-            </button>
-          </PopoverTrigger>
+          <button type="button" aria-label={label} aria-pressed={on} className={cn(ACTION_BUTTON, "rounded-r-none", on ? "text-primary hover:text-primary" : "")} onClick={() => void set(!on)}>
+            <Icon name={on ? "studio/speaker" : "studio/speaker-off"} className="size-4" />
+          </button>
         </Tooltip>
-        <PopoverContent side="top" align="end" className="p-0">
-          {/* Portaled out of Studio's root: Studio's styles apply only inside its scope. */}
-          <div data-bb-plugin="studio" data-bb-plugin-root="" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
-          <div className="mb-3 flex items-center gap-2 border-b border-border pb-3">
-            <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Voice mode</span>
-            <span className="text-xs text-muted-foreground">{on ? "Replies are spoken" : "Off in this thread"}</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={on}
-              aria-label={on ? "Turn voice mode off in this thread" : "Turn voice mode on in this thread"}
-              onClick={() => void set(!on)}
-              className={cn("relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-primary" : "bg-muted")}
-            >
-              <span className={cn("inline-block size-3 rounded-full bg-background shadow transition-transform", on ? "translate-x-3.5" : "translate-x-0.5")} />
-            </button>
-          </div>
-          <SpeechSection compact onState={(state) => followSpeed(state.speed)} />
-          </div>
-        </PopoverContent>
-      </Popover>
+        <Popover>
+          <Tooltip label="Voice settings" side="top">
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="Voice settings" className={cn(ACTION_BUTTON, "w-5 rounded-l-none", on ? "text-primary hover:text-primary" : "")}>
+                <Icon name="ChevronDown" className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+          </Tooltip>
+          <PopoverContent side="top" align="end" className="p-0">
+            {/* Portaled out of Studio's root: Studio's styles apply only inside its scope. */}
+            <div data-bb-plugin="studio" data-bb-plugin-root="" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
+              <label className="mb-3 flex items-start gap-2 border-b border-border pb-3">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-xs font-medium text-foreground">Conversational replies</span>
+                  <span className="text-xs text-muted-foreground">Tell the agent you're talking: short spoken answers, no markdown.</span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={conversational}
+                  aria-label="Conversational replies"
+                  onClick={() => void setConversational(!conversational)}
+                  className={cn("relative mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", conversational ? "bg-primary" : "bg-muted")}
+                >
+                  <span className={cn("inline-block size-3 rounded-full bg-background shadow transition-transform", conversational ? "translate-x-3.5" : "translate-x-0.5")} />
+                </button>
+              </label>
+              <SpeechSection compact onState={(state) => followSpeed(state.speed)} />
+            </div>
+          </PopoverContent>
+        </Popover>
+      </span>
     </>
   );
 }

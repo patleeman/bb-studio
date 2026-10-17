@@ -50,6 +50,9 @@ describe("registerVoice", () => {
     expect(voice.configure("thr_new", { voice: "on" })).toMatchObject({ chat: true, instructions: expect.stringContaining("This is a voice chat") });
     expect(voice.configure("thr_voice")).toMatchObject({ chat: false, tools: ["voice_delegate", "voice_threads", "voice_read"], instructions: expect.stringContaining("Voice mode is on") });
     expect(voice.configure("thr_other")).toBeNull();
+    await voice.sessions.setConversational(false);
+    expect(voice.configure("thr_voice")).toMatchObject({ chat: false, instructions: "" });
+    expect(voice.configure("thr_new", { voice: "on" })).toMatchObject({ chat: true, instructions: expect.stringContaining("This is a voice chat") });
     await expect(tools.voice_delegate!.execute({ target: "bot", message: "Hi" }, { threadId: "thr_other" })).rejects.toThrow(/Only a thread with voice mode on/);
   });
 });

@@ -45,6 +45,8 @@ interface Delegation {
 interface VoiceState {
   /** Threads with voice mode on. */
   threads: string[];
+  /** Whether voice threads are told to answer conversationally (the voice menu's switch). */
+  conversational: boolean;
   /** Target thread id → the voice thread waiting for its reply. */
   delegations: Record<string, Delegation>;
 }
@@ -52,7 +54,7 @@ interface VoiceState {
 type EventRow = { seq: number; type: string; data?: unknown };
 
 export class VoiceSessions {
-  private state: VoiceState = { threads: [], delegations: {} };
+  private state: VoiceState = { threads: [], conversational: true, delegations: {} };
 
   constructor(private readonly deps: {
     sdk: Sdk;
@@ -66,7 +68,7 @@ export class VoiceSessions {
     const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as (Partial<VoiceState> & { session?: { threadId?: string } | null }) | null;
     // Before voice was a mode there was one current session.
     const old = stored?.session?.threadId ? [stored.session.threadId] : [];
-    this.state = { threads: stored?.threads ?? old, delegations: stored?.delegations ?? {} };
+    this.state = { threads: stored?.threads ?? old, conversational: stored?.conversational ?? true, delegations: stored?.delegations ?? {} };
   }
 
   private async save(): Promise<void> {
@@ -80,6 +82,15 @@ export class VoiceSessions {
   /** Whether a thread has voice mode on (a new voice chat's metadata says so from its first turn). */
   isOn(threadId: string, metadata?: { readonly [key: string]: unknown }): boolean {
     return this.state.threads.includes(threadId) || metadata?.voice === "on";
+  }
+
+  get conversational(): boolean {
+    return this.state.conversational;
+  }
+
+  async setConversational(on: boolean): Promise<void> {
+    this.state.conversational = on;
+    await this.save();
   }
 
   async set(threadId: string, on: boolean): Promise<void> {

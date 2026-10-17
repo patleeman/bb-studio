@@ -11,6 +11,8 @@ export const voiceStateSchema = z.object({
   pending: z.array(z.string()),
   /** Why replies can't be spoken, or null. */
   speechProblem: z.string().nullable(),
+  /** Whether voice threads are told to answer conversationally; the voice menu's switch, for every thread. */
+  conversational: z.boolean(),
 });
 export type VoiceState = z.infer<typeof voiceStateSchema>;
 
@@ -24,6 +26,11 @@ export const voiceContract = defineRpcContract({
   },
   "voice.set": {
     experimental_description: "Turn voice mode on or off in a thread.",
+    input: z.object({ threadId, on: z.boolean() }).strict(),
+    output: voiceStateSchema,
+  },
+  "voice.conversational": {
+    experimental_description: "Whether voice threads are told to answer conversationally (short spoken sentences, no markdown).",
     input: z.object({ threadId, on: z.boolean() }).strict(),
     output: voiceStateSchema,
   },

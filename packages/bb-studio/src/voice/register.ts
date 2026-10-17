@@ -36,12 +36,17 @@ export async function registerVoice(bb: BbPluginApi, deps: {
     on: sessions.isOn(threadId),
     pending: sessions.pending(threadId),
     speechProblem: deps.speech.problem(),
+    conversational: sessions.conversational,
   });
 
   bb.rpc.register(voiceContract, {
     "voice.state": ({ threadId }) => state(threadId),
     "voice.set": async ({ threadId, on }) => {
       await sessions.set(threadId, on);
+      return state(threadId);
+    },
+    "voice.conversational": async ({ threadId, on }) => {
+      await sessions.setConversational(on);
       return state(threadId);
     },
     "voice.new": async ({ projectId, modelId }) => ({ threadId: await sessions.start(modelId ?? VOICE_MODELS[0]!.id, projectId ?? null) }),
@@ -120,7 +125,9 @@ export async function registerVoice(bb: BbPluginApi, deps: {
     configure(threadId, metadata) {
       if (!sessions.isOn(threadId, metadata)) return null;
       const chat = metadata?.voice === "on";
-      return { chat, tools: [...VOICE_TOOLS, ...(chat ? ["studio_list_items"] : [])], instructions: chat ? VOICE_CHAT_INSTRUCTIONS : VOICE_MODE_INSTRUCTIONS };
+      // Off, a thread in voice mode keeps writing as it does; its replies are still spoken.
+      const instructions = chat ? VOICE_CHAT_INSTRUCTIONS : sessions.conversational ? VOICE_MODE_INSTRUCTIONS : "";
+      return { chat, tools: [...VOICE_TOOLS, ...(chat ? ["studio_list_items"] : [])], instructions };
     },
   };
 }

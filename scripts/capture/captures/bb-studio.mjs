@@ -525,7 +525,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     setup: async (client) => {
       const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForAriaButton("Voice mode is on: voice settings", 30000);
+      await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
       // The greeting is spoken first; stop it and ask a question.
       await client.waitForAriaButton("Stop speaking", 120000);
       await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
@@ -540,8 +540,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     },
   },
   {
-    // The voice menu: the composer's speaker button opens voice mode's switch
-    // and Speech's settings, on OpenRouter with Fish Drama 3's named voices.
+    // The voice menu: the caret beside the composer's speaker button opens the
+    // Conversational replies switch and Speech's settings, on OpenRouter with
+    // Fish Drama 3's named voices.
     id: "studio-voice-menu",
     packageDir: "bb-studio",
     fileName: "voice-menu.png",
@@ -549,9 +550,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await pluginRpc("studio", "speech.update", { engine: "openrouter", model: "fish-audio/drama-3", voice: "", speed: 1.25 });
       const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForAriaButton("Voice mode is on: voice settings", 30000);
-      await client.evaluate(`document.querySelector('[aria-label="Voice mode is on: voice settings"]').click()`);
-      await client.waitForText("Replies are spoken", 10000);
+      await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
+      await client.evaluate(`document.querySelector('[aria-label="Voice settings"]').click()`);
+      await client.waitForText("Conversational replies", 10000);
       await client.waitForText("Hannah", 30000);
       await client.waitForText("1.25×");
       await client.waitForText("Play sample");
