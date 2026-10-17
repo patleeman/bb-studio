@@ -61,7 +61,13 @@ export class Speaker {
         this.current = clip;
         const ended = this.played(clip, run);
         ended.catch(() => {});
-        await clip.play();
+        try {
+          await clip.play();
+        } catch (error) {
+          // Stopped while it was still starting: the browser rejects play(), and that's not a failure.
+          if (run !== this.run) return;
+          throw error;
+        }
         if (run !== this.run) return;
         this.set("speaking");
         onPiece?.(index);

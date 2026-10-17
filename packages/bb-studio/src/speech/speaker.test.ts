@@ -84,6 +84,20 @@ describe("Speaker", () => {
     expect(states.at(-1)).toBe("idle");
   });
 
+  it("resolves quietly when stopped while a piece is still starting", async () => {
+    let reject: (error: Error) => void = () => {};
+    const speaker = new Speaker(async () => "/audio/1", () => {}, (url) => {
+      const clip = new FakeAudio(url);
+      clip.play = () => new Promise<void>((_, fail) => { reject = fail; });
+      return clip;
+    });
+    const done = speaker.speak("Hello.");
+    await tick();
+    speaker.stop();
+    reject(new Error("The play() request was interrupted by a call to pause()."));
+    await expect(done).resolves.toBeUndefined();
+  });
+
   it("rejects when the audio can't play", async () => {
     const { speaker, clips } = setup();
     const done = speaker.speak("Broken.");
