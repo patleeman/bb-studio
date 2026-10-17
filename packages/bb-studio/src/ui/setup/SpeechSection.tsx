@@ -1,0 +1,175 @@
+// The Speech section of the Setup page: which engine, model and voice Studio
+// speaks with, and a sample to choose by ear. Keys live in Studio's plugin
+// settings, where BB keeps secrets. See src/speech/.
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@bb-studio/kit/ui";
+import { errorMessage } from "@bb-studio/kit/format";
+import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { speechContract, SpeechState } from "../../speech/contract";
+import { Speaker, type SpeakerState } from "../../speech/speaker";
+
+type Model = { id: string; name: string; pricePerMillionChars?: number; voices: string[] | null };
+
+const SAMPLE = "Done. The build thread finished, and two tests fail in the auth module. Want me to read you the errors?";
+/** The Select's value for "the model's default voice". */
+const DEFAULT_VOICE = "__default__";
+
+function price(model: Model): string {
+  return model.pricePerMillionChars === undefined ? "" : ` · $${model.pricePerMillionChars}/M chars`;
+}
+
+export function SpeechSection() {
+  const rpc = useRpc<typeof speechContract>();
+  const [state, setState] = useState<SpeechState | null>(null);
+  const [models, setModels] = useState<Model[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sample, setSample] = useState(SAMPLE);
+  const [playing, setPlaying] = useState<SpeakerState>("idle");
+  const speaker = useMemo(() => new Speaker(
+    async (text) => (await rpc.call("speech.prepare", { text })).url,
+    setPlaying,
+  ), [rpc]);
+  useEffect(() => () => speaker.stop(), [speaker]);
+
+  const loadModels = useCallback((next: SpeechState) => {
+    setModels(null);
+    if (next.problem) return;
+    rpc.call("speech.models", null).then((result) => setModels(result.models), (cause: unknown) => { setModels([]); setError(errorMessage(cause)); });
+  }, [rpc]);
+  useEffect(() => {
+    rpc.call("speech.state", null).then((next) => { setState(next); loadModels(next); }, (cause: unknown) => setError(errorMessage(cause)));
+  }, [rpc, loadModels]);
+
+  const update = async (change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions">>) => {
+    setBusy(true);
+    try {
+      const next = await rpc.call("speech.update", change);
+      setError(null);
+      if (next.engine !== state?.engine || next.endpoint !== state?.endpoint) loadModels(next);
+      setState(next);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const play = async () => {
+    if (playing !== "idle") return speaker.stop();
+    setError(null);
+    try {
+      await speaker.speak(sample);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  };
+
+  const model = models?.find((each) => each.id === state?.model);
+  return (
+    <section className="flex flex-col gap-2" aria-label="Speech">
+      <h2 className="text-sm font-medium text-foreground">Speech</h2>
+      <p className="text-xs text-muted-foreground">
+        The voice Studio speaks with. Play a sample to choose by ear; changes apply to the next thing spoken.
+      </p>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {!state ? <p className="text-xs text-muted-foreground">Loading speech settings…</p> : (
+        <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+          <label className="flex min-w-0 items-center gap-2">
+            <span className="w-20 shrink-0 text-xs text-foreground">Engine</span>
+            <Select value={state.engine} disabled={busy} onValueChange={(engine) => void update({ engine: engine as SpeechState["engine"] })}>
+              <SelectTrigger className="h-8 w-64 text-xs" aria-label="Speech engine"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {state.engines.map((engine) => <SelectItem key={engine.id} value={engine.id}>{engine.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </label>
+          {state.engine === "custom" ? (
+            <label className="flex min-w-0 items-center gap-2">
+              <span className="w-20 shrink-0 text-xs text-foreground">Endpoint</span>
+              <Input
+                key={state.endpoint}
+                className="h-8 w-80 text-xs"
+                defaultValue={state.endpoint}
+                placeholder="http://127.0.0.1:8000/v1"
+                aria-label="Custom speech endpoint"
+                onBlur={(event) => { if (event.target.value.trim() !== state.endpoint) void update({ endpoint: event.target.value.trim() }); }}
+              />
+            </label>
+          ) : null}
+          {state.problem ? (
+            <p className="text-xs text-foreground">
+              {state.problem}
+              {state.engine === "openrouter" ? " Keys are in BB Settings → Plugins → Studio." : ""}
+            </p>
+          ) : (
+            <>
+              <label className="flex min-w-0 items-center gap-2">
+                <span className="w-20 shrink-0 text-xs text-foreground">Model</span>
+                {models?.length ? (
+                  <Select value={state.model} disabled={busy} onValueChange={(id) => void update({ model: id, voice: "" })}>
+                    <SelectTrigger className="h-8 w-80 text-xs" aria-label="Speech model"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {model ? null : <SelectItem value={state.model}>{state.model}</SelectItem>}
+                      {models.map((each) => <SelectItem key={each.id} value={each.id}>{each.name}{price(each)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    key={state.model}
+                    className="h-8 w-80 text-xs"
+                    defaultValue={state.model}
+                    placeholder={models ? "Model name" : "Loading models…"}
+                    aria-label="Speech model"
+                    onBlur={(event) => { if (event.target.value.trim() && event.target.value.trim() !== state.model) void update({ model: event.target.value.trim() }); }}
+                  />
+                )}
+              </label>
+              <label className="flex min-w-0 items-center gap-2">
+                <span className="w-20 shrink-0 text-xs text-foreground">Voice</span>
+                {model?.voices?.length ? (
+                  <Select value={state.voice || DEFAULT_VOICE} disabled={busy} onValueChange={(voice) => void update({ voice: voice === DEFAULT_VOICE ? "" : voice })}>
+                    <SelectTrigger className="h-8 w-80 text-xs" aria-label="Speech voice"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DEFAULT_VOICE}>Model default</SelectItem>
+                      {state.voice && !model.voices.includes(state.voice) ? <SelectItem value={state.voice}>{state.voice}</SelectItem> : null}
+                      {model.voices.map((voice) => <SelectItem key={voice} value={voice}>{voice}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    key={`${state.model}:${state.voice}`}
+                    className="h-8 w-80 text-xs"
+                    defaultValue={state.voice}
+                    placeholder="Model default, or a voice ID"
+                    aria-label="Speech voice"
+                    onBlur={(event) => { if (event.target.value.trim() !== state.voice) void update({ voice: event.target.value.trim() }); }}
+                  />
+                )}
+              </label>
+              <label className="flex min-w-0 items-center gap-2">
+                <span className="w-20 shrink-0 text-xs text-foreground">Delivery</span>
+                <Input
+                  key={state.instructions}
+                  className="h-8 w-80 text-xs"
+                  defaultValue={state.instructions}
+                  placeholder="Warm and calm, a little brisk"
+                  aria-label="Speech delivery"
+                  onBlur={(event) => { if (event.target.value.trim() !== state.instructions) void update({ instructions: event.target.value.trim() }); }}
+                />
+              </label>
+              <div className="flex min-w-0 flex-col gap-2">
+                <Textarea className="min-h-16 text-xs" value={sample} onChange={(event) => setSample(event.target.value)} aria-label="Sample text" />
+                <div>
+                  <Button size="sm" variant="outline" disabled={!sample.trim()} onClick={() => void play()}>
+                    {playing === "idle" ? "Play sample" : playing === "loading" ? "Loading… (stop)" : "Stop"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

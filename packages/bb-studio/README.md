@@ -1819,6 +1819,8 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   removes anything.
 - **Kinds** turns built-in kinds on and off and picks who opens and creates
   each; see [Kinds](#kinds).
+- **Speech** picks the engine, model and voice Studio speaks with; see
+  [Speech](#speech).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
 `bb studio setup` prints the same status, the retired plugins and the
@@ -1888,6 +1890,42 @@ studio_describe: () => ({
 The field is optional, so older providers are unaffected. Your kind keeps
 its own id and items; Studio only routes New to it when it's chosen (or the
 only replacement) and offers New on your kind only then.
+
+## Speech
+
+Studio turns text into speech with an engine you choose. It's the speaking
+half of voice conversations: Talk listens, and Speech answers. BB's own AI
+services only transcribe, so Studio brings this itself.
+
+- **Engines.** Every engine speaks OpenAI's `POST /audio/speech` request, so
+  one adapter covers them all:
+  - **OpenRouter** (default) reaches every hosted speech model with one key:
+    Fish Audio, ElevenLabs, Gemini, Microsoft MAI-Voice, Qwen, Kokoro and
+    more. Models that make only raw PCM (Gemini) are wrapped as WAV.
+  - **Custom endpoint** points at any server with the same API, such as a
+    local mlx-audio or fish-speech server.
+- **Setup → Speech** picks the engine, model (with its price per million
+  characters) and voice (from the model's list, or typed in). An optional
+  **Delivery** line ("Warm and calm, a little brisk") goes to models that take
+  directions. **Play sample** speaks any text, so you can choose by ear.
+- **Keys** are in BB Settings → Plugins → Studio: **OpenRouter API key**
+  (falls back to `OPENROUTER_API_KEY` on the BB host) and the custom
+  endpoint's key. The OpenRouter key is Studio's, for other features to use
+  later too.
+- **Streaming and cache.** Audio streams to the player as the engine makes
+  it, and is saved on the BB host (up to 200 MB, least recently played
+  dropped first), so the same text in the same voice is made once. Long text
+  is spoken in pieces cut at sentence ends; the first piece is short so it
+  starts sooner, and each next piece loads while one plays.
+
+```sh
+bb studio speech status            # engine, model, voice, and what's missing
+bb studio speech models            # the engine's models, prices and voices
+bb studio speech say "Done. Two tests fail." --out reply.mp3 [--model <id>] [--voice <name>]
+```
+
+Clients (Setup's sample, and the voice features to come) call the
+`speech.prepare` RPC for a piece of text and play the URL it returns.
 
 ## Backup and restore
 

@@ -13,6 +13,8 @@ import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
 import { kindsContract, type KindsState } from "./src/kinds-contract";
+import { SPEECH_SETTINGS } from "./src/speech/settings";
+import { registerSpeech } from "./src/speech/register";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -117,8 +119,9 @@ export default async function plugin(bb: BbPluginApi) {
   const dashboards = registerDashboards(bb, db);
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
-  // Pages', Explore's and Reactions', under the keys they had in their own plugins.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS });
+  // Pages', Explore's and Reactions', under the keys they had in their own plugins,
+  // then Bot avatars' and Speech's.
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   let settingValues: Record<string, unknown> = await settings.get();
@@ -126,6 +129,10 @@ export default async function plugin(bb: BbPluginApi) {
   settings.onChange((next) => {
     settingValues = next;
     explore.update(next);
+  });
+  const speech = registerSpeech(bb, db, {
+    values: () => settingValues,
+    set: async (values) => { settingValues = { ...settingValues, ...values }; await settings.experimental_set(values as never); },
   });
   // Reactions keep only settings: copy the old plugin's once, in the background.
   const reactionsImport = {
@@ -1579,6 +1586,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
       { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
+      { name: "speech", summary: "Text to speech: show the engine, list its models, speak text to a file", usage: "bb studio speech <status|models|say> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
@@ -1587,6 +1595,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
       if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
+      if (argv[0] === "speech") return speech.cli(argv.slice(1), ctx);
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
@@ -1678,7 +1687,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|speech> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
