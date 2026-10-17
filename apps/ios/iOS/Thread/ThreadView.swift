@@ -774,8 +774,10 @@ struct ThreadView: View {
         }
         draft = ""
         sends += 1
-        let note = voice.agentNote
-        Task { if await !model.send(text, agentNote: note) { restoreDraft(text, []) } }
+        Task {
+            let note = await voice.agentNote()
+            if await !model.send(text, agentNote: note) { restoreDraft(text, []) }
+        }
     }
 
     /// Moves the draft into the thread's note and opens it. The composer is

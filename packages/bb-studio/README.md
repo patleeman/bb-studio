@@ -2000,8 +2000,11 @@ piece being read is lit in the transcript. Recapture with
   agent sees it, you don't) with each message it sends for you: you spoke
   this, answer in a few short spoken sentences, no markdown. Typed messages
   get the same guidance from the thread's instructions. Off, a thread in
-  voice mode keeps writing as it does (its replies are still spoken); a new
-  voice chat is always conversational.
+  voice mode keeps writing as it does (its replies are still spoken); the
+  first spoken message after you turn it off carries a one-time note saying
+  so, since the agent has seen the earlier ones. Studio picks the note
+  (`voice.turnNote`), so desktop and iPhone agree. A new voice chat is always
+  conversational.
 
   ![Live BB screenshot of the voice menu above a thread's composer](assets/voice-menu.png)
 

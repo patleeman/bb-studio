@@ -304,5 +304,27 @@
     "output": {
       "url": "/api/v1/plugins/studio/http/speech/audio?key=0123456789abcdef0123456789abcdef01234567"
     }
+  },
+  {
+    "id": "voice-turn-note",
+    "plugin": "studio",
+    "method": "voice.turnNote",
+    "input": {
+      "threadId": "thr_voice"
+    },
+    "output": {
+      "note": "Conversational replies are off now: answer as you normally would, with whatever length and formatting suit the answer. Your replies are still read aloud."
+    }
+  },
+  {
+    "id": "voice-turn-note-none",
+    "plugin": "studio",
+    "method": "voice.turnNote",
+    "input": {
+      "threadId": "thr_voice"
+    },
+    "output": {
+      "note": null
+    }
   }
 ]

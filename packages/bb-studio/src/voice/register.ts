@@ -7,7 +7,7 @@ import { SPEECH_HTTP_ROOT } from "../speech/contract";
 import type { SpeechService } from "../speech/service";
 import { voiceContract, type VoiceState } from "./contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "./shared";
-import { speakable, VOICE_CHAT_INSTRUCTIONS, VOICE_MODE_INSTRUCTIONS } from "./instructions";
+import { speakable, VOICE_CHAT_INSTRUCTIONS, VOICE_MODE_INSTRUCTIONS, VOICE_TURN_NOTE, VOICE_TURN_OFF_NOTE } from "./instructions";
 import { VOICE_MODELS, VoiceSessions } from "./sessions";
 
 /** A voice thread's own tools, beside its usual ones. */
@@ -48,6 +48,10 @@ export async function registerVoice(bb: BbPluginApi, deps: {
     "voice.conversational": async ({ threadId, on }) => {
       await sessions.setConversational(on);
       return state(threadId);
+    },
+    "voice.turnNote": async ({ threadId }) => {
+      const note = await sessions.turnNote(threadId);
+      return { note: note === "on" ? VOICE_TURN_NOTE : note === "off" ? VOICE_TURN_OFF_NOTE : null };
     },
     "voice.new": async ({ projectId, modelId }) => ({ threadId: await sessions.start(modelId ?? VOICE_MODELS[0]!.id, projectId ?? null) }),
   });

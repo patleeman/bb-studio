@@ -47,6 +47,8 @@ interface VoiceState {
   threads: string[];
   /** Whether voice threads are told to answer conversationally (the voice menu's switch). */
   conversational: boolean;
+  /** The last note each thread's spoken messages carried, so turning conversational off is said once. */
+  notes: Record<string, "on" | "off">;
   /** Target thread id → the voice thread waiting for its reply. */
   delegations: Record<string, Delegation>;
 }
@@ -54,7 +56,7 @@ interface VoiceState {
 type EventRow = { seq: number; type: string; data?: unknown };
 
 export class VoiceSessions {
-  private state: VoiceState = { threads: [], conversational: true, delegations: {} };
+  private state: VoiceState = { threads: [], conversational: true, notes: {}, delegations: {} };
 
   constructor(private readonly deps: {
     sdk: Sdk;
@@ -68,7 +70,7 @@ export class VoiceSessions {
     const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as (Partial<VoiceState> & { session?: { threadId?: string } | null }) | null;
     // Before voice was a mode there was one current session.
     const old = stored?.session?.threadId ? [stored.session.threadId] : [];
-    this.state = { threads: stored?.threads ?? old, conversational: stored?.conversational ?? true, delegations: stored?.delegations ?? {} };
+    this.state = { threads: stored?.threads ?? old, conversational: stored?.conversational ?? true, notes: stored?.notes ?? {}, delegations: stored?.delegations ?? {} };
   }
 
   private async save(): Promise<void> {
@@ -86,6 +88,21 @@ export class VoiceSessions {
 
   get conversational(): boolean {
     return this.state.conversational;
+  }
+
+  /**
+   * The note a spoken message in this thread carries: "on" while conversational
+   * replies are on; "off" once, for the first message after they're turned off;
+   * then none. Records what it hands out.
+   */
+  async turnNote(threadId: string): Promise<"on" | "off" | null> {
+    const last = this.state.notes[threadId];
+    const note = this.state.conversational ? "on" : last === "on" ? "off" : null;
+    if (note && note !== last) {
+      this.state.notes[threadId] = note;
+      await this.save();
+    }
+    return note;
   }
 
   async setConversational(on: boolean): Promise<void> {

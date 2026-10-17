@@ -16,6 +16,8 @@ public enum VoiceRequests {
         json(Studio.VoiceConversationalInput(threadId: threadId, on: on))
     }
 
+    public static func turnNote(_ threadId: String) -> JSONValue { json(Studio.VoiceTurnNoteInput(threadId: threadId)) }
+
     /// No project starts it in BB's personal project, as on desktop.
     public static func new(projectId: String?) -> JSONValue {
         projectId.map { json(Studio.VoiceNewInput(projectId: $0)) } ?? .object([:])
@@ -49,6 +51,12 @@ extension BBClient {
     /// For every voice thread; the thread only names whose state comes back.
     public func setVoiceConversational(_ threadId: String, on: Bool) async throws -> VoiceModeState {
         try await rpc("studio", Studio.Method.voice_conversational, VoiceRequests.conversational(threadId, on: on))
+    }
+
+    /// The unseen note for a spoken message: conversational while that's on, a one-time "it's off" after it's turned off, else nil.
+    public func voiceTurnNote(_ threadId: String) async throws -> String? {
+        let result: Studio.VoiceTurnNoteOutput = try await rpc("studio", Studio.Method.voice_turnNote, VoiceRequests.turnNote(threadId))
+        return result.note
     }
 
     /// A new voice chat: a thread on a fast model with voice mode on, whose agent greets you.

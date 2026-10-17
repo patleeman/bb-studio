@@ -140,8 +140,18 @@ final class ThreadVoice: ObservableObject {
         player.setRate(speed)
     }
 
-    /// What `send` says along with a spoken message: the conversational note, when that's on.
-    var agentNote: String? { conversational ? VoiceText.turnNote : nil }
+    /// What `send` says along with a spoken message. Studio picks it: the
+    /// conversational note while that's on, a one-time "it's off" note after
+    /// it's turned off, then none. An older Studio without that falls back to
+    /// the conversational note alone.
+    func agentNote() async -> String? {
+        guard let client else { return conversational ? VoiceText.turnNote : nil }
+        do {
+            return try await client.voiceTurnNote(threadId)
+        } catch {
+            return conversational ? VoiceText.turnNote : nil
+        }
+    }
 
     /// Studio announced a spoken reply.
     func handle(_ spoken: VoiceSpoken) {

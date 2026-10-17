@@ -239,6 +239,7 @@ public enum Studio {
     public static let voice_state = "voice.state"
     public static let voice_set = "voice.set"
     public static let voice_conversational = "voice.conversational"
+    public static let voice_turnNote = "voice.turnNote"
     public static let voice_new = "voice.new"
   }
 
@@ -749,6 +750,8 @@ public enum Studio {
   public typealias VoiceSet = VoiceSetOutput
 
   public typealias VoiceConversational = VoiceConversationalOutput
+
+  public typealias VoiceTurnNote = VoiceTurnNoteOutput
 
   public typealias VoiceNew = VoiceNewOutput
 
@@ -20031,6 +20034,22 @@ public enum Studio {
       self.pending = pending
       self.speechProblem = speechProblem
       self.conversational = conversational
+    }
+  }
+
+  public struct VoiceTurnNoteInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct VoiceTurnNoteOutput: Sendable, Hashable, Codable {
+    public var note: String?
+
+    public init(note: String? = nil) {
+      self.note = note
     }
   }
 

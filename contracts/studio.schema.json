@@ -26831,6 +26831,39 @@
         "additionalProperties": false
       }
     },
+    "voice.turnNote": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    },
     "voice.new": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

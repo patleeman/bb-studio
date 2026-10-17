@@ -57,6 +57,10 @@ final class NativePayloadContractTests: XCTestCase {
         XCTAssertEqual(inProject, "thr_voice")
         let personal = try await client("voice-new-personal").newVoiceChat(projectId: nil)
         XCTAssertEqual(personal, "thr_voice")
+        let offNote = try await client("voice-turn-note").voiceTurnNote("thr_voice")
+        XCTAssertEqual(offNote?.hasPrefix("Conversational replies are off now"), true)
+        let noNote = try await client("voice-turn-note-none").voiceTurnNote("thr_voice")
+        XCTAssertNil(noNote)
     }
 
     func testSpeechPayloads() async throws {

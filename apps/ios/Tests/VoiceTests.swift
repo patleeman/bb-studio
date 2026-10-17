@@ -396,9 +396,11 @@ final class ThreadVoiceTests: XCTestCase {
         backend.player.stop()
     }
 
-    func testTheConversationalNoteFollowsTheSwitch() {
+    func testWithoutStudioTheConversationalNoteFollowsTheSwitch() async {
+        // Not attached to a server (or an older Studio): the local switch decides.
         let voice = ThreadVoice(threadId: "thr_n", player: FakeBackendPlayer().player)
-        XCTAssertEqual(voice.agentNote, VoiceText.turnNote)
+        let note = await voice.agentNote()
+        XCTAssertEqual(note, VoiceText.turnNote)
     }
 
     func testOpenVoiceThreadsKeepTheAppGoing() {

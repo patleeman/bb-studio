@@ -54,6 +54,7 @@ describe("VoiceSessions", () => {
     expect(sessions.conversational).toBe(true);
     await sessions.setConversational(false);
     expect(sessions.conversational).toBe(false);
+    await sessions.setConversational(true);
     // A new voice chat's first turn comes before Studio has stored it.
     expect(sessions.isOn("thr_new", { voice: "on" })).toBe(true);
   });
@@ -106,6 +107,19 @@ describe("VoiceSessions", () => {
     expect(await sessions.idle("thr_work", "User's other request.")).toBe(false);
     expect(sent.length).toBe(before);
     expect(sessions.pending("thr_voice")).toEqual(["thr_work"]);
+  });
+
+  it("sends the conversational note while it's on, says once that it's off, then nothing", async () => {
+    const { sessions } = setup();
+    expect(await sessions.turnNote("thr_a")).toBe("on");
+    expect(await sessions.turnNote("thr_a")).toBe("on");
+    await sessions.setConversational(false);
+    expect(await sessions.turnNote("thr_a")).toBe("off");
+    expect(await sessions.turnNote("thr_a")).toBeNull();
+    // A thread that never had the note isn't told it's off.
+    expect(await sessions.turnNote("thr_b")).toBeNull();
+    await sessions.setConversational(true);
+    expect(await sessions.turnNote("thr_a")).toBe("on");
   });
 
   it("ignores threads it isn't waiting on, and keeps its state across a reload", async () => {

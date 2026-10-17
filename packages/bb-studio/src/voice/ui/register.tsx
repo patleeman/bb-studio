@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { talk, useTalkState } from "../../talk/ui/controller";
 import type { speechContract } from "../../speech/contract";
 import type { voiceContract } from "../contract";
-import { VOICE_TURN_NOTE } from "../instructions";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "../shared";
 import { useVoiceSnapshot, voicePlayer } from "./state";
 
@@ -114,8 +113,9 @@ function VoiceControls() {
 
 function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerApi; threadId: string }) {
   const { on, set, conversational, setConversational } = useVoiceMode(threadId);
-  const conversationalRef = useRef(conversational);
-  conversationalRef.current = conversational;
+  const voiceRpc = useRpc<typeof voiceContract>();
+  const rpcRef = useRef(voiceRpc);
+  rpcRef.current = voiceRpc;
   const { speed, change: changeSpeed, follow: followSpeed } = useSpeechSpeed();
   const snapshot = useVoiceSnapshot();
   const talkState = useTalkState();
@@ -157,9 +157,10 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
         return;
       }
       current.replace({ text: "", mentions: [] });
-      // The guidance rides along unseen: instructions only reach a running session at its next start.
-      const note = conversationalRef.current ? [{ type: "text", text: VOICE_TURN_NOTE, mentions: [], visibility: "agent-only" }] : [];
-      sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }, ...note] } as never)
+      // The guidance rides along unseen (instructions only reach a running session at its next start).
+      // Studio picks it: conversational while that's on, a one-time "it's off" after it's turned off.
+      rpcRef.current.call("voice.turnNote", { threadId }).then((result) => result.note, () => null)
+        .then((note) => sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }, ...(note ? [{ type: "text", text: note, mentions: [], visibility: "agent-only" }] : [])] } as never))
         .catch((error: unknown) => {
           current.replace({ text, mentions: [] });
           toast.error("Couldn't send what you said", { description: errorMessage(error) });
