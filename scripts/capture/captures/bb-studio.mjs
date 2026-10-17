@@ -436,6 +436,42 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
+    // Setup → Speech on OpenRouter with an ElevenLabs voice, playing the
+    // sample. Needs OPENROUTER_API_KEY in the staged BB's environment.
+    id: "studio-speech",
+    packageDir: "bb-studio",
+    fileName: "speech.png",
+    setup: async (client) => {
+      await pluginRpc("studio", "speech.update", { engine: "openrouter", model: "elevenlabs/eleven-v4", voice: "george", instructions: "Warm and calm, a little brisk." });
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("The voice Studio speaks with.");
+      await client.waitForText("$40/M chars", 30000);
+      await client.waitForText("george");
+      await client.evaluate(`(() => {
+        const section = document.querySelector('section[aria-label="Speech"]');
+        if (!section) throw new Error("The Speech section is missing");
+        if (section.querySelector(".text-destructive")) throw new Error("Speech shows an error: " + section.querySelector(".text-destructive").textContent);
+        const play = [...section.querySelectorAll("button")].find((button) => button.textContent.trim() === "Play sample");
+        if (!play) throw new Error("No Play sample button");
+        section.scrollIntoView({ block: "start" });
+        play.click();
+        return true;
+      })()`);
+      // The sample plays once the first piece's audio streams in.
+      await client.waitForText("Stop", 30000);
+      await sleep(400);
+      return async () => {
+        await client.evaluate(`[...document.querySelectorAll('section[aria-label="Speech"] button')].find((button) => button.textContent.trim() === "Stop")?.click()`).catch(() => {});
+        await pluginRpc("studio", "speech.update", { model: "fish-audio/drama-3", voice: "", instructions: "" });
+      };
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const box = document.querySelector('section[aria-label="Speech"]').getBoundingClientRect();
+      return { x: Math.max(0, box.left - 24), y: Math.max(0, box.top - 24), width: box.width + 48, height: box.height + 48, scale: 2 };
+    })()`),
+  },
+  {
     id: "studio-setup",
     packageDir: "bb-studio",
     fileName: "plugin-setup.png",

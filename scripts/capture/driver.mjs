@@ -413,6 +413,9 @@ export async function ensureChrome() {
         // Talk records from a synthetic microphone without a permission prompt.
         "--use-fake-ui-for-media-stream",
         "--use-fake-device-for-media-stream",
+        // Speech's Play sample plays without a real click, and silently.
+        "--autoplay-policy=no-user-gesture-required",
+        "--mute-audio",
         "about:blank",
       ],
       { stdio: "ignore" },

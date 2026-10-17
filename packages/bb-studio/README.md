@@ -1897,6 +1897,14 @@ Studio turns text into speech with an engine you choose. It's the speaking
 half of voice conversations: Talk listens, and Speech answers. BB's own AI
 services only transcribe, so Studio brings this itself.
 
+![Live BB screenshot of Setup → Speech playing a sample with an ElevenLabs voice](assets/speech.png)
+
+Captured from a staged BB with an OpenRouter key in its environment: Setup →
+Speech on OpenRouter with ElevenLabs' Eleven v4 (priced from OpenRouter's
+model list) and its voice `george`, a delivery line, and the sample playing
+(its button reads **Stop**). Recapture with `BB_CAPTURE_ONLY=studio-speech`;
+it needs `OPENROUTER_API_KEY` set when the staged BB starts.
+
 - **Engines.** Every engine speaks OpenAI's `POST /audio/speech` request, so
   one adapter covers them all:
   - **OpenRouter** (default) reaches every hosted speech model with one key:
