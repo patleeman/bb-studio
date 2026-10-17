@@ -425,31 +425,63 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars.staticTexts["BB Studio renamed scratch"].waitForExistence(timeout: 10), "new title")
     }
 
-    /// Opens voice chat on the scratch thread and checks it starts listening.
+    /// Voice mode end to end, against a staged BB whose Studio can speak
+    /// (`TEST_RUNNER_BBGO_QA_VOICE_SERVER=http://127.0.0.1:<port>`; it starts a thread and sends to it).
+    /// New voice chat greets you aloud; a typed message's reply plays and is
+    /// lit up as it's read; Read Aloud reads a reply again; the speaker's
+    /// menu opens the voice settings.
     func testVoiceChat() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
-        addUIInterruptionMonitor(withDescription: "permissions") { alert in
-            for label in ["Allow", "OK"] where alert.buttons[label].exists {
-                alert.buttons[label].tap()
-                return true
-            }
-            return false
-        }
-        app.open(URL(string: "bbstudio://thread/\(id)")!)
-        let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        more.tap()
-        app.buttons["Voice chat"].tap()
+        guard let server = ProcessInfo.processInfo.environment["BBGO_QA_VOICE_SERVER"] else { throw XCTSkip("no staged voice server") }
+        app.terminate()
+        app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://voice"]
+        app.launch()
+        let composer = app.textViews["Message"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the new voice chat opens")
+        let voice = app.descendants(matching: .any)["composerVoice"].firstMatch
+        XCTAssertTrue(voice.waitForExistence(timeout: 15), "the speaker beside the mic")
+        XCTAssertEqual(voice.value as? String, "On", "voice mode is on in a new voice chat")
+
+        // The agent's greeting is spoken: Studio's audio downloads and plays.
+        let speaking = app.staticTexts["voiceSpeaking"]
+        XCTAssertTrue(speaking.waitForExistence(timeout: 120), "the greeting plays")
+        XCTAssertTrue(wait(60) { speaking.label == "Speaking" }, "the greeting's audio loaded")
+        shot("voice-greeting")
+        XCTAssertTrue(wait(90) { !speaking.exists }, "the greeting finishes")
+
+        composer.tap()
+        composer.typeText("In two short sentences: what is a haiku, and how many syllables does it have?")
+        app.buttons["Send"].tap()
+        XCTAssertTrue(speaking.waitForExistence(timeout: 120), "the reply plays")
+        XCTAssertTrue(wait(60) { speaking.label == "Speaking" }, "the reply's audio loaded")
+        sleep(1)
+        shot("voice-reply")
+        // Stop cuts it off.
+        app.buttons["voiceStop"].tap()
+        XCTAssertTrue(wait(5) { !speaking.exists }, "Stop ends it")
+
+        // Read Aloud from the reply's menu.
+        let reply = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'syllable'")).allElementsBoundByIndex.last
+        let replyText = try XCTUnwrap(reply, "the reply is in the thread")
+        replyText.press(forDuration: 1)
+        let readAloud = app.buttons["Read Aloud"]
+        XCTAssertTrue(readAloud.waitForExistence(timeout: 5), "Read Aloud in the message menu")
+        readAloud.tap()
+        XCTAssertTrue(speaking.waitForExistence(timeout: 60), "Read Aloud plays")
+        XCTAssertTrue(wait(60) { speaking.label == "Reading aloud" }, "Read Aloud's audio loaded")
+        shot("voice-read-aloud")
+        app.buttons["voiceStop"].tap()
+
+        // The speaker's menu, and the voice settings.
+        voice.press(forDuration: 1)
+        let settings = app.buttons["Voice Settings…"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), "the voice menu")
+        shot("voice-menu")
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Voice"].waitForExistence(timeout: 10), "voice settings")
+        XCTAssertTrue(app.buttons["speechPlaySample"].waitForExistence(timeout: 15), "speech settings loaded")
         sleep(2)
-        app.tap()
-        sleep(5)
-        shot("voice-chat")
-        // The simulator can't grant speech recognition, so accept the Settings path too.
-        let listening = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Listening'")).firstMatch
-        XCTAssertTrue(listening.waitForExistence(timeout: 5) || app.links["Open Settings"].exists || app.buttons["Open Settings"].exists,
-            "listening, or a way to fix the permission")
-        app.buttons["Pause"].tap()
-        app.buttons["End"].tap()
+        shot("voice-settings")
+        app.buttons["Done"].tap()
     }
 
     /// Taps a file path in a reply and checks the file viewer opens. Scratch

@@ -144,6 +144,7 @@ final class VoicePlayer: ObservableObject {
             current = clip
             clip.rate = Self.clamp(rate)
             try clip.play()
+            log.notice("voice: playing piece \(index + 1, privacy: .public) of \(sources.count, privacy: .public) in \(self.threadId ?? "", privacy: .public)")
             phase = .speaking
             piece = pieces.indices.contains(index) ? pieces[index] : nil
             try await clip.finished()
@@ -192,7 +193,9 @@ final class AudioSpeechBackend: SpeechBackend {
             let message = String(data: data.prefix(300), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
             throw BBError(status: http?.statusCode ?? 0, message: message?.isEmpty == false ? message! : "The speech audio didn't load.")
         }
-        return try AudioClip(data: data, mimeType: http.value(forHTTPHeaderField: "content-type"))
+        let type = http.value(forHTTPHeaderField: "content-type")
+        log.notice("voice: loaded \(data.count, privacy: .public) bytes of \(type ?? "?", privacy: .public) from \(url.path(), privacy: .public)")
+        return try AudioClip(data: data, mimeType: type)
     }
 
     func speaking(_ on: Bool) {
