@@ -1989,7 +1989,14 @@ piece being read is lit in the transcript. Recapture with
   Speech's settings in small (engine, including **On this Mac** with its
   Install and server status, model, voice, delivery, speed and Play sample),
   the same ones as Setup → Speech. *Voice mode: turn on or off in this
-  thread* in the command palette switches it directly. In a new
+  thread* in the command palette switches it directly.
+
+  ![Live BB screenshot of the voice menu above a thread's composer](assets/voice-menu.png)
+
+  Captured from a staged BB: the voice menu open above a voice chat's
+  composer, with voice mode on, OpenRouter's Fish Drama 3 and its default
+  voice Hannah, and speed 1.25×. Recapture with
+  `BB_CAPTURE_ONLY=studio-voice-menu`. In a new
   thread's composer the same spot starts a **New voice chat**, as does the
   *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
   current project (the Personal project otherwise), in the project's main
