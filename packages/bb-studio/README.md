@@ -2028,6 +2028,12 @@ piece being read is lit in the transcript. Recapture with
   that message (or the text you selected in it) in Speech's voice and speed,
   with the same read-along highlight, in any thread, voice mode or not.
   Pressing it again while it reads stops it.
+
+  ![Live BB screenshot of a voice chat's greeting read aloud again, lit as it plays](assets/voice-read-aloud.png)
+
+  Captured from a staged BB: a voice chat's greeting, stopped, then read
+  again with Read aloud from its action bar. Recapture with
+  `BB_CAPTURE_ONLY=studio-voice-read-aloud`.
 - **Written for listening.** A voice chat's agent is told it's a voice chat:
   short spoken sentences, no markdown or code, numbers and paths said as a
   person would, and real work handed off. Voice mode in any other thread adds
