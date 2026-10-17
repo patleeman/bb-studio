@@ -190,7 +190,9 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
             </button>
           </PopoverTrigger>
         </Tooltip>
-        <PopoverContent side="top" align="end" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
+        <PopoverContent side="top" align="end" className="p-0">
+          {/* Portaled out of Studio's root: Studio's styles apply only inside its scope. */}
+          <div data-bb-plugin="studio" data-bb-plugin-root="" className="w-[22rem] max-w-[calc(100vw-1rem)] p-3">
           <div className="mb-3 flex items-center gap-2 border-b border-border pb-3">
             <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Voice mode</span>
             <span className="text-xs text-muted-foreground">{on ? "Replies are spoken" : "Off in this thread"}</span>
@@ -206,6 +208,7 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
             </button>
           </div>
           <SpeechSection compact onState={(state) => followSpeed(state.speed)} />
+          </div>
         </PopoverContent>
       </Popover>
     </>

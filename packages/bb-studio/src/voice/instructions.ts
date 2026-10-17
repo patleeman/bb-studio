@@ -31,6 +31,10 @@ ${HANDING_OFF}`;
 /** Text as it should be heard: markdown marks, code and links reduced to words. */
 export function speakable(text: string): string {
   return text
+    // BB draws directives (::next{…}, ::page{…}) as cards and buttons; they aren't words.
+    .replace(/^[ \t]*::[\w-]+\{[^\n]*\}[ \t]*$/gm, "")
+    .replace(/::[\w-]+\{[^}\n]*\}/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/```[\s\S]*?```/g, " (code left out) ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
