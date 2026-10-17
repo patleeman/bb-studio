@@ -537,7 +537,8 @@ final class ThreadModel: ObservableObject {
         }
     }
 
-    func send(_ text: String, mentions: [Mention] = [], attachments: [PendingAttachment] = []) async -> Bool {
+    /// `agentNote`, when set, goes along unseen by the user (voice mode's turn note).
+    func send(_ text: String, mentions: [Mention] = [], attachments: [PendingAttachment] = [], agentNote: String? = nil) async -> Bool {
         guard let client else { return false }
         sending = true
         defer { sending = false }
@@ -548,12 +549,12 @@ final class ThreadModel: ObservableObject {
         do {
             if attachments.isEmpty {
                 // Queued behind a running turn: the shelf shows it, not the chat.
-                if try await client.send(threadId, text: text, mentions: mentions).delivery == "queued" { drop() }
+                if try await client.send(threadId, text: text, attachments: [], mentions: mentions, agentNote: agentNote).delivery == "queued" { drop() }
             } else {
                 let projectId: String
                 if let known = thread?.projectId { projectId = known } else { projectId = try await client.thread(threadId).projectId }
                 let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
-                if try await client.send(threadId, text: text, attachments: inputs, mentions: mentions).delivery == "queued" { drop() }
+                if try await client.send(threadId, text: text, attachments: inputs, mentions: mentions, agentNote: agentNote).delivery == "queued" { drop() }
             }
             confirmations += 1
             await refreshLatest()

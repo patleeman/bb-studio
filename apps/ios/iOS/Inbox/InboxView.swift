@@ -450,7 +450,7 @@ struct InboxView: View {
                 thread.isUnread ? "Mark as read" : "Mark as unread",
                 systemImage: thread.isUnread ? "envelope.open" : "envelope.badge")
         }
-        Button { app.startVoiceChat(threadId: thread.id) } label: { Label("Voice chat", systemImage: Symbols.voiceChat) }
+        Button { app.startVoiceChat(projectId: thread.projectId) } label: { Label("New Voice Chat", systemImage: Symbols.voiceChat) }
         Button { UIPasteboard.general.string = thread.id } label: { Label("Copy Thread ID", systemImage: "number") }
         Divider()
         Button { Task { await model.archive(app.client, thread) } } label: {

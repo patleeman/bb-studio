@@ -103,6 +103,10 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var dictation: DictationGate? = nil
     /// "Expand to page": the draft into a Notes page linked to the thread. Beside the mic.
     var toPage: ComposerPageAction? = nil
+    /// Voice mode's speaker, just before the mic; nil where Studio has no voice mode.
+    var voice: VoiceModeButton? = nil
+    /// Talking covers the field, so the draft stays put; voice mode streams what you say into it instead.
+    var talkCoversField = true
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -118,7 +122,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             }
             .padding(.top, 4)
             .overlay {
-                if let talk { TalkOverlay(talk: talk, dictation: dictation) }
+                if let talk { TalkOverlay(talk: talk, dictation: dictation, covers: talkCoversField) }
             }
             .overlay(alignment: .topTrailing) {
                 if let expand {
@@ -150,6 +154,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                     .accessibilityIdentifier("composerExpandToPage")
                     .help(toPage.label)
                 }
+                if let voice { voice }
                 if let talk {
                     HoldToTalkMic(talk: talk, tap: dictate)
                 } else {
@@ -185,10 +190,11 @@ private struct TalkOverlay: View {
     @ObservedObject var talk: HoldToTalk
     /// Holds Send while a talk records or transcribes.
     let dictation: DictationGate?
+    var covers = true
 
     var body: some View {
         Group {
-            if talk.state != .idle {
+            if covers, talk.state != .idle {
                 HoldToTalkStatus(talk: talk, cancel: talk.cancel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .background(.background.secondary, in: .rect(cornerRadius: 16))

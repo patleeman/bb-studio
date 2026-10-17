@@ -41,10 +41,10 @@ struct VoiceControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.voice") {
             ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://voice")!)) {
-                Label("Voice chat", systemImage: Symbols.voiceChat)
+                Label("New voice chat", systemImage: Symbols.voiceChat)
             }
         }
-        .displayName("Voice chat with BB")
+        .displayName("New voice chat with BB")
     }
 }
 

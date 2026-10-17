@@ -206,6 +206,54 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "voice.state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "voice.set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "voice.conversational",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "voice.new",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "speech.state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "speech.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "speech.models",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Voice.swift",
+      "plugin": "studio",
+      "method": "speech.prepare",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/BBClient.swift",
       "plugin": "thread-list",
       "method": "listPreferences",

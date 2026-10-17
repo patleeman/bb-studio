@@ -56,8 +56,10 @@ final class TalkRecorder: ObservableObject {
         }
     }
 
-    func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil) async {
+    /// `policy` decides where segments are cut: voice mode cuts short ones so the words show up while you talk.
+    func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil, policy: SegmentPolicy = .talk) async {
         guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
+        capture.policy = policy
         starting = true
         abandoned = false
         discardRequested = false
@@ -144,6 +146,15 @@ final class TalkRecorder: ObservableObject {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    /// Reads what Talk has transcribed so far, while recording. Voice mode
+    /// streams it into the composer; `finish()` still waits for all of it.
+    func refreshTranscript() async {
+        guard phase == .recording, let id = recordingId, let detail = try? await client.recording(id),
+            recordingId == id, phase == .recording
+        else { return }
+        transcript = detail.transcript
     }
 
     /// Stops capture and waits for Talk to transcribe every segment.
@@ -350,10 +361,8 @@ final class SegmentCapture: @unchecked Sendable {
     private var peakRMS: Float = 0
     private var lastAudioAt = Date()
 
-    // Talk's default policy: 25s target, 40s hard max, 350ms of quiet counts as a pause.
-    private let targetMs = 25_000.0
-    private let maxMs = 40_000.0
-    private let pauseMs = 350.0
+    /// Set before `start`; read on the capture queue.
+    var policy = SegmentPolicy.talk
 
     func start(journal: TalkCaptureJournal, session: TalkCaptureJournal.Session, onError: @escaping (Error) -> Void, onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) throws {
         self.journal = journal
@@ -495,7 +504,7 @@ final class SegmentCapture: @unchecked Sendable {
         onLevel?(tracker.level)
 
         let elapsedMs = Double(segmentFrames) / format.sampleRate * 1000
-        if elapsedMs >= maxMs || (elapsedMs >= targetMs && quietMs >= pauseMs) {
+        if policy.shouldCut(elapsedMs: elapsedMs, quietMs: quietMs) {
             closeSegment()
             do { try openSegment() } catch { onError?(error) }
         }
@@ -535,6 +544,25 @@ final class SegmentCapture: @unchecked Sendable {
         var sum: Float = 0
         for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
         return (sum / Float(buffer.frameLength)).squareRoot()
+    }
+}
+
+/// When to close one audio segment and open the next: at a pause once it
+/// reaches the target length, or at the hard maximum. Talk's `SegmentPolicy`
+/// (packages/bb-studio/src/talk/ui/segmenter.ts).
+struct SegmentPolicy: Equatable, Sendable {
+    var targetMs: Double
+    var maxMs: Double
+    /// How long the level must stay low to count as a pause.
+    var pauseMs: Double
+
+    /// Talk's default: 25s target, 40s hard max, 350ms of quiet counts as a pause.
+    static let talk = SegmentPolicy(targetMs: 25_000, maxMs: 40_000, pauseMs: 350)
+    /// Voice mode's dictations, a phrase at a time (`VOICE_SEGMENT_POLICY`).
+    static let voice = SegmentPolicy(targetMs: 2_500, maxMs: 8_000, pauseMs: 300)
+
+    func shouldCut(elapsedMs: Double, quietMs: Double) -> Bool {
+        elapsedMs >= maxMs || (elapsedMs >= targetMs && quietMs >= pauseMs)
     }
 }
 

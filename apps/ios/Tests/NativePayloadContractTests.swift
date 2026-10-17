@@ -45,6 +45,33 @@ final class NativePayloadContractTests: XCTestCase {
     }
 
 
+    func testVoiceModePayloads() async throws {
+        let state = try await client("voice-state").voiceState("thr_voice")
+        XCTAssertEqual(state.on, true)
+        XCTAssertEqual(state.conversational, true)
+        let set = try await client("voice-set").setVoice("thr_voice", on: true)
+        XCTAssertEqual(set.speechProblem, "No OpenRouter key.")
+        let conversational = try await client("voice-conversational").setVoiceConversational("thr_voice", on: false)
+        XCTAssertEqual(conversational.conversational, false)
+        let inProject = try await client("voice-new").newVoiceChat(projectId: "proj_contract")
+        XCTAssertEqual(inProject, "thr_voice")
+        let personal = try await client("voice-new-personal").newVoiceChat(projectId: nil)
+        XCTAssertEqual(personal, "thr_voice")
+    }
+
+    func testSpeechPayloads() async throws {
+        let settings = try await client("speech-state").speechSettings()
+        XCTAssertEqual(settings.speed, 1.5)
+        XCTAssertEqual(settings.engines?.count, 3)
+        let updated = try await client("speech-update").updateSpeech(VoiceRequests.update(speed: 1.5))
+        XCTAssertEqual(updated.voice, "alloy")
+        let models = try await client("speech-models").speechModels()
+        XCTAssertEqual(models.first?.voiceNames?["verse"], "Verse")
+        XCTAssertNil(models.last?.voices)
+        let url = try await client("speech-prepare").prepareSpeech("Hello there.")
+        XCTAssertEqual(url.absoluteString, "https://contracts.invalid/api/v1/plugins/studio/http/speech/audio?key=0123456789abcdef0123456789abcdef01234567")
+    }
+
     func testChatStartEnvelope() async throws {
         let chatClient = try client("chat-start")
         let thread = try await chatClient.startStudioChat(pluginId: "pages", itemId: "pg_contract", projectId: "proj_contract", text: "Discuss")

@@ -169,10 +169,10 @@ struct BotTab: View {
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if let id = bot.lead.threadId {
-                Button { model.startVoiceChat(threadId: id) } label: { Image(systemName: "phone.fill") }
-                    .accessibilityLabel("Talk to \(bot.name)")
-                    .accessibilityHint("Starts a hands-free voice chat")
+            if bot.lead.threadId != nil {
+                Button { model.startVoiceChat() } label: { Image(systemName: "phone.fill") }
+                    .accessibilityLabel("New voice chat")
+                    .accessibilityHint("Starts a voice chat that can hand work to \(bot.name)")
             }
             Button { sheet = .activity } label: {
                 Image(systemName: needsYou > 0 ? "bell.badge.fill" : "bell")

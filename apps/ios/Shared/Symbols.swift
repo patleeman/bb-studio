@@ -4,7 +4,7 @@ import Foundation
 enum Symbols {
     /// A BB thread.
     static let thread = "bubble.left.and.text.bubble.right"
-    /// Hands-free voice chat with a thread, distinct from a recording's `waveform` and dictation's `mic`.
+    /// A new voice chat (a thread whose replies are spoken), distinct from a recording's `waveform` and dictation's `mic`.
     static let voiceChat = "waveform.and.person.filled"
     /// Starting a new thread.
     static let newThread = "square.and.pencil"

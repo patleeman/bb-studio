@@ -59,7 +59,6 @@ enum Sheet: Identifiable, Hashable {
     case capture
     case dictation(threadId: String?, autoStart: Bool)
     case recording
-    case voiceChat(threadId: String)
     case write
 
     var id: String {
@@ -67,7 +66,6 @@ enum Sheet: Identifiable, Hashable {
         case .capture: "capture"
         case .dictation(let threadId, _): "dictation:\(threadId ?? "")"
         case .recording: "recording"
-        case .voiceChat(let threadId): "voice:\(threadId)"
         case .write: "write"
         }
     }
@@ -106,7 +104,7 @@ final class AppModel: ObservableObject {
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
     @Published var replyThreadId: String?
 
-    /// The last thread opened, so the action button can resume a voice chat with it.
+    /// The last thread opened.
     var lastThreadId: String {
         get { UserDefaults.standard.string(forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) }
@@ -168,13 +166,16 @@ final class AppModel: ObservableObject {
 
     /// The socket keeps the radio awake, and nothing shows its updates in the
     /// background: close it there and reconnect (which refetches) on return.
-    /// Voice chat keeps it, since it waits on replies with the screen locked.
+    /// An open thread in voice mode keeps it, since it waits on replies to speak
+    /// with the screen locked, until it has been quiet a while.
     func scenePhaseChanged(_ phase: ScenePhase) {
         switch phase {
         case .background:
-            if case .voiceChat = sheet { return }
+            let realtime = realtime
+            if VoiceBackground.shared.enteredBackground(release: { realtime.stop() }) { return }
             realtime.stop()
         case .active:
+            VoiceBackground.shared.becameActive()
             realtime.start()
         default:
             break
@@ -217,7 +218,7 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
-        case "voice": startVoiceChat(threadId: id)
+        case "voice": if let id { openWithVoice(id) } else { startVoiceChat() }
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)
@@ -289,11 +290,38 @@ final class AppModel: ObservableObject {
         tab = .bot
     }
 
-    func startVoiceChat(threadId: String? = nil) {
-        guard let id = threadId ?? (lastThreadId.isEmpty ? nil : lastThreadId) else {
-            tab = .inbox
-            return
+    /// Set while `voice.new` runs, so a second tap doesn't start a second chat.
+    @Published private(set) var startingVoiceChat = false
+
+    /// A new voice chat (Studio's `voice.new`): a thread on a fast model with
+    /// voice mode on, whose agent greets you. Opens it; without a project it
+    /// goes in BB's personal project, as on desktop.
+    func startVoiceChat(projectId: String? = nil) {
+        guard !startingVoiceChat else { return }
+        startingVoiceChat = true
+        sheet = nil
+        let client = client
+        Task {
+            defer { startingVoiceChat = false }
+            do {
+                let threadId = try await client.newVoiceChat(projectId: projectId)
+                guard client.baseURL == serverURL else { return }
+                ThreadVoice.startedOn.insert(threadId)
+                openThread(threadId)
+            } catch {
+                flash("Couldn't start a voice chat: \(BBClient.describe(error, plugin: "Studio", server: client.baseURL))")
+            }
         }
-        sheet = .voiceChat(threadId: id)
+    }
+
+    /// `bbstudio://voice/<id>`: the thread, with voice mode turned on.
+    func openWithVoice(_ threadId: String) {
+        sheet = nil
+        let client = client
+        Task {
+            if (try? await client.setVoice(threadId, on: true))?.on == true { ThreadVoice.startedOn.insert(threadId) }
+            guard client.baseURL == serverURL else { return }
+            openThread(threadId)
+        }
     }
 }

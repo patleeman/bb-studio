@@ -369,20 +369,24 @@ extension BBClient {
     }
 
     @discardableResult
-    public func send(_ threadId: String, text: String, attachments: [JSONValue], mentions: [Mention] = []) async throws
-        -> SendResult
+    /// `agentNote` goes along as an agent-only item: the agent reads it, the transcript doesn't show it.
+    public func send(_ threadId: String, text: String, attachments: [JSONValue], mentions: [Mention] = [], agentNote: String? = nil)
+        async throws -> SendResult
     {
-        var body: [String: JSONValue] = ["input": Self.input(text, attachments, mentions), "mode": "queue-if-active"]
+        var body: [String: JSONValue] = ["input": Self.input(text, attachments, mentions, agentNote: agentNote), "mode": "queue-if-active"]
         PermissionMode.apply(threadId, to: &body, serverURL: baseURL)
         let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
         PermissionMode.sent(threadId, body, serverURL: baseURL)
         return result
     }
 
-    static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = []) -> JSONValue {
+    static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = [], agentNote: String? = nil) -> JSONValue {
         var input = attachments
         if !text.isEmpty {
             input.append(["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))])
+        }
+        if let agentNote, !agentNote.isEmpty {
+            input.append(["type": "text", "text": .string(agentNote), "mentions": [], "visibility": "agent-only"])
         }
         return .array(input)
     }

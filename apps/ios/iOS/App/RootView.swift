@@ -58,8 +58,6 @@ struct RootView: View {
                 DictationView(threadId: threadId, autoStart: autoStart)
             case .recording:
                 DictationView(threadId: nil, autoStart: true, kind: "recording")
-            case .voiceChat(let threadId):
-                VoiceChatView(threadId: threadId)
             case .write:
                 QuickWriteView()
             }

@@ -1,13 +1,9 @@
-import AVFoundation
 import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var app: AppModel
     @State private var serverURL = ""
     @State private var status: String?
-    @AppStorage(VoiceChatEngine.voiceKey) private var voiceId = ""
-    @AppStorage(VoiceChatEngine.rateKey) private var rate = 1.08
-    @State private var preview = AVSpeechSynthesizer()
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @ObservedObject private var audioOutbox = TalkOutbox.shared
     @State private var confirmingLegacyUpload = false
@@ -90,32 +86,25 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section {
-                Picker("Voice", selection: $voiceId) {
-                    Text("Best installed").tag("")
-                    ForEach(VoiceChatEngine.voices, id: \.identifier) { voice in
-                        Text("\(voice.name)\(Self.quality(voice))").tag(voice.identifier)
+            if runningPlugins.split(separator: ",").contains("studio") {
+                Section {
+                    NavigationLink { SpeechSettingsView() } label: {
+                        Label("Voice", systemImage: "speaker.wave.2")
                     }
+                    .accessibilityIdentifier("settingsVoice")
+                    Button { app.startVoiceChat() } label: {
+                        Label("New Voice Chat", systemImage: Symbols.voiceChat)
+                    }
+                } header: {
+                    Text("Voice").foregroundStyle(Color.primary.opacity(0.75))
+                } footer: {
+                    Text("Replies in voice threads are spoken in Studio's voice. Turn voice mode on in any thread with the speaker beside the mic.")
+                        .foregroundStyle(Color.primary.opacity(0.75))
                 }
-                LabeledContent("Speed") {
-                    Slider(value: $rate, in: 0.8...1.5, step: 0.05)
-                }
-                Button("Preview") {
-                    let utterance = AVSpeechUtterance(string: "Hi, this is how BB sounds in voice chat.")
-                    utterance.voice = voiceId.isEmpty ? VoiceChatEngine.voices.first : AVSpeechSynthesisVoice(identifier: voiceId)
-                    utterance.rate = AVSpeechUtteranceDefaultSpeechRate * Float(rate)
-                    preview.stopSpeaking(at: .immediate)
-                    preview.speak(utterance)
-                }
-            } header: {
-                Text("Voice chat").foregroundStyle(Color.primary.opacity(0.75))
-            } footer: {
-                Text("Download Premium or Enhanced voices in Settings → Accessibility → Spoken Content → Voices. Talk over BB to interrupt it.")
-                    .foregroundStyle(Color.primary.opacity(0.75))
             }
             Section("Action button") {
                 Text(
-                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, Voice chat with BB, or Open BB thread."
+                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, New voice chat with BB, or Open BB thread."
                 )
                 .font(.footnote)
             }
@@ -144,14 +133,6 @@ struct SettingsView: View {
             }
         } message: {
             Text("Continue only if these recordings were created on this server. To use another server, cancel and save its URL first.")
-        }
-    }
-
-    private static func quality(_ voice: AVSpeechSynthesisVoice) -> String {
-        switch voice.quality {
-        case .premium: " · Premium"
-        case .enhanced: " · Enhanced"
-        default: ""
         }
     }
 

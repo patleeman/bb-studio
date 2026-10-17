@@ -125,5 +125,184 @@
     "output": {
       "threadId": "thr_chat"
     }
+  },
+  {
+    "id": "voice-state",
+    "plugin": "studio",
+    "method": "voice.state",
+    "input": {
+      "threadId": "thr_voice"
+    },
+    "output": {
+      "on": true,
+      "pending": [],
+      "speechProblem": null,
+      "conversational": true
+    }
+  },
+  {
+    "id": "voice-set",
+    "plugin": "studio",
+    "method": "voice.set",
+    "input": {
+      "threadId": "thr_voice",
+      "on": true
+    },
+    "output": {
+      "on": true,
+      "pending": [],
+      "speechProblem": "No OpenRouter key.",
+      "conversational": true
+    }
+  },
+  {
+    "id": "voice-conversational",
+    "plugin": "studio",
+    "method": "voice.conversational",
+    "input": {
+      "threadId": "thr_voice",
+      "on": false
+    },
+    "output": {
+      "on": true,
+      "pending": [],
+      "speechProblem": null,
+      "conversational": false
+    }
+  },
+  {
+    "id": "voice-new",
+    "plugin": "studio",
+    "method": "voice.new",
+    "input": {
+      "projectId": "proj_contract"
+    },
+    "output": {
+      "threadId": "thr_voice"
+    }
+  },
+  {
+    "id": "voice-new-personal",
+    "plugin": "studio",
+    "method": "voice.new",
+    "input": {},
+    "output": {
+      "threadId": "thr_voice"
+    }
+  },
+  {
+    "id": "speech-state",
+    "plugin": "studio",
+    "method": "speech.state",
+    "input": null,
+    "output": {
+      "engine": "openrouter",
+      "engines": [
+        {
+          "id": "openrouter",
+          "label": "OpenRouter"
+        },
+        {
+          "id": "custom",
+          "label": "Custom endpoint"
+        },
+        {
+          "id": "local",
+          "label": "Local (this Mac)"
+        }
+      ],
+      "model": "openai/gpt-4o-mini-tts",
+      "voice": "alloy",
+      "instructions": "",
+      "speed": 1.5,
+      "endpoint": "",
+      "openRouterKey": true,
+      "problem": null,
+      "local": {
+        "state": "not-installed",
+        "installed": false,
+        "detail": null,
+        "log": [],
+        "url": null
+      }
+    }
+  },
+  {
+    "id": "speech-update",
+    "plugin": "studio",
+    "method": "speech.update",
+    "input": {
+      "speed": 1.5
+    },
+    "output": {
+      "engine": "openrouter",
+      "engines": [
+        {
+          "id": "openrouter",
+          "label": "OpenRouter"
+        },
+        {
+          "id": "custom",
+          "label": "Custom endpoint"
+        },
+        {
+          "id": "local",
+          "label": "Local (this Mac)"
+        }
+      ],
+      "model": "openai/gpt-4o-mini-tts",
+      "voice": "alloy",
+      "instructions": "",
+      "speed": 1.5,
+      "endpoint": "",
+      "openRouterKey": true,
+      "problem": null,
+      "local": {
+        "state": "not-installed",
+        "installed": false,
+        "detail": null,
+        "log": [],
+        "url": null
+      }
+    }
+  },
+  {
+    "id": "speech-models",
+    "plugin": "studio",
+    "method": "speech.models",
+    "input": null,
+    "output": {
+      "models": [
+        {
+          "id": "openai/gpt-4o-mini-tts",
+          "name": "GPT-4o mini TTS",
+          "pricePerMillionChars": 12,
+          "voices": [
+            "alloy",
+            "verse"
+          ],
+          "voiceNames": {
+            "alloy": "Alloy",
+            "verse": "Verse"
+          }
+        },
+        {
+          "id": "other/tts",
+          "name": "Other",
+          "voices": null
+        }
+      ]
+    }
+  },
+  {
+    "id": "speech-prepare",
+    "plugin": "studio",
+    "method": "speech.prepare",
+    "input": {
+      "text": "Hello there."
+    },
+    "output": {
+      "url": "/api/v1/plugins/studio/http/speech/audio?key=0123456789abcdef0123456789abcdef01234567"
+    }
   }
 ]

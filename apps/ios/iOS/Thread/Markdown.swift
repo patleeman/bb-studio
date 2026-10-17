@@ -13,29 +13,35 @@ struct MarkdownText: View {
         self.source = source
     }
 
+    /// The piece of this message being spoken, set only on that message (voice mode's read-along).
+    @Environment(\.readAlongPiece) private var readAlongPiece
+
     var body: some View {
+        let blocks = MarkdownBlock.parse(source)
+        // Only the message being read aloud does this work; the cached text stays as it is.
+        let readAlong = readAlongPiece.flatMap { ReadAlongBlocks(piece: $0, blocks: blocks) }
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(MarkdownBlock.parse(source).enumerated()), id: \.offset) { _, block in
-                view(for: block)
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                view(for: block, at: index, readAlong: readAlong)
             }
         }
     }
 
     @ViewBuilder
-    private func view(for block: MarkdownBlock) -> some View {
+    private func view(for block: MarkdownBlock, at index: Int, readAlong: ReadAlongBlocks?) -> some View {
         switch block {
         case .heading(let level, let text):
-            Text(Self.inline(text))
+            Text(ReadAlongBlocks.text(text, block: index, in: readAlong))
                 .font(level == 1 ? .title3.bold() : level == 2 ? .headline : .subheadline.bold())
                 .padding(.top, 4)
         case .paragraph(let text):
-            Text(Self.inline(text))
+            Text(ReadAlongBlocks.text(text, block: index, in: readAlong))
         case .list(let items):
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(items.enumerated()), id: \.offset) { itemIndex, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         marker(item)
-                        Text(Self.inline(item.text))
+                        Text(ReadAlongBlocks.text(item.text, block: index, item: itemIndex, in: readAlong))
                     }
                     .padding(.leading, CGFloat(item.level) * 18)
                 }
@@ -128,6 +134,53 @@ struct MarkdownText: View {
             }
         }
         return attributed
+    }
+}
+
+extension EnvironmentValues {
+    /// The text being spoken now, for the message it comes from.
+    @Entry var readAlongPiece: String?
+}
+
+/// Read-along across a message's blocks: the piece being spoken, lit up in
+/// the paragraphs, headings and list items that hold it.
+@MainActor
+struct ReadAlongBlocks {
+    private struct Key: Hashable { var block: Int, item: Int }
+    private var ranges: [Key: Range<Int>] = [:]
+
+    init?(piece: String, blocks: [MarkdownBlock]) {
+        var keys: [Key] = []
+        var texts: [String] = []
+        for (index, block) in blocks.enumerated() {
+            switch block {
+            case .heading(_, let text), .paragraph(let text):
+                keys.append(Key(block: index, item: 0))
+                texts.append(String(MarkdownText.inline(text).characters))
+            case .list(let items):
+                for (item, entry) in items.enumerated() {
+                    keys.append(Key(block: index, item: item))
+                    texts.append(String(MarkdownText.inline(entry.text).characters))
+                }
+            default:
+                continue
+            }
+        }
+        guard let match = ReadAlong.Match(piece: piece, texts: texts) else { return nil }
+        for (position, range) in match.ranges { ranges[keys[position]] = range }
+    }
+
+    /// The block's text, with the part being spoken lit up.
+    static func text(_ source: String, block: Int, item: Int = 0, in readAlong: ReadAlongBlocks?) -> AttributedString {
+        let text = MarkdownText.inline(source)
+        guard let range = readAlong?.ranges[Key(block: block, item: item)] else { return text }
+        var lit = text
+        let characters = lit.characters
+        guard range.upperBound <= characters.count else { return text }
+        let start = characters.index(characters.startIndex, offsetBy: range.lowerBound)
+        let end = characters.index(start, offsetBy: range.count)
+        lit[start..<end].backgroundColor = Color.accentColor.opacity(0.22)
+        return lit
     }
 }
 

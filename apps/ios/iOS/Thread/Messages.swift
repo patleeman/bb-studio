@@ -13,6 +13,10 @@ struct MessageBubble: View {
     var edit: ((String) -> Void)?
     /// Saves the files this reply produced to Studio; nil without the artifacts plugin.
     var saveFiles: ((Int?) -> Void)?
+    /// Reads the message aloud in Studio's voice, or stops it; nil without voice mode.
+    var readAloud: ((String) -> Void)?
+    /// This message is being read aloud now.
+    var reading = false
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -82,6 +86,11 @@ struct MessageBubble: View {
             Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
         }
         ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
+        if let readAloud {
+            Button { readAloud(plainText) } label: {
+                Label(reading ? "Stop Reading" : "Read Aloud", systemImage: reading ? "stop.circle" : "play.circle")
+            }
+        }
         if !row.isUser, let saveFiles {
             Button { saveFiles(row.sourceSeqEnd.map { Int($0) }) } label: {
                 Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")

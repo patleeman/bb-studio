@@ -62,17 +62,15 @@ struct DictateIntent: AppIntent {
     }
 }
 
+/// Kept under its old type name so shortcuts people made still run.
 struct VoiceChatIntent: AppIntent {
-    static let title: LocalizedStringResource = "Voice chat with BB"
-    static let description = IntentDescription("Talk hands-free with a thread. Defaults to the last thread you opened.")
+    static let title: LocalizedStringResource = "New voice chat with BB"
+    static let description = IntentDescription("Start a new voice chat: a thread whose replies are spoken, which can hand work to your Bot.")
     static let openAppWhenRun = true
-
-    @Parameter(title: "Thread")
-    var thread: ThreadEntity?
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.startVoiceChat(threadId: try thread?.threadId(on: AppModel.shared.serverURL))
+        AppModel.shared.startVoiceChat()
         return .result()
     }
 }
@@ -123,7 +121,7 @@ struct AskBBIntent: AppIntent {
         guard client.baseURL == ServerScope.selectedURL else {
             return .result(value: "", dialog: "The server changed. Your message was sent to the original server.")
         }
-        let spoken = VoiceChatEngine.speakable(reply)
+        let spoken = Speakable.text(reply)
         let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
         return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
     }
@@ -197,7 +195,7 @@ struct TellChiefIntent: AppIntent {
         guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
             return .result(value: "", dialog: "Sent. Your bot is still working, and you'll get a notification when it's done.")
         }
-        let spoken = VoiceChatEngine.speakable(reply)
+        let spoken = Speakable.text(reply)
         let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
         return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
     }
@@ -236,7 +234,7 @@ struct BBShortcuts: AppShortcutsProvider {
             intent: DictateIntent(), phrases: ["Dictate to \(.applicationName)"], shortTitle: "Dictate",
             systemImageName: "mic.fill")
         AppShortcut(
-            intent: VoiceChatIntent(), phrases: ["Voice chat with \(.applicationName)"], shortTitle: "Voice chat",
+            intent: VoiceChatIntent(), phrases: ["Voice chat with \(.applicationName)", "New voice chat in \(.applicationName)"], shortTitle: "Voice chat",
             systemImageName: "waveform.and.person.filled")
         AppShortcut(
             intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",

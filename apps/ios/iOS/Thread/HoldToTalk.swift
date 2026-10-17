@@ -13,6 +13,10 @@ final class HoldToTalk: ObservableObject {
     @Published private(set) var startedAt: Date?
     @Published private(set) var level: Float = 0
     @Published var error: String?
+    /// What Talk has heard so far, while talking in voice mode.
+    @Published private(set) var heard = ""
+    /// Voice mode: short segments, and `heard` follows the transcript while you talk.
+    var voice = false
 
     private let recorder = TalkRecorder(client: AppModel.shared.client)
     private var starting: Task<Void, Never>?
@@ -44,15 +48,27 @@ final class HoldToTalk: ObservableObject {
         error = nil
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         startReturned = false
+        heard = ""
+        let voice = voice
         starting = Task { [weak self] in
             guard let self else { return }
-            await recorder.start(kind: "dictation", threadId: threadId)
+            await recorder.start(kind: "dictation", threadId: threadId, policy: voice ? .voice : .talk)
             startReturned = true
         }
         watching = Task { [weak self] in
+            var ticks = 0
             while let self, !Task.isCancelled, self.isActive {
                 self.startedAt = self.recorder.startedAt
                 self.level = self.recorder.level
+                ticks += 1
+                // About once a second: segments are cut every few seconds in voice mode.
+                if voice, ticks % 10 == 0 {
+                    Task { [weak self] in
+                        guard let self else { return }
+                        await self.recorder.refreshTranscript()
+                        if self.isActive { self.heard = self.recorder.transcript }
+                    }
+                }
                 // No microphone (permission, storage, the session): say so now, not when the hand lets go.
                 if self.startReturned, case .failed(let message) = self.recorder.phase {
                     self.error = message
@@ -151,6 +167,7 @@ final class HoldToTalk: ObservableObject {
         state = .idle
         startedAt = nil
         level = 0
+        heard = ""
     }
 }
 
