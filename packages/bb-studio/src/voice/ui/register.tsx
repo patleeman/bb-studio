@@ -1,7 +1,7 @@
 // Voice mode in BB's own thread view (round 3a of the "Voice mode in a
 // thread" design). Beside the composer's mic: a speaker button that turns
 // voice mode on for the thread, and a small pill that shows who's talking with
-// a live level: you (red dot, time, "Listening") or the agent ("Speaking",
+// a live level and no words beside the controls: you (red dot, time) or the agent (its level,
 // Stop). While you talk, your words stream into the input phrase by phrase and
 // are sent when you finish; while the agent speaks, the piece being read
 // lights up in the transcript. New voice chat starts a thread with it on.
@@ -179,16 +179,14 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
   return (
     <>
       {on && listening ? (
-        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 pr-1 text-xs text-muted-foreground" role="status" aria-live="polite">
+        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 pr-1 text-xs text-muted-foreground" role="status" aria-live="polite" aria-label="Listening" title="Listening">
           <span aria-hidden className="size-1.5 rounded-full bg-red-500" />
           <Elapsed recordedMs={talkState.recordedMs} since={talkState.captureStartedAt} />
           <Wave level={() => talk.level()} className="bg-sky-400" />
-          <span className="max-sm:hidden">Listening</span>
         </span>
       ) : on && speaking ? (
-        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 text-xs text-muted-foreground" role="status" aria-live="polite" aria-label={snapshot.playing === "loading" ? "Getting ready to speak" : "Speaking"} title={snapshot.playing === "loading" ? "Getting ready to speak" : "Speaking"}>
           <Wave level={() => voicePlayer.level()} className="bg-primary" />
-          <span className="max-sm:hidden">{snapshot.playing === "loading" ? "Getting ready" : "Speaking"}</span>
           <Tooltip label="Speed" side="top">
             <button type="button" aria-label={`Speed ${speed}×, change`} className="inline-flex h-8 min-w-9 shrink-0 items-center justify-center rounded-md px-1.5 text-xs font-medium tabular-nums text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={() => changeSpeed(nextSpeed(speed))}>
               {speed}×

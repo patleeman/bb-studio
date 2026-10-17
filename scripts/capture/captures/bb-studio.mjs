@@ -532,7 +532,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await bbCli(["thread", "tell", threadId, "In one sentence: what's a good name for a release about offline mode?"]);
       await sleep(4000);
       await client.waitForAriaButton("Stop speaking", 180000);
-      await client.waitForText("Speaking", 30000);
+      await client.waitForSelector('[role="status"][aria-label="Speaking"]', 30000);
       await sleep(600);
       return async () => {
         await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`).catch(() => {});

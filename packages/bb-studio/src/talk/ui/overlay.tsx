@@ -204,6 +204,12 @@ function statusLabel(state: TalkState, online: boolean): string {
   }
 }
 
+/** Plain capturing needs no words beside the controls: the red dot, clock and meter say it. Anything else (paused, offline, failed) is still said. */
+function visibleStatus(state: TalkState, online: boolean): string {
+  const routine = (state.phase === "recording" || state.phase === "starting") && online && state.pendingUploads <= 1;
+  return routine ? "" : statusLabel(state, online);
+}
+
 export function TalkOverlay() {
   useControllerWiring();
   const state = useTalkState();
@@ -283,7 +289,7 @@ export function TalkOverlay() {
           aria-expanded={expanded}
           className={cn("flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground", dock && "min-w-6")}
         >
-          <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{statusLabel(state, online)}</span>
+          {visibleStatus(state, online) ? <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{visibleStatus(state, online)}</span> : <span className="sr-only">{statusLabel(state, online)}</span>}
           <Icon name={expanded ? "ChevronUp" : "ChevronDown"} className="size-3.5 shrink-0" />
         </button>
         {state.uploadError && online ? (
