@@ -472,6 +472,49 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
+    // Setup → Speech on local voices: Studio installs mlx-audio into the
+    // staged BB's data folder, starts its server, and plays a Kokoro sample.
+    // Needs an Apple silicon Mac with uv; the first sample downloads Kokoro.
+    id: "studio-speech-local",
+    packageDir: "bb-studio",
+    fileName: "speech-local.png",
+    setup: async (client) => {
+      await pluginRpc("studio", "speech.update", { engine: "local", instructions: "" });
+      await pluginRpc("studio", "speech.local", { action: "install" });
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Set up BB Studio", 30000);
+      await client.waitForText("On this Mac (local)");
+      await client.waitForText("Running", 10 * 60_000);
+      await client.waitForText("Kokoro · fast", 30000);
+      await client.waitForText("af_heart");
+      const sampleButton = `[...document.querySelectorAll('section[aria-label="Speech"] button')].find((button) => /^(Play sample|Loading… \\(stop\\)|Stop)$/.test(button.textContent.trim()) && button.closest('.flex-col')?.querySelector('textarea'))`;
+      await client.evaluate(`(() => {
+        const section = document.querySelector('section[aria-label="Speech"]');
+        if (section.querySelector(".text-destructive")) throw new Error("Speech shows an error: " + section.querySelector(".text-destructive").textContent);
+        section.scrollIntoView({ block: "start" });
+        ${sampleButton}.click();
+        return true;
+      })()`);
+      // Kokoro downloads (0.4 GB) on the first sample; then it plays.
+      const started = Date.now();
+      while ((await client.poll(`${sampleButton}?.textContent.trim()`)) !== "Stop") {
+        const error = await client.poll(`document.querySelector('section[aria-label="Speech"] .text-destructive')?.textContent`);
+        if (error) throw new Error(`Speech shows an error: ${error}`);
+        if (Date.now() - started > 5 * 60_000) throw new Error("The local sample never started playing");
+        await sleep(250);
+      }
+      await sleep(400);
+      return async () => {
+        await client.evaluate(`${sampleButton}?.click()`).catch(() => {});
+        await pluginRpc("studio", "speech.update", { engine: "openrouter" });
+      };
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const box = document.querySelector('section[aria-label="Speech"]').getBoundingClientRect();
+      return { x: Math.max(0, box.left - 24), y: Math.max(0, box.top - 24), width: box.width + 48, height: box.height + 48, scale: 2 };
+    })()`),
+  },
+  {
     // Studio → Voice: a real session on GPT-6-Luna (Codex's fast tier), asked
     // a question, its reply spoken with Speech. Needs Codex signed in and
     // OPENROUTER_API_KEY in the staged BB's environment.

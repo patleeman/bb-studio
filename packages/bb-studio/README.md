@@ -1905,6 +1905,14 @@ model list) and its voice `george`, a delivery line, and the sample playing
 (its button reads **Stop**). Recapture with `BB_CAPTURE_ONLY=studio-speech`;
 it needs `OPENROUTER_API_KEY` set when the staged BB starts.
 
+![Live BB screenshot of Setup → Speech with the local engine running Kokoro and playing a sample](assets/speech-local.png)
+
+The same section on local voices, from a staged BB on an Apple silicon Mac:
+Studio installed mlx-audio into the staged data folder, its server reads
+**Running**, Kokoro and `af_heart` are picked, and the sample is playing.
+Recapture with `BB_CAPTURE_ONLY=studio-speech-local` (needs uv; the first
+sample downloads Kokoro).
+
 - **Engines.** Every engine speaks OpenAI's `POST /audio/speech` request, so
   one adapter covers them all:
   - **OpenRouter** (default) reaches every hosted speech model with one key:
