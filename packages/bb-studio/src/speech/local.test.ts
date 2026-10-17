@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { localEngine, type LocalSpeechServer } from "./engines";
 import {
-  DEFAULT_LOCAL_MODEL, findUv, freePort, installCommands, LOCAL_MODELS, LOCAL_PACKAGES, localPaths, localSupport,
+  DEFAULT_LOCAL_MODEL, espeakShim, findUv, freePort, installCommands, LOCAL_MODELS, LOCAL_PACKAGES, localPaths, localSupport,
   LocalVoice, restartDelay, serverCommand, UV_MISSING, type Command, type LocalProcess,
 } from "./local";
 import { modelForEngine } from "./settings";
@@ -115,6 +115,16 @@ describe("local voices", () => {
     expect(server.command).toBe("/data/speech-local/venv/bin/mlx_audio.server");
     expect(server.args).toEqual(["--host", "127.0.0.1", "--port", "40123", "--log-dir", "/data/speech-local/logs"]);
     expect(server.env?.HF_HOME).toBe("/data/speech-local/hf");
+  });
+
+  it("copies espeak-ng's data to a short path only when the venv is too deep for it", () => {
+    expect(espeakShim(localPaths("/Users/me/.bb/plugins/studio/speech-local"), "/Users/me")).toBeNull();
+    const deep = localPaths("/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-staged/data/plugins/studio/speech-local");
+    const shim = espeakShim(deep, "/Users/me")!;
+    expect(shim.source).toBe(`${deep.venv}/lib/python3.12/site-packages/espeakng_loader/espeak-ng-data`);
+    expect(shim.copy).toMatch(/^\/Users\/me\/\.cache\/bb-studio\/espeak-[0-9a-f]{8}\/espeak-ng-data$/);
+    expect(shim.pth).toBe(`${deep.venv}/lib/python3.12/site-packages/bb_studio_espeak.pth`);
+    expect(shim.code).toContain(`espeakng_loader.get_data_path = lambda: "${shim.copy}"`);
   });
 
   it("backs off restarts up to a minute", () => {

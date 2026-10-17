@@ -6,10 +6,11 @@
 import { spawn as spawnChild } from "node:child_process";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { SpeechNotSetUpError, type LocalSpeechServer, type SpeechModel } from "./engines";
 
@@ -79,6 +80,7 @@ export interface LocalPaths {
   logs: string;
   /** Written after a whole install, with what was installed. */
   marker: string;
+  sitePackages: string;
   pid: string;
 }
 
@@ -92,6 +94,7 @@ export function localPaths(root: string): LocalPaths {
     hfHome: join(root, "hf"),
     logs: join(root, "logs"),
     marker: join(root, "installed.json"),
+    sitePackages: join(venv, "lib", `python${PYTHON_VERSION}`, "site-packages"),
     pid: join(root, "server.pid"),
   };
 }
@@ -110,6 +113,36 @@ export function serverCommand(paths: LocalPaths, port: number): Command {
     command: paths.server,
     args: ["--host", "127.0.0.1", "--port", String(port), "--log-dir", paths.logs],
     env: { HF_HOME: paths.hfHome, HF_HUB_DISABLE_TELEMETRY: "1", PYTHONUNBUFFERED: "1" },
+  };
+}
+
+/**
+ * espeak-ng, which Kokoro asks about words it doesn't know, can't open its
+ * data on a path of 160 characters or more and then the server answers with
+ * no audio. When the venv's copy is that deep, Studio copies it (19 MB) to a
+ * short path and points espeakng_loader there with a .pth file run at
+ * startup. A symlink doesn't do: espeak-ng resolves it to the long path.
+ * Null when the path is short enough.
+ */
+export function espeakShim(paths: LocalPaths, home: string = homedir()): { copy: string; source: string; pth: string; module: string; code: string } | null {
+  const data = join(paths.sitePackages, "espeakng_loader", "espeak-ng-data");
+  if (data.length < 140) return null;
+  // espeak-ng looks for a folder named espeak-ng-data.
+  const copy = join(home, ".cache", "bb-studio", `espeak-${createHash("sha256").update(paths.root).digest("hex").slice(0, 8)}`, "espeak-ng-data");
+  return {
+    copy,
+    source: data,
+    pth: join(paths.sitePackages, "bb_studio_espeak.pth"),
+    module: join(paths.sitePackages, "bb_studio_espeak.py"),
+    code: [
+      "# Written by BB Studio: espeak-ng can't open its data on a path this long, so use a copy on a short one.",
+      "try:",
+      "    import espeakng_loader",
+      `    espeakng_loader.get_data_path = lambda: ${JSON.stringify(copy)}`,
+      "except ImportError:",
+      "    pass",
+      "",
+    ].join("\n"),
   };
 }
 
@@ -334,6 +367,15 @@ export class LocalVoice implements LocalSpeechServer {
           const child = this.spawn(step, (line) => this.log(line));
           const { code, signal } = await child.exited;
           if (code !== 0) throw new Error(`${step.args.slice(0, 2).join(" ")} failed (${signal ?? `exit ${code}`}): ${this.lines.at(-1) ?? "no output"}`);
+        }
+        const shim = espeakShim(this.paths, this.deps.home);
+        if (shim && (this.deps.exists ?? existsSync)(shim.source)) {
+          await rm(shim.copy, { recursive: true, force: true });
+          await mkdir(dirname(shim.copy), { recursive: true });
+          await cp(shim.source, shim.copy, { recursive: true });
+          await writeFile(shim.module, shim.code);
+          await writeFile(shim.pth, "import bb_studio_espeak\n");
+          this.log(`Copied espeak-ng's data to ${shim.copy}; its own path is too long for it.`);
         }
         await writeFile(this.paths.marker, JSON.stringify({ packages: LOCAL_PACKAGES, at: new Date().toISOString() }, null, 2));
         this.markerCurrent = true;
