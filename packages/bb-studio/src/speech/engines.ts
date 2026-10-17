@@ -278,6 +278,8 @@ export interface SpeechConfig {
   model: string;
   voice: string;
   instructions: string;
+  /** How fast the player plays speech, 0.5 to 2.5; the audio itself is made at the model's pace. */
+  speed: number;
   openRouterApiKey: string;
   endpoint: string;
   endpointApiKey: string;

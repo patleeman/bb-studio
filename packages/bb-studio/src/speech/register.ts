@@ -57,6 +57,7 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
       model: current.model,
       voice: current.voice,
       instructions: current.instructions,
+      speed: current.speed,
       endpoint: current.endpoint,
       openRouterKey: Boolean(current.openRouterApiKey),
       problem,
@@ -91,6 +92,7 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
       if (input.voice !== undefined) values.speechVoice = input.voice;
       if (input.instructions !== undefined) values.speechInstructions = input.instructions;
       if (input.endpoint !== undefined) values.speechEndpoint = input.endpoint;
+      if (input.speed !== undefined) values.speechSpeed = input.speed;
       await settings.set(values);
       return state();
     },

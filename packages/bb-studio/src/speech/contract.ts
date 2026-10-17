@@ -23,6 +23,8 @@ export const speechStateSchema = z.object({
   model: z.string(),
   voice: z.string(),
   instructions: z.string(),
+  /** Playback speed, 0.5 to 2.5. */
+  speed: z.number(),
   endpoint: z.string(),
   /** Whether a key is set for OpenRouter (in settings or the host's environment). */
   openRouterKey: z.boolean(),
@@ -57,6 +59,7 @@ export const speechContract = defineRpcContract({
     input: z.object({
       engine: engineSchema.optional(),
       endpoint: z.string().trim().max(500).optional(),
+      speed: z.number().min(0.5).max(2.5).optional(),
       ...overrides,
     }).strict(),
     output: speechStateSchema,

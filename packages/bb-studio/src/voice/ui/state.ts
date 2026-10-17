@@ -57,15 +57,30 @@ const speaker = new Speaker(
 
 /** Composers showing a voice thread, by thread: they take a finished dictation and send it. */
 const composers = new Map<string, (text: string) => void>();
+/** The reply last started, so a second composer on the same thread (or a repeated event) doesn't start it again. */
+let lastPlayed = "";
+
+// A reload of Studio's bundle loads this module again in the same window. Only
+// the newest copy plays, and it silences the one before, so two replies never
+// talk over each other.
+const CURRENT = Symbol.for("bb-studio.voice.player");
+const current = () => (window as unknown as Record<symbol, unknown>)[CURRENT];
 
 export const voicePlayer = {
   /** Play a thread's reply, cutting off whatever was speaking; each piece lights up as it plays. */
   play(threadId: string, urls: readonly string[], pieces: readonly string[] = []): Promise<void> {
+    const key = urls.join("|");
+    if (current() !== voicePlayer || key === lastPlayed) return Promise.resolve();
+    lastPlayed = key;
     set({ threadId });
     return speaker.play(urls, (index) => { if (pieces[index]) highlightPiece(pieces[index]!); });
   },
   stop(): void {
     speaker.stop();
+  },
+  /** Playback speed for every reply from now on, and the one playing. */
+  setRate(rate: number): void {
+    speaker.setRate(rate);
   },
   isOn(threadId: string | null): boolean {
     return threadId !== null && snapshot.on[threadId] === true;
@@ -100,3 +115,7 @@ export const voicePlayer = {
 export function useVoiceSnapshot(): Snapshot {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
+
+const previous = current() as { stop(): void } | undefined;
+(window as unknown as Record<symbol, unknown>)[CURRENT] = voicePlayer;
+previous?.stop();

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { SpeechConfig, SpeechEngine, SpeechRequest } from "./engines";
 import { SpeechService } from "./service";
 
-const config: SpeechConfig = { engine: "openrouter", model: "m1", voice: "v1", instructions: "", openRouterApiKey: "sk", endpoint: "", endpointApiKey: "" };
+const config: SpeechConfig = { engine: "openrouter", model: "m1", voice: "v1", instructions: "", speed: 1, openRouterApiKey: "sk", endpoint: "", endpointApiKey: "" };
 const text = (stream: ReadableStream<Uint8Array>) => new Response(stream).text();
 
 let dir: string;

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { findPiece } from "./read-along";
-import { joinText } from "./register";
+import { joinText, nextSpeed } from "./register";
 
 describe("findPiece", () => {
   it("finds a spoken piece in rendered markdown, ignoring marks, case and spacing", () => {
@@ -20,5 +20,13 @@ describe("joinText", () => {
     expect(joinText("Also", "check the build")).toBe("Also check the build");
     expect(joinText("Also ", "check the build")).toBe("Also check the build");
     expect(joinText("Typed", "")).toBe("Typed");
+  });
+});
+
+describe("nextSpeed", () => {
+  it("steps up through the speeds and wraps back to 1", () => {
+    expect([1, 1.25, 1.5, 1.75, 2].map(nextSpeed)).toEqual([1.25, 1.5, 1.75, 2, 1]);
+    expect(nextSpeed(1.1)).toBe(1.25);
+    expect(nextSpeed(2.5)).toBe(1);
   });
 });

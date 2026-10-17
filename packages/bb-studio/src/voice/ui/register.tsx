@@ -11,6 +11,7 @@ import { useBbNavigate, useComposer, useRealtime, useRpc, useSdk, type PluginApp
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { talk, useTalkState } from "../../talk/ui/controller";
+import type { speechContract } from "../../speech/contract";
 import type { voiceContract } from "../contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "../shared";
 import { useVoiceSnapshot, voicePlayer } from "./state";
@@ -18,6 +19,34 @@ import { useVoiceSnapshot, voicePlayer } from "./state";
 const NEW_VOICE_CHAT_EVENT = "studio:new-voice-chat";
 const TOGGLE_VOICE_EVENT = "studio:toggle-voice";
 const BARS = 28;
+/** The pill's speed button steps through these. */
+export const SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
+
+/** The next speed after `speed`, back to 1 after the fastest. */
+export function nextSpeed(speed: number): number {
+  return SPEEDS.find((each) => each > speed + 0.001) ?? SPEEDS[0];
+}
+
+/** Speech's playback speed, shared with Setup → Speech; the pill's button changes it. */
+function useSpeechSpeed() {
+  const rpc = useRpc<typeof speechContract>();
+  const [speed, setSpeed] = useState(1);
+  useEffect(() => {
+    let live = true;
+    rpc.call("speech.state", null).then((state) => {
+      if (!live) return;
+      setSpeed(state.speed);
+      voicePlayer.setRate(state.speed);
+    }, () => {});
+    return () => { live = false; };
+  }, [rpc]);
+  const change = useCallback((next: number) => {
+    setSpeed(next);
+    voicePlayer.setRate(next);
+    rpc.call("speech.update", { speed: next }).catch((error: unknown) => toast.error("Couldn't save the speed", { description: errorMessage(error) }));
+  }, [rpc]);
+  return { speed, change };
+}
 
 const ACTION_BUTTON =
   "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4";
@@ -64,6 +93,7 @@ function VoiceControls() {
 
 function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerApi; threadId: string }) {
   const { on, set } = useVoiceMode(threadId);
+  const { speed, change: changeSpeed } = useSpeechSpeed();
   const snapshot = useVoiceSnapshot();
   const talkState = useTalkState();
   const sdk = useSdk();
@@ -134,6 +164,11 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
         <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 text-xs text-muted-foreground" role="status" aria-live="polite">
           <Wave level={() => voicePlayer.level()} className="bg-primary" />
           <span className="max-sm:hidden">{snapshot.playing === "loading" ? "Getting ready" : "Speaking"}</span>
+          <Tooltip label="Speed" side="top">
+            <button type="button" aria-label={`Speed ${speed}×, change`} className="inline-flex h-8 min-w-9 shrink-0 items-center justify-center rounded-md px-1.5 text-xs font-medium tabular-nums text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={() => changeSpeed(nextSpeed(speed))}>
+              {speed}×
+            </button>
+          </Tooltip>
           <Tooltip label="Stop speaking" side="top">
             <button type="button" aria-label="Stop speaking" className={ACTION_BUTTON} onClick={() => voicePlayer.stop()}>
               <Icon name="Square" className="size-3.5" />

@@ -3,6 +3,7 @@ import { Speaker, type SpeakerState } from "./speaker";
 
 class FakeAudio extends EventTarget {
   preload: "" | "none" | "auto" | "metadata" = "";
+  playbackRate = 1;
   paused = true;
   loaded = 0;
   constructor(public src: string) { super(); }
@@ -58,6 +59,18 @@ describe("Speaker", () => {
     await done;
     expect(started).toEqual([0, 1]);
     expect(clips.map((clip) => clip.src)).toEqual(["/audio/a", "/audio/b"]);
+  });
+
+  it("plays at the speed it's set to, including the piece already playing", async () => {
+    const { speaker, clips } = setup();
+    speaker.setRate(1.5);
+    const done = speaker.play(["/audio/a", "/audio/b"]);
+    await tick();
+    expect(clips.map((clip) => clip.playbackRate)).toEqual([1.5, 1.5]);
+    speaker.setRate(2);
+    expect(clips.map((clip) => clip.playbackRate)).toEqual([2, 2]);
+    speaker.stop();
+    await done;
   });
 
   it("stops at once and resolves the speech it cut off", async () => {

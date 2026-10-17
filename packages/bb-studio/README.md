@@ -1943,7 +1943,9 @@ sample downloads Kokoro).
 - **Setup → Speech** picks the engine, model (with its price per million
   characters) and voice (from the model's list, or typed in). An optional
   **Delivery** line ("Warm and calm, a little brisk") goes to models that take
-  directions. **Play sample** speaks any text, so you can choose by ear.
+  directions. **Speed** sets how fast speech plays (the browser keeps the
+  pitch; the audio itself is made at the voice's pace). **Play sample** speaks
+  any text at that speed, so you can choose by ear.
 - **Keys** are in BB Settings → Plugins → Studio: **OpenRouter API key**
   (falls back to `OPENROUTER_API_KEY` on the BB host) and the custom
   endpoint's key. The OpenRouter key is Studio's, for other features to use
@@ -1997,9 +1999,11 @@ piece being read is lit in the transcript. Recapture with
 - **Hearing replies.** When a voice thread's agent finishes a reply, the
   server cuts it into pieces and starts making their audio at once, and the
   composer showing that thread plays it. The pill shows the agent's level,
-  "Speaking" and Stop, and the piece being read lights up in BB's own
+  "Speaking", a speed button (1×, 1.25×, 1.5×, 1.75×, 2×, saved as Speech's
+  speed) and Stop, and the piece being read lights up in BB's own
   transcript (a CSS highlight; BB's markup isn't changed). Starting to talk
-  cuts it off. Replies play only where the thread is open.
+  cuts it off, and a new reply cuts off the one before. Replies play only
+  where the thread is open.
 - **Written for listening.** A voice chat's agent is told it's a voice chat:
   short spoken sentences, no markdown or code, numbers and paths said as a
   person would, and real work handed off. Voice mode in any other thread adds

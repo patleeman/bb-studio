@@ -3,7 +3,7 @@
 // is already loading, so long text plays without gaps after the first piece.
 import { speechChunks } from "./chunks";
 
-type Clip = Pick<HTMLAudioElement, "play" | "pause" | "removeAttribute" | "load" | "addEventListener" | "preload">;
+type Clip = Pick<HTMLAudioElement, "play" | "pause" | "removeAttribute" | "load" | "addEventListener" | "preload" | "playbackRate">;
 
 export type SpeakerState = "idle" | "loading" | "speaking";
 
@@ -12,6 +12,8 @@ export class Speaker {
   private current: Clip | null = null;
   private next: Clip | null = null;
   state: SpeakerState = "idle";
+  /** Playback speed; the browser keeps the pitch. */
+  private rate = 1;
 
   constructor(
     /** The audio URL for one piece of text. */
@@ -19,6 +21,18 @@ export class Speaker {
     private readonly changed: (state: SpeakerState) => void = () => {},
     private readonly createAudio: (url: string) => Clip = (url) => new Audio(url),
   ) {}
+
+  /** Play faster or slower, now and from the next piece on. */
+  setRate(rate: number): void {
+    this.rate = rate;
+    for (const clip of [this.current, this.next]) if (clip) clip.playbackRate = rate;
+  }
+
+  private clip(url: string): Clip {
+    const clip = this.createAudio(url);
+    clip.playbackRate = this.rate;
+    return clip;
+  }
 
   private set(state: SpeakerState): void {
     if (this.state === state) return;
@@ -41,7 +55,7 @@ export class Speaker {
       const urls = sources.map((source) => Promise.resolve(source));
       // Keep a failed later piece from rejecting unheard while an earlier one plays.
       urls.forEach((url) => url.catch(() => {}));
-      let clip = this.createAudio(await urls[0]!);
+      let clip = this.clip(await urls[0]!);
       for (let index = 0; index < urls.length; index++) {
         if (run !== this.run) return;
         this.current = clip;
@@ -53,7 +67,7 @@ export class Speaker {
         onPiece?.(index);
         if (index + 1 < urls.length) {
           // Start the next piece's audio while this one plays.
-          const following = this.createAudio(await urls[index + 1]!);
+          const following = this.clip(await urls[index + 1]!);
           following.preload = "auto";
           following.load();
           this.next = following;

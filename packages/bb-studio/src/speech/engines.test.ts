@@ -13,7 +13,7 @@ function fakeFetch(respond: (call: Call, index: number) => Response) {
 const body = (call: Call) => JSON.parse(String(call.init?.body)) as Record<string, unknown>;
 const bytes = async (stream: ReadableStream<Uint8Array>) => new Uint8Array(await new Response(stream).arrayBuffer());
 
-const config: SpeechConfig = { engine: "openrouter", model: "fish-audio/drama-3", voice: "", instructions: "", openRouterApiKey: "", endpoint: "", endpointApiKey: "" };
+const config: SpeechConfig = { engine: "openrouter", model: "fish-audio/drama-3", voice: "", instructions: "", speed: 1, openRouterApiKey: "", endpoint: "", endpointApiKey: "" };
 
 describe("speech engines", () => {
   it("sends OpenAI's speech request to OpenRouter with the key, leaving out an empty voice", async () => {

@@ -13,6 +13,7 @@ type Model = { id: string; name: string; pricePerMillionChars?: number; voices: 
 const SAMPLE = "Done. The build thread finished, and two tests fail in the auth module. Want me to read you the errors?";
 /** The Select's value for "the model's default voice". */
 const DEFAULT_VOICE = "__default__";
+const SPEEDS: number[] = [0.75, 1, 1.15, 1.25, 1.5, 1.75, 2];
 
 function price(model: Model): string {
   return model.pricePerMillionChars === undefined ? "" : ` · $${model.pricePerMillionChars}/M chars`;
@@ -107,7 +108,10 @@ export function SpeechSection() {
     }
   };
 
-  const update = async (change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions">>) => {
+  // The sample plays at the saved speed, so you hear what replies will sound like.
+  useEffect(() => { if (state) speaker.setRate(state.speed); }, [speaker, state]);
+
+  const update = async (change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions" | "speed">>) => {
     setBusy(true);
     try {
       const next = await rpc.call("speech.update", change);
@@ -224,6 +228,15 @@ export function SpeechSection() {
                   aria-label="Speech delivery"
                   onBlur={(event) => { if (event.target.value.trim() !== state.instructions) void update({ instructions: event.target.value.trim() }); }}
                 />
+              </label>
+              <label className="flex min-w-0 items-center gap-2">
+                <span className="w-20 shrink-0 text-xs text-foreground">Speed</span>
+                <Select value={String(state.speed)} disabled={busy} onValueChange={(value) => void update({ speed: Number(value) })}>
+                  <SelectTrigger className="h-8 w-32 text-xs" aria-label="Speech speed"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(SPEEDS.includes(state.speed) ? SPEEDS : [...SPEEDS, state.speed].sort((a, b) => a - b)).map((speed) => <SelectItem key={speed} value={String(speed)}>{speed === 1 ? "1× (the voice's pace)" : `${speed}×`}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
               <div className="flex min-w-0 flex-col gap-2">
                 <Textarea className="min-h-16 text-xs" value={sample} onChange={(event) => setSample(event.target.value)} aria-label="Sample text" />
