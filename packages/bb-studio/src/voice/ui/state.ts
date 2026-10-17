@@ -4,6 +4,8 @@
 // can take a finished dictation.
 import { useSyncExternalStore } from "react";
 import { Speaker, type SpeakerState } from "../../speech/speaker";
+import { speechChunks } from "../../speech/chunks";
+import { speakable } from "../instructions";
 import { clearHighlight, highlightPiece } from "./read-along";
 
 interface Snapshot {
@@ -74,6 +76,17 @@ export const voicePlayer = {
     lastPlayed = key;
     set({ threadId });
     return speaker.play(urls, (index) => { if (pieces[index]) highlightPiece(pieces[index]!); });
+  },
+  /** Read text aloud on request (a message's Read aloud), even if it was spoken before; again stops it. */
+  readAloud(threadId: string, text: string, prepare: (piece: string) => Promise<string>): Promise<void> {
+    if (snapshot.threadId === threadId && snapshot.playing !== "idle" && lastPlayed === `read:${text}`) {
+      speaker.stop();
+      return Promise.resolve();
+    }
+    const pieces = speechChunks(speakable(text));
+    lastPlayed = `read:${text}`;
+    set({ threadId });
+    return speaker.play(pieces.map(prepare), (index) => { if (pieces[index]) highlightPiece(pieces[index]!); });
   },
   stop(): void {
     speaker.stop();

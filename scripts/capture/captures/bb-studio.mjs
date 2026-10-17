@@ -565,6 +565,37 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
+    // Read aloud under a reply: a voice chat's greeting, stopped, then read
+    // again from the message's action bar.
+    id: "studio-voice-read-aloud",
+    packageDir: "bb-studio",
+    fileName: "voice-read-aloud.png",
+    setup: async (client) => {
+      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      await client.waitForAriaButton("Stop speaking", 120000);
+      await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
+      await sleep(800);
+      const found = await client.evaluate(`(() => {
+        const messages = [...document.querySelectorAll("[data-timeline-row-id]")];
+        const reply = messages.find((message) => /help/i.test(message.textContent));
+        if (!reply) return "no reply";
+        reply.scrollIntoView({ block: "center" });
+        for (const type of ["pointerover", "pointerenter", "mouseover", "mouseenter", "mousemove"]) reply.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+        const button = [...document.querySelectorAll("button")].find((each) => each.getAttribute("aria-label") === "Read aloud" || each.getAttribute("title") === "Read aloud");
+        if (!button) return "no button";
+        button.click();
+        return "clicked";
+      })()`);
+      if (found !== "clicked") throw new Error(`Read aloud: ${found}`);
+      await client.waitForAriaButton("Stop speaking", 60000);
+      await sleep(600);
+      return async () => {
+        await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`).catch(() => {});
+      };
+    },
+  },
+  {
     id: "studio-setup",
     packageDir: "bb-studio",
     fileName: "plugin-setup.png",

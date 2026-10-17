@@ -2024,6 +2024,10 @@ piece being read is lit in the transcript. Recapture with
   transcript (a CSS highlight; BB's markup isn't changed). Starting to talk
   cuts it off, and a new reply cuts off the one before. Replies play only
   where the thread is open.
+- **Read aloud.** Every message's action bar has **Read aloud**: it plays
+  that message (or the text you selected in it) in Speech's voice and speed,
+  with the same read-along highlight, in any thread, voice mode or not.
+  Pressing it again while it reads stops it.
 - **Written for listening.** A voice chat's agent is told it's a voice chat:
   short spoken sentences, no markdown or code, numbers and paths said as a
   person would, and real work handed off. Voice mode in any other thread adds

@@ -317,6 +317,15 @@ function VoiceChatStarter() {
   return null;
 }
 
+/** Studio's RPC from outside React (a message action's run). */
+async function studioRpc<T>(method: string, input: unknown): Promise<T> {
+  const response = await fetch(`/api/v1/plugins/studio/rpc/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  const body = await response.json().catch(() => null) as { ok?: boolean; result?: T; error?: { message?: string } } | null;
+  if (!body?.ok || body.result === undefined) throw new Error(body?.error?.message ?? "Studio couldn't do that.");
+  return body.result;
+}
+const prepareSpeech = async (text: string) => (await studioRpc<{ url: string }>("speech.prepare", { text })).url;
+
 export function registerVoiceApp(app: PluginAppBuilder): void {
   // Dictations into a voice thread cut short segments and are sent, not typed in.
   talk.voiceDictation = { wants: (threadId) => voicePlayer.isOn(threadId), deliver: (threadId, text) => voicePlayer.deliver(threadId, text) };
@@ -326,6 +335,19 @@ export function registerVoiceApp(app: PluginAppBuilder): void {
     actions: [{ id: "voice", component: VoiceControls }],
   });
   app.slots.experimental_appOverlay({ id: "voice-chat-starter", component: VoiceChatStarter });
+  // Under any reply: read it aloud (again), in the Speech voice and speed; pressing it while it reads stops it.
+  app.slots.messageAction({
+    id: "read-aloud",
+    title: "Read aloud",
+    icon: "Play",
+    run({ threadId, message, selectedText }) {
+      const text = (selectedText ?? message.text).trim();
+      if (!text) return;
+      // At Speech's speed, even where no voice composer has set it yet.
+      void studioRpc<{ speed: number }>("speech.state", null).then((state) => voicePlayer.setRate(state.speed), () => {});
+      voicePlayer.readAloud(threadId, text, prepareSpeech).catch((error: unknown) => toast.error("Couldn't read it aloud", { description: errorMessage(error) }));
+    },
+  });
   app.commands.register({ id: "new-voice-chat", title: "New voice chat", run: ({ projectId }) => newVoiceChat(projectId) });
   app.commands.register({
     id: "toggle-voice",
