@@ -1986,7 +1986,8 @@ piece being read is lit in the transcript. Recapture with
   mode: turn on or off in this thread* in the command palette. In a new
   thread's composer the same spot starts a **New voice chat**, as does the
   *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
-  current project (the Personal project otherwise).
+  current project (the Personal project otherwise), in the project's main
+  checkout: a voice chat never makes its own worktree.
 - **Talking.** Use the composer's mic or your hold-to-talk key. In a voice
   thread Talk cuts short segments, about every 2.5 seconds at a pause, so
   your words stream into the input phrase by phrase, a second or two behind

@@ -94,7 +94,8 @@ export class VoiceSessions {
     const thread = await this.deps.sdk.threads.spawn({
       projectId: projectId ?? PERSONAL_PROJECT_ID,
       title: "New voice chat",
-      environment: { type: "project-default" },
+      // The project's main checkout, never a new worktree: a voice chat talks and hands work off.
+      environment: { type: "host", workspace: { type: "unmanaged", path: null } },
       providerId: model.providerId,
       model: model.model,
       ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
