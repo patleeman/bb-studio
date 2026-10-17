@@ -16,6 +16,10 @@ import {
   useProjects,
   type CollectionItem,
 } from "@bb-studio/kit/app";
+import { VOICE_SUBPATH } from "../voice/shared";
+
+/** Studio → Voice (src/voice/). */
+const VOICE_PATH = `/plugins/studio/studio/${VOICE_SUBPATH}`;
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { useBbContext, useRealtime, useRpc, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -101,6 +105,7 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
   const workspace = useWorkspace();
   const query = useLibraryQuery();
   const [closed, toggle] = useClosed();
+  const onVoice = usePathname().replace(/\/+$/, "") === VOICE_PATH;
   const model = useMemo(() => data ? studioSidebarModel(data.overview, data.tabs, appliedKinds()?.off) : null, [data]);
   const active = panes(workspace.layout).find((pane) => pane.id === workspace.focused)?.active ?? null;
   const onLibrary = active === BROWSE.href;
@@ -159,6 +164,13 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{kind.count}</span>
               </button>
             ))}
+          </div>
+          <div className="flex flex-col gap-px">
+            <button type="button" data-testid="studio-sidebar-voice" aria-current={onVoice ? "page" : undefined}
+              onClick={() => { openAppPath(VOICE_PATH); onNavigate(); }} className={`${ROW} ${onVoice ? ACTIVE : ""}`}>
+              <Icon name="Mic" className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">Voice</span>
+            </button>
           </div>
           {model.views.length ? (
             <Section id="views" label="Saved views" closed={closed} onToggle={toggle}>
