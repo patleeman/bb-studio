@@ -43,6 +43,17 @@ describe("SpeechService", () => {
     expect(requests).toHaveLength(1);
   });
 
+  it("gives a Fish model a fixed voice when none is chosen, so a reply keeps one voice", async () => {
+    const { service, requests, setConfig } = setup();
+    setConfig({ model: "fish-audio/drama-3", voice: "" });
+    await service.speak("First piece.");
+    await service.speak("Second piece.");
+    expect(requests.map((request) => request.voice)).toEqual(["9a9cf47702da476aa4629e2506d4a857", "9a9cf47702da476aa4629e2506d4a857"]);
+    setConfig({ model: "elevenlabs/eleven-v4", voice: "" });
+    await service.speak("Third piece.");
+    expect(requests.at(-1)!.voice).toBe("");
+  });
+
   it("knows nothing of a key nobody prepared", async () => {
     expect(await setup().service.audio("0".repeat(40))).toBeNull();
   });

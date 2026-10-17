@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import { engineFor, type SpeechConfig, type SpeechEngine, type SpeechRequest } from "./engines";
+import { defaultVoice, engineFor, type SpeechConfig, type SpeechEngine, type SpeechRequest } from "./engines";
 
 /** Characters in one request. Clients cut longer text with speechChunks. */
 export const MAX_SPEECH_CHARS = 4000;
@@ -66,10 +66,12 @@ export class SpeechService {
     if (!trimmed) throw new Error("Nothing to speak.");
     if (trimmed.length > MAX_SPEECH_CHARS) throw new Error(`Speak at most ${MAX_SPEECH_CHARS} characters at a time; cut longer text into pieces.`);
     const instructions = overrides.instructions ?? config.instructions;
+    const model = overrides.model?.trim() || config.model;
     return {
       text: trimmed,
-      model: overrides.model?.trim() || config.model,
-      voice: overrides.voice ?? config.voice,
+      model,
+      // A model that would pick a voice per request gets a fixed one, so a reply keeps one voice.
+      voice: (overrides.voice ?? config.voice) || defaultVoice(model),
       ...(instructions ? { instructions } : {}),
     };
   }

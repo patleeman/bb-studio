@@ -64,7 +64,7 @@ describe("speech engines", () => {
     expect(calls[0]!.url).toContain("/models?output_modalities=speech");
     expect(models).toEqual([
       { id: "elevenlabs/eleven-v4", name: "Eleven v4", pricePerMillionChars: 40, voices: ["george", "sarah"] },
-      { id: "fish-audio/drama-3", name: "Drama 3", pricePerMillionChars: 2, voices: null },
+      expect.objectContaining({ id: "fish-audio/drama-3", name: "Drama 3", pricePerMillionChars: 2, voices: expect.arrayContaining(["9a9cf47702da476aa4629e2506d4a857"]), voiceNames: expect.objectContaining({ "9a9cf47702da476aa4629e2506d4a857": "Hannah · friendly, clear" }) }),
     ]);
   });
 

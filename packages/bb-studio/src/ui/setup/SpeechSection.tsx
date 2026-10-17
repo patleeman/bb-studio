@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LocalSpeechStatus, speechContract, SpeechState } from "../../speech/contract";
 import { Speaker, type SpeakerState } from "../../speech/speaker";
 
-type Model = { id: string; name: string; pricePerMillionChars?: number; voices: string[] | null };
+type Model = { id: string; name: string; pricePerMillionChars?: number; voices: string[] | null; voiceNames?: Record<string, string> };
 
 const SAMPLE = "Done. The build thread finished, and two tests fail in the auth module. Want me to read you the errors?";
 /** The Select's value for "the model's default voice". */
@@ -202,9 +202,9 @@ export function SpeechSection() {
                   <Select value={state.voice || DEFAULT_VOICE} disabled={busy} onValueChange={(voice) => void update({ voice: voice === DEFAULT_VOICE ? "" : voice })}>
                     <SelectTrigger className="h-8 w-80 text-xs" aria-label="Speech voice"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={DEFAULT_VOICE}>Model default</SelectItem>
+                      <SelectItem value={DEFAULT_VOICE}>{model.voiceNames ? `Default: ${model.voiceNames[model.voices[0]!]?.split(" · ")[0] ?? "first"}` : "Model default"}</SelectItem>
                       {state.voice && !model.voices.includes(state.voice) ? <SelectItem value={state.voice}>{state.voice}</SelectItem> : null}
-                      {model.voices.map((voice) => <SelectItem key={voice} value={voice}>{voice}</SelectItem>)}
+                      {model.voices.map((voice) => <SelectItem key={voice} value={voice}>{model.voiceNames?.[voice] ?? voice}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 ) : (

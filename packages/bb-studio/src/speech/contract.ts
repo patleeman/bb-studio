@@ -40,6 +40,7 @@ export const speechModelSchema = z.object({
   name: z.string(),
   pricePerMillionChars: z.number().optional(),
   voices: z.array(z.string()).nullable(),
+  voiceNames: z.record(z.string(), z.string()).optional(),
 });
 
 const overrides = {

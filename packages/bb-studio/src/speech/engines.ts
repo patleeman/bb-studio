@@ -12,6 +12,8 @@ export interface SpeechModel {
   pricePerMillionChars?: number;
   /** The voices the engine lists for this model; null when it doesn't say (type one in). */
   voices: string[] | null;
+  /** Display names for voices whose ids aren't readable. */
+  voiceNames?: Record<string, string>;
 }
 
 export interface SpeechRequest {
@@ -179,6 +181,26 @@ interface OpenRouterModel {
   supported_voices?: unknown;
 }
 
+/**
+ * Fish Audio's own stock voices (fish.audio's public library). OpenRouter
+ * lists no voices for Fish models, and without one Fish picks a voice per
+ * request, so a reply spoken in pieces changed voice midway. Studio always
+ * sends one of these.
+ */
+export const FISH_VOICES: readonly { id: string; name: string }[] = [
+  { id: "9a9cf47702da476aa4629e2506d4a857", name: "Hannah · friendly, clear" },
+  { id: "933563129e564b19a115bedd57b7406a", name: "Sarah · soft, conversational" },
+  { id: "b347db033a6549378b48d00acb0d06cd", name: "Selene · calm, gentle" },
+  { id: "536d3a5e000945adb7038665781a4aca", name: "Ethan · clear explainer" },
+  { id: "bf322df2096a46f18c579d0baa36f41d", name: "Adrian · steady narrator" },
+  { id: "79d0bd3e4e5444b18f7b6d89b5927bf1", name: "Jordan · measured, confident" },
+];
+
+/** The voice to send when none is chosen: a fixed one for models that would otherwise pick one per request. */
+export function defaultVoice(model: string): string {
+  return model.startsWith("fish-audio/") ? FISH_VOICES[0]!.id : "";
+}
+
 export function openRouterEngine(apiKey: string, fetchImpl?: Fetch): SpeechEngine {
   return openAiCompatible({
     id: "openrouter",
@@ -196,7 +218,8 @@ export function openRouterEngine(apiKey: string, fetchImpl?: Fetch): SpeechEngin
           id: model.id,
           name: model.name ?? model.id,
           ...(Number.isFinite(perChar) && perChar > 0 ? { pricePerMillionChars: Math.round(perChar * 1e6 * 100) / 100 } : {}),
-          voices: Array.isArray(model.supported_voices) ? model.supported_voices.filter((voice): voice is string => typeof voice === "string") : null,
+          voices: Array.isArray(model.supported_voices) ? model.supported_voices.filter((voice): voice is string => typeof voice === "string") : model.id.startsWith("fish-audio/") ? FISH_VOICES.map((voice) => voice.id) : null,
+          ...(model.id.startsWith("fish-audio/") ? { voiceNames: Object.fromEntries(FISH_VOICES.map((voice) => [voice.id, voice.name])) } : {}),
         };
       });
     },
