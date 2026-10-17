@@ -129,6 +129,21 @@ export class SpeechService {
     return { mimeType: audio.mimeType, body: toClient };
   }
 
+  /** Start making the audio for text now, into the cache, so a player that asks for it soon gets it sooner. Returns the key. */
+  warm(text: string, overrides: SpeechOverrides = {}): string {
+    const key = this.prepare(text, overrides);
+    if (this.making.has(key)) return key;
+    const entry = this.prepared.get(key)!;
+    const making = (async () => {
+      if (await this.cached(key)) return;
+      const audio = await this.engine().synthesize(entry.request);
+      await this.save(key, audio.mimeType, audio.body);
+    })();
+    this.making.set(key, making);
+    void making.catch((error) => this.options.warn(`Studio couldn't make speech ${key}: ${String(error)}`)).finally(() => this.making.delete(key));
+    return key;
+  }
+
   /** The whole audio for text, for the CLI and agent tools. */
   async speak(text: string, overrides: SpeechOverrides = {}): Promise<{ mimeType: string; bytes: Uint8Array }> {
     const key = this.prepare(text, overrides);

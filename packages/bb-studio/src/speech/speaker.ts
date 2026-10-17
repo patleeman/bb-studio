@@ -27,18 +27,22 @@ export class Speaker {
   }
 
   /** Speak text, stopping anything already playing. Resolves when it has all played; rejects when a piece fails. A later speak() or stop() resolves it early. */
-  async speak(text: string): Promise<void> {
+  speak(text: string): Promise<void> {
+    return this.play(speechChunks(text).map((piece) => this.prepare(piece)));
+  }
+
+  /** Play audio URLs in order (a server that prepared the pieces already), stopping anything already playing. */
+  async play(sources: readonly (string | Promise<string>)[]): Promise<void> {
     this.stop();
     const run = ++this.run;
-    const pieces = speechChunks(text);
-    if (!pieces.length) return;
+    if (!sources.length) return;
     this.set("loading");
     try {
-      const urls: Promise<string>[] = pieces.map((piece) => this.prepare(piece));
+      const urls = sources.map((source) => Promise.resolve(source));
       // Keep a failed later piece from rejecting unheard while an earlier one plays.
       urls.forEach((url) => url.catch(() => {}));
       let clip = this.createAudio(await urls[0]!);
-      for (let index = 0; index < pieces.length; index++) {
+      for (let index = 0; index < urls.length; index++) {
         if (run !== this.run) return;
         this.current = clip;
         const ended = this.played(clip, run);
@@ -46,7 +50,7 @@ export class Speaker {
         await clip.play();
         if (run !== this.run) return;
         this.set("speaking");
-        if (index + 1 < pieces.length) {
+        if (index + 1 < urls.length) {
           // Start the next piece's audio while this one plays.
           const following = this.createAudio(await urls[index + 1]!);
           following.preload = "auto";

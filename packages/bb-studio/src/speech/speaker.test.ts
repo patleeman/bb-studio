@@ -46,6 +46,18 @@ describe("Speaker", () => {
     expect(states.at(-1)).toBe("idle");
   });
 
+  it("plays URLs a server already prepared", async () => {
+    const { speaker, clips, prepared } = setup();
+    const done = speaker.play(["/audio/a", "/audio/b"]);
+    await tick();
+    expect(prepared).toEqual([]);
+    clips[0]!.end();
+    await tick();
+    clips[1]!.end();
+    await done;
+    expect(clips.map((clip) => clip.src)).toEqual(["/audio/a", "/audio/b"]);
+  });
+
   it("stops at once and resolves the speech it cut off", async () => {
     const { speaker, clips, states } = setup();
     const done = speaker.speak("One. Two.");

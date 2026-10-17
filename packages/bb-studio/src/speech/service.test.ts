@@ -90,6 +90,14 @@ describe("SpeechService", () => {
     expect(saved.getUint32(40, true)).toBe(4);
   });
 
+  it("warms audio ahead of a player, once, and serves it from the cache", async () => {
+    const { service, requests } = setup();
+    const key = service.warm("Ready soon.");
+    expect(service.warm("Ready soon.")).toBe(key);
+    expect(await text((await service.audio(key))!.body)).toBe("audio:Ready soon.");
+    expect(requests).toHaveLength(1);
+  });
+
   it("says when the engine fails, and keeps no partial file", async () => {
     const { service } = setup({ fail: true });
     await expect(service.audio(service.prepare("Hi."))).rejects.toThrow(/engine down/);
