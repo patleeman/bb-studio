@@ -1,7 +1,6 @@
-// Voice's names the frontend and server share; no SDK imports, so the app bundle can take them.
+// Voice mode's names the frontend and server share; no SDK imports, so the app bundle can take them.
 
-export const VOICE_SUBPATH = "voice";
-/** Studio publishes `VoiceSpoken` here when the voice agent's reply is ready to play. */
+/** Studio publishes `VoiceSpoken` here when a voice thread's reply is ready to play. */
 export const VOICE_REALTIME_CHANNEL = "studio-voice";
 
 export interface VoiceSpoken {
@@ -9,6 +8,8 @@ export interface VoiceSpoken {
   text: string;
   /** Audio URLs for the reply's pieces, in order; the server is already making them. */
   urls: string[];
+  /** The text of each piece, for lighting it up in the transcript as it plays. */
+  pieces: string[];
   /** Why it can't be spoken (speech isn't set up), when it can't. */
   problem?: string;
 }

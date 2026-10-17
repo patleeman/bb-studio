@@ -32,18 +32,26 @@ function setup(options: { events?: Record<string, { seq: number; type: string; d
 }
 
 describe("VoiceSessions", () => {
-  it("starts a session in a new Personal thread on the fast model, and remembers it", async () => {
+  it("starts a voice chat in a new thread on the fast model, with voice on", async () => {
     const { sessions, kv, spawned } = setup();
-    const session = await sessions.start("luna-fast");
-    expect(session.threadId).toBe("thr_voice");
-    expect(spawned[0]).toMatchObject({ projectId: "proj_personal", providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", executionInputSources: { serviceTier: "explicit" } });
-    expect((spawned[0]!.pluginMetadata as { voice: string }).voice).toMatch(/^voice_/);
-    expect((kv.get(VOICE_KV_KEY) as { session: { threadId: string } }).session.threadId).toBe("thr_voice");
-    expect(sessions.isVoiceThread("thr_voice")).toBe(true);
-    expect(sessions.isVoiceThread("thr_other", { voice: "voice_x" })).toBe(true);
-    expect(sessions.isVoiceThread("thr_other")).toBe(false);
-    await sessions.end();
-    expect(sessions.session).toBeNull();
+    expect(await sessions.start("luna-fast", "proj_app")).toBe("thr_voice");
+    expect(spawned[0]).toMatchObject({ projectId: "proj_app", providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", executionInputSources: { serviceTier: "explicit" }, pluginMetadata: { voice: "on" } });
+    expect((kv.get(VOICE_KV_KEY) as { threads: string[] }).threads).toEqual(["thr_voice"]);
+    expect(sessions.isOn("thr_voice")).toBe(true);
+    await sessions.start("luna-fast");
+    expect(spawned[1]).toMatchObject({ projectId: "proj_personal" });
+  });
+
+  it("turns voice mode on and off in any thread", async () => {
+    const { sessions } = setup();
+    expect(sessions.isOn("thr_code")).toBe(false);
+    await sessions.set("thr_code", true);
+    await sessions.set("thr_code", true);
+    expect(sessions.isOn("thr_code")).toBe(true);
+    await sessions.set("thr_code", false);
+    expect(sessions.isOn("thr_code")).toBe(false);
+    // A new voice chat's first turn comes before Studio has stored it.
+    expect(sessions.isOn("thr_new", { voice: "on" })).toBe(true);
   });
 
   it("falls back to the first model for an unknown one, and gives Haiku no service tier", async () => {
@@ -103,7 +111,16 @@ describe("VoiceSessions", () => {
     await sessions.delegate("thr_voice", "thr_work", "Do it.");
     const reloaded = new VoiceSessions({ sdk: {} as never, kv: { get: async (key) => kv.get(key), set: async () => {} }, botThread: () => null, warn: () => {} });
     await reloaded.load();
-    expect(reloaded.session?.threadId).toBe("thr_voice");
+    expect(reloaded.isOn("thr_voice")).toBe(true);
     expect(reloaded.pending("thr_voice")).toEqual(["thr_work"]);
+  });
+});
+
+describe("VoiceSessions from the one-session days", () => {
+  it("keeps the old session's thread in voice mode", async () => {
+    const kv = new Map<string, unknown>([[VOICE_KV_KEY, { session: { threadId: "thr_old", modelId: "luna-fast", startedAt: 1 }, delegations: {} }]]);
+    const sessions = new VoiceSessions({ sdk: {} as never, kv: { get: async (key) => kv.get(key), set: async () => {} }, botThread: () => null, warn: () => {} });
+    await sessions.load();
+    expect(sessions.isOn("thr_old")).toBe(true);
   });
 });

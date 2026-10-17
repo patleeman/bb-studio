@@ -34,7 +34,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
-import { VOICE_SUBPATH } from "./src/voice/shared";
+import { registerVoiceApp } from "./src/voice/ui/register";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
@@ -93,9 +93,6 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
 };
 
-/** Studio → Voice; it loads when first opened. */
-const VoicePage = lazy(() => import("./src/voice/ui/VoicePage"));
-
 /** The thread's Studio tab; its kinds' editors load when an item opens. */
 const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 
@@ -105,7 +102,6 @@ function StudioRoot({ subPath }: { subPath: string }) {
   if (path === "") return <StudioWorkspace />;
   if (path === "browse") return <StudioPanel />;
   if (path === SETUP_SUBPATH) return <SetupPage />;
-  if (path === VOICE_SUBPATH) return <Suspense fallback={null}><VoicePage /></Suspense>;
   // The Bot page: the selected Bot's Info, or the create flow; its chat and
   // threads open as BB threads, with the Bots list in BB's sidebar.
   if (path === BOT_SUBPATH || path.startsWith(`${BOT_SUBPATH}/`)) return <BotPanel />;
@@ -247,11 +243,8 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "bot-list-switch", component: ThreadListSwitcher });
   // The thread panel's Automations tab and the header's clock badge.
   registerThreadAutomations(app);
-  app.commands.register({
-    id: "voice",
-    title: "Studio: Voice",
-    run: () => openAppPath(`/plugins/studio/studio/${VOICE_SUBPATH}`),
-  });
+  // Voice mode (src/voice/): the speaker button and orb in thread composers, and New voice chat.
+  registerVoiceApp(app);
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

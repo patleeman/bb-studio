@@ -69,6 +69,7 @@ import {
   rmsOf,
   segmentPolicy,
   shouldCut,
+  VOICE_SEGMENT_POLICY,
   tickGap,
   uploadDuration,
   type SegmentPolicy,
@@ -256,6 +257,12 @@ export class TalkController {
   /** Finished captures still transcribing, to report ones discarded as empty. */
   private readonly settling = new Map<string, RecordingKind>();
   private insertOnDone = false;
+  /**
+   * Voice mode (src/voice/): a dictation into a voice thread cuts short
+   * segments, so its words show up phrase by phrase, and hands its text to
+   * voice mode instead of typing it in.
+   */
+  voiceDictation: { wants(threadId: string | null): boolean; deliver(threadId: string, text: string): boolean } | null = null;
   private releaseLock: (() => void) | null = null;
   private uploading = false;
   private uploadAgain = false;
@@ -884,7 +891,8 @@ export class TalkController {
     capture.analyser.getFloatTimeDomainData(capture.samples);
     const { quietForMs } = capture.tracker.push(rmsOf(capture.samples), dt);
     const current = capture.current;
-    if (current && shouldCut(this.policy, current.elapsedMs, quietForMs)) {
+    const policy = this.voiceDictation?.wants(this.state.threadId) ? VOICE_SEGMENT_POLICY : this.policy;
+    if (current && shouldCut(policy, current.elapsedMs, quietForMs)) {
       // Open the next recorder before stopping this one so no audio falls
       // between them; a few milliseconds of overlap is harmless.
       this.openSegment(capture);
@@ -1099,6 +1107,12 @@ export class TalkController {
   private async deliverText(): Promise<void> {
     const id = this.state.recordingId;
     const raw = this.state.transcript.trim();
+    // Voice mode sends what was said as is: no cleanup wait, no typing.
+    const voiceThread = this.state.threadId;
+    if (raw !== "" && voiceThread !== null && !this.state.field && this.voiceDictation?.wants(voiceThread) && this.voiceDictation.deliver(voiceThread, raw)) {
+      this.finishIdle();
+      return;
+    }
     let text = raw;
     if (raw !== "" && id && this.rpc && this.cleanupEnabled) {
       this.set({ cleaning: true });

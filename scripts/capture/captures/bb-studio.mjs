@@ -515,33 +515,27 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     })()`),
   },
   {
-    // Studio → Voice: a real session on GPT-6-Luna (Codex's fast tier), asked
-    // a question, its reply spoken with Speech. Needs Codex signed in and
-    // OPENROUTER_API_KEY in the staged BB's environment.
+    // Voice mode: a new voice chat on GPT-6-Luna (Codex's fast tier), asked a
+    // question, its reply playing with the Speaking pill beside the composer's
+    // buttons. Needs Codex signed in and OPENROUTER_API_KEY in the staged BB's
+    // environment.
     id: "studio-voice",
     packageDir: "bb-studio",
     fileName: "voice.png",
     setup: async (client) => {
-      await pluginRpc("studio", "voice.end", null);
-      await client.navigate("/plugins/studio/studio/voice");
-      await client.waitForText("Talk to BB and hear the answers.", 30000);
-      await client.clickButtonText("Start a voice session");
-      // The agent greets the user; that reply is spoken.
-      await client.waitForText("End session", 30000);
-      const { session } = await pluginRpc("studio", "voice.state", null);
-      if (!session) throw new Error("No voice session started");
-      await client.waitForText("Stop speaking", 120000);
-      await client.evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Stop speaking")?.click()`);
-      await bbCli(["thread", "tell", session.threadId, "In one sentence: what's a good name for a release about offline mode?"]);
-      await client.waitForText("Stop speaking", 180000);
-      await client.evaluate(`(() => {
-        const error = document.querySelector(".text-destructive");
-        if (error) throw new Error("Voice shows an error: " + error.textContent);
-        return true;
-      })()`);
+      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+      await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
+      // The greeting is spoken first; stop it and ask a question.
+      await client.waitForAriaButton("Stop speaking", 120000);
+      await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
+      await bbCli(["thread", "tell", threadId, "In one sentence: what's a good name for a release about offline mode?"]);
+      await sleep(4000);
+      await client.waitForAriaButton("Stop speaking", 180000);
+      await client.waitForText("Speaking", 30000);
       await sleep(600);
       return async () => {
-        await client.evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Stop speaking")?.click()`).catch(() => {});
+        await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`).catch(() => {});
       };
     },
   },

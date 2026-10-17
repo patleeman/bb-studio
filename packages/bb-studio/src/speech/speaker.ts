@@ -31,8 +31,8 @@ export class Speaker {
     return this.play(speechChunks(text).map((piece) => this.prepare(piece)));
   }
 
-  /** Play audio URLs in order (a server that prepared the pieces already), stopping anything already playing. */
-  async play(sources: readonly (string | Promise<string>)[]): Promise<void> {
+  /** Play audio URLs in order (a server that prepared the pieces already), stopping anything already playing. `onPiece` hears each piece's index as it starts. */
+  async play(sources: readonly (string | Promise<string>)[], onPiece?: (index: number) => void): Promise<void> {
     this.stop();
     const run = ++this.run;
     if (!sources.length) return;
@@ -50,6 +50,7 @@ export class Speaker {
         await clip.play();
         if (run !== this.run) return;
         this.set("speaking");
+        onPiece?.(index);
         if (index + 1 < urls.length) {
           // Start the next piece's audio while this one plays.
           const following = this.createAudio(await urls[index + 1]!);

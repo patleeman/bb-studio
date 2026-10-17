@@ -6,7 +6,7 @@ function fakeBb(session: { threadId: string } | null) {
   const handlers: Record<string, (payload: never) => void> = {};
   const published: { channel: string; data: unknown }[] = [];
   const tools: Record<string, { execute(input: unknown, ctx: { threadId: string }): Promise<unknown> }> = {};
-  const kv = new Map<string, unknown>([["voice:state", { session: session ? { ...session, modelId: "luna-fast", startedAt: 1 } : null, delegations: {} }]]);
+  const kv = new Map<string, unknown>([["voice:state", { threads: session ? [session.threadId] : [], delegations: {} }]]);
   const bb = {
     sdk: { threads: { events: { list: async () => [] }, getPluginMetadata: async () => ({}) } },
     storage: { kv: { get: async (key: string) => kv.get(key), set: async (key: string, value: unknown) => { kv.set(key, value); } } },
@@ -30,7 +30,7 @@ describe("registerVoice", () => {
     handlers["thread.idle"]!({ thread: { id: "thr_voice" }, lastAssistantText: "**Done.** Two tests fail." } as never);
     await settle();
     expect(warmed).toEqual(["Done. Two tests fail."]);
-    expect(published).toEqual([{ channel: VOICE_REALTIME_CHANNEL, data: { threadId: "thr_voice", text: "Done. Two tests fail.", urls: [`/api/v1/plugins/studio/http/speech/audio?key=${"a".repeat(40)}`] } }]);
+    expect(published).toEqual([{ channel: VOICE_REALTIME_CHANNEL, data: { threadId: "thr_voice", text: "Done. Two tests fail.", pieces: ["Done. Two tests fail."], urls: [`/api/v1/plugins/studio/http/speech/audio?key=${"a".repeat(40)}`] } }]);
   });
 
   it("says why a reply can't be spoken, and stays quiet for other threads", async () => {
@@ -44,11 +44,12 @@ describe("registerVoice", () => {
     expect((published[0]!.data as { problem: string }).problem).toMatch(/OpenRouter/);
   });
 
-  it("gives the voice thread its instructions and tools, and keeps its tools to voice threads", async () => {
+  it("gives a voice chat its own setup, adds voice to a thread in voice mode, and keeps its tools to voice threads", async () => {
     const { bb, tools } = fakeBb({ threadId: "thr_voice" });
     const voice = await registerVoice(bb as never, { speech: { problem: () => null } as never, botThread: () => null });
-    expect(voice.configure("thr_voice")?.tools).toContain("voice_delegate");
+    expect(voice.configure("thr_new", { voice: "on" })).toMatchObject({ chat: true, instructions: expect.stringContaining("This is a voice chat") });
+    expect(voice.configure("thr_voice")).toMatchObject({ chat: false, tools: ["voice_delegate", "voice_threads", "voice_read"], instructions: expect.stringContaining("Voice mode is on") });
     expect(voice.configure("thr_other")).toBeNull();
-    await expect(tools.voice_delegate!.execute({ target: "bot", message: "Hi" }, { threadId: "thr_other" })).rejects.toThrow(/Only the voice/);
+    await expect(tools.voice_delegate!.execute({ target: "bot", message: "Hi" }, { threadId: "thr_other" })).rejects.toThrow(/Only a thread with voice mode on/);
   });
 });

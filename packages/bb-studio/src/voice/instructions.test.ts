@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { speakable, VOICE_INSTRUCTIONS } from "./instructions";
+import { speakable, VOICE_CHAT_INSTRUCTIONS, VOICE_MODE_INSTRUCTIONS } from "./instructions";
 
 describe("voice instructions", () => {
-  it("fit in BB's 4096 characters", () => {
-    expect(VOICE_INSTRUCTIONS.length).toBeLessThan(4096);
+  it("leave room in BB's 4096 characters for a thread's other instructions", () => {
+    expect(VOICE_CHAT_INSTRUCTIONS.length).toBeLessThan(2500);
+    expect(VOICE_MODE_INSTRUCTIONS.length).toBeLessThan(2000);
   });
 });
 

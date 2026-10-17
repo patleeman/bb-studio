@@ -1968,38 +1968,49 @@ Clients (Setup's sample, and the voice features to come) call the
 
 ## Voice
 
-**Studio → Voice** (`/plugins/studio/studio/voice`, or *Studio: Voice* in the
-command palette) is a spoken conversation with BB. You talk with Talk's mic or
-your hold-to-talk key; a fast voice agent answers in a sentence or two, and
-its replies are spoken with [Speech](#speech).
+Voice mode is a setting on any thread, in BB's own thread view. A speaker
+button beside the composer's mic turns it on; then you talk, and the thread's
+replies are spoken with [Speech](#speech). **New voice chat** starts a thread
+with it on.
 
-![Live BB screenshot of Studio → Voice in a session on GPT-6-Luna, speaking its reply](assets/voice.png)
+![Live BB screenshot of a voice chat speaking its reply, with the Speaking pill beside the composer's buttons](assets/voice.png)
 
-Captured from a staged BB: a real session on GPT-6-Luna (Codex's fast tier).
-It greeted the user, was asked for a release name, answered in one sentence,
-and is speaking that reply (**Stop speaking** shows while it plays). Recapture
-with `BB_CAPTURE_ONLY=studio-voice`; it needs Codex signed in and
+Captured from a staged BB: a new voice chat on GPT-6-Luna (Codex's fast
+tier) was asked for a release name. Its reply is playing: the pill beside the
+speaker and mic buttons shows the agent's level, "Speaking" and Stop, and the
+piece being read is lit in the transcript. Recapture with
+`BB_CAPTURE_ONLY=studio-voice`; it needs Codex signed in and
 `OPENROUTER_API_KEY` set when the staged BB starts.
 
-- **A session is one thread** in the Personal project, on a fast model:
-  GPT-6-Luna on Codex's fast tier (default) or Haiku 5.5 on Claude Code. The
-  page shows it with BB's own chat, so the transcript, history and composer
-  are the usual ones. **End session** leaves the thread in BB's history; the
-  next session starts a new one.
-- **Written for listening.** The agent is told to answer in short spoken
-  sentences with no markdown, lists or code, and to say numbers and paths as
-  a person would. What's spoken is cleaned of any markdown that slips through.
-- **It hands work off.** `voice_delegate` sends a request to the Bot
-  (`bot`) or any thread, as the voice thread. When that thread finishes the
-  turn it was asked for, Studio posts its reply back into the voice thread as
-  a note, and the agent sums it up aloud. It checks that the finished turn is
-  the one it asked for, so a busy thread's other work isn't mistaken for the
-  answer. `voice_threads` lists threads and `voice_read` reads one's latest
-  reply. Delegated threads aren't parented to the voice thread or the Bot.
-- **Speaking.** When the voice agent replies, the server cuts the reply into
-  pieces and starts making their audio at once, then tells the open Voice page
-  to play them. **Speak replies** turns this on or off per device, **Stop
-  speaking** cuts it off, and starting to dictate stops it too.
+- **Turning it on.** The speaker button in a thread's composer, or *Voice
+  mode: turn on or off in this thread* in the command palette. In a new
+  thread's composer the same spot starts a **New voice chat**, as does the
+  *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
+  current project (the Personal project otherwise).
+- **Talking.** Use the composer's mic or your hold-to-talk key. In a voice
+  thread Talk cuts short segments, about every 2.5 seconds at a pause, so
+  your words stream into the input phrase by phrase, a second or two behind
+  you. A pill beside the buttons shows a red dot, the time and your level.
+  When you finish, what you said is sent as is (no cleanup pass). A draft
+  with mentions or files stays in the composer for Send instead.
+- **Hearing replies.** When a voice thread's agent finishes a reply, the
+  server cuts it into pieces and starts making their audio at once, and the
+  composer showing that thread plays it. The pill shows the agent's level,
+  "Speaking" and Stop, and the piece being read lights up in BB's own
+  transcript (a CSS highlight; BB's markup isn't changed). Starting to talk
+  cuts it off. Replies play only where the thread is open.
+- **Written for listening.** A voice chat's agent is told it's a voice chat:
+  short spoken sentences, no markdown or code, numbers and paths said as a
+  person would, and real work handed off. Voice mode in any other thread adds
+  the same speaking rules to what the thread already does, from its next
+  session start or resume (BB doesn't change a running session). Whatever is
+  spoken is cleaned of markdown first.
+- **Handing work off.** `voice_delegate` sends a request to the Bot (`bot`)
+  or any thread, as the voice thread. When that thread finishes the turn it
+  was asked for, Studio posts its reply back as a note, and the agent sums it
+  up aloud; a busy thread's other work isn't mistaken for the answer.
+  `voice_threads` lists threads and `voice_read` reads one's latest reply.
+  Delegated threads aren't parented to the voice thread or the Bot.
 
 ## Backup and restore
 

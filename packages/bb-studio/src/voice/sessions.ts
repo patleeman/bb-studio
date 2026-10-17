@@ -1,8 +1,9 @@
-// Voice sessions: one BB thread on a fast model that the user talks to by
-// voice. It hands real work to the Bot or other threads (delegate), and when
-// one of those finishes the turn it asked for, its reply is posted back into
-// the voice thread as a note for the voice agent to sum up aloud. Its own
-// replies are spoken (see register.ts).
+// Voice mode: any BB thread can have it on. Its replies are spoken (see
+// register.ts) and its agent is told to answer for listening. A new voice chat
+// is a thread on a fast model with voice on from the start. A voice thread can
+// hand real work to the Bot or other threads (delegate); when one of those
+// finishes the turn it asked for, its reply is posted back into the voice
+// thread as a note for the agent to sum up aloud.
 //
 // Delegated threads are never parented to the voice thread or the Bot: Studio
 // adopts and hides threads parented to a Bot (bot-owned.ts), and BB would post
@@ -28,17 +29,11 @@ export interface VoiceModel {
   reasoningLevel?: string;
 }
 
-/** Fast models for the voice agent. Only Codex models have a fast tier in BB. */
+/** Fast models for a new voice chat. Only Codex models have a fast tier in BB. */
 export const VOICE_MODELS: readonly VoiceModel[] = [
   { id: "luna-fast", label: "GPT-6-Luna, fast (Codex)", providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", reasoningLevel: "low" },
   { id: "haiku", label: "Haiku 5.5 (Claude Code)", providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: "low" },
 ];
-
-export interface VoiceSession {
-  threadId: string;
-  modelId: string;
-  startedAt: number;
-}
 
 interface Delegation {
   voiceThreadId: string;
@@ -48,7 +43,8 @@ interface Delegation {
 }
 
 interface VoiceState {
-  session: VoiceSession | null;
+  /** Threads with voice mode on. */
+  threads: string[];
   /** Target thread id → the voice thread waiting for its reply. */
   delegations: Record<string, Delegation>;
 }
@@ -56,7 +52,7 @@ interface VoiceState {
 type EventRow = { seq: number; type: string; data?: unknown };
 
 export class VoiceSessions {
-  private state: VoiceState = { session: null, delegations: {} };
+  private state: VoiceState = { threads: [], delegations: {} };
 
   constructor(private readonly deps: {
     sdk: Sdk;
@@ -67,8 +63,10 @@ export class VoiceSessions {
   }) {}
 
   async load(): Promise<void> {
-    const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as Partial<VoiceState> | null;
-    this.state = { session: stored?.session ?? null, delegations: stored?.delegations ?? {} };
+    const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as (Partial<VoiceState> & { session?: { threadId?: string } | null }) | null;
+    // Before voice was a mode there was one current session.
+    const old = stored?.session?.threadId ? [stored.session.threadId] : [];
+    this.state = { threads: stored?.threads ?? old, delegations: stored?.delegations ?? {} };
   }
 
   private async save(): Promise<void> {
@@ -79,23 +77,23 @@ export class VoiceSessions {
     await this.deps.kv.set(VOICE_KV_KEY, this.state);
   }
 
-  get session(): VoiceSession | null {
-    return this.state.session;
+  /** Whether a thread has voice mode on (a new voice chat's metadata says so from its first turn). */
+  isOn(threadId: string, metadata?: { readonly [key: string]: unknown }): boolean {
+    return this.state.threads.includes(threadId) || metadata?.voice === "on";
   }
 
-  /** Whether a thread is a voice thread (its metadata says so from its first turn). */
-  isVoiceThread(threadId: string, metadata?: { readonly [key: string]: unknown }): boolean {
-    return typeof metadata?.voice === "string" || this.state.session?.threadId === threadId;
+  async set(threadId: string, on: boolean): Promise<void> {
+    const threads = this.state.threads.filter((each) => each !== threadId);
+    this.state.threads = on ? [...threads, threadId] : threads;
+    await this.save();
   }
 
-  /** Start a new session in a new thread; the previous one stays in BB's history. */
-  async start(modelId: string): Promise<VoiceSession> {
+  /** A new voice chat: a thread on a fast model with voice on, in the given project (the Personal project otherwise). */
+  async start(modelId: string, projectId: string | null = null): Promise<string> {
     const model = VOICE_MODELS.find((each) => each.id === modelId) ?? VOICE_MODELS[0]!;
-    const sessionId = `voice_${Math.random().toString(36).slice(2, 12)}`;
-    const startedAt = Date.now();
     const thread = await this.deps.sdk.threads.spawn({
-      projectId: PERSONAL_PROJECT_ID,
-      title: `Voice · ${new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+      projectId: projectId ?? PERSONAL_PROJECT_ID,
+      title: "New voice chat",
       environment: { type: "project-default" },
       providerId: model.providerId,
       model: model.model,
@@ -106,17 +104,11 @@ export class VoiceSessions {
         ...(model.reasoningLevel ? { reasoningLevel: "explicit" } : {}),
         ...(model.serviceTier ? { serviceTier: "explicit" } : {}),
       },
-      pluginMetadata: { voice: sessionId },
-      input: [{ type: "text", text: "The user opened a voice session. Greet them in one short sentence and ask what they need.", mentions: [], visibility: "agent-only" }],
+      pluginMetadata: { voice: "on" },
+      input: [{ type: "text", text: "The user opened a voice chat. Greet them in one short sentence and ask what they need.", mentions: [], visibility: "agent-only" }],
     } as never);
-    this.state.session = { threadId: thread.id, modelId: model.id, startedAt };
-    await this.save();
-    return this.state.session;
-  }
-
-  async end(): Promise<void> {
-    this.state.session = null;
-    await this.save();
+    await this.set(thread.id, true);
+    return thread.id;
   }
 
   /** Send work to the Bot ("bot") or a thread, and remember to bring its reply back. */
@@ -141,7 +133,7 @@ export class VoiceSessions {
   }
 
   /**
-   * A thread went idle. If the voice agent is waiting on it and the turn that
+   * A thread went idle. If a voice thread is waiting on it and the turn that
    * just ended is the one it asked for, post the reply into the voice thread.
    */
   async idle(threadId: string, lastAssistantText: string | null): Promise<boolean> {

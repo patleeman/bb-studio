@@ -18,6 +18,9 @@ export function segmentPolicy(segmentSeconds: number): SegmentPolicy {
   return { targetMs: target * 1000, maxMs: Math.round(target * 1.6 * 1000), pauseMs: 350 };
 }
 
+/** Voice mode's dictations: a phrase at a time, so the words show up while you talk. */
+export const VOICE_SEGMENT_POLICY: SegmentPolicy = { targetMs: 2500, maxMs: 8000, pauseMs: 300 };
+
 /** The server refuses longer segments (`segment_put`'s `durationMs`). */
 export const MAX_SEGMENT_MS = 10 * 60_000;
 

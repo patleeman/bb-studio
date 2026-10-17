@@ -1,5 +1,5 @@
-// Voice, built into Studio: the voice agent's tools, its RPCs, and speaking
-// its replies. See sessions.ts for how a session works.
+// Voice mode, built into Studio: its RPCs, the voice tools, and speaking a
+// voice thread's replies. See sessions.ts.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { speechChunks } from "../speech/chunks";
@@ -7,18 +7,22 @@ import { SPEECH_HTTP_ROOT } from "../speech/contract";
 import type { SpeechService } from "../speech/service";
 import { voiceContract, type VoiceState } from "./contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "./shared";
-import { speakable, VOICE_INSTRUCTIONS } from "./instructions";
+import { speakable, VOICE_CHAT_INSTRUCTIONS, VOICE_MODE_INSTRUCTIONS } from "./instructions";
 import { VOICE_MODELS, VoiceSessions } from "./sessions";
 
-/** The voice agent's own tools; it also gets Studio's item tools. */
+/** A voice thread's own tools, beside its usual ones. */
 export const VOICE_TOOLS = ["voice_delegate", "voice_threads", "voice_read"] as const;
 
 const READ_CHARS = 8000;
 
 export interface BuiltinVoice {
   sessions: VoiceSessions;
-  /** The voice agent's configuration, for a voice thread; null for any other. */
-  configure(threadId: string, metadata?: { readonly [key: string]: unknown }): { tools: string[]; instructions: string } | null;
+  /**
+   * What a voice thread adds: its tools and instructions, and whether it's a
+   * voice chat (which gets only these) or voice mode in another thread (which
+   * keeps its own). Null for a thread without voice.
+   */
+  configure(threadId: string, metadata?: { readonly [key: string]: unknown }): { chat: boolean; tools: string[]; instructions: string } | null;
 }
 
 export async function registerVoice(bb: BbPluginApi, deps: {
@@ -28,26 +32,19 @@ export async function registerVoice(bb: BbPluginApi, deps: {
   const sessions = new VoiceSessions({ sdk: bb.sdk, kv: bb.storage.kv as never, botThread: deps.botThread, warn: (message) => bb.log.warn(message) });
   await sessions.load();
 
-  function state(): VoiceState {
-    const session = sessions.session;
-    return {
-      session,
-      models: VOICE_MODELS.map(({ id, label }) => ({ id, label })),
-      pending: session ? sessions.pending(session.threadId) : [],
-      speechProblem: deps.speech.problem(),
-    };
-  }
+  const state = (threadId: string): VoiceState => ({
+    on: sessions.isOn(threadId),
+    pending: sessions.pending(threadId),
+    speechProblem: deps.speech.problem(),
+  });
 
   bb.rpc.register(voiceContract, {
-    "voice.state": () => state(),
-    "voice.start": async ({ modelId }) => {
-      await sessions.start(modelId);
-      return state();
+    "voice.state": ({ threadId }) => state(threadId),
+    "voice.set": async ({ threadId, on }) => {
+      await sessions.set(threadId, on);
+      return state(threadId);
     },
-    "voice.end": async () => {
-      await sessions.end();
-      return state();
-    },
+    "voice.new": async ({ projectId, modelId }) => ({ threadId: await sessions.start(modelId ?? VOICE_MODELS[0]!.id, projectId ?? null) }),
   });
 
   // A voice reply is spoken: the server starts making each piece's audio now
@@ -56,11 +53,12 @@ export async function registerVoice(bb: BbPluginApi, deps: {
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => {
     void (async () => {
       if (await sessions.idle(thread.id, lastAssistantText ?? null)) return;
-      if (thread.id !== sessions.session?.threadId || !lastAssistantText?.trim()) return;
+      if (!sessions.isOn(thread.id) || !lastAssistantText?.trim()) return;
       const text = speakable(lastAssistantText);
-      const spoken: VoiceSpoken = { threadId: thread.id, text, urls: [] };
+      const pieces = speechChunks(text);
+      const spoken: VoiceSpoken = { threadId: thread.id, text, urls: [], pieces };
       try {
-        spoken.urls = speechChunks(text).map((piece) => `${SPEECH_HTTP_ROOT}?key=${deps.speech.warm(piece)}`);
+        spoken.urls = pieces.map((piece) => `${SPEECH_HTTP_ROOT}?key=${deps.speech.warm(piece)}`);
       } catch (error) {
         spoken.problem = error instanceof Error ? error.message : String(error);
       }
@@ -69,9 +67,9 @@ export async function registerVoice(bb: BbPluginApi, deps: {
   });
 
   const voiceOnly = async (threadId: string) => {
-    if (threadId !== sessions.session?.threadId) {
+    if (!sessions.isOn(threadId)) {
       const metadata = await bb.sdk.threads.getPluginMetadata({ threadId }).catch(() => null);
-      if (typeof metadata?.voice !== "string") throw new Error("Only the voice assistant's thread can use this.");
+      if (metadata?.voice !== "on") throw new Error("Only a thread with voice mode on can use this.");
     }
   };
 
@@ -120,8 +118,9 @@ export async function registerVoice(bb: BbPluginApi, deps: {
   return {
     sessions,
     configure(threadId, metadata) {
-      if (!sessions.isVoiceThread(threadId, metadata)) return null;
-      return { tools: [...VOICE_TOOLS, "studio_list_items"], instructions: VOICE_INSTRUCTIONS };
+      if (!sessions.isOn(threadId, metadata)) return null;
+      const chat = metadata?.voice === "on";
+      return { chat, tools: [...VOICE_TOOLS, ...(chat ? ["studio_list_items"] : [])], instructions: chat ? VOICE_CHAT_INSTRUCTIONS : VOICE_MODE_INSTRUCTIONS };
     },
   };
 }

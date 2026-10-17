@@ -48,13 +48,15 @@ describe("Speaker", () => {
 
   it("plays URLs a server already prepared", async () => {
     const { speaker, clips, prepared } = setup();
-    const done = speaker.play(["/audio/a", "/audio/b"]);
+    const started: number[] = [];
+    const done = speaker.play(["/audio/a", "/audio/b"], (index) => started.push(index));
     await tick();
     expect(prepared).toEqual([]);
     clips[0]!.end();
     await tick();
     clips[1]!.end();
     await done;
+    expect(started).toEqual([0, 1]);
     expect(clips.map((clip) => clip.src)).toEqual(["/audio/a", "/audio/b"]);
   });
 
