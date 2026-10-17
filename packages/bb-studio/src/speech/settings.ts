@@ -1,10 +1,12 @@
 // Speech's part of Studio's settings. The OpenRouter key is named for Studio,
 // not for speech, so other Studio features can share it later.
 import type { SpeechConfig, SpeechEngineId } from "./engines";
+import { DEFAULT_LOCAL_MODEL, isLocalModel } from "./local";
 
 export const SPEECH_ENGINES: readonly { id: SpeechEngineId; label: string }[] = [
   { id: "openrouter", label: "OpenRouter" },
   { id: "custom", label: "Custom endpoint" },
+  { id: "local", label: "On this Mac (local)" },
 ];
 
 export const DEFAULT_SPEECH_MODEL = "fish-audio/drama-3";
@@ -13,7 +15,7 @@ export const SPEECH_SETTINGS = {
   speechEngine: {
     type: "select" as const,
     label: "Speech: engine",
-    description: "Where Studio turns text into speech: OpenRouter's hosted voices, or your own server with OpenAI's speech API.",
+    description: "Where Studio turns text into speech: OpenRouter's hosted voices, your own server with OpenAI's speech API, or voices Studio installs and runs on this Mac (Apple silicon).",
     options: SPEECH_ENGINES.map((engine) => engine.id as string),
     default: "openrouter",
   },
@@ -62,7 +64,7 @@ const text = (value: unknown) => (typeof value === "string" ? value : "");
 /** Studio's setting values as a speech config, with the host's OPENROUTER_API_KEY as the key's fallback. */
 export function speechConfig(values: Record<string, unknown>, env: Record<string, string | undefined> = process.env): SpeechConfig {
   return {
-    engine: values.speechEngine === "custom" ? "custom" : "openrouter",
+    engine: values.speechEngine === "custom" || values.speechEngine === "local" ? values.speechEngine : "openrouter",
     model: text(values.speechModel).trim() || DEFAULT_SPEECH_MODEL,
     voice: text(values.speechVoice).trim(),
     instructions: text(values.speechInstructions).trim(),
@@ -70,4 +72,15 @@ export function speechConfig(values: Record<string, unknown>, env: Record<string
     endpoint: text(values.speechEndpoint).trim(),
     endpointApiKey: text(values.speechEndpointApiKey).trim(),
   };
+}
+
+/**
+ * The model and voice to switch to with the engine, when the current ones are
+ * the other engine's: local voices start with Kokoro, and a local model means
+ * nothing to OpenRouter. Null when they can stay.
+ */
+export function modelForEngine(engine: SpeechEngineId, model: string): { model: string; voice: string } | null {
+  if (engine === "local" && !isLocalModel(model)) return { model: DEFAULT_LOCAL_MODEL.id, voice: DEFAULT_LOCAL_MODEL.defaultVoice };
+  if (engine === "openrouter" && isLocalModel(model)) return { model: DEFAULT_SPEECH_MODEL, voice: "" };
+  return null;
 }

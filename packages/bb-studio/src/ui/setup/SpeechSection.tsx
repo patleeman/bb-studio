@@ -5,7 +5,7 @@ import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, Select
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { speechContract, SpeechState } from "../../speech/contract";
+import type { LocalSpeechStatus, speechContract, SpeechState } from "../../speech/contract";
 import { Speaker, type SpeakerState } from "../../speech/speaker";
 
 type Model = { id: string; name: string; pricePerMillionChars?: number; voices: string[] | null };
@@ -16,6 +16,47 @@ const DEFAULT_VOICE = "__default__";
 
 function price(model: Model): string {
   return model.pricePerMillionChars === undefined ? "" : ` · $${model.pricePerMillionChars}/M chars`;
+}
+
+const LOCAL_LABELS: Record<LocalSpeechStatus["state"], string> = {
+  unsupported: "Not available on this host",
+  "not-installed": "Not installed",
+  installing: "Installing…",
+  stopped: "Stopped",
+  starting: "Starting…",
+  ready: "Running",
+  failed: "Failed",
+};
+
+/** Studio's own voice server: install it, see it start, read why it failed. */
+function LocalVoices({ local, busy, onAction }: { local: LocalSpeechStatus; busy: boolean; onAction(action: "install" | "start" | "stop"): void }) {
+  const showLog = local.log.length > 0 && (local.state === "installing" || local.state === "failed" || local.state === "starting");
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="w-20 shrink-0 text-xs text-foreground">Server</span>
+        <span className="text-xs text-foreground">{LOCAL_LABELS[local.state]}</span>
+        {local.state === "not-installed" || (local.state === "failed" && !local.installed) ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("install")}>{local.state === "failed" ? "Install again" : "Install"}</Button>
+        ) : null}
+        {local.installed && (local.state === "stopped" || local.state === "failed") ? (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("start")}>Start</Button>
+        ) : null}
+        {local.state === "ready" || local.state === "starting" ? (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => onAction("stop")}>Stop</Button>
+        ) : null}
+      </div>
+      {local.detail && local.state !== "ready" ? <p className="text-xs text-muted-foreground">{local.detail}</p> : null}
+      {local.state === "not-installed" ? (
+        <p className="text-xs text-muted-foreground">
+          Installs mlx-audio (about 1.3 GB) into Studio's data folder with uv. Voices then download on first use and never leave this Mac.
+        </p>
+      ) : null}
+      {showLog ? (
+        <pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-[11px] leading-4 text-muted-foreground" aria-label="Local voice server log">{local.log.join("\n")}</pre>
+      ) : null}
+    </div>
+  );
 }
 
 export function SpeechSection() {
@@ -40,6 +81,31 @@ export function SpeechSection() {
   useEffect(() => {
     rpc.call("speech.state", null).then((next) => { setState(next); loadModels(next); }, (cause: unknown) => setError(errorMessage(cause)));
   }, [rpc, loadModels]);
+
+  // Follow the local server while it installs or starts; list models again once it's up.
+  const localState = state?.engine === "local" ? state.local.state : null;
+  useEffect(() => {
+    if (localState !== "installing" && localState !== "starting" && localState !== "stopped") return;
+    const timer = setInterval(() => {
+      rpc.call("speech.state", null).then((next) => {
+        setState(next);
+        if (next.local.state !== localState && (next.local.state === "ready" || (localState === "installing" && !next.problem))) loadModels(next);
+      }, () => {});
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rpc, localState, loadModels]);
+
+  const localAction = async (action: "install" | "start" | "stop") => {
+    setBusy(true);
+    try {
+      setState(await rpc.call("speech.local", { action }));
+      setError(null);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const update = async (change: Partial<Pick<SpeechState, "engine" | "endpoint" | "model" | "voice" | "instructions">>) => {
     setBusy(true);
@@ -97,7 +163,8 @@ export function SpeechSection() {
               />
             </label>
           ) : null}
-          {state.problem ? (
+          {state.engine === "local" ? <LocalVoices local={state.local} busy={busy} onAction={(action) => void localAction(action)} /> : null}
+          {state.problem && state.engine === "local" ? null : state.problem ? (
             <p className="text-xs text-foreground">
               {state.problem}
               {state.engine === "openrouter" ? " Keys are in BB Settings → Plugins → Studio." : ""}
@@ -141,7 +208,7 @@ export function SpeechSection() {
                     key={`${state.model}:${state.voice}`}
                     className="h-8 w-80 text-xs"
                     defaultValue={state.voice}
-                    placeholder="Model default, or a voice ID"
+                    placeholder={state.engine === "local" ? "Model default, or the path of a recording to clone" : "Model default, or a voice ID"}
                     aria-label="Speech voice"
                     onBlur={(event) => { if (event.target.value.trim() !== state.voice) void update({ voice: event.target.value.trim() }); }}
                   />

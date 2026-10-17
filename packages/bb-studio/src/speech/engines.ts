@@ -3,7 +3,7 @@
 // (mlx-audio, fish-speech and others) share, so one adapter covers them; each
 // engine differs only in where it points, its key, and how it lists models.
 
-export type SpeechEngineId = "openrouter" | "custom";
+export type SpeechEngineId = "openrouter" | "custom" | "local";
 
 export interface SpeechModel {
   id: string;
@@ -49,6 +49,8 @@ interface OpenAiCompatibleOptions {
   headers?: Record<string, string>;
   /** Models when the server has no list. */
   listModels(get: (path: string, signal?: AbortSignal) => Promise<unknown>, signal?: AbortSignal): Promise<SpeechModel[]>;
+  /** Fields to add to or replace in the speech request's body, for servers that name them differently. */
+  fields?(request: SpeechRequest): Record<string, unknown>;
   fetch?: Fetch;
 }
 
@@ -75,6 +77,7 @@ function openAiCompatible(options: OpenAiCompatibleOptions): SpeechEngine {
           ...(request.voice ? { voice: request.voice } : {}),
           ...(request.instructions ? { instructions: request.instructions } : {}),
           response_format: format,
+          ...options.fields?.(request),
         }),
         signal,
       });
@@ -218,6 +221,58 @@ export function customEngine(baseUrl: string, apiKey: string | undefined, fetchI
   });
 }
 
+/** Studio's own mlx-audio server (see local.ts), as the local engine needs it. */
+export interface LocalSpeechServer {
+  /** Why the server can't run here or yet (unsupported, not installed), or null. */
+  problem(): string | null;
+  /** The server's base URL once it's ready, starting it if it isn't running. */
+  ready(signal?: AbortSignal): Promise<string>;
+  /** Unload the model spoken with before, when it differs: the server keeps every model it loads. */
+  useModel(model: string): Promise<void>;
+  models(): SpeechModel[];
+  /** The model's voices as the server lists them, or null when it lists none. */
+  voices(model: string, signal?: AbortSignal): Promise<string[] | null>;
+}
+
+/** Speech on this Mac, through the mlx-audio server Studio installs and runs. */
+export function localEngine(server: LocalSpeechServer, fetchImpl?: Fetch): SpeechEngine {
+  const engine = (baseUrl: string) => openAiCompatible({
+    id: "local",
+    label: "On this Mac",
+    baseUrl,
+    fetch: fetchImpl,
+    listModels: async () => server.models(),
+    fields(request) {
+      // A voice that's a path to a recording is a voice to clone (Chatterbox).
+      const clone = request.voice.startsWith("/");
+      // Kokoro's American (a_) and British (b_) voices need their accent's phonemes.
+      const accent = /kokoro/i.test(request.model) ? /^([ab])[fm]_/.exec(request.voice)?.[1] : undefined;
+      return {
+        ...(clone ? { voice: undefined, ref_audio: request.voice } : {}),
+        ...(accent ? { lang_code: accent } : {}),
+        // mlx-audio takes delivery as `instruct` (Qwen3-TTS follows it).
+        ...(request.instructions ? { instructions: undefined, instruct: request.instructions } : {}),
+      };
+    },
+  });
+  return {
+    id: "local",
+    label: "On this Mac",
+    async models(signal) {
+      // Voices come from the server when it lists them, else the model's known ones.
+      return Promise.all(server.models().map(async (model) => {
+        const listed = await server.voices(model.id, signal).catch(() => null);
+        return listed?.length ? { ...model, voices: listed } : model;
+      }));
+    },
+    async synthesize(request, signal) {
+      const url = await server.ready(signal);
+      await server.useModel(request.model);
+      return engine(url).synthesize(request, signal);
+    },
+  };
+}
+
 export interface SpeechConfig {
   engine: SpeechEngineId;
   model: string;
@@ -229,7 +284,13 @@ export interface SpeechConfig {
 }
 
 /** The configured engine, or SpeechNotSetUpError saying what's missing. */
-export function engineFor(config: SpeechConfig, fetchImpl?: Fetch): SpeechEngine {
+export function engineFor(config: SpeechConfig, fetchImpl?: Fetch, local?: LocalSpeechServer): SpeechEngine {
+  if (config.engine === "local") {
+    if (!local) throw new SpeechNotSetUpError("Local voices run only inside Studio's server.");
+    const problem = local.problem();
+    if (problem) throw new SpeechNotSetUpError(problem);
+    return localEngine(local, fetchImpl);
+  }
   if (config.engine === "custom") {
     const url = config.endpoint.trim();
     if (!url) throw new SpeechNotSetUpError("Set the custom speech endpoint in Studio's settings (Speech: custom endpoint), such as http://127.0.0.1:8000/v1.");

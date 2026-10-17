@@ -5,8 +5,9 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { pluginDataDirectory } from "../talk/server/audio-files";
 import { parseCliArgs } from "../cli-args";
-import { SpeechNotSetUpError, type SpeechModel } from "./engines";
-import { SPEECH_ENGINES, speechConfig } from "./settings";
+import { engineFor, SpeechNotSetUpError, type SpeechModel } from "./engines";
+import { LocalVoice } from "./local";
+import { modelForEngine, SPEECH_ENGINES, speechConfig } from "./settings";
 import { SpeechService } from "./service";
 import { SPEECH_HTTP_PATH, SPEECH_HTTP_ROOT, speechContract, type SpeechState } from "./contract";
 import type Database from "better-sqlite3";
@@ -16,12 +17,14 @@ export const SPEECH_USAGE = [
   "  bb studio speech status [--json]",
   "  bb studio speech models [--json]",
   "  bb studio speech say <text…> --out <file.mp3> [--model <id>] [--voice <name>] [--instructions <text>]",
+  "  bb studio speech local <status|install|start|stop> [--json]",
 ].join("\n");
 
 type CliResult = { exitCode: number; stdout?: string; stderr?: string };
 
 export interface BuiltinSpeech {
   service: SpeechService;
+  local: LocalVoice;
   cli(argv: string[], ctx: { cwd?: string }): Promise<CliResult>;
 }
 
@@ -32,8 +35,15 @@ interface SettingsAccess {
 
 export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings: SettingsAccess): BuiltinSpeech {
   const config = () => speechConfig(settings.values());
+  const local = new LocalVoice({
+    root: join(pluginDataDirectory(db), "speech-local"),
+    selected: () => config().engine === "local",
+    log: (message) => bb.log.warn(message),
+  });
+  bb.background.service("speech-local", { start: (signal) => local.run(signal) });
   const service = new SpeechService({
     config,
+    engineFor: (current) => engineFor(current, undefined, local),
     cacheDir: join(pluginDataDirectory(db), "speech-cache"),
     warn: (message) => bb.log.warn(message),
   });
@@ -50,6 +60,7 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
       endpoint: current.endpoint,
       openRouterKey: Boolean(current.openRouterApiKey),
       problem,
+      local: local.status(),
     };
   }
 
@@ -57,7 +68,8 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
   let modelCache: { key: string; at: number; models: SpeechModel[] } | null = null;
   async function models(): Promise<SpeechModel[]> {
     const current = config();
-    const key = `${current.engine}|${current.endpoint}`;
+    // Local voices list more once the server is up.
+    const key = `${current.engine}|${current.endpoint}|${current.engine === "local" ? local.status().state : ""}`;
     if (modelCache?.key === key && Date.now() - modelCache.at < 60_000) return modelCache.models;
     const list = await service.models(AbortSignal.timeout(15_000));
     modelCache = { key, at: Date.now(), models: list };
@@ -68,7 +80,13 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
     "speech.state": () => state(),
     "speech.update": async (input) => {
       const values: Record<string, unknown> = {};
-      if (input.engine !== undefined) values.speechEngine = input.engine;
+      if (input.engine !== undefined && input.engine !== config().engine) {
+        values.speechEngine = input.engine;
+        const switched = input.model === undefined ? modelForEngine(input.engine, config().model) : null;
+        if (switched) Object.assign(values, { speechModel: switched.model, speechVoice: switched.voice });
+        if (input.engine === "local") local.start();
+        else local.release();
+      }
       if (input.model !== undefined) values.speechModel = input.model;
       if (input.voice !== undefined) values.speechVoice = input.voice;
       if (input.instructions !== undefined) values.speechInstructions = input.instructions;
@@ -77,6 +95,19 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
       return state();
     },
     "speech.models": async () => ({ models: await models() }),
+    "speech.local": ({ action }) => {
+      if (action === "install") {
+        // Minutes, not seconds: the client polls speech.state for progress.
+        local.install().catch((error) => bb.log.warn(`Studio couldn't install local voices: ${String(error)}`));
+      } else if (action === "start") {
+        const problem = local.problem();
+        if (problem) throw new Error(problem);
+        local.start();
+      } else {
+        local.stop();
+      }
+      return state();
+    },
     "speech.prepare": ({ text, ...overrides }) => ({ url: `${SPEECH_HTTP_ROOT}?key=${service.prepare(text, overrides)}` }),
   });
 
@@ -112,12 +143,14 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
         const engine = SPEECH_ENGINES.find((each) => each.id === current.engine)!.label;
         return { exitCode: 0, stdout: [
           `Engine: ${engine}${current.engine === "custom" ? ` (${current.endpoint || "no endpoint"})` : ""}`,
+          ...(current.engine === "local" ? [`Local server: ${localLine()}`] : []),
           `Model: ${current.model}`,
           `Voice: ${current.voice || "(model default)"}`,
           ...(current.instructions ? [`Delivery: ${current.instructions}`] : []),
           current.problem ? `Not ready: ${current.problem}` : "Ready.",
         ].join("\n") };
       }
+      if (command === "local") return await localCli(args.positional[0], json);
       if (command === "models") {
         const list = await models();
         if (json) return { exitCode: 0, stdout: JSON.stringify(list, null, 2) };
@@ -148,5 +181,39 @@ export function registerSpeech(bb: BbPluginApi, db: Database.Database, settings:
     }
   }
 
-  return { service, cli };
+  function localLine(): string {
+    const status = local.status();
+    return `${status.state}${status.url ? ` at ${status.url}` : ""}${status.detail ? `. ${status.detail}` : ""}`;
+  }
+
+  async function localCli(action: string | undefined, json: boolean): Promise<CliResult> {
+    const report = (extra: string[] = []) => json
+      ? { exitCode: 0, stdout: JSON.stringify(local.status(), null, 2) }
+      : { exitCode: 0, stdout: [...extra, `Local voices: ${localLine()}`].join("\n") };
+    if (action === "status") {
+      const status = local.status();
+      return report(json ? [] : status.log.slice(-8));
+    }
+    if (action === "install") {
+      const started = Date.now();
+      try {
+        await local.install();
+      } catch (error) {
+        return { exitCode: 1, stderr: [...local.status().log.slice(-15), error instanceof Error ? error.message : String(error)].join("\n") };
+      }
+      return report([`Installed in ${Math.round((Date.now() - started) / 1000)}s into ${local.paths.root}.`]);
+    }
+    if (action === "start") {
+      const started = Date.now();
+      await local.ready(AbortSignal.timeout(180_000));
+      return report([`Ready in ${((Date.now() - started) / 1000).toFixed(1)}s.`]);
+    }
+    if (action === "stop") {
+      local.stop();
+      return report(["Stopping; it starts again when it next speaks or on `bb studio speech local start`."]);
+    }
+    return { exitCode: 2, stderr: SPEECH_USAGE };
+  }
+
+  return { service, cli, local };
 }
