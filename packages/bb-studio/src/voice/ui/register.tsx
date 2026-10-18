@@ -234,6 +234,15 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     return () => window.removeEventListener(VOICE_FIXTURE_EVENT, onFixture);
   }, [threadId]);
 
+  // Escape while holding to talk drops the turn.
+  const holding = input.pressedAt !== null;
+  useEffect(() => {
+    if (!holding) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") dispatch({ type: "cancel" }); };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [holding, dispatch]);
+
   // Push-to-talk from the hold-to-talk key (or a command) cuts the Bot off too.
   useEffect(() => { if (capturing && inputRef.current.sub === "ptt") voicePlayer.stop(); }, [capturing]);
 
@@ -381,7 +390,9 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
             }}
             onClick={() => {
               // The click that ends a long press isn't a tap on the new pill.
-              if (handsFree && performance.now() - releasedAt.current > 400) dispatch({ type: "tap-pill", heard: gate.current.heard });
+              if (!handsFree || performance.now() - releasedAt.current <= 400) return;
+              if (fixture) setFixture(null);
+              else dispatch({ type: "tap-pill", heard: gate.current.heard });
             }}
           >
             {inputShown ? (
