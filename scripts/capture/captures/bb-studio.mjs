@@ -1,4 +1,4 @@
-export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
   {
     id: "studio-workspace",
     packageDir: "bb-studio",
@@ -594,6 +594,191 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`).catch(() => {});
       };
     },
+  },
+  {
+    // The composer's one recording surface, state by state, in the seeded
+    // thread: idle, dictating (voice mode off), voice mode's first-time hint,
+    // holding to talk, hands-free listening and the Bot speaking. Idle,
+    // dictating, the hint and push-to-talk are live (Chrome's fake mic);
+    // hands-free and speaking are set with Studio's voice fixture event,
+    // since staging can't talk or wait on a spoken reply. Each state checks
+    // there's at most one timer and one indicator.
+    id: "studio-composer-voice",
+    packageDir: "bb-studio",
+    fileName: "composer-voice-speaking.png",
+    setup: async (client) => {
+      // A seeded thread with nothing queued, so the composer stands alone.
+      const threadId = process.env.BB_CAPTURE_WORKSPACE_THREAD_ID || seededThreadId;
+      const asset = (name) => new URL(`../../../packages/bb-studio/assets/${name}`, import.meta.url).pathname;
+      const until = async (expression, what, timeoutMs = 15000) => {
+        const started = Date.now();
+        while (!(await client.poll(expression))) {
+          if (Date.now() - started > timeoutMs) throw new Error(`Timed out waiting for ${what}`);
+          await sleep(150);
+        }
+      };
+      const recordings = new Set();
+      const noteRecording = async () => {
+        const id = await client.evaluate(`(() => { try { return JSON.parse(localStorage.getItem('bb-plugin-talk:active'))?.recordingId ?? null; } catch { return null; } })()`);
+        if (id) recordings.add(id);
+      };
+      const fixture = (state) => client.evaluate(`window.dispatchEvent(new CustomEvent("studio:voice-fixture", { detail: { threadId: ${JSON.stringify(threadId)}, state: ${JSON.stringify(state)} } }))`);
+      // What the footer shows: timers, indicators, and which controls.
+      const footer = () => client.evaluate(`(() => {
+        const box = document.querySelector('[data-promptbox]');
+        const shell = box.closest('[data-promptbox-shell]') ?? box;
+        const mic = box.querySelector('button[aria-label="Start voice input"]');
+        const clocks = (box.innerText.match(/\\b\\d+:\\d\\d\\b/g) ?? []).length;
+        return {
+          clocks,
+          recorder: !!shell.querySelector('[data-talk-inline]') || !!document.querySelector('[data-talk-overlay]'),
+          input: [...shell.querySelectorAll('[data-studio-voice-input]')].map((each) => each.getAttribute('data-studio-voice-input')),
+          output: shell.querySelectorAll('[data-studio-voice-output]').length,
+          mic: !!mic?.checkVisibility(),
+          ptt: !!shell.querySelector('button[aria-label="Hold to talk"]'),
+          hint: shell.querySelector('[data-studio-voice-hint]')?.innerText.trim() ?? null,
+          status: [...shell.querySelectorAll('[role="status"]')].map((each) => each.getAttribute('aria-label') || each.textContent.trim()).filter(Boolean),
+        };
+      })()`);
+      const expectFooter = async (name, want) => {
+        const started = Date.now();
+        let got;
+        while (Date.now() - started < 15000) {
+          got = await footer();
+          if (Object.entries(want).every(([key, value]) => JSON.stringify(got[key]) === JSON.stringify(value))) return got;
+          await sleep(150);
+        }
+        await client.capture(`${process.env.TMPDIR ?? "/tmp/"}composer-voice-${name}-failure.png`);
+        throw new Error(`Composer ${name}: wanted ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+      };
+      const clip = () => client.evaluate(`(() => {
+        // The input, and the hint above it when it shows (not the thread's queue).
+        const box = document.querySelector('[data-promptbox]').getBoundingClientRect();
+        const hint = document.querySelector('[data-studio-voice-hint]')?.getBoundingClientRect();
+        const top = Math.max(0, Math.min(box.top, hint?.top ?? box.top) - 20);
+        return { x: Math.max(0, box.left - 20), y: top, width: box.width + 40, height: box.bottom + 20 - top };
+      })()`);
+      // The pointer off the controls (no tooltips), and the meter given time to fill.
+      const shoot = async (name) => {
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 700, y: 300, buttons: 0 });
+        await client.evaluate(`document.activeElement?.blur?.()`);
+        await sleep(2500);
+        await client.capture(asset(name), await clip());
+      };
+      // Toasts wait while the pointer is over them.
+      const toastsGone = async () => {
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 700, y: 300, buttons: 0 });
+        await until(`!document.querySelector('[data-sonner-toast]')`, "toasts to clear", 30000);
+      };
+      const pttPoint = () => client.evaluate(`(() => { const r = document.querySelector('[data-studio-voice-ptt]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      const hold = async () => {
+        const point = await pttPoint();
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", ...point, buttons: 0 });
+        await client.command("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", buttons: 1, clickCount: 1 });
+        return point;
+      };
+      // Escape drops the held turn, so nothing is sent; then the button comes up.
+      const dropHeld = async (point) => {
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await client.command("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", buttons: 0, clickCount: 1 });
+      };
+      const cleanup = async () => {
+        await fixture(null).catch(() => {});
+        await noteRecording().catch(() => {});
+        if (await client.evaluate(`!!document.querySelector('button[aria-label="Stop without inserting"]')`).catch(() => false)) await client.clickAriaButtonWithPointer("Stop without inserting").catch(() => {});
+        if (await client.evaluate(`!!document.querySelector('button[aria-label="Voice mode on: replies are spoken. Turn off"]')`).catch(() => false)) await client.clickAriaButtonWithPointer("Voice mode on: replies are spoken. Turn off").catch(() => {});
+        await pluginRpc("studio", "voice.set", { threadId, on: false }).catch(() => {});
+        await sleep(1500);
+        for (const id of recordings) await talkRpc("recording_delete", { id }).catch(() => {});
+      };
+      try {
+        await pluginRpc("studio", "voice.set", { threadId, on: false });
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.evaluate(`localStorage.removeItem("studio:voice:ptt-hint-seen")`);
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector('[data-promptbox] button[data-talk-mic]', 30000);
+        await client.waitForAriaButton("Voice mode: speak replies aloud", 30000);
+
+        // 1. Idle: the dictation mic and the speaker, no timers.
+        await expectFooter("idle", { clocks: 0, recorder: false, input: [], output: 0, mic: true, ptt: false, hint: null });
+        await toastsGone();
+        await shoot("composer-idle.png");
+
+        // 2. Dictating, voice mode off: Talk's one recorder with its timer.
+        await client.clickAriaButtonWithPointer("Start voice input");
+        await client.waitForAriaButton("Pause", 20000);
+        await noteRecording();
+        await expectFooter("dictating", { clocks: 1, recorder: true, input: [], output: 0, ptt: false });
+        await shoot("composer-dictating.png");
+
+        // Turning voice mode on stops the dictation first, and voice mode takes the mic.
+        await client.clickAriaButtonWithPointer("Voice mode: speak replies aloud");
+        await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 15000);
+        await until(`!document.querySelector('button[aria-label="Pause"]')`, "the dictation to stop");
+        for (const label of ["Stop waiting; keep it in recordings", "Stop without inserting"]) {
+          if (await client.evaluate(`!!document.querySelector('button[aria-label=${JSON.stringify(label)}]')`)) await client.clickAriaButtonWithPointer(label);
+        }
+
+        // 3. Voice mode on, the first time: the hint, the hold-to-talk control, no dictation mic.
+        await expectFooter("hint", { clocks: 0, recorder: false, input: [], output: 0, mic: false, ptt: true, hint: "Hold to talk · long-press for hands-free" });
+        // It shows for a few seconds; for the picture, hold it while the toasts above clear.
+        await fixture("hint");
+        await toastsGone();
+        await shoot("composer-voice-hint.png");
+        await fixture(null);
+        // Seen once: not again after a reload.
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
+        await sleep(1500);
+        await expectFooter("hint-once", { hint: null, ptt: true, mic: false });
+
+        // 4. Push-to-talk: holding the control opens voice mode's mic: red dot and bars, no timer, no Talk recorder.
+        await toastsGone();
+        const point = await hold();
+        await until(`(() => { try { return JSON.parse(localStorage.getItem('bb-plugin-talk:active'))?.phase === 'recording'; } catch { return false; } })()`, "voice mode's capture");
+        await noteRecording();
+        await expectFooter("ptt", { clocks: 0, recorder: false, input: ["ptt"], output: 0, mic: false, ptt: false });
+        await shoot("composer-voice-ptt.png");
+        await dropHeld(point);
+        await expectFooter("ptt-dropped", { input: [], ptt: true });
+
+        // 5. Hands-free (set by the fixture): the red pill alone, no timer and no hold-to-talk control.
+        await fixture("listening-hands-free");
+        await expectFooter("hands-free", { clocks: 0, recorder: false, input: ["hands-free"], output: 0, mic: false, ptt: false });
+        await toastsGone();
+        await shoot("composer-voice-hands-free.png");
+        // Tapping the red pill goes back to push-to-talk.
+        await client.clickAriaButtonWithPointer("Listening hands-free. Tap for push-to-talk");
+        await expectFooter("hands-free-exit", { input: [], ptt: true });
+
+        // 6. The Bot speaking (set by the fixture): the same spot shows its voice, with Stop.
+        await fixture("speaking");
+        await expectFooter("speaking", { clocks: 0, recorder: false, input: [], output: 1, mic: false, ptt: true });
+        await client.waitForAriaButton("Stop speaking");
+        const speaking = await footer();
+        if (!speaking.status.includes("Speaking")) throw new Error(`The Bot's pill isn't announced as Speaking: ${JSON.stringify(speaking.status)}`);
+        // A press interrupts it.
+        const again = await hold();
+        await expectFooter("interrupt", { input: ["ptt"], output: 0 });
+        await noteRecording();
+        await dropHeld(again);
+        await expectFooter("speaking-again", { input: [], output: 1, ptt: true });
+        await toastsGone();
+        await shoot("composer-voice-speaking.png");
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      // The input, and the hint above it when it shows (not the thread's queue).
+      const box = document.querySelector('[data-promptbox]').getBoundingClientRect();
+      const hint = document.querySelector('[data-studio-voice-hint]')?.getBoundingClientRect();
+      const top = Math.max(0, Math.min(box.top, hint?.top ?? box.top) - 20);
+      return { x: Math.max(0, box.left - 20), y: top, width: box.width + 40, height: box.bottom + 20 - top };
+    })()`),
   },
   {
     id: "studio-setup",

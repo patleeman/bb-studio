@@ -2016,19 +2016,76 @@ piece being read is lit in the transcript. Recapture with
   *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
   current project (the Personal project otherwise), in the project's main
   checkout: a voice chat never makes its own worktree.
-- **Talking.** Use the composer's mic or your hold-to-talk key. In a voice
-  thread Talk cuts short segments, about every 2.5 seconds at a pause, so
-  your words stream into the input phrase by phrase, a second or two behind
-  you. A pill beside the buttons shows a red dot, the time and your level.
-  When you finish, what you said is sent as is (no cleanup pass). A draft
-  with mentions or files stays in the composer for Send instead.
+- **The composer, state by state.** Captured from a staged BB in a seeded
+  thread with `BB_CAPTURE_ONLY=studio-composer-voice`. Idle, dictating, the
+  hint and push-to-talk are live, on Chrome's fake microphone; hands-free and
+  the Bot speaking are set with Studio's `studio:voice-fixture` event, since
+  staging can't talk over a spoken reply. Each state checks there's at most
+  one timer and one indicator.
+
+  ![Idle: the speaker and the dictation mic, no timers](assets/composer-idle.png)
+
+  Idle: the speaker (voice mode, off) and the dictation mic.
+
+  ![Dictating with voice mode off: Talk's one recorder](assets/composer-dictating.png)
+
+  Dictating with voice mode off: Talk's recorder, the one timer, with
+  cancel and done.
+
+  ![Voice mode's first-time hint above the composer](assets/composer-voice-hint.png)
+
+  Voice mode on for the first time: the hint above the composer, the
+  hold-to-talk mic beside the speaker, and no dictation mic.
+
+  ![Holding to talk: the red pill, no timer](assets/composer-voice-ptt.png)
+
+  Holding to talk: the mic becomes the red pill with your level, and no timer.
+
+  ![Hands-free listening: the red pill alone](assets/composer-voice-hands-free.png)
+
+  Hands-free: the red pill alone; tap it to go back to push-to-talk.
+
+  ![The Bot speaking: the blue pill with speed and Stop](assets/composer-voice-speaking.png)
+
+  The Bot speaking: the same spot shows its voice in blue, with speed and
+  Stop, and the hold-to-talk mic to interrupt it.
+- **One mic, one indicator.** The composer shows at most one timer and one
+  level meter. Your voice is a red dot with red bars; the Bot's is its
+  speaker glyph with accent bars, only while it speaks, in the same spot. Voice
+  mode owns the mic in its thread: the dictation mic and Talk's recorder are
+  hidden, and turning voice mode on while you dictate finishes the dictation
+  first (it's typed in, not sent). Voice mode has no timer. There are no
+  words beside the controls; screen readers hear "Listening…" and
+  "Speaking…". (They belong in the field's placeholder, which BB doesn't let
+  plugins set yet.)
+- **Push-to-talk, the default.** Hold the mic beside the speaker to talk
+  and let go to send (or hold your hold-to-talk key). Escape while holding
+  drops the turn. Pressing it while the Bot speaks cuts the Bot off. The
+  first time voice mode is on, a hint above the composer says *Hold to talk ·
+  long-press for hands-free*; it shows once per device.
+- **Hands-free.** Hold the mic without saying anything for over half a
+  second, then let go: voice mode keeps listening. A pause of about a second
+  after you speak sends what you said, and the mic opens again. Talking over
+  the Bot stops it: Talk's level meter, measured against the room's noise
+  floor, has to stay above a speaking level for 0.3 seconds, a higher bar
+  than while the Bot is quiet, so its own voice leaking past the browser's
+  echo cancellation doesn't interrupt it. Tap the red pill to go back to
+  push-to-talk. Leaving the thread closes a mic that hasn't heard you, and
+  hands-free never starts on its own after a reload.
+- **Talking.** In a voice thread Talk cuts short segments, about every 2.5
+  seconds at a pause, so your words stream into the input phrase by phrase,
+  a second or two behind you, and pieces with no sound in them aren't sent
+  to be transcribed. When you finish, what you said is sent as is (no
+  cleanup pass). A draft with mentions or files stays in the composer for
+  Send instead.
 - **Hearing replies.** When a voice thread's agent finishes a reply, the
   server cuts it into pieces and starts making their audio at once, and the
   composer showing that thread plays it. The pill shows the agent's level,
-  "Speaking", a speed button (1×, 1.25×, 1.5×, 1.75×, 2×, saved as Speech's
+  a speed button (1×, 1.25×, 1.5×, 1.75×, 2×, saved as Speech's
   speed) and Stop, and the piece being read lights up in BB's own
-  transcript (a CSS highlight; BB's markup isn't changed). Starting to talk
-  cuts it off, and a new reply cuts off the one before. Replies play only
+  transcript (a CSS highlight; BB's markup isn't changed). Holding to talk,
+  or talking over it hands-free, cuts it off, and a new reply cuts off the
+  one before. Replies play only
   where the thread is open.
 - **Read aloud.** Every message's action bar has **Read aloud**: it plays
   that message (or the text you selected in it) in Speech's voice and speed,
