@@ -14,9 +14,11 @@ interface Snapshot {
   playing: SpeakerState;
   /** Voice mode per thread, as last read or set. */
   on: Readonly<Record<string, boolean>>;
+  /** The thread whose composer shows the push-to-talk hint, if any. */
+  hint: string | null;
 }
 
-let snapshot: Snapshot = { threadId: null, playing: "idle", on: {} };
+let snapshot: Snapshot = { threadId: null, playing: "idle", on: {}, hint: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<Snapshot>) => {
   snapshot = { ...snapshot, ...patch };
@@ -111,6 +113,15 @@ export const voicePlayer = {
     for (const sample of samples) sum += sample * sample;
     return Math.min(1, Math.sqrt(sum / samples.length) * 4);
   },
+  /** Show the push-to-talk hint above a thread's composer, or hide it (null). */
+  setHint(threadId: string | null): void {
+    if (snapshot.hint !== threadId) set({ hint: threadId });
+  },
+  hint(): string | null {
+    return snapshot.hint;
+  },
+  /** Called whenever voice mode or playback changes; returns the release. */
+  subscribe,
   /** A voice thread's composer offers to take its finished dictations; returns the release. */
   takeDictations(threadId: string, send: (text: string) => void): () => void {
     composers.set(threadId, send);

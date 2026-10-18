@@ -348,3 +348,48 @@ it("lets only one window take a waiting dictation", async () => {
     Reflect.deleteProperty(navigator, "locks");
   }
 });
+
+it("hands a voice thread's mic to voice mode: hidden there, its capture flagged, its silent pieces never uploaded", async () => {
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  document.body.append(prompt);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_voice" }));
+  const recording = { id: "rec_voice", durationMs: 0, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recordings.recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  const voiceOn = new Set(["thr_voice"]);
+  controller.voiceDictation = { wants: (threadId) => threadId !== null && voiceOn.has(threadId), deliver: () => true };
+  expect(controller.micState(prompt).mode).toBe("hidden");
+  voiceOn.clear();
+  expect(controller.micState(prompt).mode).toBe("idle");
+  voiceOn.add("thr_voice");
+  await controller.startRecording("dictation", prompt);
+  expect(controller.getState().voice).toBe(true);
+  expect(controller.isVoiceCapture()).toBe(true);
+  expect(controller.activity()).toEqual({ level: 0, quietForMs: 0 });
+  const remove = vi.spyOn(Outbox.prototype, "remove").mockResolvedValue();
+  vi.mocked(Outbox.prototype.complete).mockClear();
+  // The analyser reads silence: the piece is dropped, not sealed for upload.
+  await controller.stop(false);
+  await vi.waitFor(() => expect(remove).toHaveBeenCalled());
+  expect(Outbox.prototype.complete).not.toHaveBeenCalled();
+  unregister();
+});
+
+it("keeps a dictation started before voice mode an ordinary one", async () => {
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  document.body.append(prompt);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_voice" }));
+  const recording = { id: "rec_plain", durationMs: 0, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recordings.recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  let on = false;
+  controller.voiceDictation = { wants: () => on, deliver: () => true };
+  await controller.startRecording("dictation", prompt);
+  on = true;
+  expect(controller.getState().voice).toBe(false);
+  expect(controller.isVoiceCapture()).toBe(false);
+  await controller.stop(false);
+  unregister();
+});

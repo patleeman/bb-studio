@@ -57,6 +57,11 @@ export class LevelTracker {
   /** 0..1, smoothed for a level meter. */
   level = 0;
 
+  /** How long the level has stayed below the speech threshold. */
+  get quietForMs(): number {
+    return this.quietMs;
+  }
+
   push(rms: number, dtMs: number): { quietForMs: number } {
     // Floor drops at once to a quieter reading, and creeps up slowly.
     this.floor = rms < this.floor ? rms : this.floor + (rms - this.floor) * Math.min(1, dtMs / 8000);

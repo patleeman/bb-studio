@@ -216,13 +216,16 @@ export function TalkOverlay() {
   const open = useOpenMain();
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
-  const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);
+  // Voice mode's capture shows in voice mode's own pill; Talk's appears only when something needs you.
+  const voiceOwned = state.voice && !state.transcribeError && !state.localSaveError;
+  const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError && !voiceOwned);
   const drag = useDraggable<HTMLDivElement>();
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
   // follows the composer on screen.
   const now = useNow(state.phase !== "idle");
 
+  if (state.phase !== "idle" && voiceOwned) return null;
   if (state.phase === "idle") {
     if (state.pendingUploads === 0) return null;
     return (

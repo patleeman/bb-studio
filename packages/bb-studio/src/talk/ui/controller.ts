@@ -115,6 +115,12 @@ export interface TalkState {
   cleaning: boolean;
   /** Dictation only: why the voice service failed on a piece; null while it works. */
   transcribeError: string | null;
+  /**
+   * Voice mode's capture (src/voice/): started in a thread in voice mode. It
+   * cuts short segments, skips silent ones, and sends its text instead of
+   * typing it in; voice mode's own pill shows it, not Talk's.
+   */
+  voice: boolean;
 }
 
 interface Persisted {
@@ -129,6 +135,7 @@ interface Persisted {
   localSaveFailed?: boolean;
   /** Written before the recorder starts; cleared only after its audio is durable. */
   captureInProgress?: boolean;
+  voice?: boolean;
 }
 
 interface OpenSegment {
@@ -144,6 +151,8 @@ interface OpenSegment {
   /** Retained until the entire segment is durably sealed. */
   parts: Blob[];
   failed: boolean;
+  /** Some tick in it was above the noise floor. */
+  voiced: boolean;
 }
 
 interface Capture {
@@ -187,6 +196,7 @@ const INITIAL: TalkState = {
   transcript: "",
   cleaning: false,
   transcribeError: null,
+  voice: false,
 };
 
 type SetThreadRowStatus = NonNullable<PluginContentScriptContext["experimental_setThreadRowStatus"]>;
@@ -256,6 +266,8 @@ export class TalkController {
   private fieldsOnScreen = new Set<string>();
   /** Finished captures still transcribing, to report ones discarded as empty. */
   private readonly settling = new Map<string, RecordingKind>();
+  /** Voice mode's captures: one that heard nothing goes away without a word. */
+  private readonly voiceRecordings = new Set<string>();
   private insertOnDone = false;
   /**
    * Voice mode (src/voice/): a dictation into a voice thread cuts short
@@ -290,6 +302,22 @@ export class TalkController {
   /** Input level 0..1 for a meter; read it on animation frames. */
   level(): number {
     return this.capture?.tracker.level ?? 0;
+  }
+
+  /** The live capture's level and how long it has been quiet, for voice mode's turn taking; null when not capturing. */
+  activity(): { level: number; quietForMs: number } | null {
+    const tracker = this.capture?.tracker;
+    return tracker ? { level: tracker.level, quietForMs: tracker.quietForMs } : null;
+  }
+
+  /** Whether voice mode's capture is on: one started in a voice thread. */
+  isVoiceCapture(): boolean {
+    return this.isDictating() && this.state.voice;
+  }
+
+  /** Something outside Talk changed what the composer mic should show (voice mode turned on or off). */
+  invalidate(): void {
+    this.set({});
   }
 
   private set(patch: Partial<TalkState>): void {
@@ -434,6 +462,9 @@ export class TalkController {
 
   /** How the composer mic in `promptbox` should look and behave. */
   micState(promptbox: HTMLElement): MicState {
+    // Voice mode owns the microphone in its thread: no second recorder.
+    const { threadId } = composerSource(promptbox, this.context);
+    if (threadId !== null && this.voiceDictation?.wants(threadId)) return { mode: "hidden", title: "Voice mode is listening here" };
     if (!this.isActive()) return { mode: "idle", title: "Dictate with Talk" };
     if (this.state.localSaveError) return { mode: "busy", title: this.busyMessage() };
     if (this.isDictating() && this.isSourceComposer(promptbox)) {
@@ -508,6 +539,7 @@ export class TalkController {
       kind: saved.kind,
       threadId: saved.threadId,
       field: parseField(saved.field),
+      voice: saved.voice === true,
       recording,
       recordedMs: recording.durationMs,
       phase: interrupted ? "storage-error" : saved.phase,
@@ -545,7 +577,8 @@ export class TalkController {
     this.insertOnDone = kind === "dictation";
     // A field dictation belongs to the field, not to the open thread.
     const threadId = field ? null : source.threadId;
-    this.set({ ...INITIAL, phase: "starting", kind, threadId, field });
+    const voice = kind === "dictation" && threadId !== null && this.voiceDictation?.wants(threadId) === true;
+    this.set({ ...INITIAL, phase: "starting", kind, threadId, field, voice });
     const epoch = this.startEpoch;
     let stream: MediaStream;
     try {
@@ -567,6 +600,7 @@ export class TalkController {
         threadId,
       });
       created = recording.id;
+      if (voice) this.voiceRecordings.add(recording.id);
       if (epoch !== this.startEpoch) throw new StartCancelled();
       this.set({ recordingId: recording.id, recording });
       this.persistPhase("recording");
@@ -826,6 +860,7 @@ export class TalkController {
       mimeType: recorder.mimeType || capture.mimeType || "audio/webm",
       parts: [],
       failed: false,
+      voiced: false,
       closed: new Promise<void>((resolve) => (markClosed = resolve)),
       writes: this.outbox.begin({
         ...key,
@@ -856,8 +891,10 @@ export class TalkController {
     });
     recorder.addEventListener("stop", () => {
       const durationMs = segment.elapsedMs;
+      // Voice mode listens between turns: a piece with no sound in it isn't sent to be transcribed.
+      const silent = this.state.voice && !segment.voiced;
       segment.writes = segment.writes
-        .then(async () => { if (!segment.failed) await this.outbox.complete(key, durationMs); })
+        .then(async () => { if (!segment.failed) await (silent ? this.outbox.remove(key) : this.outbox.complete(key, durationMs)); })
         .catch(report)
         .finally(() => {
           if (!segment.failed) this.live.delete(keyString(key));
@@ -891,7 +928,8 @@ export class TalkController {
     capture.analyser.getFloatTimeDomainData(capture.samples);
     const { quietForMs } = capture.tracker.push(rmsOf(capture.samples), dt);
     const current = capture.current;
-    const policy = this.voiceDictation?.wants(this.state.threadId) ? VOICE_SEGMENT_POLICY : this.policy;
+    if (current && quietForMs === 0) current.voiced = true;
+    const policy = this.state.voice ? VOICE_SEGMENT_POLICY : this.policy;
     if (current && shouldCut(policy, current.elapsedMs, quietForMs)) {
       // Open the next recorder before stopping this one so no audio falls
       // between them; a few milliseconds of overlap is harmless.
@@ -1041,7 +1079,7 @@ export class TalkController {
     }
     if (isEmptyRecording(recording)) {
       // The server discards it; an open recording page says so itself.
-      if (kind === "dictation" || this.viewing !== id) this.announceEmpty(kind);
+      if (kind === "dictation" || this.viewing !== id) this.announceEmpty(kind, id);
       if (this.state.recordingId === id) this.finishIdle();
     } else if (this.insertOnDone) {
       this.set({ phase: "transcribing" });
@@ -1082,7 +1120,7 @@ export class TalkController {
     } catch (error) {
       if (/No recording/.test(message(error))) {
         // A dictation deleted while transcribing was discarded as empty.
-        if (this.state.phase === "transcribing") this.announceEmpty(this.state.kind);
+        if (this.state.phase === "transcribing") this.announceEmpty(this.state.kind, this.state.recordingId);
         await this.stopCapture();
         this.finishIdle();
       }
@@ -1109,7 +1147,7 @@ export class TalkController {
     const raw = this.state.transcript.trim();
     // Voice mode sends what was said as is: no cleanup wait, no typing.
     const voiceThread = this.state.threadId;
-    if (raw !== "" && voiceThread !== null && !this.state.field && this.voiceDictation?.wants(voiceThread) && this.voiceDictation.deliver(voiceThread, raw)) {
+    if (raw !== "" && voiceThread !== null && this.state.voice && this.voiceDictation?.deliver(voiceThread, raw)) {
       this.finishIdle();
       return;
     }
@@ -1125,7 +1163,7 @@ export class TalkController {
     const { threadId, field, recording } = this.state;
     const references: RecordingReference[] = recording ? [{ id: recording.id, title: recording.title, kind: recording.kind }] : [];
     if (text === "") {
-      this.announceEmpty(this.state.kind);
+      this.announceEmpty(this.state.kind, id);
     } else if (field) {
       if (!insertIntoField(field.key, text)) {
         await holdPending(`${FIELD_PENDING_PREFIX}${field.key}`, text);
@@ -1206,11 +1244,13 @@ export class TalkController {
     } catch (error) {
       if (!/No recording/.test(message(error)) || !this.settling.delete(id)) return;
       // An open recording page says so itself.
-      if (this.viewing !== id) this.announceEmpty(kind);
+      if (this.viewing !== id) this.announceEmpty(kind, id);
     }
   }
 
-  private announceEmpty(kind: RecordingKind): void {
+  private announceEmpty(kind: RecordingKind, id: string | null): void {
+    // Voice mode's quiet turns (a tap, or silence before leaving hands-free) aren't news.
+    if (id !== null && this.voiceRecordings.delete(id)) return;
     toast.info(
       kind === "dictation"
         ? "Talk heard no speech, so it didn't keep the dictation."
@@ -1570,6 +1610,7 @@ export class TalkController {
     const { recordingId, kind, threadId, field } = this.state;
     if (recordingId) {
       return this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath,
+        voice: this.state.voice,
         captureInProgress: phase === "recording" || this.unsaved.size > 0 || this.state.localAudioLost,
         localSaveFailed: this.unsaved.size > 0 || this.state.localAudioLost });
     }

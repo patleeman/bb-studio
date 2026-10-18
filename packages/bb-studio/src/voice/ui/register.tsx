@@ -1,10 +1,14 @@
-// Voice mode in BB's own thread view (round 3a of the "Voice mode in a
-// thread" design). Beside the composer's mic: a speaker button that turns
-// voice mode on for the thread, and a small pill that shows who's talking with
-// a live level and no words beside the controls: you (red dot, time) or the agent (its level,
-// Stop). While you talk, your words stream into the input phrase by phrase and
-// are sent when you finish; while the agent speaks, the piece being read
-// lights up in the transcript. New voice chat starts a thread with it on.
+// Voice mode in BB's own thread view, and the composer's one recording
+// surface ("Composer: one recording surface"). A speaker button turns voice
+// mode on for the thread; then voice mode owns the mic: Talk's dictation mic
+// and recorder are hidden, and one spot beside the speaker shows one thing at
+// a time, with no words or timer beside it: the hold-to-talk control, your
+// voice (a red dot and red bars) or the Bot's (its speaker glyph and accent
+// bars, with Stop). Push-to-talk is the default; a long silent press switches
+// to hands-free, and tapping the red pill switches back (voice-input.ts has
+// the rules). While you talk, your words stream into the input phrase by
+// phrase and are sent when you finish; while the Bot speaks, the piece being
+// read lights up in the transcript. New voice chat starts a thread with it on.
 import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "@bb-studio/kit/ui";
 import { SpeechSection } from "../../ui/setup/SpeechSection";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -16,6 +20,7 @@ import type { speechContract } from "../../speech/contract";
 import type { voiceContract } from "../contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "../shared";
 import { useVoiceSnapshot, voicePlayer } from "./state";
+import { HINT_TEXT, INITIAL_INPUT, SpeechGate, footer, reduce, takeHint, wantsCapture, type VoiceEffect, type VoiceEvent, type VoiceInput } from "./voice-input";
 
 const NEW_VOICE_CHAT_EVENT = "studio:new-voice-chat";
 const TOGGLE_VOICE_EVENT = "studio:toggle-voice";
@@ -111,6 +116,17 @@ function VoiceControls() {
   return null;
 }
 
+/** Screenshots and tests set a voice state without a microphone or a reply: `{ threadId, state }`, state null to clear. */
+export const VOICE_FIXTURE_EVENT = "studio:voice-fixture";
+type Fixture = "listening-ptt" | "listening-hands-free" | "speaking" | "hint";
+const FIXTURES: readonly Fixture[] = ["listening-ptt", "listening-hands-free", "speaking", "hint"];
+const HINT_SHOWS_MS = 8000;
+
+const inputLevel = () => talk.level();
+const outputLevel = () => voicePlayer.level();
+/** A believable level for a fixture's meter. */
+const fixtureLevel = () => 0.3 + 0.45 * Math.abs(Math.sin(performance.now() / 170) * Math.cos(performance.now() / 410));
+
 function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerApi; threadId: string }) {
   const { on, set, conversational, setConversational } = useVoiceMode(threadId);
   const voiceRpc = useRpc<typeof voiceContract>();
@@ -120,8 +136,135 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
   const snapshot = useVoiceSnapshot();
   const talkState = useTalkState();
   const sdk = useSdk();
-  const listening = on && talkState.threadId === threadId && talkState.kind === "dictation" && (talkState.phase === "starting" || talkState.phase === "recording" || talkState.phase === "transcribing");
-  const speaking = snapshot.threadId === threadId && snapshot.playing !== "idle";
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [fixture, setFixture] = useState<Fixture | null>(null);
+  const [input, setInput] = useState<VoiceInput>(INITIAL_INPUT);
+  const inputRef = useRef(input);
+  const gate = useRef(new SpeechGate());
+  const releasedAt = useRef(0);
+
+  const ours = talkState.threadId === threadId && talkState.kind === "dictation" && talkState.voice;
+  const capturing = ours && (talkState.phase === "starting" || talkState.phase === "recording");
+  const listening = ours && (capturing || talkState.phase === "transcribing");
+  const realSpeaking = snapshot.threadId === threadId && snapshot.playing !== "idle";
+  const speaking = fixture ? fixture === "speaking" : realSpeaking;
+  const capturingRef = useRef(capturing);
+  capturingRef.current = capturing;
+  const speakingRef = useRef(realSpeaking);
+  speakingRef.current = realSpeaking;
+  const shown: VoiceInput = fixture === "listening-ptt" ? { sub: "ptt", pressedAt: 0 } : fixture === "listening-hands-free" ? { sub: "hands-free", pressedAt: null } : input;
+  const view = footer({ voiceOn: on, state: shown, dictating: talkState.kind === "dictation" && talkState.phase !== "idle" && !talkState.voice, capturing: fixture ? fixture === "listening-ptt" : capturing, speaking });
+
+  const run = useCallback((effect: VoiceEffect) => {
+    switch (effect) {
+      case "start-capture": {
+        const state = talk.getState();
+        // The last turn is still being transcribed: it's the one capture Talk has.
+        if (state.voice && state.threadId === threadId && state.phase !== "idle") return;
+        gate.current.reset();
+        void talk.startRecording("dictation", anchor.current?.closest<HTMLElement>("[data-promptbox]") ?? null)
+          .catch((error: unknown) => toast.error("Couldn't start listening", { description: errorMessage(error) }))
+          .then(() => {
+            // It didn't open (no mic, or Talk busy elsewhere): hands-free goes back to push-to-talk rather than retry.
+            const state = talk.getState();
+            if (state.voice && state.threadId === threadId && state.phase !== "idle") return;
+            if (inputRef.current.sub === "hands-free") {
+              inputRef.current = INITIAL_INPUT;
+              setInput(INITIAL_INPUT);
+            }
+          });
+        return;
+      }
+      case "send":
+        gate.current.reset();
+        void talk.stop(true);
+        return;
+      case "discard":
+        gate.current.reset();
+        void talk.stop(false);
+        return;
+      case "finish-dictation":
+        void talk.stop(true);
+        return;
+      case "stop-playback":
+        voicePlayer.stop();
+        return;
+      case "show-hint":
+        voicePlayer.setHint(threadId);
+        window.setTimeout(() => { if (voicePlayer.hint() === threadId) voicePlayer.setHint(null); }, HINT_SHOWS_MS);
+        return;
+    }
+  }, [threadId]);
+
+  const dispatch = useCallback((event: VoiceEvent) => {
+    const state = talk.getState();
+    const context = {
+      speaking: speakingRef.current,
+      capturing: state.voice && state.threadId === threadId && (state.phase === "starting" || state.phase === "recording"),
+    };
+    const result = reduce(inputRef.current, event, context);
+    inputRef.current = result.state;
+    setInput(result.state);
+    result.effects.forEach(run);
+  }, [threadId, run]);
+
+  // Voice mode takes the mic from a dictation, and gives it back when it's off.
+  const wasOn = useRef(on);
+  useEffect(() => {
+    if (wasOn.current === on) return;
+    wasOn.current = on;
+    dispatch(on ? { type: "voice-on", dictating: talk.isDictating() && !talk.getState().voice } : { type: "voice-off" });
+  }, [on, dispatch]);
+
+  // The first time voice mode is on, say how the control works.
+  useEffect(() => {
+    if (on && takeHint(window.localStorage)) run("show-hint");
+  }, [on, run]);
+
+  // Screenshots and tests: a voice state without audio.
+  useEffect(() => {
+    const onFixture = (event: Event) => {
+      const detail = (event as CustomEvent<{ threadId?: string; state?: string | null }>).detail;
+      if (detail?.threadId !== threadId) return;
+      const next = FIXTURES.find((each) => each === detail.state) ?? null;
+      setFixture(next === "hint" ? null : next);
+      voicePlayer.setHint(next === "hint" ? threadId : null);
+    };
+    window.addEventListener(VOICE_FIXTURE_EVENT, onFixture);
+    return () => window.removeEventListener(VOICE_FIXTURE_EVENT, onFixture);
+  }, [threadId]);
+
+  // Push-to-talk from the hold-to-talk key (or a command) cuts the Bot off too.
+  useEffect(() => { if (capturing && inputRef.current.sub === "ptt") voicePlayer.stop(); }, [capturing]);
+
+  // Hands-free keeps the mic open between turns.
+  const talkIdle = talkState.phase === "idle";
+  useEffect(() => {
+    if (!fixture && wantsCapture(on, input, talkIdle)) run("start-capture");
+  }, [on, input, talkIdle, fixture, run]);
+
+  // Turn taking: talking over the Bot stops it; in hands-free, a pause after you speak sends.
+  useEffect(() => {
+    if (!on || !capturing || fixture) return;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const sample = talk.activity();
+      const dt = now - last;
+      last = now;
+      if (!sample) return;
+      const { bargeIn, turnEnd } = gate.current.push(sample, dt, speakingRef.current);
+      if (bargeIn) dispatch({ type: "barge-in" });
+      if (turnEnd) dispatch({ type: "turn-end" });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [on, capturing, fixture, dispatch]);
+
+  // Leaving the thread closes a hands-free mic that hasn't heard anything.
+  useEffect(() => () => {
+    const state = talk.getState();
+    if (inputRef.current.sub === "hands-free" && !gate.current.heard && state.voice && state.threadId === threadId && state.phase === "recording") void talk.stop(false);
+  }, [threadId]);
 
   useEffect(() => {
     const toggle = (event: Event) => { if ((event as CustomEvent<{ threadId?: string }>).detail?.threadId === threadId) void set(!on); };
@@ -129,20 +272,17 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     return () => window.removeEventListener(TOGGLE_VOICE_EVENT, toggle);
   }, [threadId, on, set]);
 
-  // Starting to talk cuts the reply off.
-  useEffect(() => { if (listening) voicePlayer.stop(); }, [listening]);
-
   // While you talk, your words stream into the input after what was typed.
   const typed = useRef<string | null>(null);
   const composerRef = useRef(composer);
   composerRef.current = composer;
   useEffect(() => {
-    if (!listening) { typed.current = null; return; }
+    if (!on || !listening) { typed.current = null; return; }
     if (typed.current === null) typed.current = composer.text;
     const heard = talkState.transcript.trim();
     const before = typed.current;
     composer.replace((current) => ({ text: joinText(before, heard), mentions: current.mentions.filter((mention) => mention.to <= before.length) }));
-  }, [listening, talkState.transcript, composer]);
+  }, [on, listening, talkState.transcript, composer]);
 
   // When you finish, what you said is sent; the input goes back to empty.
   useEffect(() => {
@@ -172,33 +312,88 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     const spoken = event as VoiceSpoken;
     if (!on || spoken.threadId !== threadId) return;
     if (spoken.problem) return void toast.error("Couldn't speak the reply", { description: spoken.problem });
-    if (listening || !spoken.urls.length) return;
+    // Not over you: while you hold to talk, or once hands-free has heard you this turn.
+    const state = inputRef.current;
+    const talking = state.sub === "ptt" ? state.pressedAt !== null || capturingRef.current : gate.current.heard;
+    if (talking || !spoken.urls.length) return;
     voicePlayer.play(threadId, spoken.urls, spoken.pieces).catch((error: unknown) => toast.error("Couldn't play the reply", { description: errorMessage(error) }));
   });
 
+  const press = (at: number) => { voicePlayer.setHint(null); dispatch({ type: "press", at }); };
+  const release = (at: number) => { releasedAt.current = at; dispatch({ type: "release", at, heard: gate.current.heard }); };
+  const handsFree = view.sub === "hands-free";
+  const inputShown = view.indicator === "input";
+  const pttLabel = inputShown
+    ? (handsFree ? "Listening hands-free. Tap for push-to-talk" : "Listening. Release to send")
+    : "Hold to talk";
   const label = on ? "Voice mode on: replies are spoken. Turn off" : "Voice mode: speak replies aloud";
+  const loading = snapshot.playing === "loading" && !fixture;
   return (
     <>
-      {on && listening ? (
-        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 pr-1 text-xs text-muted-foreground" role="status" aria-live="polite" aria-label="Listening" title="Listening">
-          <span aria-hidden className="size-1.5 rounded-full bg-red-500" />
-          <Elapsed recordedMs={talkState.recordedMs} since={talkState.captureStartedAt} />
-          <Wave level={() => talk.level()} className="bg-sky-400" />
-        </span>
-      ) : on && speaking ? (
-        <span className="inline-flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md pl-2.5 text-xs text-muted-foreground" role="status" aria-live="polite" aria-label={snapshot.playing === "loading" ? "Getting ready to speak" : "Speaking"} title={snapshot.playing === "loading" ? "Getting ready to speak" : "Speaking"}>
-          <Wave level={() => voicePlayer.level()} className="bg-primary" />
+      <span ref={anchor} hidden data-studio-voice-anchor="" />
+      {/* The state word, for screen readers: the field's placeholder has no plugin API yet. */}
+      <span className="sr-only" role="status" aria-live="polite">{view.placeholder ?? ""}</span>
+      {view.indicator === "output" ? (
+        <span data-studio-voice-output="" className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary/10 pl-2.5 text-xs text-primary" role="status" aria-label={loading ? "Getting ready to speak" : "Speaking"} title={loading ? "Getting ready to speak" : "Speaking"}>
+          <Icon name="studio/speaker" className="size-3.5 shrink-0" />
+          <Wave level={fixture ? fixtureLevel : outputLevel} className="bg-primary" />
           <Tooltip label="Speed" side="top">
             <button type="button" aria-label={`Speed ${speed}×, change`} className="inline-flex h-8 min-w-9 shrink-0 items-center justify-center rounded-md px-1.5 text-xs font-medium tabular-nums text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={() => changeSpeed(nextSpeed(speed))}>
               {speed}×
             </button>
           </Tooltip>
           <Tooltip label="Stop speaking" side="top">
-            <button type="button" aria-label="Stop speaking" className={ACTION_BUTTON} onClick={() => voicePlayer.stop()}>
+            <button type="button" aria-label="Stop speaking" className={cn(ACTION_BUTTON, "rounded-full")} onClick={() => voicePlayer.stop()}>
               <Icon name="Square" className="size-3.5" />
             </button>
           </Tooltip>
         </span>
+      ) : null}
+      {view.ptt || inputShown ? (
+        <Tooltip label={inputShown ? (handsFree ? "Tap for push-to-talk" : "Release to send") : HINT_TEXT} side="top">
+          <button
+            type="button"
+            aria-label={pttLabel}
+            aria-pressed={inputShown && !handsFree}
+            data-studio-voice-input={inputShown ? view.sub : undefined}
+            data-studio-voice-ptt=""
+            className={cn(
+              "inline-flex h-8 shrink-0 touch-none select-none items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              inputShown ? "gap-2 bg-red-500/10 pl-2.5 pr-3 text-red-600 hover:bg-red-500/15 dark:text-red-400" : "w-8 text-muted-foreground hover:bg-state-hover hover:text-foreground [&_svg]:size-4",
+            )}
+            onPointerDown={(event) => {
+              if (event.button !== 0 || handsFree) return;
+              event.preventDefault();
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              press(performance.now());
+            }}
+            onPointerUp={() => { if (!handsFree) release(performance.now()); }}
+            onPointerCancel={() => dispatch({ type: "cancel" })}
+            onKeyDown={(event) => {
+              if ((event.key !== " " && event.key !== "Enter") || event.repeat || handsFree) return;
+              event.preventDefault();
+              press(performance.now());
+            }}
+            onKeyUp={(event) => {
+              if ((event.key !== " " && event.key !== "Enter") || handsFree) return;
+              event.preventDefault();
+              release(performance.now());
+            }}
+            onClick={() => {
+              // The click that ends a long press isn't a tap on the new pill.
+              if (handsFree && performance.now() - releasedAt.current > 400) dispatch({ type: "tap-pill", heard: gate.current.heard });
+            }}
+          >
+            {inputShown ? (
+              <>
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-red-500" />
+                <Wave level={fixture ? fixtureLevel : inputLevel} className="bg-red-500" />
+              </>
+            ) : (
+              <Icon name="Mic" className="size-4" />
+            )}
+          </button>
+        </Tooltip>
       ) : null}
       {/* A split button, like Send: the speaker turns voice mode on or off; the caret opens its settings. */}
       <span className={cn("inline-flex h-8 shrink-0 items-center rounded-md", on ? "bg-primary/15 text-primary" : "")}>
@@ -278,19 +473,25 @@ function Wave({ level, className }: { level: () => number; className: string }) 
   );
 }
 
-function Elapsed({ recordedMs, since }: { recordedMs: number; since: number | null }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (since === null) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 500);
-    return () => window.clearInterval(timer);
-  }, [since]);
-  const seconds = Math.max(0, Math.floor((recordedMs + (since === null ? 0 : now - since)) / 1000));
-  return <span className="font-medium tabular-nums text-foreground max-sm:hidden">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span>;
-}
-
 function newVoiceChat(projectId: string | null): void {
   window.dispatchEvent(new CustomEvent(NEW_VOICE_CHAT_EVENT, { detail: { projectId } }));
+}
+
+/** Above a voice thread's composer, once: how the hold-to-talk control works. */
+function VoiceHint() {
+  const composer = useComposer();
+  const { hint } = useVoiceSnapshot();
+  const threadId = composer.scope.kind === "thread" ? composer.scope.threadId : null;
+  if (!threadId || hint !== threadId) return null;
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground" role="note" data-studio-voice-hint="">
+      <Icon name="Mic" className="size-3.5 shrink-0" />
+      <span className="min-w-0 flex-1">{HINT_TEXT}</span>
+      <button type="button" aria-label="Dismiss" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground" onClick={() => voicePlayer.setHint(null)}>
+        <Icon name="X" className="size-3.5" />
+      </button>
+    </div>
+  );
 }
 
 /** Makes new voice chats for the button and the command, and opens them. */
@@ -329,10 +530,13 @@ const prepareSpeech = async (text: string) => (await studioRpc<{ url: string }>(
 export function registerVoiceApp(app: PluginAppBuilder): void {
   // Dictations into a voice thread cut short segments and are sent, not typed in.
   talk.voiceDictation = { wants: (threadId) => voicePlayer.isOn(threadId), deliver: (threadId, text) => voicePlayer.deliver(threadId, text) };
+  // Voice mode turning on or off shows or hides Talk's composer mic.
+  voicePlayer.subscribe(() => talk.invalidate());
   app.composer.customize({
     id: "voice",
     scopes: ["thread", "new-thread"],
     actions: [{ id: "voice", component: VoiceControls }],
+    banners: [{ id: "ptt-hint", chrome: "bare", component: VoiceHint }],
   });
   app.slots.experimental_appOverlay({ id: "voice-chat-starter", component: VoiceChatStarter });
   // Under any reply: read it aloud (again), in the Speech voice and speed; pressing it while it reads stops it.
