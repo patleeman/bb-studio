@@ -26,7 +26,7 @@ are unchanged, and old `bbgo://` links still open.
 | Drafts are kept per thread, and Home marks threads that have one | `iOS/Thread/Drafts.swift` |
 | `@` suggests threads, recordings, pages, drawings, and artifacts, and sends them as real BB mentions | `iOS/Thread/MentionSuggestions.swift`, `Shared/Mentions.swift` |
 | `/` searches the project's commands and skills and inserts the chosen command as a BB command mention | `iOS/Thread/CommandSuggestions.swift`, `Shared/ComposerCommands.swift` |
-| The composer is one card, as in ChatGPT: attachments, the field at full width, then + (attach), the model button (model and reasoning level; opens Model & permissions), dictate, and send. Tap the mic to dictate inline, as on desktop: no sheet; the mic turns active and Listening (time, level, ✓ finish, ✕ cancel) shows over the composer while your words stream into the field after what you typed, in short segments as Talk transcribes them. Tap the mic again or ✓ to finish: the full transcript replaces the streamed words and stays in the field to edit and send (in a voice thread it's sent, like letting go of a hold). ✕ puts back what you typed. Leaving the thread or the app, or a sheet opening, finishes it into the field rather than losing words. Hold the mic to talk and send as before. It grows with the message, then offers a full-screen editor. While dictation has words on the way (the mic's dictation or talk, or the keyboard's own mic), Send and ⌘↩ are off and "Listening…" or "Transcribing…" shows beside Send until the text is in the field; an error, cancel or closing the sheet frees it. The keyboard's dictation is read from UIKit's input mode ("dictation"), its recording-ended, failed and result-placeholder callbacks on the field, and the next text change; the same input-mode check holds Send in New thread, Write, Capture note, page comments, Work with this page, Chat About This and queued-message edits | `iOS/Thread/Composer.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/DictationGate.swift` |
+| The composer is one card, as in ChatGPT: attachments, the field at full width, then + (attach), the model button (model and reasoning level; opens Model & permissions), dictate, and send. Tap the mic to dictate inline, as on desktop: no sheet; the mic turns active and Listening (time, level, ✓ finish, ✕ cancel) shows over the composer while your words stream into the field after what you typed, in short segments as Talk transcribes them. Tap the mic again or ✓ to finish: the full transcript replaces the streamed words and stays in the field to edit and send. ✕ puts back what you typed. Leaving the thread or the app, or a sheet opening, finishes it into the field rather than losing words. Hold the mic to talk and send as before. In voice mode push to talk takes the mic's place (see [Voice mode](#voice-mode)); a talk's status always shows in the one pill over the composer, never in the field. It grows with the message, then offers a full-screen editor. While dictation has words on the way (the mic's dictation or talk, or the keyboard's own mic), Send and ⌘↩ are off (VoiceOver reads "Listening…" or "Transcribing…" beside Send) until the text is in the field; an error, cancel or closing the sheet frees it. The keyboard's dictation is read from UIKit's input mode ("dictation"), its recording-ended, failed and result-placeholder callbacks on the field, and the next text change; the same input-mode check holds Send in New thread, Write, Capture note, page comments, Work with this page, Chat About This and queued-message edits | `iOS/Thread/Composer.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/DictationGate.swift` |
 | Change a thread's model, reasoning level, and permissions (Accept edits, Auto, Full access, up to the machine's ceiling) for its next turns. BB takes permissions with each message, so the choice goes out with the next one you send. Until then a card over the composer shows it, with Undo. A Provider picker (BB's available providers) moves the thread to another provider: BB can't change a thread's provider, so Hand off calls Studio's `thread_handoff_to_model`, "Handing off to <provider>…" shows over the composer while Studio summarizes the thread into a new one (permissions carry over), and the app then follows the new thread (in the Bot chat, the bot's next thread) | `iOS/Thread/ExecutionSheet.swift`, `Shared/ModelHandoff.swift` |
 | File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
@@ -205,10 +205,52 @@ way (`speech.prepare` per piece, after the ported `speakable` and
 silence with the screen locked, so replies still play, until a minute after
 the thread stops working and nothing is speaking.
 
-Holding (or tapping) the mic in a voice thread cuts phrase-length segments (2.5 s target,
-8 s max, 300 ms pause), puts the words in the field as Talk transcribes
-them, and sends on release (or on ✓) with Studio's agent-only conversational note when
-Conversational Replies is on. Starting to talk stops the reply.
+### One mic, one indicator
+
+The composer has one mic and one indicator, as on desktop (Studio's page
+"Composer: one recording surface"): at most one timer and one level at a
+time, always in the same spot over the composer. Your voice is a red dot and
+red bars; the Bot's is a speaker and accent bars, shown only while it speaks.
+Input and output never show together. "Listening…" and "Speaking…" go in
+the field's placeholder, not beside the buttons (`iOS/Voice/ComposerVoice.swift`).
+
+- **Idle:** the mic (dictate) and the speaker (voice mode), no timers.
+- **Dictating:** one red recorder pill with a timer, ✕ and ✓.
+- **Voice mode on:** voice mode owns the mic, so the dictation mic is hidden
+  and push to talk (a waveform) takes its place. Turning voice mode on while
+  dictating finishes the dictation into the draft first. No timer.
+- **The Bot speaking:** the same spot shows the speaker, its level, the speed
+  and Stop.
+
+Push to talk is the default: hold to talk, let go to send (slide left to
+cancel). Pressing while the Bot speaks stops it. Hold without speaking for
+a second (a long press) and it switches to hands-free: it listens all the
+time, sends each turn after 1.5 s of quiet once you've spoken, and listens
+again. Talking over the Bot stops it (barge-in): the mic's level (Talk's
+`LevelTracker`, 0–1) above 0.45 for 0.3 s while it speaks, higher than the
+0.35 that counts as speech, and the capture runs in the voice-chat audio mode
+so its own echo is cancelled. A reply that plays out with nobody talking over
+it drops what the mic heard meanwhile and listens afresh. Tap the red pill
+(or push to talk) to go back to push to talk; VoiceOver has a Hands-free
+action. The first time voice mode is on, "Hold to talk · long-press for
+hands-free" shows for a few seconds, once (tapping push to talk shows it
+again).
+
+Voice mode's talks cut phrase-length segments (2.5 s target, 8 s max, 300 ms
+pause), put the words in the field as Talk transcribes them, and send with
+Studio's agent-only conversational note when Conversational Replies is on.
+
+The meters and the mic's polling share one 10 Hz clock (`VoiceClock`) that
+runs only while something is listening or speaking and stops while the app
+is inactive; there are no per-frame animations. Debug builds show each state
+with no server or mic: `-qaBotDemo chat -openURL bbstudio://bot -qaVoice
+idle|dictating|ptt|handsfree|speaking|hint` (`-qaDictation listening` also
+shows the dictating pill).
+
+| | Idle | Dictating | Push to talk, held | Hands-free | The Bot speaking | First-time hint |
+| --- | --- | --- | --- | --- | --- | --- |
+| Light | ![Idle: the mic and the muted speaker, no timer](docs/voice/composer-idle-light.png) | ![Dictating: a red dot, 0:26, red bars, ✕ and ✓ over the composer](docs/voice/composer-dictating-light.png) | ![Push to talk held: a red dot and red bars, no timer, Listening… in the field, the red waveform button](docs/voice/composer-ptt-light.png) | ![Hands-free: the red listening pill, Listening… in the field](docs/voice/composer-handsfree-light.png) | ![The Bot speaking: a speaker, accent bars, 1× and Stop, Speaking… in the field](docs/voice/composer-speaking-light.png) | ![The hint: Hold to talk · long-press for hands-free](docs/voice/composer-hint-light.png) |
+| Dark | ![Idle, dark](docs/voice/composer-idle-dark.png) | ![Dictating, dark](docs/voice/composer-dictating-dark.png) | ![Push to talk held, dark](docs/voice/composer-ptt-dark.png) | ![Hands-free, dark](docs/voice/composer-handsfree-dark.png) | ![The Bot speaking, dark](docs/voice/composer-speaking-dark.png) | ![The hint, dark](docs/voice/composer-hint-dark.png) |
 
 New voice chat (`voice.new`: a thread on a fast model with voice on, whose
 agent greets you) is in Settings, the ⋯ menu and a thread row's menu (in

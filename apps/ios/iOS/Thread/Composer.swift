@@ -33,6 +33,11 @@ struct ComposerField: UIViewRepresentable {
         context.coordinator.parent = self
         view.onPasteImages = onPasteImages
         view.onDictation = { [weak dictation] event in dictation?.handle(event) }
+        // "Listening…" and "Speaking…" show here, in place of a label beside the controls.
+        if view.placeholder.text != placeholder {
+            view.placeholder.text = placeholder
+            view.accessibilityLabel = placeholder
+        }
         if view.textContainerInset.right != trailingInset {
             view.textContainerInset.right = trailingInset
             view.invalidateIntrinsicContentSize()
@@ -84,9 +89,10 @@ struct ComposerField: UIViewRepresentable {
 
 /// The message box, as in ChatGPT: one card with any attachments, the field
 /// at full width, and a row under it with + (attach), the agent's settings,
-/// dictation and `send`. With a `dictation` gate, a "Listening…" or
-/// "Transcribing…" label sits beside `send` while words are on the way; the
-/// caller disables `send` on `dictation.blocksSend`.
+/// dictation and `send`. With a `dictation` gate, VoiceOver hears "Listening…"
+/// or "Transcribing…" beside `send` while words are on the way; the caller
+/// disables `send` on `dictation.blocksSend`. In voice mode `pushToTalk`
+/// takes the dictation mic's place.
 struct ComposerBar<Settings: View, Send: View>: View {
     @Binding var text: String
     @Binding var focused: Bool
@@ -105,6 +111,8 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var toPage: ComposerPageAction? = nil
     /// Voice mode's speaker, just before the mic; nil where Studio has no voice mode.
     var voice: VoiceModeButton? = nil
+    /// Voice mode's mic; when set, the dictation mic is hidden.
+    var pushToTalk: PushToTalkButton? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -153,7 +161,9 @@ struct ComposerBar<Settings: View, Send: View>: View {
                     .help(toPage.label)
                 }
                 if let voice { voice }
-                if let talk {
+                if let pushToTalk {
+                    pushToTalk
+                } else if let talk {
                     HoldToTalkMic(talk: talk)
                 } else {
                     Button(action: dictate) {
@@ -183,25 +193,18 @@ struct ComposerPageAction {
     var run: () -> Void
 }
 
-/// Covers the field while holding to talk, so the draft underneath stays put.
-/// An inline dictation (or any talk in voice mode) streams into the field
-/// instead, with its status over the composer (`TalkStatusBar`).
+/// Tells the dictation gate what a talk is doing, so Send waits for its words.
+/// Every talk's status shows over the composer, in the one indicator spot
+/// (`TalkStatusBar`, `VoiceIndicator`), never inside the field.
 private struct TalkOverlay: View {
     @ObservedObject var talk: HoldToTalk
     /// Holds Send while a talk records or transcribes.
     let dictation: DictationGate?
 
     var body: some View {
-        Group {
-            if !talk.inline, talk.state != .idle {
-                HoldToTalkStatus(talk: talk, cancel: talk.cancel)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .background(.background.secondary, in: .rect(cornerRadius: 16))
-                    .padding(.horizontal, 4)
-                    .transition(.opacity)
-            }
-        }
-        .onChange(of: talk.state) { _, state in dictation?.handle(DictationState.talk(state)) }
+        Color.clear
+            .allowsHitTesting(false)
+            .onChange(of: talk.state) { _, state in dictation?.handle(DictationState.talk(state)) }
     }
 }
 

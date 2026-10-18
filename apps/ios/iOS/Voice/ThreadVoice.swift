@@ -56,6 +56,14 @@ final class ThreadVoice: ObservableObject {
         Task { await load() }
     }
 
+    #if DEBUG
+    /// `-qaVoice`: voice mode as Studio would report it, with no server.
+    func qaPretend(on: Bool) {
+        available = true
+        self.on = on
+    }
+    #endif
+
     func detach() {
         if let listener { realtime?.removeListener(listener) }
         listener = nil

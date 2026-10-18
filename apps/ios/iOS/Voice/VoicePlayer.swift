@@ -64,7 +64,23 @@ final class VoicePlayer: ObservableObject {
     func isPlaying(in threadId: String) -> Bool { isActive && self.threadId == threadId }
 
     /// The playing reply's level, 0...1.
-    var level: Float { phase == .speaking ? current?.level ?? 0 : 0 }
+    var level: Float {
+        #if DEBUG
+        if let qaTick { self.qaTick = qaTick + 1; return HoldToTalk.qaWave(qaTick + 7) }
+        #endif
+        return phase == .speaking ? current?.level ?? 0 : 0
+    }
+
+    #if DEBUG
+    private var qaTick: Int?
+
+    /// `-qaVoice speaking`: a reply caught mid-way, with no audio, for screenshots.
+    func qaPretendSpeaking(threadId: String) {
+        self.threadId = threadId
+        phase = .speaking
+        qaTick = 0
+    }
+    #endif
 
     /// Play a thread's reply from its prepared audio URLs, cutting off whatever was speaking.
     func play(threadId: String, urls: [URL], pieces: [String]) {
@@ -283,11 +299,15 @@ final class VoiceAudioSession {
 
     var speaking = false { didSet { if speaking != oldValue { apply() } } }
     var keepAlive = false { didSet { if keepAlive != oldValue { apply() } } }
+    /// The mic is recording: its play-and-record session plays replies too, so
+    /// it's left alone (switching to playback would cut the mic off).
+    var capturing = false { didSet { if capturing != oldValue, !capturing { apply() } } }
 
     private var silence: AVAudioPlayer?
     private var active = false
 
     private func apply() {
+        if capturing { return }
         let session = AVAudioSession.sharedInstance()
         do {
             if speaking {

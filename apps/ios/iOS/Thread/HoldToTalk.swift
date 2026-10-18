@@ -13,7 +13,8 @@ final class HoldToTalk: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var startedAt: Date?
-    @Published private(set) var level: Float = 0
+    /// The mic's level, read by the meters on the voice clock; not published, so views don't redraw ten times a second.
+    private(set) var level: Float = 0
     @Published var error: String?
     /// What Talk has heard so far, while talking in voice mode.
     @Published private(set) var heard = ""
@@ -31,7 +32,7 @@ final class HoldToTalk: ObservableObject {
 
     private let recorder = TalkRecorder(client: AppModel.shared.client)
     private var starting: Task<Void, Never>?
-    private var watching: Task<Void, Never>?
+    private var watching: UUID?
     private var interruptions: AnyCancellable?
     /// Set once the recorder's start has returned, so a stale failure isn't mistaken for this one.
     private var startReturned = false
@@ -75,35 +76,81 @@ final class HoldToTalk: ObservableObject {
         inline = voice
         let send = send, insert = insert
         delivery = Self.delivery(for: mode, voice: self.voice) == .insert ? { insert($0) } : { send($0) }
+        // Voice mode's capture cancels the reply's echo, so talking over it can stop it.
+        let echo = self.voice
+        VoiceAudioSession.shared.capturing = true
         starting = Task { [weak self] in
             guard let self else { return }
-            await recorder.start(kind: "dictation", threadId: threadId, policy: voice ? .voice : .talk)
+            await recorder.start(kind: "dictation", threadId: threadId, policy: voice ? .voice : .talk, echoCancelling: echo)
             startReturned = true
         }
-        watching = Task { [weak self] in
-            var ticks = 0
-            while let self, !Task.isCancelled, self.isActive {
-                self.startedAt = self.recorder.startedAt
-                self.level = self.recorder.level
-                ticks += 1
-                // About once a second: segments are cut every few seconds in voice mode.
-                if voice, ticks % 10 == 0 {
-                    Task { [weak self] in
-                        guard let self else { return }
-                        await self.recorder.refreshTranscript()
-                        if self.isActive { self.heard = self.recorder.transcript }
-                    }
-                }
-                // No microphone (permission, storage, the session): say so now, not when the hand lets go.
-                if self.startReturned, case .failed(let message) = self.recorder.phase {
-                    self.error = message
-                    self.cancel()
-                    return
-                }
-                try? await Task.sleep(for: .milliseconds(100))
+        ticks = 0
+        if let watching { VoiceClock.shared.unsubscribe(watching) }
+        // The app's one voice clock, not a loop of its own; it pauses while the app is inactive.
+        watching = VoiceClock.shared.subscribe { [weak self] in self?.tick(streaming: voice) }
+    }
+
+    private var ticks = 0
+
+    private func tick(streaming voice: Bool) {
+        guard isActive else {
+            if let watching { VoiceClock.shared.unsubscribe(watching) }
+            watching = nil
+            return
+        }
+        #if DEBUG
+        if qaPinned {
+            level = Self.qaWave(ticks)
+            ticks += 1
+            return
+        }
+        #endif
+        if startedAt != recorder.startedAt { startedAt = recorder.startedAt }
+        level = recorder.level
+        ticks += 1
+        // About once a second: segments are cut every few seconds in voice mode.
+        if voice, ticks % 10 == 0 {
+            Task { [weak self] in
+                guard let self else { return }
+                await self.recorder.refreshTranscript()
+                if self.isActive { self.heard = self.recorder.transcript }
             }
         }
+        // No microphone (permission, storage, the session): say so now, not when the hand lets go.
+        if startReturned, case .failed(let message) = recorder.phase {
+            error = message
+            cancel()
+        }
     }
+
+    /// A quiet long press in voice mode: the hold becomes hands-free listening,
+    /// so letting go no longer sends.
+    func goHandsFree() {
+        guard state == .recording || state == .cancelling else { return }
+        state = .handsFree
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+    }
+
+    #if DEBUG
+    /// `-qaVoice`: a talk caught mid-way, with no recorder, for screenshots.
+    private var qaPinned = false
+
+    func qaPretend(_ mode: State, voice: Bool, seconds: TimeInterval = 22) {
+        self.voice = voice
+        state = mode
+        inline = Self.streams(mode, voice: voice)
+        startedAt = Date(timeIntervalSinceNow: -seconds)
+        qaPinned = true
+        level = Self.qaWave(0)
+        watching = VoiceClock.shared.subscribe { [weak self] in self?.tick(streaming: false) }
+    }
+
+    /// A speech-like level that rises and falls, for the meters in screenshots.
+    static func qaWave(_ tick: Int) -> Float {
+        let t = Double(tick)
+        return Float(0.45 + 0.3 * sin(t * 0.9) * cos(t * 0.37))
+    }
+    #endif
 
     /// While holding: past this far left, letting go cancels.
     func drag(_ translation: CGSize) {
@@ -217,7 +264,12 @@ final class HoldToTalk: ObservableObject {
     }
 
     private func stop() {
-        watching?.cancel()
+        if let watching { VoiceClock.shared.unsubscribe(watching) }
+        watching = nil
+        VoiceAudioSession.shared.capturing = false
+        #if DEBUG
+        qaPinned = false
+        #endif
         state = .idle
         startedAt = nil
         level = 0
@@ -321,46 +373,5 @@ struct HoldToTalkMic: View {
             .accessibilityLabel(talk.state == .dictating ? "Finish dictation" : "Dictate")
             .accessibilityHint("Tap to dictate into the message. Hold to talk and send; slide left before letting go to cancel.")
             .accessibilityAction(named: "Talk and send") { talk.toggleHandsFree() }
-    }
-}
-
-/// Fills the composer's field while talking: the timer, a level, and what letting go does.
-struct HoldToTalkStatus: View {
-    @ObservedObject var talk: HoldToTalk
-    let cancel: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle().fill(talk.state == .cancelling ? Color.gray : .red).frame(width: 8, height: 8)
-                .opacity(talk.state == .sending ? 0.4 : 1)
-                .accessibilityLabel(label)
-            if let startedAt = talk.startedAt {
-                Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.secondary)
-            }
-            // No words: the dot (grey to cancel), time and spinner say it; VoiceOver reads the label.
-            if talk.state == .sending { ProgressView().controlSize(.small) }
-            Spacer(minLength: 0)
-            if talk.state == .handsFree {
-                Button(action: cancel) {
-                    Image(systemName: "xmark").font(.footnote.weight(.bold))
-                        .frame(width: 30, height: 30)
-                        .background(.fill.secondary, in: .circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Cancel")
-            }
-        }
-        .font(.subheadline)
-        .padding(.horizontal, 12)
-        .frame(minHeight: 40)
-    }
-
-    private var label: String {
-        switch talk.state {
-        case .cancelling: "Release to cancel"
-        case .handsFree: "Listening · tap mic to send"
-        case .sending: "Transcribing…"
-        default: "Release to send · ← cancel"
-        }
     }
 }

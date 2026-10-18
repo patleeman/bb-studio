@@ -26,6 +26,7 @@ final class TalkRecorder: ObservableObject {
     @Published private(set) var needsRecovery = false
     /// Between the tap and capture starting: permission, the session, `recording_create`.
     @Published private(set) var starting = false
+    private var echoCancelling = false
     /// Closed while starting, so the start stops before it turns the microphone on.
     private var abandoned = false
     /// Discarded while starting: the start throws away whatever it made.
@@ -57,7 +58,10 @@ final class TalkRecorder: ObservableObject {
     }
 
     /// `policy` decides where segments are cut: voice mode cuts short ones so the words show up while you talk.
-    func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil, policy: SegmentPolicy = .talk) async {
+    /// `echoCancelling` records in the voice-chat mode, which takes the app's own playback out of the mic,
+    /// so a spoken reply isn't heard as you talking over it.
+    func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil, policy: SegmentPolicy = .talk,
+               echoCancelling: Bool = false) async {
         guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
         capture.policy = policy
         starting = true
@@ -65,6 +69,7 @@ final class TalkRecorder: ObservableObject {
         discardRequested = false
         recordingId = nil
         ownsRecording = false
+        self.echoCancelling = echoCancelling
         await begin(kind: kind, threadId: threadId, projectId: projectId)
         starting = false
         if discardRequested {
@@ -85,7 +90,8 @@ final class TalkRecorder: ObservableObject {
             guard !abandoned, !Task.isCancelled else { return }
             let session = AVAudioSession.sharedInstance()
             // The iPhone mic: switching to AirPods' hands-free mic mid-start stalls the engine and sends silence.
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
+            // Voice chat cancels echo; without the Bluetooth HFP option it keeps the iPhone mic too.
+            try session.setCategory(.playAndRecord, mode: echoCancelling ? .voiceChat : .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try session.setActive(true)
 
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)

@@ -46,16 +46,26 @@ struct VoiceModeButton: View {
     }
 }
 
-/// Over the composer while you dictate inline or talk in voice mode: a red
-/// dot, the time, your level, and what ends it (✓ finish, ✕ cancel). The
-/// desktop's pill beside the mic.
+/// Your voice over the composer, while you dictate or talk: a red dot, the
+/// time (dictation only), your level, and what ends it (✓ finish, ✕ cancel).
+/// In voice mode's hands-free the whole pill is the way back to push to talk.
 struct TalkStatusBar: View {
     @ObservedObject var talk: HoldToTalk
+    /// Dictation's timer; voice mode's turns are short and have none.
+    var showsTimer = true
+    /// Hands-free in voice mode: a tap on the pill goes back to push to talk.
+    var exitHandsFree: (() -> Void)? = nil
 
     var body: some View {
         Group {
-            if talk.inline, talk.isActive || talk.state == .sending {
-                listening
+            if talk.state != .idle {
+                if let exitHandsFree, talk.state == .handsFree {
+                    Button(action: exitHandsFree) { listening }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Tap to go back to push to talk.")
+                } else {
+                    listening
+                }
             }
         }
         .animation(.snappy, value: talk.state)
@@ -65,17 +75,17 @@ struct TalkStatusBar: View {
         HStack(spacing: 10) {
             Circle().fill(talk.state == .cancelling ? Color.gray : .red).frame(width: 8, height: 8)
                 .opacity(talk.state == .sending ? 0.4 : 1)
-            if let startedAt = talk.startedAt {
+            if showsTimer, let startedAt = talk.startedAt {
                 Text(startedAt, style: .timer).monospacedDigit().foregroundStyle(.primary)
                     .frame(minWidth: 34, alignment: .leading)
             }
             // No words beside the controls: the dot, time and level say it; VoiceOver reads the label.
-            LevelBars(tint: .red) { talk.state == .sending ? 0 : talk.level }
+            LevelBars(tint: .red) { [weak talk] in talk?.state == .sending ? 0 : talk?.level ?? 0 }
                 .accessibilityElement()
                 .accessibilityLabel(listeningLabel)
             if talk.state == .sending { ProgressView().controlSize(.small) }
             Spacer(minLength: 0)
-            if talk.state == .handsFree {
+            if talk.state == .handsFree, exitHandsFree == nil {
                 Button(action: talk.cancel) {
                     Image(systemName: "xmark").font(.footnote.weight(.bold))
                         .frame(width: 30, height: 30)
@@ -104,6 +114,7 @@ struct TalkStatusBar: View {
             }
         }
         .modifier(VoiceStatusCard())
+        .contentShape(.capsule)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("talkListening")
     }
@@ -111,10 +122,10 @@ struct TalkStatusBar: View {
     private var listeningLabel: String {
         switch talk.state {
         case .cancelling: "Release to cancel"
-        case .handsFree: "Listening · tap mic to send"
+        case .handsFree: exitHandsFree == nil ? "Listening · tap mic to send" : "Listening hands-free"
         case .dictating: "Listening"
         case .sending: talk.cancelled ? "Cancelling…" : talk.voice ? "Sending what you said…" : "Transcribing…"
-        default: "Listening · release to send"
+        default: "Listening · release to send · slide left to cancel"
         }
     }
 }
@@ -133,7 +144,11 @@ struct VoiceStatusBar: View {
 
     private var speaking: some View {
         HStack(spacing: 10) {
-            LevelBars(tint: .accentColor) { player.level }
+            Image(systemName: "speaker.wave.2.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
+            LevelBars(tint: .accentColor) { [weak player] in player?.level ?? 0 }
                 .accessibilityElement()
                 .accessibilityLabel(player.phase == .loading ? "Getting ready…" : player.rowId == nil ? "Speaking" : "Reading aloud")
                 .accessibilityIdentifier("voiceSpeaking")
@@ -170,11 +185,14 @@ private struct VoiceStatusCard: ViewModifier {
     }
 }
 
-/// A small rolling level meter.
+/// A small rolling level meter, on the shared voice clock (slower with
+/// Reduce Motion); it stops with the clock while the app is inactive.
 struct LevelBars: View {
     var tint: Color
     let level: () -> Float
     @State private var history = Array(repeating: Float(0), count: 16)
+    @State private var subscription: UUID?
+    @State private var ticks = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -186,10 +204,21 @@ struct LevelBars: View {
         }
         .frame(height: 18)
         .accessibilityHidden(true)
-        .onReceive(Timer.publish(every: reduceMotion ? 0.4 : 0.08, on: .main, in: .common).autoconnect()) { _ in
-            history.removeFirst()
-            history.append(min(1, max(0, level())))
+        .onAppear {
+            guard subscription == nil else { return }
+            subscription = VoiceClock.shared.subscribe { sample() }
         }
+        .onDisappear {
+            if let subscription { VoiceClock.shared.unsubscribe(subscription) }
+            subscription = nil
+        }
+    }
+
+    private func sample() {
+        ticks += 1
+        if reduceMotion, ticks % 4 != 0 { return }
+        history.removeFirst()
+        history.append(min(1, max(0, level())))
     }
 }
 
