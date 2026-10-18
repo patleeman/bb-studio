@@ -343,9 +343,9 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
       {/* The state word, for screen readers: the field's placeholder has no plugin API yet. */}
       <span className="sr-only" role="status" aria-live="polite">{view.placeholder ?? ""}</span>
       {view.indicator === "output" ? (
-        <span data-studio-voice-output="" className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary/10 pl-2.5 text-xs text-primary" role="status" aria-label={loading ? "Getting ready to speak" : "Speaking"} title={loading ? "Getting ready to speak" : "Speaking"}>
+        <span data-studio-voice-output="" className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-sky-500/10 pl-2.5 text-xs text-sky-600 dark:text-sky-400" role="status" aria-label={loading ? "Getting ready to speak" : "Speaking"} title={loading ? "Getting ready to speak" : "Speaking"}>
           <Icon name="studio/speaker" className="size-3.5 shrink-0" />
-          <Wave level={fixture ? fixtureLevel : outputLevel} className="bg-primary" />
+          <Wave level={fixture ? fixtureLevel : outputLevel} className="bg-sky-500 dark:bg-sky-400" />
           <Tooltip label="Speed" side="top">
             <button type="button" aria-label={`Speed ${speed}×, change`} className="inline-flex h-8 min-w-9 shrink-0 items-center justify-center rounded-md px-1.5 text-xs font-medium tabular-nums text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={() => changeSpeed(nextSpeed(speed))}>
               {speed}×
