@@ -24,6 +24,8 @@ struct BotTab: View {
     /// The chat's prompt cache (`bot_cache_state`), for the header.
     @State private var cache: BotCacheState?
     @State private var sideThreads: [String: BotSideThread] = [:]
+    /// Each chat thread's environment, as its ThreadView loads it, for Terminals.
+    @State private var chatEnvironments: [String: String] = [:]
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
@@ -156,6 +158,9 @@ struct BotTab: View {
                          replyInThread: { messageId in replyInThread(threadId: bot.lead.threadId, messageId: messageId) },
                          runningChanged: { _ in Task { await loadActivity() } },
                          followThread: { _ in attempt += 1 },
+                         environmentChanged: { thread, environment in
+                             if chatEnvironments[thread] != environment { chatEnvironments[thread] = environment }
+                         },
                          cache: cache)
     }
 
@@ -197,6 +202,14 @@ struct BotTab: View {
                     Button { sheet = .skills } label: { Label("Skills", systemImage: "wand.and.stars") }
                 }
                 Button { sheet = .checkIns } label: { Label("Automations", systemImage: "alarm") }
+            }
+            // The chat thread's terminals, as a regular thread's ⋯ menu opens them.
+            if let id = bot.lead.threadId, let terminals = TerminalScope.forThread(id, environmentId: chatEnvironments[id]) {
+                Section {
+                    Button { path.append(.terminals(scope: terminals, title: "Terminals")) } label: {
+                        Label("Terminals", systemImage: "apple.terminal")
+                    }
+                }
             }
             Section {
                 if bot.state == .active {

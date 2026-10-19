@@ -171,7 +171,7 @@ enum BotDemo {
     }
 
     fileprivate static func threadJSON(running: Bool) -> Data {
-        Data(#"{"id":"\#(threadId)","projectId":"proj_personal","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)}"#.utf8)
+        Data(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)}"#.utf8)
     }
 
     static var sheet: String? {
@@ -228,7 +228,7 @@ enum BotDemo {
     private static var now: Double { Date().timeIntervalSince1970 * 1000 }
 
     private static func thread(running: Bool, needs: Bool) -> ThreadEntry {
-        decode(#"{"id":"\#(threadId)","projectId":"proj_personal","title":"Juniper","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
+        decode(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
     }
 
     /// The served chat's rows, made once.

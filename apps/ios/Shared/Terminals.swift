@@ -44,6 +44,12 @@ public enum TerminalScope: Hashable, Sendable {
     case thread(String)
     case environment(String)
 
+    /// A thread's terminals, as its ⋯ menu offers them: scoped to the thread,
+    /// and only once it has an environment for the shell to run in.
+    public static func forThread(_ threadId: String, environmentId: String?) -> TerminalScope? {
+        environmentId == nil ? nil : .thread(threadId)
+    }
+
     var query: String {
         switch self {
         case .thread(let id): "threadId=\(id)"

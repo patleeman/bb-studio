@@ -131,6 +131,18 @@ fake server serves a 300-message chat (`-qaDemoMessages`) through
 `BBClient.transport`. `-qaDemoColdCache` drops the caches first, and
 `-qaDemoSend <text>` types a message and sends it.
 
+## Bot chat: terminals
+
+The Bot chat's ⋯ menu has **Terminals**, the same item a regular thread's ⋯
+menu has: it opens the terminals of the Bot's current chat thread, scoped to
+that thread (`TerminalScope.forThread` in `Shared/Terminals.swift`), so a
+one-off script doesn't need a new thread. Like a regular thread, it shows once
+the thread has an environment; the chat's `ThreadView` reports it to the Bot
+tab (`BotChrome.environmentChanged`). `BotTerminalUITests` checks it on
+`-qaBotDemo chat`.
+
+![The Bot chat's ⋯ menu: Edit profile, Memory, Skills, Automations, then Terminals in its own section, then Pause and Stop](docs/bot/terminal-menu.png)
+
 ## Expand to page
 
 When a message grows into meeting notes, the note button beside the mic in a

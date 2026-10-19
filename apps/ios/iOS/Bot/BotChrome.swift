@@ -19,6 +19,8 @@ struct BotChrome {
     var runningChanged: (Bool) -> Void = { _ in }
     /// The chat moved to a new thread (a handoff to another provider).
     var followThread: (String) -> Void = { _ in }
+    /// The chat's thread loaded with this environment (nil before it has one).
+    var environmentChanged: (_ threadId: String, _ environmentId: String?) -> Void = { _, _ in }
     /// Its prompt cache, shown small beside the status while it's idle.
     var cache: BotCacheState? = nil
 }
@@ -85,9 +87,11 @@ struct BotComposerGlass: ViewModifier {
 }
 
 /// A send haptic, and word to the Bot tab when the chat starts or stops
-/// running or something comes to need the user.
+/// running, something comes to need the user, or its environment loads.
 struct BotThreadHooks: ViewModifier {
     let chrome: BotChrome?
+    let threadId: String
+    let environmentId: String?
     let sends: Int
     let running: Bool
     let interactions: Int
@@ -97,5 +101,6 @@ struct BotThreadHooks: ViewModifier {
             .sensoryFeedback(.impact(weight: .medium), trigger: sends)
             .onChange(of: running) { _, running in chrome?.runningChanged(running) }
             .onChange(of: interactions) { _, _ in chrome?.runningChanged(running) }
+            .onChange(of: environmentId, initial: true) { _, id in chrome?.environmentChanged(threadId, id) }
     }
 }

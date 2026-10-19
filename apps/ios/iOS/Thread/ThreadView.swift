@@ -305,7 +305,8 @@ struct ThreadView: View {
             // The chain ends at this thread; until `bot_chain` answers, the thread alone.
             if let chain = botChrome?.chain, chain.last == model.threadId { model.chainBefore = Array(chain.dropLast()) }
         }
-        .modifier(BotThreadHooks(chrome: botChrome, sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
+        .modifier(BotThreadHooks(chrome: botChrome, threadId: model.threadId, environmentId: model.thread?.environmentId,
+                                    sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
         .sensoryFeedback(.warning, trigger: model.interactions.count) { old, new in new > old }
         .sensoryFeedback(.error, trigger: model.error) { _, new in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count) { old, new in new > old }
@@ -394,9 +395,9 @@ struct ThreadView: View {
                         renaming = true
                     } label: { Label("Rename", systemImage: "pencil") }
                     Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
-                    if model.thread?.environmentId != nil {
+                    if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
                         Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
-                        Button { app.push(.terminals(scope: .thread(model.threadId), title: "Terminals")) } label: {
+                        Button { app.push(.terminals(scope: terminals, title: "Terminals")) } label: {
                             Label("Terminals", systemImage: "apple.terminal")
                         }
                     }
