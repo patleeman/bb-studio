@@ -467,6 +467,8 @@ export class TalkController {
   micState(promptbox: HTMLElement): MicState {
     if (!this.isActive()) return { mode: "idle", title: "Dictate with Talk" };
     if (this.state.localSaveError) return { mode: "busy", title: this.busyMessage() };
+    // Voice mode's capture shows in its own pill; here the mic still starts a dictation.
+    if (this.state.voice && this.isDictating() && this.isSourceComposer(promptbox)) return { mode: "idle", title: "Dictate with Talk" };
     if (this.isDictating() && this.isSourceComposer(promptbox)) {
       return { mode: "active", title: "Stop Talk dictation and insert" };
     }

@@ -364,6 +364,8 @@ it("flags voice mode's capture in a voice thread and never uploads its silent pi
   await controller.startRecording("dictation", prompt);
   expect(controller.getState().voice).toBe(true);
   expect(controller.isVoiceCapture()).toBe(true);
+  // Voice mode's pill shows the capture; Talk's mic isn't lit as dictating.
+  expect(controller.micState(prompt).mode).not.toBe("active");
   expect(controller.activity()).toEqual({ level: 0, quietForMs: 0 });
   const remove = vi.spyOn(Outbox.prototype, "remove").mockResolvedValue();
   vi.mocked(Outbox.prototype.complete).mockClear();

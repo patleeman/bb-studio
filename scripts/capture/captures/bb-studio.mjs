@@ -636,6 +636,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
           input: [...shell.querySelectorAll('[data-studio-voice-input]')].map((each) => each.getAttribute('data-studio-voice-input')),
           output: shell.querySelectorAll('[data-studio-voice-output]').length,
           mic: !!mic?.checkVisibility(),
+          micLit: !!mic?.hasAttribute('data-talk-dictating'),
           ptt: !!shell.querySelector('button[aria-label="Hold to talk"]'),
           hint: shell.querySelector('[data-studio-voice-hint]')?.innerText.trim() ?? null,
           status: [...shell.querySelectorAll('[role="status"]')].map((each) => each.getAttribute('aria-label') || each.textContent.trim()).filter(Boolean),
@@ -739,7 +740,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
         const point = await hold();
         await until(`(() => { try { return JSON.parse(localStorage.getItem('bb-plugin-talk:active'))?.phase === 'recording'; } catch { return false; } })()`, "voice mode's capture");
         await noteRecording();
-        await expectFooter("ptt", { clocks: 0, recorder: false, input: ["ptt"], output: 0, mic: true, ptt: false });
+        await expectFooter("ptt", { clocks: 0, recorder: false, input: ["ptt"], output: 0, mic: true, micLit: false, ptt: false });
         await shoot("composer-voice-ptt.png");
         await dropHeld(point);
         await expectFooter("ptt-dropped", { input: [], ptt: true });
@@ -749,10 +750,13 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
         await client.clickAriaButtonWithPointer("Start voice input");
         await client.waitForAriaButton("Pause", 20000);
         await noteRecording();
-        await expectFooter("voice-dictating", { clocks: 1, recorder: true, input: [], output: 0, ptt: false });
+        await expectFooter("voice-dictating", { clocks: 1, recorder: true, input: [], output: 0, micLit: true, ptt: false });
         await shoot("composer-voice-dictating.png");
         await client.clickAriaButtonWithPointer("Stop without inserting");
         await expectFooter("voice-dictating-done", { clocks: 0, recorder: false, input: [], ptt: true, mic: true });
+        // "Talk heard no speech" comes once the server drops the empty dictation; it would sit over the controls.
+        await until(`[...document.querySelectorAll('[data-sonner-toast]')].some((each) => each.innerText.includes("heard no speech"))`, "the empty dictation's toast", 20000).catch(() => {});
+        await toastsGone();
 
         // 6. Hands-free (set by the fixture): the red pill, no timer and no hold-to-talk control.
         await fixture("listening-hands-free");
