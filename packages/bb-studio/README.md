@@ -1449,6 +1449,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   resume about every 15 seconds, with at most three resumed turns running.
   Turn it off with **Resume threads cut off by a restart** in Studio's
   settings.
+  ![A staged BB thread, Long build, on GPT-6-Luna: its sleep 300 command cut off by a killed host daemon ("Thread interrupted because the host daemon disconnected"), Studio's ↻ Resumed after a restart and the agent checking state, a second cut-off and resume, and a third cut-off left in error after two resumes that hour](assets/thread-resume.png)
   ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Schedule](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by
