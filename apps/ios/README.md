@@ -210,7 +210,7 @@ the thread stops working and nothing is speaking.
 The composer has one mic and one indicator, as on desktop (Studio's page
 "Composer: one recording surface"): at most one timer and one level at a
 time, always in the same spot over the composer. Your voice is a red dot and
-red bars; the Bot's is a speaker and accent bars, shown only while it speaks.
+red bars; the Bot's is a blue speaker and blue bars, shown only while it speaks.
 Input and output never show together. "Listening…" and "Speaking…" go in
 the field's placeholder, not beside the buttons (`iOS/Voice/ComposerVoice.swift`).
 
@@ -249,7 +249,7 @@ shows the dictating pill).
 
 | | Idle | Dictating | Push to talk, held | Hands-free | The Bot speaking | First-time hint |
 | --- | --- | --- | --- | --- | --- | --- |
-| Light | ![Idle: the mic and the muted speaker, no timer](docs/voice/composer-idle-light.png) | ![Dictating: a red dot, 0:26, red bars, ✕ and ✓ over the composer](docs/voice/composer-dictating-light.png) | ![Push to talk held: a red dot and red bars, no timer, Listening… in the field, the red waveform button](docs/voice/composer-ptt-light.png) | ![Hands-free: the red listening pill, Listening… in the field](docs/voice/composer-handsfree-light.png) | ![The Bot speaking: a speaker, accent bars, 1× and Stop, Speaking… in the field](docs/voice/composer-speaking-light.png) | ![The hint: Hold to talk · long-press for hands-free](docs/voice/composer-hint-light.png) |
+| Light | ![Idle: the mic and the muted speaker, no timer](docs/voice/composer-idle-light.png) | ![Dictating: a red dot, 0:26, red bars, ✕ and ✓ over the composer](docs/voice/composer-dictating-light.png) | ![Push to talk held: a red dot and red bars, no timer, Listening… in the field, the red waveform button](docs/voice/composer-ptt-light.png) | ![Hands-free: the red listening pill, Listening… in the field](docs/voice/composer-handsfree-light.png) | ![The Bot speaking: a blue speaker, blue bars, 1× and Stop, Speaking… in the field](docs/voice/composer-speaking-light.png) | ![The hint: Hold to talk · long-press for hands-free](docs/voice/composer-hint-light.png) |
 | Dark | ![Idle, dark](docs/voice/composer-idle-dark.png) | ![Dictating, dark](docs/voice/composer-dictating-dark.png) | ![Push to talk held, dark](docs/voice/composer-ptt-dark.png) | ![Hands-free, dark](docs/voice/composer-handsfree-dark.png) | ![The Bot speaking, dark](docs/voice/composer-speaking-dark.png) | ![The hint, dark](docs/voice/composer-hint-dark.png) |
 
 New voice chat (`voice.new`: a thread on a fast model with voice on, whose

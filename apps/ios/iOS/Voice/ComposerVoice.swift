@@ -4,7 +4,7 @@ import UIKit
 
 /// The composer's one mic and one indicator, as on desktop: at most one timer
 /// and one level meter at a time, always in the same spot over the composer.
-/// Your voice is a red dot and red bars; the Bot's is a speaker and accent
+/// Your voice is a red dot and red bars; the Bot's is a blue speaker and blue
 /// bars, shown only while it speaks. Input and output never show together.
 ///
 /// Voice mode owns the mic: the dictation mic is hidden and push to talk takes

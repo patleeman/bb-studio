@@ -146,9 +146,9 @@ struct VoiceStatusBar: View {
         HStack(spacing: 10) {
             Image(systemName: "speaker.wave.2.fill")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.botVoice)
                 .accessibilityHidden(true)
-            LevelBars(tint: .accentColor) { [weak player] in player?.level ?? 0 }
+            LevelBars(tint: .botVoice) { [weak player] in player?.level ?? 0 }
                 .accessibilityElement()
                 .accessibilityLabel(player.phase == .loading ? "Getting ready…" : player.rowId == nil ? "Speaking" : "Reading aloud")
                 .accessibilityIdentifier("voiceSpeaking")
@@ -159,6 +159,7 @@ struct VoiceStatusBar: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
                 .controlSize(.small)
+                .tint(.botVoice)
                 .accessibilityLabel("Speed \(VoiceText.speedLabel(voice.speed)), change")
             Button { player.stop() } label: {
                 Image(systemName: "stop.fill").font(.footnote.weight(.bold))
@@ -171,6 +172,11 @@ struct VoiceStatusBar: View {
         }
         .modifier(VoiceStatusCard())
     }
+}
+
+extension Color {
+    /// The Bot's voice: blue, apart from your own voice in red (as on desktop).
+    static let botVoice = Color.blue
 }
 
 private struct VoiceStatusCard: ViewModifier {
