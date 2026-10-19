@@ -61,6 +61,8 @@ const speaker = new Speaker(
 
 /** Composers showing a voice thread, by thread: they take a finished dictation and send it. */
 const composers = new Map<string, (text: string) => void>();
+/** Each voice thread's controls, told when a dictation takes or gives back the mic. */
+const micHolders = new Map<string, (dictating: boolean) => void>();
 /** The reply last started, so a second composer on the same thread (or a repeated event) doesn't start it again. */
 let lastPlayed = "";
 
@@ -126,6 +128,15 @@ export const voicePlayer = {
   takeDictations(threadId: string, send: (text: string) => void): () => void {
     composers.set(threadId, send);
     return () => { if (composers.get(threadId) === send) composers.delete(threadId); };
+  },
+  /** A voice thread's controls hand the mic to a dictation and take it back; returns the release. */
+  holdMic(threadId: string, yieldTo: (dictating: boolean) => void): () => void {
+    micHolders.set(threadId, yieldTo);
+    return () => { if (micHolders.get(threadId) === yieldTo) micHolders.delete(threadId); };
+  },
+  /** Talk's voiceDictation.dictating: a dictation is starting in the thread (true) or is over (false). */
+  dictating(threadId: string, dictating: boolean): void {
+    micHolders.get(threadId)?.(dictating);
   },
   /** Talk's voiceDictation.deliver: true when a showing composer took the text. */
   deliver(threadId: string, text: string): boolean {

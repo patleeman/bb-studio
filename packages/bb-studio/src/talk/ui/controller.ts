@@ -203,6 +203,8 @@ type SetThreadRowStatus = NonNullable<PluginContentScriptContext["experimental_s
 
 /** How often a waiting dictation looks for its thread's composer. */
 const PENDING_POLL_MS = 700;
+/** How long a voice turn may take to finish before Talk's mic gives up waiting for it. */
+const VOICE_HANDOFF_MS = 20_000;
 
 function randomId(length = 12): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
@@ -272,9 +274,15 @@ export class TalkController {
   /**
    * Voice mode (src/voice/): a dictation into a voice thread cuts short
    * segments, so its words show up phrase by phrase, and hands its text to
-   * voice mode instead of typing it in.
+   * voice mode instead of typing it in. A dictation from Talk's own mic stays
+   * an ordinary one: voice mode is told it's starting (true), so it ends its
+   * turn and holds off, and told when one that never started is over (false).
    */
-  voiceDictation: { wants(threadId: string | null): boolean; deliver(threadId: string, text: string): boolean } | null = null;
+  voiceDictation: {
+    wants(threadId: string | null): boolean;
+    deliver(threadId: string, text: string): boolean;
+    dictating?(threadId: string, dictating: boolean): void;
+  } | null = null;
   private releaseLock: (() => void) | null = null;
   private uploading = false;
   private uploadAgain = false;
@@ -313,11 +321,6 @@ export class TalkController {
   /** Whether voice mode's capture is on: one started in a voice thread. */
   isVoiceCapture(): boolean {
     return this.isDictating() && this.state.voice;
-  }
-
-  /** Something outside Talk changed what the composer mic should show (voice mode turned on or off). */
-  invalidate(): void {
-    this.set({});
   }
 
   private set(patch: Partial<TalkState>): void {
@@ -462,9 +465,6 @@ export class TalkController {
 
   /** How the composer mic in `promptbox` should look and behave. */
   micState(promptbox: HTMLElement): MicState {
-    // Voice mode owns the microphone in its thread: no second recorder.
-    const { threadId } = composerSource(promptbox, this.context);
-    if (threadId !== null && this.voiceDictation?.wants(threadId)) return { mode: "hidden", title: "Voice mode is listening here" };
     if (!this.isActive()) return { mode: "idle", title: "Dictate with Talk" };
     if (this.state.localSaveError) return { mode: "busy", title: this.busyMessage() };
     if (this.isDictating() && this.isSourceComposer(promptbox)) {
@@ -560,7 +560,8 @@ export class TalkController {
     kind: RecordingKind,
     promptbox: HTMLElement | null = null,
     field: FieldRef | null = null,
-    options: { projectId?: string | null } = {},
+    /** `ordinary`: a dictation that's typed in even in a voice thread (Talk's own mic). */
+    options: { projectId?: string | null; ordinary?: boolean } = {},
   ): Promise<void> {
     if (!this.rpc) throw new Error("Talk is still loading.");
     if (this.state.phase !== "idle") {
@@ -577,7 +578,7 @@ export class TalkController {
     this.insertOnDone = kind === "dictation";
     // A field dictation belongs to the field, not to the open thread.
     const threadId = field ? null : source.threadId;
-    const voice = kind === "dictation" && threadId !== null && this.voiceDictation?.wants(threadId) === true;
+    const voice = kind === "dictation" && !options.ordinary && threadId !== null && this.voiceDictation?.wants(threadId) === true;
     this.set({ ...INITIAL, phase: "starting", kind, threadId, field, voice });
     const epoch = this.startEpoch;
     let stream: MediaStream;
@@ -674,13 +675,52 @@ export class TalkController {
    * The composer mic: start dictating into this composer, or finish. Only the
    * composer the dictation started in finishes it; other mics say where it is.
    */
-  async toggleDictation(promptbox: HTMLElement | null): Promise<void> {
+  async toggleDictation(promptbox: HTMLElement | null, options: { ordinary?: boolean } = {}): Promise<void> {
+    if (options.ordinary && promptbox && (await this.dictateInVoiceThread(promptbox))) return;
     if (this.isActive()) {
       if (this.isDictating() && promptbox && this.isSourceComposer(promptbox)) await this.stop(true);
       else this.showBusy();
       return;
     }
     await this.startRecording("dictation", promptbox);
+  }
+
+  /**
+   * Talk's mic in a voice thread: one recording at a time. Voice mode ends
+   * its turn (what it heard still goes) and holds off, hands-free included;
+   * then an ordinary dictation starts, and voice mode listens again once it's
+   * over. False when this isn't a voice thread's mic, or Talk is busy with
+   * something else.
+   */
+  private async dictateInVoiceThread(promptbox: HTMLElement): Promise<boolean> {
+    const { threadId } = composerSource(promptbox, this.context);
+    const voice = this.voiceDictation;
+    if (threadId === null || !voice?.dictating || !voice.wants(threadId)) return false;
+    if (this.isActive() && !(this.state.voice && this.state.threadId === threadId)) return false;
+    voice.dictating(threadId, true);
+    if (!(await this.untilIdle(VOICE_HANDOFF_MS))) {
+      voice.dictating(threadId, false);
+      this.showBusy();
+      return true;
+    }
+    await this.startRecording("dictation", promptbox, null, { ordinary: true });
+    if (!this.isDictating()) voice.dictating(threadId, false);
+    return true;
+  }
+
+  /** Resolves true once Talk is idle, or false after `timeoutMs`. */
+  private untilIdle(timeoutMs: number): Promise<boolean> {
+    if (!this.isActive()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const done = (idle: boolean) => {
+        clearTimeout(timer);
+        this.listeners.delete(check);
+        resolve(idle);
+      };
+      const check = () => { if (!this.isActive()) done(true); };
+      const timer = setTimeout(() => done(false), timeoutMs);
+      this.listeners.add(check);
+    });
   }
 
   /** A field's dictate control: start dictating into it, or finish. */

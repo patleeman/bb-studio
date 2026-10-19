@@ -20,15 +20,13 @@ const EDITOR_SELECTOR = '[contenteditable="true"]';
 const ACTIVE_ATTR = "data-talk-dictating";
 const BUSY_ATTR = "data-talk-busy";
 const CLAIMED_ATTR = "data-talk-mic";
-const HIDDEN_ATTR = "data-talk-hidden";
 
 /**
  * `active` is the composer Talk is dictating into; `busy` is every other
- * composer while Talk is capturing somewhere else; `hidden` is a thread in
- * voice mode, whose own push-to-talk control owns the microphone.
+ * composer while Talk is capturing somewhere else.
  */
 export interface MicState {
-  mode: "idle" | "active" | "busy" | "hidden";
+  mode: "idle" | "active" | "busy";
   title: string;
 }
 
@@ -61,7 +59,6 @@ export function interceptBuiltInMic(options: MicInterceptOptions, signal: AbortS
     button[${CLAIMED_ATTR}][${ACTIVE_ATTR}] { color: var(--destructive, #e5484d) !important; }
     button[${CLAIMED_ATTR}][${ACTIVE_ATTR}] svg { animation: bb-talk-pulse 1.4s ease-in-out infinite; }
     button[${CLAIMED_ATTR}][${BUSY_ATTR}] { opacity: .4; }
-    button[${CLAIMED_ATTR}][${HIDDEN_ATTR}] { display: none !important; }
     @keyframes bb-talk-pulse { 50% { opacity: .45; } }
     @media (prefers-reduced-motion: reduce) { button[${CLAIMED_ATTR}] svg { animation: none !important; } }
   `;
@@ -74,7 +71,6 @@ export function interceptBuiltInMic(options: MicInterceptOptions, signal: AbortS
       button.toggleAttribute(CLAIMED_ATTR, state !== null);
       button.toggleAttribute(ACTIVE_ATTR, state?.mode === "active");
       button.toggleAttribute(BUSY_ATTR, state?.mode === "busy");
-      button.toggleAttribute(HIDDEN_ATTR, state?.mode === "hidden");
       if (state) button.title = state.title;
     }
   };
@@ -102,7 +98,6 @@ export function interceptBuiltInMic(options: MicInterceptOptions, signal: AbortS
         button.removeAttribute(CLAIMED_ATTR);
         button.removeAttribute(ACTIVE_ATTR);
         button.removeAttribute(BUSY_ATTR);
-        button.removeAttribute(HIDDEN_ATTR);
         button.removeAttribute("title");
       }
     },

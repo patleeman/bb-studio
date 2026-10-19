@@ -44,7 +44,7 @@ export function registerTalkApp(app: PluginAppBuilder): void {
         {
           enabled: () => talk.replaceBuiltIn,
           stateFor: (promptbox) => talk.micState(promptbox),
-          onPress: (promptbox) => void talk.toggleDictation(promptbox),
+          onPress: (promptbox) => void talk.toggleDictation(promptbox, { ordinary: true }),
           subscribe: talk.subscribe,
         },
         signal,

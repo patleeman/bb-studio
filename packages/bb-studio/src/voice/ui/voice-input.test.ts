@@ -22,22 +22,27 @@ describe("one mic, one indicator", () => {
   const base = { state: INITIAL_INPUT, dictating: false, capturing: false, speaking: false };
 
   it("idle: the dictation mic and the speaker, nothing recording", () => {
-    expect(footer({ ...base, voiceOn: false })).toMatchObject({ kind: "idle", dictationMic: true, ptt: false, indicator: null, placeholder: null });
+    expect(footer({ ...base, voiceOn: false })).toMatchObject({ kind: "idle", ptt: false, indicator: null, placeholder: null });
   });
 
   it("dictating with voice mode off: Talk's one recorder", () => {
     expect(footer({ ...base, voiceOn: false, dictating: true })).toMatchObject({ kind: "dictating", indicator: "recorder", ptt: false });
   });
 
-  it("voice mode on hides the dictation mic in every state", () => {
+  it("voice mode's own states never show Talk's recorder", () => {
     for (const state of [INITIAL_INPUT, { sub: "ptt", pressedAt: 1 } as VoiceInput, handsFree]) {
       for (const speaking of [false, true]) {
         for (const capturing of [false, true]) {
-          const view = footer({ voiceOn: true, state, dictating: false, capturing, speaking });
-          expect(view.dictationMic).toBe(false);
-          expect(view.indicator).not.toBe("recorder");
+          expect(footer({ voiceOn: true, state, dictating: false, capturing, speaking }).indicator).not.toBe("recorder");
         }
       }
+    }
+  });
+
+  it("a dictation in a voice thread is the one indicator: no hold-to-talk, no Bot pill", () => {
+    for (const state of [{ ...INITIAL_INPUT, yielded: true } as VoiceInput, { ...handsFree, yielded: true } as VoiceInput]) {
+      expect(footer({ voiceOn: true, state, dictating: true, capturing: false, speaking: false })).toMatchObject({ kind: "dictating", indicator: "recorder", ptt: false, placeholder: null });
+      expect(footer({ voiceOn: true, state, dictating: true, capturing: false, speaking: true }).indicator).toBe("recorder");
     }
   });
 
@@ -73,6 +78,27 @@ describe("dictation and voice mode", () => {
   it("turning voice mode off closes its mic without sending and goes back to push-to-talk", () => {
     expect(reduce(handsFree, { type: "voice-off" }, live)).toEqual({ state: INITIAL_INPUT, effects: ["discard"] });
     expect(reduce(handsFree, { type: "voice-off" }, idle).effects).toEqual([]);
+  });
+
+  it("starting a dictation ends voice mode's turn, sending what it heard, and stops the Bot", () => {
+    expect(reduce({ sub: "ptt", pressedAt: 5 }, { type: "dictation-start", heard: true }, live)).toEqual({ state: { sub: "ptt", pressedAt: null, yielded: true }, effects: ["send"] });
+    expect(reduce(handsFree, { type: "dictation-start", heard: false }, live)).toEqual({ state: { ...handsFree, yielded: true }, effects: ["discard"] });
+    expect(reduce(INITIAL_INPUT, { type: "dictation-start", heard: false }, { speaking: true, capturing: false }).effects).toEqual(["stop-playback"]);
+  });
+
+  it("while a dictation has the mic, hands-free waits and the control doesn't open a capture", () => {
+    const pttHeld = reduce(INITIAL_INPUT, { type: "dictation-start", heard: false }, idle).state;
+    expect(reduce(pttHeld, { type: "press", at: 0 }, idle)).toEqual({ state: pttHeld, effects: [] });
+    const handsFreeHeld = reduce(handsFree, { type: "dictation-start", heard: false }, idle).state;
+    expect(wantsCapture(true, handsFreeHeld, true)).toBe(false);
+  });
+
+  it("when the dictation ends, voice mode listens again where it was", () => {
+    const held = reduce(handsFree, { type: "dictation-start", heard: false }, live).state;
+    const back = reduce(held, { type: "dictation-end" }, idle).state;
+    expect(back).toEqual(handsFree);
+    expect(wantsCapture(true, back, true)).toBe(true);
+    expect(reduce(INITIAL_INPUT, { type: "dictation-end" }, idle)).toEqual({ state: INITIAL_INPUT, effects: [] });
   });
 
   it("voice mode starts in push-to-talk", () => {

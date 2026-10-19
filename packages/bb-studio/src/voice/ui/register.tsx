@@ -1,10 +1,11 @@
 // Voice mode in BB's own thread view, and the composer's one recording
 // surface ("Composer: one recording surface"). A speaker button turns voice
-// mode on for the thread; then voice mode owns the mic: Talk's dictation mic
-// and recorder are hidden, and one spot beside the speaker shows one thing at
+// mode on for the thread; then one spot beside the speaker shows one thing at
 // a time, with no words or timer beside it: the hold-to-talk control, your
-// voice (a red dot and red bars) or the Bot's (its speaker glyph and accent
-// bars, with Stop). Push-to-talk is the default; a long silent press switches
+// voice (a red dot and red bars) or the Bot's (its speaker glyph and blue
+// bars, with Stop). Talk's dictation mic stays; one recording runs at a time:
+// pressing it ends voice mode's turn and holds voice mode (hands-free too)
+// until the dictation is done, and turning voice mode on finishes a dictation. Push-to-talk is the default; a long silent press switches
 // to hands-free, and tapping the red pill switches back (voice-input.ts has
 // the rules). While you talk, your words stream into the input phrase by
 // phrase and are sent when you finish; while the Bot speaks, the piece being
@@ -215,6 +216,19 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     wasOn.current = on;
     dispatch(on ? { type: "voice-on", dictating: talk.isDictating() && !talk.getState().voice } : { type: "voice-off" });
   }, [on, dispatch]);
+
+  // Talk's mic pressed here: voice mode ends its turn and waits for the dictation.
+  useEffect(() => {
+    if (!on) return;
+    return voicePlayer.holdMic(threadId, (dictating) => dispatch(dictating ? { type: "dictation-start", heard: gate.current.heard } : { type: "dictation-end" }));
+  }, [on, threadId, dispatch]);
+  const dictating = talkState.kind === "dictation" && talkState.phase !== "idle" && !talkState.voice;
+  const wasDictating = useRef(dictating);
+  useEffect(() => {
+    if (wasDictating.current === dictating) return;
+    wasDictating.current = dictating;
+    if (!dictating && inputRef.current.yielded) dispatch({ type: "dictation-end" });
+  }, [dictating, dispatch]);
 
   // The first time voice mode is on, say how the control works.
   useEffect(() => {
@@ -539,10 +553,12 @@ async function studioRpc<T>(method: string, input: unknown): Promise<T> {
 const prepareSpeech = async (text: string) => (await studioRpc<{ url: string }>("speech.prepare", { text })).url;
 
 export function registerVoiceApp(app: PluginAppBuilder): void {
-  // Dictations into a voice thread cut short segments and are sent, not typed in.
-  talk.voiceDictation = { wants: (threadId) => voicePlayer.isOn(threadId), deliver: (threadId, text) => voicePlayer.deliver(threadId, text) };
-  // Voice mode turning on or off shows or hides Talk's composer mic.
-  voicePlayer.subscribe(() => talk.invalidate());
+  // Voice mode's captures cut short segments and are sent, not typed in; Talk's own mic dictates as usual.
+  talk.voiceDictation = {
+    wants: (threadId) => voicePlayer.isOn(threadId),
+    deliver: (threadId, text) => voicePlayer.deliver(threadId, text),
+    dictating: (threadId, dictating) => voicePlayer.dictating(threadId, dictating),
+  };
   app.composer.customize({
     id: "voice",
     scopes: ["thread", "new-thread"],

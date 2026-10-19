@@ -349,7 +349,7 @@ it("lets only one window take a waiting dictation", async () => {
   }
 });
 
-it("hands a voice thread's mic to voice mode: hidden there, its capture flagged, its silent pieces never uploaded", async () => {
+it("flags voice mode's capture in a voice thread and never uploads its silent pieces", async () => {
   const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
   document.body.append(prompt);
   const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_voice" }));
@@ -359,10 +359,8 @@ it("hands a voice thread's mic to voice mode: hidden there, its capture flagged,
   await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
   const voiceOn = new Set(["thr_voice"]);
   controller.voiceDictation = { wants: (threadId) => threadId !== null && voiceOn.has(threadId), deliver: () => true };
-  expect(controller.micState(prompt).mode).toBe("hidden");
-  voiceOn.clear();
+  // Talk's mic keeps its own look in a voice thread.
   expect(controller.micState(prompt).mode).toBe("idle");
-  voiceOn.add("thr_voice");
   await controller.startRecording("dictation", prompt);
   expect(controller.getState().voice).toBe(true);
   expect(controller.isVoiceCapture()).toBe(true);
@@ -391,5 +389,51 @@ it("keeps a dictation started before voice mode an ordinary one", async () => {
   expect(controller.getState().voice).toBe(false);
   expect(controller.isVoiceCapture()).toBe(false);
   await controller.stop(false);
+  unregister();
+});
+
+it("Talk's mic in a voice thread: voice mode ends its turn first, then an ordinary dictation, then voice mode listens again", async () => {
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  document.body.append(prompt);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_voice" }));
+  const recording = { id: "rec_turn", durationMs: 0, status: "recording" };
+  // Each capture heard nothing: finishing it ends it at once.
+  const call = vi.fn(async (method: string) => method === "recordings.recording_get" ? { recording, segments: [] }
+    : method === "recordings.recording_state" ? { ...recording, status: "done", wordCount: 0, failedCount: 0 } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  const told: boolean[] = [];
+  controller.voiceDictation = {
+    wants: (threadId) => threadId === "thr_voice",
+    deliver: () => true,
+    // Voice mode ends its own capture when told a dictation is starting.
+    dictating: (_threadId, dictating) => { told.push(dictating); if (dictating) void controller.stop(false); },
+  };
+  // Voice mode is listening (hands-free or a held turn).
+  await controller.startRecording("dictation", prompt);
+  expect(controller.isVoiceCapture()).toBe(true);
+  // Its silent piece is dropped from the outbox.
+  vi.spyOn(Outbox.prototype, "remove").mockResolvedValue();
+  await controller.toggleDictation(prompt, { ordinary: true });
+  expect(told).toEqual([true]);
+  expect(controller.isDictating()).toBe(true);
+  expect(controller.getState().voice).toBe(false);
+  // It finishes like any dictation.
+  await controller.stop(true);
+  await vi.waitFor(() => expect(controller.isActive()).toBe(false));
+  unregister();
+});
+
+it("gives voice mode the mic back when the dictation can't start", async () => {
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  document.body.append(prompt);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_voice" }));
+  const controller = new TalkController();
+  controller.attach({ call: vi.fn(async () => { throw new Error("offline"); }) } as never);
+  const told: boolean[] = [];
+  controller.voiceDictation = { wants: () => true, deliver: () => true, dictating: (_threadId, dictating) => void told.push(dictating) };
+  await controller.toggleDictation(prompt, { ordinary: true });
+  expect(controller.isActive()).toBe(false);
+  expect(told).toEqual([true, false]);
   unregister();
 });

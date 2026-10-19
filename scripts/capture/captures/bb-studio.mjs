@@ -598,8 +598,9 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
   {
     // The composer's one recording surface, state by state, in the seeded
     // thread: idle, dictating (voice mode off), voice mode's first-time hint,
-    // holding to talk, hands-free listening and the Bot speaking. Idle,
-    // dictating, the hint and push-to-talk are live (Chrome's fake mic);
+    // holding to talk, dictating in a voice thread, hands-free listening and
+    // the Bot speaking. Idle, dictating, the hint, push-to-talk and the voice
+    // thread's dictation are live (Chrome's fake mic);
     // hands-free and speaking are set with Studio's voice fixture event,
     // since staging can't talk or wait on a spoken reply. Each state checks
     // there's at most one timer and one indicator.
@@ -712,7 +713,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
         await expectFooter("dictating", { clocks: 1, recorder: true, input: [], output: 0, ptt: false });
         await shoot("composer-dictating.png");
 
-        // Turning voice mode on stops the dictation first, and voice mode takes the mic.
+        // Turning voice mode on stops the dictation first.
         await client.clickAriaButtonWithPointer("Voice mode: speak replies aloud");
         await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 15000);
         await until(`!document.querySelector('button[aria-label="Pause"]')`, "the dictation to stop");
@@ -720,8 +721,8 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
           if (await client.evaluate(`!!document.querySelector('button[aria-label=${JSON.stringify(label)}]')`)) await client.clickAriaButtonWithPointer(label);
         }
 
-        // 3. Voice mode on, the first time: the hint, the hold-to-talk control, no dictation mic.
-        await expectFooter("hint", { clocks: 0, recorder: false, input: [], output: 0, mic: false, ptt: true, hint: "Hold to talk · long-press for hands-free" });
+        // 3. Voice mode on, the first time: the hint and the hold-to-talk control beside Talk's dictation mic.
+        await expectFooter("hint", { clocks: 0, recorder: false, input: [], output: 0, mic: true, ptt: true, hint: "Hold to talk · long-press for hands-free" });
         // It shows for a few seconds; for the picture, hold it while the toasts above clear.
         await fixture("hint");
         await toastsGone();
@@ -731,30 +732,40 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
         await sleep(1500);
-        await expectFooter("hint-once", { hint: null, ptt: true, mic: false });
+        await expectFooter("hint-once", { hint: null, ptt: true, mic: true });
 
         // 4. Push-to-talk: holding the control opens voice mode's mic: red dot and bars, no timer, no Talk recorder.
         await toastsGone();
         const point = await hold();
         await until(`(() => { try { return JSON.parse(localStorage.getItem('bb-plugin-talk:active'))?.phase === 'recording'; } catch { return false; } })()`, "voice mode's capture");
         await noteRecording();
-        await expectFooter("ptt", { clocks: 0, recorder: false, input: ["ptt"], output: 0, mic: false, ptt: false });
+        await expectFooter("ptt", { clocks: 0, recorder: false, input: ["ptt"], output: 0, mic: true, ptt: false });
         await shoot("composer-voice-ptt.png");
         await dropHeld(point);
         await expectFooter("ptt-dropped", { input: [], ptt: true });
 
-        // 5. Hands-free (set by the fixture): the red pill alone, no timer and no hold-to-talk control.
+        // 5. Dictating in the voice thread: Talk's recorder is the one indicator; voice mode waits, then comes back.
+        await toastsGone();
+        await client.clickAriaButtonWithPointer("Start voice input");
+        await client.waitForAriaButton("Pause", 20000);
+        await noteRecording();
+        await expectFooter("voice-dictating", { clocks: 1, recorder: true, input: [], output: 0, ptt: false });
+        await shoot("composer-voice-dictating.png");
+        await client.clickAriaButtonWithPointer("Stop without inserting");
+        await expectFooter("voice-dictating-done", { clocks: 0, recorder: false, input: [], ptt: true, mic: true });
+
+        // 6. Hands-free (set by the fixture): the red pill, no timer and no hold-to-talk control.
         await fixture("listening-hands-free");
-        await expectFooter("hands-free", { clocks: 0, recorder: false, input: ["hands-free"], output: 0, mic: false, ptt: false });
+        await expectFooter("hands-free", { clocks: 0, recorder: false, input: ["hands-free"], output: 0, mic: true, ptt: false });
         await toastsGone();
         await shoot("composer-voice-hands-free.png");
         // Tapping the red pill goes back to push-to-talk.
         await client.clickAriaButtonWithPointer("Listening hands-free. Tap for push-to-talk");
         await expectFooter("hands-free-exit", { input: [], ptt: true });
 
-        // 6. The Bot speaking (set by the fixture): the same spot shows its voice, with Stop.
+        // 7. The Bot speaking (set by the fixture): the same spot shows its voice, with Stop.
         await fixture("speaking");
-        await expectFooter("speaking", { clocks: 0, recorder: false, input: [], output: 1, mic: false, ptt: true });
+        await expectFooter("speaking", { clocks: 0, recorder: false, input: [], output: 1, mic: true, ptt: true });
         await client.waitForAriaButton("Stop speaking");
         const speaking = await footer();
         if (!speaking.status.includes("Speaking")) throw new Error(`The Bot's pill isn't announced as Speaking: ${JSON.stringify(speaking.status)}`);

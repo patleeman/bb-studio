@@ -2,9 +2,11 @@
 // footer shows, and how push-to-talk and hands-free take turns. Pure, so the
 // rules are tested without a microphone or a speaker.
 //
-// - One mic, one indicator: Talk's dictation recorder (voice mode off) or
-//   voice mode's capture (on), never both, and your voice (red) and the Bot's
-//   (accent) never show at once.
+// - One recording at a time: Talk's dictation or voice mode's capture, never
+//   both, and your voice (red) and the Bot's (blue) never show at once.
+//   Turning voice mode on finishes a dictation; starting a dictation in a
+//   voice thread ends voice mode's turn and holds it (hands-free too) until
+//   the dictation is done.
 // - Push-to-talk, the default: hold to talk, release to send; a press while
 //   the Bot speaks cuts it off. Holding without saying anything (a long
 //   press) switches to hands-free.
@@ -33,6 +35,8 @@ export interface VoiceInput {
   sub: VoiceSub;
   /** When the push-to-talk control went down, while it's held. */
   pressedAt: number | null;
+  /** A dictation has the mic: voice mode doesn't listen until it ends. */
+  yielded?: true;
 }
 
 export const INITIAL_INPUT: VoiceInput = { sub: "ptt", pressedAt: null };
@@ -48,6 +52,10 @@ export type VoiceEvent =
   /** Hands-free: a pause after you spoke. */
   | { type: "turn-end" }
   | { type: "voice-on"; dictating: boolean }
+  /** Talk's dictation mic was pressed in this thread: hand it the mic. */
+  | { type: "dictation-start"; heard: boolean }
+  /** That dictation is over (or never started): voice mode listens again. */
+  | { type: "dictation-end" }
   | { type: "voice-off" };
 
 export type VoiceEffect =
@@ -72,7 +80,7 @@ export interface Context {
 export function reduce(state: VoiceInput, event: VoiceEvent, context: Context): { state: VoiceInput; effects: VoiceEffect[] } {
   switch (event.type) {
     case "press": {
-      if (state.sub !== "ptt" || state.pressedAt !== null) return { state, effects: [] };
+      if (state.sub !== "ptt" || state.pressedAt !== null || state.yielded) return { state, effects: [] };
       const effects: VoiceEffect[] = [];
       if (context.speaking) effects.push("stop-playback");
       if (!context.capturing) effects.push("start-capture");
@@ -101,29 +109,36 @@ export function reduce(state: VoiceInput, event: VoiceEvent, context: Context): 
       return { state: INITIAL_INPUT, effects: event.dictating ? ["finish-dictation"] : [] };
     case "voice-off":
       return { state: INITIAL_INPUT, effects: context.capturing ? ["discard"] : [] };
+    case "dictation-start": {
+      // What you'd already said in this turn still goes; then the mic is the dictation's.
+      const effects: VoiceEffect[] = context.capturing ? [event.heard ? "send" : "discard"] : [];
+      if (context.speaking) effects.push("stop-playback");
+      return { state: { sub: state.sub, pressedAt: null, yielded: true }, effects };
+    }
+    case "dictation-end":
+      return { state: state.yielded ? { sub: state.sub, pressedAt: state.pressedAt } : state, effects: [] };
   }
 }
 
 /** Hands-free listens whenever it isn't already: the effect that keeps the mic open between turns. */
 export function wantsCapture(voiceOn: boolean, state: VoiceInput, talkIdle: boolean): boolean {
-  return voiceOn && state.sub === "hands-free" && talkIdle;
+  return voiceOn && state.sub === "hands-free" && !state.yielded && talkIdle;
 }
 
 /**
  * The footer, from what's going on:
  * - `idle`: dictation mic and voice mode's speaker, no timers.
- * - `dictating`: Talk's red recorder with its timer (voice mode off).
+ * - `dictating`: Talk's red recorder with its timer (voice mode off, or a
+ *   dictation started from Talk's mic in a voice thread).
  * - `ready`: voice mode on, push-to-talk, nothing heard: the hold-to-talk control.
  * - `listening`: voice mode's red pill (no timer).
- * - `speaking`: the Bot's accent pill with Stop, in the same spot.
+ * - `speaking`: the Bot's blue pill with Stop, in the same spot.
  */
 export type FooterKind = "idle" | "dictating" | "ready" | "listening" | "speaking";
 
 export interface Footer {
   kind: FooterKind;
   sub: VoiceSub;
-  /** Talk's dictation mic beside the composer. Hidden in voice mode: voice mode owns the mic. */
-  dictationMic: boolean;
   /** The hold-to-talk control. */
   ptt: boolean;
   /** The one input or output indicator, if any. */
@@ -144,15 +159,17 @@ export function footer(input: {
   const { voiceOn, state, dictating, capturing, speaking } = input;
   if (!voiceOn) {
     return dictating
-      ? { kind: "dictating", sub: "ptt", dictationMic: true, ptt: false, indicator: "recorder", placeholder: null }
-      : { kind: "idle", sub: "ptt", dictationMic: true, ptt: false, indicator: null, placeholder: null };
+      ? { kind: "dictating", sub: "ptt", ptt: false, indicator: "recorder", placeholder: null }
+      : { kind: "idle", sub: "ptt", ptt: false, indicator: null, placeholder: null };
   }
+  // A dictation has the mic: Talk's recorder is the one indicator; voice mode waits.
+  if (dictating) return { kind: "dictating", sub: state.sub, ptt: false, indicator: "recorder", placeholder: null };
   // Your voice wins the spot while you hold to talk: the press already cut the Bot off.
   const talking = state.pressedAt !== null || (state.sub === "ptt" && capturing);
   // Hands-free keeps listening under the Bot's voice, but shows the Bot until you talk over it.
-  if (speaking && !talking) return { kind: "speaking", sub: state.sub, dictationMic: false, ptt: state.sub === "ptt", indicator: "output", placeholder: "Speaking…" };
-  if (talking || state.sub === "hands-free") return { kind: "listening", sub: state.sub, dictationMic: false, ptt: state.sub === "ptt", indicator: "input", placeholder: "Listening…" };
-  return { kind: "ready", sub: "ptt", dictationMic: false, ptt: true, indicator: null, placeholder: null };
+  if (speaking && !talking) return { kind: "speaking", sub: state.sub, ptt: state.sub === "ptt", indicator: "output", placeholder: "Speaking…" };
+  if (talking || state.sub === "hands-free") return { kind: "listening", sub: state.sub, ptt: state.sub === "ptt", indicator: "input", placeholder: "Listening…" };
+  return { kind: "ready", sub: "ptt", ptt: true, indicator: null, placeholder: null };
 }
 
 /**
