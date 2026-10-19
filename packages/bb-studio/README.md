@@ -1427,6 +1427,28 @@ of Staff", with the same thread and check-ins; rename it from its page.
   path), once per failure, until it's on again. Studio checks at startup,
   on the five-minute sweep and shortly after a runner's or Bot's thread
   goes idle or fails; the plugin SDK has no automation events.
+
+  **Cut off by a restart** (`src/thread-resume.ts`, table
+  `thread_auto_resumes`): when a host daemon restart or a lost host
+  connection stops a running turn, BB leaves the thread in error. Studio
+  sends it **↻ Resumed after a restart**, with an agent-only note to check
+  the current state (files, running commands, messages already sent)
+  before redoing anything. Any thread qualifies, not only a Bot's, when it
+  is in error and its newest event is `system/thread/interrupted` with
+  reason `host-daemon-restarted` (or cause `host-connection-lost`), BB's
+  own rule for a restart interruption; stalled turns, your stops and model
+  or tool errors don't, and no error text is read. It skips archived and
+  deleted threads, threads of a paused or stopped Bot, threads whose host
+  is still disconnected and anything with a newer event. Each interrupt is
+  resumed once, at most twice per thread in a rolling hour; past that the
+  thread stays in error and, once, a Bot's thread goes to its **Needs you**
+  with a line in its chat and a phone push, and any other thread gets a
+  phone push (Studio Mobile). Studio checks 30 seconds after a thread
+  fails, a few seconds after a host connects (`host:changed`), at startup
+  once the first minute is past and on the five-minute sweep; it starts one
+  resume about every 15 seconds, with at most three resumed turns running.
+  Turn it off with **Resume threads cut off by a restart** in Studio's
+  settings.
   ![Info's Automations in a staged BB: Dot's original Check-in (weekdays 8:00), the Skill curator (weekly, when idle) and Evening wrap-up, the Check the deploy reminder, the Release watch watcher opened with its script, Pause, Run now, Edit, Delete and its two runs (a manual run that woke Dot with "ORBIT-42 v1.4.0 is out on the release page", then Nothing new), and the Inbox watch and Deploy watch runners with their last reports; the Bots sidebar lists the reminder and the evening check-in under Schedule](assets/bot-automations.png)
 
 - **Schedule editor** (`src/ui/bot/ScheduleEditor.tsx`, compiled by

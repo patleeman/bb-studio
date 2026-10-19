@@ -53,6 +53,7 @@ import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
+import { THREAD_RESUME_SETTINGS, ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
 import { Automations } from "./src/automations";
 import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
@@ -121,8 +122,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
-  // then Bot avatars' and Speech's.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS });
+  // then Bot avatars', Speech's and thread resume's.
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   let settingValues: Record<string, unknown> = await settings.get();
@@ -416,7 +417,7 @@ export default async function plugin(bb: BbPluginApi) {
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
-    automationAlerts: (botId) => autoResume.alerts(botId).filter((alert) => alert.owner !== "runner"),
+    automationAlerts: (botId) => [...autoResume.alerts(botId).filter((alert) => alert.owner !== "runner"), ...threadResume.alerts(botId)],
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
       restore: (id) => automations.restore(id),
@@ -457,7 +458,7 @@ export default async function plugin(bb: BbPluginApi) {
   const sweepOwned = () => void ownedThreads.sweep().catch((error) => bb.log.warn(`Hiding Bot threads failed: ${errorText(error)}`));
   bb.events.on("thread.created", ({ thread }) => void ownedThreads.created(thread).catch(() => {}));
   // The same five-minute sweep turns back on automations BB turned off (resumeSweep, below).
-  const ownedTimer = setInterval(() => { sweepOwned(); resumeSweep(); }, 5 * 60_000);
+  const ownedTimer = setInterval(() => { sweepOwned(); resumeSweep(); threadResumeSweep(); }, 5 * 60_000);
   bb.onDispose(() => { clearInterval(ownedTimer); ownedThreads.dispose(); });
   void runners.hideThreads().catch((error) => bb.log.warn(`Hiding runner threads failed: ${errorText(error)}`)).finally(sweepOwned);
   // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
@@ -526,6 +527,48 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.idle", ({ thread }) => resumeSoon(thread.id));
   bb.events.on("thread.failed", ({ thread }) => resumeSoon(thread.id));
   resumeSweep();
+  // Threads a host restart cut off (src/thread-resume.ts): resumed with a
+  // marker, at most twice an hour each; past that, Needs you (a Bot's thread)
+  // or a phone push (any other).
+  const threadOwner = (threadId: string): ThreadOwner | null => {
+    const bot = bots.list().find((each) => bots.chain(each.id).includes(threadId))
+      ?? (() => { const runner = runners.forThread(threadId); return runner ? bots.stored(runner.bot_id) : null; })()
+      ?? bots.list().find((each) => ownedThreads.owned(each.id).has(threadId));
+    return bot ? { botId: bot.id, name: bot.name, threadId: bot.threadId ?? null, active: bot.state === "active" } : null;
+  };
+  const threadResume = new ThreadResume({
+    db, sdk: bb.sdk, owner: threadOwner, log: (message) => bb.log.warn(message),
+    enabled: () => settingValues.autoResumeThreads !== false,
+    exhausted: async (thread, owner, line) => {
+      if (owner?.threadId) {
+        tagsChanged();
+        await alertBot(bb.sdk, {
+          botThreadId: owner.threadId, line: `⚠️ ${line}`,
+          note: "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].",
+          push: { title: `${owner.name} · ${thread.title}`, body: line, coalesceKey: `thread-resume:${thread.id}` },
+        });
+        return;
+      }
+      await bb.sdk.plugins.callRpc({
+        pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
+        input: { title: `Stopped: ${thread.title}`, body: line, kind: "turn-finished", threadId: thread.id, ...(thread.projectId ? { projectId: thread.projectId } : {}), coalesceKey: `thread-resume:${thread.id}` } as never,
+      }).catch((error) => bb.log.warn(`Thread resume notice failed: ${errorText(error)}`));
+    },
+  });
+  const threadResumeSweep = () => void threadResume.sweep().catch((error) => bb.log.warn(`Thread resume sweep failed: ${errorText(error)}`));
+  bb.onDispose(() => threadResume.dispose());
+  bb.events.on("thread.failed", ({ thread }) => threadResume.failed(thread.id));
+  bb.events.on("thread.idle", ({ thread }) => threadResume.idle(thread.id));
+  bb.events.on("thread.archived", ({ thread }) => threadResume.settled(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => threadResume.settled(thread.id));
+  // host:changed comes over BB's realtime socket (SDK 0.6.37 has it); without it, the sweeps still run.
+  if (typeof bb.sdk.subscribe === "function") {
+    try {
+      const unsubscribe = bb.sdk.subscribe({ event: "host:changed", callback: (event) => { if (event.changes.includes("host-connected")) threadResume.hostConnected(); } });
+      bb.onDispose(() => unsubscribe());
+    } catch (error) { bb.log.warn(`Thread resume: no host events (${errorText(error)})`); }
+  }
+  threadResume.startup();
   // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work and the weekly curator.
   const learningBot = (bot: NonNullable<ReturnType<typeof bots.stored>>) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, kind: bot.kind ?? "studio" });
   // Side threads on a Bot's replies (src/bot-side-threads.ts).

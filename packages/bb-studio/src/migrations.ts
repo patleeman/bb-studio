@@ -378,4 +378,15 @@ export const MIGRATIONS = [
        id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, thread_id TEXT NOT NULL, at INTEGER NOT NULL, tokens INTEGER
      );
    CREATE INDEX bot_cache_compactions_thread ON bot_cache_compactions (thread_id, at);`,
+  // Threads Studio resumed after a host restart cut them off
+  // (src/thread-resume.ts). Append-only: a resume, the cap reached, a failed
+  // send and cleared (the thread went idle after the cap), each tied to the
+  // interrupt event it answers (one resume per interrupt); the cap counts
+  // resumes per thread in the last hour.
+  `CREATE TABLE thread_auto_resumes (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL, event_id TEXT NOT NULL, event TEXT NOT NULL,
+       bot_id TEXT, title TEXT, reason TEXT, message TEXT, at INTEGER NOT NULL
+     );
+   CREATE INDEX thread_auto_resumes_thread ON thread_auto_resumes (thread_id, at);
+   CREATE INDEX thread_auto_resumes_event ON thread_auto_resumes (thread_id, event_id);`,
 ];

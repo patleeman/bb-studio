@@ -1131,11 +1131,11 @@ export class Bots {
     for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
       if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
     }
-    // An automation past its auto-resume cap: one entry, opening the Bot's chat, where its line is.
+    // An automation or thread past its auto-resume cap: one entry, opening the Bot's chat, where its line is.
     const alerts = this.deps.automationAlerts?.(bot.id) ?? [];
     if (alerts.length && !needsYou.some((thread) => thread.id === bot.threadId)) {
       needsYou.unshift({
-        id: bot.threadId, title: alerts.length === 1 ? alerts[0]!.message : `${alerts.length} automations are off after failing: ${alerts.map((each) => each.name).join(", ")}`,
+        id: bot.threadId, title: alerts.length === 1 ? alerts[0]!.message : `${alerts.length} automations or threads stopped after failing: ${alerts.map((each) => each.name).join(", ")}`,
         status: "idle", projectId: threads.find((thread) => thread.id === bot.threadId)?.projectId ?? PERSONAL_PROJECT_ID, updatedAt: Math.max(...alerts.map((each) => each.at)), relation: "self", needsYou: true, parentId: null,
       });
     }
