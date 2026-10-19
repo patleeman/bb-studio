@@ -2041,7 +2041,8 @@ piece being read is lit in the transcript. Recapture with
   checkout: a voice chat never makes its own worktree.
 - **The composer, state by state.** Captured from a staged BB in a seeded
   thread with `BB_CAPTURE_ONLY=studio-composer-voice`. Idle, dictating, the
-  hint and push-to-talk are live, on Chrome's fake microphone; hands-free and
+  hint, push-to-talk and dictating in a voice thread are live, on Chrome's
+  fake microphone; hands-free and
   the Bot speaking are set with Studio's `studio:voice-fixture` event, since
   staging can't talk over a spoken reply. Each state checks there's at most
   one timer and one indicator.
@@ -2057,27 +2058,36 @@ piece being read is lit in the transcript. Recapture with
 
   ![Voice mode's first-time hint above the composer](assets/composer-voice-hint.png)
 
-  Voice mode on for the first time: the hint above the composer, the
-  hold-to-talk mic beside the speaker, and no dictation mic.
+  Voice mode on for the first time: the hint above the composer, and the
+  hold-to-talk mic beside the speaker. Talk's dictation mic stays where it
+  was.
 
   ![Holding to talk: the red pill, no timer](assets/composer-voice-ptt.png)
 
   Holding to talk: the mic becomes the red pill with your level, and no timer.
 
-  ![Hands-free listening: the red pill alone](assets/composer-voice-hands-free.png)
+  ![Dictating in a voice thread: Talk's recorder, and no hold-to-talk control](assets/composer-voice-dictating.png)
 
-  Hands-free: the red pill alone; tap it to go back to push-to-talk.
+  Dictating in a voice thread, from Talk's mic: Talk's recorder is the one
+  indicator, and voice mode waits until the dictation is done.
+
+  ![Hands-free listening: the red pill](assets/composer-voice-hands-free.png)
+
+  Hands-free: the red pill; tap it to go back to push-to-talk.
 
   ![The Bot speaking: the blue pill with speed and Stop](assets/composer-voice-speaking.png)
 
   The Bot speaking: the same spot shows its voice in blue, with speed and
   Stop, and the hold-to-talk mic to interrupt it.
-- **One mic, one indicator.** The composer shows at most one timer and one
+- **One recording at a time.** The composer shows at most one timer and one
   level meter. Your voice is a red dot with red bars; the Bot's is its
-  speaker glyph with accent bars, only while it speaks, in the same spot. Voice
-  mode owns the mic in its thread: the dictation mic and Talk's recorder are
-  hidden, and turning voice mode on while you dictate finishes the dictation
-  first (it's typed in, not sent). Voice mode has no timer. There are no
+  speaker glyph with blue bars, only while it speaks, in the same spot.
+  Talk's dictation mic stays in a voice thread, and Studio's own state keeps
+  one recording going: turning voice mode on while you dictate finishes the
+  dictation first (it's typed in, not sent), and pressing the dictation mic
+  while voice mode listens ends voice mode's turn (what it heard is still
+  sent) and holds voice mode, hands-free included, until the dictation is
+  done. The dictation is typed in, like any other. Voice mode has no timer. There are no
   words beside the controls; screen readers hear "Listening…" and
   "Speaking…". (They belong in the field's placeholder, which BB doesn't let
   plugins set yet.)
