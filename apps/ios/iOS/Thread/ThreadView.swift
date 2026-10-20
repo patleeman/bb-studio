@@ -285,7 +285,6 @@ struct ThreadView: View {
             try? await Task.sleep(for: .milliseconds(150))
             if let item = unreadItem() {
                 pinned = false
-                ScrollLog.cause("unread")
                 position.scrollTo(id: item, anchor: .top)
             }
         }
@@ -530,7 +529,6 @@ struct ThreadView: View {
                     // edge, not every frame of a scroll.
                     Color.clear.frame(height: 1).id(Self.bottomId)
                         .onGeometryChange(for: EndPlace.self) { EndPlace($0) } action: { place in
-                            ScrollLog.log("end \(end)->\(place)")
                             end = place
                             keepPinned()
                         }
@@ -630,15 +628,11 @@ struct ThreadView: View {
         .onChange(of: findQuery) { _, _ in findIndex = 0 }
         // Earlier pages going in above would carry the match off screen.
         .onChange(of: model.rows.first?.id) { _, _ in
-            if finding, let currentMatch {
-                ScrollLog.cause("find.olderPage")
-                position.scrollTo(id: currentMatch, anchor: .center)
-            }
+            if finding, let currentMatch { position.scrollTo(id: currentMatch, anchor: .center) }
         }
         .onChange(of: currentMatch) { _, id in
             guard let id else { return }
             pinned = false
-            ScrollLog.cause("find")
             withAnimation(.snappy) { position.scrollTo(id: id, anchor: .center) }
         }
         // A streaming reply: follow it, at most once a beat rather than per token.
@@ -652,8 +646,6 @@ struct ThreadView: View {
         .onChange(of: outbox.messages.count) { old, new in
             if new > old { scrollToBottom() }
         }
-        .modifier(ScrollLogProbe(name: botChrome != nil ? "bot" : "thread", pinned: pinned, working: showsWorking,
-                                 lastRowLength: model.rows.last?.text?.utf8.count ?? 0))
     }
 
     @ViewBuilder private var jumpButton: some View {
@@ -702,14 +694,12 @@ struct ThreadView: View {
         // Rows already here but not drawn: draw the next lot.
         if hidden > 0 {
             drawnItems = min(all.count, drawnItems + Self.itemWindow)
-            ScrollLog.cause("olderDrawn")
             position.scrollTo(id: first, anchor: .top)
             return .added
         }
         let result = await model.loadOlder()
         if result == .added {
             drawnItems = max(drawnItems, allItemIds.count)
-            ScrollLog.cause("olderPage")
             position.scrollTo(id: first, anchor: .top)
         }
         return result
@@ -818,7 +808,6 @@ struct ThreadView: View {
             // Above the bottom with the chat longer than the screen: rows
             // above measured shorter and left a blank under the end.
             guard pinned, scrollPhase == .idle, end != .bottom || pastEnd > Self.pastEndSlack else { return }
-            ScrollLog.cause("keepPinned.snap")
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
         }
     }
@@ -833,18 +822,13 @@ struct ThreadView: View {
     private func scrollToBottom(animated: Bool = true) {
         pinned = true
         guard animated, atBottom else {
-            ScrollLog.cause(animated ? "toBottom.jump" : "toBottom.pastEnd")
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
             return
         }
-        ScrollLog.cause("toBottom.animated")
         withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
         Task {
             try? await Task.sleep(for: .milliseconds(400))
-            if !scrollPhase.byReader, pinned || pastEnd > Self.pastEndSlack {
-                ScrollLog.cause("toBottom.settle")
-                position.scrollTo(id: Self.bottomId, anchor: .bottom)
-            }
+            if !scrollPhase.byReader, pinned || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
         }
     }
 

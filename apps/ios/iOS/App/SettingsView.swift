@@ -108,7 +108,6 @@ struct SettingsView: View {
                 )
                 .font(.footnote)
             }
-            ScrollDiagnosticsSection()
         }
         .navigationTitle("Settings")
         .onAppear { serverURL = app.serverURL.absoluteString }
@@ -149,59 +148,5 @@ struct SettingsView: View {
         } catch {
             status = BBClient.describe(error, server: url)
         }
-    }
-}
-
-/// The app's version, and under it the hidden scroll diagnostics: five taps
-/// on the version show the switch. Off by default; on, chat scrolling is
-/// logged to a file to share from here (numbers and causes, never text).
-private struct ScrollDiagnosticsSection: View {
-    @AppStorage(ScrollLog.defaultsKey) private var logging = false
-    @AppStorage("scrollDiagnosticsShown") private var shown = false
-    @State private var taps = 0
-    @State private var size: Int64 = 0
-
-    private var version: String {
-        let info = Bundle.main.infoDictionary
-        return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
-    }
-
-    var body: some View {
-        Section {
-            if shown || logging {
-                Toggle("Log chat scrolling", isOn: $logging)
-                    .accessibilityIdentifier("settingsScrollDiagnostics")
-                    .onChange(of: logging) { _, on in
-                        ScrollLog.setEnabled(on)
-                        refresh()
-                    }
-                if size > 0 {
-                    ShareLink(item: ScrollLog.fileURL) {
-                        Label("Share scroll log (\(ByteCountFormatter.string(fromByteCount: size, countStyle: .file)))",
-                              systemImage: "square.and.arrow.up")
-                    }
-                    Button("Clear scroll log", role: .destructive) {
-                        ScrollLog.clear()
-                        refresh()
-                    }
-                }
-            }
-        } footer: {
-            Text("BB Studio \(version)")
-                .foregroundStyle(Color.primary.opacity(0.75))
-                .frame(maxWidth: .infinity)
-                .contentShape(.rect)
-                .onTapGesture {
-                    taps += 1
-                    if taps >= 5 { shown = true }
-                }
-                .accessibilityIdentifier("settingsVersion")
-        }
-        .onAppear(perform: refresh)
-    }
-
-    private func refresh() {
-        ScrollLog.flushAndWait()
-        size = ScrollLog.fileSize
     }
 }
