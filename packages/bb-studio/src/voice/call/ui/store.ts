@@ -22,6 +22,8 @@ type State = { call: ActiveCall | null; starting: boolean; error: string | null 
  */
 export type CallFixture = { callId: string; botName: string; transport: RealtimeTransport };
 const fixture = () => (globalThis as { __studioVoiceCallFixture?: CallFixture }).__studioVoiceCallFixture ?? null;
+/** Whether a staging capture set up a call (so no key is needed). */
+export const hasCallFixture = () => !!fixture();
 
 let state: State = { call: null, starting: false, error: null };
 const listeners = new Set<() => void>();

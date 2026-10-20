@@ -12,7 +12,7 @@ import { useLive } from "../../../ui/live";
 import type { voiceCallContract, VoiceCallState } from "../contract";
 import { callClock, callLength, callUsd, VOICE_CALL_CHANNEL, type VoiceCallSignal } from "../shared";
 import type { CallSession, CallSnapshot } from "./session";
-import { dismissCall, endCall, startCall, useCallState } from "./store";
+import { dismissCall, endCall, hasCallFixture, startCall, useCallState } from "./store";
 
 function useSnapshot(session: CallSession): CallSnapshot {
   return useSyncExternalStore((listener) => session.subscribe(listener), () => session.state);
@@ -28,7 +28,7 @@ export function VoiceCallButton({ threadId, isCompactViewport }: PluginThreadHea
   const onCall = !!call && call.session.state.status !== "ended";
   const label = onCall ? `On a call with ${call!.botName}` : starting ? "Calling…" : state.ready ? `Call ${state.botName}` : state.problem ?? "Calls aren't available";
   const start = () => {
-    if (!state.ready) return void toast.error(`Can't call ${state.botName}`, { description: state.problem ?? undefined });
+    if (!state.ready && !hasCallFixture()) return void toast.error(`Can't call ${state.botName}`, { description: state.problem ?? undefined });
     void startCall(rpc as never, state.botId!).then(() => live.refresh(), (error: unknown) => { live.refresh(); toast.error(`Couldn't call ${state.botName}`, { description: errorMessage(error) }); });
   };
   return (
