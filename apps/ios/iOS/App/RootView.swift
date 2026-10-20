@@ -24,9 +24,6 @@ struct RootView: View {
                 .tag(Tab.settings)
         }
         .tabViewStyle(.sidebarAdaptable)
-        #if DEBUG
-        .onAppear { if BotDemo.variant != nil { model.tab = .bot } }
-        #endif
         .overlay(alignment: .bottom) {
             if let notice = model.notice {
                 Text(notice)

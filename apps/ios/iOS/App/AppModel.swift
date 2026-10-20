@@ -86,7 +86,9 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published private(set) var realtime: BBRealtime
-    @Published var tab: Tab = .inbox
+    /// Bot is the primary tab: every launch opens on it. Links, notification
+    /// taps, widgets and Siri set their own tab after this, so they always win.
+    @Published var tab: Tab = .bot
     @Published var path: [Route] = []
     @Published var studioPath: [Route] = []
     /// Set by the Action button until the Bot tab starts or stops talking.

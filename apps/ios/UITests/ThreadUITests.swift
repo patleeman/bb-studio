@@ -13,6 +13,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testHome() {
+        app.tabBars.buttons["Threads"].tap()
         XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
         shot("home-top")
         app.swipeUp()
