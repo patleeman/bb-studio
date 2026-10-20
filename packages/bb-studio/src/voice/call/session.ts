@@ -49,7 +49,7 @@ export const CALL_TOOL_DEFINITIONS: { type: "function"; name: VoiceCallToolName;
   },
   {
     type: "function", name: "daily_brief",
-    description: "Today's Kensico Brief and Heard on the Street top items, from the user's Studio items. Says when they can't be found.",
+    description: "Today's Kensico Brief (top line and top stories), Heard on the Street open rumors, and capacity and market moves, from Kensico. Says when a part is empty.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {

@@ -18,7 +18,7 @@ import { registerSpeech } from "./src/speech/register";
 import { registerVoice, type BuiltinVoice } from "./src/voice/register";
 import { VOICE_CALL_SETTINGS, VoiceCalls, type CallBot } from "./src/voice/call/calls";
 import { registerVoiceCalls } from "./src/voice/call/register";
-import { BRIEF_TITLES, formatBotStatus, formatDailyBrief, formatLeadsStatus, type BriefItem } from "./src/voice/call/read";
+import { formatBotStatus, formatKensicoVoice, formatLeadsStatus, KENSICO_VOICE_URL } from "./src/voice/call/read";
 import { VOICE_CALL_CHANNEL } from "./src/voice/call/shared";
 import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
 import { pagePath } from "./src/pages/constants";
@@ -1153,15 +1153,15 @@ export default async function plugin(bb: BbPluginApi) {
         return formatLeadsStatus(bot.name, leads, await runners.list(bot.id));
       },
       dailyBrief: async () => {
-        await searchIndex.ensure();
-        const found = new Map<string, BriefItem | null>();
-        for (const name of BRIEF_TITLES) {
-          const hit = searchIndex.search(name, { limit: 50 })
-            .filter((each) => each.title.toLowerCase().includes(name.toLowerCase()))
-            .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-          found.set(name, hit ? { title: hit.title, kind: hit.kind, updatedAt: hit.updatedAt, text: (hit.ref.pluginId === "pages" ? pages.markdown(hit.ref.id) : null) ?? hit.snippet.text } : null);
+        try {
+          const response = await fetch(KENSICO_VOICE_URL, { signal: AbortSignal.timeout(6000), redirect: "error" });
+          if (!response.ok) return `Kensico's summary isn't available right now (HTTP ${response.status}).`;
+          const body = await response.text();
+          if (body.length > 16_000) return "Kensico's summary was too large to read.";
+          return formatKensicoVoice(JSON.parse(body), new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }));
+        } catch {
+          return "Kensico isn't reachable from the BB host right now (it's on the tailnet).";
         }
-        return formatDailyBrief(found);
       },
     },
     send: ({ threadId, text, note, mode }) => bb.sdk.threads.send({
