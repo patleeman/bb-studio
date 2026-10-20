@@ -70,7 +70,7 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => {
   let callId = null;
   let botName = BOT.name;
   let botThread = threadId;
-  let botProject = projectId;
+  let chatPath = null;
   return [
     {
       id: "studio-voice-call-bar",
@@ -86,9 +86,11 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => {
         await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "180"]).catch(() => {});
         botName = bot.name;
         botThread = bot.threadId;
-        botProject = JSON.parse(await bbCli(["thread", "show", botThread, "--json"])).thread.projectId;
+        // The personal project's threads open at /threads/<id>.
+        const botProject = JSON.parse(await bbCli(["thread", "show", botThread, "--json"])).thread.projectId;
+        chatPath = botProject === "proj_personal" ? `/threads/${botThread}` : `/projects/${botProject}/threads/${botThread}`;
         callId = seedCall({ botId: bot.id, botName, threadId: botThread, startedAt: Date.now() - 4 * 60_000 });
-        await client.navigate(`/projects/${botProject}/threads/${botThread}`);
+        await client.navigate(chatPath);
         await client.waitForSelector("[data-testid=voice-call-button]", 30_000);
         await client.evaluate(fixtureScript(callId, botName));
         await client.evaluate(`(() => { document.querySelector("[data-testid=voice-call-button]").click(); return true; })()`);
@@ -128,7 +130,7 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => {
         await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
         await sleep(3000);
         await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
-        await client.navigate(`/projects/${botProject}/threads/${botThread}`);
+        await client.navigate(chatPath);
         await client.waitForText("sent you 1 message", 120_000);
         const line = await client.poll(`document.body.innerText.match(/Call · \\d+ min · ≈\\$\\d+\\.\\d\\d · sent you 1 message · Transcript/)?.[0] ?? ""`);
         if (!line) throw new Error("The chat's call line should read Call · N min · ≈$X · sent you 1 message · Transcript.");

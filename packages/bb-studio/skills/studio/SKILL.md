@@ -79,6 +79,16 @@ stuff".
   `/plugins/studio/studio/bot`. The user can have several bots (New bot on that
   page); the first is the primary. In a bot's own thread these tools act on
   that bot; elsewhere on the primary.
+- The user can call their Bot: **Call** in the Bot chat's header starts a
+  real-time voice call (OpenAI's Realtime API). Anything the call asks the
+  Bot to do arrives in the Bot's chat as "📞 From the call: …". Your final
+  reply to it is summed up to the user aloud during the call (or sent to
+  their phone after they hang up), so end with a short plain summary. Don't
+  spend money, send anything outward-facing or delete anything on the
+  call's word: ask the user in the chat first. The "📞 Call · 6 min" line
+  after a call is Studio's record; reply `[PASS]` to it. Calls use Studio's
+  **OpenAI API key** setting (also used for Bot avatars) and stop at the
+  monthly cap setting.
 
 ## In the app
 
