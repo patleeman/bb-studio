@@ -38,20 +38,8 @@ struct ThreadView: View {
     @State private var findQuery = ""
     @State private var findIndex = 0
     @State private var composerFocused = false
-    /// Near the bottom by the scroll view's geometry, which counts estimated
-    /// heights for lazy rows not yet drawn.
+    /// Follow new output only while the reader is at the bottom.
     @State private var atBottom = true
-    /// Following the end: new output and changes in size keep the last row
-    /// in view. Only the reader's own scrolling changes it (to whether the
-    /// end is in view when they let go); sending or "Jump to latest" sets it.
-    @State private var pinned = true
-    /// Where the end-of-list marker is, against the bottom of the visible area.
-    @State private var end = EndPlace.bottom
-    /// Brings the end back once the layout settles (`keepPinned`).
-    @State private var settling: Task<Void, Never>?
-    /// How many of the newest items the timeline draws; reaching the top
-    /// draws more before asking the server for older pages.
-    @State private var drawnItems = ThreadView.itemWindow
     @State private var atTop = false
     /// How far the timeline is scrolled past its last row, or negative short of it.
     @State private var pastEnd: CGFloat = 0
@@ -283,10 +271,7 @@ struct ThreadView: View {
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
             try? await Task.sleep(for: .milliseconds(150))
-            if let item = unreadItem() {
-                pinned = false
-                position.scrollTo(id: item, anchor: .top)
-            }
+            if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
         }
         .onDisappear {
             model.detach()
@@ -360,10 +345,10 @@ struct ThreadView: View {
         // since than one page holds) does it replace them: start again at the
         // bottom then, unless the reader has scrolled up into the cached rows.
         .onChange(of: model.replacedCache) { _, _ in
-            if pinned || pastEnd > Self.pastEndSlack { timelineKey += 1 }
+            if atBottom || pastEnd > Self.pastEndSlack { timelineKey += 1 }
         }
         .overlay(alignment: .bottomTrailing) { jumpButton }
-        .animation(.snappy, value: pinned)
+        .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
         .environment(\.threadId, model.threadId)
         .environment(\.openURL, OpenURLAction { url in
@@ -477,67 +462,85 @@ struct ThreadView: View {
 
     private var timeline: some View {
         ScrollView {
-            let all = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
-            let (items, hidden) = drawnWindow(all)
-            let unread = unreadItem(in: items)
-            VStack(alignment: .leading, spacing: 14) {
-                // The history, drawn as it scrolls into view.
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if hidden > 0 || (botChrome != nil ? model.canLoadOlder : model.hasOlder) {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+            LazyVStack(alignment: .leading, spacing: 14) {
+                if botChrome != nil ? model.canLoadOlder : model.hasOlder {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                if let botChrome {
+                    if !model.canLoadOlder { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
+                    BotChatTimeline(
+                        bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
+                        running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
+                        react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
+                        edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
+                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache)
+                }
+                let items = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
+                let unread = unreadItem(in: items)
+                let editable = lastUserRowId
+                let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
+                ForEach(items) { item in
+                    // One view per item, so scrolling to the item lands on the divider.
+                    VStack(alignment: .leading, spacing: 14) {
+                        if item.id == unread { UnreadDivider() }
+                        Group {
+                            switch item {
+                            case .message(let row):
+                                MessageBubble(
+                                    row: row,
+                                    projectId: model.thread?.projectId,
+                                    react: { draftReply($0) },
+                                    reactionItems: reactionSettings.items,
+                                    quote: { quote($0) },
+                                    select: { selecting = SelectionText(text: $0) },
+                                    sideChat: sideChat,
+                                    edit: row.id == editable ? startEditing : nil,
+                                    saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
+                                    readAloud: voice.available == true ? { voice.readAloud(rowId: row.id, text: $0) } : nil,
+                                    reading: player.isReading(row.id))
+                                .environment(\.readAlongPiece, row.id == readAlongRow ? player.piece : nil)
+                            case .activity(let rows):
+                                ActivityGroup(rows: rows)
+                            }
+                        }
+                        .background {
+                            if item.id == currentMatch {
+                                RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
+                            }
+                        }
                     }
+                }
+                ForEach(outbox.messages(for: model.threadId)) { message in
+                    PendingBubble(message: message)
+                }
+                ForEach(botChrome == nil ? model.interactions : []) { interaction in
+                    InteractionCard(
+                        interaction: interaction,
+                        resolve: { await model.resolve(interaction, $0) },
+                        cancel: { await model.cancel(interaction) },
+                        openWeb: { showingWeb = true })
+                    .id(interaction.id)
+                }
+                if showsWorking {
                     if let botChrome {
-                        if !model.canLoadOlder, hidden == 0 { BotHero(bot: botChrome.bot, status: botStatus, working: model.thread?.isRunning == true) }
-                        botTimeline(botChrome, part: .older(drawn: finding ? nil : drawnItems, tail: Self.tailItems))
+                        BotTypingRow(bot: botChrome.bot, thinking: model.shelf.thinking)
+                            .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
+                    } else {
+                        WorkingIndicator(thinking: model.shelf.thinking)
                     }
-                    ForEach(items.dropLast(Self.tailItems)) { itemView($0, unread: unread) }
                 }
-                .scrollTargetLayout()
-                // The newest items, the reply on its way and the end, always
-                // drawn. Laid out lazily, the end sat where the stack estimated
-                // it: after a reply shrank under the reader in a long chat (its
-                // stream settling, steps folding), a jump there drew nothing
-                // (a blank chat, "Jump to latest" up, until the reader scrolled).
-                VStack(alignment: .leading, spacing: 14) {
-                    if let botChrome { botTimeline(botChrome, part: .newest(Self.tailItems)) }
-                    ForEach(items.suffix(Self.tailItems)) { itemView($0, unread: unread) }
-                    ForEach(outbox.messages(for: model.threadId)) { message in
-                        PendingBubble(message: message)
-                    }
-                    ForEach(botChrome == nil ? model.interactions : []) { interaction in
-                        InteractionCard(
-                            interaction: interaction,
-                            resolve: { await model.resolve(interaction, $0) },
-                            cancel: { await model.cancel(interaction) },
-                            openWeb: { showingWeb = true })
-                        .id(interaction.id)
-                    }
-                    if showsWorking {
-                        if let botChrome {
-                            BotTypingRow(bot: botChrome.bot, thinking: model.shelf.thinking)
-                                .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
-                        } else {
-                            WorkingIndicator(thinking: model.shelf.thinking)
-                        }
-                    }
-                    // Where "scroll to the bottom" goes, and how the timeline
-                    // knows where its end is: the scroll view's content size
-                    // counts estimates for the rows above, and lags them as
-                    // they measure in. A few cases, so it changes only at an
-                    // edge, not every frame of a scroll.
-                    Color.clear.frame(height: 1).id(Self.bottomId)
-                        .onGeometryChange(for: EndPlace.self) { EndPlace($0) } action: { place in
-                            end = place
-                            if scrollPhase.byReader { pinned = place != .off } else { keepPinned() }
-                        }
-                }
-                .scrollTargetLayout()
+                // Where "scroll to the bottom" goes. A lazy stack scrolled to its
+                // bottom edge while rows go in and the composer or keyboard moves
+                // can land where it draws nothing: after a send, a blank chat
+                // until the reply. Scrolling to a view lays that view out.
+                Color.clear.frame(height: 1).id(Self.bottomId)
             }
             .padding(.horizontal, botChrome != nil ? 12 : 16)
             .padding(.vertical, 8)
             .animation(botChrome != nil ? .smooth(duration: 0.3) : nil, value: showsWorking)
+            .scrollTargetLayout()
             .frame(maxWidth: Self.readableWidth)
             .frame(maxWidth: .infinity)
         }
@@ -552,15 +555,6 @@ struct ThreadView: View {
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
-        // While pinned, a change in size (a reply streaming or settling,
-        // rows folding or measuring in, the keyboard or composer moving)
-        // brings the end back.
-        .onScrollGeometryChange(for: ScrollFit.self) { geometry in
-            ScrollFit(content: geometry.contentSize.height.rounded(), inset: geometry.contentInsets.bottom.rounded(),
-                      container: geometry.containerSize.height.rounded())
-        } action: { _, _ in
-            keepPinned()
-        }
         // Following a streaming reply scrolls to the bottom the lazy stack
         // estimates; when rows above measure shorter than estimated, or the
         // bottom shrinks (the working indicator goes, steps fold into a group),
@@ -574,26 +568,18 @@ struct ThreadView: View {
             pastEnd = distance
             if scrollPhase == .idle { settlePastEnd() }
         }
-        .onScrollPhaseChange { old, phase in
+        .onScrollPhaseChange { _, phase in
             scrollPhase = phase
-            // The reader let go: follow on only if they left the end in view.
-            if old.byReader, !phase.byReader { pinned = end != .off }
-            if phase == .idle {
-                settlePastEnd()
-                keepPinned()
-            }
+            if phase == .idle { settlePastEnd() }
         }
         // The first page lands at the bottom through `defaultScrollAnchor`;
         // scrolling by hand while lazy rows are still measuring can overshoot.
         .onChange(of: model.shownRows.last?.id) { old, _ in
-            // The window takes new rows in at the bottom rather than drop
-            // its oldest above the reader.
-            if old != nil { drawnItems += 1 }
-            if old != nil, pinned || model.shownRows.last?.isUser == true { scrollToBottom() }
+            if old != nil, atBottom || model.shownRows.last?.isUser == true { scrollToBottom() }
         }
         // The Bot's typing row goes in under the message just sent.
         .onChange(of: showsWorking) { _, shows in
-            if shows, pinned { scrollToBottom() }
+            if shows, atBottom { scrollToBottom() }
         }
         // Older pages load when the reader reaches the top.
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -606,7 +592,7 @@ struct ThreadView: View {
         // a page brings nothing new.
         .task(id: atTop) {
             var failures = 0
-            while atTop, hiddenItems > 0 || (botChrome != nil ? model.canLoadOlder : model.hasOlder), !Task.isCancelled {
+            while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
                 guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
                 try? await Task.sleep(for: delay)
             }
@@ -620,12 +606,10 @@ struct ThreadView: View {
             if finding, let currentMatch { position.scrollTo(id: currentMatch, anchor: .center) }
         }
         .onChange(of: currentMatch) { _, id in
-            guard let id else { return }
-            pinned = false
-            withAnimation(.snappy) { position.scrollTo(id: id, anchor: .center) }
+            if let id { withAnimation(.snappy) { position.scrollTo(id: id, anchor: .center) } }
         }
         .onChange(of: model.rows.last?.text) { _, _ in
-            if pinned { scrollToBottom(animated: false) }
+            if atBottom { scrollToBottom(animated: false) }
         }
         .onChange(of: model.interactions.first?.id) { _, id in
             if id != nil { scrollToBottom() }
@@ -637,7 +621,7 @@ struct ThreadView: View {
     }
 
     @ViewBuilder private var jumpButton: some View {
-        if !pinned {
+        if !atBottom {
             Button { scrollToBottom() } label: {
                 Image(systemName: "arrow.down")
                     .font(.body.weight(.semibold))
@@ -676,102 +660,11 @@ struct ThreadView: View {
     /// The page goes in above the reader, so bring back what was the first
     /// item. By id rather than offset: rows above are only estimated heights.
     private func loadOlder() async -> OlderPage {
-        let all = allItemIds
-        let hidden = hiddenItems
-        guard let first = all.dropFirst(hidden).first else { return .nothing }
-        // Rows already here but not drawn: draw the next lot.
-        if hidden > 0 {
-            drawnItems = min(all.count, drawnItems + Self.itemWindow)
-            position.scrollTo(id: first, anchor: .top)
-            return .added
-        }
+        let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started, compactions: $0.compactions).first?.id } ?? TimelineItem.group(model.rows).first?.id
+        guard let first else { return .nothing }
         let result = await model.loadOlder()
-        if result == .added {
-            drawnItems = max(drawnItems, allItemIds.count)
-            position.scrollTo(id: first, anchor: .top)
-        }
+        if result == .added { position.scrollTo(id: first, anchor: .top) }
         return result
-    }
-
-    /// The newest items a timeline draws at first. A lazy stack places what
-    /// it hasn't drawn by estimated heights; over thousands of rows of every
-    /// height (a line, a screenful, a folded run of tools) the estimate is
-    /// off by screens. The rest draw as the reader scrolls up, like older pages.
-    static let itemWindow = 60
-    /// The newest items, drawn whether in view or not, so the end is where it
-    /// really is. A screenful and more, a handful of views.
-    static let tailItems = 16
-
-    /// Ids of every item the timeline could draw, oldest first.
-    private var allItemIds: [String] {
-        if let botChrome {
-            return BotChatEntry.memo.entries(model.chainRows, started: botChrome.started, compactions: botChrome.compactions).map(\.id)
-        }
-        return TimelineItem.group(model.shownRows).map(\.id)
-    }
-
-    /// Items above the window, not drawn.
-    private var hiddenItems: Int {
-        drawnWindow(botChrome != nil ? [] : TimelineItem.group(model.shownRows)).hidden
-    }
-
-    /// A regular thread's items to draw (of `all`), and how many items above
-    /// them aren't drawn, the Bot's or the thread's. All of them while
-    /// finding, as a match can be anywhere; stretched to keep the first
-    /// unread item in, as the timeline opens there.
-    private func drawnWindow(_ all: [TimelineItem]) -> (items: [TimelineItem], hidden: Int) {
-        if let botChrome {
-            let count = BotChatEntry.memo.entries(model.chainRows, started: botChrome.started, compactions: botChrome.compactions).count
-            return ([], finding ? 0 : max(0, count - drawnItems))
-        }
-        guard !finding else { return (all, 0) }
-        var limit = drawnItems
-        if let unread = model.unreadFrom, let index = all.firstIndex(where: { $0.rows.contains { $0.id == unread } }) {
-            limit = max(limit, all.count - index)
-        }
-        return (Array(all.suffix(limit)), max(0, all.count - limit))
-    }
-
-    private func botTimeline(_ botChrome: BotChrome, part: BotChatTimeline.Part) -> some View {
-        BotChatTimeline(
-            bot: botChrome.bot, rows: model.chainRows, threadId: model.threadId, projectId: model.thread?.projectId,
-            running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
-            react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
-            edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
-            sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache,
-            part: part)
-    }
-
-    /// One view per item, so scrolling to the item lands on the divider.
-    private func itemView(_ item: TimelineItem, unread: String?) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if item.id == unread { UnreadDivider() }
-            Group {
-                switch item {
-                case .message(let row):
-                    MessageBubble(
-                        row: row,
-                        projectId: model.thread?.projectId,
-                        react: { draftReply($0) },
-                        reactionItems: reactionSettings.items,
-                        quote: { quote($0) },
-                        select: { selecting = SelectionText(text: $0) },
-                        sideChat: runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil,
-                        edit: row.id == lastUserRowId ? startEditing : nil,
-                        saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-                        readAloud: voice.available == true ? { voice.readAloud(rowId: row.id, text: $0) } : nil,
-                        reading: player.isReading(row.id))
-                    .environment(\.readAlongPiece, row.id == readAlongRow ? player.piece : nil)
-                case .activity(let rows):
-                    ActivityGroup(rows: rows)
-                }
-            }
-            .background {
-                if item.id == currentMatch {
-                    RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
-                }
-            }
-        }
     }
 
     /// Past this, the timeline is past its last row rather than bouncing.
@@ -782,22 +675,6 @@ struct ThreadView: View {
         if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
     }
 
-    /// Brings the end back into view while pinned, a beat after the last
-    /// change of a burst (so rows still measuring aren't fought), once
-    /// nothing scrolls: not under the reader's finger, nor mid-animation
-    /// (going idle calls this again). Runs on a change, never on a timer.
-    private func keepPinned() {
-        guard pinned, scrollPhase == .idle else { return }
-        settling?.cancel()
-        settling = Task {
-            try? await Task.sleep(for: .milliseconds(100))
-            // Above the bottom with the chat longer than the screen: rows
-            // above measured shorter and left a blank under the end.
-            guard !Task.isCancelled, pinned, scrollPhase == .idle, end != .bottom || pastEnd > Self.pastEndSlack else { return }
-            position.scrollTo(id: Self.bottomId, anchor: .bottom)
-        }
-    }
-
     /// Animates only a short way, from near the bottom, and then toward the
     /// edge rather than the marker. An animated scroll to an id in a lazy
     /// stack goes to where the stack estimates it, and re-aims as unmeasured
@@ -806,7 +683,6 @@ struct ThreadView: View {
     /// (no animation) lays it out at once, and draws the end after a raised
     /// keyboard, where a scroll to the edge alone could land blank.
     private func scrollToBottom(animated: Bool = true) {
-        pinned = true
         guard animated, atBottom else {
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
             return
@@ -814,7 +690,7 @@ struct ThreadView: View {
         withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
         Task {
             try? await Task.sleep(for: .milliseconds(400))
-            if pinned || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
+            if atBottom || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
         }
     }
 
@@ -1305,37 +1181,6 @@ struct PendingBubble: View {
 private struct OpenFile: Identifiable {
     let path: String
     var id: String { path }
-}
-
-/// Where the timeline's end is, against the bottom of what the reader sees.
-private enum EndPlace: Equatable {
-    /// Out of view, or not drawn.
-    case off
-    /// At the bottom, give or take a little.
-    case bottom
-    /// In view, with room under it: a chat shorter than the screen, or a
-    /// blank where the end should be.
-    case above
-
-    init(_ proxy: GeometryProxy) {
-        guard let shown = proxy.bounds(of: .scrollView), shown.minY <= 0, proxy.size.height <= shown.maxY + 2 else {
-            self = .off
-            return
-        }
-        self = shown.maxY - proxy.size.height <= 24 ? .bottom : .above
-    }
-}
-
-/// What changes the timeline's fit: its content, the composer and keyboard, the screen.
-private struct ScrollFit: Equatable {
-    var content: CGFloat
-    var inset: CGFloat
-    var container: CGFloat
-}
-
-extension ScrollPhase {
-    /// The reader's finger, or the fling it left.
-    var byReader: Bool { self == .tracking || self == .interacting || self == .decelerating }
 }
 
 extension ScrollGeometry {

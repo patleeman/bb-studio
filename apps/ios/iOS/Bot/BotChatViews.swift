@@ -29,27 +29,9 @@ struct BotChatTimeline: View {
     var threadRows: Set<String> = []
     /// The rows are the cached ones, for timing.
     var cached = false
-    /// Which of the entries to draw.
-    var part = Part.all
-
-    enum Part {
-        case all
-        /// Up to `drawn` of the newest (nil: all of them), leaving out the newest `tail`.
-        case older(drawn: Int?, tail: Int)
-        /// The newest `count`.
-        case newest(Int)
-
-        func of<C: RandomAccessCollection>(_ entries: C) -> C.SubSequence {
-            switch self {
-            case .all: return entries[...]
-            case .older(let drawn, let tail): return entries.suffix(drawn ?? entries.count).dropLast(tail)
-            case .newest(let count): return entries.suffix(count)
-            }
-        }
-    }
 
     var body: some View {
-        let entries = part.of(BotChatEntry.memo.entries(rows, started: started, compactions: compactions))
+        let entries = BotChatEntry.memo.entries(rows, started: started, compactions: compactions)
         let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in
             switch entry {
