@@ -131,9 +131,12 @@ was left where the stack drew nothing: a black chat with "Jump to latest" up
 until a scroll by hand. So the newest 16 items, the reply on its way and the
 end marker are an ordinary `VStack` under the lazy history, always drawn; the
 timeline draws the newest 60 items and more as the reader scrolls up, like
-older pages; and while it follows the end (`pinned`, changed only by the
-reader's own scrolling, a send or "Jump to latest"), any change in size
-brings the end marker back to the bottom once the layout settles. The marker
+older pages; and while it follows the end (`pinned`), any change in size
+brings the end marker back to the bottom, at most once every 100ms. The
+reader's touch unpins it at once and cancels a pending snap, nothing snaps
+during a drag or fling, and size changes keep the bottom in place only while
+pinned; it pins again when their scroll settles within 40pt of the end, or on
+a send or "Jump to latest". The marker
 reports whether it's at the bottom, above it, or out of view, rather than
 trusting the content size. Regular threads use the same `ThreadView`.
 

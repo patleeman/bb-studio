@@ -42,8 +42,8 @@ struct ThreadView: View {
     /// heights for lazy rows not yet drawn.
     @State private var atBottom = true
     /// Following the end: new output and changes in size keep the last row
-    /// in view. Only the reader's own scrolling changes it (to whether the
-    /// end is in view when they let go); sending or "Jump to latest" sets it.
+    /// in view. The reader's touch clears it at once, and it's set again
+    /// when their scroll settles near the end, or by a send or "Jump to latest".
     @State private var pinned = true
     /// Where the end-of-list marker is, against the bottom of the visible area.
     @State private var end = EndPlace.bottom
@@ -530,7 +530,7 @@ struct ThreadView: View {
                     Color.clear.frame(height: 1).id(Self.bottomId)
                         .onGeometryChange(for: EndPlace.self) { EndPlace($0) } action: { place in
                             end = place
-                            if scrollPhase.byReader { pinned = place != .off } else { keepPinned() }
+                            keepPinned()
                         }
                 }
                 .scrollTargetLayout()
@@ -545,7 +545,11 @@ struct ThreadView: View {
         // The Bot's header floats on glass: earlier messages blur away under it
         // rather than being cut off at a hard edge.
         .scrollEdgeEffectStyle(botChrome != nil ? .soft : nil, for: .top)
-        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.bottom, for: .initialOffset)
+        .defaultScrollAnchor(.bottom, for: .alignment)
+        // Growth keeps the bottom in place only while following it: scrolled
+        // up, a streaming reply would slide the chat up under the reader.
+        .defaultScrollAnchor(pinned ? .bottom : nil, for: .sizeChanges)
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.unobscuredBottom >= geometry.contentSize.height - 120
@@ -576,8 +580,15 @@ struct ThreadView: View {
         }
         .onScrollPhaseChange { old, phase in
             scrollPhase = phase
-            // The reader let go: follow on only if they left the end in view.
-            if old.byReader, !phase.byReader { pinned = end != .off }
+            // The reader's finger: stop following at once, so a reply
+            // streaming in doesn't pull the chat back down under it.
+            if phase.byReader {
+                pinned = false
+                settling?.cancel()
+                settling = nil
+            }
+            // Their scroll settled: follow again only at the end (or past it).
+            if old.byReader, phase == .idle { pinned = end == .bottom || (end == .above && pastEnd > -Self.pastEndSlack) }
             if phase == .idle {
                 settlePastEnd()
                 keepPinned()
@@ -589,11 +600,11 @@ struct ThreadView: View {
             // The window takes new rows in at the bottom rather than drop
             // its oldest above the reader.
             if old != nil { drawnItems += 1 }
-            if old != nil, pinned || model.shownRows.last?.isUser == true { scrollToBottom() }
+            if old != nil, !scrollPhase.byReader, pinned || model.shownRows.last?.isUser == true { scrollToBottom() }
         }
         // The Bot's typing row goes in under the message just sent.
         .onChange(of: showsWorking) { _, shows in
-            if shows, pinned { scrollToBottom() }
+            if shows, pinned, !scrollPhase.byReader { scrollToBottom() }
         }
         // Older pages load when the reader reaches the top.
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -624,11 +635,12 @@ struct ThreadView: View {
             pinned = false
             withAnimation(.snappy) { position.scrollTo(id: id, anchor: .center) }
         }
+        // A streaming reply: follow it, at most once a beat rather than per token.
         .onChange(of: model.rows.last?.text) { _, _ in
-            if pinned { scrollToBottom(animated: false) }
+            keepPinned()
         }
         .onChange(of: model.interactions.first?.id) { _, id in
-            if id != nil { scrollToBottom() }
+            if id != nil, !scrollPhase.byReader { scrollToBottom() }
         }
         .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
         .onChange(of: outbox.messages.count) { old, new in
@@ -782,18 +794,20 @@ struct ThreadView: View {
         if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
     }
 
-    /// Brings the end back into view while pinned, a beat after the last
-    /// change of a burst (so rows still measuring aren't fought), once
-    /// nothing scrolls: not under the reader's finger, nor mid-animation
-    /// (going idle calls this again). Runs on a change, never on a timer.
+    /// Brings the end back into view while pinned, at most once a beat
+    /// however many changes come in (rows measuring, a reply streaming), and
+    /// only while nothing scrolls: never under the reader's finger or its
+    /// fling (a touch cancels it), nor mid-animation (going idle calls this
+    /// again). Runs on a change, never on a timer.
     private func keepPinned() {
-        guard pinned, scrollPhase == .idle else { return }
-        settling?.cancel()
+        guard pinned, scrollPhase == .idle, settling == nil else { return }
         settling = Task {
             try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            settling = nil
             // Above the bottom with the chat longer than the screen: rows
             // above measured shorter and left a blank under the end.
-            guard !Task.isCancelled, pinned, scrollPhase == .idle, end != .bottom || pastEnd > Self.pastEndSlack else { return }
+            guard pinned, scrollPhase == .idle, end != .bottom || pastEnd > Self.pastEndSlack else { return }
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
         }
     }
@@ -814,7 +828,7 @@ struct ThreadView: View {
         withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
         Task {
             try? await Task.sleep(for: .milliseconds(400))
-            if pinned || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
+            if !scrollPhase.byReader, pinned || pastEnd > Self.pastEndSlack { position.scrollTo(id: Self.bottomId, anchor: .bottom) }
         }
     }
 
@@ -1311,7 +1325,7 @@ private struct OpenFile: Identifiable {
 private enum EndPlace: Equatable {
     /// Out of view, or not drawn.
     case off
-    /// At the bottom, give or take a little.
+    /// At the bottom, give or take 40pt.
     case bottom
     /// In view, with room under it: a chat shorter than the screen, or a
     /// blank where the end should be.
@@ -1322,7 +1336,7 @@ private enum EndPlace: Equatable {
             self = .off
             return
         }
-        self = shown.maxY - proxy.size.height <= 24 ? .bottom : .above
+        self = shown.maxY - proxy.size.height <= 40 ? .bottom : .above
     }
 }
 
