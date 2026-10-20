@@ -135,9 +135,6 @@ struct ChatPerfRow: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                #if DEBUG
-                RenderStats.appears += 1
-                #endif
                 ChatPerf.rowAppeared(cached: cached)
                 #if DEBUG
                 if row.isUser { ChatPerf.userRowAppeared(row.text) }

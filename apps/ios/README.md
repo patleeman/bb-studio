@@ -170,20 +170,7 @@ While the reader's finger or fling is on the chat, streamed updates wait
 (`ThreadModel.holdsRefresh`) and so do older pages, and both catch up when
 the scroll settles. Messages redraw only when what they show changes
 (`BotMessageRow` is `Equatable`), and the chat's `openURL` handler is made
-once (`LinkOpener`). So typing in the composer redraws none of them.
-`testTypingDoesNotRedrawTheChat` types 50 characters and counts row bodies
-(`RenderStats`, debug builds). It found 1,200 redraws before this change and
-none after.
-
-A pull down toward older rows never puts the chat back on the end once it
-settles, even when rows re-measured during the pull and left the end in
-view. Before, it snapped back, so a chat pulled down went up. While it
-follows a turn, new rows jump to the end rather than animate there: an
-animated scroll doesn't stop for a touch, and it fought a pull that landed
-mid-way. Only the reader's own send animates. The
-`testDragDown…` tests pull down with the keyboard up and down, idle and
-mid-stream. They check that the offset only follows the finger and that
-nothing scrolls the chat once it's let go.
+once (`LinkOpener`).
 
 ### Scroll diagnostics
 

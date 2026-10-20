@@ -71,9 +71,6 @@ final class ChatSendScrollUITests: XCTestCase {
         let draft = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Paragraph 1 of the draft")).firstMatch
         XCTAssertTrue(draft.exists, "the reply is drawn")
         let draftTop = draft.frame.minY
-        // A long pull can carry the reply below the composer: then there's
-        // nothing in view of it to keep.
-        let wasInView = draft.frame.intersects(visibleRect(app, composer: composer))
         // The stream goes on; the chat stays where the reader left it.
         sleep(2)
         let screen = XCUIScreen.main.screenshot()
@@ -81,7 +78,7 @@ final class ChatSendScrollUITests: XCTestCase {
         let after = visibleRect(app, composer: composer)
         XCTAssertFalse(app.buttons["Send"].exists, "still streaming")
         XCTAssertEqual(draft.frame.minY, draftTop, accuracy: 40, "the chat didn't move under the reader")
-        if wasInView { XCTAssertTrue(draft.frame.intersects(after), "what was in view still is: \(draft.frame) in \(after)") }
+        XCTAssertTrue(draft.frame.intersects(after), "what was in view still is: \(draft.frame) in \(after)")
         let jump = app.buttons["Jump to latest"]
         XCTAssertTrue(jump.exists, "Jump to latest shows")
         let final = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Reply 1: all set")).firstMatch
