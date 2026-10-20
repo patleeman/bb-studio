@@ -5,6 +5,7 @@
 // Full screen presents it alone.
 import { useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { isTypingTarget, keyInScope } from "../../ui/typing-target";
 import { ExportPdfButton } from "./export-pdf";
 import { clampSlide, frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../shared";
 
@@ -41,7 +42,9 @@ export function PlayView({ designId, screen, step = "", onClose }: { designId: s
     const onKey = (event: KeyboardEvent) => {
       // Escape leaves full screen first; the browser handles that itself.
       if (event.key === "Escape" && !document.fullscreenElement) onClose();
-      if (!deck || (event.target instanceof Element && event.target.closest("input, textarea, select, button"))) return;
+      // Slide keys only with focus in the player (or on nothing), never while typing elsewhere in BB.
+      if (!deck || event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event) || !keyInScope(event.target, root.current)) return;
+      if (event.target instanceof Element && event.target.closest("button, a, [role='button']")) return;
       const by = { ArrowRight: 1, ArrowDown: 1, PageDown: 1, " ": 1, ArrowLeft: -1, ArrowUp: -1, PageUp: -1 }[event.key];
       if (by) {
         event.preventDefault();

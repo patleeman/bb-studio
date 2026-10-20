@@ -171,9 +171,11 @@ const SCREEN_AGENT = String.raw`(() => {
   }, { passive: false });
 
   // Space held outside a text field lets the canvas pan by dragging.
-  const typing = (target) => target instanceof Element && Boolean((target.closest("input, textarea, select") || (target instanceof HTMLElement && target.isContentEditable)));
+  // Same rule as isTypingTarget in src/ui/typing-target.ts.
+  const field = (node) => node instanceof Element && Boolean((node instanceof HTMLElement && node.isContentEditable) || node.closest("input, textarea, select, [role='textbox'], [role='combobox'], [role='searchbox'], [contenteditable]:not([contenteditable='false'])"));
+  const typing = (event) => event.isComposing || event.keyCode === 229 || field(event.target) || field(document.activeElement);
   window.addEventListener("keydown", (event) => {
-    if (event.code === "Space" && !event.repeat && !typing(event.target)) { event.preventDefault(); post({ type: "space", down: true }); }
+    if (event.code === "Space" && !event.repeat && !typing(event)) { event.preventDefault(); post({ type: "space", down: true }); }
   });
   window.addEventListener("keyup", (event) => { if (event.code === "Space") post({ type: "space", down: false }); });
 

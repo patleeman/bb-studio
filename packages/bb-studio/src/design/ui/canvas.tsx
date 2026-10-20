@@ -5,6 +5,7 @@
 // the canvas from anywhere, screens included.
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { isTypingTarget, keyInScope } from "../../ui/typing-target";
 
 type View = { x: number; y: number; scale: number };
 
@@ -30,9 +31,9 @@ export type CanvasApi = {
   setSpace(down: boolean): void;
 };
 
-/** Targets that use Space themselves: text fields and controls. */
+/** Targets that use Space themselves: controls. Text fields are `isTypingTarget`. */
 const usesSpace = (target: EventTarget | null) =>
-  target instanceof Element && Boolean(target.closest("input, textarea, select, button, a, [role='button'], [contenteditable='true'], [contenteditable='']"));
+  target instanceof Element && Boolean(target.closest("button, a, [role='button'], [role='checkbox'], [role='switch'], [role='menuitem'], [role='option'], [role='tab']"));
 
 export function Canvas({ children, leftTools, rightTools, fitKey, api }: {
   children: ReactNode;
@@ -114,10 +115,12 @@ export function Canvas({ children, leftTools, rightTools, fitKey, api }: {
     return () => element.removeEventListener("wheel", onWheel);
   }, [wheel]);
 
-  // Space outside text fields: drag the canvas from anywhere.
+  // Space outside text fields: drag the canvas from anywhere. Only with focus
+  // on the canvas or on nothing, so it never eats a space typed elsewhere in BB.
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || event.repeat || !hovered.current || usesSpace(event.target)) return;
+      if (event.code !== "Space" || event.repeat || !hovered.current) return;
+      if (isTypingTarget(event) || usesSpace(event.target) || !keyInScope(event.target, viewport.current)) return;
       event.preventDefault();
       setSpace(true);
     };
