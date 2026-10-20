@@ -17,6 +17,9 @@ struct MarkdownText: View {
     @Environment(\.readAlongPiece) private var readAlongPiece
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderStats.markdown += 1
+        #endif
         let blocks = MarkdownBlock.parse(source)
         // Only the message being read aloud does this work; the cached text stays as it is.
         let readAlong = readAlongPiece.flatMap { ReadAlongBlocks(piece: $0, blocks: blocks) }

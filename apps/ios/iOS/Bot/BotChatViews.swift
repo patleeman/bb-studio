@@ -134,13 +134,15 @@ struct BotMessageRow: View, Equatable {
     var sideThread: BotSideThread?
     /// Opens (or starts) the reply's side thread; nil where replies can't have one.
     var replyInThread: (() -> Void)?
-    @EnvironmentObject private var app: AppModel
 
     private static let avatarSize: CGFloat = 28
     private var text: String { row.text ?? "" }
     private var tint: Color { BotPalette.color(bot.color) }
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderStats.rows += 1
+        #endif
         Group {
             if row.isUser { user } else { reply }
         }

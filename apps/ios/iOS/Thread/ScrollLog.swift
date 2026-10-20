@@ -166,6 +166,9 @@ struct ScrollLogProbe: ViewModifier {
     #endif
     /// When the last row's text last grew: a reply streaming.
     @State private var streamedAt: ContinuousClock.Instant?
+    /// The last change in content height, to tell the scroll view keeping
+    /// what's in view in place (the offset moving by as much) from a jump.
+    @State private var lastContent = ContentChange()
 
     func body(content: Content) -> some View {
         if on {
@@ -192,7 +195,12 @@ struct ScrollLogProbe: ViewModifier {
                 }
                 .onChange(of: lastRowLength) { old, new in if new > old { streamedAt = .now } }
                 .onAppear { ScrollLog.log("\(name) appeared") }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in ScrollLog.flush() }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    #if DEBUG
+                    ScrollLog.log("\(name) renders \(RenderStats.line)")
+                    #endif
+                    ScrollLog.flush()
+                }
                 .onDisappear {
                     ScrollLog.log("\(name) disappeared")
                     ScrollLog.flush()
@@ -211,10 +219,12 @@ struct ScrollLogProbe: ViewModifier {
         if new.container != old.container { parts.append("container \(Int(old.container))->\(Int(new.container))") }
         if new.inset != old.inset { parts.append("inset \(Int(old.inset))->\(Int(new.inset))") }
         guard !parts.isEmpty else { return }
-        let cause = cause(offsetMoved: offsetDelta != 0, contentChanged: contentDelta != 0 || new.inset != old.inset || new.container != old.container)
+        if contentDelta != 0 { lastContent.set(contentDelta) }
+        let compensating = offsetDelta != 0 && lastContent.matches(offsetDelta)
+        let cause = compensating ? "compensation" : cause(offsetMoved: offsetDelta != 0, contentChanged: contentDelta != 0 || new.inset != old.inset || new.container != old.container)
         // An offset jump the reader didn't make, away from the end (pinned,
         // the chat follows the end on purpose): what a glitch looks like.
-        let flag = abs(offsetDelta) > 8 && !phase.byReader && !pinned && phase != .animating && ScrollLog.recentCause() == nil ? " JUMP" : ""
+        let flag = abs(offsetDelta) > 8 && !compensating && !phase.byReader && !pinned && phase != .animating && ScrollLog.recentCause() == nil ? " JUMP" : ""
         ScrollLog.log("\(name) \(parts.joined(separator: " ")) cause=\(cause) pinned=\(pinned)\(flag)")
     }
 
@@ -232,6 +242,23 @@ struct ScrollLogProbe: ViewModifier {
     private func signed(_ value: CGFloat) -> String { value > 0 ? "+\(Int(value))" : "\(Int(value))" }
 }
 
+/// A content-height change and when it came (a box: set per change, never drawn).
+private final class ContentChange {
+    private var delta: CGFloat = 0
+    private var at: ContinuousClock.Instant?
+
+    func set(_ delta: CGFloat) {
+        self.delta = delta
+        at = .now
+    }
+
+    /// An offset move by as much, just after.
+    func matches(_ offsetDelta: CGFloat) -> Bool {
+        guard let at, at.duration(to: .now) < .milliseconds(50) else { return false }
+        return abs(offsetDelta - delta) <= 1
+    }
+}
+
 private extension ScrollPhase {
     var logName: String {
         switch self {
@@ -246,6 +273,20 @@ private extension ScrollPhase {
 }
 
 #if DEBUG
+/// Debug builds: how often chat rows are drawn, for tests that check what
+/// redraws them (typing in the composer shouldn't). Logged with the scroll
+/// log when the app goes to the background.
+@MainActor
+enum RenderStats {
+    /// `BotMessageRow` bodies.
+    static var rows = 0
+    /// `MarkdownText` bodies.
+    static var markdown = 0
+    /// Bot message rows coming on screen (identity churn shows here).
+    static var appears = 0
+    static var line: String { "rows=\(rows) markdown=\(markdown) appears=\(appears)" }
+}
+
 /// Debug builds: frames dropped over one scroll gesture (touch to rest) or
 /// one turn, logged as `frames …` lines: how long it ran, the hitch time
 /// (frames late past their deadline, as Instruments counts it) and its

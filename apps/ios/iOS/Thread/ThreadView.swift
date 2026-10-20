@@ -59,6 +59,8 @@ struct ThreadView: View {
     /// Rebuilds the timeline so it opens at the bottom of the server's rows.
     @State private var timelineKey = 0
     @State private var scrollPhase = ScrollPhase.idle
+    /// Where the reader's touch began, to tell a pull down from a push to the end.
+    @State private var readerStart: CGFloat?
     /// The chat's link handler, made once (`LinkOpener`).
     @State private var links = LinkOpener()
     @State private var selecting: SelectionText?
@@ -571,8 +573,9 @@ struct ThreadView: View {
             pastEnd = distance
             if scrollPhase == .idle { settlePastEnd() }
         }
-        .onScrollPhaseChange { old, phase in
+        .onScrollPhaseChange { old, phase, context in
             scrollPhase = phase
+            if phase.byReader, !old.byReader { readerStart = context.geometry.contentOffset.y }
             // The reader's finger: stop following at once, so a reply
             // streaming in doesn't pull the chat back down under it.
             // Updates wait while the reader's finger or fling is on the chat
@@ -583,8 +586,16 @@ struct ThreadView: View {
                 settling?.cancel()
                 settling = nil
             }
-            // Their scroll settled: follow again only at the end (or past it).
-            if old.byReader, phase == .idle { pinned = end == .bottom || (end == .above && pastEnd > -Self.pastEndSlack) }
+            // Their scroll settled: follow again only at the end (or past it),
+            // and not after pulling the chat down toward older rows. Rows
+            // re-measuring as they came in could leave the end in view after
+            // such a pull, and the chat then snapped back to the end: pulled
+            // down, it went up.
+            if old.byReader, phase == .idle {
+                let pulledDown = context.geometry.contentOffset.y < (readerStart ?? .infinity) - Self.pastEndSlack
+                pinned = !pulledDown && (end == .bottom || (end == .above && pastEnd > -Self.pastEndSlack))
+                readerStart = nil
+            }
             if phase == .idle {
                 settlePastEnd()
                 keepPinned()
@@ -596,11 +607,17 @@ struct ThreadView: View {
             // The window takes new rows in at the bottom rather than drop
             // its oldest above the reader.
             if old != nil { drawnItems += 1 }
-            if old != nil, !scrollPhase.byReader, pinned || model.shownRows.last?.isUser == true { scrollToBottom() }
+            // Animated only for the reader's own send. Following a turn, a
+            // new row jumps: an animated scroll ran on under a finger that
+            // landed mid-way (it doesn't stop for a touch) and fought the
+            // pull, so a chat pulled down went up.
+            if old != nil, !scrollPhase.byReader, pinned || model.shownRows.last?.isUser == true {
+                scrollToBottom(animated: model.shownRows.last?.isUser == true)
+            }
         }
         // The Bot's typing row goes in under the message just sent.
         .onChange(of: showsWorking) { _, shows in
-            if shows, pinned, !scrollPhase.byReader { scrollToBottom() }
+            if shows, pinned, !scrollPhase.byReader { scrollToBottom(animated: false) }
         }
         // Older pages load when the reader reaches the top.
         .onScrollGeometryChange(for: Bool.self) { geometry in

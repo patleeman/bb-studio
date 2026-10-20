@@ -64,6 +64,143 @@ final class ReplayScrollUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Jump to latest"].exists, "scrolled away from the end")
     }
 
+    /// Typing in the composer doesn't redraw the chat's rows: none of their
+    /// bodies runs, none comes on screen again, and those in view hold
+    /// still together (a composer growing a line moves them as one).
+    func testTypingDoesNotRedrawTheChat() throws {
+        let app = launch()
+        let composer = app.textViews["Message Juniper"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the chat loaded")
+        sleep(3)
+        composer.tap()
+        sleep(2)
+        // Leaving and coming back logs the counts; once without typing, as a control.
+        func counts() throws -> [String: Int] {
+            XCUIDevice.shared.press(.home)
+            sleep(1)
+            let line = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").last { $0.contains(" renders ") } ?? ""
+            app.activate()
+            _ = composer.waitForExistence(timeout: 10)
+            sleep(2)
+            return Dictionary(uniqueKeysWithValues: line.split(separator: " ").compactMap { part -> (String, Int)? in
+                let pair = part.split(separator: "=")
+                guard pair.count == 2, let value = Int(pair[1]) else { return nil }
+                return (String(pair[0]), value)
+            })
+        }
+        let first = try counts()
+        let second = try counts()
+        // Rows in view, found again by their text afterwards (by index, the
+        // composer's own text and suggestions would shift them).
+        let labels = Array(Set(visibleTexts(app, composer: composer).map(\.label).filter { $0.count > 12 })).prefix(8)
+        let rows = labels.map { app.staticTexts.matching(NSPredicate(format: "label == %@", $0)).firstMatch }
+        let frames = rows.map(\.frame)
+        // 50 characters, a key at a time.
+        composer.typeText("Lorem ipsum dolor sit amet, consectetur adipiscing")
+        sleep(1)
+        let after = rows.map { $0.exists ? $0.frame : .null }
+        let third = try counts()
+        print("[replay] typing counts \(first) \(second) \(third)")
+        for key in ["rows", "markdown", "appears"] {
+            let control = (second[key] ?? 0) - (first[key] ?? 0)
+            let typing = (third[key] ?? 0) - (second[key] ?? 0)
+            print("[replay] typing \(key): control=\(control) typing=\(typing)")
+            XCTAssertLessThanOrEqual(typing, control, "typing redraws no chat \(key)")
+        }
+        XCTAssertFalse(rows.isEmpty, "rows in view")
+        XCTAssertFalse(after.contains(.null), "every row in view is still there")
+        let shifts = zip(frames, after).map { $1.minY - $0.minY }
+        XCTAssertLessThanOrEqual((shifts.max() ?? 0) - (shifts.min() ?? 0), 1, "rows in view move together, if at all: \(shifts)")
+        XCTAssertTrue(zip(frames, after).allSatisfy { abs($0.height - $1.height) < 1 }, "no row changes size")
+    }
+
+    /// Pulling the chat down brings older rows into view (it moved up
+    /// instead, iOS, Oct 2026), with the keyboard up or down, idle or while
+    /// a reply streams; nothing but the finger moves it.
+    func testDragDownKeyboardDown() throws { try dragDown(keyboard: false, streaming: false) }
+    func testDragDownKeyboardUp() throws { try dragDown(keyboard: true, streaming: false) }
+    func testDragDownWhileStreamingKeyboardDown() throws { try dragDown(keyboard: false, streaming: true) }
+    func testDragDownWhileStreamingKeyboardUp() throws { try dragDown(keyboard: true, streaming: true) }
+
+    private func dragDown(keyboard: Bool, streaming: Bool, file: StaticString = #filePath, line: UInt = #line) throws {
+        let app = launch()
+        let composer = app.textViews["Message Juniper"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the chat loaded")
+        sleep(3)
+        if streaming {
+            composer.tap()
+            composer.typeText("Go")
+            app.buttons["Send"].tap()
+            sleep(2)
+        } else if keyboard {
+            composer.tap()
+        }
+        if !keyboard, app.keyboards.firstMatch.exists {
+            // Swiped away, as a person would: a drag down through the keyboard.
+            let window = app.windows.firstMatch.frame
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: window.midX, dy: window.height * 0.3))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: window.midX, dy: window.height * 0.95)))
+            sleep(1)
+            let jump = app.buttons["Jump to latest"]
+            if jump.exists { jump.tap() }
+        }
+        sleep(2)
+        XCTAssertEqual(app.keyboards.firstMatch.exists, keyboard, "keyboard \(keyboard ? "up" : "down")", file: file, line: line)
+        XCTAssertFalse(app.buttons["Jump to latest"].exists, "at the end to start with", file: file, line: line)
+        let area = visibleRect(app, composer: composer)
+        let chat = Chat(app, area: area)
+        // A row in view, to follow down the screen (mid-stream there may be
+        // none the test can read).
+        let row = visibleTexts(app, composer: composer).filter { $0.label.count > 12 }.min { $0.frame.minY < $1.frame.minY }
+        let label = row?.label
+        let before = row?.frame
+        let mark = (try? String(contentsOf: log, encoding: .utf8))?.count ?? 0
+        chat.drag(up: false)
+        // The chat stays where the reader pulled it: it doesn't go back to the end.
+        sleep(2)
+        snapshot("drag-down-\(keyboard ? "kb" : "nokb")\(streaming ? "-stream" : "")")
+        XCTAssertTrue(app.buttons["Jump to latest"].exists, "still scrolled up toward older rows", file: file, line: line)
+        if let label, let before {
+            let again = app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
+            XCTAssertTrue(again.exists && again.frame.minY > before.minY + area.height * 0.25,
+                          "the row moved down with the finger: \(before) -> \(again.frame)", file: file, line: line)
+        }
+        // In the log: while the finger was down the offset only went toward
+        // older rows, and nothing scrolled the chat after it let go.
+        XCUIDevice.shared.press(.home)
+        sleep(1)
+        let text = try String(contentsOf: log, encoding: .utf8)
+        let lines = String(text.dropFirst(mark)).split(separator: "\n").map(String.init)
+        var touching = false
+        var against: [String] = []
+        for entry in lines {
+            if entry.contains(" phase ") { touching = entry.hasSuffix("->tracking") || entry.hasSuffix("->interacting") }
+            guard touching, entry.contains(" offset "), let delta = offsetDelta(entry) else { continue }
+            // A few points as the touch lands are the bottom anchor settling
+            // a streamed chunk in the same frame (it settles back at once);
+            // the bug moved the chat by hundreds.
+            if delta > 8 { against.append(entry) }
+        }
+        let attachment = XCTAttachment(string: lines.joined(separator: "\n"))
+        attachment.name = "drag log"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertTrue(lines.contains { $0.contains("phase") && $0.contains("->interacting") }, "the drag was logged", file: file, line: line)
+        XCTAssertTrue(against.isEmpty, "the offset moved against the finger: \(against.prefix(6))", file: file, line: line)
+        let after = lines.drop { !($0.contains(" phase ") && $0.hasSuffix("->idle")) }
+        let snaps = after.filter { $0.contains("scrollTo") }
+        XCTAssertTrue(snaps.isEmpty, "nothing scrolled the chat once the reader let go: \(snaps.prefix(4))", file: file, line: line)
+        XCTAssertTrue(lines.filter { $0.contains(" JUMP") }.isEmpty, "no offset jump", file: file, line: line)
+        app.activate()
+    }
+
+    private func offsetDelta(_ entry: String) -> Double? {
+        guard let open = entry.range(of: "offset "), let paren = entry[open.upperBound...].firstIndex(of: "(") else { return nil }
+        let rest = entry[entry.index(after: paren)...]
+        return Double(rest.prefix { $0 != ")" })
+    }
+
     /// Right after a send, and on through the turn as it streams: commands
     /// with screens of output between parts of a long reply.
     func testScrollWhileTheReplyStreams() throws {
