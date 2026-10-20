@@ -16,6 +16,7 @@ import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { SPEECH_SETTINGS } from "./src/speech/settings";
 import { registerSpeech } from "./src/speech/register";
 import { registerVoice, type BuiltinVoice } from "./src/voice/register";
+import { migrateOpenaiKey } from "./src/openai-key";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -122,10 +123,14 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
-  // then Bot avatars', Speech's and thread resume's.
+  // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread resume's.
   const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
+  // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
+  await migrateOpenaiKey({ get: () => settings.get(), set: (values) => settings.experimental_set(values as never) })
+    .then((moved) => { if (moved) bb.log.info("Moved the Bot avatars OpenAI key to Studio's OpenAI API key setting."); })
+    .catch((error) => bb.log.warn(`Couldn't move the Bot avatars OpenAI key: ${errorText(error)}`));
   let settingValues: Record<string, unknown> = await settings.get();
   const explore = registerExploreBuiltin(bb, db, settingValues);
   settings.onChange((next) => {

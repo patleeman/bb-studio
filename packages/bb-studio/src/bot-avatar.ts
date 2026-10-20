@@ -8,11 +8,13 @@
 // one Revert goes back to are never pruned.
 //
 // Generation goes through a small provider interface. Keys come from Studio's
-// secret settings or the BB server's environment (XAI_API_KEY,
-// OPENAI_API_KEY); without one the tool says image generation isn't set up.
+// secret settings (OpenAI's is the shared "OpenAI API key", src/openai-key.ts)
+// or the BB server's environment (XAI_API_KEY, OPENAI_API_KEY); without one
+// the tool says image generation isn't set up.
 // Never log a key.
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
+import { OPENAI_KEY_SETTINGS, openaiKey } from "./openai-key";
 
 /** How many images a Bot keeps. */
 export const AVATAR_HISTORY = 5;
@@ -106,11 +108,11 @@ export function openaiImageProvider(key: string, options: { baseUrl?: string; mo
 
 /** Where keys come from: Studio's secret settings first, then the BB server's environment. */
 export type ImageKeys = { settings?: Record<string, unknown>; env?: NodeJS.ProcessEnv; fetch?: Fetch };
-export const IMAGE_KEY_SETTINGS = { xai: "botAvatarXaiApiKey", openai: "botAvatarOpenaiApiKey" } as const;
+export const IMAGE_KEY_SETTINGS = { xai: "botAvatarXaiApiKey" } as const;
 
-/** Studio's settings for the keys: secret, so they stay on the server. */
+/** Studio's settings for the keys: secret, so they stay on the server. OpenAI's is Studio's shared key (src/openai-key.ts). */
 export const BOT_AVATAR_SETTINGS = {
-  [IMAGE_KEY_SETTINGS.openai]: { type: "string", label: "Bot avatars: OpenAI API key", description: "Lets a Bot draw its own avatar with gpt-image (about 1¢ an image at low quality). Falls back to OPENAI_API_KEY on the BB host.", secret: true, default: "" },
+  ...OPENAI_KEY_SETTINGS,
   [IMAGE_KEY_SETTINGS.xai]: { type: "string", label: "Bot avatars: xAI API key", description: "Lets a Bot draw its own avatar with Grok's image model (about 7¢ an image). Falls back to XAI_API_KEY on the BB host.", secret: true, default: "" },
 } as const;
 
@@ -120,11 +122,11 @@ export function pickImageProvider({ settings = {}, env = process.env, fetch: fet
     const value = settings[setting];
     return (typeof value === "string" && value.trim()) || env[variable]?.trim() || "";
   };
-  const openai = key(IMAGE_KEY_SETTINGS.openai, "OPENAI_API_KEY");
+  const openai = openaiKey(settings, env);
   if (openai) return openaiImageProvider(openai, { fetch: fetchImpl });
   const xai = key(IMAGE_KEY_SETTINGS.xai, "XAI_API_KEY");
   if (xai) return xaiImageProvider(xai, { fetch: fetchImpl });
-  throw new ImageNotSetUpError("add an OpenAI or xAI API key in Studio's settings (Bot avatars), or set OPENAI_API_KEY or XAI_API_KEY on the BB host. Until then, the user can upload an image or pick a drawn avatar in Edit profile.");
+  throw new ImageNotSetUpError("add an OpenAI API key or an xAI key (Bot avatars) in Studio's settings, or set OPENAI_API_KEY or XAI_API_KEY on the BB host. Until then, the user can upload an image or pick a drawn avatar in Edit profile.");
 }
 
 /** The prompt a provider gets: the Bot's idea, framed as a square avatar. */
