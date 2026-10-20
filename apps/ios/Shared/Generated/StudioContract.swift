@@ -241,6 +241,13 @@ public enum Studio {
     public static let voice_conversational = "voice.conversational"
     public static let voice_turnNote = "voice.turnNote"
     public static let voice_new = "voice.new"
+    public static let voice_call_state = "voice_call_state"
+    public static let voice_call_start = "voice_call_start"
+    public static let voice_call_tool = "voice_call_tool"
+    public static let voice_call_event = "voice_call_event"
+    public static let voice_call_poll = "voice_call_poll"
+    public static let voice_call_end = "voice_call_end"
+    public static let voice_call_get = "voice_call_get"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -754,6 +761,20 @@ public enum Studio {
   public typealias VoiceTurnNote = VoiceTurnNoteOutput
 
   public typealias VoiceNew = VoiceNewOutput
+
+  public typealias VoiceCallState = VoiceCallStateOutput
+
+  public typealias VoiceCallStart = VoiceCallStartOutput
+
+  public typealias VoiceCallTool = VoiceCallToolOutput
+
+  public typealias VoiceCallEvent = VoiceCallEventOutput
+
+  public typealias VoiceCallPoll = VoiceCallPollOutput
+
+  public typealias VoiceCallEnd = VoiceCallEndOutput
+
+  public typealias VoiceCallGet = VoiceCallGetOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -20068,6 +20089,326 @@ public enum Studio {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
+    }
+  }
+
+  public struct VoiceCallStateInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
+  public struct VoiceCallStateOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var botName: String?
+    public var ready: Bool?
+    public var problem: String?
+    public var monthUsd: Double?
+    public var capUsd: Double?
+    public var model: String?
+
+    public init(botId: String? = nil, botName: String? = nil, ready: Bool? = nil, problem: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: String? = nil) {
+      self.botId = botId
+      self.botName = botName
+      self.ready = ready
+      self.problem = problem
+      self.monthUsd = monthUsd
+      self.capUsd = capUsd
+      self.model = model
+    }
+  }
+
+  public struct VoiceCallStartInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct VoiceCallStartOutput: Sendable, Hashable, Codable {
+    public var callId: String?
+    public var clientSecret: String?
+    public var expiresAt: Double?
+    public var model: String?
+    public var voice: String?
+    public var callsUrl: String?
+    public var botName: String?
+
+    public init(callId: String? = nil, clientSecret: String? = nil, expiresAt: Double? = nil, model: String? = nil, voice: String? = nil, callsUrl: String? = nil, botName: String? = nil) {
+      self.callId = callId
+      self.clientSecret = clientSecret
+      self.expiresAt = expiresAt
+      self.model = model
+      self.voice = voice
+      self.callsUrl = callsUrl
+      self.botName = botName
+    }
+  }
+
+  public struct VoiceCallToolInput: Sendable, Hashable, Codable {
+    public var callId: String?
+    public var name: String?
+    public var args: String?
+
+    public init(callId: String? = nil, name: String? = nil, args: String? = nil) {
+      self.callId = callId
+      self.name = name
+      self.args = args
+    }
+  }
+
+  public struct VoiceCallToolOutput: Sendable, Hashable, Codable {
+    public var output: String?
+
+    public init(output: String? = nil) {
+      self.output = output
+    }
+  }
+
+  public struct VoiceCallEventInput: Sendable, Hashable, Codable {
+    public var callId: String?
+    public var events: [StudioJSONValue]?
+
+    public init(callId: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.callId = callId
+      self.events = events
+    }
+  }
+
+  public struct VoiceCallEventOutput: Sendable, Hashable, Codable {
+    public var costUsd: Double?
+    public var replies: Int?
+
+    public init(costUsd: Double? = nil, replies: Int? = nil) {
+      self.costUsd = costUsd
+      self.replies = replies
+    }
+  }
+
+  public struct VoiceCallPollInput: Sendable, Hashable, Codable {
+    public var callId: String?
+
+    public init(callId: String? = nil) {
+      self.callId = callId
+    }
+  }
+
+  public struct VoiceCallPollOutputRepliesItem: Sendable, Hashable, Codable {
+    public var id: Int?
+    public var summary: String?
+    public var note: String?
+
+    public init(id: Int? = nil, summary: String? = nil, note: String? = nil) {
+      self.id = id
+      self.summary = summary
+      self.note = note
+    }
+  }
+
+  public struct VoiceCallPollOutput: Sendable, Hashable, Codable {
+    public var replies: [VoiceCallPollOutputRepliesItem]?
+
+    public init(replies: [VoiceCallPollOutputRepliesItem]? = nil) {
+      self.replies = replies
+    }
+  }
+
+  public struct VoiceCallEndInput: Sendable, Hashable, Codable {
+    public var callId: String?
+    public var events: [StudioJSONValue]?
+
+    public init(callId: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.callId = callId
+      self.events = events
+    }
+  }
+
+  public enum VoiceCallEndOutputTranscriptItemRole: Sendable, Hashable, Codable {
+    case user
+    case assistant
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "assistant": self = .assistant
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .assistant: try container.encode("assistant")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceCallEndOutputTranscriptItem: Sendable, Hashable, Codable {
+    public var role: VoiceCallEndOutputTranscriptItemRole?
+    public var text: String?
+    public var at: Double?
+
+    public init(role: VoiceCallEndOutputTranscriptItemRole? = nil, text: String? = nil, at: Double? = nil) {
+      self.role = role
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallEndOutputSentItem: Sendable, Hashable, Codable {
+    public var message: String?
+    public var at: Double?
+
+    public init(message: String? = nil, at: Double? = nil) {
+      self.message = message
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallEndOutputRepliesItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var at: Double?
+
+    public init(text: String? = nil, at: Double? = nil) {
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallEndOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var botName: String?
+    public var model: String?
+    public var voice: String?
+    public var startedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var costUsd: Double?
+    public var transcript: [VoiceCallEndOutputTranscriptItem]?
+    public var sent: [VoiceCallEndOutputSentItem]?
+    public var replies: [VoiceCallEndOutputRepliesItem]?
+    public var pageId: String?
+
+    public init(id: String? = nil, botId: String? = nil, botName: String? = nil, model: String? = nil, voice: String? = nil, startedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, costUsd: Double? = nil, transcript: [VoiceCallEndOutputTranscriptItem]? = nil, sent: [VoiceCallEndOutputSentItem]? = nil, replies: [VoiceCallEndOutputRepliesItem]? = nil, pageId: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.botName = botName
+      self.model = model
+      self.voice = voice
+      self.startedAt = startedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.costUsd = costUsd
+      self.transcript = transcript
+      self.sent = sent
+      self.replies = replies
+      self.pageId = pageId
+    }
+  }
+
+  public struct VoiceCallGetInput: Sendable, Hashable, Codable {
+    public var callId: String?
+
+    public init(callId: String? = nil) {
+      self.callId = callId
+    }
+  }
+
+  public enum VoiceCallGetOutputTranscriptItemRole: Sendable, Hashable, Codable {
+    case user
+    case assistant
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "assistant": self = .assistant
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .assistant: try container.encode("assistant")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceCallGetOutputTranscriptItem: Sendable, Hashable, Codable {
+    public var role: VoiceCallGetOutputTranscriptItemRole?
+    public var text: String?
+    public var at: Double?
+
+    public init(role: VoiceCallGetOutputTranscriptItemRole? = nil, text: String? = nil, at: Double? = nil) {
+      self.role = role
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallGetOutputSentItem: Sendable, Hashable, Codable {
+    public var message: String?
+    public var at: Double?
+
+    public init(message: String? = nil, at: Double? = nil) {
+      self.message = message
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallGetOutputRepliesItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var at: Double?
+
+    public init(text: String? = nil, at: Double? = nil) {
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceCallGetOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var botName: String?
+    public var model: String?
+    public var voice: String?
+    public var startedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var costUsd: Double?
+    public var transcript: [VoiceCallGetOutputTranscriptItem]?
+    public var sent: [VoiceCallGetOutputSentItem]?
+    public var replies: [VoiceCallGetOutputRepliesItem]?
+    public var pageId: String?
+
+    public init(id: String? = nil, botId: String? = nil, botName: String? = nil, model: String? = nil, voice: String? = nil, startedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, costUsd: Double? = nil, transcript: [VoiceCallGetOutputTranscriptItem]? = nil, sent: [VoiceCallGetOutputSentItem]? = nil, replies: [VoiceCallGetOutputRepliesItem]? = nil, pageId: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.botName = botName
+      self.model = model
+      self.voice = voice
+      self.startedAt = startedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.costUsd = costUsd
+      self.transcript = transcript
+      self.sent = sent
+      self.replies = replies
+      self.pageId = pageId
     }
   }
 

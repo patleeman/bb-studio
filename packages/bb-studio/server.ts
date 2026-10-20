@@ -16,7 +16,12 @@ import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { SPEECH_SETTINGS } from "./src/speech/settings";
 import { registerSpeech } from "./src/speech/register";
 import { registerVoice, type BuiltinVoice } from "./src/voice/register";
-import { migrateOpenaiKey } from "./src/openai-key";
+import { VOICE_CALL_SETTINGS, VoiceCalls, type CallBot } from "./src/voice/call/calls";
+import { registerVoiceCalls } from "./src/voice/call/register";
+import { BRIEF_TITLES, formatBotStatus, formatDailyBrief, formatLeadsStatus, type BriefItem } from "./src/voice/call/read";
+import { VOICE_CALL_CHANNEL } from "./src/voice/call/shared";
+import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
+import { pagePath } from "./src/pages/constants";
 import { subcommand, usage } from "@bb-studio/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -123,8 +128,9 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
-  // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread resume's.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
+  // then Bot avatars' (with Studio's shared OpenAI key), Speech's, thread
+  // resume's and voice calls'.
+  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS, ...VOICE_CALL_SETTINGS });
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
@@ -1127,6 +1133,53 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   registerBotProfileTools(bb, { bots, acting, imageProvider: () => pickImageProvider({ settings: settingValues }) });
+  // Voice calls with the Bot (src/voice/call): OpenAI Realtime over WebRTC
+  // from the client, with the key, the tools and the record kept here.
+  const callBot = (bot: ReturnType<typeof bots.stored>): CallBot | null => bot ? { id: bot.id, name: bot.name, threadId: bot.threadId ?? null, state: bot.state } : null;
+  const voiceCalls = new VoiceCalls({
+    db,
+    key: () => openaiKey(settingValues),
+    settings: () => settingValues,
+    bot: (botId) => callBot(bots.stored(botId)),
+    botForThread: (threadId) => callBot(bots.list().find((bot) => bots.chain(bot.id).includes(threadId)) ?? null),
+    read: {
+      botStatus: async (bot) => formatBotStatus(bot, await bots.activity(bot.id)),
+      leadsStatus: async (bot) => {
+        const projects = new Map(((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).map((project) => [project.id, project.name]));
+        const leads = await Promise.all(projectLeads.list().filter((lead) => lead.projectId !== PERSONAL_PROJECT_ID).map(async (lead) => {
+          const thread = lead.leadThreadId ? await bb.sdk.threads.get({ threadId: lead.leadThreadId }).catch(() => null) : null;
+          return { project: projects.get(lead.projectId) ?? lead.projectId, lead, status: thread?.status ?? null, title: thread ? (thread.title || thread.titleFallback || null) : null };
+        }));
+        return formatLeadsStatus(bot.name, leads, await runners.list(bot.id));
+      },
+      dailyBrief: async () => {
+        await searchIndex.ensure();
+        const found = new Map<string, BriefItem | null>();
+        for (const name of BRIEF_TITLES) {
+          const hit = searchIndex.search(name, { limit: 50 })
+            .filter((each) => each.title.toLowerCase().includes(name.toLowerCase()))
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+          found.set(name, hit ? { title: hit.title, kind: hit.kind, updatedAt: hit.updatedAt, text: (hit.ref.pluginId === "pages" ? pages.markdown(hit.ref.id) : null) ?? hit.snippet.text } : null);
+        }
+        return formatDailyBrief(found);
+      },
+    },
+    send: ({ threadId, text, note, mode }) => bb.sdk.threads.send({
+      threadId, mode,
+      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
+    } as never).then(() => undefined),
+    push: async ({ title, body, threadId, coalesceKey }) => {
+      await bb.sdk.plugins.callRpc({
+        pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
+        input: { title, body: body.slice(0, 4000), kind: "turn-finished", threadId, projectId: PERSONAL_PROJECT_ID, coalesceKey } as never,
+      });
+    },
+    savePage: ({ title, markdown }) => pages.createPage({ projectId: PERSONAL_PROJECT_ID, title, icon: "📞", markdown }),
+    pageHref: (pageId) => pagePath(pageId),
+    publish: (signal) => bb.realtime.publish(VOICE_CALL_CHANNEL, signal),
+    warn: (message) => bb.log.warn(message),
+  });
+  registerVoiceCalls(bb, voiceCalls);
   // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.
   bb.http.route("GET", AVATAR_ROUTE, (context) => {
     const image = bots.avatarImage(context.req.query("bot") ?? "", context.req.query("image") ?? "");

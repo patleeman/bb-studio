@@ -7,6 +7,7 @@ import { MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
 import { PAGE_NOTES_TABLE } from "./pages/notes";
 import { SIDE_THREADS_MANY, SIDE_THREADS_TABLE } from "./bot-side-threads";
 import { NEXT_LOG_MIGRATIONS } from "./explore/store";
+import { VOICE_CALL_TABLES } from "./voice/call/store";
 import { DASHBOARD_PROPOSALS_TABLE, DASHBOARD_TABLES } from "./dashboards/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
@@ -389,4 +390,8 @@ export const MIGRATIONS = [
      );
    CREATE INDEX thread_auto_resumes_thread ON thread_auto_resumes (thread_id, at);
    CREATE INDEX thread_auto_resumes_event ON thread_auto_resumes (thread_id, event_id);`,
+  // Voice calls with the Bot (src/voice/call/calls.ts): each call, and an
+  // append-only log of what happened on it (transcript lines, usage, what it
+  // sent the Bot, the Bot's replies, hang-up).
+  VOICE_CALL_TABLES,
 ];
