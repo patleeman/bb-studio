@@ -32,6 +32,10 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: iOS/Info.plist
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        # Debug-only replay fixtures (ReplayThread) stay out of release builds.
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: "*.qa.json"
     scheme:
       testTargets:
         - BBStudioTests

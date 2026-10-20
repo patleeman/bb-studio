@@ -153,6 +153,44 @@ short one. `ChatSendScrollUITests` sends in it (4,000 messages, pages of 600
 rows), in the Bot chat and as a regular thread, and checks the reply's end is
 on screen above the composer.
 
+`-qaReplayThread chief-of-staff` serves the Chief of Staff Bot's real shape
+instead (`iOS/Bot/Replay`): its last 497 rows' kinds, order, lengths, line
+counts and Markdown, with every word in lorem ipsum, links on example.com and
+made-up ids. It's debug-only and left out of release builds. A send there
+streams a turn shaped like the real ones: reasoning, a command with a
+screenful of output, and a reply growing a chunk at a time (lists, links, a
+fenced block of shell output), four times over. `-qaReplayRepeat <n>` repeats
+the fixture, `-qaReplayInterval <ms>` sets the chunk rate, and
+`-qaReplayChunk <chars>` sets the chunk size. `ReplayScrollUITests` scrolls it
+idle, flings into older pages, and scrolls right after a send and through
+the stream. It checks each gesture's frames (no hitch over 50ms, hitch time
+under 20ms per second) and that the reader's position holds.
+
+While the reader's finger or fling is on the chat, streamed updates wait
+(`ThreadModel.holdsRefresh`) and so do older pages, and both catch up when
+the scroll settles. Messages redraw only when what they show changes
+(`BotMessageRow` is `Equatable`), and the chat's `openURL` handler is made
+once (`LinkOpener`).
+
+### Scroll diagnostics
+
+`ScrollLog` (OSLog subsystem `nyc.plee.bbgo`, category `scroll`) logs each
+content-height and offset change of a chat and its cause: the reader
+(`user.tracking`, `user.decelerating`), the app's own scrolls (`app.keepPinned.snap`,
+`app.toBottom.*`, `app.olderPage`, `app.find`), the bottom anchor while pinned
+(`anchor.*`), a reply streaming (`stream`), or rows re-measuring
+(`estimate/lateLayout`). It also logs phase, pinned, end-marker and
+Working-line changes. An offset move over 8pt that nobody asked for is marked
+`JUMP`. Debug builds also log `frames` lines for each gesture and each turn:
+how long it ran, the hitch time and the longest frame.
+
+It's on in debug builds. In release builds (TestFlight), it's off until
+you turn it on: in Settings, tap the version line at the bottom five times,
+then turn on **Log chat scrolling**. The log goes to a file, and **Share
+scroll log** sends it from there. It holds only numbers, phases and causes,
+never message text. Watch it live with `log stream --level debug --predicate
+'subsystem == "nyc.plee.bbgo" AND category == "scroll"'`.
+
 ## Bot chat: terminals
 
 The Bot chat's ⋯ menu has **Terminals**, the same item a regular thread's ⋯
