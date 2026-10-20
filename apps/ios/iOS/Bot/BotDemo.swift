@@ -190,7 +190,7 @@ enum BotDemo {
                 }
             }
             await step { rows[rows.count - 1] = BotDemo.workRow(id: "turn\(sent)w5", tool: "bb_threads_list", at: at + 3_000) }
-            let paragraphs = (1...20).map { "Paragraph \($0) of the draft: the venue, the budget and the flights, with what each needs from you this week." }
+            let paragraphs = (1...12).map { "Paragraph \($0) of the draft: the venue, the budget and the flights, with what each needs from you this week." }
             for chunk in 1...paragraphs.count {
                 await step {
                     let row = BotDemo.row(id: "reply\(sent)", role: "assistant", text: paragraphs.prefix(chunk).joined(separator: "\n\n"), at: at + 4_000)
