@@ -52,13 +52,21 @@ enum BotDemo {
     /// `-qaDemoLatency <ms>`: the chat's thread comes from a local server
     /// behind that much latency (`BotDemo.Server`), and the bot and the Bots
     /// list wait as long, as on a phone over Tailscale. `-qaDemoMessages <n>`
-    /// sizes the chat, `-qaDemoColdCache` drops what's cached first, and
-    /// `-qaDemoSend <text>` sends a message once the chat is in.
+    /// sizes the chat, `-qaDemoPage <rows>` the server's pages (BB pages by
+    /// turns, so a page of a working Bot runs to hundreds of rows),
+    /// `-qaDemoColdCache` drops what's cached first, and `-qaDemoSend <text>`
+    /// sends a message once the chat is in. `-qaDemoLong` makes it a long,
+    /// compacted chat: runs of up to 60 tool rows folded into "Worked",
+    /// replies from a line to a screenful, and a "/compact" every 40
+    /// exchanges; a send there works, streams a long reply, then settles on
+    /// a short one.
     struct Served {
         var latency: Duration
         var messages: Int
         var coldCache: Bool
         var send: String?
+        var page: Int
+        var long: Bool
     }
 
     static let served: Served? = {
@@ -68,7 +76,8 @@ enum BotDemo {
         }
         guard variant != nil, let ms = value("-qaDemoLatency").flatMap(Int.init) else { return nil }
         return Served(latency: .milliseconds(ms), messages: value("-qaDemoMessages").flatMap(Int.init) ?? 300,
-                      coldCache: arguments.contains("-qaDemoColdCache"), send: value("-qaDemoSend"))
+                      coldCache: arguments.contains("-qaDemoColdCache"), send: value("-qaDemoSend"),
+                      page: value("-qaDemoPage").flatMap(Int.init) ?? 24, long: arguments.contains("-qaDemoLong"))
     }()
 
     /// With `-qaDemoColdCache`, drops the cached chat, bot and Bots list
@@ -96,7 +105,7 @@ enum BotDemo {
         /// Called on the main actor when the thread changes, as BB's realtime would.
         @MainActor var changed: (() -> Void)?
 
-        static let pageSize = 24
+        static var pageSize: Int { BotDemo.served?.page ?? 24 }
 
         func client(_ baseURL: URL) -> BBClient {
             let client = BBClient(baseURL: baseURL)
@@ -150,13 +159,47 @@ enum BotDemo {
                 return sends
             }
             notify()
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                lock.withLock {
-                    rows.append(BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Got it. I'll take care of **that** now.", at: at + 3_000))
-                    running = false
+            guard BotDemo.served?.long == true else {
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    lock.withLock {
+                        rows.append(BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Got it. I'll take care of **that** now.", at: at + 3_000))
+                        running = false
+                    }
+                    notify()
                 }
+                return
+            }
+            Task { await work(sent, at: at) }
+        }
+
+        /// A turn as BB streams one: tool calls one after another, a long
+        /// reply growing in chunks, and then the reply settling on its final,
+        /// much shorter text, so the bottom of the chat shrinks under a
+        /// reader who's following it.
+        private func work(_ sent: Int, at: Double) async {
+            func step(_ change: () -> Void) async {
+                try? await Task.sleep(for: .milliseconds(450))
+                lock.withLock(change)
                 notify()
+            }
+            for index in 0..<6 {
+                await step {
+                    if index > 0 { rows[rows.count - 1] = BotDemo.workRow(id: "turn\(sent)w\(index - 1)", tool: "bb_threads_list", at: at + Double(index) * 500) }
+                    rows.append(BotDemo.workRow(id: "turn\(sent)w\(index)", tool: "bb_threads_list", at: at + Double(index) * 500 + 100, status: "running"))
+                }
+            }
+            await step { rows[rows.count - 1] = BotDemo.workRow(id: "turn\(sent)w5", tool: "bb_threads_list", at: at + 3_000) }
+            let paragraphs = (1...12).map { "Paragraph \($0) of the draft: the venue, the budget and the flights, with what each needs from you this week." }
+            for chunk in 1...paragraphs.count {
+                await step {
+                    let row = BotDemo.row(id: "reply\(sent)", role: "assistant", text: paragraphs.prefix(chunk).joined(separator: "\n\n"), at: at + 4_000)
+                    if rows.last?.id == row.id { rows[rows.count - 1] = row } else { rows.append(row) }
+                }
+            }
+            await step {
+                rows[rows.count - 1] = BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Reply \(sent): all set. I'll take care of **that** now.", at: at + 4_000)
+                running = false
             }
         }
 
@@ -166,8 +209,12 @@ enum BotDemo {
     }
 
     fileprivate static func row(id: String, role: String, text: String, at: Double) -> TimelineRow {
-        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: "\\n")
         return decode(#"{"id":"\#(id)","kind":"conversation","role":"\#(role)","text":"\#(escaped)","createdAt":\#(at)}"#)
+    }
+
+    fileprivate static func workRow(id: String, tool: String, at: Double, status: String = "completed") -> TimelineRow {
+        decode(#"{"id":"\#(id)","kind":"work","workKind":"tool","toolName":"\#(tool)","title":"\#(tool)","status":"\#(status)","output":"","createdAt":\#(at)}"#)
     }
 
     fileprivate static func threadJSON(running: Bool) -> Data {
@@ -272,7 +319,7 @@ enum BotDemo {
     /// code, reactions and quick replies, with work between, over a few weeks.
     private static func longChat(_ count: Int, message: (String, String, String, Double) -> String,
                                  work: (String, String, Double, String, String) -> String) -> [String] {
-        let start = now - Double(count) * 1_800_000
+        let start = longNow - Double(count) * 1_800_000
         let replies = [
             "Here's where things stand:\n\n- **Design review** moved to Thursday\n- The deck has *two* open comments\n- [The brief](https://example.com/brief) is final\n\nAnything else?",
             "## Release notes\n\nThe build is green. Three changes went in:\n\n1. Faster sync on launch\n2. Fixed the share sheet\n3. New `::next` chips\n\n::reactions{items=\"👍|🎉|👀\"}",
@@ -282,13 +329,46 @@ enum BotDemo {
         ]
         let asks = ["What's on today?", "Can you check the build?", "Why did the deploy fail?", "Who owns what for the offsite?", "Anything I'm forgetting?"]
         var out: [String] = []
-        for index in 0..<(count / 2) {
+        let long = served?.long == true
+        let exchanges = count / 2
+        for index in 0..<exchanges {
             let at = start + Double(index) * 3_600_000
+            if long, compacts(index) {
+                out.append(message("c\(index)", "user", "/compact", at - 60_000))
+            }
             out.append(message("u\(index)", "user", asks[index % asks.count], at))
-            if index % 3 == 0 { out.append(work("w\(index)", "bb_threads_list", at + 5_000, "completed", "")) }
-            out.append(message("a\(index)", "assistant", replies[index % replies.count], at + 30_000))
+            if long {
+                // Runs of tool calls of every length, folded into one "Worked" row each.
+                let steps = [0, 1, 3, 0, 12, 0, 2, 60, 5, 0, 24][index % 11]
+                for step in 0..<steps {
+                    out.append(work("w\(index)s\(step)", ["bb_threads_list", "pages_read", "calendar_events", "shell"][step % 4], at + 5_000 + Double(step) * 100, "completed", ""))
+                }
+                // Replies from a line to a screenful.
+                let paragraphs = [1, 4, 1, 9, 2, 1, 14][index % 7]
+                let text = index == exchanges - 1 ? replies[4]
+                    : (0..<paragraphs).map { "\(replies[(index + $0) % 4])" }.joined(separator: "\n\n")
+                out.append(message("a\(index)", "assistant", text, at + 30_000))
+            } else {
+                if index % 3 == 0 { out.append(work("w\(index)", "bb_threads_list", at + 5_000, "completed", "")) }
+                out.append(message("a\(index)", "assistant", replies[index % replies.count], at + 30_000))
+            }
         }
         return out
+    }
+
+    /// When the long chat was made, so its "/compact" rows and their compactions line up.
+    private static let longNow = now
+
+    /// The long chat's compactions: Studio's warmer sends "/compact" every 40 exchanges.
+    private static func compacts(_ index: Int) -> Bool { index > 0 && index % 40 == 0 }
+
+    /// What Studio recorded for each of those "/compact" messages.
+    static var compactionsJSON: String {
+        guard served?.long == true else { return "[]" }
+        let count = served?.messages ?? 300
+        let start = longNow - Double(count) * 1_800_000
+        let times = (0..<(count / 2)).filter(compacts).map { start + Double($0) * 3_600_000 - 90_000 }
+        return "[" + times.map { #"{"threadId":"\#(threadId)","at":\#($0),"tokens":180000}"# }.joined(separator: ",") + "]"
     }
 
     private static var interactions: [PendingInteraction] {
@@ -298,7 +378,8 @@ enum BotDemo {
     private static func activity(needs: Bool) -> BotActivity {
         let t = now
         return decode(#"""
-        {"needsYou":\#(needs ? #"[{"id":"thr_reviewprs1","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"),
+        {"compactions":\#(compactionsJSON),
+         "needsYou":\#(needs ? #"[{"id":"thr_reviewprs1","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"),
          "waiting":[{"id":"thr_waiting01","title":"Summarize inbox","status":"pending","relation":"started","needsYou":false,"updatedAt":\#(t - 120000)}],
          "inProgress":[{"id":"thr_research1","title":"Lisbon offsite options","status":"running","relation":"started","needsYou":false,"updatedAt":\#(t - 60000)}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":\#(t + 50400000)},

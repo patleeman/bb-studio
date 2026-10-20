@@ -124,12 +124,31 @@ after a send with the keyboard up. Only a short scroll from near the bottom anim
 farther ones jump to the marker, since an animated scroll to an id in a lazy
 stack re-aims as rows above measure and visibly runs through the chat.
 
+In a long chat the lazy stack places rows it hasn't drawn by estimated
+heights, and its content size lags them as they measure in. When a reply
+shrank under the reader (its stream settling on a short final text), the end
+was left where the stack drew nothing: a black chat with "Jump to latest" up
+until a scroll by hand. So the newest 16 items, the reply on its way and the
+end marker are an ordinary `VStack` under the lazy history, always drawn; the
+timeline draws the newest 60 items and more as the reader scrolls up, like
+older pages; and while it follows the end (`pinned`, changed only by the
+reader's own scrolling, a send or "Jump to latest"), any change in size
+brings the end marker back to the bottom once the layout settles. The marker
+reports whether it's at the bottom, above it, or out of view, rather than
+trusting the content size. Regular threads use the same `ThreadView`.
+
 Signposts time the open (Points of Interest, `BotChatOpen`; `ChatPerf`).
 Debug builds print `[perf]` lines to stderr. To measure, launch with
 `simctl launch --console` and `-qaBotDemo chat -qaDemoLatency 600`: a local
 fake server serves a 300-message chat (`-qaDemoMessages`) through
 `BBClient.transport`. `-qaDemoColdCache` drops the caches first, and
-`-qaDemoSend <text>` types a message and sends it.
+`-qaDemoSend <text>` types a message and sends it. `-qaDemoLong` makes it a
+long, compacted chat (runs of up to 60 tool rows, replies from a line to a
+screenful, a "/compact" every 40 exchanges), `-qaDemoPage <rows>` sizes the
+server's pages, and a send there works, streams a long reply and settles on a
+short one. `ChatSendScrollUITests` sends in it (4,000 messages, pages of 600
+rows), in the Bot chat and as a regular thread, and checks the reply's end is
+on screen above the composer.
 
 ## Bot chat: terminals
 
