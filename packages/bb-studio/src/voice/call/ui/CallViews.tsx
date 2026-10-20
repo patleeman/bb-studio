@@ -97,7 +97,7 @@ function Bar() {
   const micLive = snapshot.pushToTalk ? snapshot.talking : !snapshot.muted;
   const you = micLive && (snapshot.userSpeaking || levels.mic > 0.12);
   const voice = !you && (levels.voice > 0.04 || snapshot.responding);
-  const speaker = you ? "You" : voice ? call!.botName : snapshot.waiting ? `${call!.botName} is working` : "Listening";
+  const speaker = you ? "You're talking" : voice ? "Speaking" : snapshot.waiting ? `${call!.botName} is on it` : "Listening";
   const elapsed = (snapshot.record?.endedAt ?? Date.now()) - snapshot.startedAt;
 
   if (snapshot.status !== "live") {

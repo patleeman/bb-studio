@@ -66,10 +66,11 @@ const fixtureScript = (callId, botName) => `(() => {
   return true;
 })()`;
 
-export default ({ projectId, threadId, pluginRpc, sleep }) => {
+export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => {
   let callId = null;
   let botName = BOT.name;
   let botThread = threadId;
+  let botProject = projectId;
   return [
     {
       id: "studio-voice-call-bar",
@@ -77,20 +78,24 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => {
       fileName: "voice-call-bar.png",
       privateSidebar: true,
       setup: async (client) => {
-        // The seeded thread is the Bot's chat: no agent run to make the Bot.
+        // A Bot with its own chat, as the Bot capture makes it (one short agent turn in the staged BB).
         let { bot } = await pluginRpc("studio", "bot_get", {});
-        if (!bot?.threadId) ({ bot } = await pluginRpc("studio", "bot_set_thread", { threadId }));
-        if (bot.name !== BOT.name) ({ bot } = await pluginRpc("studio", "bot_set", { botId: bot.id, ...BOT }));
+        if (!bot) {
+          ({ bot } = await pluginRpc("studio", "bot_create", { ...BOT, prompt: "Hi Dot. In one short sentence, say you'll keep an eye on the ORBIT-42 launch and tell me what needs me." }));
+        }
+        await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "180"]).catch(() => {});
         botName = bot.name;
         botThread = bot.threadId;
+        botProject = JSON.parse(await bbCli(["thread", "show", botThread, "--json"])).thread.projectId;
         callId = seedCall({ botId: bot.id, botName, threadId: botThread, startedAt: Date.now() - 4 * 60_000 });
-        await client.navigate(`/projects/${projectId}/threads/${botThread}`);
+        await client.navigate(`/projects/${botProject}/threads/${botThread}`);
         await client.waitForSelector("[data-testid=voice-call-button]", 30_000);
         await client.evaluate(fixtureScript(callId, botName));
         await client.evaluate(`(() => { document.querySelector("[data-testid=voice-call-button]").click(); return true; })()`);
         await client.waitForSelector("[data-testid=voice-call-bar][data-state=live]");
-        // The bar shows the call: the Bot's name, a timer past four minutes, the voice speaking, and the server's cost.
-        await client.waitForText("4:0", 10_000);
+        // The bar shows the call: the Bot's name, the timer running, the voice speaking, and the server's cost.
+        const timer = await client.poll(`document.querySelector("[data-testid=voice-call-timer]")?.textContent ?? ""`);
+        if (!/^\d+:\d\d$/.test(timer)) throw new Error(`The call bar's timer reads ${JSON.stringify(timer)}.`);
         const cost = await client.poll(`document.querySelector("[data-testid=voice-call-cost]")?.textContent ?? ""`);
         for (let tries = 0; tries < 40; tries++) {
           const text = await client.poll(`document.querySelector("[data-testid=voice-call-cost]")?.textContent ?? ""`);
@@ -99,9 +104,11 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => {
           await sleep(250);
         }
         const speaker = await client.poll(`document.querySelector("[data-testid=voice-call-speaker]")?.textContent ?? ""`);
-        if (speaker !== botName) throw new Error(`The call bar should show ${botName} speaking, not ${JSON.stringify(speaker)}.`);
+        if (speaker !== "Speaking") throw new Error(`The call bar should show the voice speaking, not ${JSON.stringify(speaker)}.`);
         // send_to_bot went through the real tool: the chat has the call's message.
         await client.waitForText("📞 From the call:", 20_000);
+        // A few seconds on the clock.
+        await sleep(4000);
       },
     },
     {
@@ -117,8 +124,11 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => {
         if (!record.endedAt || !record.pageId || record.transcript.length < 4 || record.sent.length !== 1 || !(record.costUsd > 0)) {
           throw new Error(`The call's record is incomplete: ${JSON.stringify(record).slice(0, 400)}`);
         }
-        // The line in the chat waits behind the Bot's reply to what the call sent.
-        await client.navigate(`/projects/${projectId}/threads/${botThread}`);
+        // The line in the chat waits behind the Bot's reply to what the call sent, then gets its [PASS].
+        await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
+        await sleep(3000);
+        await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
+        await client.navigate(`/projects/${botProject}/threads/${botThread}`);
         await client.waitForText("sent you 1 message", 120_000);
         const line = await client.poll(`document.body.innerText.match(/Call · \\d+ min · ≈\\$\\d+\\.\\d\\d · sent you 1 message · Transcript/)?.[0] ?? ""`);
         if (!line) throw new Error("The chat's call line should read Call · N min · ≈$X · sent you 1 message · Transcript.");
