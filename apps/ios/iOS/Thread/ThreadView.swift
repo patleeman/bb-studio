@@ -53,14 +53,11 @@ struct ThreadView: View {
     /// draws more before asking the server for older pages.
     @State private var drawnItems = ThreadView.itemWindow
     @State private var atTop = false
-    /// How far the timeline is scrolled past its last row, or negative short
-    /// of it, to within `pastEndSlack`: past it, short of it, or near.
+    /// How far the timeline is scrolled past its last row, or negative short of it.
     @State private var pastEnd: CGFloat = 0
     /// Rebuilds the timeline so it opens at the bottom of the server's rows.
     @State private var timelineKey = 0
     @State private var scrollPhase = ScrollPhase.idle
-    /// The chat's link handler, made once (`LinkOpener`).
-    @State private var links = LinkOpener()
     @State private var selecting: SelectionText?
     @State private var selectedExcerpt = ""
     @State private var reactionSettings = ReactionSettings.defaults
@@ -370,7 +367,24 @@ struct ThreadView: View {
         .animation(.snappy, value: pinned)
         .safeAreaInset(edge: .bottom) { composer }
         .environment(\.threadId, model.threadId)
-        .environment(\.openURL, links.action { url in openLink(url) })
+        .environment(\.openURL, OpenURLAction { url in
+            // Agents link Studio items by their BB web path, which reads like a file path.
+            if let path = FilePathLink.path(from: url) ?? (url.host() == client.baseURL.host() ? url.path() : nil),
+                let route = Route(href: path)
+            {
+                app.path.append(route)
+                return .handled
+            }
+            if let path = FilePathLink.path(from: url) {
+                openingFile = OpenFile(path: path)
+                return .handled
+            }
+            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
+                return .systemAction
+            }
+            if let botChrome { botChrome.openThread(id) } else { app.path.append(.thread(id: id)) }
+            return .handled
+        })
         .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, working: model.thread?.isRunning == true))
         .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
@@ -561,12 +575,7 @@ struct ThreadView: View {
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             // Content shorter than the screen sits at the top: nothing is past its end.
             let end = max(geometry.contentSize.height, geometry.visibleRect.minY + geometry.contentInsets.top + geometry.containerSize.height)
-            // Only which side of the slack it's on is ever asked, so this
-            // changes (and writes state) at those edges, not every frame of
-            // a scroll: a state write per frame dirtied the whole chat's
-            // graph each frame of a fling.
-            let distance = geometry.unobscuredBottom - end
-            return distance > Self.pastEndSlack ? Self.pastEndSlack + 1 : distance > -Self.pastEndSlack ? 0 : -Self.pastEndSlack - 1
+            return geometry.unobscuredBottom - end
         } action: { _, distance in
             pastEnd = distance
             if scrollPhase == .idle { settlePastEnd() }
@@ -575,9 +584,6 @@ struct ThreadView: View {
             scrollPhase = phase
             // The reader's finger: stop following at once, so a reply
             // streaming in doesn't pull the chat back down under it.
-            // Updates wait while the reader's finger or fling is on the chat
-            // (`ThreadModel.holdsRefresh`), and catch up once it settles.
-            model.holdsRefresh = phase.byReader
             if phase.byReader {
                 pinned = false
                 settling?.cancel()
@@ -610,13 +616,10 @@ struct ThreadView: View {
         }
         // Keeps loading while the reader stays at the top and a page is too
         // short to move them off it; backs off after failures, and stops when
-        // a page brings nothing new. Waits for the reader's finger or fling to
-        // settle: a page going in above them mid-fling re-laid out the chat
-        // (frames of 70-90ms) and its scroll back to their place moved the
-        // chat under their finger.
-        .task(id: atTop && !scrollPhase.byReader) {
+        // a page brings nothing new.
+        .task(id: atTop) {
             var failures = 0
-            while atTop, !scrollPhase.byReader, hiddenItems > 0 || (botChrome != nil ? model.canLoadOlder : model.hasOlder), !Task.isCancelled {
+            while atTop, hiddenItems > 0 || (botChrome != nil ? model.canLoadOlder : model.hasOlder), !Task.isCancelled {
                 guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
                 try? await Task.sleep(for: delay)
             }
@@ -843,26 +846,6 @@ struct ThreadView: View {
                 position.scrollTo(id: Self.bottomId, anchor: .bottom)
             }
         }
-    }
-
-    /// Links in messages: Studio items and files open in the app, threads in the chat.
-    private func openLink(_ url: URL) -> OpenURLAction.Result {
-        // Agents link Studio items by their BB web path, which reads like a file path.
-        if let path = FilePathLink.path(from: url) ?? (url.host() == client.baseURL.host() ? url.path() : nil),
-            let route = Route(href: path)
-        {
-            app.path.append(route)
-            return .handled
-        }
-        if let path = FilePathLink.path(from: url) {
-            openingFile = OpenFile(path: path)
-            return .handled
-        }
-        guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
-            return .systemAction
-        }
-        if let botChrome { botChrome.openThread(id) } else { app.path.append(.thread(id: id)) }
-        return .handled
     }
 
     /// Reactions draft a reply rather than sending it, like BB web: appended after
@@ -1370,22 +1353,6 @@ private enum EndPlace: Equatable {
             return
         }
         self = shown.maxY - proxy.size.height <= 40 ? .bottom : .above
-    }
-}
-
-/// The thread's `openURL`, made once and kept. A new `OpenURLAction` on
-/// every redraw read as a new environment value, and every `Text` in the
-/// chat (each reads `openURL`, for its links) resolved its styled text again:
-/// each streamed chunk restyled every message drawn, not just the one growing.
-@MainActor
-private final class LinkOpener {
-    private var open: (URL) -> OpenURLAction.Result = { _ in .systemAction }
-    private lazy var stable = OpenURLAction { [unowned self] url in open(url) }
-
-    /// The same action each time, calling the latest `handle`.
-    func action(_ handle: @escaping (URL) -> OpenURLAction.Result) -> OpenURLAction {
-        open = handle
-        return stable
     }
 }
 

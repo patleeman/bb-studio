@@ -247,7 +247,6 @@ final class ThreadModel: ObservableObject {
         refreshRun += 1
         refreshTask?.cancel()
         refreshTask = nil
-        holdsRefresh = false
         pending = []
         realtime?.unsubscribeThread(threadId)
         if let listener { realtime?.removeListener(listener) }
@@ -334,19 +333,6 @@ final class ThreadModel: ObservableObject {
 
     /// Streaming output arrives as a burst of change signals; coalesce them into
     /// at most one refresh every ~150ms.
-    /// Set while the reader's finger or fling is on the chat: refreshes wait
-    /// until it settles, then catch up in one go. Applied mid-scroll, every
-    /// streamed chunk re-laid out the chat under the reader (and rows above
-    /// re-measured), which stutters on a phone.
-    var holdsRefresh = false {
-        didSet {
-            guard !holdsRefresh, let held else { return }
-            self.held = nil
-            held.resume()
-        }
-    }
-    private var held: CheckedContinuation<Void, Never>?
-
     func scheduleRefresh(_ changes: Set<String>?) {
         #if DEBUG
         if BotDemo.served == nil, BotDemo.current != nil, threadId == BotDemo.threadId { return }
@@ -357,7 +343,6 @@ final class ThreadModel: ObservableObject {
         refreshTask = Task {
             while !Task.isCancelled, pending?.isEmpty != true {
                 try? await Task.sleep(for: .milliseconds(150))
-                if holdsRefresh, !Task.isCancelled { await withCheckedContinuation { held = $0 } }
                 if Task.isCancelled { break }
                 let changes = pending
                 pending = []

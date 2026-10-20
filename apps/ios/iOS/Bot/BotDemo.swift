@@ -159,10 +159,6 @@ enum BotDemo {
                 return sends
             }
             notify()
-            if ReplayThread.name != nil {
-                Task { await replay(sent, at: at) }
-                return
-            }
             guard BotDemo.served?.long == true else {
                 Task {
                     try? await Task.sleep(for: .seconds(3))
@@ -205,20 +201,6 @@ enum BotDemo {
                 rows[rows.count - 1] = BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Reply \(sent): all set. I'll take care of **that** now.", at: at + 4_000)
                 running = false
             }
-        }
-
-        /// The recorded thread's turn (`ReplayThread.turn`), a chunk every
-        /// `-qaReplayInterval` ms (120 by default).
-        private func replay(_ sent: Int, at: Double) async {
-            let interval = ProcessInfo.processInfo.arguments.firstIndex(of: "-qaReplayInterval")
-                .flatMap { ProcessInfo.processInfo.arguments.dropFirst($0 + 1).first }.flatMap(Int.init) ?? 120
-            await ReplayThread.turn(sent, at: at + 1_000) { change in
-                try? await Task.sleep(for: .milliseconds(interval))
-                lock.withLock { change(&rows) }
-                notify()
-            }
-            lock.withLock { running = false }
-            notify()
         }
 
         private func notify() {
@@ -297,7 +279,7 @@ enum BotDemo {
     }
 
     /// The served chat's rows, made once.
-    static let longRows: [TimelineRow] = ReplayThread.name.map(ReplayThread.rows) ?? rows("chat", long: served?.messages ?? 300)
+    static let longRows: [TimelineRow] = rows("chat", long: served?.messages ?? 300)
 
     private static func rows(_ variant: String, long: Int? = nil) -> [TimelineRow] {
         let yesterday = now - 86_400_000 - 3_600_000

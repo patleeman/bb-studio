@@ -62,7 +62,6 @@ struct BotChatTimeline: View {
                     edit: row.id == editableId ? edit : nil,
                     sideThread: sideThreads[row.id],
                     replyInThread: !row.isUser && threadRows.contains(row.id) ? { replyInThread(row.id) } : nil)
-                .equatable()
                 .modifier(ChatPerfRow(row: row, cached: cached))
             case .work(let rows):
                 BotWorkRow(rows: rows)
@@ -110,17 +109,7 @@ struct BotAutoCompactedMarker: View {
 
 /// One message. The Bot's sit in a soft bubble on the left; yours in its
 /// color on the right.
-///
-/// Equatable on what it draws, leaving out its actions: they're new closures
-/// on every redraw of the chat, so without this each streamed chunk redrew
-/// every message drawn (their Markdown, menus and labels), not just the
-/// one growing. The actions only reach the chat's state, which stays put.
-struct BotMessageRow: View, Equatable {
-    nonisolated static func == (a: BotMessageRow, b: BotMessageRow) -> Bool {
-        a.row == b.row && a.first == b.first && a.last == b.last && a.bot == b.bot && a.projectId == b.projectId
-            && a.sideThread == b.sideThread && (a.edit == nil) == (b.edit == nil) && (a.replyInThread == nil) == (b.replyInThread == nil)
-    }
-
+struct BotMessageRow: View {
     let bot: BotInfo
     let row: TimelineRow
     let first: Bool
