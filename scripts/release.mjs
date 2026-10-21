@@ -6,7 +6,8 @@
 //   node scripts/release.mjs [--ref <commit>] [--dry-run] [--skip-tests]
 //
 // The commit (default: origin/main) must be on origin/main and a fast-forward
-// of origin/stable. It's checked out alone in a temporary worktree, so other
+// of origin/stable. A dry run may check an unmerged branch commit.
+// It's checked out alone in a temporary worktree, so other
 // agents' uncommitted work in this checkout can't make it pass or fail, and
 // these must pass there: the repo checks, every package's typecheck and tests
 // (unless --skip-tests).

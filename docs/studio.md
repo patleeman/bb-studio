@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio-kit/src/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). VS Code also runs inside Studio, with the `studio-code` item namespace and `/plugins/studio/studio/workspaces/<id>` addresses. Its old URLs still resolve. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in. Dashboards (`packages/bb-studio/src/dashboards`) were built in from the start: items are `dashboards:<id>` at `/plugins/studio/studio/dashboards/<id>`, with no older address.
+BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio/src/kit/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). VS Code also runs inside Studio, with the `studio-code` item namespace and `/plugins/studio/studio/workspaces/<id>` addresses. Its old URLs still resolve. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in. Dashboards (`packages/bb-studio/src/dashboards`) were built in from the start: items are `dashboards:<id>` at `/plugins/studio/studio/dashboards/<id>`, with no older address.
 
 ## Provider contract
 
@@ -85,9 +85,19 @@ Templates and bulk export are described in the [Studio README](../packages/bb-st
 
 `CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. VS Code workspace links now open Studio tabs; thread editors are available through the + tab menu. [Code upgrade details](upgrade-studio-code.md) include the process handover and recovery state.
 
-`packages/bb-studio-kit` (`@bb-studio/kit`) is a source package. Each add-on depends on its packed copy, `file:../bb-studio-kit.tgz` (rebuilt by `scripts/refresh-locks.sh`), and `bb plugin build` bundles it. The kit exports `CollectionPage`, item headers and menus, directive cards, format helpers and shared UI primitives. Plugins use the kit's `bb.pluginTailwindContent` so its classes are included in their builds.
+Studio owns contracts, helpers, UI primitives and their tests in
+`packages/bb-studio/src/kit`. All Studio imports are local. BB's default
+Tailwind scan covers these package-local sources, so Studio no longer needs a
+shared package's `bb.pluginTailwindContent`. Runtime UI dependencies are declared
+directly by Studio. Swift generation reads Studio's internal contract.
 
-BB installs a Git plugin by cloning the repository and running `npm install --omit=dev` in the package directory. Each plugin's `package-lock.json` must therefore include the kit link. Use `scripts/refresh-locks.sh <package>` to regenerate locks in a clean clone.
+`packages/bb-studio-kit` is now a temporary, slim compatibility library for the
+Decisions and Code bridges. Its eight source files must match Studio's internal
+copies byte for byte; `scripts/pack-kit.sh` enforces that before packing and in
+`--check` mode. Only the bridges depend on `file:../bb-studio-kit.tgz`.
+`scripts/refresh-locks.sh` repacks it and refreshes their npm integrity hashes.
+Mobile stays independent, with its existing local silent-output helper; its test
+compares that helper with Studio's internal implementation.
 
 ## Setup
 

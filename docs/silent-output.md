@@ -20,7 +20,7 @@ summary" are ordinary replies.
 
 ## Matching
 
-`isPassOutput(text)` in `@bb-studio/kit/silent` is the one matcher. It accepts
+`isPassOutput(text)` in `packages/bb-studio/src/kit/silent` is the one matcher. It accepts
 `[PASS]` in any case, with surrounding whitespace, backticks or markdown
 emphasis (`` `[PASS]` ``, `**[PASS]**`, a fenced block). `isSilentOutput(text)`
 also counts an empty reply. The kit exports `PASS_REPLY` and

@@ -182,7 +182,7 @@ logs.
   including when the fallback is off. It uses the same temporary-thread cleanup.
 
 Studio Talk can choose models for transcript cleanup, recording titles, and summaries. Callers share the typed
-`@bb-studio/kit/decisions` client, including its `askTitle` helper.
+`packages/bb-studio/src/kit/decisions` client, including its `askTitle` helper.
 
 Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }`.
 `unavailable` means nothing is configured to answer.

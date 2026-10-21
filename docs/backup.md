@@ -105,8 +105,8 @@ folder, hard-linking audio where it can. Studio adds `studio/` and
 deleted afterwards.
 
 The two methods are an optional part of the Studio provider contract
-(`@bb-studio/kit/backup`). An add-on registers them with
-`registerStudioBackup` from `@bb-studio/kit/server`. It is given only a
+(`packages/bb-studio/src/kit/backup`). An add-on registers them with
+`registerStudioBackup` from `packages/bb-studio/src/kit/server`. It is given only a
 session id, never a path: the kit joins the id to Studio's session folder and
 refuses anything else.
 

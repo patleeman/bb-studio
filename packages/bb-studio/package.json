@@ -52,9 +52,6 @@
         "description": "The Silk S icon's colors: teal-black ground, a warm coral accent. Light and dark.",
         "css": "./themes/bb-studio.css"
       }
-    ],
-    "pluginTailwindContent": [
-      "src/kit/**/*.{ts,tsx}"
     ]
   },
   "dependencies": {
