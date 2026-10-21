@@ -23,6 +23,9 @@ const RUNTIME = new Set([
   "@radix-ui/react-dropdown-menu",
   "@get-bb/plugin-sdk/app",
   "node:crypto",
+  "node:child_process",
+  "node:util",
+  "node:timers/promises",
   "node:fs/promises",
   "node:path",
 ]);

@@ -1,7 +1,7 @@
 // Names, schemas and links the server and the app share.
 import type { PluginRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { bbThemeSchema } from "./theme";
+import { bbThemeSchema } from "./code-theme";
 
 // The SDK's defineRpcContract, inlined: the app bundles this file, and BB
 // doesn't serve the bare SDK to frontends.

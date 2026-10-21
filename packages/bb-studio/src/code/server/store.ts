@@ -3,23 +3,9 @@
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { ID_PREFIX, type Workspace } from "../shared";
-import { COMMENT_MIGRATIONS } from "./comments";
 
-export const MIGRATIONS = [
-  `CREATE TABLE IF NOT EXISTS code_workspaces (
-  id TEXT PRIMARY KEY, title TEXT NOT NULL, project_id TEXT, folders TEXT NOT NULL,
-  archived INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-); CREATE INDEX IF NOT EXISTS code_workspaces_updated ON code_workspaces(updated_at);`,
-  `ALTER TABLE code_workspaces ADD COLUMN thread_id TEXT; CREATE INDEX IF NOT EXISTS code_workspaces_thread ON code_workspaces(thread_id);`,
-  // Workspaces made so far were made by the user, so they stay trusted.
-  `ALTER TABLE code_workspaces ADD COLUMN trusted INTEGER NOT NULL DEFAULT 1;`,
-  // Whether agents may see what the user has open in this workspace.
-  `ALTER TABLE code_workspaces ADD COLUMN share INTEGER NOT NULL DEFAULT 1;`,
-  // When the user last opened the workspace's editor: Code's page opens the latest.
-  `ALTER TABLE code_workspaces ADD COLUMN opened_at INTEGER;`,
-  // Review comments (src/server/comments.ts).
-  ...COMMENT_MIGRATIONS,
-];
+
+export { MIGRATIONS } from "@bb-studio/kit/code-migrations";
 
 type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; share: number; folders: string; archived: number; created_at: number; updated_at: number };
 

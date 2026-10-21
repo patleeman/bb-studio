@@ -94,6 +94,7 @@ describe("5. Stop during download or start cancels it", () => {
     let spawned = 0;
     const servers = new CodeServers({
       root: dir,
+      quiesce: async () => {},
       log: { info() {}, warn() {} },
       onChange() {},
       install: () => new Promise<string>((resolve) => { finishInstall = resolve; }),

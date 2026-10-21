@@ -1,3 +1,4 @@
+import type { CodeContract } from "./contract";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
@@ -5,7 +6,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
 import { themeChanges, useThemeSync } from "./theme-sync";
-import { CHANNEL, HIDDEN_RELEASE_MS, type CodeContract, type ServerStatus, type Workspace } from "./shared";
+import { CHANNEL, HIDDEN_RELEASE_MS, type ServerStatus, type Workspace } from "./shared";
 
 /**
  * VS Code answers on the computer running BB, at 127.0.0.1. Only a BB page
@@ -113,7 +114,7 @@ export function WorkspaceView({ id }: { id: string }) {
   }, [shown]);
   useEffect(() => {
     let live = true;
-    rpc.call("get", { id }).then(
+    rpc.call("code.get", { id }).then(
       (result) => { if (!live) return; setWorkspace(result.workspace); setStatus(result.status); setLoadError(result.workspace ? "" : "Workspace not found."); },
       (error) => { if (live) setLoadError(errorMessage(error)); },
     );
@@ -124,7 +125,7 @@ export function WorkspaceView({ id }: { id: string }) {
   const open = () => {
     if (opening.current) return;
     opening.current = true;
-    void rpc.call("open", { id }).then(
+    void rpc.call("code.open", { id }).then(
       (result) => setStatus(result.status),
       (error) => toast.error(errorMessage(error)),
     ).finally(() => { opening.current = false; });
@@ -136,7 +137,7 @@ export function WorkspaceView({ id }: { id: string }) {
   }, [embed, shown, retried, workspace, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (changes: { share: boolean }) =>
-    rpc.call("update", { id, ...changes }).then((result) => setWorkspace(result.workspace), (error) => toast.error(errorMessage(error)));
+    rpc.call("code.update", { id, ...changes }).then((result) => setWorkspace(result.workspace), (error) => toast.error(errorMessage(error)));
 
   if (!workspace)
     return (

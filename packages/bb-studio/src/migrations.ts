@@ -1,3 +1,4 @@
+import { MIGRATIONS as CODE_MIGRATIONS } from "@bb-studio/kit/code-migrations";
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
 import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
 import { DRAWING_TABLES } from "./draw/server/store";
@@ -453,4 +454,5 @@ export const MIGRATIONS = [
    CREATE TRIGGER bot_maintenance_settings_no_delete BEFORE DELETE ON bot_maintenance_settings BEGIN SELECT RAISE(ABORT, 'append-only'); END;
    CREATE TRIGGER bot_maintenance_runs_no_update BEFORE UPDATE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;
    CREATE TRIGGER bot_maintenance_runs_no_delete BEFORE DELETE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;`,
+  ...CODE_MIGRATIONS,
 ];

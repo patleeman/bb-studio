@@ -1,3 +1,4 @@
+import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerDecisions } from "./src/decisions/server";
 import { DECISIONS_SETTINGS } from "./src/decisions/settings";
 import { BotMaintenance } from "./src/bot-maintenance";
@@ -129,6 +130,7 @@ export default async function plugin(bb: BbPluginApi) {
   // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread
   // resume's, plus Decisions under namespaced keys.
   const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
+  const code = registerCode(bb, db);
   const decisions = await registerDecisions(bb, settings);
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
@@ -168,6 +170,7 @@ export default async function plugin(bb: BbPluginApi) {
   // A dashboard kind that's off refreshes nothing.
   dashboards.setEnabled(() => builtinOn(kindSettings.current, "dashboards"));
   const hub = new StudioHub(bb.sdk, [
+    { pluginId: "studio-code", name: "VS Code", handlers: code.provider },
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
     { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
@@ -217,15 +220,16 @@ export default async function plugin(bb: BbPluginApi) {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
+    tools.push(...CODE_TOOLS);
     // A voice chat is told to speak, not write, and gets Studio's item tools with its own;
     // voice mode in any other thread adds the same to what it already gets (at the end).
     const voiceMode = voice?.configure(context.thread.id, context.pluginMetadata) ?? null;
-    if (voiceMode?.chat) return { tools: [...tools, ...voiceMode.tools], skills: [], instructions: voiceMode.instructions };
+    if (voiceMode?.chat) return { tools: [...tools, ...voiceMode.tools], skills: ["studio-code"], instructions: voiceMode.instructions };
     const withVoice = (config: { tools: string[]; skills: string[]; instructions: string }) => voiceMode
       ? { ...config, tools: [...config.tools, ...voiceMode.tools], instructions: [config.instructions, voiceMode.instructions].filter(Boolean).join("\n\n") }
       : config;
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
-    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS], skills: [], instructions: "" };
+    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // A side thread (a fork at one of its replies) runs as the Bot too.
     // BB sets a fork's session up while it's made, before Studio records it:
@@ -235,16 +239,16 @@ export default async function plugin(bb: BbPluginApi) {
     if (sideBot && sideBot.kind !== "external") {
       const asBot = { ...sideBot, threadId: context.thread.id };
       const instructions = [bots.instructions(asBot), SIDE_THREAD_INSTRUCTIONS, off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-      return withVoice({ tools: [...tools, ...SIDE_THREAD_TOOLS], skills: [], instructions });
+      return withVoice({ tools: [...tools, ...SIDE_THREAD_TOOLS], skills: ["studio-code"], instructions });
     }
     const bot = sideBot ? { ...sideBot, threadId: context.thread.id } : bots.forThread(context.thread.id, context.pluginMetadata);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return withVoice({ tools: [], skills: [], instructions: bots.instructions(bot) });
-    if (bot && bot.state !== "active") return withVoice({ tools: [...BOT_TOOLS], skills: [], instructions: bots.instructions(bot) });
+    if (bot && bot.state !== "active") return withVoice({ tools: [...BOT_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: bots.instructions(bot) });
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
     const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return withVoice({ tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: [], instructions });
+    return withVoice({ tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions });
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.

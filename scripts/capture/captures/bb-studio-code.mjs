@@ -34,19 +34,19 @@ async function revealIn(client, pluginRpc, sleep, id, startLine, endLine) {
     const names = await inEditor(client, explorer);
     return Array.isArray(names) && names.includes("README.md") && names.includes("src");
   }, 300000);
-  await waitFor(sleep, "the bridge to connect", async () => (await pluginRpc("studio-code", "editorState", { id })).state !== null);
-  const { shown } = await pluginRpc("studio-code", "reveal", { id, path: "src/retry.ts", startLine, endLine });
+  await waitFor(sleep, "the bridge to connect", async () => (await pluginRpc("studio", "code.editorState", { id })).state !== null);
+  const { shown } = await pluginRpc("studio", "code.reveal", { id, path: "src/retry.ts", startLine, endLine });
   if (!shown) throw new Error("reveal found no editor");
   await waitFor(sleep, `retry.ts lines ${startLine}–${endLine} selected`, async () => {
-    const { state } = await pluginRpc("studio-code", "editorState", { id });
+    const { state } = await pluginRpc("studio", "code.editorState", { id });
     return state?.activeFile?.path.endsWith("src/retry.ts") && state.activeFile.selection.startLine === startLine && state.activeFile.selection.endLine === endLine;
   });
   await sleep(1200);
 }
 
-export default ({ projectId, pluginRpc, sleep }) => [
+export default ({ projectId, pluginRpc, sleep, bbCli }) => [
   {
-    id: "studio-code", packageDir: "bb-studio-code", privateSidebar: true,
+    id: "studio-code", packageDir: "bb-studio", fileName: "code-preview.png", privateSidebar: true,
     setup: async (client) => {
       // The thread that ran in the Orbit checkout, so it has a folder for VS Code.
       const workspaceThreadId = process.env.BB_CAPTURE_WORKSPACE_THREAD_ID;
@@ -54,7 +54,7 @@ export default ({ projectId, pluginRpc, sleep }) => [
       let id = null;
       const cleanup = async () => {
         if (!id) return;
-        await pluginRpc("studio-code", "stop", { id }).catch(() => {});
+        await pluginRpc("studio", "code.stop", { id }).catch(() => {});
       };
       try {
         await client.navigate(`/projects/${projectId}/threads/${workspaceThreadId}`);
@@ -67,7 +67,7 @@ export default ({ projectId, pluginRpc, sleep }) => [
         await client.clickButtonText("VS Code");
         // The tab opens the thread's own folder, its VS Code made on first open.
         await waitFor(sleep, "the thread's worktree workspace", async () => {
-          const { workspace } = await pluginRpc("studio-code", "threadWorkspace", { threadId: workspaceThreadId });
+          const { workspace } = await pluginRpc("studio", "code.threadWorkspace", { threadId: workspaceThreadId });
           id = workspace?.id ?? null;
           return !!id;
         });
@@ -78,6 +78,18 @@ export default ({ projectId, pluginRpc, sleep }) => [
         if (!(await client.hasText("Pick a database for the todo app"))) throw new Error("The thread isn't beside the editor");
       } catch (error) { await cleanup(); throw error; }
       return cleanup;
+    },
+  },
+  {
+    id: "studio-code-bridge", packageDir: "bb-studio-code",
+    setup: async (client) => {
+      await bbCli(["studio-code", "migrate"]);
+      const status = await pluginRpc("studio-code", "migrationStatus", null);
+      if (!status.complete) throw new Error("Code migration must be acknowledged before capture");
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Retired plugins");
+      await client.waitForText("VS Code, its tools and the studio-code skill are built into Studio.");
+      await client.waitForText("bb plugin remove studio-code");
     },
   },
 ];

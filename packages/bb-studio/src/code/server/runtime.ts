@@ -1,3 +1,4 @@
+import { quiesceCode } from "@bb-studio/kit/code-handover";
 // code-server, one process per open workspace. The plugin downloads a pinned
 // code-server release into its data folder on first use (checked against its
 // SHA-256 before unpacking), and runs each workspace on its own loopback port
@@ -104,6 +105,7 @@ export class CodeServers {
   private readonly entries = new Map<string, Entry>();
   private readonly starting = new Map<string, Promise<ServerStatus>>();
   private installing: Promise<string> | null = null;
+  private readonly draining = new Map<string, Promise<void>>();
   /** Each Stop bumps a workspace's generation; a start of an older one gives up. */
   private readonly generations = new Map<string, number>();
   /** Leftovers from a BB that crashed, stopped before the first start. */
@@ -112,6 +114,9 @@ export class CodeServers {
   constructor(private readonly options: {
     /** The plugin's own data folder. */
     root: string;
+    beforeOpen?(): Promise<void>;
+    /** Tests can fence their simulated processes without inspecting the host. */
+    quiesce?(): Promise<void>;
     log: { info(message: string): void; warn(message: string): void };
     /** A workspace's status changed. */
     onChange(id: string): void;
@@ -123,7 +128,8 @@ export class CodeServers {
     install?(): Promise<string>;
     spawn?: Spawn;
   }) {
-    this.swept = this.sweep();
+    this.swept = this.options.quiesce?.() ?? quiesceCode(this.options.root);
+    void this.swept.catch((error) => this.options.log.warn(`VS Code startup is blocked: ${String(error)}`));
   }
 
   status(id: string): ServerStatus {
@@ -153,7 +159,7 @@ export class CodeServers {
     const entry = this.entries.get(id);
     if (entry?.child) {
       entry.stopping = true;
-      entry.child.kill("SIGTERM");
+      this.drain(id, entry.child);
     }
     this.set(id, { status: STOPPED, child: null, file: null, stopping: false });
     return STOPPED;
@@ -161,6 +167,20 @@ export class CodeServers {
 
   dispose(): void {
     for (const id of [...this.entries.keys()]) this.stop(id);
+  }
+
+  /** Stop is synchronous for callers, but its replacement waits for actual exit. */
+  private drain(id: string, child: ChildProcess): void {
+    if (this.draining.has(id)) return;
+    const done = new Promise<void>((resolve, reject) => {
+      if (child.exitCode !== null || child.signalCode !== null) { resolve(); return; }
+      const timer = setTimeout(() => reject(new Error("The previous code-server has not exited; restart is blocked.")), 15_000);
+      timer.unref();
+      child.once("exit", () => { clearTimeout(timer); resolve(); });
+      child.kill("SIGTERM");
+    });
+    this.draining.set(id, done);
+    void done.then(() => { if (this.draining.get(id) === done) this.draining.delete(id); }, () => {});
   }
 
   private set(id: string, entry: Entry): void {
@@ -176,7 +196,11 @@ export class CodeServers {
     const check = () => { if ((this.generations.get(id) ?? 0) !== generation) throw new Cancelled(); };
     let child: ChildProcess | null = null;
     try {
+      await this.draining.get(id);
+      check();
       await this.swept;
+      check();
+      await this.options.beforeOpen?.();
       check();
       const bin = await this.binary(id, check);
       check();
@@ -236,7 +260,7 @@ export class CodeServers {
       this.options.log.info(`workspace ${id}: code-server on port ${port}`);
       return status;
     } catch (cause) {
-      if (child) { child.removeAllListeners("exit"); child.kill("SIGTERM"); }
+      if (child) this.drain(id, child);
       // Stop already said "stopped"; a cancelled start leaves it that way.
       if (cause instanceof Cancelled) return this.status(id);
       // code-server's own exit message says more than "stopped while starting".
@@ -245,20 +269,6 @@ export class CodeServers {
       const status: ServerStatus = { state: "failed", url: null, password: null, error };
       this.set(id, { status, child: null, file: null, stopping: false });
       return status;
-    }
-  }
-
-  /** Stops code-servers a previous run left behind, found by their paths in this plugin's folder. */
-  private async sweep(): Promise<void> {
-    try {
-      const { stdout } = await promisify(execFile)("ps", ["-axo", "pid=,command="], { maxBuffer: 16 * 1024 * 1024 });
-      const pids = leftoverPids(stdout, this.options.root, process.pid);
-      for (const pid of pids) {
-        try { process.kill(pid, "SIGTERM"); } catch { /* Already gone. */ }
-      }
-      if (pids.length) this.options.log.info(`stopped ${pids.length} code-server process(es) left from an earlier run`);
-    } catch (error) {
-      this.options.log.warn(`couldn't look for leftover code-servers: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -16,7 +16,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, and Decisions for Jev, fallback models and Smart Queue.",
+    "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread\u2019s worktree, and Decisions for Jev, fallback models and Smart Queue.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {

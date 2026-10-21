@@ -12,16 +12,7 @@ import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 
-export const COMMENT_MIGRATIONS = [
-  `CREATE TABLE IF NOT EXISTS code_comments (
-  id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, path TEXT NOT NULL,
-  start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, line_text TEXT NOT NULL,
-  author TEXT NOT NULL, body TEXT NOT NULL, sent_to TEXT, sent_at INTEGER, resolved_at INTEGER,
-  created_at INTEGER NOT NULL
-); CREATE INDEX IF NOT EXISTS code_comments_workspace ON code_comments(workspace_id, created_at);`,
-  // The thread whose VS Code tab last showed the workspace: where its review goes.
-  `ALTER TABLE code_workspaces ADD COLUMN review_thread_id TEXT;`,
-];
+export { COMMENT_MIGRATIONS } from "@bb-studio/kit/code-migrations";
 
 /** The longest comment, and the most of its lines a comment keeps. */
 const MAX_BODY = 20_000;

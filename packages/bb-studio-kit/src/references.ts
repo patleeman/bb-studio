@@ -19,16 +19,18 @@ export interface ReferenceOptions {
 }
 
 const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
-  pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], design: ["design"], talk: ["recordings"],
+  "studio-code": ["workspace"], pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], design: ["design"], talk: ["recordings"],
 };
 /**
  * Kinds built into Studio: their mention provider id (registered by Studio)
  * and the item namespace they keep, their old add-on's plugin id.
  */
-const STUDIO_BUILTIN_MENTIONS: Record<string, string> = { page: "pages", artifact: "artifacts", drawing: "excalidraw", design: "design", recordings: "talk", dashboard: "dashboards" };
+const STUDIO_BUILTIN_MENTIONS: Record<string, string> = { workspace: "studio-code", page: "pages", artifact: "artifacts", drawing: "excalidraw", design: "design", recordings: "talk", dashboard: "dashboards" };
 /** Studio's panel, where built-in kinds' items live at <segment>/<id>. */
 const STUDIO_PANEL = "/plugins/studio/studio/";
 const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
+  { pluginId: "studio-code", path: `${STUDIO_PANEL}workspaces/` },
+  { pluginId: "studio-code", path: "/plugins/studio-code/workspaces/" },
   { pluginId: "pages", path: `${STUDIO_PANEL}pages/`, subpaths: ["chat/:id"] },
   // The address pages had before they were built into Studio.
   { pluginId: "pages", path: "/plugins/pages/pages/", subpaths: ["chat/:id"] },

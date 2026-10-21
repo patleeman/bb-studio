@@ -15,7 +15,7 @@ export const emptyPane = (): Pane => ({ kind: "pane", id: id(), tabs: [], active
  */
 export const BROWSE: Tab = { href: "/plugins/studio/studio/browse", title: "New tab", kindIcon: "studio/studio" };
 /** Tools with their own page, never Studio tabs: tabs saved for them are dropped. */
-const OWN_PAGE_PREFIXES = ["/plugins/studio-code/"];
+const OWN_PAGE_PREFIXES: string[] = [];
 export function isOwnPageTool(href: string): boolean { return OWN_PAGE_PREFIXES.some(prefix => href.startsWith(prefix)); }
 export function emptyWorkspace(): Workspace { const layout = emptyPane(); return { layout, focused: layout.id }; }
 export function panes(layout: Layout): Pane[] { return layout.kind === "pane" ? [layout] : [...panes(layout.first), ...panes(layout.second)]; }

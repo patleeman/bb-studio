@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio-kit/src/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). Separate plugins with items, such as Studio Code, publish `studio_describe` and Studio discovers them. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in. Dashboards (`packages/bb-studio/src/dashboards`) were built in from the start: items are `dashboards:<id>` at `/plugins/studio/studio/dashboards/<id>`, with no older address.
+BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio-kit/src/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). VS Code also runs inside Studio, with the `studio-code` item namespace and `/plugins/studio/studio/workspaces/<id>` addresses. Its old URLs still resolve. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in. Dashboards (`packages/bb-studio/src/dashboards`) were built in from the start: items are `dashboards:<id>` at `/plugins/studio/studio/dashboards/<id>`, with no older address.
 
 ## Provider contract
 
@@ -83,7 +83,7 @@ Templates and bulk export are described in the [Studio README](../packages/bb-st
 
 ## Collection and installation
 
-`CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. A separate plugin with items (Code) hands its collection path to Studio's collection; its item views stay with it.
+`CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. VS Code workspace links now open Studio tabs; thread editors are available through the + tab menu. [Code upgrade details](upgrade-studio-code.md) include the process handover and recovery state.
 
 `packages/bb-studio-kit` (`@bb-studio/kit`) is a source package. Each add-on depends on its packed copy, `file:../bb-studio-kit.tgz` (rebuilt by `scripts/refresh-locks.sh`), and `bb plugin build` bundles it. The kit exports `CollectionPage`, item headers and menus, directive cards, format helpers and shared UI primitives. Plugins use the kit's `bb.pluginTailwindContent` so its classes are included in their builds.
 

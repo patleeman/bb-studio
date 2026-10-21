@@ -355,3 +355,16 @@ keeps a list of known add-ons, since every kind that had one is built in.
 ## Decisions merge (21 October 2026)
 
 Decisions is a service, with no item routes or database tables. Its server and settings sections now live in `src/decisions`, with `decisions.*` RPCs and `bb studio decisions`. The 0.5.0 `smart-decisions` bridge forwards all former RPCs and CLI commands. Ordinary settings use `getSettings`; five secrets travel only from the verified bridge server into Studio’s secret settings. Import acknowledgment gates Smart Queue and Setup removal. Existing destination settings and KV values win. The bridge has no hook; Studio cleans classifier threads belonging to either ID and still pauses for standalone `smart-queue`. Staged upgrade verification needs the lead’s pushed merge commit.
+
+## Code merge (21 October 2026)
+
+VS Code now lives in `src/code`, with `code.*` RPCs and unchanged agent tool and
+skill names. The 0.2.0 `studio-code` bridge quiesces the old process tree, then
+copies editor files before rows and final acknowledgment. Studio gates starts
+until completion. Both sides enforce the process fence. Recovery paths, SQLite
+state and derived workspace-storage/backup IDs follow the new root. The bridge
+retains a small legacy thread-tab renderer because SDK 0.6.37 cannot alias the
+plugin-scoped `studio-code/code` identity; new tabs and file opens belong to
+Studio. Old workspace URLs and item IDs resolve after bridge removal. See
+[the upgrade guide](upgrade-studio-code.md) for removal limits and the staged
+checks the lead must run; no staged BB was run during implementation.

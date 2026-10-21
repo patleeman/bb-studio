@@ -100,6 +100,18 @@ export const bridgeBlocker = (noun: string, version: string): RetiredPlugin["blo
 
 export const RETIRED: readonly RetiredPlugin[] = [
   {
+    id: "studio-code", name: "Studio Code upgrade bridge",
+    why: "VS Code, its tools and the studio-code skill are built into Studio.",
+    kept: "Workspaces, review comments, theme, extensions and editor recovery files copied into Studio with their ids; existing Studio files and rows are kept.",
+    deleted: "Its installed bridge files and the compatibility renderer for old saved thread tabs. Studio keeps its own editor data copy.",
+    before: [
+      { text: "Update Code first; its bridge stops all old code-servers before copying.", command: "bb plugin update studio-code" },
+      { text: "Update Studio and finish the copy.", command: "bb plugin update studio && bb studio-code migrate" },
+      { text: "If Studio updated first, reload it after updating the bridge to register the six code tools.", command: "bb plugin reload studio" },
+    ],
+    blocker: bridgeBlocker("Studio Code", "0.2.0"),
+  },
+  {
     id: "smart-decisions", name: "Studio Decisions upgrade bridge",
     why: "Decisions and Smart Queue are built into Studio now.",
     kept: "The fallback model, recent decisions, ordinary settings and five secret API keys copied into Studio; existing Studio choices are kept.",

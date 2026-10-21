@@ -1,10 +1,11 @@
+import type { CodeContract } from "./contract";
 // Sends BB's palette to the server whenever BB's theme or mode changes, so
 // open and future workspaces match it. Colors are read from the page, so
 // custom and plugin themes work too; a canvas turns oklch() and
 // color-mix() into the hex VS Code needs.
 import { useEffect } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import type { CodeContract } from "./shared";
+
 import { BB_THEME_VARIABLES, type BbTheme, type BbThemeVariable } from "./theme";
 
 /** For a theme that leaves a variable out. */
@@ -79,7 +80,7 @@ export function useThemeSync(enabled: boolean): void {
         // A change this page saw, or one the server hadn't heard of yet.
         const seen = lastSent !== "";
         lastSent = key;
-        rpc.call("syncTheme", theme).then(
+        rpc.call("code.syncTheme", theme).then(
           ({ changed }) => { if (seen || changed) themeChanges.dispatchEvent(new Event("change")); },
           () => { lastSent = ""; },
         );

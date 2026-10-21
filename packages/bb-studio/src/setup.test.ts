@@ -65,15 +65,15 @@ describe("buildSetup", () => {
     const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("other")]);
     const summary = await buildSetup(sdk, health({
-      problems: [problem("studio-code", "degraded", "Editor needs setup"), problem("other", "broken", "Stopped")],
-      healthy: [{ pluginId: "studio-code", pluginName: "Studio Code", titles: ["code-server found"] }],
+      problems: [problem("studio", "degraded", "Editor needs setup"), problem("other", "broken", "Stopped")],
+      healthy: [{ pluginId: "studio", pluginName: "Studio", titles: ["code-server found"] }],
     }));
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
     expect(byId.studio).toMatchObject({ status: "disabled", command: "bb plugin enable studio" });
     expect(byId["smart-decisions"]).toBeUndefined();
-    expect(byId["studio-code"]!.problems.map((each) => each.title)).toEqual(["Editor needs setup"]);
-    expect(byId["studio-code"]).toMatchObject({ status: "needs-setup", passed: [] });
+    expect(byId["studio"]!.problems).toEqual([]);
+    expect(byId["studio"]).toMatchObject({ status: "disabled", passed: [] });
     expect(summary.commands).toEqual(["bb plugin enable studio"]);
     expect(summary.installAll).toBeNull();
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
@@ -81,11 +81,11 @@ describe("buildSetup", () => {
   });
 
   it("asks to add the marketplace before installing from it", async () => {
-    const { sdk } = fakeSdk([plugin("studio")], { marketplaces: ["bb-community"] });
+    const { sdk } = fakeSdk([], { marketplaces: ["bb-community"] });
     const summary = await buildSetup(sdk, health());
     expect(summary.marketplaceAdded).toBe(false);
     expect(summary.commands[0]).toBe("bb marketplace add git:github.com/patleeman/bb-studio@main");
-    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 2);
+    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 1);
   });
 });
 
@@ -102,10 +102,10 @@ describe("SetupService", () => {
   const service = (fake: ReturnType<typeof fakeSdk>) => new SetupService({ sdk: fake.sdk, health: async () => health() });
 
   it("installs from the bb-studio marketplace with the source BB resolved, and reports failures", async () => {
-    const fake = fakeSdk([plugin("studio")], { installFails: ["studio-code"] });
-    const result = await service(fake).install(["mobile", "studio-code"]);
-    expect(fake.calls).toEqual(["install mobile@bb-studio confirmed"]);
-    expect(result.failures).toEqual([{ id: "studio-code", error: "permission denied" }]);
+    const fake = fakeSdk([], { installFails: ["mobile"] });
+    const result = await service(fake).install(["studio", "mobile"]);
+    expect(fake.calls).toEqual(["install studio@bb-studio confirmed"]);
+    expect(result.failures).toEqual([{ id: "mobile", error: "permission denied" }]);
     await expect(service(fake).install(["not-ours"])).resolves.toMatchObject({ failures: [{ id: "not-ours", error: expect.stringContaining("isn't a BB Studio add-on") }] });
   });
 
@@ -118,12 +118,12 @@ describe("SetupService", () => {
   });
 
   it("enables only add-ons and removes only retired plugins that nothing blocks", async () => {
-    const fake = fakeSdk([plugin("studio-code", { enabled: false }), plugin("studio-tables")]);
-    await service(fake).enable("studio-code");
+    const fake = fakeSdk([plugin("mobile", { enabled: false }), plugin("studio-tables")]);
+    await service(fake).enable("mobile");
     await expect(service(fake).enable("studio-tables")).rejects.toThrow("isn't a BB Studio add-on");
-    await expect(service(fake).remove("studio-code")).rejects.toThrow("isn't a retired");
+    await expect(service(fake).remove("mobile")).rejects.toThrow("isn't a retired");
     await service(fake).remove("studio-tables");
-    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable studio-code", "remove studio-tables"]);
+    expect(fake.calls.filter((call) => !call.startsWith("rpc"))).toEqual(["enable mobile", "remove studio-tables"]);
   });
 });
 
@@ -145,17 +145,16 @@ describe("retired Studio Reactions", () => {
 
 describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
-    const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio-code" ? { ...each, enabled: false } : each));
+    const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("studio-tables")]);
-    const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("studio-code", "degraded", "Editor needs setup"), detail: "Add a key" }] })));
+    const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("studio", "degraded", "Editor needs setup"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
     expect(text).toMatch(/ {2}not installed +mobile +Studio Mobile:/);
-    expect(text).toMatch(/ {2}disabled +studio-code +Studio Code:/);
+    expect(text).toMatch(/ {2}disabled +studio +Studio:/);
     expect(text).not.toContain("smart-decisions");
-    expect(text).toMatch(/ {2}ok +studio +Studio:/);
     expect(text).toContain("Retired plugins still installed\n  studio-tables");
     expect(text).toContain("Then remove it: bb plugin remove studio-tables");
-    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin enable studio-code")).toBe(true);
+    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin enable studio")).toBe(true);
   });
 
   it("says when there's nothing left to run", async () => {
@@ -167,7 +166,7 @@ describe("formatSetup", () => {
 
 describe("SetupService install", () => {
   it("skips an add-on that is already installed and installs one at a time", async () => {
-    const plugins = [plugin("studio")];
+    const plugins: SetupPluginEntry[] = [];
     const { sdk, raw, calls } = fakeSdk(plugins);
     let active = 0;
     let overlapped = false;
@@ -180,10 +179,10 @@ describe("SetupService install", () => {
       active--;
     });
     const service = new SetupService({ sdk, health: async () => health() });
-    const [first, second] = await Promise.all([service.install(["studio", "mobile"]), service.install(["mobile", "studio-code"])]);
+    const [first, second] = await Promise.all([service.install(["studio", "mobile"]), service.install(["mobile", "studio"])]);
     expect(first.failures).toEqual([]);
     expect(second.failures).toEqual([]);
-    expect(calls).toEqual(["install mobile", "install studio-code"]);
+    expect(calls).toEqual(["install studio", "install mobile"]);
     expect(overlapped).toBe(false);
   });
 });
@@ -202,6 +201,24 @@ describe("Decisions bridge retirement", () => {
       const retired = summary.retired.find((entry) => entry.id === "smart-decisions")!;
       if (expected === null) expect(retired.blocker).toBeNull();
       else expect(retired.blocker).toContain(expected);
+    }
+  });
+});
+
+
+describe("Code bridge retirement", () => {
+  it("requires a current, enabled bridge and acknowledged file and row copy", async () => {
+    for (const [extra, complete, expected] of [
+      [{ version: "0.1.0" }, true, "Update Studio Code first"],
+      [{ version: "0.2.0", enabled: false }, true, "Enable Studio Code"],
+      [{ version: "0.2.0" }, false, "bb studio-code migrate"],
+      [{ version: "0.2.0" }, true, null],
+    ] as const) {
+      const fake = fakeSdk([plugin("studio-code", extra)]);
+      fake.raw.plugins.callRpc.mockResolvedValue({ complete } as never);
+      const entry = (await buildSetup(fake.sdk, health())).retired.find((entry) => entry.id === "studio-code")!;
+      if (expected === null) expect(entry.blocker).toBeNull();
+      else expect(entry.blocker).toContain(expected);
     }
   });
 });

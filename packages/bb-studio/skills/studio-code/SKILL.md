@@ -5,6 +5,8 @@ description: Use whenever code is better shown than pasted. That covers walking 
 
 # Studio Code: the workbench beside the chat
 
+Studio now includes Studio Code and its six unchanged `code_*` tools. RPC callers use Studio’s `code.*` methods.
+
 Studio Code puts a real VS Code next to the conversation: one per thread, open to the thread's own worktree. It's the user's editor in BB; code files they click open there. You and the user can look at the same code. You can move their editor to the lines you mean, and type into their files while they watch. Reach for it whenever you want to show code instead of pasting it into the chat: walkthroughs, explanations, reviews, bug hunts, and editing a file together.
 
 Don't open it for work the user won't look at. You can read and change files with your own tools without it.

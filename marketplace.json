@@ -8,7 +8,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, and Decisions for Jev, fallback models and Smart Queue.",
+      "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread\u2019s worktree, and Decisions for Jev, fallback models and Smart Queue.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -61,8 +61,8 @@
     },
     {
       "id": "studio-code",
-      "displayName": "Studio Code",
-      "description": "Part of BB Studio. VS Code as BB's editor: each thread gets its own VS Code on its worktree, and code files open there. Run by a local code-server.",
+      "displayName": "Studio Code upgrade bridge",
+      "description": "Upgrade bridge: copies Studio Code workspaces, reviews and editor recovery files into Studio, then forwards old RPCs. Remove after Setup confirms the copy.",
       "icon": {
         "url": "./packages/bb-studio-code/assets/icon.svg"
       },

@@ -1,10 +1,11 @@
+import type { CodeContract } from "./contract";
 // A small VS Code button (the code icon) in a thread's header, shown once the
 // thread has a workspace or has edited files: one click opens the thread's
 // VS Code tab. A dot pulses while the agent is editing.
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
-import { CHANNEL, CODE_TAB, type CodeContract } from "./shared";
+import { CHANNEL, CODE_TAB } from "./shared";
 
 type Chip = { workspaceId: string | null; title: string; working: boolean };
 
@@ -13,7 +14,7 @@ export function ThreadCodeChip({ threadId }: PluginThreadHeaderActionProps) {
   const navigate = useBbNavigate();
   const [chip, setChip] = useState<Chip | null>(null);
   const load = useCallback(() => {
-    rpc.call("threadChip", { threadId }).then(({ chip }) => setChip(chip), () => undefined);
+    rpc.call("code.threadChip", { threadId }).then(({ chip }) => setChip(chip), () => undefined);
   }, [rpc, threadId]);
   useEffect(load, [load]);
   // This thread's editing started or stopped, or a workspace came or went.

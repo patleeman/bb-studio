@@ -1,3 +1,4 @@
+import type { CodeContract } from "./contract";
 // VS Code beside a conversation: the thread's own worktree, so the user sees
 // the agent's changes. Each thread has one; the tab is VS Code alone, with no bar.
 import { useEffect, useState } from "react";
@@ -5,7 +6,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { WorkspaceView } from "./panel";
-import type { CodeContract } from "./shared";
+
 
 export function ThreadCodePanel({ threadId }: { threadId: string }) {
   const rpc = useRpc<CodeContract>();
@@ -15,7 +16,7 @@ export function ThreadCodePanel({ threadId }: { threadId: string }) {
   useEffect(() => {
     let live = true;
     setError("");
-    rpc.call("forThread", { threadId }).then(
+    rpc.call("code.forThread", { threadId }).then(
       ({ workspace }) => { if (live) setWorkspaceId(workspace.id); },
       (cause) => { if (live) setError(errorMessage(cause)); },
     );
@@ -23,7 +24,7 @@ export function ThreadCodePanel({ threadId }: { threadId: string }) {
   }, [rpc, threadId, attempt]);
   // Review comments submitted from this editor go to this thread.
   useEffect(() => {
-    if (workspaceId) rpc.call("viewedFrom", { id: workspaceId, threadId }).catch(() => undefined);
+    if (workspaceId) rpc.call("code.viewedFrom", { id: workspaceId, threadId }).catch(() => undefined);
   }, [rpc, workspaceId, threadId]);
 
   if (workspaceId) return <WorkspaceView key={workspaceId} id={workspaceId} />;

@@ -1,3 +1,4 @@
+import type { CodeContract } from "./contract";
 // "VS Code" in a file tab's "Open with" menu, and the default for these
 // extensions (BB renders the first opener). VS Code is the editor: opening a
 // code file sends it, at its lines, to the thread's VS Code tab, and this tab
@@ -8,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRpc, type PluginFileOpenerProps, type PluginFileOpenerSource } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { CODE_TAB, type CodeContract } from "./shared";
+import { CODE_TAB } from "./shared";
 
 /** Text and code files worth editing in VS Code. Markdown stays in BB's preview, which renders it. */
 export const CODE_EXTENSIONS = [
@@ -52,10 +53,10 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
     if (!threadId) return;
     setState({ kind: "opening" });
     try {
-      const { workspace } = await rpc.call("forThread", { threadId });
+      const { workspace } = await rpc.call("code.forThread", { threadId });
       const startLine = experimental_lineRange?.startLineNumber ?? 1;
       // Held until the editor connects, so it lands once the tab loads.
-      await rpc.call("reveal", { id: workspace.id, path, startLine, endLine: experimental_lineRange?.endLineNumber ?? startLine });
+      await rpc.call("code.reveal", { id: workspace.id, path, startLine, endLine: experimental_lineRange?.endLineNumber ?? startLine });
       if (!navigate.openThreadPanel({ actionId: CODE_TAB, title: "VS Code" })) throw new Error("There's no side panel here for VS Code.");
       setState({ kind: "opened" });
     } catch (cause) {

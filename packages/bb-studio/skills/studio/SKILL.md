@@ -10,6 +10,7 @@ the core: one collection that lists every item from every installed add-on.
 
 | Add-on | Plugin id | Items | Open with |
 | --- | --- | --- | --- |
+| VS Code (built into Studio) | `studio-code` | Thread workspaces | the `studio-code` skill and six `code_*` tools |
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Drawings (built into Studio) | `excalidraw` | Drawings | the `draw` skill, `excalidraw_*` tools and `bb studio drawings` |

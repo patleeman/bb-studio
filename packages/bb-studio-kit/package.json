@@ -27,7 +27,12 @@
     "./talk-contract": "./src/talk-contract.ts",
     "./pages-contract": "./src/pages-contract.ts",
     "./silent": "./src/silent.ts",
-    "./decisions-legacy-contract": "./src/decisions-legacy-contract.ts"
+    "./decisions-legacy-contract": "./src/decisions-legacy-contract.ts",
+    "./code-contract": "./src/code-contract.ts",
+    "./code-theme": "./src/code-theme.ts",
+    "./code-migrations": "./src/code-migrations.ts",
+    "./code-handover": "./src/code-handover.ts",
+    "./code-import-contract": "./src/code-import-contract.ts"
   },
   "files": [
     "src",

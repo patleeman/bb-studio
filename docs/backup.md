@@ -36,7 +36,7 @@ use the CLI.
 
 Every manifest lists these under `excluded`:
 
-- **Studio Code workspaces.** A workspace is a folder on disk. Back up the folder with your other files.
+- **Studio Code workspaces.** Project files are folders on disk; back them up with your other files. Editor metadata and recovery state live under Studio’s `code/` data directory after migration. The ordinary Studio item backup still excludes Code editor state; back up that directory separately while servers are stopped.
 - **Settings: Studio's (with its reactions), Studio Mobile's and Decisions'.** These hold settings for one BB, not items. Set them up again on the new BB.
 - **BB threads, projects and their files.** These belong to BB itself. Restore matches items to projects that already exist on the new BB.
 - **Secrets and provider credentials.** They never leave the BB they were entered on.

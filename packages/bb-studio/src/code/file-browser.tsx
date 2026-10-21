@@ -1,10 +1,11 @@
+import type { CodeContract } from "./contract";
 // Where VS Code can't run (a phone, or another computer), the workspace's
 // files read-only: folders to walk, and a file's text.
 import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import type { CodeContract, Workspace } from "./shared";
+import type { Workspace } from "./shared";
 
 type Entry = { name: string; path: string; dir: boolean };
 
@@ -22,7 +23,7 @@ export function FileBrowser({ workspace }: { workspace: Workspace }) {
     let live = true;
     setEntries(null);
     setError("");
-    rpc.call("listDir", { id: workspace.id, path: folder }).then(
+    rpc.call("code.listDir", { id: workspace.id, path: folder }).then(
       (result) => { if (live) setEntries(result.entries); },
       (cause) => { if (live) setError(errorMessage(cause)); },
     );
@@ -32,7 +33,7 @@ export function FileBrowser({ workspace }: { workspace: Workspace }) {
     if (!file) return;
     let live = true;
     setText(null);
-    rpc.call("readFile", { id: workspace.id, path: file.path }).then(
+    rpc.call("code.readFile", { id: workspace.id, path: file.path }).then(
       (result) => { if (live) setText(result); },
       (cause) => { if (live) setText({ text: null, reason: errorMessage(cause) }); },
     );

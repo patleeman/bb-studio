@@ -7,6 +7,18 @@ recordings and dictations, drawings, designs and saved artifacts, and other plug
 kind, project and tag, and hand any of them to an agent. Each BB project can have a lead thread
 woken by a Heartbeat.
 
+## VS Code
+
+VS Code is built into Studio. Choose **VS Code** from a thread's right-panel
+**+** menu, or open a code file to jump to its lines in that editor. The six
+`code_*` tools and `studio-code` skill keep their names. Each workspace uses
+Studio's own code-server runtime and `code.*` RPCs. The removed thread-header
+VS Code button stays absent.
+
+[Editor usage](src/code/README.md) covers sharing, live edits and reviews.
+[Upgrade instructions](../../docs/upgrade-studio-code.md) cover existing data,
+unsaved recovery state and the temporary `studio-code` bridge.
+
 ## Workspace
 
 Studio opens on its workspace: items in tabs, without a conversation. The
@@ -1184,9 +1196,8 @@ open in the background, so it's as you left it when you come back.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project. It always opens the full menu, even with a kind filter active.
 - **One entry.** Studio's ⋯ menu can hide other plugins' sidebar rows, so
-  Studio is the only entry for content. Studio Code is a tool, not content:
-  its workspaces aren't a Studio kind, its links open Code's own page, and
-  Studio drops saved tabs that point at them.
+  Studio is the entry for content and VS Code. Existing workspace links and
+  saved Studio tabs resolve inside Studio, keeping their workspace IDs.
 - **The BB Studio theme**: the app icon's colors for all of BB, light and
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set

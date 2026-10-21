@@ -1,3 +1,4 @@
+import { registerCodeApp } from "./src/code/register";
 import { registerDecisionsApp } from "./src/decisions/ui/register";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
@@ -83,6 +84,7 @@ function decodeSegment(segment: string): string {
 /** Built-in kinds' item pages, each loaded the first time one opens. */
 const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: ComponentType<{ id: string; rest?: string }> }> = {
   // The editor (BlockNote, Yjs, Mermaid, Shiki, Recharts) loads when a page first opens.
+  workspaces: { isId: (id) => /^cws_[a-zA-Z0-9]+$/.test(id), View: lazy(() => import("./src/code/route")) },
   pages: { isId: isPageId, View: lazy(() => import("./src/pages/ui/route")) },
   artifacts: { isId: isArtifactId, View: lazy(() => import("./src/artifacts/ui/route")) },
   // Excalidraw is big: it loads when a drawing first opens, not with Studio.
@@ -143,6 +145,7 @@ function BuiltinRoutes() {
 }
 
 export default definePluginApp((app) => {
+  registerCodeApp(app);
   app.slots.experimental_appOverlay({ id: "workspace-bridge", component: WorkspaceBridge });
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   // Right-click and Mod-click on Studio items and threads anywhere on screen.

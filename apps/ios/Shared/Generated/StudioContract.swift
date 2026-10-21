@@ -3,6 +3,19 @@ import Foundation
 
 public enum Studio {
   public enum Method {
+    public static let code_get = "code.get"
+    public static let code_update = "code.update"
+    public static let code_open = "code.open"
+    public static let code_stop = "code.stop"
+    public static let code_threadWorkspace = "code.threadWorkspace"
+    public static let code_forThread = "code.forThread"
+    public static let code_listDir = "code.listDir"
+    public static let code_readFile = "code.readFile"
+    public static let code_reveal = "code.reveal"
+    public static let code_threadChip = "code.threadChip"
+    public static let code_viewedFrom = "code.viewedFrom"
+    public static let code_editorState = "code.editorState"
+    public static let code_syncTheme = "code.syncTheme"
     public static let decisions_systemOne_ask = "decisions.systemOne.ask"
     public static let decisions_model_ask = "decisions.model.ask"
     public static let decisions_fallback_get = "decisions.fallback.get"
@@ -256,6 +269,32 @@ public enum Studio {
     public static let voice_turnNote = "voice.turnNote"
     public static let voice_new = "voice.new"
   }
+
+  public typealias CodeGet = CodeGetOutput
+
+  public typealias CodeUpdate = CodeUpdateOutput
+
+  public typealias CodeOpen = CodeOpenOutput
+
+  public typealias CodeStop = CodeStopOutput
+
+  public typealias CodeThreadWorkspace = CodeThreadWorkspaceOutput
+
+  public typealias CodeForThread = CodeForThreadOutput
+
+  public typealias CodeListDir = CodeListDirOutput
+
+  public typealias CodeReadFile = CodeReadFileOutput
+
+  public typealias CodeReveal = CodeRevealOutput
+
+  public typealias CodeThreadChip = CodeThreadChipOutput
+
+  public typealias CodeViewedFrom = CodeViewedFromOutput
+
+  public typealias CodeEditorState = CodeEditorStateOutput
+
+  public typealias CodeSyncTheme = CodeSyncThemeOutput
 
   public typealias DecisionsSystemOneAskOutput = StudioJSONValue
 
@@ -816,6 +855,664 @@ public enum Studio {
   public typealias VoiceTurnNote = VoiceTurnNoteOutput
 
   public typealias VoiceNew = VoiceNewOutput
+
+  public struct CodeGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct CodeGetOutputWorkspace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var threadId: String?
+    public var trusted: Bool?
+    public var share: Bool?
+    public var folders: [String]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, threadId: String? = nil, trusted: Bool? = nil, share: Bool? = nil, folders: [String]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.threadId = threadId
+      self.trusted = trusted
+      self.share = share
+      self.folders = folders
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum CodeGetOutputStatusState: Sendable, Hashable, Codable {
+    case stopped
+    case installing
+    case starting
+    case running
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stopped": self = .stopped
+      case "installing": self = .installing
+      case "starting": self = .starting
+      case "running": self = .running
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stopped: try container.encode("stopped")
+      case .installing: try container.encode("installing")
+      case .starting: try container.encode("starting")
+      case .running: try container.encode("running")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CodeGetOutputStatus: Sendable, Hashable, Codable {
+    public var state: CodeGetOutputStatusState?
+    public var url: String?
+    public var password: String?
+    public var error: String?
+
+    public init(state: CodeGetOutputStatusState? = nil, url: String? = nil, password: String? = nil, error: String? = nil) {
+      self.state = state
+      self.url = url
+      self.password = password
+      self.error = error
+    }
+  }
+
+  public struct CodeGetOutput: Sendable, Hashable, Codable {
+    public var workspace: CodeGetOutputWorkspace?
+    public var status: CodeGetOutputStatus?
+
+    public init(workspace: CodeGetOutputWorkspace? = nil, status: CodeGetOutputStatus? = nil) {
+      self.workspace = workspace
+      self.status = status
+    }
+  }
+
+  public struct CodeUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var share: Bool?
+
+    public init(id: String? = nil, share: Bool? = nil) {
+      self.id = id
+      self.share = share
+    }
+  }
+
+  public struct CodeUpdateOutputWorkspace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var threadId: String?
+    public var trusted: Bool?
+    public var share: Bool?
+    public var folders: [String]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, threadId: String? = nil, trusted: Bool? = nil, share: Bool? = nil, folders: [String]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.threadId = threadId
+      self.trusted = trusted
+      self.share = share
+      self.folders = folders
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct CodeUpdateOutput: Sendable, Hashable, Codable {
+    public var workspace: CodeUpdateOutputWorkspace?
+
+    public init(workspace: CodeUpdateOutputWorkspace? = nil) {
+      self.workspace = workspace
+    }
+  }
+
+  public struct CodeOpenInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum CodeOpenOutputStatusState: Sendable, Hashable, Codable {
+    case stopped
+    case installing
+    case starting
+    case running
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stopped": self = .stopped
+      case "installing": self = .installing
+      case "starting": self = .starting
+      case "running": self = .running
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stopped: try container.encode("stopped")
+      case .installing: try container.encode("installing")
+      case .starting: try container.encode("starting")
+      case .running: try container.encode("running")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CodeOpenOutputStatus: Sendable, Hashable, Codable {
+    public var state: CodeOpenOutputStatusState?
+    public var url: String?
+    public var password: String?
+    public var error: String?
+
+    public init(state: CodeOpenOutputStatusState? = nil, url: String? = nil, password: String? = nil, error: String? = nil) {
+      self.state = state
+      self.url = url
+      self.password = password
+      self.error = error
+    }
+  }
+
+  public struct CodeOpenOutput: Sendable, Hashable, Codable {
+    public var status: CodeOpenOutputStatus?
+
+    public init(status: CodeOpenOutputStatus? = nil) {
+      self.status = status
+    }
+  }
+
+  public struct CodeStopInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum CodeStopOutputStatusState: Sendable, Hashable, Codable {
+    case stopped
+    case installing
+    case starting
+    case running
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stopped": self = .stopped
+      case "installing": self = .installing
+      case "starting": self = .starting
+      case "running": self = .running
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stopped: try container.encode("stopped")
+      case .installing: try container.encode("installing")
+      case .starting: try container.encode("starting")
+      case .running: try container.encode("running")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CodeStopOutputStatus: Sendable, Hashable, Codable {
+    public var state: CodeStopOutputStatusState?
+    public var url: String?
+    public var password: String?
+    public var error: String?
+
+    public init(state: CodeStopOutputStatusState? = nil, url: String? = nil, password: String? = nil, error: String? = nil) {
+      self.state = state
+      self.url = url
+      self.password = password
+      self.error = error
+    }
+  }
+
+  public struct CodeStopOutput: Sendable, Hashable, Codable {
+    public var status: CodeStopOutputStatus?
+
+    public init(status: CodeStopOutputStatus? = nil) {
+      self.status = status
+    }
+  }
+
+  public struct CodeThreadWorkspaceInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct CodeThreadWorkspaceOutputWorkspace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var threadId: String?
+    public var trusted: Bool?
+    public var share: Bool?
+    public var folders: [String]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, threadId: String? = nil, trusted: Bool? = nil, share: Bool? = nil, folders: [String]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.threadId = threadId
+      self.trusted = trusted
+      self.share = share
+      self.folders = folders
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct CodeThreadWorkspaceOutput: Sendable, Hashable, Codable {
+    public var workspace: CodeThreadWorkspaceOutputWorkspace?
+
+    public init(workspace: CodeThreadWorkspaceOutputWorkspace? = nil) {
+      self.workspace = workspace
+    }
+  }
+
+  public struct CodeForThreadInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct CodeForThreadOutputWorkspace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var threadId: String?
+    public var trusted: Bool?
+    public var share: Bool?
+    public var folders: [String]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, threadId: String? = nil, trusted: Bool? = nil, share: Bool? = nil, folders: [String]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.threadId = threadId
+      self.trusted = trusted
+      self.share = share
+      self.folders = folders
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct CodeForThreadOutput: Sendable, Hashable, Codable {
+    public var workspace: CodeForThreadOutputWorkspace?
+
+    public init(workspace: CodeForThreadOutputWorkspace? = nil) {
+      self.workspace = workspace
+    }
+  }
+
+  public struct CodeListDirInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var path: String?
+
+    public init(id: String? = nil, path: String? = nil) {
+      self.id = id
+      self.path = path
+    }
+  }
+
+  public struct CodeListDirOutputEntriesItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var path: String?
+    public var dir: Bool?
+
+    public init(name: String? = nil, path: String? = nil, dir: Bool? = nil) {
+      self.name = name
+      self.path = path
+      self.dir = dir
+    }
+  }
+
+  public struct CodeListDirOutput: Sendable, Hashable, Codable {
+    public var entries: [CodeListDirOutputEntriesItem]?
+
+    public init(entries: [CodeListDirOutputEntriesItem]? = nil) {
+      self.entries = entries
+    }
+  }
+
+  public struct CodeReadFileInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var path: String?
+
+    public init(id: String? = nil, path: String? = nil) {
+      self.id = id
+      self.path = path
+    }
+  }
+
+  public struct CodeReadFileOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var reason: String?
+
+    public init(text: String? = nil, reason: String? = nil) {
+      self.text = text
+      self.reason = reason
+    }
+  }
+
+  public struct CodeRevealInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var path: String?
+    public var startLine: Int?
+    public var endLine: Int?
+
+    public init(id: String? = nil, path: String? = nil, startLine: Int? = nil, endLine: Int? = nil) {
+      self.id = id
+      self.path = path
+      self.startLine = startLine
+      self.endLine = endLine
+    }
+  }
+
+  public struct CodeRevealOutput: Sendable, Hashable, Codable {
+    public var shown: Bool?
+
+    public init(shown: Bool? = nil) {
+      self.shown = shown
+    }
+  }
+
+  public struct CodeThreadChipInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct CodeThreadChipOutputChip: Sendable, Hashable, Codable {
+    public var workspaceId: String?
+    public var title: String?
+    public var working: Bool?
+
+    public init(workspaceId: String? = nil, title: String? = nil, working: Bool? = nil) {
+      self.workspaceId = workspaceId
+      self.title = title
+      self.working = working
+    }
+  }
+
+  public struct CodeThreadChipOutput: Sendable, Hashable, Codable {
+    public var chip: CodeThreadChipOutputChip?
+
+    public init(chip: CodeThreadChipOutputChip? = nil) {
+      self.chip = chip
+    }
+  }
+
+  public struct CodeViewedFromInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var threadId: String?
+
+    public init(id: String? = nil, threadId: String? = nil) {
+      self.id = id
+      self.threadId = threadId
+    }
+  }
+
+  public struct CodeViewedFromOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct CodeEditorStateInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct CodeEditorStateOutputStateActiveFileSelection: Sendable, Hashable, Codable {
+    public var startLine: Int?
+    public var startColumn: Int?
+    public var endLine: Int?
+    public var endColumn: Int?
+
+    public init(startLine: Int? = nil, startColumn: Int? = nil, endLine: Int? = nil, endColumn: Int? = nil) {
+      self.startLine = startLine
+      self.startColumn = startColumn
+      self.endLine = endLine
+      self.endColumn = endColumn
+    }
+  }
+
+  public struct CodeEditorStateOutputStateActiveFileVisible: Sendable, Hashable, Codable {
+    public var startLine: Int?
+    public var endLine: Int?
+
+    public init(startLine: Int? = nil, endLine: Int? = nil) {
+      self.startLine = startLine
+      self.endLine = endLine
+    }
+  }
+
+  public enum CodeEditorStateOutputStateActiveFileProblemsItemSeverity: Sendable, Hashable, Codable {
+    case error
+    case warning
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "error": self = .error
+      case "warning": self = .warning
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .error: try container.encode("error")
+      case .warning: try container.encode("warning")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CodeEditorStateOutputStateActiveFileProblemsItem: Sendable, Hashable, Codable {
+    public var line: Int?
+    public var severity: CodeEditorStateOutputStateActiveFileProblemsItemSeverity?
+    public var message: String?
+
+    public init(line: Int? = nil, severity: CodeEditorStateOutputStateActiveFileProblemsItemSeverity? = nil, message: String? = nil) {
+      self.line = line
+      self.severity = severity
+      self.message = message
+    }
+  }
+
+  public struct CodeEditorStateOutputStateActiveFile: Sendable, Hashable, Codable {
+    public var path: String?
+    public var language: String?
+    public var selection: CodeEditorStateOutputStateActiveFileSelection?
+    public var selectedText: String?
+    public var visible: CodeEditorStateOutputStateActiveFileVisible?
+    public var problems: [CodeEditorStateOutputStateActiveFileProblemsItem]?
+
+    public init(path: String? = nil, language: String? = nil, selection: CodeEditorStateOutputStateActiveFileSelection? = nil, selectedText: String? = nil, visible: CodeEditorStateOutputStateActiveFileVisible? = nil, problems: [CodeEditorStateOutputStateActiveFileProblemsItem]? = nil) {
+      self.path = path
+      self.language = language
+      self.selection = selection
+      self.selectedText = selectedText
+      self.visible = visible
+      self.problems = problems
+    }
+  }
+
+  public struct CodeEditorStateOutputState: Sendable, Hashable, Codable {
+    public var focused: Bool?
+    public var activeFile: CodeEditorStateOutputStateActiveFile?
+    public var openFiles: [String]?
+    public var unsavedFiles: [String]?
+
+    public init(focused: Bool? = nil, activeFile: CodeEditorStateOutputStateActiveFile? = nil, openFiles: [String]? = nil, unsavedFiles: [String]? = nil) {
+      self.focused = focused
+      self.activeFile = activeFile
+      self.openFiles = openFiles
+      self.unsavedFiles = unsavedFiles
+    }
+  }
+
+  public struct CodeEditorStateOutput: Sendable, Hashable, Codable {
+    public var state: CodeEditorStateOutputState?
+
+    public init(state: CodeEditorStateOutputState? = nil) {
+      self.state = state
+    }
+  }
+
+  public enum CodeSyncThemeInputMode: Sendable, Hashable, Codable {
+    case dark
+    case light
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "dark": self = .dark
+      case "light": self = .light
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .dark: try container.encode("dark")
+      case .light: try container.encode("light")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CodeSyncThemeInputColors: Sendable, Hashable, Codable {
+    public var background: String?
+    public var foreground: String?
+    public var sidebar: String?
+    public var border: String?
+    public var primary: String?
+    public var primary_foreground: String?
+    public var muted_foreground: String?
+    public var popover: String?
+    public var state_hover: String?
+    public var destructive: String?
+    public var warning: String?
+    public var success: String?
+
+    public init(background: String? = nil, foreground: String? = nil, sidebar: String? = nil, border: String? = nil, primary: String? = nil, primary_foreground: String? = nil, muted_foreground: String? = nil, popover: String? = nil, state_hover: String? = nil, destructive: String? = nil, warning: String? = nil, success: String? = nil) {
+      self.background = background
+      self.foreground = foreground
+      self.sidebar = sidebar
+      self.border = border
+      self.primary = primary
+      self.primary_foreground = primary_foreground
+      self.muted_foreground = muted_foreground
+      self.popover = popover
+      self.state_hover = state_hover
+      self.destructive = destructive
+      self.warning = warning
+      self.success = success
+    }
+
+    enum CodingKeys: String, CodingKey {
+      case background
+      case foreground
+      case sidebar
+      case border
+      case primary
+      case primary_foreground = "primary-foreground"
+      case muted_foreground = "muted-foreground"
+      case popover
+      case state_hover = "state-hover"
+      case destructive
+      case warning
+      case success
+    }
+  }
+
+  public struct CodeSyncThemeInput: Sendable, Hashable, Codable {
+    public var mode: CodeSyncThemeInputMode?
+    public var colors: CodeSyncThemeInputColors?
+
+    public init(mode: CodeSyncThemeInputMode? = nil, colors: CodeSyncThemeInputColors? = nil) {
+      self.mode = mode
+      self.colors = colors
+    }
+  }
+
+  public struct CodeSyncThemeOutput: Sendable, Hashable, Codable {
+    public var changed: Bool?
+
+    public init(changed: Bool? = nil) {
+      self.changed = changed
+    }
+  }
 
   public struct DecisionsSystemOneAskInput: Sendable, Hashable, Codable {
     public var caller: String?
