@@ -1366,8 +1366,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **Info**: a bot's Info page (`/plugins/studio/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
   (a thread panel action, so BB's panel launcher offers it on every thread;
   on a thread no bot owns it shows "Not a Bot thread"). It has the
-  **Profile** section with inline name, description and avatar editing, plus
-  profile changes made by the Bot. The ⋯ menu has Memory, Skills, Check-ins,
+  **Profile** section with the avatar, name, status and description. Choose
+  **Edit**, the name or avatar to open its inline editor; **Save**, **Cancel**
+  or Escape closes it. **Profile changes** stays behind a collapsed link until
+  you open it. The ⋯ menu has Memory, Skills, Check-ins,
   Switch model, Pause / Resume and Stop. It also has **Open chat** (not on the
   chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
   Activity: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
@@ -1380,7 +1382,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   you pick a shape; the emoji stays for older clients.
 - **Image avatar** (`src/bot-avatar.ts`, table `bot_avatar_images`): a Bot
   can draw its own with `bot_avatar_generate({ prompt })`, and you can
-  **Upload…** one (PNG, JPEG, WebP or GIF, up to 4 MB) in the Profile section.
+  **Upload…** one (PNG, JPEG, WebP or GIF, up to 4 MB) in the Profile editor.
   Its image gallery (**Drawn**, then its last five, newest first) picks one
   at once; **Revert** goes back to the avatar the last change replaced (the
   drawn one included), and again flips forward. The image shows in the Bots
@@ -1402,10 +1404,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_set` called from a Bot's threads counts as the Bot's edit too. Every
   such edit lands in `bot_profile_changes`, an append-only table (triggers
   refuse updates and deletes): who, when, from which thread, the field, the
-  old and the new value. Info's Profile section lists them under **Profile
-  changes** ("Changed by Dot · description: … → …") with **Revert**, which
-  restores the old value and records the revert; the iOS Edit profile sheet
-  shows the same list. What's the user's alone (pause, resume, stop,
+  old and the new value. Open Info's **Profile changes** link to see the list
+  ("Changed by Dot · description: … → …") with **Revert**, which restores the
+  old value and records the revert; the iOS Edit profile sheet shows the same
+  list. What's the user's alone (pause, resume, stop,
   delete, model and provider, reasoning, permission mode, turning check-ins
   on or off) isn't in the tool's schema, which rejects unknown keys, and
   `Bots.selfEdit` refuses it as well.
@@ -1661,8 +1663,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
     and never in overage, on a cold, small or busy chat, or with warming
     off. The header menu shows when it will compact or when it did, and the
     cold-send banner doesn't show the size from before compaction.
-  - **Header dot** on a Bot's chat: its tooltip says **Warm · 59m left**,
-    **Cold** or **Warming off**. Click it for why, the next ping, costs, a
+  - **Header indicator** on a Bot's chat: a Clock icon shows the time left,
+    such as **59m**, and turns amber under 10 minutes. An expired cache shows
+    **cold** beside a dimmed icon. When warming is off, only the dimmed icon
+    appears. Click it for why, the next ping, warming and cold-send costs, a
     warming switch and **Compact now…**. The iOS app shows its status text
     beside the Bot's status.
   - **Cold-send banner**: on a cold Bot chat above the threshold, the

@@ -64,7 +64,7 @@ vi.mock("@bb-studio/kit/app", () => ({
   openAppPath: vi.fn(), usePathname: () => state.pathname, DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
 }));
 vi.mock("@bb-studio/kit/ui", () => ({
-  Icon: () => null,
+  Icon: ({ name, className }: { name: string; className?: string }) => React.createElement("span", { "data-icon": name, className }),
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
   DropdownMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
@@ -290,8 +290,9 @@ test("Info tab: profile, controls, automations, and activity whose rows open as 
     ] },
   };
   await show(<BotPanel />);
+  await act(async () => button("Edit").click());
   expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
-  expect((container.querySelector('textarea[aria-label="Role"]') as HTMLTextAreaElement)?.value).toBe("You are my chief of staff.");
+  expect((container.querySelector('textarea[aria-label="Description"]') as HTMLTextAreaElement)?.value).toBe("You are my chief of staff.");
   expect(container.querySelector("[data-automation=heartbeat]")?.textContent).toContain("Weekdays 8:00");
   expect(container.querySelector("[data-automation=aut_w]")?.textContent).toContain("Paused");
   await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
@@ -313,10 +314,10 @@ test("the Bot page shows its status and confirms Stop", async () => {
   expect(state.call).toHaveBeenCalledWith("bot_stop", { botId: "bot_main" });
 });
 
-test("Bot info edits profile inline, keeps avatar history and Skills beside Memory", async () => {
+test("Bot info keeps profile and history collapsed until asked, then saves profile edits inline", async () => {
   vi.stubGlobal("confirm", () => true);
   state.data = {
-    bot_get: { bot: { ...dot, memoryPageId: "pg_mem" }, run: null },
+    bot_get: { bot: { ...dot, role: "Chief of staff.", memoryPageId: "pg_mem" }, run: null },
     bot_activity: empty,
     bot_avatar_history: { current: "img_1", previous: "img_0", images: [{ id: "img_1", url: "data:image/png;base64,AA==", mime: "image/png", source: "upload", prompt: null, provider: null, createdAt: 1 }] },
     bot_profile_changes: { changes: [{ id: "change_1", field: "role", reverts: null, actorName: "Dot", oldValue: "Assistant", newValue: "Chief of staff", oldImageUrl: null, newImageUrl: null, revertedAt: null, at: Date.now() }] },
@@ -325,9 +326,17 @@ test("Bot info edits profile inline, keeps avatar history and Skills beside Memo
   await show(<BotPanel />);
   expect(container.querySelector('[data-testid="bot-profile-section"]')).not.toBeNull();
   expect(container.querySelector('[role="dialog"]')).toBeNull();
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
+  expect(container.querySelector('input[type="file"][accept*="image/png"]')).toBeNull();
+  expect(container.textContent).toContain("Chief of staff.");
+  expect(container.querySelector('[data-testid="bot-info-status"]')?.textContent).toContain("Idle");
+  const history = button("Profile changes");
+  expect(history.getAttribute("aria-expanded")).toBe("false");
+  expect((container.querySelector('[data-testid="bot-profile-change"]')?.closest("#bot-profile-changes-content") as HTMLElement | null)?.hidden).toBe(true);
+  await act(async () => history.click());
+  expect(button("Profile changes").getAttribute("aria-expanded")).toBe("true");
   expect(container.textContent).toContain("Changed by Dot");
-  expect(container.querySelector('input[type="file"][accept*="image/png"]')).not.toBeNull();
-  expect(container.querySelector('[data-testid="bot-avatar-revert"]')).not.toBeNull();
+  await act(async () => button("Profile changes").click());
   const { openAppPath } = await import("@bb-studio/kit/app");
   await act(async () => button("Memory").click());
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
@@ -338,14 +347,42 @@ test("Bot info edits profile inline, keeps avatar history and Skills beside Memo
   expect(state.call).toHaveBeenCalledWith("bot_skill_share", { name: "weekly-review", botId: "bot_main" });
   await act(async () => button("Delete").click());
   expect(state.call).toHaveBeenCalledWith("bot_skill_delete", { name: "weekly-review", botId: "bot_main" });
+  await act(async () => button("Edit").click());
+  expect(container.querySelector('input[type="file"][accept*="image/png"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="bot-avatar-revert"]')).not.toBeNull();
   await act(async () => click(container.querySelector('[data-testid="bot-avatar-revert"]')));
   expect(state.call).toHaveBeenCalledWith("bot_avatar_revert", { botId: "bot_main" });
   act(() => click(container.querySelector('[aria-label="Shape star"]')));
   act(() => click(container.querySelector('[aria-label="Color #e5484d"]')));
-  const role = container.querySelector('textarea[aria-label="Role"]') as HTMLTextAreaElement;
+  const role = container.querySelector('textarea[aria-label="Description"]') as HTMLTextAreaElement;
   act(() => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(role, "You are my chief of staff."); role.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => button("Save profile").click());
   expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff.", botId: "bot_main" });
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
+  expect(button("Edit")).not.toBeNull();
+});
+
+test("Bot profile opens from its name or avatar, and Cancel and Escape close it with focus returned", async () => {
+  state.data = { bot_get: { bot: { ...dot, role: "Chief of staff." }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  const avatar = container.querySelector('button[aria-label="Edit Dot avatar and profile"]') as HTMLButtonElement;
+  const name = container.querySelector('button[aria-label="Edit Dot profile"]') as HTMLButtonElement;
+  expect(avatar).not.toBeNull();
+  expect(name).not.toBeNull();
+  await act(async () => click(avatar));
+  const input = container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement;
+  expect(document.activeElement).toBe(input);
+  act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Temporary name"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+  await act(async () => button("Cancel").click());
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
+  expect(document.activeElement).toBe(button("Edit"));
+  expect(state.call).not.toHaveBeenCalledWith("bot_set", expect.anything());
+
+  await act(async () => click(container.querySelector('button[aria-label="Edit Dot profile"]')));
+  expect(container.querySelector('input[aria-label="Bot name"]')).not.toBeNull();
+  act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
+  expect(document.activeElement).toBe(button("Edit"));
 });
 
 test("the Bot page embeds no chat; Open chat opens its main thread as a BB thread", async () => {
@@ -361,6 +398,7 @@ test("Bot info beside a thread: the owner's Info, no Open chat on its own chat; 
   await show(<BotInfoPanel threadId="thr_bot" params={null} />);
   expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_bot" }]);
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_main" }]);
+  await act(async () => button("Edit").click());
   expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(container.querySelector("[data-testid=bot-open-chat]")).toBeNull();
@@ -385,25 +423,44 @@ test("the thread header Bot info button opens the existing right-side panel for 
   expect(container.querySelector('[data-testid="bot-info-header"]')).toBeNull();
 });
 
-test("the cache header is a dot with the exact state in its tooltip", async () => {
-  const { BotCacheChip, cacheLabel } = await import("./BotCache");
+test("the cache header shows a Clock and time, turns amber near expiry, and dims cold or disabled states", async () => {
+  const { BotCacheChip, cacheIndicator, cacheLabel } = await import("./BotCache");
   const now = Date.now();
   const warm = {
     botId: "bot_main", threadId: "thr_bot", state: "warm" as const, label: "Warm · 59m", warmUntil: now + 59 * 60_000,
     model: "model", contextTokens: 100_000,
     warming: { active: true, nextPingAt: null, reason: null, lastPingAt: null, lastCompactAt: null, compactAt: null },
-    costs: { warmingPerHour: null, coldSend: null, warmSend: null }, banner: false,
+    costs: { warmingPerHour: 0.01, coldSend: 0.4, warmSend: 0.04 }, banner: false,
     settings: { enabled: true, thresholdTokens: 100_000, idleHours: 3, compactBeforeExpiry: true },
   };
   expect(cacheLabel(warm, now)).toBe("Warm · 59m left");
+  expect(cacheIndicator(warm, now)).toMatchObject({ text: "59m", label: "Prompt cache: 59m left", tone: "normal" });
+  expect(cacheIndicator({ ...warm, warmUntil: now + 10 * 60_000 }, now).tone).toBe("normal");
+  expect(cacheIndicator({ ...warm, warmUntil: now + 9 * 60_000 }, now).tone).toBe("amber");
+  expect(cacheIndicator({ ...warm, warmUntil: now }, now)).toMatchObject({ text: "cold", tone: "dim" });
   expect(cacheLabel({ ...warm, state: "cold", label: "Cold", warmUntil: null }, now)).toBe("Cold");
-  expect(cacheLabel({ ...warm, state: "off", label: "Warming off", warmUntil: null, settings: { ...warm.settings, enabled: false } }, now)).toBe("Warming off");
+  const off = { ...warm, state: "off" as const, label: "Warming off", warmUntil: null, settings: { ...warm.settings, enabled: false } };
+  expect(cacheLabel(off, now)).toBe("Warming off");
+  expect(cacheIndicator(off, now)).toMatchObject({ text: null, label: "Prompt cache: Warming off", tone: "dim" });
   state.data = { bot_cache_state: warm };
   await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
   const chip = container.querySelector('[data-testid="bot-cache-chip"]') as HTMLButtonElement;
-  expect(chip.title).toBe("Warm · 59m left");
-  expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warm · 59m left");
+  expect(chip.title).toBe("Prompt cache: 59m left");
+  expect(chip.getAttribute("aria-label")).toBe("Prompt cache: 59m left");
+  expect(chip.textContent).toBe("59m");
+  expect(chip.querySelector('[data-icon="Clock"]')).not.toBeNull();
+  expect(container.querySelector('[role="menu"]')?.textContent).toContain("cold send ≈");
+  expect(container.querySelector('[role="menu"]')?.textContent).toContain("warming ≈");
+
+  state.data = { bot_cache_state: { ...warm, warmUntil: now } };
+  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  expect(chip.textContent).toBe("cold");
+  expect((chip.querySelector('[data-icon="Clock"]') as HTMLElement).className).toContain("text-muted-foreground/40");
+
+  state.data = { bot_cache_state: off };
+  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
   expect(chip.textContent).toBe("");
+  expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warming off");
 });
 
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {

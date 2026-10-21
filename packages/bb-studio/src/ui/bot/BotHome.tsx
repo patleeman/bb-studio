@@ -12,7 +12,7 @@ import { errorMessage, relativeTime } from "@bb-studio/kit/format";
 import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotAvatarHistoryView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
@@ -352,65 +352,125 @@ export function BotProfileEditor({ bot, value, status, statusDot, working, busy,
   children?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Profile>({ ...value, color: value.color ?? colorForName(value.name) });
+  const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
   useEffect(() => {
     setDraft({ ...value, color: value.color ?? colorForName(value.name) });
   }, [bot.id, value.name, value.shape, value.color, value.role, value.emoji]);
+  useEffect(() => {
+    if (editing) {
+      wasEditing.current = true;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        setDraft({ ...value, color: value.color ?? colorForName(value.name) });
+        setEditing(false);
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }
+    if (wasEditing.current) {
+      wasEditing.current = false;
+      editButton.current?.focus();
+    }
+  }, [editing, bot.id, value.name, value.shape, value.color, value.role, value.emoji]);
   const patch = (next: Partial<Profile>) => setDraft((current) => ({ ...current, ...next }));
+  const freshDraft = () => ({ ...value, color: value.color ?? colorForName(value.name) });
+  const openEditor = () => { setDraft(freshDraft()); setEditing(true); };
+  const cancel = () => { setDraft(freshDraft()); setEditing(false); };
   const initialColor = value.color ?? colorForName(value.name);
   const changed = draft.name.trim() !== value.name || draft.shape !== value.shape || draft.color !== initialColor || draft.role !== value.role || draft.emoji.trim() !== value.emoji;
-  const save = () => { if (draft.name.trim() && changed) onSave({ ...draft, name: draft.name.trim(), emoji: draft.emoji.trim() || value.emoji }); };
+  const save = () => {
+    if (!draft.name.trim() || !changed) return;
+    onSave({ ...draft, name: draft.name.trim(), emoji: draft.emoji.trim() || value.emoji });
+    setEditing(false);
+  };
   return (
     <section aria-label="Profile" className="mx-4 mt-3 flex flex-col gap-2.5 border-b border-border pb-3" data-testid="bot-profile-section">
       <h3 className="text-xs font-medium text-muted-foreground">Profile</h3>
-      <header className="flex items-start gap-3">
-        <BotAvatar shape={draft.shape} color={draft.color} emoji={draft.emoji || "🤖"} image={bot.avatarImageUrl} size={44} working={working} provider={botProvider(bot)} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Name</span>
-            <Input aria-label="Bot name" value={draft.name} maxLength={60} onChange={(event) => patch({ name: event.target.value })} />
+      {editing ? (
+        <div id="bot-profile-editor" className="flex flex-col gap-2.5">
+          <header className="flex items-start gap-3">
+            <BotAvatar shape={draft.shape} color={draft.color} emoji={draft.emoji || "🤖"} image={bot.avatarImageUrl} size={44} working={working} provider={botProvider(bot)} />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium">Name</span>
+                <Input autoFocus aria-label="Bot name" value={draft.name} maxLength={60} onChange={(event) => patch({ name: event.target.value })} />
+              </label>
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
+                <span className={`size-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
+                <span className="truncate">{status}</span>
+              </span>
+            </div>
+          </header>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Avatar</span>
+            <AvatarImages botId={bot.id} onChanged={onChanged} />
+          </div>
+          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Shape">
+            {BOT_SHAPES.map((shape) => (
+              <button key={shape} type="button" role="radio" aria-checked={draft.shape === shape} aria-label={`Shape ${shape}`} onClick={() => patch({ shape })}
+                className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
+                <BotAvatar shape={shape} color={draft.color} emoji="" size={24} />
+              </button>
+            ))}
+            <button type="button" role="radio" aria-checked={draft.shape === null} aria-label="Emoji" title="Emoji" onClick={() => patch({ shape: null })}
+              className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
+              <BotAvatar shape={null} emoji={draft.emoji || "🤖"} size={24} />
+            </button>
+          </div>
+          {draft.shape === null ? (
+            <label className="flex items-center gap-2 text-xs">
+              <span className="font-medium">Emoji</span>
+              <Input aria-label="Avatar emoji" className="w-20 text-center" value={draft.emoji} maxLength={16} onChange={(event) => patch({ emoji: event.target.value })} />
+            </label>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Color">
+            {BOT_COLORS.map((color) => (
+              <button key={color} type="button" role="radio" aria-checked={draft.color === color} aria-label={`Color ${color}`} onClick={() => patch({ color })}
+                className="size-5 rounded-full outline-offset-2 aria-checked:outline aria-checked:outline-2 aria-checked:outline-foreground" style={{ background: color }} />
+            ))}
+            <button type="button" className="ml-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => patch({ color: colorForName(draft.name) })}>Match the name</button>
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs font-medium">Description</span>
+            <Textarea aria-label="Description" rows={2} maxLength={400} placeholder="You are my chief of staff." value={draft.role} onChange={(event) => patch({ role: event.target.value })} />
           </label>
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
-            <span className={`size-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
-            <span className="truncate">{status}</span>
-          </span>
+          <div className="flex justify-end gap-2">
+            <button type="button" className={GHOST_BUTTON} onClick={cancel}>Cancel</button>
+            <button type="button" className={PRIMARY_BUTTON} disabled={busy || !draft.name.trim() || !changed} onClick={save}>Save profile</button>
+          </div>
         </div>
-      </header>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium">Avatar</span>
-        <AvatarImages botId={bot.id} onChanged={onChanged} />
-      </div>
-      <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Shape">
-        {BOT_SHAPES.map((shape) => (
-          <button key={shape} type="button" role="radio" aria-checked={draft.shape === shape} aria-label={`Shape ${shape}`} onClick={() => patch({ shape })}
-            className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
-            <BotAvatar shape={shape} color={draft.color} emoji="" size={24} />
-          </button>
-        ))}
-        <button type="button" role="radio" aria-checked={draft.shape === null} aria-label="Emoji" title="Emoji" onClick={() => patch({ shape: null })}
-          className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
-          <BotAvatar shape={null} emoji={draft.emoji || "🤖"} size={24} />
-        </button>
-      </div>
-      {draft.shape === null ? (
-        <label className="flex items-center gap-2 text-xs">
-          <span className="font-medium">Emoji</span>
-          <Input aria-label="Avatar emoji" className="w-20 text-center" value={draft.emoji} maxLength={16} onChange={(event) => patch({ emoji: event.target.value })} />
-        </label>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Color">
-        {BOT_COLORS.map((color) => (
-          <button key={color} type="button" role="radio" aria-checked={draft.color === color} aria-label={`Color ${color}`} onClick={() => patch({ color })}
-            className="size-5 rounded-full outline-offset-2 aria-checked:outline aria-checked:outline-2 aria-checked:outline-foreground" style={{ background: color }} />
-        ))}
-        <button type="button" className="ml-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => patch({ color: colorForName(draft.name) })}>Match the name</button>
-      </div>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-xs font-medium">Description</span>
-        <Textarea aria-label="Role" rows={2} maxLength={400} placeholder="You are my chief of staff." value={draft.role} onChange={(event) => patch({ role: event.target.value })} />
-      </label>
-      <div className="flex justify-end">
-        <button type="button" className={PRIMARY_BUTTON} disabled={busy || !draft.name.trim() || !changed} onClick={save}>Save profile</button>
-      </div>
+      ) : (
+        <>
+          <header className="flex items-start gap-3">
+            <button type="button" aria-label={`Edit ${bot.name} avatar and profile`} aria-expanded={false} onClick={openEditor}
+              className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+              <BotAvatar shape={value.shape} color={value.color ?? colorForName(value.name)} emoji={value.emoji || "🤖"} image={bot.avatarImageUrl} size={44} working={working} provider={botProvider(bot)} />
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <button type="button" aria-label={`Edit ${bot.name} profile`} aria-expanded={false} onClick={openEditor}
+                  className="min-w-0 truncate rounded-sm text-left text-sm font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  {bot.name}
+                </button>
+                <button ref={editButton} type="button" aria-label="Edit profile" aria-expanded={false} onClick={openEditor}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  <Icon name="Edit" className="size-3" aria-hidden />Edit
+                </button>
+              </div>
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
+                <span className={`size-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
+                <span className="truncate">{status}</span>
+              </span>
+            </div>
+          </header>
+          <p className={`whitespace-pre-wrap break-words text-sm ${value.role.trim() ? "text-foreground" : "text-muted-foreground"}`}>
+            {value.role.trim() ? value.role : "No description."}
+          </p>
+        </>
+      )}
       {children ? <div className="border-t border-border pt-2">{children}</div> : null}
     </section>
   );

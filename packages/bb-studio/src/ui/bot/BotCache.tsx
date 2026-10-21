@@ -27,6 +27,23 @@ export function cacheLabel(state: BotCacheStateView, now = Date.now()): string {
   return state.label;
 }
 
+type CacheIndicator = { text: string | null; label: string; tone: "normal" | "amber" | "dim" };
+
+/** Compact status for the thread header; the chip stays quiet when warming is off. */
+export function cacheIndicator(state: BotCacheStateView, now = Date.now()): CacheIndicator {
+  if (state.state === "off") return { text: null, label: "Prompt cache: Warming off", tone: "dim" };
+  if (state.state === "cold" || state.warmUntil == null || state.warmUntil <= now) {
+    return { text: "cold", label: "Prompt cache: cold", tone: "dim" };
+  }
+  const remaining = state.warmUntil - now;
+  const minutes = Math.max(1, Math.ceil(remaining / 60_000));
+  return {
+    text: `${minutes}m`,
+    label: `Prompt cache: ${minutes}m left`,
+    tone: remaining < 10 * 60_000 ? "amber" : "normal",
+  };
+}
+
 /** One line on what the cache costs: the next send cold, and warming per hour. */
 export function costLine(state: BotCacheStateView): string | null {
   const parts: string[] = [];
@@ -46,22 +63,21 @@ export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
   useTick(30_000);
   const state = live.data;
   if (!state?.botId) return null;
-  const label = cacheLabel(state);
-  const warm = label.startsWith("Warm");
-  const disabled = label === "Warming off";
+  const indicator = cacheIndicator(state);
   const act = (method: string, input: object) => { setError(null); void call(method, input).then(() => live.refresh(), (cause: unknown) => setError(errorMessage(cause))); };
   const cost = costLine(state);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" data-testid="bot-cache-chip" aria-label={`Prompt cache: ${label}`} title={label}
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground">
-          <span aria-hidden className={`size-2 rounded-full ${warm ? "bg-success" : disabled ? "bg-muted-foreground/40" : "bg-warning"}`} />
+        <button type="button" data-testid="bot-cache-chip" aria-label={indicator.label} title={indicator.label}
+          className="inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-xs hover:bg-state-hover hover:text-foreground">
+          <Icon name="Clock" className={`size-3.5 ${indicator.tone === "amber" ? "text-warning" : indicator.tone === "dim" ? "text-muted-foreground/40" : "text-muted-foreground"}`} aria-hidden />
+          {indicator.text ? <span className={`tabular-nums ${indicator.tone === "amber" ? "text-warning" : "text-muted-foreground"}`}>{indicator.text}</span> : null}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
         <div className="flex flex-col gap-1 px-2 py-1.5 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Prompt cache: {label}</span>
+          <span className="font-medium text-foreground">Prompt cache: {indicator.text ?? "Warming off"}</span>
           {state.warming.reason ? <span>{state.warming.reason}.</span> : null}
           {state.warming.active && state.warming.nextPingAt ? <span>Next keep-alive ping around {clock(state.warming.nextPingAt)}.</span> : null}
           {state.warming.compactAt ? <span>Compacts around {clock(state.warming.compactAt)}.</span> : state.warming.lastCompactAt ? <span>Compacted at {clock(state.warming.lastCompactAt)}.</span> : null}
