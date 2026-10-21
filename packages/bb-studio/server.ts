@@ -604,12 +604,14 @@ export default async function plugin(bb: BbPluginApi) {
     automationPause: (id, botId) => automations.setState(id, "paused", botId),
     automationDelete: (id, botId) => automations.delete(id, botId),
     adoptable: (id) => runners.adoptable(id),
-    alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Mention this once. The details are in Bot info → Maintenance." }); },
+    alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Maintenance alert, already shown to the user. Do not repeat or acknowledge it. Reply exactly [PASS]. Details are in Bot info → Maintenance." }); },
   });
   bb.events.on("thread.idle", ({ thread }) => {
     const bot = bots.list().find((b) => b.threadId === thread.id);
     if (bot) void bb.sdk.threads.events.list({ threadId: thread.id, order: "desc", limit: "1", types: ["client/turn/requested"] }).then((events) => {
-      if (JSON.stringify(events[0]?.data ?? {}).includes("[bb automation due:")) return maintenance.tick(Date.now(), bot.id);
+      const key = bots.heartbeatKey(bot.id);
+      const heartbeat = key ? projectLeads.runs.automation(key) : null;
+      if (heartbeat && JSON.stringify(events[0]?.data ?? {}).includes(`[bb automation due:${heartbeat.id}]`)) return maintenance.tick(Date.now(), bot.id);
     }).catch((error) => bb.log.warn(`Maintenance after check-in: ${errorText(error)}`));
   });
   // Prompt-cache warming for Bot chats (src/bot-cache.ts): a tiny ping about

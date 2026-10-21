@@ -674,7 +674,9 @@ it("applies skill saves immediately, preserves diffs and warnings, and reverts w
 });
 
 it("migrates pending writes and deletes as approved once, preserving prior and applied versions", async () => {
-  const x = await setup(MIGRATIONS.slice(0, -1));
+  const skillHistoryMigration = MIGRATIONS.findIndex((sql) => sql.includes("CREATE TABLE bot_skill_versions"));
+  expect(skillHistoryMigration).toBeGreaterThan(0);
+  const x = await setup(MIGRATIONS.slice(0, skillHistoryMigration));
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
   const insert = x.db.prepare("INSERT INTO bot_skills(bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', ?, 'd', ?, 1, 1)");

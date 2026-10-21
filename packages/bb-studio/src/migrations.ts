@@ -448,5 +448,9 @@ export const MIGRATIONS = [
   `CREATE TABLE bot_maintenance_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, at INTEGER NOT NULL, settings TEXT NOT NULL);
    CREATE INDEX bot_maintenance_settings_bot ON bot_maintenance_settings (bot_id, id);
    CREATE TABLE bot_maintenance_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, at INTEGER NOT NULL, result TEXT NOT NULL);
-   CREATE INDEX bot_maintenance_runs_bot ON bot_maintenance_runs (bot_id, id);`,
+   CREATE INDEX bot_maintenance_runs_bot ON bot_maintenance_runs (bot_id, id);
+   CREATE TRIGGER bot_maintenance_settings_no_update BEFORE UPDATE ON bot_maintenance_settings BEGIN SELECT RAISE(ABORT, 'append-only'); END;
+   CREATE TRIGGER bot_maintenance_settings_no_delete BEFORE DELETE ON bot_maintenance_settings BEGIN SELECT RAISE(ABORT, 'append-only'); END;
+   CREATE TRIGGER bot_maintenance_runs_no_update BEFORE UPDATE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;
+   CREATE TRIGGER bot_maintenance_runs_no_delete BEFORE DELETE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;`,
 ];

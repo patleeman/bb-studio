@@ -314,14 +314,13 @@ export class SkillLearning {
       models = options?.map((each) => each.model) ?? [];
       defaultModel = options ? cheapestModel(options) : null;
     }
-    const since = row.curator_last_at ?? row.curator_since;
     return {
       enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models,
       approval: false, consolidate: !!row.consolidate, curatorPaused: !!row.curator_paused,
       toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,
       lastCurator: row.curator_last_at && row.curator_last_result ? { at: row.curator_last_at, result: row.curator_last_result } : null,
-      nextCuratorAt: row.curator_paused || !since ? null : since + CURATOR_EVERY_MS,
+      nextCuratorAt: null, // Built-in Maintenance owns the schedule.
       pending: [],
     };
   }
@@ -519,11 +518,10 @@ export class SkillLearning {
 
   // ---- Curator ----
 
-  /** The curator as the Automations list shows it. */
+  /** The curator’s last result. Built-in Maintenance owns its schedule. */
   curatorState(botId: string): { paused: boolean; lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } {
     const row = this.row(botId);
-    const since = row.curator_last_at ?? row.curator_since;
-    return { paused: !!row.curator_paused, lastRunAt: row.curator_last_at, lastOutcome: row.curator_last_result, nextRunAt: row.curator_paused || !since ? null : since + CURATOR_EVERY_MS };
+    return { paused: !!row.curator_paused, lastRunAt: row.curator_last_at, lastOutcome: row.curator_last_result, nextRunAt: null };
   }
 
   /** Runs the curator now: the transitions (applied unless dryRun) and, if on, a consolidation fork. */
@@ -544,7 +542,7 @@ export class SkillLearning {
     return { changes: plan, consolidating, result };
   }
 
-  /** The minute tick: times out stuck reviews, stops reviews of paused Bots, runs due curators. */
+  /** The minute tick: times out stuck reviews and stops reviews of paused Bots. */
   async tick(now = Date.now()): Promise<void> {
     for (const review of this.deps.db.prepare("SELECT * FROM bot_skill_reviews WHERE status = 'running'").all() as ReviewRow[]) {
       const bot = this.deps.bot(review.bot_id);

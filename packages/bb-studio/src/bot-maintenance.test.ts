@@ -33,7 +33,7 @@ async function setup() {
   const maintenance = new BotMaintenance({ db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
   const enable = async () => { await maintenance.set("bot", { enabled: true }, now - DAY); archive.mockClear(); curate.mockClear(); };
   const local = (id: string, kind: string, state = "active", age = 1, target = "main", instruction = "report") => db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, state, schedule_json, project_id, created_at, updated_at, target, instruction, bb_ids) VALUES (?, 'bot', ?, ?, ?, '{}', 'proj', 0, ?, ?, ?, '[\"a\"]')").run(id, kind, id, state, now - age * DAY, target, instruction);
-  return { db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
+  return { harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
 }
 it("defaults off and waits one day before going live", () => {
   const s = maintenanceDefaults(); expect(s.enabled).toBe(false); expect(s.memoryWords).toBe(8000);
@@ -144,4 +144,16 @@ it("does not run twice when an early check-in is followed by 4 AM", async () => 
   const x = await setup(); const at = new Date(2026, 9, 21, 2).getTime(); await x.maintenance.set("bot", { enabled: true }, at - 2 * DAY);
   await x.maintenance.tick(at, "bot"); const count = x.maintenance.view("bot").runs.length;
   await x.maintenance.tick(at + 2 * 3_600_000); expect(x.maintenance.view("bot").runs).toHaveLength(count);
+});
+it("settings and run records reject updates and deletes", async () => {
+  const x = await setup(); await x.enable();
+  for (const table of ["bot_maintenance_settings", "bot_maintenance_runs"]) {
+    expect(() => x.db.prepare(`UPDATE ${table} SET at = 0`).run()).toThrow(/append-only/);
+    expect(() => x.db.prepare(`DELETE FROM ${table}`).run()).toThrow(/append-only/);
+  }
+});
+it("fails closed and records a run when the automation overview is unavailable", async () => {
+  const x = await setup(); await x.enable();
+  x.harness.sdk.stub("plugins.callRpc", async () => { throw new Error("overview unavailable"); });
+  const run = await x.maintenance.run("bot", { now }); expect(run?.summary).toContain("stopped: overview unavailable"); expect(x.archive).not.toHaveBeenCalled();
 });
