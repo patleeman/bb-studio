@@ -35,7 +35,6 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { registerVoiceApp } from "./src/voice/ui/register";
-import { VoiceCallBar, VoiceCallButton } from "./src/voice/call/ui/CallViews";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
@@ -165,10 +164,6 @@ export default definePluginApp((app) => {
   // and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });
   app.composer.customize({ id: "bot-cache", banners: [{ id: "cold", chrome: "bare", component: BotCacheBanner }] });
-  // Voice calls with the Bot (src/voice/call): the phone button in its chat's
-  // header, and the call bar over every page while a call is on.
-  app.slots.experimental_threadHeaderAction({ id: "voice-call", title: "Call", component: VoiceCallButton });
-  app.slots.experimental_appOverlay({ id: "voice-call-bar", component: VoiceCallBar });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "builtin-routes", component: BuiltinRoutes });

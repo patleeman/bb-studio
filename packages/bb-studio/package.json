@@ -37,10 +37,7 @@
         "explore": "./icons/explore.svg",
         "dashboard": "./icons/dashboard.svg",
         "speaker": "./icons/speaker.svg",
-        "speaker-off": "./icons/speaker-off.svg",
-        "phone": "./icons/phone.svg",
-        "phone-off": "./icons/phone-off.svg",
-        "mic-off": "./icons/mic-off.svg"
+        "speaker-off": "./icons/speaker-off.svg"
       }
     },
     "server": "./server.ts",

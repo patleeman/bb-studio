@@ -1347,7 +1347,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   or if it fails. Generation uses the first configured provider: **OpenAI**
   `gpt-image-1` at low quality (about 1¢ an image), then **xAI**
   `grok-2-image` (about 7¢). Keys come from Studio's secret settings
-  (**OpenAI API key**, shared with voice calls, and **Bot avatars: xAI API
+  (**OpenAI API key** and **Bot avatars: xAI API
   key**), else `OPENAI_API_KEY` or `XAI_API_KEY` in the BB server's
   environment. A key in the old **Bot avatars: OpenAI API key** setting is
   read while **OpenAI API key** is unset and moved into it at startup. With
@@ -1371,55 +1371,6 @@ of Staff", with the same thread and check-ins; rename it from its page.
   chat, queued messages, questions and approvals inline. Threads it handed
   off from are under **Earlier conversations** in its sidebar (`bot_chain`,
   which the iOS app also reads for its history).
-- **Voice calls** (screenshots below; `src/voice/call`, tables `voice_calls` and
-  `voice_call_events`, both append-only): **Call** in a Bot chat's header
-  starts a real-time voice call with the Bot over OpenAI's Realtime API
-  (`gpt-realtime-2.1` by default, voice **marin**). The server checks this
-  month's spend against **Voice calls: monthly cap (USD)** (default $20)
-  and mints a two-minute client secret (`POST /v1/realtime/client_secrets`)
-  with the whole session: model, voice, the instructions, server VAD, input
-  transcription (`gpt-4o-mini-transcribe`) and the tools. The API key (the
-  **OpenAI API key** setting, else `OPENAI_API_KEY`) never reaches a
-  client. The desktop opens WebRTC to OpenAI with that secret (the mic up,
-  the voice down, events on the `oai-events` data channel). The call bar,
-  top center over every page, shows the Bot's name, the timer, who's
-  speaking and the running cost, with **Mute**, **Push to talk** (server
-  VAD off; hold the button or Space, and letting go sends the turn) and
-  **End**. Talking over the voice cuts it off.
-
-  The voice is a fast front end for the Bot: it answers quick things itself
-  and sends anything real to the Bot with `send_to_bot` ("On it"). It never
-  approves spending, anything outward-facing or deletes; it says the Bot
-  will ask in the chat. Its tools run on the host (`voice_call_tool`):
-  `bot_status` (state, Needs you, In progress, its latest reply),
-  `leads_status` (project leads and the Bot's runners) and `daily_brief`
-  only read; `send_to_bot` is the only write, a visible "📞 From the call: …"
-  message in the Bot's chat. `daily_brief` looks for Studio items titled
-  **Kensico Brief** and **Heard on the Street** and reads the newest of
-  each; the Kensico Brief lives in the Kensico app, not in Studio, so until
-  it's published as a Studio item the tool says it can't find it. There's
-  no calendar tool: the host has no calendar integration. Tool output is
-  capped at 4,000 characters.
-
-  When the Bot finishes the turn a call started, its reply (cut to a few
-  sentences) is spoken into the call. After hang-up it stays in the chat
-  and goes to the phone (Studio Mobile). Hang-up saves the call as a page
-  in the personal project (both sides' transcript, what it sent and the
-  Bot's replies in order, minutes and estimated cost) and posts a
-  "📞 **Call · 6 min** · ≈$0.42 · [Transcript]" line in the chat. The line
-  is a message, not a card: BB draws directives only in assistant
-  messages. The cost is estimated from each response's usage (audio and
-  text tokens in and out, cached input) and the transcription usage,
-  against the price table in `src/bot-prices.ts`. **Voice calls: model**
-  switches to `gpt-realtime-2.1-mini`; **Voice calls: voice** picks the
-  voice. RPCs: `voice_call_state`, `voice_call_start`, `voice_call_tool`,
-  `voice_call_event`, `voice_call_poll`, `voice_call_end`, `voice_call_get`.
-
-  ![A voice call with Dot in a staged BB: the call bar at the top of Dot's chat reads Dot, 0:04, blue bars and Speaking, ≈$0.25 (the server's estimate from the reported usage), a mic button, Push to talk and a red End; the header's phone button reads On call; in the chat, the call's send_to_bot message "📞 From the call: Reply with one short sentence: you'll check the ORBIT-42 launch checklist for blockers after the call." and Dot working on it. Staged with a fake Realtime transport, no OpenAI call](assets/voice-call-bar.png)
-
-  ![After hang-up: Dot's reply to the call's request ("I'll check the ORBIT-42 launch checklist for blockers after the call."), then the call's line "📞 Call · 4 min · ≈$0.25 · sent you 1 message · Transcript" and Dot's [PASS] to it](assets/voice-call-record.png)
-
-  ![The call's record page, Call with Dot · Oct 20, 4 min: about $0.25 on gpt-realtime-2.1, voice marin; Sent to Dot with the one request; and the transcript in order, You and Voice turns and the → Sent to Dot line](assets/voice-call-transcript.png)
 - **Quiet**: the Bot is told its chat is your inbox. With nothing new (a
   check-in with nothing to report, a notice that a thread it started
   finished fine, an automation result like `[PASS]`) it replies exactly
