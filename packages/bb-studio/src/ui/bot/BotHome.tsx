@@ -18,7 +18,7 @@ import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BotAvatar, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
 import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
@@ -137,7 +137,7 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
 }
 
 /** shape null: the emoji avatar. */
-type Profile = { name: string; shape: string | null; color: string | null; role: string; emoji: string };
+export type Profile = { name: string; shape: string | null; color: string | null; role: string; emoji: string };
 
 /** The first Bot's name until it picks its own; a further Bot's. */
 export const FIRST_BOT_NAME = "Chief of Staff";
@@ -168,35 +168,38 @@ function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) 
   return <Welcome first={first} look={look} busy={!!busy} error={error} onCreate={make} />;
 }
 
-export type Sheet = "profile" | "skills" | "checkins" | "stop" | null;
+export type Sheet = "checkins" | "stop" | null;
 
 /** The Bot's controls, shared by the page and its Info tab: RPCs, dialogs, and opening its Memory. */
 export function useBotControls(view: BotView, refresh: () => void, running: number) {
   const bot = view.bot!;
   const { run, busy, error } = useAction(refresh, bot.id);
   const [sheet, setSheet] = useState<Sheet>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
   const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "", emoji: bot.avatar };
+  const saveProfile = (next: Profile) => {
+    const input = {
+      ...(next.name !== bot.name ? { name: next.name } : {}),
+      ...(next.shape !== (bot.shape ?? null) ? { shape: next.shape } : {}),
+      ...(next.emoji.trim() && next.emoji.trim() !== bot.avatar ? { avatar: next.emoji.trim() } : {}),
+      ...(next.color && next.color !== bot.color ? { color: next.color } : {}),
+      ...(next.role.trim() !== (bot.role ?? "") ? { role: next.role.trim() } : {}),
+    };
+    if (Object.keys(input).length) void run("bot_set", input);
+  };
+  const toggleSkills = () => setSkillsOpen((open) => !open);
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
   };
+  const skills = skillsOpen && bot.kind !== "external" ? (
+    <section aria-label="Skills" className="mx-4 mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <h3 className="text-xs font-medium text-muted-foreground">Skills</h3>
+      <SkillsList botId={bot.id} name={bot.name} />
+    </section>
+  ) : null;
   const sheets = (
     <>
-      {sheet === "profile" || sheet === "skills" ? (
-        <ProfileDialog value={profile} advancedOpen={sheet === "skills"} advanced={bot.kind === "external" ? undefined : <SkillsList botId={bot.id} name={bot.name} />} onClose={() => setSheet(null)}
-          images={<AvatarImages botId={bot.id} onChanged={refresh} />}
-          onSave={(next) => {
-            setSheet(null);
-            const input = {
-              ...(next.name !== bot.name ? { name: next.name } : {}),
-              ...(next.shape !== (bot.shape ?? null) ? { shape: next.shape } : {}),
-              ...(next.emoji.trim() && next.emoji.trim() !== bot.avatar ? { avatar: next.emoji.trim() } : {}),
-              ...(next.color && next.color !== bot.color ? { color: next.color } : {}),
-              ...(next.role.trim() !== (bot.role ?? "") ? { role: next.role.trim() } : {}),
-            };
-            if (Object.keys(input).length) void run("bot_set", input);
-          }} />
-      ) : null}
       {sheet === "checkins" ? (
         <CheckinsDialog run={view.run} busy={!!busy} onClose={() => setSheet(null)}
           onPreset={(preset) => { setSheet(null); void run("bot_checkin_preset", { preset }); }}
@@ -220,7 +223,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
       ) : null}
     </>
   );
-  return { bot, profile, run, busy, error, setSheet, openMemory, sheets };
+  return { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, toggleSkills, skills, sheets };
 }
 
 /** Threads it started that are running now. */
@@ -335,71 +338,80 @@ function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: Heartbe
   );
 }
 
-/**
- * Edit profile: the avatar (an image it made or you uploaded, else drawn: a
- * shape and color, or an emoji), its name, and the role it's given. Advanced
- * holds its skills. Picking an image applies at once; the rest on Save.
- */
-function ProfileDialog({ value, advanced, advancedOpen = false, images, onClose, onSave }: { value: Profile; advanced?: ReactNode; advancedOpen?: boolean; images?: ReactNode; onClose(): void; onSave(next: Profile): void }) {
+/** Profile fields live in the Bot info surface. Avatar image choices apply at once; the fields save together. */
+export function BotProfileEditor({ bot, value, status, statusDot, working, busy, onChanged, onSave, children }: {
+  bot: NonNullable<BotView["bot"]>;
+  value: Profile;
+  status: string;
+  statusDot: string;
+  working: boolean;
+  busy: boolean;
+  onChanged(): void;
+  onSave(next: Profile): void;
+  children?: ReactNode;
+}) {
   const [draft, setDraft] = useState<Profile>({ ...value, color: value.color ?? colorForName(value.name) });
-  const [showAdvanced, setShowAdvanced] = useState(advancedOpen);
-  const patch = (next: Partial<Profile>) => setDraft({ ...draft, ...next });
-  const save = () => { if (draft.name.trim()) onSave({ ...draft, name: draft.name.trim(), emoji: draft.emoji.trim() || value.emoji }); };
+  useEffect(() => {
+    setDraft({ ...value, color: value.color ?? colorForName(value.name) });
+  }, [bot.id, value.name, value.shape, value.color, value.role, value.emoji]);
+  const patch = (next: Partial<Profile>) => setDraft((current) => ({ ...current, ...next }));
+  const initialColor = value.color ?? colorForName(value.name);
+  const changed = draft.name.trim() !== value.name || draft.shape !== value.shape || draft.color !== initialColor || draft.role !== value.role || draft.emoji.trim() !== value.emoji;
+  const save = () => { if (draft.name.trim() && changed) onSave({ ...draft, name: draft.name.trim(), emoji: draft.emoji.trim() || value.emoji }); };
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Edit profile</DialogTitle></DialogHeader>
-        <div className="flex flex-col gap-4 text-sm">
-          <div className="flex justify-center"><BotAvatar shape={draft.shape} color={draft.color} emoji={draft.emoji || "🤖"} size={72} /></div>
-          {images}
-          <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Shape">
-            {BOT_SHAPES.map((shape) => (
-              <button key={shape} type="button" role="radio" aria-checked={draft.shape === shape} aria-label={`Shape ${shape}`} onClick={() => patch({ shape })}
-                className="flex aspect-square items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
-                <BotAvatar shape={shape} color={draft.color} emoji="" size={26} />
-              </button>
-            ))}
-            <button type="button" role="radio" aria-checked={draft.shape === null} aria-label="Emoji" title="Emoji" onClick={() => patch({ shape: null })}
-              className="flex aspect-square items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
-              <BotAvatar shape={null} emoji={draft.emoji || "🤖"} size={26} />
-            </button>
-          </div>
-          {draft.shape === null ? (
-            <label className="flex items-center gap-2">
-              <span className="font-medium">Emoji</span>
-              <Input aria-label="Avatar emoji" className="w-20 text-center" value={draft.emoji} maxLength={16} onChange={(event) => patch({ emoji: event.target.value })} />
-            </label>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Color">
-            {BOT_COLORS.map((color) => (
-              <button key={color} type="button" role="radio" aria-checked={draft.color === color} aria-label={`Color ${color}`} onClick={() => patch({ color })}
-                className="size-5 rounded-full outline-offset-2 aria-checked:outline aria-checked:outline-2 aria-checked:outline-foreground" style={{ background: color }} />
-            ))}
-            <button type="button" className="ml-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => patch({ color: colorForName(draft.name) })}>Match the name</button>
-          </div>
+    <section aria-label="Profile" className="mx-4 mt-3 flex flex-col gap-2.5 border-b border-border pb-3" data-testid="bot-profile-section">
+      <h3 className="text-xs font-medium text-muted-foreground">Profile</h3>
+      <header className="flex items-start gap-3">
+        <BotAvatar shape={draft.shape} color={draft.color} emoji={draft.emoji || "🤖"} image={bot.avatarImageUrl} size={44} working={working} provider={botProvider(bot)} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <label className="flex flex-col gap-1">
-            <span className="font-medium">Name</span>
+            <span className="text-xs font-medium">Name</span>
             <Input aria-label="Bot name" value={draft.name} maxLength={60} onChange={(event) => patch({ name: event.target.value })} />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-medium">Description</span>
-            <Textarea aria-label="Role" rows={2} maxLength={400} placeholder="You are my chief of staff." value={draft.role} onChange={(event) => patch({ role: event.target.value })} />
-          </label>
-          {advanced ? (
-            <div className="flex flex-col gap-2">
-              <button type="button" aria-expanded={showAdvanced} className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowAdvanced(!showAdvanced)}>
-                <Icon name={showAdvanced ? "ChevronDown" : "ChevronRight"} className="size-3.5" />Advanced — skills
-              </button>
-              {showAdvanced ? advanced : null}
-            </div>
-          ) : null}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
+            <span className={`size-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
+            <span className="truncate">{status}</span>
+          </span>
         </div>
-        <DialogFooter>
-          <button type="button" className={GHOST_BUTTON} onClick={onClose}>Cancel</button>
-          <button type="button" className={PRIMARY_BUTTON} disabled={!draft.name.trim()} onClick={save}>Save</button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </header>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium">Avatar</span>
+        <AvatarImages botId={bot.id} onChanged={onChanged} />
+      </div>
+      <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Shape">
+        {BOT_SHAPES.map((shape) => (
+          <button key={shape} type="button" role="radio" aria-checked={draft.shape === shape} aria-label={`Shape ${shape}`} onClick={() => patch({ shape })}
+            className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
+            <BotAvatar shape={shape} color={draft.color} emoji="" size={24} />
+          </button>
+        ))}
+        <button type="button" role="radio" aria-checked={draft.shape === null} aria-label="Emoji" title="Emoji" onClick={() => patch({ shape: null })}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-state-hover aria-checked:bg-state-active aria-checked:ring-1 aria-checked:ring-border">
+          <BotAvatar shape={null} emoji={draft.emoji || "🤖"} size={24} />
+        </button>
+      </div>
+      {draft.shape === null ? (
+        <label className="flex items-center gap-2 text-xs">
+          <span className="font-medium">Emoji</span>
+          <Input aria-label="Avatar emoji" className="w-20 text-center" value={draft.emoji} maxLength={16} onChange={(event) => patch({ emoji: event.target.value })} />
+        </label>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Color">
+        {BOT_COLORS.map((color) => (
+          <button key={color} type="button" role="radio" aria-checked={draft.color === color} aria-label={`Color ${color}`} onClick={() => patch({ color })}
+            className="size-5 rounded-full outline-offset-2 aria-checked:outline aria-checked:outline-2 aria-checked:outline-foreground" style={{ background: color }} />
+        ))}
+        <button type="button" className="ml-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => patch({ color: colorForName(draft.name) })}>Match the name</button>
+      </div>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-xs font-medium">Description</span>
+        <Textarea aria-label="Role" rows={2} maxLength={400} placeholder="You are my chief of staff." value={draft.role} onChange={(event) => patch({ role: event.target.value })} />
+      </label>
+      <div className="flex justify-end">
+        <button type="button" className={PRIMARY_BUTTON} disabled={busy || !draft.name.trim() || !changed} onClick={save}>Save profile</button>
+      </div>
+      {children ? <div className="border-t border-border pt-2">{children}</div> : null}
+    </section>
   );
 }
 

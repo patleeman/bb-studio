@@ -1198,9 +1198,10 @@ open in the background, so it's as you left it when you come back.
   one, and **Edit** opens it in Automations. The tab refreshes when it opens
   and every 30 seconds while it's visible. If BB's Automations plugin is off
   or doesn't answer, the tab says Automations are unavailable.
-- **Automations badge.** A thread that automations wake shows a clock with
-  their count in its header; click it to open the Automations tab. It uses
-  BB's experimental thread header slot, so Studio still loads without it.
+- **Automations badge.** A regular thread that automations wake shows a clock
+  with their count in its header; click it to open the Automations tab. Bot
+  threads show a **Bot info** button beside the cache dot instead. Automations
+  for that Bot are already listed in Bot info.
 - **For agents**: the `studio_list_items`,
   `studio_tag_items`, `studio_delete_items` and
   `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
@@ -1321,24 +1322,22 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **Info**: a bot's Info page (`/plugins/studio/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
   (a thread panel action, so BB's panel launcher offers it on every thread;
   on a thread no bot owns it shows "Not a Bot thread"). It has the
-  bot's avatar, name and live status (Working on N threads, Checks in …,
-  Idle, Paused, Stopped), **Edit profile**, ⋯ (Edit profile, Memory, Skills,
-  Check-ins, Switch model, Pause / Resume, Stop…), **Open chat** (not on the
+  **Profile** section with inline name, description and avatar editing, plus
+  profile changes made by the Bot. The ⋯ menu has Memory, Skills, Check-ins,
+  Switch model, Pause / Resume and Stop. It also has **Open chat** (not on the
   chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
   Activity: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
   (its check-in and automations, with the next run) and **Recent** (the
   last three, then Show all). A thread clicked in the Bots sidebar,
   Activity or Needs you opens as a normal BB thread in the main pane.
-- **Edit profile**: a drawn avatar (one of nine shapes with two eyes, in one
-  of twelve colors, or **Match the name**), or an emoji, its name, and a
-  Description: a sentence or two on its role ("You are my chief of staff."),
-  which it's told. **Advanced** lists its skills. A Bot made before drawn
-  avatars shows its emoji until you pick a shape; the emoji stays for older
-  clients.
+- **Profile**: edit the Bot's name and description in its Info tab. Choose a
+  drawn avatar (one of nine shapes in one of twelve colors, or **Match the
+  name**) or an emoji. A Bot made before drawn avatars shows its emoji until
+  you pick a shape; the emoji stays for older clients.
 - **Image avatar** (`src/bot-avatar.ts`, table `bot_avatar_images`): a Bot
   can draw its own with `bot_avatar_generate({ prompt })`, and you can
-  **Upload…** one (PNG, JPEG, WebP or GIF, up to 4 MB) in Edit profile. The
-  row of images there (**Drawn**, then its last five, newest first) picks one
+  **Upload…** one (PNG, JPEG, WebP or GIF, up to 4 MB) in the Profile section.
+  Its image gallery (**Drawn**, then its last five, newest first) picks one
   at once; **Revert** goes back to the avatar the last change replaced (the
   drawn one included), and again flips forward. The image shows in the Bots
   list, Info and the chat greeting, and in the iOS app; it's served at
@@ -1359,7 +1358,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_set` called from a Bot's threads counts as the Bot's edit too. Every
   such edit lands in `bot_profile_changes`, an append-only table (triggers
   refuse updates and deletes): who, when, from which thread, the field, the
-  old and the new value. Info's Activity lists them under **Profile
+  old and the new value. Info's Profile section lists them under **Profile
   changes** ("Changed by Dot · description: … → …") with **Revert**, which
   restores the old value and records the revert; the iOS Edit profile sheet
   shows the same list. What's the user's alone (pause, resume, stop,
@@ -1493,7 +1492,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   about 8,000 characters, or a name close to another skill's. BB
   selects plugin skills only from a plugin's manifest, so a skill a plugin
   makes at runtime can't be a native per-thread skill. **Skills** (⋯, or
-  Edit profile → Advanced) has **Share**, which moves the skill to BB's user skills
+  Bot info → **Manage skills**) has **Share**, which moves the skill to BB's user skills
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
   `bb skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it. See "Skills that learn" below.
@@ -1540,15 +1539,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
     and `bot_skill_lints`). Upgrade applies pending changes as approved and
     clears the pending list. For one release, `bot_skill_pending_resolve` is a
     deprecated no-op returning `pending: []`, with `approval: false`.
-  - **Settings** (Skills, ⋯ or Edit profile → Advanced): **Learn from
+  - **Settings** (Skills, ⋯ or Bot info → Manage skills): **Learn from
     work** on or off, every N turns, review model, the last review's result
     with **Review now**, pins, and a collapsed **Archived** list. Older iOS
     clients retain their approval controls, but receive no pending changes.
     See [the approval audit](../../docs/approvals.md) for the iOS follow-up.
 
-  The screenshot below predates immediate saving and still shows the retired approval switch.
-
-  ![Skills in a staged BB, opened from Info → Manage skills: Edit profile's Advanced section with Learn from work on, every 10 turns; the last review "Saved 1 skill · 2m ago" with Review now; Review model Cheapest (gpt-6-luna); Review skills before saving and Curator merges overlapping skills off; and the system-report skill Dot's review fork saved after the user corrected how a system report should look, with Pin, Share and Delete](assets/bot-skills.png)
+  ![Earlier staged capture of Skills in Bot info, before immediate saving. It shows the retired approval switch, Learn from work settings, and the system-report skill with Pin, Share and Delete. The current interface opens Skills inline from Bot info.](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started).
 - **Phone**: questions and approvals it, or a thread it started, raises push
@@ -1618,16 +1615,16 @@ of Staff", with the same thread and check-ins; rename it from its page.
     history. Once per idle stretch (a message from you starts a new one;
     the `/compact` it sends doesn't),
     and never in overage, on a cold, small or busy chat, or with warming
-    off. The chip shows when it will compact or when it did, and the
+    off. The header menu shows when it will compact or when it did, and the
     cold-send banner doesn't show the size from before compaction.
-  - **Header chip** on a Bot's chat: **Warm · 42m** (minutes left),
-    **Cold** or **Warming off**, with why, the next ping, the costs, a
-    warming switch and **Compact now…** in its menu. The iOS app shows the
-    same line, small, beside the Bot's status.
+  - **Header dot** on a Bot's chat: its tooltip says **Warm · 59m left**,
+    **Cold** or **Warming off**. Click it for why, the next ping, costs, a
+    warming switch and **Compact now…**. The iOS app shows its status text
+    beside the Bot's status.
   - **Cold-send banner**: on a cold Bot chat above the threshold, the
     composer says "Cache expired — next send re-reads ~N tokens (~$X)" with
     **Dismiss** and **Don't show for this thread**. **Compact** is also a
-    manual action in Bot info and the chip's menu.
+    manual action in Bot info and the header dot's menu.
   - **Settings** (Bot info → Prompt cache, `bot_cache_set`): warming on or
     off (on), size threshold (100k tokens), idle cutoff (3 hours), compact
     before expiry (on). Bot info shows "Warming ≈ $0.07/h" from the price

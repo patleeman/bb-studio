@@ -1,5 +1,5 @@
 // A Bot's image avatar: one it generated (bot_avatar_generate) or the user
-// uploaded (Edit profile). The drawn avatar (shape, color, emoji) stays the
+// uploaded (Bot info → Profile). The drawn avatar (shape, color, emoji) stays the
 // fallback: no image, or a client that can't load it, shows it.
 //
 // Images live in bot_avatar_images and are served at AVATAR_ROUTE, which the
@@ -126,7 +126,7 @@ export function pickImageProvider({ settings = {}, env = process.env, fetch: fet
   if (openai) return openaiImageProvider(openai, { fetch: fetchImpl });
   const xai = key(IMAGE_KEY_SETTINGS.xai, "XAI_API_KEY");
   if (xai) return xaiImageProvider(xai, { fetch: fetchImpl });
-  throw new ImageNotSetUpError("add an OpenAI API key or an xAI key (Bot avatars) in Studio's settings, or set OPENAI_API_KEY or XAI_API_KEY on the BB host. Until then, the user can upload an image or pick a drawn avatar in Edit profile.");
+  throw new ImageNotSetUpError("add an OpenAI API key or an xAI key (Bot avatars) in Studio's settings, or set OPENAI_API_KEY or XAI_API_KEY on the BB host. Until then, the user can upload an image or pick a drawn avatar in Bot info → Profile.");
 }
 
 /** The prompt a provider gets: the Bot's idea, framed as a square avatar. */

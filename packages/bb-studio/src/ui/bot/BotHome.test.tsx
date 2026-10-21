@@ -290,8 +290,8 @@ test("Info tab: profile, controls, automations, and activity whose rows open as 
     ] },
   };
   await show(<BotPanel />);
-  expect(container.querySelector("h2")?.textContent).toBe("Dot");
-  expect(container.textContent).toContain("You are my chief of staff.");
+  expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
+  expect((container.querySelector('textarea[aria-label="Role"]') as HTMLTextAreaElement)?.value).toBe("You are my chief of staff.");
   expect(container.querySelector("[data-automation=heartbeat]")?.textContent).toContain("Weekdays 8:00");
   expect(container.querySelector("[data-automation=aut_w]")?.textContent).toContain("Paused");
   await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
@@ -313,28 +313,38 @@ test("the Bot page shows its status and confirms Stop", async () => {
   expect(state.call).toHaveBeenCalledWith("bot_stop", { botId: "bot_main" });
 });
 
-test("Edit profile saves shape, color and role; Skills (Share/Delete) live under Advanced; Memory opens its page", async () => {
+test("Bot info edits profile inline, keeps avatar history and Skills beside Memory", async () => {
   vi.stubGlobal("confirm", () => true);
   state.data = {
     bot_get: { bot: { ...dot, memoryPageId: "pg_mem" }, run: null },
     bot_activity: empty,
+    bot_avatar_history: { current: "img_1", previous: "img_0", images: [{ id: "img_1", url: "data:image/png;base64,AA==", mime: "image/png", source: "upload", prompt: null, provider: null, createdAt: 1 }] },
+    bot_profile_changes: { changes: [{ id: "change_1", field: "role", reverts: null, actorName: "Dot", oldValue: "Assistant", newValue: "Chief of staff", oldImageUrl: null, newImageUrl: null, revertedAt: null, at: Date.now() }] },
     bot_skills: { skills: [{ name: "weekly-review", description: "Fridays: sum up the week", updatedAt: 1 }] },
   };
   await show(<BotPanel />);
+  expect(container.querySelector('[data-testid="bot-profile-section"]')).not.toBeNull();
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  expect(container.textContent).toContain("Changed by Dot");
+  expect(container.querySelector('input[type="file"][accept*="image/png"]')).not.toBeNull();
+  expect(container.querySelector('[data-testid="bot-avatar-revert"]')).not.toBeNull();
   const { openAppPath } = await import("@bb-studio/kit/app");
   await act(async () => button("Memory").click());
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
   act(() => button("Skills…").click());
   expect(container.textContent).toContain("weekly-review");
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
   await act(async () => button("Share").click());
   expect(state.call).toHaveBeenCalledWith("bot_skill_share", { name: "weekly-review", botId: "bot_main" });
   await act(async () => button("Delete").click());
   expect(state.call).toHaveBeenCalledWith("bot_skill_delete", { name: "weekly-review", botId: "bot_main" });
+  await act(async () => click(container.querySelector('[data-testid="bot-avatar-revert"]')));
+  expect(state.call).toHaveBeenCalledWith("bot_avatar_revert", { botId: "bot_main" });
   act(() => click(container.querySelector('[aria-label="Shape star"]')));
   act(() => click(container.querySelector('[aria-label="Color #e5484d"]')));
   const role = container.querySelector('textarea[aria-label="Role"]') as HTMLTextAreaElement;
   act(() => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(role, "You are my chief of staff."); role.dispatchEvent(new Event("input", { bubbles: true })); });
-  await act(async () => button("Save").click());
+  await act(async () => button("Save profile").click());
   expect(state.call).toHaveBeenCalledWith("bot_set", { shape: "star", color: "#e5484d", role: "You are my chief of staff.", botId: "bot_main" });
 });
 
@@ -351,13 +361,49 @@ test("Bot info beside a thread: the owner's Info, no Open chat on its own chat; 
   await show(<BotInfoPanel threadId="thr_bot" params={null} />);
   expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_bot" }]);
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_main" }]);
-  expect(container.querySelector("h2")?.textContent).toBe("Dot");
+  expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(container.querySelector("[data-testid=bot-open-chat]")).toBeNull();
   await show(<BotInfoPanel threadId="t9" params={null} />);
   expect(container.querySelector("[data-testid=bot-open-chat]")).not.toBeNull();
   state.data = { bot_thread_owner: { botId: null } };
   await show(<BotInfoPanel threadId="t9" params={null} />);
   expect(container.textContent).toContain("Not a Bot thread.");
+});
+
+test("the thread header Bot info button opens the existing right-side panel for Bot threads only", async () => {
+  const { BotInfoHeaderAction } = await import("./BotTabs");
+  state.data = { bot_thread_owner: { botId: "bot_main" } };
+  await show(<BotInfoHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  const button = container.querySelector('[data-testid="bot-info-header"]') as HTMLButtonElement;
+  expect(button.title).toBe("Bot info");
+  act(() => button.click());
+  expect(state.openThreadPanel).toHaveBeenLastCalledWith({ actionId: "bot-info", title: "Bot info" });
+
+  state.data = { bot_thread_owner: { botId: null } };
+  await show(<BotInfoHeaderAction threadId="thr_regular" projectId="proj_personal" isCompactViewport={false} />);
+  expect(container.querySelector('[data-testid="bot-info-header"]')).toBeNull();
+});
+
+test("the cache header is a dot with the exact state in its tooltip", async () => {
+  const { BotCacheChip, cacheLabel } = await import("./BotCache");
+  const now = Date.now();
+  const warm = {
+    botId: "bot_main", threadId: "thr_bot", state: "warm" as const, label: "Warm · 59m", warmUntil: now + 59 * 60_000,
+    model: "model", contextTokens: 100_000,
+    warming: { active: true, nextPingAt: null, reason: null, lastPingAt: null, lastCompactAt: null, compactAt: null },
+    costs: { warmingPerHour: null, coldSend: null, warmSend: null }, banner: false,
+    settings: { enabled: true, thresholdTokens: 100_000, idleHours: 3, compactBeforeExpiry: true },
+  };
+  expect(cacheLabel(warm, now)).toBe("Warm · 59m left");
+  expect(cacheLabel({ ...warm, state: "cold", label: "Cold", warmUntil: null }, now)).toBe("Cold");
+  expect(cacheLabel({ ...warm, state: "off", label: "Warming off", warmUntil: null, settings: { ...warm.settings, enabled: false } }, now)).toBe("Warming off");
+  state.data = { bot_cache_state: warm };
+  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  const chip = container.querySelector('[data-testid="bot-cache-chip"]') as HTMLButtonElement;
+  expect(chip.title).toBe("Warm · 59m left");
+  expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warm · 59m left");
+  expect(chip.textContent).toBe("");
 });
 
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {

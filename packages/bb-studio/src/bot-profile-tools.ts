@@ -48,7 +48,7 @@ export function registerBotProfileTools(bb: Pick<BbPluginApi, "agents">, deps: B
       const provider = deps.imageProvider();
       const image = await provider.generate(avatarPrompt(bot.name, prompt));
       bots.addAvatarImage(bot.id, { data: image.data, mime: image.mime, source: "generated", prompt, provider: `${provider.id}/${image.model}` }, { botId: acting?.botId ?? null, threadId: ctx.threadId ?? null });
-      return `${bot.name}'s avatar is now the new image (${provider.label} ${image.model}). The user can revert to the previous one in Bot info → Edit profile.`;
+      return `${bot.name}'s avatar is now the new image (${provider.label} ${image.model}). The user can revert to the previous one in Bot info → Profile.`;
     },
   });
   bb.agents.registerTool({

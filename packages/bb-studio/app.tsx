@@ -36,7 +36,7 @@ import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { registerVoiceApp } from "./src/voice/ui/register";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
-import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
+import { BotInfoHeaderAction, BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
 import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadOpener, SideThreadPanel } from "./src/ui/bot/SideThreads";
@@ -160,9 +160,10 @@ export default definePluginApp((app) => {
   // view can open a tab beside it (BB declines openThreadPanel from an overlay).
   app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountSideThreadRows(signal) });
   app.slots.experimental_threadHeaderAction({ id: "side-thread-opener", title: "Side threads", component: SideThreadOpener });
-  // A Bot chat's prompt cache (src/bot-cache.ts): "Warm · 42m" in its header,
-  // and a banner in its composer when the cache expired on a big chat.
+  // A Bot chat's prompt cache (src/bot-cache.ts): a minimal state dot in its
+  // header, and a banner in its composer when the cache expired on a big chat.
   app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });
+  app.slots.experimental_threadHeaderAction({ id: "bot-info", title: "Bot info", component: BotInfoHeaderAction });
   app.composer.customize({ id: "bot-cache", banners: [{ id: "cold", chrome: "bare", component: BotCacheBanner }] });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });

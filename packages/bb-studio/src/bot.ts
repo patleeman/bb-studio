@@ -727,7 +727,7 @@ export class Bots {
     const row = this.need(botId);
     const change = this.deps.db.prepare("SELECT * FROM bot_profile_changes WHERE id = ? AND bot_id = ?").get(changeId, row.id) as ProfileChangeRow | undefined;
     if (!change) throw new Error("No such change.");
-    if (change.reverts !== null) throw new Error("That's a revert; change it in Edit profile instead.");
+    if (change.reverts !== null) throw new Error("That's a revert; change it in Bot info → Profile instead.");
     if (this.deps.db.prepare("SELECT 1 FROM bot_profile_changes WHERE reverts = ?").get(change.id)) throw new Error("That change is already reverted.");
     const user: ProfileActor = { botId: null };
     if (change.field === "avatarImage") {

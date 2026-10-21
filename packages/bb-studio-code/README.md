@@ -4,9 +4,8 @@ Part of BB Studio. VS Code is the editor, inside BB. Each thread gets one VS Cod
 
 ## Use it
 
-- **Beside a thread**, open the **VS Code** tab in the right panel. It opens the thread's own worktree, so you see the agent's changes, branch and diff. It's made the first time and reused. This works only when the thread runs on the computer running BB.
+- **Beside a thread**, choose **VS Code** from the right panel's **+** menu. It opens the thread's own worktree, so you see the agent's changes, branch and diff. It's made the first time and reused. This works only when the thread runs on the computer running BB.
 - **From a file tab**, code files open in the thread's VS Code tab, at their lines. The file tab says "Opened in VS Code beside this thread", with **Show BB's preview** to see BB's own view. Files VS Code can't open (no thread, thread storage, a thread on another machine, a file outside the worktree) show BB's preview. Markdown stays in BB's preview. **Settings → Files** can make BB's preview the default instead.
-- **From the thread header**, a code-icon chip appears once the thread has a VS Code or has edited files in its folder. One click opens the thread's VS Code tab. A dot pulses while the agent is editing.
 - **Sharing.** Agents see what you have open in the thread's VS Code. A bar at the top of the tab says so, with **Stop sharing**.
 - **Start and stop.** The first open downloads code-server 4.140.0 (about 200 MB) into the plugin's data folder. Later opens start in a few seconds.
 

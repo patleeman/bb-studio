@@ -1,5 +1,5 @@
 // A Bot chat's prompt cache on the desktop (src/bot-cache.ts): the header
-// chip ("Warm · 42m", "Cold", "Warming off") with its menu, the composer's
+// dot with its state tooltip and menu, the composer's
 // cold-send banner, and the Prompt cache section of Bot info.
 import { GHOST_BUTTON } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -22,7 +22,7 @@ function useTick(ms: number) {
 export function cacheLabel(state: BotCacheStateView, now = Date.now()): string {
   if (state.state === "warm" && state.warmUntil != null) {
     if (state.warmUntil <= now) return state.warming.active ? "Cold" : state.settings.enabled ? "Cold" : "Warming off";
-    return `Warm · ${Math.max(1, Math.ceil((state.warmUntil - now) / 60_000))}m`;
+    return `Warm · ${Math.max(1, Math.ceil((state.warmUntil - now) / 60_000))}m left`;
   }
   return state.label;
 }
@@ -39,7 +39,7 @@ export function costLine(state: BotCacheStateView): string | null {
 const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 /** The header chip on a Bot's chat; nothing on other threads. */
-export function BotCacheChip({ threadId, isCompactViewport }: PluginThreadHeaderActionProps) {
+export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
   const live = useLive<BotCacheStateView>("bot_cache_state", { threadId }, { pollMs: POLL_MS });
   const call = useCall();
   const [error, setError] = useState<string | null>(null);
@@ -48,15 +48,15 @@ export function BotCacheChip({ threadId, isCompactViewport }: PluginThreadHeader
   if (!state?.botId) return null;
   const label = cacheLabel(state);
   const warm = label.startsWith("Warm");
+  const disabled = label === "Warming off";
   const act = (method: string, input: object) => { setError(null); void call(method, input).then(() => live.refresh(), (cause: unknown) => setError(errorMessage(cause))); };
   const cost = costLine(state);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" data-testid="bot-cache-chip" aria-label={`Prompt cache: ${label}`} title={`Prompt cache: ${label}`}
-          className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground">
-          <Icon name={warm ? "Zap" : "CloudOff"} className="size-3.5" />
-          {isCompactViewport ? null : <span className="tabular-nums">{label}</span>}
+        <button type="button" data-testid="bot-cache-chip" aria-label={`Prompt cache: ${label}`} title={label}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground">
+          <span aria-hidden className={`size-2 rounded-full ${warm ? "bg-success" : disabled ? "bg-muted-foreground/40" : "bg-warning"}`} />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">

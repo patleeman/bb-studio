@@ -1,5 +1,5 @@
-// A Bot's Info: its profile, controls (Pause/Resume, Stop, the ⋯ menu with
-// Edit profile, Memory, Skills, Check-ins and Switch model), Memory, skills,
+// A Bot's Info: its inline profile, controls (Pause/Resume, Stop, the ⋯ menu
+// with Memory, Skills, Check-ins and Switch model), Memory, skills,
 // automations (check-ins, reminders, watchers, runners) and activity. It is
 // the Bot page itself (/plugins/studio/studio/bot[/<botId>], BotPanel), and the
 // "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
@@ -7,18 +7,18 @@
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import { useState } from "react";
-import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotActivityView, BotView } from "../../contract";
 import { useLive } from "../live";
-import { ActivityPanel, BotHome, runningCount, statusLabel, useBotControls } from "./BotHome";
-import { BOT_STYLES, BotAvatar, botProvider } from "./BotAvatar";
+import { ActivityPanel, BotHome, BotProfileEditor, runningCount, statusLabel, useBotControls } from "./BotHome";
+import { BOT_STYLES } from "./BotAvatar";
 import { SwitchModelDialog } from "./BotModel";
 import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { AutomationsSection } from "./Automations";
 import { ProfileChanges } from "./ProfileChanges";
 import { BotCacheSection } from "./BotCache";
-import { useOpenThread } from "./workspace";
+import { BOT_INFO_ACTION, useOpenThread } from "./workspace";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 
@@ -46,6 +46,20 @@ export function BotInfoPanel({ threadId }: PluginThreadPanelProps) {
   return <BotInfo botId={botId} threadId={threadId} />;
 }
 
+/** Header action beside the cache indicator on a Bot-owned thread. */
+export function BotInfoHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
+  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId }, { pollMs: 120_000 });
+  const navigate = useBbNavigate();
+  if (!owner.data?.botId) return null;
+  return (
+    <button type="button" data-testid="bot-info-header" aria-label="Bot info" title="Bot info"
+      onClick={() => navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })}
+      className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4">
+      <Icon name="Bot" aria-hidden />
+    </button>
+  );
+}
+
 /** One Bot's Info by id. */
 export function BotInfo({ botId, threadId }: { botId: string; threadId?: string }) {
   const view = useLive<BotView>("bot_get", { botId }, { pollMs: 30_000 });
@@ -57,33 +71,27 @@ export function BotInfo({ botId, threadId }: { botId: string; threadId?: string 
 function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; threadId?: string }) {
   const activity = useLive<BotActivityView>("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
-  const { bot, profile, run, busy, error, setSheet, openMemory, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
+  const { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, toggleSkills, skills, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
   const openSub = useOpenThread();
   const [switching, setSwitching] = useState(false);
+  const profileChanged = () => { refresh(); activity.refresh(); };
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
-      <header className="flex items-start gap-3 px-4 pt-4 pb-3">
-        <BotAvatar shape={profile.shape} color={profile.color} emoji={bot.avatar} image={bot.avatarImageUrl} size={44} working={running > 0} provider={botProvider(bot)} />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="truncate text-base font-semibold">{bot.name}</h2>
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
-            <span className={`size-1.5 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />
-            <span className="truncate">{statusLabel(view.run, bot.state, running)}</span>
-          </span>
-          {profile.role ? <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{profile.role}</p> : null}
-        </div>
-        <button type="button" className={ICON_BUTTON} aria-label="Edit profile" title="Edit profile" onClick={() => setSheet("profile")}><Icon name="Edit" /></button>
+      <BotProfileEditor bot={bot} value={profile} status={statusLabel(view.run, bot.state, running)} statusDot={STATE_DOT[bot.state]} working={running > 0} busy={!!busy}
+        onChanged={profileChanged} onSave={saveProfile}>
+        <ProfileChanges botId={bot.id} onChanged={profileChanged} />
+      </BotProfileEditor>
+      <div className="flex justify-end px-4 pt-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuItem onSelect={() => setSheet("profile")}><Icon name="Edit" />Edit profile…</DropdownMenuItem>
             {bot.kind === "external"
               ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
               : <>
                 <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSheet("skills")}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+                <DropdownMenuItem onSelect={toggleSkills}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
               </>}
             {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
             {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
@@ -94,7 +102,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
             {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
           </DropdownMenuContent>
         </DropdownMenu>
-      </header>
+      </div>
       {switching && bot.threadId && bot.providerId && bot.model
         ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
         : null}
@@ -114,9 +122,10 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
         {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
           <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
-          <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: () => setSheet("skills") }} />
+          <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: toggleSkills }} />
         </>}
       </dl>
+      {skills}
       {bot.kind === "external" ? null : <BotCacheSection botId={bot.id} threadId={bot.threadId} />}
 
       <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
@@ -125,7 +134,6 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
         : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} adoptOnly />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
-      <ProfileChanges botId={bot.id} onChanged={refresh} />
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />
       {sheets}
     </div>

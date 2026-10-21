@@ -1,7 +1,7 @@
 // "Changed by <Bot>": the edits a Bot made to its own profile (name,
 // description, emoji, shape, color, avatar image), each with a small diff and
-// Revert, which restores the old value. Reverts are listed too. Shown in a
-// Bot's Info, in its Activity (src/ui/bot/BotTabs.tsx).
+// Revert, which restores the old value. Reverts are listed too. Shown in the
+// Profile section of Bot info.
 import { relativeTime } from "@bb-studio/kit/format";
 import type { BotProfileChangeView } from "../../contract";
 import { useLive } from "../live";
@@ -34,11 +34,10 @@ export function ProfileChanges({ botId, onChanged, limit = 5 }: { botId: string;
   const changes = useLive<{ changes: BotProfileChangeView[] }>("bot_profile_changes", { botId }, { pollMs: 30_000 });
   const { run, busy, error } = useAction(() => { changes.refresh(); onChanged(); }, botId);
   const list = (changes.data?.changes ?? []).slice(0, limit);
-  if (!list.length) return null;
   return (
     <section aria-label="Profile changes" className="flex flex-col px-2.5 pt-2">
       <h3 className="px-1.5 pb-1 text-xs font-medium text-muted-foreground">Profile changes</h3>
-      <ul className="flex flex-col">
+      {list.length ? <ul className="flex flex-col">
         {list.map((change) => (
           <li key={change.id} className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-sm" data-testid="bot-profile-change">
             <span className="shrink-0 text-xs text-muted-foreground">{changedBy(change)} {FIELD_LABEL[change.field]}</span>
@@ -54,7 +53,7 @@ export function ProfileChanges({ botId, onChanged, limit = 5 }: { botId: string;
               : change.revertedAt !== null ? <span className="shrink-0 text-xs text-muted-foreground">Reverted</span> : null}
           </li>
         ))}
-      </ul>
+      </ul> : <p className="px-1.5 py-1 text-xs text-muted-foreground">{changes.loading && !changes.data ? "Loading…" : "No profile changes yet."}</p>}
       {error ? <p role="alert" className="px-1.5 text-xs text-destructive">{error}</p> : null}
     </section>
   );

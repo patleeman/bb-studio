@@ -15,10 +15,13 @@ import {
 import { AutomationsView } from "./ThreadAutomations";
 
 const sdkForTest = vi.hoisted(() => ({ current: {} as unknown }));
+const headerForTest = vi.hoisted(() => ({ owner: { data: null as unknown, loading: false }, openThreadPanel: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useSdk: () => sdkForTest.current,
+  useBbNavigate: () => ({ openThreadPanel: headerForTest.openThreadPanel }),
 }));
+vi.mock("../live", () => ({ useLive: () => headerForTest.owner }));
 
 installTestPluginRuntime();
 
@@ -244,5 +247,30 @@ describe("useThreadAutomations", () => {
     const { useThreadAutomations } = await import("./ThreadAutomations");
     const { result } = renderHook(() => useThreadAutomations("thr_1", null));
     await waitFor(() => expect(result.current.state.kind).toBe("unavailable"));
+  });
+});
+
+describe("ThreadAutomationsBadge", () => {
+  it("keeps the clock on regular threads and hides it for Bot-owned threads", async () => {
+    const callRpc = vi.fn(async () => [automation()]);
+    sdkForTest.current = {
+      plugins: { callRpc, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
+      threads: { get: vi.fn() },
+      subscribe: () => () => {},
+    };
+    const { ThreadAutomationsBadge } = await import("./ThreadAutomations");
+
+    headerForTest.owner = { data: { botId: "bot_1" }, loading: false };
+    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" isCompactViewport={false} />);
+    expect(document.querySelector("button")).toBeNull();
+    expect(callRpc).not.toHaveBeenCalled();
+    cleanup();
+
+    headerForTest.owner = { data: { botId: null }, loading: false };
+    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" isCompactViewport={false} />);
+    await waitFor(() => expect(callRpc).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('button[aria-label="1 automation wake this thread"]')).not.toBeNull());
+    fireEvent.click(document.querySelector('button[aria-label="1 automation wake this thread"]')!);
+    expect(headerForTest.openThreadPanel).toHaveBeenCalledWith({ actionId: "thread-automations", title: "Automations" });
   });
 });

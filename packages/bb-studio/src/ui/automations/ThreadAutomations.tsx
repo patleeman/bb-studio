@@ -10,6 +10,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { openAppPath } from "@bb-studio/kit/app";
 import { cn, Icon } from "@bb-studio/kit/ui";
+import { useLive } from "../live";
 import {
   AUTOMATIONS_PLUGIN_ID,
   AUTOMATIONS_TAB,
@@ -198,8 +199,14 @@ function AutomationRow({ row, now, onToggle }: { row: ThreadAutomation; now: num
   );
 }
 
-/** Clock badge in the thread header with the number of automations that wake it. */
-export function ThreadAutomationsBadge({ threadId, projectId }: PluginThreadHeaderActionProps) {
+/** The automation clock remains on regular threads; Bot threads use their Bot info button instead. */
+export function ThreadAutomationsBadge(props: PluginThreadHeaderActionProps) {
+  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId: props.threadId }, { pollMs: 120_000 });
+  if (owner.loading || owner.data?.botId) return null;
+  return <RegularThreadAutomationsBadge {...props} />;
+}
+
+function RegularThreadAutomationsBadge({ threadId, projectId }: PluginThreadHeaderActionProps) {
   const navigate = useBbNavigate();
   const { state } = useThreadAutomations(threadId, projectId);
   if (state.kind !== "ready" || state.rows.length === 0) return null;
