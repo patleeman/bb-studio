@@ -645,3 +645,66 @@ it("puts a Bot automation past its auto-resume cap in Needs you, opening the Bot
   alerts = [];
   expect((await x.bots.activity()).needsYou).toEqual([]);
 });
+
+it("applies skill saves immediately, preserves diffs and warnings, and reverts without losing history", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.bots.writeSkill({ name: "deploy", description: "Before deploying", body: "old step" });
+  const first = x.bots.skillHistory()[0]!;
+  x.bots.writeSkill({ name: "deploy", description: "Before deploying", body: "Yesterday we tried PR #482" });
+  expect(x.bots.skill("deploy")?.body).toBe("Yesterday we tried PR #482");
+  const second = x.bots.skillHistory()[0]!;
+  expect(second.diff).toBe("- old step\n+ Yesterday we tried PR #482");
+  expect(second.warnings[0]).toMatch(/log of one session/);
+  x.bots.lintSkillVersion(second.id, ["Check the deployment target."]);
+  expect(x.bots.skillHistory()[0]!.warnings).toContain("Check the deployment target.");
+  expect(x.bots.skill("deploy")?.body).toBe(second.body);
+  x.bots.revertSkill(first.id);
+  expect(x.bots.skill("deploy")?.body).toBe("old step");
+  expect(x.bots.skillHistory()).toHaveLength(3);
+  x.bots.deleteSkill("deploy");
+  expect(x.bots.skillHistory()[0]!.body).toBeNull();
+  x.bots.revertSkill(second.id);
+  expect(x.bots.skill("deploy")?.body).toBe(second.body);
+  expect(() => x.bots.revertSkill(first.id, "other-bot")).toThrow();
+  expect(() => x.db.prepare("UPDATE bot_skill_versions SET body = 'changed'").run()).toThrow(/append-only/);
+  expect(() => x.db.prepare("DELETE FROM bot_skill_versions").run()).toThrow(/append-only/);
+  expect(() => x.db.prepare("DELETE FROM bot_skill_lints").run()).toThrow(/append-only/);
+});
+
+it("migrates pending writes and deletes as approved once, preserving prior and applied versions", async () => {
+  const x = await setup(MIGRATIONS.slice(0, -1));
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  const insert = x.db.prepare("INSERT INTO bot_skills(bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', ?, 'd', ?, 1, 1)");
+  insert.run("deploy", "old"); insert.run("retired", "keep in history");
+  const pending = x.db.prepare("INSERT INTO bot_skill_pending(id, bot_id, name, action, description, body, created_at) VALUES (?, 'bot_main', ?, ?, 'new description', ?, 2)");
+  pending.run("p1", "deploy", "write", "new"); pending.run("p2", "retired", "delete", null); pending.run("p3", "inbox", "write", "sort mail");
+  x.db.prepare("INSERT INTO bot_learning(bot_id, approval) VALUES ('bot_main', 1)").run();
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.bots.skill("deploy")).toMatchObject({ body: "new", description: "new description" });
+  expect(x.bots.skill("inbox")?.body).toBe("sort mail");
+  expect(x.bots.skill("retired")).toBeNull();
+  expect(x.bots.skillHistory().find((v) => v.name === "deploy")?.diff).toBe("- old\n+ new");
+  expect(x.bots.skillHistory().filter((v) => v.name === "retired").map((v) => v.body)).toEqual([null, "keep in history"]);
+  expect(x.db.prepare("SELECT * FROM bot_skill_pending").all()).toEqual([]);
+  expect(x.db.prepare("SELECT approval FROM bot_learning").get()).toEqual({ approval: 0 });
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.bots.skillHistory()).toHaveLength(5);
+});
+
+it("pages skill history without preventing reverts or lint on older versions", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" }); await x.bots.setThread("bot1");
+  x.bots.writeSkill({ name: "deploy", description: "d", body: "first" });
+  const first = x.bots.skillHistory()[0]!;
+  for (let i = 0; i < 50; i++) x.bots.writeSkill({ name: "deploy", description: "d", body: `step ${i}` });
+  const recent = x.bots.skillHistory();
+  expect(recent).toHaveLength(50);
+  expect(x.bots.skillHistory(undefined, recent[49]!.id).map((v) => v.id)).toEqual([first.id]);
+  x.bots.lintSkillVersion(first.id, ["Historical warning"]);
+  expect(x.bots.skillHistory(undefined, recent[49]!.id)[0]!.warnings).toEqual(["Historical warning"]);
+  x.bots.revertSkill(first.id);
+  expect(x.bots.skill("deploy")?.body).toBe("first");
+});

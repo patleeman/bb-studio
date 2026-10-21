@@ -401,4 +401,48 @@ export const MIGRATIONS = [
        role TEXT, text TEXT, data TEXT
      );
    CREATE INDEX voice_call_events_call ON voice_call_events (call_id, id);`,
+  // Skill content history is append-only, including deletes and reverts.
+  // Triggers also cover imports and the pending saves applied during upgrade.
+  `ALTER TABLE bot_skills ADD COLUMN lint_warnings TEXT NOT NULL DEFAULT '[]';
+   CREATE TABLE bot_skill_versions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, name TEXT NOT NULL,
+     description TEXT, body TEXT, old_body TEXT NOT NULL, warnings TEXT NOT NULL, at INTEGER NOT NULL
+   );
+   CREATE INDEX bot_skill_versions_skill ON bot_skill_versions(bot_id, name, id);
+   INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at)
+     SELECT bot_id, name, description, body, '', lint_warnings, updated_at FROM bot_skills;
+   CREATE TRIGGER bot_skill_versions_insert AFTER INSERT ON bot_skills BEGIN
+     INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at)
+       VALUES (NEW.bot_id, NEW.name, NEW.description, NEW.body, '', NEW.lint_warnings, NEW.updated_at);
+   END;
+   CREATE TRIGGER bot_skill_versions_write AFTER UPDATE OF body, description ON bot_skills BEGIN
+     INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at)
+       VALUES (NEW.bot_id, NEW.name, NEW.description, NEW.body, OLD.body, NEW.lint_warnings, NEW.updated_at);
+   END;
+   CREATE TRIGGER bot_skill_versions_delete AFTER DELETE ON bot_skills BEGIN
+     INSERT INTO bot_skill_versions(bot_id, name, description, body, old_body, warnings, at)
+       VALUES (OLD.bot_id, OLD.name, NULL, NULL, OLD.body, '[]', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+   END;
+   CREATE TRIGGER bot_skill_versions_no_update BEFORE UPDATE ON bot_skill_versions
+     BEGIN SELECT RAISE(ABORT, 'bot_skill_versions is append-only'); END;
+   CREATE TRIGGER bot_skill_versions_no_delete BEFORE DELETE ON bot_skill_versions
+     BEGIN SELECT RAISE(ABORT, 'bot_skill_versions is append-only'); END;
+   CREATE TABLE bot_skill_lints (
+     id INTEGER PRIMARY KEY AUTOINCREMENT, version_id INTEGER NOT NULL REFERENCES bot_skill_versions(id),
+     warning TEXT NOT NULL
+   );
+   CREATE TRIGGER bot_skill_lints_no_update BEFORE UPDATE ON bot_skill_lints
+     BEGIN SELECT RAISE(ABORT, 'bot_skill_lints is append-only'); END;
+   CREATE TRIGGER bot_skill_lints_no_delete BEFORE DELETE ON bot_skill_lints
+     BEGIN SELECT RAISE(ABORT, 'bot_skill_lints is append-only'); END;
+   INSERT INTO bot_skills(bot_id, name, description, body, created_at, updated_at, state, used_at)
+     SELECT bot_id, name, COALESCE(description, name), COALESCE(body, ''), created_at, created_at, 'active', created_at
+     FROM bot_skill_pending WHERE action = 'write' ORDER BY created_at, id
+     ON CONFLICT(bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body,
+       updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at, lint_warnings = '[]';
+   DELETE FROM bot_skills WHERE EXISTS (
+     SELECT 1 FROM bot_skill_pending p WHERE p.bot_id = bot_skills.bot_id AND p.name = bot_skills.name AND p.action = 'delete'
+   );
+   DELETE FROM bot_skill_pending;
+   UPDATE bot_learning SET approval = 0;`,
 ];

@@ -3,7 +3,7 @@
 // that the user hasn't seen.
 import { openAppPath, studioPath } from "@bb-studio/kit/app";
 import { Button, cn, Icon } from "@bb-studio/kit/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { Problem } from "../../health-contract";
 import { useHealth, type HealthApi } from "./use-health";
 
@@ -59,7 +59,6 @@ const STATUS = {
 } as const;
 
 export function ProblemRow({ problem, health, onFix }: { problem: Problem; health: HealthApi; onFix?: () => void }) {
-  const [confirming, setConfirming] = useState(false);
   return (
     <li className="flex flex-col gap-1.5 rounded-md border border-border p-2.5">
       <div className="flex min-w-0 items-center gap-2">
@@ -71,21 +70,11 @@ export function ProblemRow({ problem, health, onFix }: { problem: Problem; healt
       <p className="text-sm text-foreground">{problem.title}</p>
       {problem.detail ? <p className="text-xs leading-relaxed text-muted-foreground">{problem.detail}</p> : null}
       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-        {confirming ? (
-          <>
-            <span className="text-xs text-muted-foreground">Turn off {problem.pluginName}?</span>
-            <Button size="sm" variant="destructive" disabled={health.busy} onClick={() => void health.disable(problem.pluginId)}>Turn off</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
-          </>
-        ) : (
-          <>
-            <Button size="sm" variant="outline" onClick={() => { onFix?.(); openAppPath(problem.fix.path); }}>{problem.fix.label}</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>Turn off plugin</Button>
-            <Button size="sm" variant="ghost" disabled={health.busy} onClick={() => void health.hide(problem.key, !problem.hidden)}>
-              {problem.hidden ? "Show" : "Hide"}
-            </Button>
-          </>
-        )}
+        <Button size="sm" variant="outline" onClick={() => { onFix?.(); openAppPath(problem.fix.path); }}>{problem.fix.label}</Button>
+        <Button size="sm" variant="ghost" disabled={health.busy} onClick={() => void health.disable(problem.pluginId)}>Turn off plugin</Button>
+        <Button size="sm" variant="ghost" disabled={health.busy} onClick={() => void health.hide(problem.key, !problem.hidden)}>
+          {problem.hidden ? "Show" : "Hide"}
+        </Button>
       </div>
     </li>
   );

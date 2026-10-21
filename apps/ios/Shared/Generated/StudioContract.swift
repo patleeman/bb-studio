@@ -77,6 +77,8 @@ public enum Studio {
     public static let bot_learning_review = "bot_learning_review"
     public static let bot_skill_curate = "bot_skill_curate"
     public static let bot_skill_pending_resolve = "bot_skill_pending_resolve"
+    public static let bot_skill_history = "bot_skill_history"
+    public static let bot_skill_revert = "bot_skill_revert"
     public static let bot_runners = "bot_runners"
     public static let bot_runner_create = "bot_runner_create"
     public static let bot_runner_update = "bot_runner_update"
@@ -402,6 +404,10 @@ public enum Studio {
   public typealias BotSkillCurate = BotSkillCurateOutput
 
   public typealias BotSkillPendingResolve = BotSkillPendingResolveOutput
+
+  public typealias BotSkillHistory = BotSkillHistoryOutput
+
+  public typealias BotSkillRevert = BotSkillRevertOutput
 
   public typealias BotRunners = BotRunnersOutput
 
@@ -7380,6 +7386,62 @@ public enum Studio {
       self.lastCurator = lastCurator
       self.nextCuratorAt = nextCuratorAt
       self.pending = pending
+    }
+  }
+
+  public struct BotSkillHistoryInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var before: Int?
+
+    public init(botId: String? = nil, before: Int? = nil) {
+      self.botId = botId
+      self.before = before
+    }
+  }
+
+  public struct BotSkillHistoryOutputVersionsItem: Sendable, Hashable, Codable {
+    public var id: Double?
+    public var name: String?
+    public var description: String?
+    public var body: String?
+    public var diff: String?
+    public var warnings: [String]?
+    public var at: Double?
+
+    public init(id: Double? = nil, name: String? = nil, description: String? = nil, body: String? = nil, diff: String? = nil, warnings: [String]? = nil, at: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.body = body
+      self.diff = diff
+      self.warnings = warnings
+      self.at = at
+    }
+  }
+
+  public struct BotSkillHistoryOutput: Sendable, Hashable, Codable {
+    public var versions: [BotSkillHistoryOutputVersionsItem]?
+
+    public init(versions: [BotSkillHistoryOutputVersionsItem]? = nil) {
+      self.versions = versions
+    }
+  }
+
+  public struct BotSkillRevertInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var versionId: Int?
+
+    public init(botId: String? = nil, versionId: Int? = nil) {
+      self.botId = botId
+      self.versionId = versionId
+    }
+  }
+
+  public struct BotSkillRevertOutput: Sendable, Hashable, Codable {
+    public var reverted: Bool?
+
+    public init(reverted: Bool? = nil) {
+      self.reverted = reverted
     }
   }
 

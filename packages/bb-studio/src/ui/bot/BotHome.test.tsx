@@ -484,7 +484,7 @@ test("Switch model hands off to another provider, saying so, and switches in pla
   state.call.mockImplementation((async () => ({})) as never);
 });
 
-test("Skills: learn from work, the last review, approvals, pins and archived skills with Restore", async () => {
+test("Skills: learn from work, the last review, history, pins and archived skills with Restore", async () => {
   state.data = {
     bot_get: { bot: dot, run: null },
     bot_activity: empty,
@@ -493,6 +493,7 @@ test("Skills: learn from work, the last review, approvals, pins and archived ski
       { name: "inbox-sweep", description: "Sort mail", updatedAt: 1, state: "stale", pinned: true, usedAt: 1 },
       { name: "old-report", description: "Gone quiet", updatedAt: 1, state: "archived", pinned: false, usedAt: 1 },
     ] },
+    bot_skill_history: { versions: [{ id: 1, name: "deploy-check", body: "new", diff: "- old\n+ new", warnings: ["Advisory lint warning"], at: 1 }] },
     bot_learning: {
       enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], approval: true, consolidate: false, curatorPaused: false,
       toolTurns: 3, userTurns: 1, reviewing: false, lastReview: { at: Date.now() - 2 * 3_600_000, result: "Saved 1 skill" }, lastCurator: null, nextCuratorAt: null,
@@ -506,8 +507,10 @@ test("Skills: learn from work, the last review, approvals, pins and archived ski
   expect(container.textContent).toContain("stale");
   expect(container.textContent).toContain("- old\n+ new");
   expect(container.textContent).not.toContain("old-report");
-  await act(async () => button("Approve").click());
-  expect(state.call).toHaveBeenCalledWith("bot_skill_pending_resolve", { id: "pend_1", approve: true, botId: "bot_main" });
+  expect(container.textContent).not.toContain("Waiting for your approval");
+  expect(container.textContent).toContain("Advisory lint warning");
+  await act(async () => button("Revert").click());
+  expect(state.call).toHaveBeenCalledWith("bot_skill_revert", { versionId: 1, botId: "bot_main" });
   await act(async () => click(container.querySelector('[aria-label="Pin deploy-check"]')));
   expect(state.call).toHaveBeenCalledWith("bot_skill_pin", { name: "deploy-check", pinned: true, botId: "bot_main" });
   act(() => button("Archived (1)").click());
@@ -600,4 +603,14 @@ test("a thread dragged from a bot's list onto Threads comes back; a Threads row 
   expect(over.defaultPrevented).toBe(true);
   await act(async () => { drag(section, "drop"); });
   expect(state.call).toHaveBeenCalledWith("bot_thread_release", { threadId: "thr_done" });
+});
+
+
+test("adopts a runner immediately without a confirmation dialog", async () => {
+  const { RunnersSection } = await import("./Runners");
+  state.data = { bot_runners: { runners: [], adoptable: [{ threadId: "thr_adopt", automationId: "auto1", title: "Report", automationName: "Daily", cron: "0 9 * * *" }] } };
+  await show(<RunnersSection botId="bot_main" botName="Dot" onOpen={() => {}} disabled={false} adoptOnly />);
+  await act(async () => button("Adopt as runner").click());
+  expect(state.call).toHaveBeenCalledWith("bot_runner_adopt", { botId: "bot_main", threadId: "thr_adopt", automationId: "auto1" });
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
 });

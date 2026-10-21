@@ -1529,13 +1529,24 @@ of Staff", with the same thread and check-ins; rename it from its page.
     deleted. It's listed in Automations as **Skill curator** (Pause, Run
     now). With **Curator merges overlapping skills** on (off by default) it
     also starts a fork that merges overlapping skills.
-  - **Approval.** With **Review skills before saving** on, a review's
-    writes wait in Skills with a line diff and **Approve** / **Reject**.
+  - **Immediate saves and history.** The Bot manages its own skills. Writes,
+    patches, and review-fork changes apply immediately. **Bot info → Skills →
+    Skill history** keeps every content version, its line diff, and advisory
+    lint warnings. **Revert** restores a version in one click and appends a new
+    version, preserving what it replaced. Deleted skills also stay in history.
+    Built-in lint runs on saves. The optional review model can attach quality
+    or safety warnings through `bot_skill_lint`; warnings never block a save.
+    History and model findings use append-only tables (`bot_skill_versions`
+    and `bot_skill_lints`). Upgrade applies pending changes as approved and
+    clears the pending list. For one release, `bot_skill_pending_resolve` is a
+    deprecated no-op returning `pending: []`, with `approval: false`.
   - **Settings** (Skills, ⋯ or Edit profile → Advanced): **Learn from
-    work** on or off, every N turns, review model, approval, the last
-    review's result with **Review now**, pins, and a collapsed **Archived**
-    list. iOS: the Skills sheet has Learn from work, approvals, pins (swipe)
-    and Archived with Restore.
+    work** on or off, every N turns, review model, the last review's result
+    with **Review now**, pins, and a collapsed **Archived** list. Older iOS
+    clients retain their approval controls, but receive no pending changes.
+    See [the approval audit](../../docs/approvals.md) for the iOS follow-up.
+
+  The screenshot below predates immediate saving and still shows the retired approval switch.
 
   ![Skills in a staged BB, opened from Info → Manage skills: Edit profile's Advanced section with Learn from work on, every 10 turns; the last review "Saved 1 skill · 2m ago" with Review now; Review model Cheapest (gpt-6-luna); Review skills before saving and Curator merges overlapping skills off; and the system-report skill Dot's review fork saved after the user corrected how a system report should look, with Pin, Share and Delete](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
@@ -1658,7 +1669,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`, `bot_skill_pin`, `bot_skill_restore`, `bot_learning`,
   `bot_learning_set`, `bot_learning_review`, `bot_skill_curate` (`dryRun`
-  lists what it would change), `bot_skill_pending_resolve`, and the runner RPCs below. Each takes an optional
+  lists what it would change), `bot_skill_history`, `bot_skill_revert`,
+  `bot_skill_pending_resolve` (deprecated for one release), and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
   then additional bots. Agent tools: `bot_get`, `bot_set`, `bot_avatar_generate`, `bot_pause`,
   `bot_resume`, `bot_stop`, `bot_activity` (`bot_pause` and `bot_stop` work only
@@ -1756,7 +1768,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     **New runner** makes one.
   - **Adopt as runner**: Info lists threads the Bot started (or whose
     automation its thread created) that an automation wakes. Nothing
-    changes until you click **Adopt**: the thread is registered, its
+    changes until you click **Adopt as runner** (applies immediately): the thread is registered, its
     automation and schedule stay, one reporting note is appended to the
     automation's prompt (runner_report instead of `[PASS]` or messaging the
     Bot), and the thread is unnested from the Bot (BB posts one "removed"

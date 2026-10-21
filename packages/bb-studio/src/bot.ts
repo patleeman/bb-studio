@@ -34,6 +34,7 @@ import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-provi
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
+import { lineDiff, lintSkill } from "./skill-learning";
 import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
 
 type Sdk = BbPluginApi["sdk"];
@@ -998,11 +999,37 @@ export class Bots {
     const row = this.need(botId);
     if (!SKILL_NAME.test(input.name)) throw new Error("A skill name is lowercase words joined by hyphens, like weekly-review.");
     const now = Date.now();
-    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?)
-      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at`)
-      .run(row.id, input.name, input.description.trim(), input.body, now, now, now);
+    this.deps.db.prepare(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, used_at, lint_warnings) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+      ON CONFLICT (bot_id, name) DO UPDATE SET description = excluded.description, body = excluded.body, updated_at = excluded.updated_at, state = 'active', used_at = excluded.used_at, lint_warnings = excluded.lint_warnings`)
+      .run(row.id, input.name, input.description.trim(), input.body, now, now, now, JSON.stringify(lintSkill(input, this.skills(row.id).map((skill) => skill.name))));
     this.deps.changed();
     return this.skills(row.id).find((skill) => skill.name === input.name)!;
+  }
+
+  /** All content versions, including removed skills; reverting appends another version. */
+  skillHistory(botId?: string, before?: number) {
+    const bot = this.need(botId);
+    const rows = this.deps.db.prepare("SELECT * FROM bot_skill_versions WHERE bot_id = ? AND (? IS NULL OR id < ?) ORDER BY id DESC LIMIT 50").all(bot.id, before ?? null, before ?? null) as { id: number; name: string; description: string | null; body: string | null; old_body: string; warnings: string; at: number }[];
+    return rows.map((row) => ({ id: row.id, name: row.name, description: row.description, body: row.body, at: row.at,
+      diff: lineDiff(row.old_body, row.body ?? ""),
+      warnings: [...JSON.parse(row.warnings) as string[], ...(this.deps.db.prepare("SELECT warning FROM bot_skill_lints WHERE version_id = ? ORDER BY id").all(row.id) as { warning: string }[]).map((lint) => lint.warning)],
+    }));
+  }
+
+  revertSkill(versionId: number, botId?: string): void {
+    const version = this.deps.db.prepare("SELECT name, description, body FROM bot_skill_versions WHERE bot_id = ? AND id = ?").get(this.need(botId).id, versionId) as { name: string; description: string | null; body: string | null } | undefined;
+    if (!version) throw new Error("That skill version is gone.");
+    if (version.body === null) this.deleteSkill(version.name, botId);
+    else this.writeSkill({ name: version.name, description: version.description ?? version.name, body: version.body }, botId);
+  }
+
+  /** Model findings are advisory and belong to the exact version inspected. */
+  lintSkillVersion(versionId: number, warnings: string[], botId?: string): void {
+    if (!this.deps.db.prepare("SELECT 1 FROM bot_skill_versions WHERE bot_id = ? AND id = ?").get(this.need(botId).id, versionId)) throw new Error("That skill version is gone.");
+    this.deps.db.transaction(() => {
+      for (const warning of warnings) this.deps.db.prepare("INSERT INTO bot_skill_lints(version_id, warning) VALUES (?, ?)").run(versionId, warning);
+    })();
+    this.deps.changed();
   }
 
   deleteSkill(name: string, botId?: string): boolean {

@@ -163,14 +163,16 @@ const botSkill = z.object({
   /** When the Bot last loaded or saved it. */
   usedAt: z.number().nullable().optional(),
 });
-/** A Bot's skill learning (src/skill-learning.ts): background reviews, the curator and staged changes. */
+/** A Bot's skill learning (src/skill-learning.ts): background reviews and the curator. */
 const botLearning = z.object({
   enabled: z.boolean(), interval: z.number(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
+  /** @deprecated Always false. */
   approval: z.boolean(), consolidate: z.boolean(), curatorPaused: z.boolean(),
   toolTurns: z.number(), userTurns: z.number(), reviewing: z.boolean(),
   lastReview: z.object({ at: z.number(), result: z.string() }).nullable(),
   lastCurator: z.object({ at: z.number(), result: z.string() }).nullable(),
   nextCuratorAt: z.number().nullable(),
+  /** @deprecated Always empty; saved changes live in skill history. */
   pending: z.array(z.object({ id: z.string(), name: z.string(), action: z.enum(["write", "delete"]), description: z.string().nullable(), diff: z.string(), createdAt: z.number() })),
 });
 export type BotLearningView = z.infer<typeof botLearning>;
@@ -532,16 +534,20 @@ export const rpcContract = defineRpcContract({
   bot_skill_pin: { input: z.object({ botId, name: z.string().min(1).max(100), pinned: z.boolean() }), output: z.object({ changed: z.boolean() }) },
   /** Brings an archived (or stale) skill back to active. */
   bot_skill_restore: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ changed: z.boolean() }) },
-  /** The Bot's skill learning: settings, counters, the last review and curator run, staged changes. */
+  /** The Bot's skill learning: settings, counters, the last review and curator run. */
   bot_learning: { input: forBot, output: botLearning },
   /** Changes the Bot's skill learning settings. */
-  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), interval: z.number().int().min(2).max(200).optional(), reviewModel: z.string().max(200).nullable().optional(), approval: z.boolean().optional(), consolidate: z.boolean().optional(), curatorPaused: z.boolean().optional() }), output: botLearning },
+  bot_learning_set: { input: z.object({ botId, enabled: z.boolean().optional(), interval: z.number().int().min(2).max(200).optional(), reviewModel: z.string().max(200).nullable().optional(), approval: z.boolean().optional().describe("Deprecated; ignored. Saves apply immediately."), consolidate: z.boolean().optional(), curatorPaused: z.boolean().optional() }), output: botLearning },
   /** Starts a skill review now (a fork of the Bot's idle thread); started is false when one is running or the Bot is busy. */
   bot_learning_review: { input: forBot, output: z.object({ started: z.boolean() }) },
   /** Runs the skill curator now; dryRun lists what it would change. */
   bot_skill_curate: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: z.object({ changes: z.array(z.object({ name: z.string(), from: z.string(), to: z.string() })), consolidating: z.boolean(), result: z.string() }) },
-  /** Approves or rejects a review's staged skill change. */
+  /** @deprecated Compatibility for one release. No-op; returns pending: [] and approval: false. */
   bot_skill_pending_resolve: { input: z.object({ botId, id: z.string().min(1).max(100), approve: z.boolean() }), output: botLearning },
+  /** Content history includes deletes, diffs and advisory lint warnings. */
+  bot_skill_history: { input: z.object({ botId, before: z.number().int().positive().optional() }), output: z.object({ versions: z.array(z.object({ id: z.number(), name: z.string(), description: z.string().nullable(), body: z.string().nullable(), diff: z.string(), warnings: z.array(z.string()), at: z.number() })) }) },
+  /** Restores a version immediately, keeping the current content in history. */
+  bot_skill_revert: { input: z.object({ botId, versionId: z.number().int().positive() }), output: z.object({ reverted: z.boolean() }) },
   /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */
   bot_runners: { input: forBot, output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
   /** Makes a runner: its thread (first run now) and its schedule. */

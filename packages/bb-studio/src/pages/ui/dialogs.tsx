@@ -85,9 +85,7 @@ export function HistoryDialog({
                   variant="ghost"
                   disabled={busy}
                   onClick={() => {
-                    if (window.confirm("Restore this version? The current page is saved first.")) {
-                      void run(() => rpc.call("pages.restore", { snapshotId: snapshot.id }));
-                    }
+                    void run(() => rpc.call("pages.restore", { snapshotId: snapshot.id }));
                   }}
                 >
                   Restore

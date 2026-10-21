@@ -186,7 +186,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_avatar_generate", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** A side thread (src/bot-side-threads.ts) talks about one reply: it reads the Bot, never changes it. */
   const SIDE_THREAD_TOOLS = ["bot_get", "bot_activity", "bot_skill_list", "bot_skill_view", "bot_history_search", "runner_list", "automation_list"] as const;
   // A fork inherits its Bot's session, tool list included, so configure can't
@@ -597,8 +597,6 @@ export default async function plugin(bb: BbPluginApi) {
     memoryPage: (botId) => { try { return bots.memoryPage(botId); } catch { return null; } },
     skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt })),
     setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
-    writeSkill: (botId, input) => { bots.writeSkill(input, botId); },
-    deleteSkill: (botId, name) => bots.deleteSkill(name, botId),
     log: (message) => bb.log.warn(message),
     quietSince: (threadId, updatedAt) => warmer.quietSince(threadId, updatedAt),
   });
@@ -846,7 +844,10 @@ export default async function plugin(bb: BbPluginApi) {
     bot_learning_set: ({ botId, ...input }) => learning.set(learnerId(botId), input),
     bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
     bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
-    bot_skill_pending_resolve: ({ botId, id, approve }) => { const bot = learnerId(botId); learning.resolve(bot, id, approve); return learning.view(bot); },
+    // Deprecated for one release: old iOS clients receive an empty pending list.
+    bot_skill_pending_resolve: ({ botId }) => learning.view(learnerId(botId)),
+    bot_skill_history: ({ botId, before }) => ({ versions: bots.skillHistory(botId, before) }),
+    bot_skill_revert: ({ botId, versionId }) => { bots.revertSkill(versionId, botId); return { reverted: true }; },
     bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),
     bot_automation_create: ({ botId, ...input }) => automations.create(input as never, botId),
     bot_automation_update: ({ botId, ...input }) => automations.update(input as never, botId),
@@ -1172,23 +1173,20 @@ export default async function plugin(bb: BbPluginApi) {
     const notes = lintSkill(skill, bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name));
     return notes.length ? `${line}\nNotes (advisory, nothing was blocked):\n${notes.map((note) => `- ${note}`).join("\n")}` : line;
   };
-  /** A skill as the caller sees it: a review with approval on sees its own staged version. */
-  const currentSkill = (name: string, botId: string, threadId: string | undefined) => {
-    const staged = learning.staging(threadId) ? learning.staged(botId, name) : null;
-    if (staged?.action === "delete") return null;
-    const saved = bots.skill(name, botId);
-    if (staged) return { name, description: staged.description ?? saved?.description ?? name, body: staged.body ?? "", state: "active" as const, pinned: !!saved?.pinned };
-    return saved ? { ...saved, state: saved.state ?? "active", pinned: !!saved.pinned } : null;
-  };
   const saveSkill = (input: { name: string; description: string; body: string }, botId: string, threadId: string | undefined, verb: string) => {
-    if (learning.staging(threadId)) {
-      learning.stage(botId, threadId, { name: input.name, action: "write", description: input.description, body: input.body });
-      return withNotes(`Staged ${input.name} (${verb}) for the user to approve.`, input, botId);
-    }
     bots.writeSkill(input, botId);
     learning.noteWrite(threadId, "saved");
     return withNotes(`${verb === "patched" ? "Patched" : "Saved"} your skill ${input.name}.`, input, botId);
   };
+  bb.agents.registerTool({
+    name: "bot_skill_lint", description: "Inspect saved skill versions and optionally attach advisory quality or safety warnings to an exact version. Never blocks or rolls back a save.",
+    parameters: z.object({ versionId: z.number().int().positive().optional(), warnings: z.array(z.string().min(1).max(2000)).max(20).optional() }),
+    execute: ({ versionId, warnings }, ctx) => {
+      const botId = ownBot(ctx.threadId);
+      if (versionId && warnings) bots.lintSkillVersion(versionId, warnings, botId);
+      return JSON.stringify(bots.skillHistory(botId).slice(0, 20));
+    },
+  });
   bb.agents.registerTool({
     name: "bot_skill_list", description: "List your own skills: name, one-line description, and whether it's stale or pinned. Archived skills are left out.", parameters: z.object({}),
     execute: (_input, ctx) => {
@@ -1200,7 +1198,7 @@ export default async function plugin(bb: BbPluginApi) {
     name: "bot_skill_view", description: "Load one of your own skills in full. Do it before you follow a skill: your instructions list only names and descriptions.", parameters: z.object({ name: z.string().min(1).max(64) }),
     execute: ({ name }, ctx) => {
       const botId = ownBot(ctx.threadId);
-      const skill = currentSkill(name, botId, ctx.threadId);
+      const skill = bots.skill(name, botId);
       if (!skill || skill.state === "archived") return `No skill "${name}". Yours: ${bots.skills(botId).filter((each) => each.state !== "archived").map((each) => each.name).join(", ") || "none"}.`;
       // A review reading skills isn't the Bot using them.
       if (!learning.review(ctx.threadId)) bots.touchSkill(name, botId);
@@ -1229,7 +1227,7 @@ export default async function plugin(bb: BbPluginApi) {
     }),
     execute: ({ name, find, replace, all, description }, ctx) => {
       const botId = ownBot(ctx.threadId);
-      const skill = currentSkill(name, botId, ctx.threadId);
+      const skill = bots.skill(name, botId);
       if (!skill) return `No skill "${name}". Make it with bot_skill_write.`;
       return saveSkill({ name, description: description ?? skill.description, body: patchText(skill.body, find, replace, all) }, botId, ctx.threadId, "patched");
     },
@@ -1241,7 +1239,6 @@ export default async function plugin(bb: BbPluginApi) {
       const skill = bots.skill(name, botId);
       if (!skill) return `No skill "${name}".`;
       if (learning.review(ctx.threadId) && skill.pinned) return `${name} is pinned by the user; leave it.`;
-      if (learning.staging(ctx.threadId)) { learning.stage(botId, ctx.threadId, { name, action: "delete" }); return `Staged deleting ${name} for the user to approve.`; }
       bots.deleteSkill(name, botId);
       learning.noteWrite(ctx.threadId, "saved");
       return `Deleted ${name}.`;

@@ -59,7 +59,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
             <AutomationRow key={automation.id} botId={botId} automation={automation} expanded={open === automation.id} busy={busy} disabled={disabled}
               onToggle={() => setOpen(open === automation.id ? null : automation.id)} onOpen={onOpen}
               onAction={(method) => void run(method, { id: automation.id }, false)}
-              onEdit={() => { setError(null); setSheet({ kind: "edit", automation }); }} onDelete={() => { setError(null); setSheet({ kind: "delete", automation }); }} />
+              onEdit={() => { setError(null); setSheet({ kind: "edit", automation }); }} onDelete={() => { if (automation.original) void run("bot_automation_pause", { id: automation.id }); else { setError(null); setSheet({ kind: "delete", automation }); } }} />
           ))}
         </ul>
       ) : (

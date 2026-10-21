@@ -32,8 +32,7 @@
 // be paused or run now. Optionally it starts a consolidation fork that
 // merges overlapping skills (off by default).
 //
-// Approval. With "Review skills before saving" on, a review's writes are
-// staged (bot_skill_pending) for the user to approve or reject.
+// Saves apply immediately. Advisory lint findings never block them.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { isPassOutput } from "@bb-studio/kit/silent";
@@ -53,7 +52,7 @@ export const CURATOR_ID = "skill-curator";
 /** BB's largest page of thread events. */
 const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
-export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "pages_read", "pages_edit"] as const;
+export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "pages_read", "pages_edit"] as const;
 const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete)$/;
 /** Items that aren't tool work. Everything else an agent does in a turn is. */
 const NOT_TOOLS = new Set(["agentMessage", "reasoning", "userMessage", "plan", "contextCompaction", "error"]);
@@ -142,6 +141,9 @@ export function patchText(body: string, find: string, replace: string, all = fal
 /** A line diff, "-" removed and "+" added, unchanged lines with two spaces. */
 export function lineDiff(before: string, after: string): string {
   const a = before ? before.split("\n") : [], b = after ? after.split("\n") : [];
+  // Bound memory for long skills with many short lines; a full replacement
+  // is still an exact diff when the LCS matrix would be too large.
+  if ((a.length + 1) * (b.length + 1) > 1_000_000) return [...a.map((line) => `- ${line}`), ...b.map((line) => `+ ${line}`)].join("\n");
   const lcs = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
   for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
   const out: string[] = [];
@@ -184,7 +186,7 @@ export function gaveUpOnTools(text: string | null): boolean {
 }
 
 /** The review fork's prompt. */
-export function reviewPrompt(input: { name: string; memoryPageId: string | null; reason: "tools" | "user" | "both" | "manual"; approval: boolean }): string {
+export function reviewPrompt(input: { name: string; memoryPageId: string | null; reason: "tools" | "user" | "both" | "manual" }): string {
   const why = input.reason === "user" ? "You've had a run of turns with the user since the last review." : input.reason === "manual" ? "The user asked for a review." : "You did a run of tool work since you last saved a skill.";
   return [
     `Background skill review for ${JSON.stringify(input.name)}. ${why} The user doesn't see this thread. Look back over the conversation above and save what the next session should already know.`,
@@ -201,7 +203,7 @@ export function reviewPrompt(input: { name: string; memoryPageId: string | null;
     "- When the same lesson shows up again, merge it into one rule. Fix a wrong line in place; don't add one that contradicts it.",
     "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape; heed them.",
     "",
-    `Use only ${REVIEW_TOOLS.join(", ")}. Don't run commands, edit files, message anyone or start threads.${input.approval ? " Your skill changes wait for the user's approval." : ""}`,
+    `Use only ${REVIEW_TOOLS.join(", ")}. Don't run commands, edit files, message anyone or start threads. Skill changes apply immediately. After saving, inspect the saved versions with bot_skill_lint and attach any quality or safety warnings to the exact version you inspected; warnings never block saving.`,
     TOOLS_CONNECTED,
     "When you're done, reply with one short line saying what you saved. If nothing is worth saving, reply exactly [PASS].",
   ].filter((line) => line !== null).join("\n");
@@ -221,12 +223,11 @@ export function consolidatePrompt(name: string): string {
 // ---- The service ----
 
 type LearningRow = {
-  bot_id: string; enabled: number; every_turns: number; review_model: string | null; approval: number; consolidate: number; curator_paused: number;
+  bot_id: string; enabled: number; every_turns: number; review_model: string | null; consolidate: number; curator_paused: number;
   thread_id: string | null; seen_seq: number; tool_turns: number; user_turns: number;
   last_review_at: number | null; last_review_result: string | null; curator_since: number | null; curator_last_at: number | null; curator_last_result: string | null;
 };
-type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; staged: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
-type PendingRow = { id: string; bot_id: string; name: string; action: "write" | "delete"; description: string | null; body: string | null; review_thread_id: string | null; created_at: number };
+type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
 
 export interface LearningBot { id: string; name: string; threadId: string | null; state: string; kind?: string; memoryPageId?: string | null }
 export interface LearningSkill { name: string; description: string; body: string; state: SkillState; pinned: boolean; usedAt: number | null; updatedAt: number }
@@ -240,8 +241,6 @@ export interface LearningDeps {
   memoryPage(botId: string): string | null;
   skills(botId: string): LearningSkill[];
   setState(botId: string, name: string, state: SkillState): void;
-  writeSkill(botId: string, input: { name: string; description: string; body: string }): void;
-  deleteSkill(botId: string, name: string): boolean;
   log?(message: string): void;
   /** When a Bot's chat was last really active, discounting cache-warming pings (BotCacheWarmer.quietSince). */
   quietSince?(threadId: string, updatedAt: number | null): number | null;
@@ -298,12 +297,6 @@ export class SkillLearning {
     return new Set((this.deps.db.prepare("SELECT thread_id FROM bot_skill_reviews").all() as { thread_id: string }[]).map((row) => row.thread_id));
   }
 
-  /** Whether a review's writes wait for the user. */
-  staging(threadId: string | null | undefined): boolean {
-    const review = this.review(threadId);
-    return !!review && review.kind === "review" && !!this.row(review.bot_id).approval;
-  }
-
   private studioBot(botId: string): LearningBot | null {
     const bot = this.deps.bot(botId);
     return bot && bot.kind !== "external" ? bot : null;
@@ -321,20 +314,15 @@ export class SkillLearning {
       models = options?.map((each) => each.model) ?? [];
       defaultModel = options ? cheapestModel(options) : null;
     }
-    const skills = new Map(this.deps.skills(botId).map((skill) => [skill.name, skill]));
-    const pending = (this.deps.db.prepare("SELECT * FROM bot_skill_pending WHERE bot_id = ? ORDER BY created_at").all(botId) as PendingRow[]).map((each) => ({
-      id: each.id, name: each.name, action: each.action, description: each.description, createdAt: each.created_at,
-      diff: lineDiff(skills.get(each.name)?.body ?? "", each.action === "delete" ? "" : each.body ?? ""),
-    }));
     const since = row.curator_last_at ?? row.curator_since;
     return {
       enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models,
-      approval: !!row.approval, consolidate: !!row.consolidate, curatorPaused: !!row.curator_paused,
+      approval: false, consolidate: !!row.consolidate, curatorPaused: !!row.curator_paused,
       toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,
       lastCurator: row.curator_last_at && row.curator_last_result ? { at: row.curator_last_at, result: row.curator_last_result } : null,
       nextCuratorAt: row.curator_paused || !since ? null : since + CURATOR_EVERY_MS,
-      pending,
+      pending: [],
     };
   }
 
@@ -344,7 +332,6 @@ export class SkillLearning {
       ...(input.enabled !== undefined ? { enabled: input.enabled ? 1 : 0 } : {}),
       ...(input.interval !== undefined ? { every_turns: input.interval } : {}),
       ...(input.reviewModel !== undefined ? { review_model: input.reviewModel || null } : {}),
-      ...(input.approval !== undefined ? { approval: input.approval ? 1 : 0 } : {}),
       ...(input.consolidate !== undefined ? { consolidate: input.consolidate ? 1 : 0 } : {}),
       ...(input.curatorPaused !== undefined ? { curator_paused: input.curatorPaused ? 1 : 0, ...(input.curatorPaused ? {} : { curator_since: Date.now() }) } : {}),
     });
@@ -438,7 +425,7 @@ export class SkillLearning {
           await this.deps.sdk.threads.update({ threadId: fork.id, model, ...(low ? { reasoningLevel: low } : {}) } as never);
         }
         const prompt = kind === "review"
-          ? reviewPrompt({ name: bot.name, memoryPageId: this.deps.memoryPage(botId), reason, approval: !!row.approval })
+          ? reviewPrompt({ name: bot.name, memoryPageId: this.deps.memoryPage(botId), reason })
           : consolidatePrompt(bot.name);
         await this.deps.sdk.threads.send({ threadId: fork.id, mode: "auto", input: [{ type: "text", text: prompt, mentions: [] }] } as never);
       } catch (error) {
@@ -471,7 +458,7 @@ export class SkillLearning {
   }
 
   /** A review's tool wrote something: counted for its result line. */
-  noteWrite(threadId: string | undefined, what: "saved" | "staged" | "memory"): void {
+  noteWrite(threadId: string | undefined, what: "saved" | "memory"): void {
     const review = this.review(threadId);
     if (review?.status === "running") this.deps.db.prepare(`UPDATE bot_skill_reviews SET ${what} = ${what} + 1 WHERE thread_id = ?`).run(review.thread_id);
   }
@@ -490,7 +477,6 @@ export class SkillLearning {
     const fresh = this.review(review.thread_id)!;
     const parts = [
       fresh.saved ? `Saved ${fresh.saved} skill${fresh.saved === 1 ? "" : "s"}` : "",
-      fresh.staged ? `${fresh.staged} waiting for approval` : "",
       fresh.memory ? "Updated Memory" : "",
     ].filter(Boolean);
     // [PASS] (or any reply without a write) saved nothing; the writes are what count.
@@ -575,32 +561,5 @@ export class SkillLearning {
       if (!thread || thread.status !== "idle" || now - (quiet ?? now) < CURATOR_IDLE_MS) continue;
       await this.curate(bot.id, { now }).catch((error) => this.deps.log?.(`Skill curator for ${bot.id} failed: ${error instanceof Error ? error.message : String(error)}`));
     }
-  }
-
-  // ---- Approval ----
-
-  /** Stages a review's change for the user. */
-  stage(botId: string, threadId: string | undefined, change: { name: string; action: "write" | "delete"; description?: string; body?: string }): void {
-    this.deps.db.prepare("DELETE FROM bot_skill_pending WHERE bot_id = ? AND name = ?").run(botId, change.name);
-    this.deps.db.prepare("INSERT INTO bot_skill_pending (id, bot_id, name, action, description, body, review_thread_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(`pend_${Math.random().toString(36).slice(2, 12)}`, botId, change.name, change.action, change.description ?? null, change.body ?? null, threadId ?? null, Date.now());
-    this.noteWrite(threadId, "staged");
-    this.deps.changed();
-  }
-
-  /** A staged change as the review would see it: its body, so a later patch builds on it. */
-  staged(botId: string, name: string): { description: string | null; body: string | null; action: "write" | "delete" } | null {
-    return (this.deps.db.prepare("SELECT action, description, body FROM bot_skill_pending WHERE bot_id = ? AND name = ?").get(botId, name) as { action: "write" | "delete"; description: string | null; body: string | null } | undefined) ?? null;
-  }
-
-  resolve(botId: string, id: string, approve: boolean): void {
-    const row = this.deps.db.prepare("SELECT * FROM bot_skill_pending WHERE id = ? AND bot_id = ?").get(id, botId) as PendingRow | undefined;
-    if (!row) throw new Error("That change is gone.");
-    if (approve) {
-      if (row.action === "delete") this.deps.deleteSkill(botId, row.name);
-      else this.deps.writeSkill(botId, { name: row.name, description: row.description ?? row.name, body: row.body ?? "" });
-    }
-    this.deps.db.prepare("DELETE FROM bot_skill_pending WHERE id = ?").run(id);
-    this.deps.changed();
   }
 }

@@ -64,8 +64,8 @@ it("moves unused skills active → stale → archived; pinned and used ones stay
 });
 
 it("gives a review fork only the skill tools and Memory page tools, and a lessons-not-logs prompt", () => {
-  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "pages_read", "pages_edit"]);
-  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools", approval: false });
+  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "pages_read", "pages_edit"]);
+  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
   expect(prompt).toMatch(/Lessons, not logs/);
   expect(prompt).toMatch(/remember this/);
   expect(prompt).toMatch(/merge it into one rule/);
@@ -74,7 +74,7 @@ it("gives a review fork only the skill tools and Memory page tools, and a lesson
 });
 
 it("tells a review its bridge tools work even when Claude Code calls them disconnected", () => {
-  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools", approval: false });
+  const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
   expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill_list,.*mcp__bb-bridge__pages_edit"\)/);
   expect(gaveUpOnTools("I couldn't save anything: the skill and Memory page tools are disconnected in this session, so nothing was written.")).toBe(true);
   expect(gaveUpOnTools("Couldn't save anything: the bot skill and Pages tools are disconnected in this session.")).toBe(true);
@@ -162,8 +162,6 @@ async function setup() {
     db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], bot: (id) => id === bot.id ? bot : null, memoryPage: () => "pg_mem",
     skills: () => skills(),
     setState: (_botId, name, state) => { db.prepare("UPDATE bot_skills SET state = ? WHERE name = ?").run(state, name); },
-    writeSkill,
-    deleteSkill: (_botId, name) => db.prepare("DELETE FROM bot_skills WHERE name = ?").run(name).changes > 0,
   });
   const work = (n: number, user = false) => { for (let i = 0; i < n; i++) events.push(...turn((events.at(-1)?.seq ?? 0) + 1, ["commandExecution"], { user })); };
   return { db, bot, threads, learning, fork, update, send, stop, archive, work, skills, writeSkill, setEvents: (next: typeof events) => { events = next; } };
@@ -252,25 +250,12 @@ it("doesn't fork a busy bot thread", async () => {
   expect(await x.learning.start("bot_main", "review")).toBe(false);
 });
 
-it("stages a review's changes when approval is on, and applies them on approve", async () => {
+it("ignores the retired approval setting and exposes no pending changes", async () => {
   const x = await setup();
   await x.learning.set("bot_main", { approval: true });
-  x.writeSkill("bot_main", { name: "deploy", description: "d", body: "old step" });
-  await x.learning.start("bot_main", "review");
-  expect(x.learning.staging("fork1")).toBe(true);
-  expect(x.learning.staging("bot1")).toBe(false);
-  x.learning.stage("bot_main", "fork1", { name: "deploy", action: "write", description: "d", body: "new step" });
-  x.learning.stage("bot_main", "fork1", { name: "inbox", action: "write", description: "Sort mail", body: "Steps" });
-  const view = await x.learning.view("bot_main");
-  expect(view.pending.map((each) => [each.name, each.diff])).toEqual([["deploy", "- old step\n+ new step"], ["inbox", "+ Steps"]]);
-  expect(x.skills().map((skill) => skill.body)).toEqual(["old step"]);
-  x.learning.resolve("bot_main", view.pending[0]!.id, true);
-  x.learning.resolve("bot_main", view.pending[1]!.id, false);
-  expect(x.skills().map((skill) => [skill.name, skill.body])).toEqual([["deploy", "new step"]]);
+  expect((await x.learning.view("bot_main")).approval).toBe(false);
   expect((await x.learning.view("bot_main")).pending).toEqual([]);
-  await x.learning.active("fork1");
-  await x.learning.idle(x.threads.get("fork1")!, "Staged one.");
-  expect((await x.learning.view("bot_main")).lastReview?.result).toBe("2 waiting for approval");
+  expect(reviewPrompt({ name: "Dot", memoryPageId: null, reason: "manual" })).toContain("apply immediately");
 });
 
 it("runs the curator weekly once the bot is idle 2 hours, with a dry run, pins exempt, and optional consolidation", async () => {
@@ -313,4 +298,11 @@ it("pages through more than 100 new events", async () => {
   x.work(45);
   await x.learning.idle(x.threads.get("bot1")!, null);
   expect((await x.learning.view("bot_main")).toolTurns).toBe(45);
+});
+
+it("bounds diff memory while retaining all lines for long skills", () => {
+  const before = "old\n".repeat(1100), after = "new\n".repeat(1100);
+  const diff = lineDiff(before, after);
+  expect(diff.split("\n").filter((line) => line === "- old")).toHaveLength(1100);
+  expect(diff.split("\n").filter((line) => line === "+ new")).toHaveLength(1100);
 });

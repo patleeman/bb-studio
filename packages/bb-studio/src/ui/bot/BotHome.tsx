@@ -457,21 +457,6 @@ function SkillsList({ botId, name }: { botId: string; name: string }) {
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">Procedures {name} saved. Only it uses them until you share one with every agent.</p>
       {learning.data ? <LearnSettings value={learning.data} busy={!!busy} run={run} /> : null}
-      {learning.data?.pending.length ? (
-        <div className="flex flex-col gap-1" aria-label="Waiting for approval">
-          <span className="text-xs font-medium">Waiting for your approval</span>
-          {learning.data.pending.map((change) => (
-            <div key={change.id} className="flex flex-col gap-1 rounded-md border border-border p-2">
-              <span className="flex items-center gap-1">
-                <span className="min-w-0 flex-1 truncate font-medium">{change.action === "delete" ? `Delete ${change.name}` : change.name}</span>
-                <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_skill_pending_resolve", { id: change.id, approve: true })}>Approve</button>
-                <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => void run("bot_skill_pending_resolve", { id: change.id, approve: false })}>Reject</button>
-              </span>
-              <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">{change.diff}</pre>
-            </div>
-          ))}
-        </div>
-      ) : null}
       {!list.length ? <p className="text-sm text-muted-foreground/70">{skills.loading && !skills.data ? "Loading…" : "No skills yet"}</p> : (
         <ul className="flex flex-col divide-y divide-border">
           {list.map((skill) => (
@@ -506,14 +491,37 @@ function SkillsList({ botId, name }: { botId: string; name: string }) {
           ) : null}
         </div>
       ) : null}
+      <SkillHistory botId={botId} onRevert={refresh} />
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }
 
+/** History includes deleted skills, so a mistaken deletion can also be reverted. */
+function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) {
+  const [cursors, setCursors] = useState<number[]>([]);
+  const history = useLive<{ versions: { id: number; name: string; body: string | null; diff: string; warnings: string[]; at: number }[] }>("bot_skill_history", { botId, ...(cursors.length ? { before: cursors[cursors.length - 1] } : {}) }, { pollMs: 30_000 });
+  const { run, busy, error } = useAction(() => { history.refresh(); onRevert(); }, botId);
+  return <details className="text-xs">
+    <summary className="cursor-pointer">Skill history</summary>
+    <p className="py-1 text-muted-foreground">Saves apply immediately. Revert keeps the current version in history. Review warnings are advisory.</p>
+    {(history.data?.versions ?? []).map((version) => <details key={version.id} className="border-b border-border py-1">
+      <summary className="cursor-pointer">{version.name} · {relativeTime(version.at)}{version.body === null ? " · deleted" : ""}{version.warnings.length ? ` · ${version.warnings.length} warnings` : ""}</summary>
+      <pre className="max-h-40 overflow-auto whitespace-pre-wrap py-1">{version.diff}</pre>
+      {version.warnings.map((warning, index) => <p key={index} className="text-amber-700 dark:text-amber-400">{warning}</p>)}
+      <button type="button" className={GHOST_BUTTON} disabled={!!busy} aria-label={`Revert ${version.name} to version ${version.id}`} onClick={() => void run("bot_skill_revert", { versionId: version.id })}>Revert</button>
+    </details>)}
+    <div className="flex gap-2">
+      {cursors.length ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors(cursors.slice(0, -1))}>Newer versions</button> : null}
+      {history.data?.versions.length === 50 ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors([...cursors, history.data!.versions[49]!.id])}>Older versions</button> : null}
+    </div>
+    {error ? <p role="alert" className="text-destructive">{error}</p> : null}
+  </details>;
+}
+
 const LEARN_INTERVALS = [5, 10, 20, 30, 50];
 
-/** Learn from work: the background review's switch, interval and model, approval, and the last result. */
+/** Learn from work: the background review's switch, interval and model and the last result. */
 function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run(method: string, input?: object): Promise<unknown> }) {
   const intervals = LEARN_INTERVALS.includes(value.interval) ? LEARN_INTERVALS : [...LEARN_INTERVALS, value.interval].sort((a, b) => a - b);
   const status = value.reviewing ? "Reviewing now…" : value.lastReview ? `${value.lastReview.result} · ${relativeTime(value.lastReview.at)}` : "No review yet";
@@ -540,9 +548,6 @@ function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boo
               <option value="">Cheapest{value.defaultModel ? ` (${value.defaultModel})` : ""}</option>
               {value.models.map((model) => <option key={model} value={model}>{model}</option>)}
             </select>
-          </label>
-          <label className="flex items-center gap-2 text-muted-foreground">
-            <input type="checkbox" checked={value.approval} disabled={busy} onChange={(event) => void run("bot_learning_set", { approval: event.target.checked })} />Review skills before saving
           </label>
         </>
       ) : null}

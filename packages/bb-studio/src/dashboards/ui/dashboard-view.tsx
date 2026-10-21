@@ -432,7 +432,6 @@ function History({ dashboard, state }: { dashboard: DashboardView; state: Dashbo
           : !versions.length ? <DropdownMenuItem disabled>No earlier versions yet.</DropdownMenuItem>
             : versions.map((version) => (
               <DropdownMenuItem key={version.id} onSelect={() => {
-                if (!window.confirm(`Restore the dashboard as it was ${ago(version.createdAt)}? The current one is kept in history.`)) return;
                 void state.rpc.call("dashboards.restoreVersion", { id: dashboard.id, versionId: version.id }).then(({ dashboard: next }) => state.apply(next as DashboardView)).catch((error) => toast.error(errorMessage(error)));
               }}>
                 <span className="flex min-w-0 flex-col">
