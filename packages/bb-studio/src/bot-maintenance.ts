@@ -7,6 +7,9 @@ import { z } from "zod";
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 const DAY = 86_400_000;
+/** "1 finished thread", "2 workers". */
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
 export const maintenanceRules = ["threads", "workers", "automations", "runtimes", "memory", "skills", "adopt"] as const;
 export type MaintenanceRule = typeof maintenanceRules[number];
 export interface MaintenanceSettings { enabled: boolean; enabledAt: number | null; memoryWords: number; rules: Record<MaintenanceRule, boolean> }
@@ -208,9 +211,9 @@ export class BotMaintenance {
         const memory = this.deps.memory(botId);
         if (memory && memoryNeedsTidy(memory.markdown, settings.memoryWords, memory.updatedAt, now)) await act("Memory tidy requested", () => this.deps.sdk.threads.send({ threadId: bot.threadId!, mode: "auto", input: [{ type: "text", text: `Maintenance: rewrite Memory page ${memory.id}. Merge duplicates, drop entries older than 60 days that are stale or contradicted, preserve useful facts, and stay under ${settings.memoryWords} words. Page history preserves the old version. Reply exactly [PASS].`, mentions: [], visibility: "agent-only" }] }));
       }
-      if (settings.rules.skills) { const skills = await this.deps.curate(botId, dryRun); result.actions.push(`Skills: ${skills.result}`); }
+      if (settings.rules.skills) { const skills = await this.deps.curate(botId, dryRun); result.actions.push(`Skills: ${skills.result.replace(/^Dry run: /, "")}`); }
       if (settings.rules.adopt) for (const candidate of await this.deps.adoptable(botId)) if (candidate.cron) result.suggestions.push({ text: `Consider adopting ${candidate.title} as a runner`, threadId: candidate.threadId, automationId: candidate.automationId });
-      result.summary = `${dryRun ? "Dry run: would archive" : "Archived"} ${archived} finished threads, ${workers} workers; ${result.actions.filter((a) => !a.startsWith("Archive")).join("; ") || "nothing else to tidy"}`;
+      result.summary = `${dryRun ? "Dry run: would archive" : "Archived"} ${count(archived, "finished thread")}, ${count(workers, "worker")}; ${result.actions.filter((a) => !a.startsWith("Archive")).join("; ") || "nothing else to tidy"}`;
       this.deps.db.prepare("INSERT INTO bot_maintenance_runs (bot_id, at, result) VALUES (?, ?, ?)").run(botId, now, JSON.stringify(result));
       recorded = true;
       this.deps.changed();

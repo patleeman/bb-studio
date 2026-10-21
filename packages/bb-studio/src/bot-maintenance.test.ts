@@ -66,6 +66,12 @@ it("archives only owned, finished threads; records a single run", async () => {
   const x = await setup(); x.rows.push(thread("user")); await x.enable();
   const result = await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledExactlyOnceWith({ threadId: "child" }); expect(result?.dryRun).toBe(false); expect(x.maintenance.view("bot").runs).toHaveLength(2); expect(x.alert).not.toHaveBeenCalled();
 });
+it("words the summary in the singular for one, and says Dry run only once", async () => {
+  const x = await setup(); await x.enable();
+  const result = await x.maintenance.run("bot", { now, dryRun: true });
+  expect(result?.summary).toMatch(/^Dry run: would archive 1 finished thread, 0 workers;/);
+  expect(result?.summary).not.toMatch(/Skills: Dry run:/);
+});
 it("does nothing while off, paused, or in the initial dry-run day", async () => {
   const x = await setup(); await x.maintenance.tick(now); expect(x.maintenance.view("bot").runs).toHaveLength(0);
   await x.maintenance.set("bot", { enabled: true }, now); expect(x.maintenance.view("bot").runs[0]?.dryRun).toBe(true); expect(x.archive).not.toHaveBeenCalled(); expect(x.refreshOwned).not.toHaveBeenCalled();
