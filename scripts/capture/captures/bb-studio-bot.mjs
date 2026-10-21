@@ -14,6 +14,8 @@
 // thread page, with the Bot's chat holding only the runner's lines.
 // Then several bots: New bot (the Bots heading's +) opening the create flow,
 // and a second bot, Scout, selected, with Dot listed above it.
+import { backdateLatestTokenUsage } from "./bot-capture-fixtures.mjs";
+
 export const BOT_PATH = "/plugins/studio/studio/bot";
 const CHILDREN = [
   { title: "Summarize this week's ORBIT-42 threads", prompt: "Reply with one short sentence: the ORBIT-42 release is on track for Friday." },
@@ -24,6 +26,7 @@ export const ORBIT_TITLES = ["Draft the ORBIT-42 release notes", "Review the lau
 /** What the first-time flow's capture asks its new Bot to help with. */
 const FIRST_GOAL = "Keep an eye on the ORBIT-42 launch and tell me each morning what needs me.";
 const HISTORY = "What's left before Friday's ORBIT-42 release? Two short bullet points, please.";
+const PROFILE_DESCRIPTION = "I track ORBIT-42 health and blockers.";
 
 /** Staging's plugin-problem card is closed so it doesn't cover the page. */
 export const dismissProblems = (client) => client.evaluate(`(() => new Promise((resolve) => {
@@ -149,7 +152,8 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     }
     const botThread = bot.threadId;
     await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
-    const started = await json(["thread", "list", "--parent-thread", botThread, "--include-hidden"]).catch(() => []);
+    const chain = await pluginRpc("studio", "bot_chain", { botId: bot.id }).catch(() => ({ threadIds: [botThread] }));
+    const started = (await Promise.all((chain.threadIds ?? [botThread]).map((parent) => json(["thread", "list", "--parent-thread", parent, "--include-hidden"]).catch(() => [])))).flat();
     if (!started.length) {
       for (const child of CHILDREN) {
         const thread = await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", child.title, "--prompt", child.prompt]);
@@ -606,60 +610,199 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     await sleep(1000);
   };
 
-  /**
-   * Skills that learn (src/skill-learning.ts): Dot is taught a procedure with a
-   * correction, then reviews its own work in a background fork (Review now,
-   * as the Skills section's button does; it also starts on its own every 10
-   * turns) and saves a skill.
-   */
-  const SKILL_LESSONS = [
-    "Give me a system report: run uname -sr, sw_vers -productVersion, sysctl -n hw.ncpu and df -h / and show them.",
-    "Not like that. A system report is a 4-row Markdown table (OS, macOS, CPUs, Free disk), free disk from the Avail column, nothing else. I'll ask for this often, so keep the procedure. Do it again.",
-  ];
   const seededSkills = async () => {
-    const bot = await seededBot();
-    let learning = await pluginRpc("studio", "bot_learning", {});
-    if (!/Saved \d+ skill/.test(learning.lastReview?.result ?? "")) {
-      for (const lesson of SKILL_LESSONS) {
-        await bbCli(["thread", "tell", bot.threadId, lesson]);
-        await sleep(3000);
-        await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "300"]);
-      }
-      let started = false;
-      for (let i = 0; i < 20 && !started; i++) {
-        ({ started } = await pluginRpc("studio", "bot_learning_review", {}));
-        if (!started) await sleep(3000);
-      }
-      if (!started) throw new Error("The skill review didn't start");
-      for (let i = 0; i < 100; i++) {
-        learning = await pluginRpc("studio", "bot_learning", {});
-        if (!learning.reviewing) break;
-        await sleep(3000);
-      }
-      if (!/Saved \d+ skill/.test(learning.lastReview?.result ?? "")) throw new Error(`The skill review ended with ${JSON.stringify(learning.lastReview)}, not a saved skill`);
-    }
-    const { skills } = await pluginRpc("studio", "bot_skills", {});
-    if (!skills.some((skill) => skill.state !== "archived")) throw new Error("Dot has no skill after its review");
-    return skills;
+    const { bot } = await pluginRpc("studio", "bot_get", {});
+    if (!bot) throw new Error("The staged BB has no Bot for its Skills capture");
+    const name = "system-report";
+    const description = "A concise, repeatable read-only system report.";
+    await pluginRpc("studio", "bot_skill_write", {
+      botId: bot.id, name, description,
+      body: "# System report\n\nCollect the OS name and version, CPU count, and free disk space. Keep the report to a short Markdown table. Use read-only commands and do not change files.",
+    });
+    await pluginRpc("studio", "bot_skill_write", {
+      botId: bot.id, name, description,
+      body: "# System report\n\nCollect the OS name and version, CPU count, and free disk space. Return exactly a four-row Markdown table with OS, macOS, CPUs, and Free disk. Use read-only commands and do not change files.",
+    });
+    const { skills } = await pluginRpc("studio", "bot_skills", { botId: bot.id });
+    const saved = skills.find((skill) => skill.name === name && skill.state !== "archived");
+    if (!saved) throw new Error("The staged Bot skill write was not saved immediately");
+    const { versions } = await pluginRpc("studio", "bot_skill_history", { botId: bot.id });
+    if (!versions.some((version) => version.name === name)) throw new Error("The staged skill write has no history version");
+    return [saved];
   };
   const skillsSection = async (client) => {
     const skills = await seededSkills();
     // From the Bot page (Info by id; the bare page opens the chat): the lessons made the chat long, so it isn't the way in.
     const { bot: primary } = await pluginRpc("studio", "bot_get", {});
     await client.navigate(`${BOT_PATH}/${primary.id}`);
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 700, deviceScaleFactor: 1, mobile: false });
     await client.waitForSelector(SIDEBAR, 30000);
     await dismissProblems(client);
     await openInfo(client);
     await client.waitForSelector('button[aria-label="Manage skills"]', 30000);
     await client.evaluate(`(() => { document.querySelector('button[aria-label="Manage skills"]').click(); return true; })()`);
     await client.waitForSelector('[aria-label="Learn from work"]', 30000);
-    for (const text of ["Learn from work", "turns", "Review model", "Review skills before saving", "Curator merges overlapping skills", skills[0].name]) await client.waitForText(text, 30000);
+    for (const text of ["Learn from work", "turns", "Review model", "Curator merges overlapping skills", skills[0].name, "Skill history"]) await client.waitForText(text, 30000);
     await client.evaluate(`(() => {
-      const status = document.querySelector('[aria-label="Last review"]')?.textContent ?? "";
-      if (!/^Saved \\d+ skill.* · /.test(status)) throw new Error("The last review reads " + JSON.stringify(status));
+      const section = document.querySelector('section[aria-label="Skills"]');
+      if (/Waiting for your approval|Review skills before saving/i.test(section?.textContent ?? "")) throw new Error("Skills still shows a save-approval state");
+      const history = [...(section?.querySelectorAll("details") ?? [])].find((details) => details.querySelector(":scope > summary")?.textContent.includes("Skill history"));
+      if (!history) throw new Error("Skill history is missing");
+      history.open = true;
+      const version = history.querySelector(":scope > details");
+      if (!version) throw new Error("Skill history has no saved version");
+      version.open = true;
+      if (!version.querySelector('button[aria-label^="Revert "]')) throw new Error("The saved version has no Revert action");
+      section.scrollIntoView({ block: "start" });
       return true;
     })()`);
+    await client.waitForText("Revert", 15000);
     await sleep(1000);
+  };
+
+  /** Ask Dot to make one real, reversible self-edit through its profile tool. */
+  const seededProfileChanges = async () => {
+    const { bot } = await pluginRpc("studio", "bot_get", {});
+    if (!bot) throw new Error("The staged BB has no Bot for the profile captures");
+    let { changes } = await pluginRpc("studio", "bot_profile_changes", { botId: bot.id });
+    if (!changes.some((change) => change.field === "role" && change.newValue === PROFILE_DESCRIPTION)) {
+      await bbCli(["thread", "tell", bot.threadId, `Use bot_profile_update to set only your description to exactly: ${PROFILE_DESCRIPTION} Keep your name and avatar unchanged. Then reply with one short confirmation.`]);
+      await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]);
+      for (let i = 0; i < 40; i++) {
+        ({ changes } = await pluginRpc("studio", "bot_profile_changes", { botId: bot.id }));
+        if (changes.some((change) => change.field === "role" && change.newValue === PROFILE_DESCRIPTION)) break;
+        await sleep(1000);
+      }
+    }
+    if (!changes.some((change) => change.field === "role" && change.newValue === PROFILE_DESCRIPTION)) throw new Error("Dot did not record the staged profile description change");
+    return bot;
+  };
+
+  const botInfoProfile = async (client) => {
+    const bot = await seededProfileChanges();
+    await client.navigate(`${BOT_PATH}/${bot.id}`);
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 560, deviceScaleFactor: 1, mobile: false });
+    await client.waitForSelector(`[aria-label="${bot.name} info"]`, 30000);
+    await dismissProblems(client);
+    await client.evaluate(`(() => {
+      const profile = document.querySelector('[data-testid="bot-profile-section"]');
+      const status = profile?.querySelector('[data-testid="bot-info-status"]')?.textContent.trim();
+      if (!profile || !status) throw new Error("Bot info has no collapsed profile or status");
+      if (!profile.querySelector('button[aria-label="Edit profile"]')) throw new Error("The collapsed profile has no Edit button");
+      if (profile.querySelector('#bot-profile-editor')) throw new Error("The profile editor should start collapsed");
+      if (!profile.textContent.includes(${JSON.stringify(PROFILE_DESCRIPTION)})) throw new Error("The profile description is missing");
+      return true;
+    })()`);
+    await sleep(700);
+  };
+
+  const botProfileEdit = async (client) => {
+    const bot = await seededProfileChanges();
+    await client.navigate(`${BOT_PATH}/${bot.id}`);
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 650, deviceScaleFactor: 1, mobile: false });
+    await client.waitForSelector('[data-testid="bot-profile-section"] button[aria-label="Edit profile"]', 30000);
+    await client.evaluate(`(() => { document.querySelector('[data-testid="bot-profile-section"] button[aria-label="Edit profile"]').click(); return true; })()`);
+    await client.waitForSelector('#bot-profile-editor textarea[aria-label="Description"]', 15000);
+    await client.evaluate(`(() => {
+      const editor = document.querySelector('#bot-profile-editor');
+      if (!editor?.querySelector('input[aria-label="Bot name"]') || !editor.querySelector('button:not([disabled])')) throw new Error("The profile edit form is incomplete");
+      if (editor.querySelector('textarea[aria-label="Description"]')?.value !== ${JSON.stringify(PROFILE_DESCRIPTION)}) throw new Error("The profile edit form has the wrong description");
+      return true;
+    })()`);
+    await sleep(700);
+  };
+
+  const botProfileChanges = async (client) => {
+    const bot = await seededProfileChanges();
+    await client.navigate(`${BOT_PATH}/${bot.id}`);
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 560, deviceScaleFactor: 1, mobile: false });
+    await client.waitForSelector('[data-testid="bot-profile-section"] button[aria-controls="bot-profile-changes-content"]', 30000);
+    await client.evaluate(`(() => { document.querySelector('[aria-controls="bot-profile-changes-content"]').click(); return true; })()`);
+    await client.waitForSelector('[data-testid="bot-profile-change"] button[aria-label="Revert description"]', 15000);
+    await client.evaluate(`(() => {
+      const profile = document.querySelector('[data-testid="bot-profile-section"]');
+      const history = profile?.querySelector('#bot-profile-changes-content');
+      if (!history || history.hidden || !history.textContent.includes("Changed by Dot")) throw new Error("Profile changes did not open with Dot's recorded edit");
+      if (!history.textContent.includes(${JSON.stringify(PROFILE_DESCRIPTION)})) throw new Error("Profile changes omit the saved description");
+      return true;
+    })()`);
+    await sleep(700);
+  };
+
+  /** Use a live Claude thread to capture the real warm and expired header states. */
+  const cacheBot = async () => {
+    let { bot } = await pluginRpc("studio", "bot_get", {});
+    if (bot.providerId !== "claude-code" || bot.model !== "claude-sonnet-5-5") {
+      const switched = await pluginRpc("studio", "thread_handoff_to_model", { threadId: bot.threadId, providerId: "claude-code", model: "claude-sonnet-5-5", reasoning: "low" });
+      if (switched.change !== "handoff" && switched.change !== "in-place") throw new Error(`Dot's cache capture model switch was ${switched.change}`);
+      await bbCli(["thread", "wait", switched.threadId, "--status", "idle", "--timeout", "300"]).catch(() => {});
+      ({ bot } = await pluginRpc("studio", "bot_get", {}));
+    }
+    await bbCli(["thread", "tell", bot.threadId, "For the staged cache header fixture, reply exactly [PASS]."]);
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "300"]);
+    await pluginRpc("studio", "bot_cache_set", { botId: bot.id, thresholdTokens: 10_000 });
+    return bot;
+  };
+
+  const cacheHeader = (state, ageMs, filenameCheck) => async (client) => {
+    const bot = await cacheBot();
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    backdateLatestTokenUsage(bot.threadId, ageMs);
+    // BotCacheWarmer memoizes observed usage for 20s; let that cache expire before checking.
+    await sleep(20_500);
+    const cache = await pluginRpc("studio", "bot_cache_state", { threadId: bot.threadId });
+    if (cache.state !== state) throw new Error(`The cache fixture is ${cache.state}, not ${state}`);
+    await client.navigate(`${BOT_PATH}/${bot.id}`);
+    await client.waitForSelector(SIDEBAR, 30000);
+    await dismissProblems(client);
+    await openChat(client, bot.threadId, "/PASS/");
+    await client.command("Page.reload");
+    await client.waitForSelector('[data-testid="bot-info-header"]', 30000);
+    await client.waitForSelector('[data-testid="bot-cache-chip"]', 30000);
+    await client.evaluate(`(() => {
+      const info = document.querySelector('[data-testid="bot-info-header"]');
+      const chip = document.querySelector('[data-testid="bot-cache-chip"]');
+      if (!info || !chip) throw new Error("The Bot thread header is missing Bot info or the cache indicator");
+      if (!chip.textContent.includes(${JSON.stringify(filenameCheck)})) throw new Error("The cache chip reads " + chip.textContent);
+      if (chip.getAttribute("aria-label") !== ${JSON.stringify(state === "warm" ? "Prompt cache: 59m left" : "Prompt cache: cold")}) throw new Error("The cache chip label is " + chip.getAttribute("aria-label"));
+      return true;
+    })()`);
+    await sleep(700);
+  };
+
+  const regularThreadHeader = async (client) => {
+    const regular = (await json(["thread", "list", "--project", projectId])).find((thread) => thread.title === "Plan the Friday release window" && !thread.parentThreadId && !thread.environmentId);
+    const thread = regular?.id;
+    if (!thread) throw new Error("The staged seed has no regular thread without a workspace");
+    const rows = JSON.parse(await bbCli(["automation", "list", "--project", projectId, "--json"]));
+    const list = Array.isArray(rows) ? rows : rows.automations ?? [];
+    if (!list.some((row) => row.name === "Thread header fixture" && row.execution?.targetThreadId === thread)) {
+      await bbCli(["automation", "create", "--project", projectId, "--name", "Thread header fixture", "--cron", "0 0 1 1 *", "--timezone", "UTC", "--prompt", "Reply exactly [PASS].", "--provider", "codex", "--model", "gpt-6.1-sol", "--target-thread", thread, "--json"]);
+    }
+    await client.navigate(BOT_PATH);
+    await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await dismissProblems(client);
+    await clickHome(client);
+    await client.waitForSelector(THREADS, 30000);
+    const title = JSON.parse(await bbCli(["thread", "show", thread, "--json"])).thread.title;
+    await openFromBbList(client, title);
+    await client.waitForSelector('[data-testid="app-page-header-content-row"]', 30000);
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const header = document.querySelector('[data-testid="app-page-header-content-row"]');
+        const button = header && [...header.querySelectorAll("button")].find((each) => /automation.*wake this thread/i.test(each.getAttribute("aria-label") ?? each.title));
+        const vscode = [...(header?.querySelectorAll("button") ?? [])].find((each) => /visual studio code|vs code|vscode/i.test((each.getAttribute("aria-label") ?? "") + " " + each.title + " " + each.textContent));
+        if (button) {
+          if (vscode) return reject(new Error("The regular thread header still has a VS Code button"));
+          return resolve(true);
+        }
+        if (Date.now() - started > 30000) return reject(new Error("The regular thread header has no Automations button"));
+        setTimeout(tick, 250);
+      };
+      tick();
+    }))()`, true);
+    await sleep(700);
   };
 
   const captures = [
@@ -682,6 +825,12 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     },
     { id: "studio-bot-first-chat", packageDir: "bb-studio", fileName: "bot-first-chat.png", setup: firstChat },
     { id: "studio-bot", packageDir: "bb-studio", fileName: "bot.png", setup: chat },
+    { id: "studio-bot-info", packageDir: "bb-studio", fileName: "bot-info.png", setup: botInfoProfile },
+    { id: "studio-bot-profile-edit", packageDir: "bb-studio", fileName: "bot-profile-edit.png", setup: botProfileEdit },
+    { id: "studio-bot-profile-changes", packageDir: "bb-studio", fileName: "bot-profile-changes.png", setup: botProfileChanges },
+    { id: "studio-bot-cache-warm", packageDir: "bb-studio", fileName: "bot-header-cache-warm.png", setup: cacheHeader("warm", 61_000, "59m") },
+    { id: "studio-bot-cache-cold", packageDir: "bb-studio", fileName: "bot-header-cache-cold.png", setup: cacheHeader("cold", 61 * 60_000, "cold") },
+    { id: "studio-thread-header-automations", packageDir: "bb-studio", fileName: "thread-header-automations.png", setup: regularThreadHeader },
     { id: "studio-bot-leave", packageDir: "bb-studio", fileName: "bot-leave.png", setup: leave },
     { id: "studio-bot-runners", packageDir: "bb-studio", fileName: "bot-runners.png", setup: runnersInfo },
     { id: "studio-bot-automations", packageDir: "bb-studio", fileName: "bot-automations.png", setup: automationsList },

@@ -1202,6 +1202,8 @@ open in the background, so it's as you left it when you come back.
   with their count in its header; click it to open the Automations tab. Bot
   threads show a **Bot info** button beside the cache dot instead. Automations
   for that Bot are already listed in Bot info.
+
+![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)
 - **For agents**: the `studio_list_items`,
   `studio_tag_items`, `studio_delete_items` and
   `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
@@ -1251,17 +1253,28 @@ appear in the maintenance summary with an **Adopt** action. Recent in the
 Bots sidebar covers 7 days; **Show archived** reveals older and archived
 owned threads. Runners keep their existing group.
 
-The live maintenance capture is defined as `studio-bot-maintenance` and
-writes `assets/bot-maintenance.png`. It is pending the lead's staged run:
-this launcher only installs commits reachable on `origin/main`, and this
-feature branch must not be pushed or merged by its worker. After merge,
-start with `node scripts/staged-bb.mjs start`, source its `capture.env`, run
-`BB_CAPTURE_ONLY=studio-bot-maintenance node scripts/capture-plugin-screenshots.mjs`,
-then always run `node scripts/staged-bb.mjs stop`. Add the resulting screenshot
-here once the live check passes. The lead must also seed old finished,
-dirty-workspace, pending-interaction and automation-targeted threads, assert
-Dry run changes none, then assert Run now only archives the eligible thread
-once the first-day preview period has elapsed.
+The `studio-bot-maintenance` capture seeds old clean and dirty Bot threads, a
+pending question, an automation-targeted thread, and a completed one-shot
+reminder. It turns maintenance on, checks the initial one-day dry run, presses
+**Dry run**, then advances only the staged settings clock before **Run now**.
+It asserts no dry-run archives, then checks the live archive, **Needs your
+call**, reminder state, and Activity entry. The capture is strict and writes
+`assets/bot-maintenance.png` even when an assertion fails.
+
+The staged run against pushed commit `affe9098` failed before thread review:
+Automations rejected `{}` for `automations_overview` (it expects `null`) with
+`HTTP 400: rpc input validation failed`, so neither dry run produced a
+proposed-action summary or **Needs your call**, and no threads were archived.
+The Automations list reconciled the completed one-shot reminder to Done
+before the live maintenance action, so the test could not attribute that
+transition to maintenance. The
+screenshot records the stopped dry run; it is diagnostic evidence, not a
+passing result. The branch fixes the overview input contract and requests the
+workspace's remote merge-base ref,
+but the staged launcher installs the pushed commit, so those fixes need to
+reach `origin/main` before the maintenance capture can pass.
+
+![Staged Bot info → Maintenance on pushed affe9098: the one-day dry run stops on an Automations overview validation error before it can show proposed actions or Needs your call.](assets/bot-maintenance.png)
 
 
 ![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
@@ -1376,6 +1389,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (its check-in and automations, with the next run) and **Recent** (the
   last three, then Show all). A thread clicked in the Bots sidebar,
   Activity or Needs you opens as a normal BB thread in the main pane.
+
+![Bot info with Dot's profile collapsed: avatar, name, active check-in status, description and Edit are visible.](assets/bot-info.png)
+
+![Bot info with the inline profile editor open, including name, drawn avatar choices, description and Save profile.](assets/bot-profile-edit.png)
+
+![Bot info with Profile changes open, showing Dot's recorded description edits and Revert actions.](assets/bot-profile-changes.png)
+
 - **Profile**: edit the Bot's name and description in its Info tab. Choose a
   drawn avatar (one of nine shapes in one of twelve colors, or **Match the
   name**) or an emoji. A Bot made before drawn avatars shows its emoji until
@@ -1591,7 +1611,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     clients retain their approval controls, but receive no pending changes.
     See [the approval audit](../../docs/approvals.md) for the iOS follow-up.
 
-  ![Earlier staged capture of Skills in Bot info, before immediate saving. It shows the retired approval switch, Learn from work settings, and the system-report skill with Pin, Share and Delete. The current interface opens Skills inline from Bot info.](assets/bot-skills.png)
+  ![Staged Bot info → Skills with the system-report skill's history expanded and Revert visible. Saves apply immediately; there is no Waiting for approval state.](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started).
 - **Phone**: questions and approvals it, or a thread it started, raises push
@@ -1669,6 +1689,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
     appears. Click it for why, the next ping, warming and cold-send costs, a
     warming switch and **Compact now…**. The iOS app shows its status text
     beside the Bot's status.
+
+    ![Warm Bot thread header with the Bot info button and prompt cache indicator showing 59m.](assets/bot-header-cache-warm.png)
+
+    ![Cold Bot thread header with the Bot info button, cold cache indicator and expired-cache banner.](assets/bot-header-cache-cold.png)
   - **Cold-send banner**: on a cold Bot chat above the threshold, the
     composer says "Cache expired — next send re-reads ~N tokens (~$X)" with
     **Dismiss** and **Don't show for this thread**. **Compact** is also a
