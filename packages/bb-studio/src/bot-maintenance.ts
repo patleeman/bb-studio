@@ -20,13 +20,14 @@ export function finished(thread: Pick<Thread, "status" | "hasPendingInteraction"
 export function archiveAge(worker: boolean, captured: boolean, ownerReplied: boolean): number { return (worker ? ownerReplied ? 1 : 3 : captured ? 3 : 7) * DAY; }
 export function safeWorkspace(status: Awaited<ReturnType<Sdk["environments"]["status"]>>): boolean {
   // 0.6.37 has no upstream/push count. A local merge base cannot prove
-  // commits were pushed: accept only zero ahead of a remote tracking ref
-  // for this exact branch. Everything else needs the user's call.
+  // commits were pushed: accept only zero ahead of a remote tracking branch
+  // for this exact branch. `baseRef` is the merge-base commit SHA, so use the
+  // requested `mergeBaseBranch` ref to prove it is remote-tracking.
   if (status.outcome !== "available") return false;
   const { checkout, mergeBase, workingTree } = status.workspace;
-  if (checkout.kind !== "branch" || !mergeBase?.baseRef) return false;
-  const remote = /^(?:refs\/remotes\/)?[^/]+\/(.+)$/.exec(mergeBase.baseRef)?.[1];
-  return remote === checkout.branchName && !mergeBase.baseRef.startsWith("refs/heads/") && workingTree.state === "clean" && !workingTree.hasUncommittedChanges && mergeBase.aheadCount === 0 && !mergeBase.hasCommittedUnmergedChanges;
+  if (checkout.kind !== "branch" || !mergeBase?.mergeBaseBranch) return false;
+  const remote = /^(?:refs\/remotes\/)?[^/]+\/(.+)$/.exec(mergeBase.mergeBaseBranch)?.[1];
+  return remote === checkout.branchName && !mergeBase.mergeBaseBranch.startsWith("refs/heads/") && workingTree.state === "clean" && !workingTree.hasUncommittedChanges && mergeBase.aheadCount === 0 && !mergeBase.hasCommittedUnmergedChanges;
 }
 export function memoryNeedsTidy(text: string, budget: number, updatedAt: number, now: number): boolean {
   const dates = [...text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => Date.parse(m[1]!)).filter(Number.isFinite);
@@ -102,7 +103,7 @@ export class BotMaintenance {
       const act = async (text: string, apply: () => Promise<unknown> | unknown) => { if (!dryRun) await apply(); result.actions.push(text); };
       if (!dryRun) await this.deps.refreshOwned();
       // If the overview is unavailable, abort. Never archive against an incomplete target list.
-      const external = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: {}, outputSchema: overview });
+      const external = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: null, outputSchema: overview });
       const targets = new Set(external.automations.filter((a) => a.automation.enabled).flatMap((a) => a.automation.execution.targetThreadId ? [a.automation.execution.targetThreadId] : []));
       const locals = this.deps.db.prepare("SELECT * FROM bot_automations WHERE bot_id = ? ORDER BY created_at, id").all(botId) as LocalAutomation[];
       for (const row of this.deps.db.prepare("SELECT target_thread_id FROM bot_automations WHERE state = 'active'").all() as { target_thread_id: string | null }[]) if (row.target_thread_id) targets.add(row.target_thread_id);
@@ -138,10 +139,12 @@ export class BotMaintenance {
         if (now - thread.updatedAt < archiveAge(worker, captured, ownerReplied)) continue;
         const fresh = await this.deps.sdk.threads.get({ threadId: id });
         if (fresh.archivedAt || fresh.environmentId !== thread.environmentId || fresh.queuedMessageCount > 0 || fresh.updatedAt !== thread.updatedAt || fresh.status !== "idle" || fresh.activeBackgroundAgentCount > 0 || (await this.deps.sdk.threads.interactions.list({ threadId: id })).some((i) => i.status === "pending" || i.status === "resolving")) continue;
-        const live = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: {}, outputSchema: overview });
+        const live = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: null, outputSchema: overview });
         if (live.automations.some((a) => a.automation.enabled && a.automation.execution.targetThreadId === id)) continue;
         if (thread.environmentId || thread.environmentPath) {
-          const status = thread.environmentId ? await this.deps.sdk.environments.status({ environmentId: thread.environmentId }).catch(() => null) : null;
+          const status = thread.environmentId && thread.environmentBranchName
+            ? await this.deps.sdk.environments.status({ environmentId: thread.environmentId, mergeBaseBranch: `origin/${thread.environmentBranchName}` }).catch(() => null)
+            : null;
           if (!status || !safeWorkspace(status)) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason: "Workspace is dirty, has unpushed commits, or clean/pushed status could not be confirmed." }); continue; }
         }
         if (!this.deps.owned(botId).has(id) || this.deps.bots().find((b) => b.id === botId)?.state !== "active") continue;

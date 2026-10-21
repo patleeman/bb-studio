@@ -7,9 +7,9 @@ const now = 200 * DAY;
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 function thread(id = "child", days = 8) {
-  return { ...makeThreadResponse({ id, status: "idle", updatedAt: now - days * DAY, parentThreadId: "main", environmentId: null }), hasPendingInteraction: false, queuedWork: "none", activity: { activeBackgroundAgentCount: 0, activeBackgroundCommandCount: 0, activeGoalCount: 0, activePlanModeCount: 0, activeWorkflowCount: 0 }, environmentPath: null };
+  return { ...makeThreadResponse({ id, status: "idle", updatedAt: now - days * DAY, parentThreadId: "main", environmentId: null }), environmentBranchName: "bb/child", hasPendingInteraction: false, queuedWork: "none", activity: { activeBackgroundAgentCount: 0, activeBackgroundCommandCount: 0, activeGoalCount: 0, activePlanModeCount: 0, activeWorkflowCount: 0 }, environmentPath: null };
 }
-const clean = () => ({ outcome: "available", workspace: { checkout: { kind: "branch", branchName: "main" }, workingTree: { state: "clean", hasUncommittedChanges: false }, mergeBase: { baseRef: "origin/main", aheadCount: 0, hasCommittedUnmergedChanges: false } } });
+const clean = () => ({ outcome: "available", workspace: { checkout: { kind: "branch", branchName: "bb/child" }, workingTree: { state: "clean", hasUncommittedChanges: false }, mergeBase: { mergeBaseBranch: "origin/bb/child", baseRef: "4f2a0930f358881edf6a22ce40d56212f8432f40", aheadCount: 0, hasCommittedUnmergedChanges: false } } });
 async function setup() {
   const rows = [thread()];
   const targets: Record<string, unknown>[] = [];
@@ -18,12 +18,13 @@ async function setup() {
   const archive = vi.fn(async () => ({ ok: true }));
   const send = vi.fn(async () => ({ ok: true }));
   const status = vi.fn(async () => clean());
+  const rpcCalls: { method: string; input: unknown }[] = [];
   const pause = vi.fn(async () => {}), del = vi.fn(async () => {}), curate = vi.fn(async () => ({ result: "Nothing to retire" })), alert = vi.fn(async () => {}), refreshOwned = vi.fn(async () => {});
   const runs: { status: string; output: string }[] = [];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: { listRunning: async () => [], get: (async ({ threadId }: { threadId: string }) => { const t = rows.find((t) => t.id === threadId); if (!t) throw Object.assign(new Error("Not found"), { status: 404 }); return t; }) as never, list: (async ({ offset }: { offset?: number }) => offset ? [] : rows) as never, archive: archive as never, send: send as never, interactions: { list: (async () => interactions) as never }, events: { list: (async () => events) as never } },
     environments: { status: status as never, pullRequest: (async () => ({ outcome: "not_applicable" })) as never },
-    plugins: { callRpc: (async ({ method }: { method: string }) => method === "automations_overview" ? { automations: targets } : { runs }) as never },
+    plugins: { callRpc: (async ({ method, input }: { method: string; input: unknown }) => { rpcCalls.push({ method, input }); return method === "automations_overview" ? { automations: targets } : { runs }; }) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database(); bb.storage.migrate(db, MIGRATIONS);
@@ -33,7 +34,7 @@ async function setup() {
   const maintenance = new BotMaintenance({ db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
   const enable = async () => { await maintenance.set("bot", { enabled: true }, now - DAY); archive.mockClear(); curate.mockClear(); };
   const local = (id: string, kind: string, state = "active", age = 1, target = "main", instruction = "report") => db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, state, schedule_json, project_id, created_at, updated_at, target, instruction, bb_ids) VALUES (?, 'bot', ?, ?, ?, '{}', 'proj', 0, ?, ?, ?, '[\"a\"]')").run(id, kind, id, state, now - age * DAY, target, instruction);
-  return { harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
+  return { harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
 }
 it("defaults off and waits one day before going live", () => {
   const s = maintenanceDefaults(); expect(s.enabled).toBe(false); expect(s.memoryWords).toBe(8000);
@@ -121,12 +122,16 @@ it("runs at 4 AM local and deduplicates heartbeat runs that day", async () => {
   await x.maintenance.tick(at + DAY); expect(x.maintenance.view("bot").runs).toHaveLength(count + 1);
 });
 it("blocks a local merge base because it cannot prove the branch was pushed", () => {
-  const s = clean(); s.workspace.mergeBase.baseRef = "main"; expect(safeWorkspace(s as never)).toBe(false);
-  s.workspace.mergeBase.baseRef = "origin/other"; expect(safeWorkspace(s as never)).toBe(false);
+  const s = clean(); s.workspace.mergeBase.mergeBaseBranch = "main"; expect(safeWorkspace(s as never)).toBe(false);
+  s.workspace.mergeBase.mergeBaseBranch = "origin/other"; expect(safeWorkspace(s as never)).toBe(false);
 });
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
-  await x.maintenance.run("bot", { now }); expect(x.status).toHaveBeenCalledWith({ environmentId: "env" }); expect(x.archive).toHaveBeenCalledOnce();
+  await x.maintenance.run("bot", { now }); expect(x.status).toHaveBeenCalledWith({ environmentId: "env", mergeBaseBranch: "origin/bb/child" }); expect(x.archive).toHaveBeenCalledOnce();
+});
+it("calls the Automations overview with its null input contract", async () => {
+  const x = await setup(); await x.enable();
+  expect(x.rpcCalls.find((call) => call.method === "automations_overview")?.input).toBeNull();
 });
 it("protects Studio automation and runner targets", async () => {
   const x = await setup(); await x.enable(); x.local("target", "checkin"); x.db.prepare("UPDATE bot_automations SET target_thread_id = 'child'").run();
