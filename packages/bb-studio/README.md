@@ -1256,25 +1256,15 @@ owned threads. Runners keep their existing group.
 The `studio-bot-maintenance` capture seeds old clean and dirty Bot threads, a
 pending question, an automation-targeted thread, and a completed one-shot
 reminder. It turns maintenance on, checks the initial one-day dry run, presses
-**Dry run**, then advances only the staged settings clock before **Run now**.
-It asserts no dry-run archives, then checks the live archive, **Needs your
-call**, reminder state, and Activity entry. The capture is strict and writes
-`assets/bot-maintenance.png` even when an assertion fails.
+**Dry run**, then advances only the staged settings clock before the same
+maintenance RPC used by **Run now**. After taking the screenshot, the capture
+leaves Bot info so its separate Automations list cannot reconcile the reminder
+before maintenance does. It asserts no dry-run archives, then checks the live
+archive, **Needs your call**, reminder state, and one Activity entry. The
+capture is strict and writes `assets/bot-maintenance.png` even when an
+assertion fails.
 
-The staged run against pushed commit `affe9098` failed before thread review:
-Automations rejected `{}` for `automations_overview` (it expects `null`) with
-`HTTP 400: rpc input validation failed`, so neither dry run produced a
-proposed-action summary or **Needs your call**, and no threads were archived.
-The Automations list reconciled the completed one-shot reminder to Done
-before the live maintenance action, so the test could not attribute that
-transition to maintenance. The
-screenshot records the stopped dry run; it is diagnostic evidence, not a
-passing result. The branch fixes the overview input contract and requests the
-workspace's remote merge-base ref,
-but the staged launcher installs the pushed commit, so those fixes need to
-reach `origin/main` before the maintenance capture can pass.
-
-![Staged Bot info → Maintenance on pushed affe9098: the one-day dry run stops on an Automations overview validation error before it can show proposed actions or Needs your call.](assets/bot-maintenance.png)
+![Staged Bot info → Maintenance: the one-day dry run proposes archiving the clean finished thread and places the dirty thread under Needs your call.](assets/bot-maintenance.png)
 
 
 ![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)

@@ -41,6 +41,9 @@ export default function maintenanceCaptures(context) {
     const dirty = dirtyChildren.find((thread) => thread.title === "Pull the ORBIT-42 thread digests");
     if (!dirty) throw new Error("Could not seed a Bot-owned thread for the dirty workspace case");
     await bbCli(["thread", "wait", dirty.id, "--status", "idle", "--timeout", "180"]);
+    // Its completion wakes the parent with a child-completed message. Wait
+    // for that follow-up too; the clean candidate below is a separate sibling.
+    await bbCli(["thread", "wait", clean.id, "--status", "idle", "--timeout", "180"]);
     const fixtureRoot = join(dirname(process.env.BB_DATA_DIR), "maintenance-fixtures");
     const configuredRemotes = exec("git", ["-C", workspace, "remote"]).split("\n");
     if (configuredRemotes.includes("origin")) exec("git", ["-C", workspace, "remote", "remove", "origin"]);
@@ -92,38 +95,50 @@ export default function maintenanceCaptures(context) {
       throw new Error("The targeted thread has no live automation pointing at it");
     }
 
-    const before = [clean.id, dirty.id, pending.id, targeted.id].map((id) => stagedThread(id));
+    // The staged fixtures predate the plugin's ownership sweep. Adopt them
+    // through the same supported operation as the Bot sidebar so Maintenance
+    // sees each one in both its dry and live runs.
+    for (const threadId of [dirty.id, pending.id, targeted.id]) {
+      await pluginRpc("studio", "bot_thread_adopt", { botId: bot.id, threadId });
+      const owner = await pluginRpc("studio", "bot_thread_owner", { threadId });
+      if (owner.botId !== bot.id) throw new Error(`The staged fixture ${threadId} is owned by ${owner.botId ?? "no Bot"}, not ${bot.id}`);
+    }
+
+    // Keep the clean candidate out of the worker's child-completed chain: that
+    // system reply refreshes its parent timestamp. Start a direct Bot sibling
+    // with the pushed clean environment and wait for its real final answer.
+    const cleanThread = JSON.parse(await bbCli([
+      "thread", "spawn", "--project", projectId, "--environment", cleanRow.environment.id,
+      "--parent-thread", bot.threadId, "--provider", "codex", "--model", "gpt-6.1-sol",
+      "--reasoning-level", "low", "--title", "Maintenance clean workspace thread",
+      "--prompt", "Reply exactly [PASS].", "--json",
+    ]));
+    await bbCli(["thread", "wait", cleanThread.id, "--status", "idle", "--timeout", "180"]);
+    await pluginRpc("studio", "bot_thread_adopt", { botId: bot.id, threadId: cleanThread.id });
+    const cleanOwner = await pluginRpc("studio", "bot_thread_owner", { threadId: cleanThread.id });
+    if (cleanOwner.botId !== bot.id) throw new Error(`The clean fixture is owned by ${cleanOwner.botId ?? "no Bot"}, not ${bot.id}`);
+    for (const id of [cleanThread.id, dirty.id, pending.id, targeted.id]) backdateThread(id, 8);
+    const agedClean = stagedThread(cleanThread.id);
+    if (!agedClean || Date.now() - agedClean.updated_at < 4 * 86_400_000) throw new Error("The clean finished fixture is not older than four days");
+
+    const before = [cleanThread.id, dirty.id, pending.id, targeted.id].map((id) => stagedThread(id));
     if (before.some((thread) => !thread || thread.archived_at != null)) throw new Error("A maintenance fixture was archived before the dry run");
-    return { bot, clean: clean.id, dirty: dirty.id, pending: pending.id, targeted: targeted.id };
+    return { bot, clean: cleanThread.id, dirty: dirty.id, pending: pending.id, targeted: targeted.id };
   };
 
-  // Create a real one-shot after Bot info mounts. Report if the live
-  // Automations list reconciles it to Done before Maintenance can act.
+  // Create a real one-shot after Bot info mounts. Schedule it after both real
+  // dry runs so the live Run now can move its completed reminder to Done.
   const seedReminder = async (bot) => {
+    const scheduledAt = Date.now() + 45_000;
     const reminder = await pluginRpc("studio", "bot_automation_create", {
       botId: bot.id, kind: "reminder", name: `Maintenance one-shot reminder ${Date.now()}`,
-      instruction: "Reply exactly [PASS].", schedule: { type: "once", at: Date.now() + 10_000 },
+      instruction: "Reply exactly [PASS].", schedule: { type: "once", at: scheduledAt },
       model: { model: "gpt-6.1-sol", reasoning: "low" },
     });
     const localReminder = stagedAutomation(reminder.id);
     const backingIds = JSON.parse(localReminder?.bb_ids ?? "[]");
     if (localReminder?.state !== "active" || !backingIds.length) throw new Error("The one-shot reminder has no active backing automation");
-    let completedReminder = null;
-    for (let i = 0; i < 120; i++) {
-      const overview = await pluginRpc("automations", "automations_overview", null);
-      completedReminder = overview.automations.find((entry) => entry.automation.id === backingIds[0])?.automation ?? null;
-      if (completedReminder?.lastRunStatus === "succeeded" && completedReminder.lastRunAt && completedReminder.nextRunAt == null) break;
-      if (completedReminder?.lastRunStatus && !["running", "succeeded"].includes(completedReminder.lastRunStatus.toLowerCase())) {
-        throw new Error(`The one-shot reminder finished ${completedReminder.lastRunStatus}`);
-      }
-      await sleep(2000);
-    }
-    if (completedReminder?.lastRunStatus !== "succeeded" || !completedReminder.lastRunAt || completedReminder.nextRunAt != null) {
-      throw new Error(`The scheduled one-shot reminder did not finish through its real schedule: ${JSON.stringify(completedReminder)}`);
-    }
-    const persisted = stagedAutomation(reminder.id);
-    if (!persisted || !["active", "done"].includes(persisted.state)) throw new Error("The one-shot reminder has an unexpected local state");
-    return { id: reminder.id, state: persisted.state, reconciledBeforeMaintenance: persisted.state === "done" };
+    return { id: reminder.id, state: localReminder.state, backingIds, scheduledAt };
   };
 
   const inspectDryRun = async (fixture) => {
@@ -138,7 +153,7 @@ export default function maintenanceCaptures(context) {
     const reminderState = stagedAutomation(fixture.reminder)?.state ?? null;
     return {
       succeeded: last.summary.startsWith("Dry run: would archive"),
-      eligible: last.actions.some((action) => action.includes("Summarize this week's ORBIT-42 threads")),
+      eligible: last.actions.some((action) => action.includes("Maintenance clean workspace thread")),
       dirtyNeedsCall: last.needsCall.some((entry) => entry.threadId === fixture.dirty),
       cleanNeedsCall: last.needsCall.some((entry) => entry.threadId === fixture.clean),
       reminderUnchanged: reminderState === fixture.reminderStateBefore,
@@ -156,7 +171,13 @@ export default function maintenanceCaptures(context) {
       const reminder = await seedReminder(fixture.bot);
       fixture.reminder = reminder.id;
       fixture.reminderStateBefore = reminder.state;
-      fixture.reminderReconciledBeforeMaintenance = reminder.reconciledBeforeMaintenance;
+      fixture.reminderBackingIds = reminder.backingIds;
+      fixture.reminderScheduledAt = reminder.scheduledAt;
+      // Opening Bot info and creating a schedule can touch the Bot's recent
+      // threads. Apply the test clock last, then verify the SDK-facing age.
+      for (const id of [fixture.clean, fixture.dirty, fixture.pending, fixture.targeted]) backdateThread(id, 8);
+      const agedClean = stagedThread(fixture.clean);
+      if (!agedClean || Date.now() - agedClean.updated_at < 4 * 86_400_000) throw new Error("The clean finished fixture is not older than four days");
       let current = await pluginRpc("studio", "bot_maintenance_get", { botId: fixture.bot.id });
       if (current.settings.enabled && current.liveAt <= Date.now()) {
         await client.evaluate(`(() => { const checkbox = document.querySelector('[data-testid="bot-maintenance"] input[type="checkbox"]'); if (checkbox.checked) checkbox.click(); return true; })()`);
@@ -182,6 +203,9 @@ export default function maintenanceCaptures(context) {
       }
       if (!enabledView?.runs[0]?.dryRun) throw new Error("Turning maintenance on did not record its initial dry run");
       const initialDryRun = await inspectDryRun(fixture);
+      if (!initialDryRun.eligible || !initialDryRun.dirtyNeedsCall || initialDryRun.cleanNeedsCall || !initialDryRun.reminderUnchanged) {
+        throw new Error(`The initial dry run did not classify the clean, dirty and reminder fixtures: ${JSON.stringify(initialDryRun)}`);
+      }
       if (initialDryRun.succeeded) await client.waitForText("Dry run: would archive", 30000);
       else await client.waitForText("Dry run stopped", 30000);
       const enabledRuns = enabledView.runs.length;
@@ -199,6 +223,9 @@ export default function maintenanceCaptures(context) {
       }
       if (!latest?.dryRun) throw new Error("The explicit Dry run button did not record a new preview");
       const refreshedDryRun = await inspectDryRun(fixture);
+      if (!refreshedDryRun.eligible || !refreshedDryRun.dirtyNeedsCall || refreshedDryRun.cleanNeedsCall || !refreshedDryRun.reminderUnchanged) {
+        throw new Error(`The explicit dry run did not preserve the expected classification: ${JSON.stringify(refreshedDryRun)}`);
+      }
       if (refreshedDryRun.succeeded) {
         await client.waitForText("Proposed actions", 30000);
         await client.evaluate(`(() => {
@@ -206,27 +233,46 @@ export default function maintenanceCaptures(context) {
           const proposed = [...section.querySelectorAll("summary")].find((summary) => summary.textContent.includes("Proposed actions"));
           if (!proposed) throw new Error("The dry-run actions are missing");
           proposed.parentElement.open = true;
+          const needsCall = [...section.querySelectorAll("h4")].find((heading) => heading.textContent.includes("Needs your call"));
+          if (!needsCall) throw new Error("Needs your call is missing from the dry-run summary");
           section.scrollIntoView({ block: "start" });
           return true;
         })()`);
         await client.waitForText("Needs your call", 30000);
-        await client.waitForText("Maintenance dirty workspace thread", 30000);
+        await client.waitForText("Pull the ORBIT-42 thread digests", 30000);
       } else {
         await client.waitForText("Dry run stopped", 30000);
         await client.evaluate(`document.querySelector('[data-testid="bot-maintenance"]')?.scrollIntoView({ block: "start" })`);
       }
       await sleep(700);
 
-      // Captures happen before this cleanup. Use the append-only settings row
-      // as a test clock override, then press the real Run now button and assert
-      // every outcome. The staged maintenance window is the only clock moved.
+      // Captures happen before this cleanup. Bot info's separate Automations
+      // panel reconciles completed one-shot reminders to Done when it polls.
+      // Unmount that panel after the screenshot so Maintenance can make and
+      // record the transition itself. The settings row is the only test clock
+      // moved, and this RPC is the same handler used by Run now.
       return async () => {
+        await client.navigate("/");
+        if (await client.poll('Boolean(document.querySelector("[data-testid=\\\"bot-maintenance\\\"]"))')) {
+          throw new Error("Bot info stayed mounted while waiting for the reminder schedule");
+        }
+        let completedReminder = null;
+        for (let i = 0; i < 120; i++) {
+          const overview = await pluginRpc("automations", "automations_overview", null);
+          completedReminder = overview.automations.find((entry) => fixture.reminderBackingIds.includes(entry.automation.id))?.automation ?? null;
+          if (completedReminder?.lastRunStatus === "succeeded" && completedReminder.lastRunAt && completedReminder.nextRunAt == null) break;
+          if (completedReminder?.lastRunStatus && !["running", "succeeded"].includes(completedReminder.lastRunStatus.toLowerCase())) {
+            throw new Error(`The one-shot reminder finished ${completedReminder.lastRunStatus}`);
+          }
+          await sleep(1000);
+        }
+        if (completedReminder?.lastRunStatus !== "succeeded" || !completedReminder.lastRunAt || completedReminder.nextRunAt != null) {
+          throw new Error(`The scheduled one-shot reminder did not finish through its real schedule: ${JSON.stringify(completedReminder)}`);
+        }
+        const reminderBeforeMaintenance = stagedAutomation(fixture.reminder);
+        if (reminderBeforeMaintenance?.state !== "active") throw new Error(`The reminder moved to ${reminderBeforeMaintenance?.state ?? "missing"} before Maintenance ran`);
         advanceMaintenanceWindow(fixture.bot.id);
-        await client.evaluate(`(() => {
-          const section = document.querySelector('[data-testid="bot-maintenance"]');
-          [...section.querySelectorAll("button")].find((button) => button.textContent.trim() === "Run now").click();
-          return true;
-        })()`);
+        await pluginRpc("studio", "bot_maintenance_run", { botId: fixture.bot.id, dryRun: false });
         for (let i = 0; i < 120; i++) {
           const view = await pluginRpc("studio", "bot_maintenance_get", { botId: fixture.bot.id });
           if (view.runs.length > enabledRuns + 1 && !view.runs[0]?.dryRun) { latest = view.runs[0]; break; }
@@ -245,18 +291,23 @@ export default function maintenanceCaptures(context) {
         const reminderDone = stagedAutomation(fixture.reminder)?.state === "done";
         const activity = await pluginRpc("studio", "bot_activity", { botId: fixture.bot.id });
         const actualRuns = (activity.maintenance ?? []).filter((run) => !run.dryRun);
+        const archiveActions = live.actions.filter((action) => action.startsWith("Archive "));
         const observed = {
           initialDryRunEligible: initialDryRun.eligible,
           initialDryRunSummary: initialDryRun.summary,
+          initialDirtyNeedsCall: initialDryRun.dirtyNeedsCall,
           explicitDryRunEligible: refreshedDryRun.eligible,
           explicitDryRunSummary: refreshedDryRun.summary,
-          reminderStateBeforeMaintenance: fixture.reminderStateBefore,
-          reminderReconciledBeforeMaintenance: fixture.reminderReconciledBeforeMaintenance,
+          explicitDirtyNeedsCall: refreshedDryRun.dirtyNeedsCall,
+          reminderStateBeforeMaintenance: reminderBeforeMaintenance.state,
+          reminderLastRunStatus: completedReminder.lastRunStatus,
+          reminderLastRunAt: completedReminder.lastRunAt,
           reminderStateAfterDryRun: refreshedDryRun.reminderState,
           reminderUnchangedAfterDryRun: refreshedDryRun.reminderUnchanged,
           cleanNeedsCall: refreshedDryRun.cleanNeedsCall,
           cleanArchived,
           dirtyNeedsCall: live.needsCall.some((entry) => entry.threadId === fixture.dirty),
+          archivedActions: archiveActions,
           dirtyArchived,
           pendingArchived,
           pendingInteraction: interaction?.status ?? null,
@@ -267,7 +318,7 @@ export default function maintenanceCaptures(context) {
           liveSummary: live.summary,
         };
         process.stdout.write(`Maintenance staged observations: ${JSON.stringify(observed)}\n`);
-        if (!cleanArchived || dirtyArchived || pendingArchived || targetedArchived || interaction?.status !== "pending" || !automationUntouched || !reminderDone || fixture.reminderStateBefore !== "active" || fixture.reminderReconciledBeforeMaintenance || actualRuns.length !== 1 || !actualRuns[0]?.summary.startsWith("Archived 1 finished threads") || !initialDryRun.eligible || !refreshedDryRun.eligible) {
+        if (!cleanArchived || dirtyArchived || pendingArchived || targetedArchived || interaction?.status !== "pending" || !automationUntouched || !reminderDone || reminderBeforeMaintenance.state !== "active" || !actualRuns[0]?.actions.some((action) => action.includes("Move done reminder to Done:")) || actualRuns.length !== 1 || !actualRuns[0]?.summary.startsWith("Archived 1 finished threads") || archiveActions.length !== 1 || !archiveActions[0]?.includes("Maintenance clean workspace thread") || !live.needsCall.some((entry) => entry.threadId === fixture.dirty) || !initialDryRun.eligible || !initialDryRun.dirtyNeedsCall || !refreshedDryRun.eligible || !refreshedDryRun.dirtyNeedsCall) {
           throw new Error(`Staged maintenance acceptance failed: expected only the clean finished thread to archive. Observed ${JSON.stringify(observed)}`);
         }
       };
