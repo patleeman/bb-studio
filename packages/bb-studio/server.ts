@@ -1,3 +1,5 @@
+import { registerDecisions } from "./src/decisions/server";
+import { DECISIONS_SETTINGS } from "./src/decisions/settings";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
@@ -125,8 +127,9 @@ export default async function plugin(bb: BbPluginApi) {
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
   // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread
-  // resume's.
-  const settings = bb.settings.define({ ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
+  // resume's, plus Decisions under namespaced keys.
+  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
+  const decisions = await registerDecisions(bb, settings);
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
   bb.onDispose(() => recordings.dispose());
   // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
@@ -1648,6 +1651,7 @@ export default async function plugin(bb: BbPluginApi) {
     name: "studio",
     summary: "BB Studio: pages, recordings, drawings, designs, artifacts and other add-ons' items",
     commands: [
+      { name: "decisions", summary: "Jev, fallback model and Smart Queue", usage: "bb studio decisions <status|recent|classify|check|fallback>" },
       { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
       { name: "move", summary: "Move items to a project", usage: "bb studio move <item-link|plugin:id>… --project <name|id|global>" },
@@ -1667,6 +1671,7 @@ export default async function plugin(bb: BbPluginApi) {
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
+      if (argv[0] === "decisions") return decisions.cli(argv.slice(1));
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
       if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
@@ -1764,7 +1769,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|speech> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|speech|decisions> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

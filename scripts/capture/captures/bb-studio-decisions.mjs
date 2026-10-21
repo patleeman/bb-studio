@@ -30,18 +30,19 @@ async function startJevStandIn() {
 export default ({ bbCli }) => [
   {
     id: "decisions",
-    packageDir: "bb-studio-decisions",
+    packageDir: "bb-studio",
+    fileName: "decisions-preview.png",
     setup: async (client) => {
       const jev = await startJevStandIn();
       const settings = { jevProvider: "custom", customJevEndpoint: jev.endpoint, customJevModel: "jev-local" };
       const cleanup = async () => {
-        for (const key of Object.keys(settings)) await bbCli(["plugin", "config", "smart-decisions", "unset", key]).catch(() => {});
+        for (const key of Object.keys(settings)) await bbCli(["plugin", "config", "studio", "unset", `decisions_${key}`]).catch(() => {});
         await jev.close();
       };
       try {
-        for (const [key, value] of Object.entries(settings)) await bbCli(["plugin", "config", "smart-decisions", "set", key, value]);
-        await client.navigate("/settings/plugins/smart-decisions");
-        await client.waitForText("Studio Decisions");
+        for (const [key, value] of Object.entries(settings)) await bbCli(["plugin", "config", "studio", "set", `decisions_${key}`, value]);
+        await client.navigate("/settings/plugins/studio");
+        await client.waitForText("Studio");
         await client.waitForText("Jev connection");
         await client.waitForText("jev-local");
         await client.waitForText("Fallback model");
@@ -59,6 +60,17 @@ export default ({ bbCli }) => [
         throw error;
       }
       return cleanup;
+    },
+  },
+  {
+    id: "decisions-bridge",
+    packageDir: "bb-studio-decisions",
+    setup: async (client) => {
+      await bbCli(["smart-decisions", "migrate"]);
+      await client.navigate("/plugins/studio/studio/setup");
+      await client.waitForText("Retired plugins");
+      await client.waitForText("Decisions and Smart Queue are built into Studio now.");
+      await client.waitForText("bb plugin remove smart-decisions");
     },
   }
 ];

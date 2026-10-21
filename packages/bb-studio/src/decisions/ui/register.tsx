@@ -1,13 +1,14 @@
+import type { Fallback } from "@bb-studio/kit/decisions-legacy-contract";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  definePluginApp,
+  type PluginAppBuilder,
   experimental_ProviderModelPicker as ProviderModelPicker,
   useRpc,
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
-import type { Fallback, rpcContract } from "./contract";
+import type { rpcContract } from "../contract";
 
 import { errorMessage as errorText } from "@bb-studio/kit/format";
 
@@ -34,7 +35,7 @@ function JevConnection() {
 
   // Secret keys are not in `values`, so also refresh after a check and on focus.
   const refresh = useCallback(() => {
-    rpc.call("jev.status", null).then(setStatus, () => setStatus(null));
+    rpc.call("decisions.jev.status", null).then(setStatus, () => setStatus(null));
   }, [rpc]);
   useEffect(refresh, [refresh, JSON.stringify(values)]);
   useEffect(() => {
@@ -45,7 +46,7 @@ function JevConnection() {
   const test = async () => {
     setCheck({ state: "running" });
     try {
-      const result = await rpc.call("jev.check", null);
+      const result = await rpc.call("decisions.jev.check", null);
       setCheck(
         result.ok
           ? { state: "done", ok: true, text: `Jev answered through ${result.via} in ${result.ms} ms.` }
@@ -108,7 +109,7 @@ function FallbackModel() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    rpc.call("fallback.get", null).then(setValue, (cause) => setError(errorText(cause)));
+    rpc.call("decisions.fallback.get", null).then(setValue, (cause) => setError(errorText(cause)));
   }, [rpc]);
 
   const save = async (next: Fallback) => {
@@ -116,7 +117,7 @@ function FallbackModel() {
     setValue(next);
     setError(null);
     try {
-      setValue(await rpc.call("fallback.set", next));
+      setValue(await rpc.call("decisions.fallback.set", next));
     } catch (cause) {
       setValue(previous);
       setError(errorText(cause));
@@ -126,7 +127,7 @@ function FallbackModel() {
   const chooseMode = async (mode: Fallback["mode"]) => {
     if (mode !== "model") return save({ mode });
     // Start from a real catalog entry so the picker never shows an empty model.
-    const suggestion = await rpc.call("fallback.suggest", null).catch(() => null);
+    const suggestion = await rpc.call("decisions.fallback.suggest", null).catch(() => null);
     if (!suggestion) return setError("No available provider has a model to choose.");
     await save(suggestion);
   };
@@ -183,17 +184,17 @@ function FallbackModel() {
   );
 }
 
-export default definePluginApp((app) => {
+export function registerDecisionsApp(app: PluginAppBuilder) {
   app.slots.settingsSection({
-    id: "jev-connection",
+    id: "decisions-jev-connection",
     title: "Jev connection",
     description: "Which Jev providers Studio Decisions will call, in order, for Smart Queue and other plugins.",
     component: JevConnection,
   });
   app.slots.settingsSection({
-    id: "fallback-model",
+    id: "decisions-fallback-model",
     title: "Fallback model",
     description: "The model that decides when no Jev provider answers.",
     component: FallbackModel,
   });
-});
+}

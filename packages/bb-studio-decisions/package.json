@@ -1,6 +1,6 @@
 {
   "name": "@bb-studio/smart-decisions",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -8,13 +8,12 @@
     "bbPluginSdk": ">=0.6.15"
   },
   "bb": {
-    "name": "Studio Decisions",
-    "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and other plugins can ask it for quick decisions.",
+    "name": "Studio Decisions upgrade bridge",
+    "description": "Upgrade bridge: copies Decisions settings and keys into Studio, and forwards old RPCs and bb smart-decisions commands.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
-    "server": "./server.ts",
-    "app": "./app.tsx"
+    "server": "./server.ts"
   },
   "dependencies": {
     "@bb-studio/kit": "file:../bb-studio-kit.tgz",

@@ -12,12 +12,12 @@
       "source": "./packages/bb-studio-mobile"
     },
     {
-      "name": "smart-decisions",
-      "source": "./packages/bb-studio-decisions"
-    },
-    {
       "name": "studio-code",
       "source": "./packages/bb-studio-code"
+    },
+    {
+      "name": "smart-decisions",
+      "source": "./packages/bb-studio-decisions"
     }
   ]
 }

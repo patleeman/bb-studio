@@ -13,7 +13,7 @@ beside it.
 | --- | --- | --- |
 | [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats, quotes and emoji reactions on replies, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
 | [Studio Code](packages/bb-studio-code/) | `studio-code` | VS Code as BB's editor: each thread gets its own VS Code on its worktree, and code files open there. Run by a local code-server. |
-| [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread. |
+| [Decisions upgrade bridge](packages/bb-studio-decisions/) | `smart-decisions` | Copies settings and secret keys into Studio. Keeps old RPCs and CLI commands working. Decisions and Smart Queue are built into Studio. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
 Install Studio first; the other plugins are built to run beside it. Studio
@@ -41,7 +41,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
 2. Ask me whether to install all of these plugins or only some. List them with
    a one-line description each:
    - studio: the Studio collection and project leads, with pages, dictation and recordings, drawings, designs and artifacts built in; required, since the others run beside it
-   - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue
+   - smart-decisions: upgrade bridge for existing Decisions installs; new installs use Studio
    - studio-code: Studio Code; VS Code beside each thread as BB's editor (downloads code-server on first open)
    - mobile: push notifications for the BB Studio iOS app; only if I use it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.

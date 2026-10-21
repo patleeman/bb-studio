@@ -15,7 +15,7 @@ import {
   situationState,
   type Situation,
   type Verdict,
-} from "../classifier";
+} from "../server/classifier";
 
 const situation: Situation = {
   title: "Build storage",

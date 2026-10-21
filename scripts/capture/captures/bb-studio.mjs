@@ -378,7 +378,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     },
   },
   {
-    // A fresh staged BB has no Jev key, so Studio Decisions reports a problem
+    // A fresh staged BB has no Jev key, so Studio’s built-in Decisions reports a problem
     // and the Plugin health footer item opens by itself.
     id: "studio-health",
     packageDir: "bb-studio",
@@ -391,7 +391,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
       await client.navigate(`/projects/${projectId}`);
       // Studio confirms a new problem 30 seconds after it first finds it.
       await client.waitForText("No Jev provider is set up", 90000);
-      await client.waitForText("Studio Decisions");
+      await client.waitForText("Studio");
       await client.waitForText("Add a key");
       await client.waitForText("Turn off plugin");
       await client.waitForText("Open plugin setup");
@@ -803,7 +803,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
       await client.navigate("/plugins/studio/studio/setup");
       await client.waitForText("Set up BB Studio", 30000);
       await client.waitForText("Add-ons");
-      await client.waitForText("Studio Decisions");
+      await client.waitForText("Studio");
       await client.waitForText("Needs setup");
       await client.waitForText("No Jev provider is set up");
       await client.waitForText("Last checked");

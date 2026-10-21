@@ -26,7 +26,8 @@
     "./design-contract": "./src/design-contract.ts",
     "./talk-contract": "./src/talk-contract.ts",
     "./pages-contract": "./src/pages-contract.ts",
-    "./silent": "./src/silent.ts"
+    "./silent": "./src/silent.ts",
+    "./decisions-legacy-contract": "./src/decisions-legacy-contract.ts"
   },
   "files": [
     "src",

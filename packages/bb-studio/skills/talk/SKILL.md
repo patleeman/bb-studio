@@ -126,7 +126,7 @@ They are on Studio's settings page (**Settings → Plugins → Studio**).
 | Summaries model | Studio Decisions | Provider and model picker for automatic and on-demand summaries. |
 
 The **Models** section also saves reasoning and the provider's supported service
-tier. Choices apply to future requests across devices. Studio Decisions must be
+tier. Choices apply to future requests across devices. Studio must be
 enabled; following it uses its fallback model. Voice transcription remains in
 **Settings → AI services**. Segment length accepts 8 to 60 seconds; dictation
 audio retention accepts 0 to 3650 days, with 0 keeping audio forever.

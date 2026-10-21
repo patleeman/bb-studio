@@ -1,3 +1,4 @@
+import { registerDecisionsApp } from "./src/decisions/ui/register";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
@@ -228,6 +229,7 @@ export default definePluginApp((app) => {
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
+  registerDecisionsApp(app);
   if (on("recording")) registerTalkApp(app);
   // Off: the `::recording` line still renders, as nothing.
   else app.slots.messageDirective({ id: "recording", component: () => null });

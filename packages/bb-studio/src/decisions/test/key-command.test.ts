@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { commandToken, tokenExpiry } from "../key-command";
+import { commandToken, tokenExpiry } from "../server/key-command";
 
 const jwt = (payload: object) => `h.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.s`;
 

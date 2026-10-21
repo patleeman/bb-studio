@@ -1,3 +1,4 @@
+import { rpcContract as decisions } from "./decisions/contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { rpcContract as studio } from "./contract";
 import { rpcContract as chat } from "./chat/contract";
@@ -10,4 +11,4 @@ import { rpcContract as dashboards } from "./dashboards/contract";
 import { rpcContract as notes } from "./pages/notes-contract";
 import { speechContract as speech } from "./speech/contract";
 import { voiceContract as voice } from "./voice/contract";
-export const rpcContract = defineRpcContract({ ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...speech, ...voice });
+export const rpcContract = defineRpcContract({ ...decisions, ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...speech, ...voice });

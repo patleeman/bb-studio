@@ -8,7 +8,7 @@ and last Pages (`packages/bb-studio/src/pages`, with Explore in
 `packages/bb-studio/src/explore`). This is the checklist, with what each
 taught.
 
-**Status: complete.** Every kind is built in, and the five upgrade bridges
+**Content-kind status: complete.** Every kind is built in, and the five upgrade bridges
 (`pages`, `talk`, `excalidraw`, `artifacts`, `design`), Studio's import RPCs
 and the iOS fallbacks to the old plugin ids were deleted after their release
 cycle. The last commit with the bridges is
@@ -351,3 +351,7 @@ commit, run `bb <old> migrate`, and check the items in Studio
 Done: the kit's `AddOnCollection`, `AddOnPanel` and `handOver` are gone (Code
 hands its collection path to Studio itself), and provider discovery no longer
 keeps a list of known add-ons, since every kind that had one is built in.
+
+## Decisions merge (21 October 2026)
+
+Decisions is a service, with no item routes or database tables. Its server and settings sections now live in `src/decisions`, with `decisions.*` RPCs and `bb studio decisions`. The 0.5.0 `smart-decisions` bridge forwards all former RPCs and CLI commands. Ordinary settings use `getSettings`; five secrets travel only from the verified bridge server into Studio’s secret settings. Import acknowledgment gates Smart Queue and Setup removal. Existing destination settings and KV values win. The bridge has no hook; Studio cleans classifier threads belonging to either ID and still pauses for standalone `smart-queue`. Staged upgrade verification needs the lead’s pushed merge commit.

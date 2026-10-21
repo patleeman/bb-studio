@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { jevRoutes } from "../jev-providers";
+import { jevRoutes } from "../server/jev-providers";
 
 const names = (settings: Parameters<typeof jevRoutes>[0], env = {}) =>
   jevRoutes(settings, env).routes.map((route) => route.name);

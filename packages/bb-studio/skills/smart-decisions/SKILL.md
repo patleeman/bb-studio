@@ -1,11 +1,11 @@
 ---
 name: smart-decisions
-description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and other plugins use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb smart-decisions CLI.
+description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and other plugins use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb studio decisions CLI.
 ---
 
 # Studio Decisions
 
-Studio Decisions holds the Jev provider keys, timeout, and fallback model for
+Studio’s built-in Decisions holds the Jev provider keys, timeout, and fallback model for
 BB Studio. Two things use them:
 
 - **Smart Queue**, built in, classifies owner messages sent to a busy thread.
@@ -13,17 +13,17 @@ BB Studio. Two things use them:
   messages sent by agents or other threads, so `bb thread tell` from inside a
   thread is not classified. It pauses while the standalone `smart-queue`
   plugin is enabled, so only one of them decides.
-- **Other plugins** call Studio Decisions' plugin RPC (`systemOne.ask`,
-  `model.ask`) with the same keys and fallback model.
+- **Other plugins** call Studio Decisions' plugin RPC (`decisions.systemOne.ask`,
+  `decisions.model.ask`) with the same keys and fallback model.
 
 ## Commands
 
 ```sh
-bb smart-decisions status [--json]
-bb smart-decisions recent [--limit <n>] [--json]
-bb smart-decisions classify <thread-id> <message> [--json]
-bb smart-decisions check [--json]
-bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]
+bb studio decisions status [--json]
+bb studio decisions recent [--limit <n>] [--json]
+bb studio decisions classify <thread-id> <message> [--json]
+bb studio decisions check [--json]
+bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]
 ```
 
 - `status` shows whether Smart Queue is on or paused, the Jev providers it will try in
@@ -43,14 +43,13 @@ bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-le
 
 ## Settings
 
-Change settings with `bb plugin config smart-decisions set <key> <value>`.
+Change settings with `bb plugin config studio set decisions_<key> <value>`.
 
 - `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
   `opencode-zen`, or `custom`. `auto` tries each configured provider in that
   order and moves on when one fails.
 - Provider keys are secrets: `typesafeApiKey`, `vercelApiKey`,
-  `openRouterApiKey`, `zenApiKey`, and `customJevApiKey`. Ask the owner for
-  them; never print them. Environment fallbacks are `TYPESAFE_API_KEY`,
+  `openRouterApiKey`, `zenApiKey`, and `customJevApiKey`. Have the owner enter them in Studio settings; never request or print their contents. Environment fallbacks are `TYPESAFE_API_KEY`,
   `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, and `OPENCODE_API_KEY`.
 - `typesafeModel`: `jev-latest` (default), `jev-preview`, or `jev-1.13.0`.
 - A custom provider needs `customJevEndpoint` (full HTTPS URL of a System One
@@ -61,15 +60,15 @@ Change settings with `bb plugin config smart-decisions set <key> <value>`.
 - `jevTimeoutMs` applies to every caller. `steerConfidence`, `batchConfidence` and
   `enabled` apply to Smart Queue only; other plugins apply their own thresholds.
 - The fallback model is not a `bb plugin config` setting. Use
-  `bb smart-decisions fallback`, or the picker on the settings page.
+  `bb studio decisions fallback`, or the picker on the settings page.
 
-Run `bb smart-decisions status` after a change. It lists the Jev routes in order
+Run `bb studio decisions status` after a change. It lists the Jev routes in order
 and any configuration problems.
 
 ## Troubleshooting
 
 - `no classifier answered`: no Jev provider answered, and the fallback model
-  failed too. Read `bb plugin logs smart-decisions` for the reason.
+  failed too. Read `bb plugin logs studio` for the reason.
 - A queued card that says *Smart Queue: follow-up after the current turn* is
   released when the thread goes idle. The owner can use the card's **Send now**
   or **Steer** button to override it. Sending a card by hand cancels its
@@ -79,8 +78,10 @@ and any configuration problems.
   many were grouped (`Smart Queue grouped 1 of 2 follow-ups with …`). Raise
   `batchConfidence` to group less, or set it to 1 to turn grouping off.
 - `request failed (HTTP 400)` from a Jev provider ends with the provider's own
-  reason, such as an unsupported model name. Run `bb smart-decisions check` to
+  reason, such as an unsupported model name. Run `bb studio decisions check` to
   retry with a fixed sample.
 - *No Jev provider is configured*: add a key here.
 - To stop Smart Queue, run
-  `bb plugin config smart-decisions set enabled false`.
+  `bb plugin config studio set decisions_enabled false`.
+
+Settings live under Studio with a `decisions_` prefix. Use Studio settings to enter API keys securely; never ask for or print their contents. The upgrade bridge preserves `bb smart-decisions` for existing scripts.

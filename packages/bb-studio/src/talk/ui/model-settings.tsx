@@ -41,7 +41,7 @@ export function ModelSettings() {
   };
 
   return <div data-talk-model-settings className="space-y-4">
-    <p className="text-xs text-muted-foreground">Use Studio Decisions’ fallback model, or choose a provider and model for each job. Studio Decisions runs these requests and must be enabled. Voice transcription uses Settings → AI services.</p>
+    <p className="text-xs text-muted-foreground">Use Studio Decisions’ fallback model, or choose a provider and model for each job. Studio runs these requests through its built-in Decisions service. Voice transcription uses Settings → AI services.</p>
     {!values && !error && <p className="text-sm text-muted-foreground" role="status">Loading models…</p>}
     {values && <div className="divide-y divide-border rounded-lg border border-border bg-card px-4">
       {purposes.map(({ id, label, description }) => {

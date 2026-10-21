@@ -3,7 +3,7 @@
 // go. Studio's Setup page and `bb studio setup` both show this. Installs,
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
-import type { z } from "zod";
+import { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry, SetupActionResult, SetupSummary } from "./setup-contract";
@@ -87,7 +87,29 @@ interface RetiredPlugin {
   blocker(plugin: SetupPluginEntry, ctx: RetiredContext): Promise<string | null>;
 }
 
+/** Require the bridge's acknowledged copy before allowing removal. */
+export const bridgeBlocker = (noun: string, version: string): RetiredPlugin["blocker"] => async (plugin, ctx) => {
+  const parts = (value: string) => value.split(".").map(Number);
+  const current = parts(plugin.version), required = parts(version);
+  const firstDifference = required.findIndex((value, index) => value !== current[index]);
+  if (current.length !== 3 || current.some((value) => !Number.isFinite(value)) || (firstDifference >= 0 && current[firstDifference]! < required[firstDifference]!)) return `Update ${noun} first: bb plugin update ${plugin.id}. Then update Studio.`;
+  if (!plugin.enabled) return `Enable ${noun} so it can copy its settings: bb plugin enable ${plugin.id}.`;
+  const result = await ctx.sdk.plugins.callRpc({ pluginId: plugin.id, method: "migrationStatus", input: null, outputSchema: z.object({ complete: z.boolean() }), signal: AbortSignal.timeout(10_000) });
+  return result.complete ? null : `Run bb ${plugin.id} migrate, then check again.`;
+};
+
 export const RETIRED: readonly RetiredPlugin[] = [
+  {
+    id: "smart-decisions", name: "Studio Decisions upgrade bridge",
+    why: "Decisions and Smart Queue are built into Studio now.",
+    kept: "The fallback model, recent decisions, ordinary settings and five secret API keys copied into Studio; existing Studio choices are kept.",
+    deleted: REMOVED,
+    before: [
+      { text: "Update Decisions first.", command: "bb plugin update smart-decisions" },
+      { text: "Update Studio, then finish the copy.", command: "bb plugin update studio && bb smart-decisions migrate" },
+    ],
+    blocker: bridgeBlocker("Decisions", "0.5.0"),
+  },
   {
     id: "studio-tables",
     name: "Studio Tables",

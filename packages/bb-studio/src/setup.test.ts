@@ -65,15 +65,15 @@ describe("buildSetup", () => {
     const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("other")]);
     const summary = await buildSetup(sdk, health({
-      problems: [problem("smart-decisions", "degraded", "No Jev provider is set up"), problem("other", "broken", "Stopped")],
+      problems: [problem("studio-code", "degraded", "Editor needs setup"), problem("other", "broken", "Stopped")],
       healthy: [{ pluginId: "studio-code", pluginName: "Studio Code", titles: ["code-server found"] }],
     }));
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
     expect(byId.studio).toMatchObject({ status: "disabled", command: "bb plugin enable studio" });
-    expect(byId["smart-decisions"]).toMatchObject({ status: "needs-setup", command: null });
-    expect(byId["smart-decisions"]!.problems.map((each) => each.title)).toEqual(["No Jev provider is set up"]);
-    expect(byId["studio-code"]).toMatchObject({ status: "installed", passed: ["code-server found"] });
+    expect(byId["smart-decisions"]).toBeUndefined();
+    expect(byId["studio-code"]!.problems.map((each) => each.title)).toEqual(["Editor needs setup"]);
+    expect(byId["studio-code"]).toMatchObject({ status: "needs-setup", passed: [] });
     expect(summary.commands).toEqual(["bb plugin enable studio"]);
     expect(summary.installAll).toBeNull();
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
@@ -147,11 +147,11 @@ describe("formatSetup", () => {
   it("prints the status, retired plugins and the commands to run", async () => {
     const plugins = allInstalled().filter((each) => each.id !== "mobile").map((each) => (each.id === "studio-code" ? { ...each, enabled: false } : each));
     const { sdk } = fakeSdk([...plugins, plugin("studio-tables")]);
-    const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("smart-decisions", "degraded", "No Jev provider is set up"), detail: "Add a key" }] })));
+    const text = formatSetup(await buildSetup(sdk, health({ problems: [{ ...problem("studio-code", "degraded", "Editor needs setup"), detail: "Add a key" }] })));
     expect(text).toContain("BB Studio add-ons\n");
     expect(text).toMatch(/ {2}not installed +mobile +Studio Mobile:/);
     expect(text).toMatch(/ {2}disabled +studio-code +Studio Code:/);
-    expect(text).toMatch(/ {2}needs setup +smart-decisions +Studio Decisions:.*\n +degraded: No Jev provider is set up\. Add a key/);
+    expect(text).not.toContain("smart-decisions");
     expect(text).toMatch(/ {2}ok +studio +Studio:/);
     expect(text).toContain("Retired plugins still installed\n  studio-tables");
     expect(text).toContain("Then remove it: bb plugin remove studio-tables");
@@ -185,5 +185,23 @@ describe("SetupService install", () => {
     expect(second.failures).toEqual([]);
     expect(calls).toEqual(["install mobile", "install studio-code"]);
     expect(overlapped).toBe(false);
+  });
+});
+
+describe("Decisions bridge retirement", () => {
+  it("requires a current, enabled bridge and acknowledged migration", async () => {
+    for (const [extra, status, expected] of [
+      [{ version: "0.4.0" }, true, "Update Decisions first"],
+      [{ version: "0.5.0", enabled: false }, true, "Enable Decisions"],
+      [{ version: "0.5.0" }, false, "bb smart-decisions migrate"],
+      [{ version: "0.5.0" }, true, null],
+    ] as const) {
+      const fake = fakeSdk([plugin("smart-decisions", extra)]);
+      fake.raw.plugins.callRpc.mockResolvedValue({ complete: status } as never);
+      const summary = await buildSetup(fake.sdk, health());
+      const retired = summary.retired.find((entry) => entry.id === "smart-decisions")!;
+      if (expected === null) expect(retired.blocker).toBeNull();
+      else expect(retired.blocker).toContain(expected);
+    }
   });
 });

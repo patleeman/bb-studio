@@ -3,6 +3,14 @@ import Foundation
 
 public enum Studio {
   public enum Method {
+    public static let decisions_systemOne_ask = "decisions.systemOne.ask"
+    public static let decisions_model_ask = "decisions.model.ask"
+    public static let decisions_fallback_get = "decisions.fallback.get"
+    public static let decisions_fallback_set = "decisions.fallback.set"
+    public static let decisions_fallback_suggest = "decisions.fallback.suggest"
+    public static let decisions_jev_status = "decisions.jev.status"
+    public static let decisions_jev_check = "decisions.jev.check"
+    public static let decisions_cli = "decisions.cli"
     public static let overview = "overview"
     public static let items = "items"
     public static let changes = "changes"
@@ -248,6 +256,42 @@ public enum Studio {
     public static let voice_turnNote = "voice.turnNote"
     public static let voice_new = "voice.new"
   }
+
+  public typealias DecisionsSystemOneAskOutput = StudioJSONValue
+
+  public typealias DecisionsSystemOneAsk = DecisionsSystemOneAskOutput
+
+  public typealias DecisionsModelAskOutput = StudioJSONValue
+
+  public typealias DecisionsModelAsk = DecisionsModelAskOutput
+
+  public typealias DecisionsFallbackGetInput = StudioJSONValue
+
+  public typealias DecisionsFallbackGetOutput = StudioJSONValue
+
+  public typealias DecisionsFallbackGet = DecisionsFallbackGetOutput
+
+  public typealias DecisionsFallbackSetInput = StudioJSONValue
+
+  public typealias DecisionsFallbackSetOutput = StudioJSONValue
+
+  public typealias DecisionsFallbackSet = DecisionsFallbackSetOutput
+
+  public typealias DecisionsFallbackSuggestInput = StudioJSONValue
+
+  public typealias DecisionsFallbackSuggest = DecisionsFallbackSuggestOutput
+
+  public typealias DecisionsJevStatusInput = StudioJSONValue
+
+  public typealias DecisionsJevStatus = DecisionsJevStatusOutput
+
+  public typealias DecisionsJevCheckInput = StudioJSONValue
+
+  public typealias DecisionsJevCheckOutput = StudioJSONValue
+
+  public typealias DecisionsJevCheck = DecisionsJevCheckOutput
+
+  public typealias DecisionsCli = DecisionsCliOutput
 
   public typealias OverviewInput = StudioJSONValue
 
@@ -772,6 +816,192 @@ public enum Studio {
   public typealias VoiceTurnNote = VoiceTurnNoteOutput
 
   public typealias VoiceNew = VoiceNewOutput
+
+  public struct DecisionsSystemOneAskInput: Sendable, Hashable, Codable {
+    public var caller: String?
+    public var state: StudioJSONValue?
+    public var questions: [String: StudioJSONValue]?
+
+    public init(caller: String? = nil, state: StudioJSONValue? = nil, questions: [String: StudioJSONValue]? = nil) {
+      self.caller = caller
+      self.state = state
+      self.questions = questions
+    }
+  }
+
+  public enum DecisionsModelAskInputModelSelectionReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DecisionsModelAskInputModelSelection: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: DecisionsModelAskInputModelSelectionReasoningLevel?
+    public var serviceTier: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: DecisionsModelAskInputModelSelectionReasoningLevel? = nil, serviceTier: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct DecisionsModelAskInput: Sendable, Hashable, Codable {
+    public var caller: String?
+    public var requestId: String?
+    public var hostId: String?
+    public var prompt: String?
+    public var providerId: String?
+    public var modelSelection: DecisionsModelAskInputModelSelection?
+
+    public init(caller: String? = nil, requestId: String? = nil, hostId: String? = nil, prompt: String? = nil, providerId: String? = nil, modelSelection: DecisionsModelAskInputModelSelection? = nil) {
+      self.caller = caller
+      self.requestId = requestId
+      self.hostId = hostId
+      self.prompt = prompt
+      self.providerId = providerId
+      self.modelSelection = modelSelection
+    }
+  }
+
+  public enum DecisionsFallbackSuggestOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DecisionsFallbackSuggestOutput: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: DecisionsFallbackSuggestOutputReasoningLevel?
+    public var serviceTier: String?
+    public var mode: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: DecisionsFallbackSuggestOutputReasoningLevel? = nil, serviceTier: String? = nil, mode: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+      self.mode = mode
+    }
+  }
+
+  public struct DecisionsJevStatusOutputRoutesItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var model: String?
+
+    public init(name: String? = nil, model: String? = nil) {
+      self.name = name
+      self.model = model
+    }
+  }
+
+  public struct DecisionsJevStatusOutput: Sendable, Hashable, Codable {
+    public var provider: String?
+    public var routes: [DecisionsJevStatusOutputRoutesItem]?
+    public var problems: [String]?
+
+    public init(provider: String? = nil, routes: [DecisionsJevStatusOutputRoutesItem]? = nil, problems: [String]? = nil) {
+      self.provider = provider
+      self.routes = routes
+      self.problems = problems
+    }
+  }
+
+  public struct DecisionsCliInput: Sendable, Hashable, Codable {
+    public var argv: [String]?
+
+    public init(argv: [String]? = nil) {
+      self.argv = argv
+    }
+  }
+
+  public struct DecisionsCliOutput: Sendable, Hashable, Codable {
+    public var exitCode: Double?
+    public var stdout: String?
+    public var stderr: String?
+
+    public init(exitCode: Double? = nil, stdout: String? = nil, stderr: String? = nil) {
+      self.exitCode = exitCode
+      self.stdout = stdout
+      self.stderr = stderr
+    }
+  }
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready

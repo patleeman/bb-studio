@@ -1,7 +1,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import type { MessageDispatchHookContext } from "@get-bb/plugin-sdk";
-import type { Verdict } from "../classifier";
+import type { Verdict } from "../server/classifier";
 import {
   RouteFailed,
   SmartQueue,
@@ -13,7 +13,7 @@ import {
   type QueuedRow,
   type SmartQueueDeps,
   type ThreadInfo,
-} from "../queue";
+} from "../server/queue";
 
 const thread = (overrides: Partial<ThreadInfo> = {}) =>
   ({
@@ -538,4 +538,12 @@ test("a row restored after a failed take-over is left with core, not taken over 
   queue.sync([row({ id: "q_restored", waitingOn: { kind: "thread-busy" } })], 1_005);
   await settle();
   assert.equal(attempts, 1, "the restored row is not deleted and re-sent in a loop");
+});
+
+
+test("Studio-owned visible work remains eligible after queue ownership moves to Studio", async () => {
+  const { queue } = harness(followup, { pluginId: "studio" });
+  assert.equal(queue.eligibleThread(thread({ originPluginId: "studio" })), true);
+  assert.equal(queue.eligibleThread(thread({ originPluginId: "studio", visibility: "hidden" })), false);
+  queue.dispose();
 });

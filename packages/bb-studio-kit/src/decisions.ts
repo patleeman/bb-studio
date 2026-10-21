@@ -6,8 +6,8 @@ export type { Answer, Answers, Question, Questions } from "./decisions-contract"
 
 export class DecisionsUnavailableError extends Error {}
 
-const installHint = "Install and enable Studio Decisions, then set up its Jev provider or fallback model.";
-const setupHint = "Set up a Jev provider or fallback model in Studio Decisions settings.";
+const installHint = "Enable Studio, then set up its Decisions Jev provider or fallback model.";
+const setupHint = "Set up a Jev provider or fallback model in Studio settings.";
 
 class DecisionsFailure extends Error {}
 
@@ -25,7 +25,7 @@ export async function askModel(
   signal.throwIfAborted();
   try {
     const result = await bb.sdk.plugins.callRpc({
-      signal, pluginId: "smart-decisions", method: "model.ask", input: request,
+      signal, pluginId: "studio", method: "decisions.model.ask", input: request,
       outputSchema: publicContract["model.ask"].output,
     });
     signal.throwIfAborted();

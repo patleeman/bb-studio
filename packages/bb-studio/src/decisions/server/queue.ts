@@ -137,8 +137,7 @@ export class SmartQueue {
   eligibleThread(thread: ThreadInfo) {
     // Visible bot profile threads use the same owner queue as other threads.
     return (
-      thread.visibility !== "hidden" &&
-      thread.originPluginId !== this.deps.pluginId
+      thread.visibility !== "hidden"
     );
   }
 
