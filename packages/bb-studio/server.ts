@@ -1,3 +1,4 @@
+import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
@@ -486,15 +487,10 @@ export default async function plugin(bb: BbPluginApi) {
       delete: (id, botId) => runners.delete(id, botId),
       automation: (id) => runners.automation(id),
     },
-    curator: {
-      get: (botId) => {
-        const bot = bots.stored(botId);
-        if (!bot || bot.kind === "external") return null;
-        const row = learning.curatorState(botId);
-        return row;
-      },
-      setPaused: async (botId, paused) => { await learning.set(botId, { curatorPaused: paused }); },
-      run: async (botId) => { await learning.curate(botId); },
+    maintenance: {
+      get: (botId) => { const view = maintenance.view(botId); const last = view.runs[0]; return { paused: !view.settings.enabled, lastRunAt: last?.at ?? null, lastOutcome: last?.summary ?? null, nextRunAt: view.settings.enabled ? (() => { const next = new Date(); next.setHours(4, 0, 0, 0); if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1); return next.getTime(); })() : null }; },
+      setPaused: async (botId, paused) => { await maintenance.set(botId, { enabled: !paused }); },
+      run: async (botId) => { await maintenance.run(botId); },
     },
   });
   // Runner and Bot automations BB turned off after a transient failure come
@@ -600,6 +596,22 @@ export default async function plugin(bb: BbPluginApi) {
     log: (message) => bb.log.warn(message),
     quietSince: (threadId, updatedAt) => warmer.quietSince(threadId, updatedAt),
   });
+  const maintenance = new BotMaintenance({
+    db, sdk: bb.sdk, changed: tagsChanged,
+    bots: () => bots.list(), owned: (id) => ownedThreads.owned(id), refreshOwned: () => ownedThreads.sweep(),
+    memory: (id) => { const pageId = bots.memoryPage(id); if (!pageId) return null; const page = pages.store.meta(pageId); return page ? { id: pageId, markdown: pages.markdown(pageId) ?? "", updatedAt: page.updated_at } : null; },
+    curate: (id, dryRun) => learning.curate(id, { dryRun }),
+    automationPause: (id, botId) => automations.setState(id, "paused", botId),
+    automationDelete: (id, botId) => automations.delete(id, botId),
+    adoptable: (id) => runners.adoptable(id),
+    alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Mention this once. The details are in Bot info → Maintenance." }); },
+  });
+  bb.events.on("thread.idle", ({ thread }) => {
+    const bot = bots.list().find((b) => b.threadId === thread.id);
+    if (bot) void bb.sdk.threads.events.list({ threadId: thread.id, order: "desc", limit: "1", types: ["client/turn/requested"] }).then((events) => {
+      if (JSON.stringify(events[0]?.data ?? {}).includes("[bb automation due:")) return maintenance.tick(Date.now(), bot.id);
+    }).catch((error) => bb.log.warn(`Maintenance after check-in: ${errorText(error)}`));
+  });
   // Prompt-cache warming for Bot chats (src/bot-cache.ts): a tiny ping about
   // every 55 minutes while the user is around, and one compaction before the
   // cache expires once they've gone idle; nothing in the first 5 minutes.
@@ -620,6 +632,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Watchers' findings and end dates, once a minute; the skill curator and stuck reviews too.
   const automationTimer = setInterval(() => {
     void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
+    void maintenance.tick().catch((error) => bb.log.warn(`Maintenance tick failed: ${errorText(error)}`));
     void learning.tick().catch((error) => bb.log.warn(`Skill learning tick failed: ${errorText(error)}`));
   }, 60_000);
   // Moves Spaces' leads to projects, retires old heartbeat automations and turns
@@ -808,7 +821,11 @@ export default async function plugin(bb: BbPluginApi) {
     bot_pause: ({ botId }) => bots.pause(botId),
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
-    bot_activity: ({ botId }) => bots.activity(botId),
+    bot_maintenance_threads: async ({ botId }) => ({ threads: await maintenance.olderThreads(learnerId(botId)) }),
+    bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),
+    bot_maintenance_set: ({ botId, ...patch }) => maintenance.set(learnerId(botId), patch),
+    bot_maintenance_run: ({ botId, dryRun }) => maintenance.run(learnerId(botId), { dryRun }),
+    bot_activity: async ({ botId }) => ({ ...await bots.activity(botId), maintenance: bots.stored(botId) ? maintenance.view(bots.stored(botId)!.id).runs : [] }),
     bot_cache_state: ({ threadId, botId }) => warmer.state(cacheThread(threadId, botId)),
     bot_cache_set: ({ botId, ...patch }) => {
       const bot = bots.stored(botId);

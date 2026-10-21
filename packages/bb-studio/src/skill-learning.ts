@@ -495,7 +495,7 @@ export class SkillLearning {
   /** Ends a review: stops it if asked, archives the fork and records the result. */
   private async close(review: ReviewRow, result: string, stop = false): Promise<void> {
     if (stop) await this.deps.sdk.threads.stop({ threadId: review.thread_id }).catch(() => {});
-    await this.deps.sdk.threads.archive({ threadId: review.thread_id }).catch(() => {});
+    // Maintenance archives finished workers after its ownership and workspace checks.
     const now = Date.now();
     this.deps.db.prepare("UPDATE bot_skill_reviews SET status = 'done', finished_at = ?, result = ? WHERE thread_id = ?").run(now, result, review.thread_id);
     if (review.kind === "review") this.save(review.bot_id, { last_review_at: now, last_review_result: result });
@@ -551,15 +551,6 @@ export class SkillLearning {
       if (!bot || bot.state !== "active") await this.close(review, `Stopped: ${bot?.name ?? "the bot"} is ${bot?.state ?? "gone"}`, true);
       else if (now - review.started_at > REVIEW_TIMEOUT_MS) await this.close(review, "Stopped: took too long", true);
     }
-    for (const bot of this.deps.bots()) {
-      if (bot.kind === "external" || bot.state !== "active" || !bot.threadId) continue;
-      const row = this.row(bot.id);
-      const since = row.curator_last_at ?? row.curator_since ?? now;
-      if (row.curator_paused || now - since < CURATOR_EVERY_MS) continue;
-      const thread = await this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => null);
-      const quiet = this.deps.quietSince ? this.deps.quietSince(bot.threadId, thread?.updatedAt ?? null) : thread?.updatedAt;
-      if (!thread || thread.status !== "idle" || now - (quiet ?? now) < CURATOR_IDLE_MS) continue;
-      await this.curate(bot.id, { now }).catch((error) => this.deps.log?.(`Skill curator for ${bot.id} failed: ${error instanceof Error ? error.message : String(error)}`));
-    }
+
   }
 }

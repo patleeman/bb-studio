@@ -17,6 +17,7 @@ import { externalName, externalNote } from "../../external-providers";
 import { RunnersSection } from "./Runners";
 import { AutomationsSection } from "./Automations";
 import { ProfileChanges } from "./ProfileChanges";
+import { BotMaintenance } from "./BotMaintenance";
 import { BotCacheSection } from "./BotCache";
 import { BOT_INFO_ACTION, useOpenThread } from "./workspace";
 
@@ -128,6 +129,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
       {skills}
       {bot.kind === "external" ? null : <BotCacheSection botId={bot.id} threadId={bot.threadId} />}
 
+      {bot.kind === "external" ? null : <BotMaintenance botId={bot.id} />}
       <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
       {bot.kind === "external"
         ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>

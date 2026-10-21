@@ -445,4 +445,8 @@ export const MIGRATIONS = [
    );
    DELETE FROM bot_skill_pending;
    UPDATE bot_learning SET approval = 0;`,
+  `CREATE TABLE bot_maintenance_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, at INTEGER NOT NULL, settings TEXT NOT NULL);
+   CREATE INDEX bot_maintenance_settings_bot ON bot_maintenance_settings (bot_id, id);
+   CREATE TABLE bot_maintenance_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, bot_id TEXT NOT NULL, at INTEGER NOT NULL, result TEXT NOT NULL);
+   CREATE INDEX bot_maintenance_runs_bot ON bot_maintenance_runs (bot_id, id);`,
 ];

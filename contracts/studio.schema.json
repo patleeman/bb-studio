@@ -6069,6 +6069,548 @@
         "additionalProperties": false
       }
     },
+    "bot_maintenance_threads": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "relation": {
+                  "type": "string",
+                  "enum": [
+                    "self",
+                    "started"
+                  ]
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "parentId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status",
+                "projectId",
+                "updatedAt",
+                "relation",
+                "needsYou",
+                "parentId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_maintenance_get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "enabledAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "memoryWords": {
+                "type": "number"
+              },
+              "rules": {
+                "type": "object",
+                "properties": {
+                  "threads": {
+                    "type": "boolean"
+                  },
+                  "workers": {
+                    "type": "boolean"
+                  },
+                  "automations": {
+                    "type": "boolean"
+                  },
+                  "runtimes": {
+                    "type": "boolean"
+                  },
+                  "memory": {
+                    "type": "boolean"
+                  },
+                  "skills": {
+                    "type": "boolean"
+                  },
+                  "adopt": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "threads",
+                  "workers",
+                  "automations",
+                  "runtimes",
+                  "memory",
+                  "skills",
+                  "adopt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "enabled",
+              "enabledAt",
+              "memoryWords",
+              "rules"
+            ],
+            "additionalProperties": false
+          },
+          "liveAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "number"
+                },
+                "dryRun": {
+                  "type": "boolean"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "needsCall": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "title",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "automationId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "at",
+                "dryRun",
+                "summary",
+                "actions",
+                "needsCall",
+                "suggestions"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "settings",
+          "liveAt",
+          "runs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_maintenance_set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "memoryWords": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 100000
+          },
+          "rules": {
+            "type": "object",
+            "properties": {
+              "threads": {
+                "type": "boolean"
+              },
+              "workers": {
+                "type": "boolean"
+              },
+              "automations": {
+                "type": "boolean"
+              },
+              "runtimes": {
+                "type": "boolean"
+              },
+              "memory": {
+                "type": "boolean"
+              },
+              "skills": {
+                "type": "boolean"
+              },
+              "adopt": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "enabledAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "memoryWords": {
+                "type": "number"
+              },
+              "rules": {
+                "type": "object",
+                "properties": {
+                  "threads": {
+                    "type": "boolean"
+                  },
+                  "workers": {
+                    "type": "boolean"
+                  },
+                  "automations": {
+                    "type": "boolean"
+                  },
+                  "runtimes": {
+                    "type": "boolean"
+                  },
+                  "memory": {
+                    "type": "boolean"
+                  },
+                  "skills": {
+                    "type": "boolean"
+                  },
+                  "adopt": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "threads",
+                  "workers",
+                  "automations",
+                  "runtimes",
+                  "memory",
+                  "skills",
+                  "adopt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "enabled",
+              "enabledAt",
+              "memoryWords",
+              "rules"
+            ],
+            "additionalProperties": false
+          },
+          "liveAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "number"
+                },
+                "dryRun": {
+                  "type": "boolean"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "needsCall": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "title",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "automationId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "at",
+                "dryRun",
+                "summary",
+                "actions",
+                "needsCall",
+                "suggestions"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "settings",
+          "liveAt",
+          "runs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_maintenance_run": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "number"
+              },
+              "dryRun": {
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "needsCall": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "threadId": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "threadId",
+                    "title",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "suggestions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "threadId": {
+                      "type": "string"
+                    },
+                    "automationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "at",
+              "dryRun",
+              "summary",
+              "actions",
+              "needsCall",
+              "suggestions"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
     "bot_activity": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6085,6 +6627,82 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "maintenance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "number"
+                },
+                "dryRun": {
+                  "type": "boolean"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "needsCall": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "title",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "automationId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "at",
+                "dryRun",
+                "summary",
+                "actions",
+                "needsCall",
+                "suggestions"
+              ],
+              "additionalProperties": false
+            }
+          },
           "needsYou": {
             "type": "array",
             "items": {

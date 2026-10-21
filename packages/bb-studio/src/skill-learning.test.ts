@@ -2,7 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import {
-  ARCHIVE_AFTER_MS, CURATOR_EVERY_MS, CURATOR_IDLE_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
+  ARCHIVE_AFTER_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
   SkillLearning, STALE_AFTER_MS, tallyTurns, type LearningSkill, type SkillState,
 } from "./skill-learning";
 
@@ -192,11 +192,11 @@ it("takes a baseline first, then forks a review on a cheap model after 10 tool t
   // A fork is idle before its prompt lands: that idle isn't the end.
   await x.learning.idle(x.threads.get("fork1")!, null);
   expect((await x.learning.view("bot_main")).reviewing).toBe(true);
-  // The fork runs, saves a skill and finishes: recorded and archived.
+  // The fork runs, saves a skill and finishes: recorded; Maintenance owns archiving.
   await x.learning.active("fork1");
   x.learning.noteWrite("fork1", "saved");
   await x.learning.idle(x.threads.get("fork1")!, "Saved deploy-check.");
-  expect(x.archive).toHaveBeenCalledWith({ threadId: "fork1" });
+  expect(x.archive).not.toHaveBeenCalled();
   expect(await x.learning.view("bot_main")).toMatchObject({ reviewing: false, lastReview: { result: "Saved 1 skill" } });
 });
 
@@ -258,7 +258,7 @@ it("ignores the retired approval setting and exposes no pending changes", async 
   expect(reviewPrompt({ name: "Dot", memoryPageId: null, reason: "manual" })).toContain("apply immediately");
 });
 
-it("runs the curator weekly once the bot is idle 2 hours, with a dry run, pins exempt, and optional consolidation", async () => {
+it("runs the curator explicitly from maintenance, with a dry run, pins exempt, and optional consolidation", async () => {
   const x = await setup();
   const now = Date.now();
   x.writeSkill("bot_main", { name: "old", description: "d", body: "b" });
@@ -272,16 +272,11 @@ it("runs the curator weekly once the bot is idle 2 hours, with a dry run, pins e
   expect(dry).toMatchObject({ changes: [{ name: "old", from: "active", to: "archived" }], result: "Dry run: 1 archived" });
   expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
 
-  // Not due yet: the first run is a week after learning started.
-  await x.learning.tick(now);
+  // The old minute tick no longer curates; built-in Maintenance owns the pass.
+  await x.learning.tick(now + 100 * DAY);
   expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
-  // Due, but the bot was busy recently.
-  x.threads.set("bot1", { ...x.threads.get("bot1")!, updatedAt: now + CURATOR_EVERY_MS });
-  await x.learning.tick(now + CURATOR_EVERY_MS + 1000);
-  expect(x.skills().find((skill) => skill.name === "old")?.state).toBe("active");
-  // Due and idle 2 hours.
   await x.learning.set("bot_main", { consolidate: true });
-  await x.learning.tick(now + CURATOR_EVERY_MS + CURATOR_IDLE_MS + 2000);
+  await x.learning.curate("bot_main", { now });
   expect(Object.fromEntries(x.skills().map((skill) => [skill.name, skill.state]))).toEqual({ fresh: "active", old: "archived", pinned: "active" });
   expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: false, lastOutcome: "1 archived" });
   // Two skills left unarchived: a consolidation fork.

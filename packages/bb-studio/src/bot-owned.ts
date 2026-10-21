@@ -146,7 +146,10 @@ export class BotOwnedThreads {
   owned(botId: string): Set<string> {
     const ids = new Set([...this.owners].filter(([, bot]) => bot === botId).map(([id]) => id));
     for (const row of this.deps.db.prepare("SELECT thread_id FROM bot_hidden_threads WHERE bot_id = ? AND reason != 'released'").all(botId) as { thread_id: string }[]) ids.add(row.thread_id);
+    // Review forks are created and recorded by Studio for this Bot.
+    for (const row of this.deps.db.prepare("SELECT thread_id FROM bot_skill_reviews WHERE bot_id = ?").all(botId) as { thread_id: string }[]) ids.add(row.thread_id);
     for (const [id, bot] of this.adopted()) if (bot !== botId) ids.delete(id);
+    for (const id of this.released()) ids.delete(id);
     for (const id of this.chains().keys()) ids.delete(id);
     return ids;
   }

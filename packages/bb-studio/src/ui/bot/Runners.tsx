@@ -4,7 +4,7 @@
 // runner for threads the Bot started that an automation wakes. Opening a
 // runner opens its thread as a BB thread.
 import { errorMessage } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { DANGER_BUTTON, GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "@bb-studio/kit/ui";
 import { useState } from "react";
 import type { RunnerAdoptableView, RunnerView } from "../../contract";
@@ -73,17 +73,8 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
     try { await call(method, { ...(input as object), botId }); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };
   const runners = data.data?.runners ?? [];
-  const adoptable = data.data?.adoptable ?? [];
-  // Runners are in Automations now; this keeps Adopt as runner.
-  if (adoptOnly) {
-    if (!adoptable.length) return null;
-    return (
-      <section aria-label="Adopt as runner" className="px-4 pt-3">
-        {error && !sheet ? <p role="alert" className="pb-1 text-xs text-destructive">{error}</p> : null}
-        <Adoptable adoptable={adoptable} busy={busy} disabled={disabled} onOpen={onOpen} onAdopt={(candidate) => void run("bot_runner_adopt", { threadId: candidate.threadId, automationId: candidate.automationId })} />
-      </section>
-    );
-  }
+  // Adoption suggestions now live in the maintenance summary.
+  if (adoptOnly) return null;
   return (
     <section aria-label="Runners" data-testid="bot-runners" className="px-4 pt-4">
       <div className="flex items-center gap-2">
@@ -117,7 +108,6 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
       ) : (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : `Recurring jobs ${botName} hands off. They stay quiet unless they have something to tell you.`}</p>
       )}
-      <Adoptable adoptable={adoptable} busy={busy} disabled={disabled} onOpen={onOpen} onAdopt={(candidate) => void run("bot_runner_adopt", { threadId: candidate.threadId, automationId: candidate.automationId })} />
       {sheet?.kind === "new" || sheet?.kind === "edit" ? (
         <RunnerDialog runner={sheet.kind === "edit" ? sheet.runner : null} busy={busy} error={error} onClose={() => setSheet(null)}
           onSave={(input) => void run(sheet.kind === "edit" ? "bot_runner_update" : "bot_runner_create", sheet.kind === "edit" ? { id: sheet.runner.id, ...input } : input)} />
@@ -127,22 +117,6 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
           text={sheet.runner.adopted ? "It stops being a runner. Its thread and automation stay as they were before you adopted it." : "Its schedule is deleted and its thread archived; the history is kept."} />
       ) : null}
     </section>
-  );
-}
-
-function Adoptable({ adoptable, busy, disabled, onOpen, onAdopt }: { adoptable: RunnerAdoptableView[]; busy: boolean; disabled: boolean; onOpen(threadId: string): void; onAdopt(candidate: RunnerAdoptableView): void }) {
-  if (!adoptable.length) return null;
-  return (
-    <div className="mt-3 flex flex-col gap-1">
-      <p className="text-xs text-muted-foreground">Woken by an automation, not runners yet:</p>
-      {adoptable.map((candidate) => (
-        <div key={candidate.threadId} className="flex min-w-0 items-center gap-2 text-sm">
-          <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
-          <button type="button" className="min-w-0 flex-1 truncate text-left hover:underline" onClick={() => onOpen(candidate.threadId)}>{candidate.title}</button>
-          <button type="button" className={OUTLINE_BUTTON} disabled={busy || disabled} onClick={() => onAdopt(candidate)}>Adopt as runner</button>
-        </div>
-      ))}
-    </div>
   );
 }
 

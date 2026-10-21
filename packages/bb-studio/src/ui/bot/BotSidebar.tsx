@@ -233,7 +233,10 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   const openBot = useOpenBot(onNavigate);
   const running = runningCount(activity.data);
   const status = statusLabel(view.run, bot.state, running);
-  const groups = sidebarGroups(activity.data);
+  const [showArchived, setShowArchived] = useState(false);
+  const older = useLive<{ threads: BotThreadView[] }>("bot_maintenance_threads", { botId: bot.id }, { enabled: showArchived && bot.kind !== "external" });
+  const recentActivity = activity.data ? { ...activity.data, completed: activity.data.completed.filter((t) => Date.now() - t.updatedAt < 7 * 86_400_000) } : null;
+  const groups = sidebarGroups(recentActivity);
   const ids = chain.data?.threadIds ?? [];
   const chatOpen = active !== null && (active === bot.threadId || ids.includes(active));
   const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
@@ -289,6 +292,8 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
+        {bot.kind !== "external" ? <button type="button" className="self-start px-2 text-xs text-muted-foreground hover:text-foreground" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Hide archived" : "Show archived"}</button> : null}
+        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} />) : null}
         {sideThreads.data?.threads.length ? (
           <Group id="threads" title="Side threads" closed={layout.closed} onToggle={toggle}>
             {sideThreads.data.threads.map((thread) => <SideThreadRow key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}

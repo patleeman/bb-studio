@@ -168,18 +168,18 @@ it("lists the skill curator, pauses it and runs it now, but won't edit or delete
     db: x.db, sdk: (x.auto as unknown as { deps: { sdk: never } }).deps.sdk, changed: () => {}, bot: () => x.bot,
     heartbeat: { get: () => null, set: vi.fn(), automation: () => null },
     runners: { list: async () => [], create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null },
-    curator: {
+    maintenance: {
       get: () => state,
       setPaused: async (_botId, paused) => { state.paused = paused; },
       run: async () => { state.lastRunAt = 7; state.lastOutcome = "1 stale"; },
     },
   });
-  expect(await auto.list()).toEqual([expect.objectContaining({ id: "skill-curator", name: "Skill curator", scheduleText: "Weekly, when idle", state: "active", nextRunAt: 5000 })]);
-  expect(await auto.setState("skill-curator", "paused")).toMatchObject({ state: "paused", nextRunAt: null });
-  expect(await auto.runNow("skill-curator")).toMatchObject({ lastRunAt: 7, lastOutcome: "1 stale" });
-  expect(await auto.runs("skill-curator")).toEqual([expect.objectContaining({ at: 7, outcome: "1 stale" })]);
-  await expect(auto.update({ id: "skill-curator", name: "x" })).rejects.toThrow(/runs weekly/);
-  await expect(auto.delete("skill-curator")).rejects.toThrow(/pause it instead/);
+  expect(await auto.list()).toEqual([expect.objectContaining({ id: "maintenance", name: "Maintenance", scheduleText: "Daily at 4 AM local", state: "active", nextRunAt: 5000 })]);
+  expect(await auto.setState("maintenance", "paused")).toMatchObject({ state: "paused", nextRunAt: null });
+  expect(await auto.runNow("maintenance")).toMatchObject({ lastRunAt: 7, lastOutcome: "1 stale" });
+  expect(await auto.runs("maintenance")).toEqual([expect.objectContaining({ at: 7, outcome: "1 stale" })]);
+  await expect(auto.update({ id: "maintenance", name: "x" })).rejects.toThrow(/Maintenance settings/);
+  await expect(auto.delete("maintenance")).rejects.toThrow(/turn it off/);
   x.bot.kind = "external";
   expect(await auto.list()).toEqual([]);
 });

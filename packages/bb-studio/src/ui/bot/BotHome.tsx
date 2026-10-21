@@ -246,6 +246,7 @@ export function ActivityPanel({ data, loading, error, onOpen = openThreadPage }:
   const empty = !data.needsYou.length && !data.waiting?.length && !data.inProgress.length && !data.scheduled.length && !data.completed.length;
   return (
     <div className="flex flex-col gap-4 px-2.5 pt-2 pb-3">
+      {data.maintenance?.map((run) => <div key={run.at} className="px-1.5 text-xs"><span className="font-medium">Maintenance</span> · {run.summary}</div>)}
       {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
       {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} onOpen={onOpen} /></Section> : null}
       {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} /></Section> : null}

@@ -288,7 +288,11 @@ const botScheduled = z.object({
   nextRunAt: z.number().nullable(),
 });
 export type BotScheduledView = z.infer<typeof botScheduled>;
+export const maintenanceRun = z.object({ at: z.number(), dryRun: z.boolean(), summary: z.string(), actions: z.array(z.string()), needsCall: z.array(z.object({ threadId: z.string(), title: z.string(), reason: z.string() })), suggestions: z.array(z.object({ text: z.string(), threadId: z.string().optional(), automationId: z.string().optional() })) });
+const maintenanceRulesSchema = z.object({ threads: z.boolean(), workers: z.boolean(), automations: z.boolean(), runtimes: z.boolean(), memory: z.boolean(), skills: z.boolean(), adopt: z.boolean() });
+const maintenanceView = z.object({ settings: z.object({ enabled: z.boolean(), enabledAt: z.number().nullable(), memoryWords: z.number(), rules: maintenanceRulesSchema }), liveAt: z.number().nullable(), runs: z.array(maintenanceRun) });
 const botActivity = z.object({
+  maintenance: z.array(maintenanceRun).optional(),
   needsYou: z.array(botThread),
   inProgress: z.array(botThread),
   /** Queued threads, or ones whose message is scheduled for later. */
@@ -493,6 +497,10 @@ export const rpcContract = defineRpcContract({
   /** Pauses the Bot, stops the running threads it started and turns off its schedules. Its data is kept. */
   bot_stop: { input: forBot, output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
+  bot_maintenance_threads: { input: forBot, output: z.object({ threads: z.array(botThread) }) },
+  bot_maintenance_get: { input: forBot, output: maintenanceView },
+  bot_maintenance_set: { input: z.object({ botId, enabled: z.boolean().optional(), memoryWords: z.number().int().min(100).max(100000).optional(), rules: maintenanceRulesSchema.partial().optional() }), output: maintenanceView },
+  bot_maintenance_run: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: maintenanceRun.nullable() },
   bot_activity: { input: forBot, output: botActivity },
   /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
   bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },

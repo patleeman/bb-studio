@@ -1220,6 +1220,50 @@ bb studio reindex
 
 ## Bot
 
+Bot info → **Maintenance** is off for every Bot until you enable it. Enabling
+it records a dry-run summary and keeps all actions simulated for one day,
+then goes live automatically. It runs daily at 4 AM in the server's local
+timezone or after a heartbeat, at most once per local day while active.
+**Run now** respects the first-day dry run; **Dry run** always previews.
+
+Each rule has its own toggle: finished owned threads (3 days with a captured
+result, 7 without), hidden workers (one day after their owner replies,
+otherwise 3), done reminders, stale watchers, recurring automation cleanup,
+Memory (8,000 words by default), skills and runner suggestions. Only done
+reminders get deleted, after 14 days in Done. Disabled automations older
+than 30 days are suggestions. Recurring jobs with 10 empty or `[PASS]` runs
+are suggestions; duplicates and retired targets are paused. Pinned skills
+are exempt from the existing 30/90-day skill retirement rules.
+
+Pending interactions, open plans, queued work and live automation or runner
+targets protect threads. Workspace archives require a successful
+`environments.status` check: clean, no uncommitted changes and no ahead
+commits. SDK 0.6.37 has no upstream push count, so a local merge base cannot
+prove a branch was pushed. Unless the returned base is the branch's remote
+tracking ref with zero ahead commits, it goes to **Needs your call**.
+The same SDK cannot identify loaded idle runtimes, so runtime cleanup skips
+them. Archives can be undone with BB's Unarchive. Settings and run history
+are append-only. Each run has one Activity entry; only **Needs your call**
+sends a short chat alert. Memory cleanup uses one agent-only message.
+
+The standalone “Adopt as runner” prompt is removed. Scheduled candidates
+appear in the maintenance summary with an **Adopt** action. Recent in the
+Bots sidebar covers 7 days; **Show archived** reveals older and archived
+owned threads. Runners keep their existing group.
+
+The live maintenance capture is defined as `studio-bot-maintenance` and
+writes `assets/bot-maintenance.png`. It is pending the lead's staged run:
+this launcher only installs commits reachable on `origin/main`, and this
+feature branch must not be pushed or merged by its worker. After merge,
+start with `node scripts/staged-bb.mjs start`, source its `capture.env`, run
+`BB_CAPTURE_ONLY=studio-bot-maintenance node scripts/capture-plugin-screenshots.mjs`,
+then always run `node scripts/staged-bb.mjs stop`. Add the resulting screenshot
+here once the live check passes. The lead must also seed old finished,
+dirty-workspace, pending-interaction and automation-targeted threads, assert
+Dry run changes none, then assert Run now only archives the eligible thread
+once the first-day preview period has elapsed.
+
+
 ![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
 
 ![Leaving the Bot page: Home on the rail, then Plan the ORBIT-42 retro, a thread no bot owns, opened from the Threads section; the sidebar keeps Studio's list, Threads on top with the retro selected above the project's other threads, and Bots below with the threads Dot started under Dot, not repeated in Threads](assets/bot-leave.png)

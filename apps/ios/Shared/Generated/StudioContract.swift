@@ -51,6 +51,10 @@ public enum Studio {
     public static let bot_pause = "bot_pause"
     public static let bot_resume = "bot_resume"
     public static let bot_stop = "bot_stop"
+    public static let bot_maintenance_threads = "bot_maintenance_threads"
+    public static let bot_maintenance_get = "bot_maintenance_get"
+    public static let bot_maintenance_set = "bot_maintenance_set"
+    public static let bot_maintenance_run = "bot_maintenance_run"
     public static let bot_activity = "bot_activity"
     public static let bot_cache_state = "bot_cache_state"
     public static let bot_cache_set = "bot_cache_set"
@@ -352,6 +356,14 @@ public enum Studio {
   public typealias BotResume = BotResumeOutput
 
   public typealias BotStop = BotStopOutput
+
+  public typealias BotMaintenanceThreads = BotMaintenanceThreadsOutput
+
+  public typealias BotMaintenanceGet = BotMaintenanceGetOutput
+
+  public typealias BotMaintenanceSet = BotMaintenanceSetOutput
+
+  public typealias BotMaintenanceRun = BotMaintenanceRunOutput
 
   public typealias BotActivity = BotActivityOutput
 
@@ -5870,11 +5882,385 @@ public enum Studio {
     }
   }
 
+  public struct BotMaintenanceThreadsInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public enum BotMaintenanceThreadsOutputThreadsItemRelation: Sendable, Hashable, Codable {
+    case `self`
+    case started
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "self": self = .`self`
+      case "started": self = .started
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`self`: try container.encode("self")
+      case .started: try container.encode("started")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotMaintenanceThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var relation: BotMaintenanceThreadsOutputThreadsItemRelation?
+    public var needsYou: Bool?
+    public var parentId: String?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.relation = relation
+      self.needsYou = needsYou
+      self.parentId = parentId
+    }
+  }
+
+  public struct BotMaintenanceThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [BotMaintenanceThreadsOutputThreadsItem]?
+
+    public init(threads: [BotMaintenanceThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct BotMaintenanceGetInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotMaintenanceGetOutputSettingsRules: Sendable, Hashable, Codable {
+    public var threads: Bool?
+    public var workers: Bool?
+    public var automations: Bool?
+    public var runtimes: Bool?
+    public var memory: Bool?
+    public var skills: Bool?
+    public var adopt: Bool?
+
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+      self.threads = threads
+      self.workers = workers
+      self.automations = automations
+      self.runtimes = runtimes
+      self.memory = memory
+      self.skills = skills
+      self.adopt = adopt
+    }
+  }
+
+  public struct BotMaintenanceGetOutputSettings: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var enabledAt: Double?
+    public var memoryWords: Double?
+    public var rules: BotMaintenanceGetOutputSettingsRules?
+
+    public init(enabled: Bool? = nil, enabledAt: Double? = nil, memoryWords: Double? = nil, rules: BotMaintenanceGetOutputSettingsRules? = nil) {
+      self.enabled = enabled
+      self.enabledAt = enabledAt
+      self.memoryWords = memoryWords
+      self.rules = rules
+    }
+  }
+
+  public struct BotMaintenanceGetOutputRunsItemNeedsCallItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var reason: String?
+
+    public init(threadId: String? = nil, title: String? = nil, reason: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.reason = reason
+    }
+  }
+
+  public struct BotMaintenanceGetOutputRunsItemSuggestionsItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var threadId: String?
+    public var automationId: String?
+
+    public init(text: String? = nil, threadId: String? = nil, automationId: String? = nil) {
+      self.text = text
+      self.threadId = threadId
+      self.automationId = automationId
+    }
+  }
+
+  public struct BotMaintenanceGetOutputRunsItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var dryRun: Bool?
+    public var summary: String?
+    public var actions: [String]?
+    public var needsCall: [BotMaintenanceGetOutputRunsItemNeedsCallItem]?
+    public var suggestions: [BotMaintenanceGetOutputRunsItemSuggestionsItem]?
+
+    public init(at: Double? = nil, dryRun: Bool? = nil, summary: String? = nil, actions: [String]? = nil, needsCall: [BotMaintenanceGetOutputRunsItemNeedsCallItem]? = nil, suggestions: [BotMaintenanceGetOutputRunsItemSuggestionsItem]? = nil) {
+      self.at = at
+      self.dryRun = dryRun
+      self.summary = summary
+      self.actions = actions
+      self.needsCall = needsCall
+      self.suggestions = suggestions
+    }
+  }
+
+  public struct BotMaintenanceGetOutput: Sendable, Hashable, Codable {
+    public var settings: BotMaintenanceGetOutputSettings?
+    public var liveAt: Double?
+    public var runs: [BotMaintenanceGetOutputRunsItem]?
+
+    public init(settings: BotMaintenanceGetOutputSettings? = nil, liveAt: Double? = nil, runs: [BotMaintenanceGetOutputRunsItem]? = nil) {
+      self.settings = settings
+      self.liveAt = liveAt
+      self.runs = runs
+    }
+  }
+
+  public struct BotMaintenanceSetInputRules: Sendable, Hashable, Codable {
+    public var threads: Bool?
+    public var workers: Bool?
+    public var automations: Bool?
+    public var runtimes: Bool?
+    public var memory: Bool?
+    public var skills: Bool?
+    public var adopt: Bool?
+
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+      self.threads = threads
+      self.workers = workers
+      self.automations = automations
+      self.runtimes = runtimes
+      self.memory = memory
+      self.skills = skills
+      self.adopt = adopt
+    }
+  }
+
+  public struct BotMaintenanceSetInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var enabled: Bool?
+    public var memoryWords: Int?
+    public var rules: BotMaintenanceSetInputRules?
+
+    public init(botId: String? = nil, enabled: Bool? = nil, memoryWords: Int? = nil, rules: BotMaintenanceSetInputRules? = nil) {
+      self.botId = botId
+      self.enabled = enabled
+      self.memoryWords = memoryWords
+      self.rules = rules
+    }
+  }
+
+  public struct BotMaintenanceSetOutputSettingsRules: Sendable, Hashable, Codable {
+    public var threads: Bool?
+    public var workers: Bool?
+    public var automations: Bool?
+    public var runtimes: Bool?
+    public var memory: Bool?
+    public var skills: Bool?
+    public var adopt: Bool?
+
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+      self.threads = threads
+      self.workers = workers
+      self.automations = automations
+      self.runtimes = runtimes
+      self.memory = memory
+      self.skills = skills
+      self.adopt = adopt
+    }
+  }
+
+  public struct BotMaintenanceSetOutputSettings: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var enabledAt: Double?
+    public var memoryWords: Double?
+    public var rules: BotMaintenanceSetOutputSettingsRules?
+
+    public init(enabled: Bool? = nil, enabledAt: Double? = nil, memoryWords: Double? = nil, rules: BotMaintenanceSetOutputSettingsRules? = nil) {
+      self.enabled = enabled
+      self.enabledAt = enabledAt
+      self.memoryWords = memoryWords
+      self.rules = rules
+    }
+  }
+
+  public struct BotMaintenanceSetOutputRunsItemNeedsCallItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var reason: String?
+
+    public init(threadId: String? = nil, title: String? = nil, reason: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.reason = reason
+    }
+  }
+
+  public struct BotMaintenanceSetOutputRunsItemSuggestionsItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var threadId: String?
+    public var automationId: String?
+
+    public init(text: String? = nil, threadId: String? = nil, automationId: String? = nil) {
+      self.text = text
+      self.threadId = threadId
+      self.automationId = automationId
+    }
+  }
+
+  public struct BotMaintenanceSetOutputRunsItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var dryRun: Bool?
+    public var summary: String?
+    public var actions: [String]?
+    public var needsCall: [BotMaintenanceSetOutputRunsItemNeedsCallItem]?
+    public var suggestions: [BotMaintenanceSetOutputRunsItemSuggestionsItem]?
+
+    public init(at: Double? = nil, dryRun: Bool? = nil, summary: String? = nil, actions: [String]? = nil, needsCall: [BotMaintenanceSetOutputRunsItemNeedsCallItem]? = nil, suggestions: [BotMaintenanceSetOutputRunsItemSuggestionsItem]? = nil) {
+      self.at = at
+      self.dryRun = dryRun
+      self.summary = summary
+      self.actions = actions
+      self.needsCall = needsCall
+      self.suggestions = suggestions
+    }
+  }
+
+  public struct BotMaintenanceSetOutput: Sendable, Hashable, Codable {
+    public var settings: BotMaintenanceSetOutputSettings?
+    public var liveAt: Double?
+    public var runs: [BotMaintenanceSetOutputRunsItem]?
+
+    public init(settings: BotMaintenanceSetOutputSettings? = nil, liveAt: Double? = nil, runs: [BotMaintenanceSetOutputRunsItem]? = nil) {
+      self.settings = settings
+      self.liveAt = liveAt
+      self.runs = runs
+    }
+  }
+
+  public struct BotMaintenanceRunInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var dryRun: Bool?
+
+    public init(botId: String? = nil, dryRun: Bool? = nil) {
+      self.botId = botId
+      self.dryRun = dryRun
+    }
+  }
+
+  public struct BotMaintenanceRunOutputNeedsCallItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var reason: String?
+
+    public init(threadId: String? = nil, title: String? = nil, reason: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.reason = reason
+    }
+  }
+
+  public struct BotMaintenanceRunOutputSuggestionsItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var threadId: String?
+    public var automationId: String?
+
+    public init(text: String? = nil, threadId: String? = nil, automationId: String? = nil) {
+      self.text = text
+      self.threadId = threadId
+      self.automationId = automationId
+    }
+  }
+
+  public struct BotMaintenanceRunOutput: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var dryRun: Bool?
+    public var summary: String?
+    public var actions: [String]?
+    public var needsCall: [BotMaintenanceRunOutputNeedsCallItem]?
+    public var suggestions: [BotMaintenanceRunOutputSuggestionsItem]?
+
+    public init(at: Double? = nil, dryRun: Bool? = nil, summary: String? = nil, actions: [String]? = nil, needsCall: [BotMaintenanceRunOutputNeedsCallItem]? = nil, suggestions: [BotMaintenanceRunOutputSuggestionsItem]? = nil) {
+      self.at = at
+      self.dryRun = dryRun
+      self.summary = summary
+      self.actions = actions
+      self.needsCall = needsCall
+      self.suggestions = suggestions
+    }
+  }
+
   public struct BotActivityInput: Sendable, Hashable, Codable {
     public var botId: String?
 
     public init(botId: String? = nil) {
       self.botId = botId
+    }
+  }
+
+  public struct BotActivityOutputMaintenanceItemNeedsCallItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var reason: String?
+
+    public init(threadId: String? = nil, title: String? = nil, reason: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.reason = reason
+    }
+  }
+
+  public struct BotActivityOutputMaintenanceItemSuggestionsItem: Sendable, Hashable, Codable {
+    public var text: String?
+    public var threadId: String?
+    public var automationId: String?
+
+    public init(text: String? = nil, threadId: String? = nil, automationId: String? = nil) {
+      self.text = text
+      self.threadId = threadId
+      self.automationId = automationId
+    }
+  }
+
+  public struct BotActivityOutputMaintenanceItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var dryRun: Bool?
+    public var summary: String?
+    public var actions: [String]?
+    public var needsCall: [BotActivityOutputMaintenanceItemNeedsCallItem]?
+    public var suggestions: [BotActivityOutputMaintenanceItemSuggestionsItem]?
+
+    public init(at: Double? = nil, dryRun: Bool? = nil, summary: String? = nil, actions: [String]? = nil, needsCall: [BotActivityOutputMaintenanceItemNeedsCallItem]? = nil, suggestions: [BotActivityOutputMaintenanceItemSuggestionsItem]? = nil) {
+      self.at = at
+      self.dryRun = dryRun
+      self.summary = summary
+      self.actions = actions
+      self.needsCall = needsCall
+      self.suggestions = suggestions
     }
   }
 
@@ -6117,6 +6503,7 @@ public enum Studio {
   }
 
   public struct BotActivityOutput: Sendable, Hashable, Codable {
+    public var maintenance: [BotActivityOutputMaintenanceItem]?
     public var needsYou: [BotActivityOutputNeedsYouItem]?
     public var inProgress: [BotActivityOutputInProgressItem]?
     public var waiting: [BotActivityOutputWaitingItem]?
@@ -6125,7 +6512,8 @@ public enum Studio {
     public var latest: String?
     public var compactions: [BotActivityOutputCompactionsItem]?
 
-    public init(needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil, compactions: [BotActivityOutputCompactionsItem]? = nil) {
+    public init(maintenance: [BotActivityOutputMaintenanceItem]? = nil, needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil, compactions: [BotActivityOutputCompactionsItem]? = nil) {
+      self.maintenance = maintenance
       self.needsYou = needsYou
       self.inProgress = inProgress
       self.waiting = waiting

@@ -40,6 +40,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
     try { await call(method, { ...(input as object), botId }); if (close) setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };
   const list = data.data?.automations ?? [];
+  const [showDone, setShowDone] = useState(false);
   const kinds: Kind[] = external ? ["checkin", "reminder", "watcher"] : ["checkin", "reminder", "watcher", "runner"];
   return (
     <section aria-label="Automations" data-testid="bot-automations" className="px-4 pt-4">
@@ -55,16 +56,17 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
       {error && !sheet ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
       {list.length ? (
         <ul className="mt-1 flex flex-col divide-y divide-border border-y border-border">
-          {list.map((automation) => (
+          {list.filter((a) => showDone || (a.state !== "done" && a.state !== "ended")).map((automation) => (
             <AutomationRow key={automation.id} botId={botId} automation={automation} expanded={open === automation.id} busy={busy} disabled={disabled}
               onToggle={() => setOpen(open === automation.id ? null : automation.id)} onOpen={onOpen}
-              onAction={(method) => void run(method, { id: automation.id }, false)}
+              onAction={(method) => void run(method === "bot_maintenance_dry_run" ? "bot_maintenance_run" : method, method === "bot_maintenance_dry_run" ? { dryRun: true } : { id: automation.id }, false)}
               onEdit={() => { setError(null); setSheet({ kind: "edit", automation }); }} onDelete={() => { if (automation.original) void run("bot_automation_pause", { id: automation.id }); else { setError(null); setSheet({ kind: "delete", automation }); } }} />
           ))}
         </ul>
       ) : (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : `No check-ins. ${botName} only wakes when you write.`}</p>
       )}
+      {list.some((a) => a.state === "done" || a.state === "ended") ? <button className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
       {sheet?.kind === "new" || sheet?.kind === "edit" ? (
         <AutomationDialog type={sheet.kind === "new" ? sheet.type : sheet.automation.kind} automation={sheet.kind === "edit" ? sheet.automation : null} runners={list.filter((each) => each.kind === "runner")} busy={busy} error={error} onClose={() => setSheet(null)}
           onSave={(input) => void run(sheet.kind === "edit" ? "bot_automation_update" : "bot_automation_create", sheet.kind === "edit" ? { id: sheet.automation.id, ...input } : { kind: sheet.type, ...input })} />
@@ -114,8 +116,9 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
               ? <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={() => onAction("bot_automation_pause")}><Icon name="Pause" />Pause</button>
               : automation.state === "paused" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_automation_resume")}><Icon name="Play" />Resume</button> : null}
             {automation.state !== "done" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_automation_run_now")}><Icon name="Zap" />Run now</button> : null}
-            <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onEdit}><Icon name="Edit" />Edit</button>
-            <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onDelete}><Icon name="Trash2" />{automation.original ? "Turn off" : "Delete"}</button>
+            {automation.id === "maintenance" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_maintenance_dry_run")} >Dry run</button> : null}
+            {automation.id !== "maintenance" ? <><button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onEdit}><Icon name="Edit" />Edit</button>
+            <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onDelete}><Icon name="Trash2" />{automation.original ? "Turn off" : "Delete"}</button></> : null}
             {automation.kind === "runner" && automation.threadId ? <button type="button" className={GHOST_BUTTON} onClick={() => onOpen(automation.threadId!)}><Icon name="MessageSquare" />Thread</button> : null}
           </div>
           <RecentRuns botId={botId} id={automation.id} onOpen={onOpen} />

@@ -118,7 +118,7 @@ const show = async (node: React.ReactNode) => {
 const button = (label: string) => [...container.querySelectorAll("button")].find((each) => each.textContent === label)!;
 
 const click = (el: Element | null | undefined) => (el as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: 1, relation: "started" as const, needsYou: false, parentId: null as string | null });
+const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: Date.now(), relation: "started" as const, needsYou: false, parentId: null as string | null });
 const empty = { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
 
@@ -652,11 +652,27 @@ test("a thread dragged from a bot's list onto Threads comes back; a Threads row 
 });
 
 
-test("adopts a runner immediately without a confirmation dialog", async () => {
-  const { RunnersSection } = await import("./Runners");
-  state.data = { bot_runners: { runners: [], adoptable: [{ threadId: "thr_adopt", automationId: "auto1", title: "Report", automationName: "Daily", cron: "0 9 * * *" }] } };
-  await show(<RunnersSection botId="bot_main" botName="Dot" onOpen={() => {}} disabled={false} adoptOnly />);
-  await act(async () => button("Adopt as runner").click());
+test("adopts a suggested runner from maintenance without a confirmation dialog", async () => {
+  const { BotMaintenance } = await import("./BotMaintenance");
+  const { maintenanceDefaults } = await import("../../bot-maintenance");
+  state.data = { bot_maintenance_get: { settings: maintenanceDefaults(), liveAt: null, runs: [{ at: Date.now(), dryRun: true, summary: "Dry run", actions: [], needsCall: [], suggestions: [{ text: "Consider Report as a runner", threadId: "thr_adopt", automationId: "auto1" }] }] } };
+  await show(<BotMaintenance botId="bot_main" />);
+  await act(async () => button("Adopt").click());
   expect(state.call).toHaveBeenCalledWith("bot_runner_adopt", { botId: "bot_main", threadId: "thr_adopt", automationId: "auto1" });
   expect(container.querySelector('[role="dialog"]')).toBeNull();
+});
+
+test("Recent hides old idle threads and Show archived reveals them in one click", async () => {
+  const old = { ...thread("old", "Earlier job"), updatedAt: Date.now() - 8 * 86_400_000 };
+  state.data = {
+    bot_get: { bot: dot, run: null }, bot_chain: { threadIds: [dot.threadId] },
+    bot_activity: { ...empty, completed: [old, thread("new", "Fresh job")], waiting: [{ ...old, id: "waiting", title: "Waiting job", status: "pending" }] },
+    bot_maintenance_threads: { threads: [old, thread("archived", "Archived job")] },
+  };
+  await show(<BotThreadList {...listProps} />);
+  expect(container.querySelector('section[aria-label="Recent"]')?.textContent).toContain("Fresh job");
+  expect(container.textContent).not.toContain("Earlier job"); expect(container.textContent).toContain("Waiting job");
+  act(() => button("Show archived").click());
+  expect(container.textContent).toContain("Earlier job"); expect(container.textContent).toContain("Archived job");
+  act(() => button("Hide archived").click()); expect(container.textContent).not.toContain("Earlier job");
 });
