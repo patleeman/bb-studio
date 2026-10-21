@@ -3,8 +3,8 @@
 // images, PDFs and text use the browser's and BB's own viewers. Dragging over
 // an image picks an area to send to the artifact's thread.
 import { useEffect, useState } from "react";
-import { EmptyState, Icon, OUTLINE_BUTTON, cn } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { EmptyState, Icon, OUTLINE_BUTTON, cn } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
 import { Markdown, experimental_SourceCode as SourceCode, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../shared";

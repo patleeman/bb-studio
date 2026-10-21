@@ -3,7 +3,7 @@
 // has the dashboard open, which the app reports with a heartbeat; otherwise
 // every 30 minutes, so the last value stays recent. Push data is never polled.
 // A script runs only while its exact command is approved.
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { LIMITS, type Widget } from "../shared";
 import { keepValue, scriptHash } from "./sources";
 import type { DashboardStore, DataRow } from "./store";

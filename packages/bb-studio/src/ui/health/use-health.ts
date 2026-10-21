@@ -1,7 +1,7 @@
 // The plugin health summary from Studio's server, kept current by its
 // realtime signal. See src/health.ts.
-import { HEALTH_REALTIME_CHANNEL } from "@bb-studio/kit/health";
-import { errorMessage } from "@bb-studio/kit/format";
+import { HEALTH_REALTIME_CHANNEL } from "../../kit/health";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import type { healthContract, HealthSummary } from "../../health-contract";

@@ -1,8 +1,8 @@
 // "Open thread": the item's home thread first, then recent threads, or what a
 // search finds once you type. Picking one hands its id back.
 import { useSdk } from "@get-bb/plugin-sdk/app";
-import { cn, Icon } from "@bb-studio/kit/app";
-import { relativeTime } from "@bb-studio/kit/format";
+import { cn, Icon } from "../../kit/app/index";
+import { relativeTime } from "../../kit/format";
 import { useEffect, useRef, useState } from "react";
 
 export interface PickedThread {

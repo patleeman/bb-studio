@@ -3,4 +3,4 @@
 // Document content doesn't go through RPC: editors sync over `/pages/sync`
 // (src/pages/hub.ts).
 export * from "./constants";
-export * from "@bb-studio/kit/pages-contract";
+export * from "../kit/pages-contract";

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runBackup, runRestore } from "@bb-studio/kit/server";
+import { runBackup, runRestore } from "../kit/server/index";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import * as Y from "yjs";

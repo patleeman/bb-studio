@@ -1,7 +1,7 @@
 // Dashboards as a Studio kind: the `studio_*` provider methods, called
 // in-process by Studio's hub (src/hub.ts).
-import { copyTitle, eachId, fillTemplate, fillTemplateJson, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { copyTitle, eachId, fillTemplate, fillTemplateJson, type StudioItem, type StudioKind } from "../../kit/contract";
+import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "../../kit/server/index";
 import { DASHBOARD_ICON, DASHBOARD_KIND, PLUGIN_ID, dashboardHref } from "../shared";
 import { buildView, dashboardText, displayName } from "./view";
 import { parseDoc, type DashboardRow, type DashboardStore } from "./store";

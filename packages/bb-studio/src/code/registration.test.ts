@@ -5,10 +5,10 @@ import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { registerCode } from "./server";
 import { registerCodeApp } from "./register";
 import { MIGRATIONS } from "./server/store";
-import { codeContract } from "@bb-studio/kit/code-contract";
+import { codeContract } from "../kit/code-contract";
 import { rpcContract } from "./contract";
 import { builtinItemAt, canonicalPath } from "../builtins";
-import { parseStudioMentionReference, parseStudioItemHref, studioTextReferences } from "@bb-studio/kit/contract";
+import { parseStudioMentionReference, parseStudioItemHref, studioTextReferences } from "../kit/contract";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { await Promise.all(cleanup.splice(0).map((dispose) => dispose())); });

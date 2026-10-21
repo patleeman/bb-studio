@@ -20,7 +20,7 @@ import {
   targetHref,
   useOpenTarget,
   type OpenTarget,
-} from "@bb-studio/kit/app";
+} from "../kit/app/index";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 

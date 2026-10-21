@@ -10,8 +10,8 @@
 // recovery-copy keys (they only dedupe this BB's own editor drafts).
 // Drawings keep no versions, so there is no history to save.
 import { readFileSync, statSync } from "node:fs";
-import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
-import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "../../kit/server/index";
+import { mapProject, restoreDecision } from "../../kit/backup";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { isDrawingId } from "../shared";

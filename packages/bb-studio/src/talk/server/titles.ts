@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { askTitle, DecisionsUnavailableError } from "@bb-studio/kit/decisions";
-import { primaryHostId } from "@bb-studio/kit/server";
-import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
+import { askTitle, DecisionsUnavailableError } from "../../kit/decisions";
+import { primaryHostId } from "../../kit/server/index";
+import type { ModelSelection } from "../../kit/decisions-contract";
 import { cleanTitle, titleExcerpt } from "../shared/format";
 
 /** A stable label when Studio Decisions is missing or has no fallback model. */

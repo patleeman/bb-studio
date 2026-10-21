@@ -1,1 +1,1 @@
-export * from "@bb-studio/kit/chat-contract";
+export * from "../kit/chat-contract";

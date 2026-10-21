@@ -1,9 +1,9 @@
 // The Kinds section of the Setup page: each kind built into Studio, on or
 // off, and who opens and creates it when another plugin offers a
 // replacement. See src/kinds.ts.
-import { Button, cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
+import { Button, cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
+import { STUDIO_REALTIME_CHANNEL } from "../../kit/contract";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import type { KindView, kindsContract, KindsState } from "../../kinds-contract";

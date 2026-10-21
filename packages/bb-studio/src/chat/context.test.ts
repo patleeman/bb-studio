@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StudioItem, StudioKind } from "@bb-studio/kit/contract";
+import type { StudioItem, StudioKind } from "../kit/contract";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk";
 import { itemKey, missingNote, parseItemKey, pointerNote, toViewed, withItemPill } from "./context";
 

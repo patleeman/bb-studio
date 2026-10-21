@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { studioIndex } from "@bb-studio/kit/server";
+import { studioIndex } from "./kit/server/index";
 import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
 

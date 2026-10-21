@@ -16,8 +16,8 @@
 // unsaved changes, is never overwritten: it fails with a reason and a later
 // run picks it up once it's closed.
 import { readFileSync } from "node:fs";
-import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
+import { mapProject, restoreDecision } from "../kit/backup";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "../kit/server/index";
 import type Database from "better-sqlite3";
 import * as Y from "yjs";
 import { z } from "zod";

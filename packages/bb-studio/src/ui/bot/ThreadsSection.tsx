@@ -9,7 +9,7 @@
 // (right-click or the hover ⋯) and Archive on hover, with rename in place.
 // A row drags onto a Bot in the Bots section to hand the thread to it; a
 // row from a Bot's list dropped here takes the thread back (bot_thread_release).
-import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
+import { cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import {
   experimental_ThreadActionsContextMenu as ThreadActionsContextMenu,
   experimental_ThreadActionsMenu as ThreadActionsMenu,

@@ -1,5 +1,5 @@
-import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
-import { untitled } from "@bb-studio/kit/format";
+import { subcommand, takeFlag, takeOption, usage } from "../kit/cli";
+import { untitled } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { actorColor } from "./actors";
 import { HUMAN_USER_ID } from "./constants";

@@ -2,7 +2,7 @@
 // description, emoji, shape, color, avatar image), each with a small diff and
 // Revert, which restores the old value. Reverts are listed too. Shown in the
 // Profile section of Bot info.
-import { relativeTime } from "@bb-studio/kit/format";
+import { relativeTime } from "../../kit/format";
 import { useState } from "react";
 import type { BotProfileChangeView } from "../../contract";
 import { useLive } from "../live";

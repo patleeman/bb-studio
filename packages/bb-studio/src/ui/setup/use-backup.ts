@@ -1,7 +1,7 @@
 // Backup and Restore on the Setup page (src/backup/register.ts). A backup is
 // made on the BB server and downloaded over HTTP; a restore uploads the file
 // in chunks, shows a dry run and only changes anything once confirmed.
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useState } from "react";
 import type { backupContract, RestoreResult } from "../../backup-contract";

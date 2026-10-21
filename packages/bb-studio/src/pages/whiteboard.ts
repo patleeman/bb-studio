@@ -3,9 +3,9 @@
 // as plain SVG (no Excalidraw bundle in Pages), and saves pen strokes and
 // erasures back as ordinary Excalidraw elements. Studio merges them by element version,
 // so the full Draw editor and agents keep working on the same drawing.
-import type { WhiteboardStroke } from "@bb-studio/kit/pages-contract";
+import type { WhiteboardStroke } from "../kit/pages-contract";
 
-export { WHITEBOARD_COLORS, type WhiteboardStroke, type WhiteboardView } from "@bb-studio/kit/pages-contract";
+export { WHITEBOARD_COLORS, type WhiteboardStroke, type WhiteboardView } from "../kit/pages-contract";
 const MAX_ELEMENTS = 2000;
 const MAX_IMAGE_CHARS = 1_500_000;
 const PADDING = 24;

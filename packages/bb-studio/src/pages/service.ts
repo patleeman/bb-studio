@@ -1,4 +1,4 @@
-import { errorMessage as errorText, untitled } from "@bb-studio/kit/format";
+import { errorMessage as errorText, untitled } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import * as Y from "yjs";
 import { actorColor } from "./actors";

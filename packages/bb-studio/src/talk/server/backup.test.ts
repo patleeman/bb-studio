@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
-import { RestoreTally } from "@bb-studio/kit/backup";
-import { BackupReader, BackupWriter } from "@bb-studio/kit/server";
+import { RestoreTally } from "../../kit/backup";
+import { BackupReader, BackupWriter } from "../../kit/server/index";
 import { afterEach, describe, expect, it } from "vitest";
 import { AudioFiles } from "./audio-files";
 import { talkBackupHandlers } from "./backup";

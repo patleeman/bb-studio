@@ -4,7 +4,7 @@ import type { CodeContract } from "./contract";
 // VS Code tab. A dot pulses while the agent is editing.
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@bb-studio/kit/app";
+import { Icon } from "../kit/app/index";
 import { CHANNEL, CODE_TAB } from "./shared";
 
 type Chip = { workspaceId: string | null; title: string; working: boolean };

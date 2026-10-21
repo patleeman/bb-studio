@@ -4,7 +4,7 @@
 // (`/api/v1/plugins/studio/http/backup?name=…`); a backup to restore uploads
 // in chunks, so no single call carries the whole file.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
-import { studioBackupSchemas } from "@bb-studio/kit/backup";
+import { studioBackupSchemas } from "./kit/backup";
 import { z } from "zod";
 import { UPLOAD_CHUNK_BYTES } from "./backup-upload";
 

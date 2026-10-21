@@ -9,8 +9,8 @@
 // script approvals: a restored script waits for the user to approve it again,
 // so a backup file can never approve a command.
 import { readFileSync, statSync } from "node:fs";
-import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader } from "@bb-studio/kit/server";
+import { mapProject, restoreDecision } from "../../kit/backup";
+import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader } from "../../kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { applyOps } from "../ops";

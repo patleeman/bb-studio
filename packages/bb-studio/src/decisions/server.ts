@@ -2,10 +2,10 @@ import { rpcContract, decisionMethods } from "./contract";
 import { decisionsDefaults } from "./settings";
 import { registerDecisionsImport } from "./migration";
 import { setTimeout as sleep } from "node:timers/promises";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { personalProjectId } from "@bb-studio/kit/server";
-import { healthSchemas, pluginSettingsPath, registerHealth, type HealthCheck } from "@bb-studio/kit/health";
+import { personalProjectId } from "../kit/server/index";
+import { healthSchemas, pluginSettingsPath, registerHealth, type HealthCheck } from "../kit/health";
 import { z } from "zod";
 import {
   askBatch,
@@ -20,7 +20,7 @@ import {
   type ModelTarget,
   type Situation,
 } from "./server/classifier";
-import { defaultFallback, fallbackSchema, type Fallback } from "@bb-studio/kit/decisions-legacy-contract";
+import { defaultFallback, fallbackSchema, type Fallback } from "../kit/decisions-legacy-contract";
 import { jevRoutes } from "./server/jev-providers";
 import { askSystemOne } from "./server/system-one";
 import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./server/queue";

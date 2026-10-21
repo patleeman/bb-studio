@@ -15,7 +15,7 @@ vi.mock("./SpeechSection", () => ({ SpeechSection: () => null }));
 vi.mock("../ProjectLeads", () => ({ ProjectLeadsSection: () => null }));
 vi.mock("../health/use-health", () => ({ useHealth: () => ({}) }));
 vi.mock("../health/HealthViews", () => ({ ProblemRow: ({ problem }: { problem: { title: string } }) => React.createElement("li", null, problem.title) }));
-vi.mock("@bb-studio/kit/ui", () => ({
+vi.mock("../../kit/ui/index", () => ({
   Button: ({ variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => React.createElement("button", props),
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
   Icon: () => null,

@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResponsiveGridLayout, useContainerWidth, type Layout, type ResponsiveLayouts } from "react-grid-layout";
 import { toast } from "sonner";
-import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, ICON_BUTTON, Icon, ItemHeader, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { BAR_BUTTON, BarTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, ICON_BUTTON, Icon, ItemHeader, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
 import { ago, breakpointFor, BREAKPOINTS, COLS, dashboardHref, GRID_MARGIN, ROW_HEIGHT, WIDGETS, type DashboardView, type DataView, type Layouts, type Op, type VersionView, type WidgetType, type WidgetTypeView, type WidgetView } from "../shared";
 import type { WidgetTheme } from "./custom-frame";
 import { viewLayouts } from "../ops";

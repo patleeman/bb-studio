@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runBackup, runRestore } from "@bb-studio/kit/server";
+import { runBackup, runRestore } from "../../kit/server/index";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { bytes, memoryStore } from "../test/db";

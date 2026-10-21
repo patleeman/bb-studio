@@ -1,4 +1,4 @@
-import { codeContract as legacy } from "@bb-studio/kit/code-contract";
+import { codeContract as legacy } from "../kit/code-contract";
 export const rpcContract = {
   "code.get": legacy.get,
   "code.update": legacy.update,

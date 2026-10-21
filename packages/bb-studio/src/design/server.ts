@@ -9,8 +9,8 @@
 // their namespace; its agent tools, skill, mention provider, message
 // directive, question form and thread tab keep their names
 // (docs/merging-add-ons.md).
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { createChangeBus, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { studioSchemas } from "../kit/contract";
+import { createChangeBus, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";

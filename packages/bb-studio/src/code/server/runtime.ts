@@ -1,4 +1,4 @@
-import { quiesceCode } from "@bb-studio/kit/code-handover";
+import { quiesceCode } from "../../kit/code-handover";
 // code-server, one process per open workspace. The plugin downloads a pinned
 // code-server release into its data folder on first use (checked against its
 // SHA-256 before unpacking), and runs each workspace on its own loopback port

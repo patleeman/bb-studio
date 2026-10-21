@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ItemQuote } from "@bb-studio/kit/format";
+import type { ItemQuote } from "../../kit/format";
 import { quote, ref, type ItemRef } from "../schemas";
 import { CHATS_PATH, CHATS_ROOT } from "../../builtins";
 

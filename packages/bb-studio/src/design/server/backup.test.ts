@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import { runBackup, runRestore } from "@bb-studio/kit/server";
+import { runBackup, runRestore } from "../../kit/server/index";
 import { designBackupHandlers } from "./backup";
 import { DesignStore, MIGRATIONS } from "./store";
 

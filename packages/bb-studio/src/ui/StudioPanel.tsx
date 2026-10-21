@@ -25,9 +25,9 @@ import {
   type CollectionItem,
   type CollectionKind,
   type CollectionTag,
-} from "@bb-studio/kit/app";
-import { mentionPrompt, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
+} from "../kit/app/index";
+import { mentionPrompt, STUDIO_REALTIME_CHANNEL } from "../kit/contract";
+import { errorMessage, untitled } from "../kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";

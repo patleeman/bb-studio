@@ -1,7 +1,7 @@
 // The BB Studio setup summary from Studio's server, refreshed whenever a
 // health check finishes. See src/setup.ts.
-import { HEALTH_REALTIME_CHANNEL } from "@bb-studio/kit/health";
-import { errorMessage } from "@bb-studio/kit/format";
+import { HEALTH_REALTIME_CHANNEL } from "../../kit/health";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SetupActionResult, setupContract, SetupSummary } from "../../setup-contract";

@@ -3,8 +3,8 @@ import type { CodeContract } from "./contract";
 // files read-only: folders to walk, and a file's text.
 import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { Icon } from "../kit/app/index";
+import { errorMessage } from "../kit/format";
 import type { Workspace } from "./shared";
 
 type Entry = { name: string; path: string; dir: boolean };

@@ -1,7 +1,7 @@
 // Recordings as a Studio kind: the same `studio_*` provider methods the Talk
 // add-on published over RPC, called in-process by Studio's hub (src/hub.ts).
-import { eachId, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { eachId, type StudioItem, type StudioKind } from "../../kit/contract";
+import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "../../kit/server/index";
 import type { Recording } from "../shared/contract";
 import { NEW_RECORDING_EVENT, PLUGIN_ID, TALK_ICON, formatLength, recordingBadge, recordingHref } from "../shared/format";
 import type { TalkStore } from "./store";

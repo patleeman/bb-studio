@@ -4,8 +4,8 @@
 // the Bot page itself (/plugins/studio/studio/bot[/<botId>], BotPanel), and the
 // "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
 // chat and the threads it lists open as BB threads.
-import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
+import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { useState } from "react";
 import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotActivityView, BotView } from "../../contract";

@@ -1,7 +1,7 @@
 // Designs as a Studio kind: the same `studio_*` provider methods an add-on
 // publishes over RPC, called in-process by Studio's hub (src/hub.ts).
-import { copyTitle, eachId, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { copyTitle, eachId, type StudioItem, type StudioKind } from "../../kit/contract";
+import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderHandlers } from "../../kit/server/index";
 import { DESIGN_ICON, PLUGIN_ID, designHref } from "../shared";
 import { displayName, type DesignRow, type DesignStore } from "./store";
 

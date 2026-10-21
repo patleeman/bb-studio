@@ -1,4 +1,4 @@
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../kit/ids";
 import type Database from "better-sqlite3";
 
 // SQLite persistence. A page's content is its Yjs state (`state`); `markdown`

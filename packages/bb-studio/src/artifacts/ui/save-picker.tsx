@@ -5,8 +5,8 @@
 // (`{ artifactId }`), with a way back to the list.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
-import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
+import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "../../kit/app/index";
+import { errorMessage, plural, relativeTime } from "../../kit/format";
 import { useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";

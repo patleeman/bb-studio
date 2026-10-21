@@ -6,8 +6,8 @@
 //
 // Restore is keyed by the original ids: a design is created, replaced when the
 // backup is newer, or left alone when the copy here is the same age or newer.
-import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "@bb-studio/kit/server";
+import { mapProject, restoreDecision } from "../../kit/backup";
+import { fileSafeId, type BackupHandlers, type BackupReader, type BackupWriter } from "../../kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { SCREEN_ID, VIEWPORT_PATTERN, parseViewport } from "../shared";

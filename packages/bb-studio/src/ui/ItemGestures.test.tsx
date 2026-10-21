@@ -6,8 +6,8 @@ import { ItemGestures } from "./ItemGestures";
 
 const state = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toCompose: vi.fn() }), experimental_Icon: () => null }));
-vi.mock("@bb-studio/kit/app", async importOriginal => ({
-  ...(await importOriginal<typeof import("@bb-studio/kit/app")>()),
+vi.mock("../kit/app/index", async importOriginal => ({
+  ...(await importOriginal<typeof import("../kit/app/index")>()),
   Icon: () => null,
   CopyReferenceMenuItem: () => null,
   useOpenTarget: () => ({ open: state.open, anchor: null }),

@@ -2,7 +2,7 @@
 // a layout per breakpoint, the custom widget library, each widget's last
 // data, script approvals pinned by hash, and the last 20 versions of each
 // dashboard.
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { BREAKPOINT_NAMES, EMPTY_LAYOUTS, LIMITS, layoutItemSchema, sourceSchema, WIDGET_TYPES, type DashboardDoc, type Layouts, type Source, type Widget, type WidgetType } from "../shared";
 import { z } from "zod";

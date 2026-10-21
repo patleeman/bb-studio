@@ -1,9 +1,9 @@
 // Embeds that stay live: a recording played with its
 // transcript. Each reads and writes its add-on
 // through Pages and refreshes while it's shown.
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Icon, cn } from "@bb-studio/kit/ui";
+import { Icon, cn } from "../../kit/ui/index";
 import { toast } from "sonner";
 import type { RecordingCard } from "../contract";
 import { usePagesUi } from "./context";

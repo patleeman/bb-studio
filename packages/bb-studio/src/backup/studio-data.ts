@@ -10,8 +10,8 @@
 // except for links and activity that a real run's add-ons record for their
 // restored items first: those then count as already here.
 import { createHash } from "node:crypto";
-import type { RestoreTally } from "@bb-studio/kit/backup";
-import type { BackupHandlers } from "@bb-studio/kit/server";
+import type { RestoreTally } from "../kit/backup";
+import type { BackupHandlers } from "../kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { PERSONAL_PROJECT_ID } from "../project-lead";

@@ -4,8 +4,8 @@
 import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useMemo } from "react";
 import { toast } from "sonner";
-import { composerFor } from "@bb-studio/kit/composer";
-import { cn, Icon } from "@bb-studio/kit/ui";
+import { composerFor } from "../../kit/composer";
+import { cn, Icon } from "../../kit/ui/index";
 import { PLUGIN_ID } from "../constants";
 import { labelKey, parseExploreItems, type ExploreItem } from "../shared";
 import { appendDraft } from "./composer";

@@ -2,7 +2,7 @@
 // its viewer in the thread's workbench, beside the chat. Files BB can show
 // are previewed inline, as in the viewer.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";

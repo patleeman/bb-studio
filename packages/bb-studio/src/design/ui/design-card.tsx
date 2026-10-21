@@ -1,6 +1,6 @@
 // The `::design{id="dsn_…"}` card in a reply: the newest round's screens,
 // under a header that opens the design in the thread's Studio tab.
-import { ItemDirectiveCard, openAppPath, remember } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, openAppPath, remember } from "../../kit/app/index";
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { DESIGN_ICON, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
 import { useDesign } from "./use-design";

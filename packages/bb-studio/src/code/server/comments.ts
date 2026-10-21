@@ -8,11 +8,11 @@
 // Each comment is pending until submitted, then sent; a thread is open until
 // resolved. Comments keep the text of the lines they're on, so the editor can
 // find the lines again after edits above them move them.
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 
-export { COMMENT_MIGRATIONS } from "@bb-studio/kit/code-migrations";
+export { COMMENT_MIGRATIONS } from "../../kit/code-migrations";
 
 /** The longest comment, and the most of its lines a comment keeps. */
 const MAX_BODY = 20_000;

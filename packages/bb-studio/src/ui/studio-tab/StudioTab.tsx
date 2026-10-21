@@ -4,8 +4,8 @@
 // item opens in place in its kind's editor, with a way back; an add-on's item
 // opens its page in BB's main area. Cards open it with `{ kind, id }`; see
 // ./model.ts for params, kinds and the old per-kind tab ids.
-import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
-import { errorMessage, relativeTime, untitled } from "@bb-studio/kit/format";
+import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "../../kit/app/index";
+import { errorMessage, relativeTime, untitled } from "../../kit/format";
 import { useRealtime, useRpc, useSdk, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";

@@ -1,6 +1,6 @@
-import { untitled } from "@bb-studio/kit/format";
-import { openAppPath } from "@bb-studio/kit/app";
-import { Icon } from "@bb-studio/kit/ui";
+import { untitled } from "../../kit/format";
+import { openAppPath } from "../../kit/app/index";
+import { Icon } from "../../kit/ui/index";
 import { pagePath } from "../constants";
 import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
 import { MissingPageRecovery } from "./MissingPageRecovery";

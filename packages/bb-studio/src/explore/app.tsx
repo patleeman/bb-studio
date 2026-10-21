@@ -1,7 +1,7 @@
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { DIRECTIVE } from "./shared";
 import { ExploreDirective } from "./ui/rows";
-import { ComposerBridge } from "@bb-studio/kit/composer";
+import { ComposerBridge } from "../kit/composer";
 import { NextDirective } from "./ui/next";
 import { NEXT_DIRECTIVE } from "./next";
 

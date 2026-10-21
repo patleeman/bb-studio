@@ -1,6 +1,6 @@
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../../kit/format";
 import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useOpenMain } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, ITEM_TITLE, useOpenMain } from "../../kit/app/index";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -9,9 +9,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@bb-studio/kit/ui";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
+} from "../../kit/ui/index";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
 import type { PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog } from "./dialogs";

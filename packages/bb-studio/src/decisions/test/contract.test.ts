@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { defaultFallback, fallbackSchema } from "@bb-studio/kit/decisions-legacy-contract";
+import { defaultFallback, fallbackSchema } from "../../kit/decisions-legacy-contract";
 
 test("the fallback defaults to the thread's own provider", () => {
   assert.deepEqual(defaultFallback, { mode: "thread" });

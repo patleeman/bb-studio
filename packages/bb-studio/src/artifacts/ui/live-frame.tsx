@@ -5,8 +5,8 @@
 // before anything reaches the agent.
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { composerFor } from "@bb-studio/kit/composer";
-import { errorMessage } from "@bb-studio/kit/format";
+import { composerFor } from "../../kit/composer";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { liveContract } from "../live/contract";
 import type { LiveEventPayload } from "../live/server";

@@ -1,4 +1,4 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { z } from "zod";
 
 /**

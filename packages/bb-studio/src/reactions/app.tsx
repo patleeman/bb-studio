@@ -25,11 +25,11 @@ import {
   type PluginMessageActionContext,
   type PluginMessageDirectiveProps,
 } from "@get-bb/plugin-sdk/app";
-import { Button } from "@bb-studio/kit/ui";
+import { Button } from "../kit/ui/index";
 import { parseEmojiItems } from "./emoji-items";
 import { menuSettings, needsMenuReload, type MenuSettings } from "./settings";
 import { mountActionDecoration } from "./action-decoration";
-import { composerFor } from "@bb-studio/kit/composer";
+import { composerFor } from "../kit/composer";
 import {
   appendQuote,
   composeReactionDraft,

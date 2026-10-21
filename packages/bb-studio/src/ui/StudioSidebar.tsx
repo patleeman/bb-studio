@@ -15,8 +15,8 @@ import {
   usePathname,
   useProjects,
   type CollectionItem,
-} from "@bb-studio/kit/app";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+} from "../kit/app/index";
+import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { useBbContext, useRealtime, useRpc, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ProviderView, rpcContract, SavedViewView, TabView, TagView } from "../contract";

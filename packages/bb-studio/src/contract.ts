@@ -1,6 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { BOT_SHAPES } from "./bot-shapes";
-import { conversationRequestSchema, studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
+import { conversationRequestSchema, studioSchemas, studioTagSchemas } from "./kit/contract";
 import { z } from "zod";
 
 export const schemas = studioSchemas(z);

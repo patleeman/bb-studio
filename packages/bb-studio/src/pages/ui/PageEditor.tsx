@@ -1,4 +1,4 @@
-import { errorMessage, untitled } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "../../kit/format";
 import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu, SyntaxHighlightingExtension } from "@blocknote/core";
 import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comments";
 import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
@@ -15,11 +15,11 @@ import {
 import { BlockNoteView } from "@blocknote/shadcn";
 // BlockNote's stylesheet without the :has() rules that slow typing everywhere in BB.
 import "./blocknote.css";
-import { itemReferenceFrom } from "@bb-studio/kit/app";
+import { itemReferenceFrom } from "../../kit/app/index";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
@@ -32,7 +32,7 @@ import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
 import { CommentDictation } from "./CommentDictation";
 import { editWhiteboardWhenShown } from "./whiteboard";
-import { studioFileUrl } from "@bb-studio/kit/pages-contract";
+import { studioFileUrl } from "../../kit/pages-contract";
 import {
   dictationParagraphs,
   pageFieldKey,

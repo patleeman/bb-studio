@@ -1,5 +1,5 @@
-import { GHOST_BUTTON } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { GHOST_BUTTON } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
 import { useState } from "react";
 import type { MaintenanceRule, MaintenanceView } from "../../bot-maintenance";
 import { useCall, useLive } from "../live";

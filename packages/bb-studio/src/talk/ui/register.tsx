@@ -12,7 +12,7 @@
 // The ids are the ones the Talk plugin registered, now under Studio, so
 // commands are `studio` commands: a keybinding set on Talk's command has to be
 // set again (docs/merging-add-ons.md).
-import { openAppPath } from "@bb-studio/kit/app";
+import { openAppPath } from "../../kit/app/index";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { interceptBuiltInMic, findComposer } from "./composer-dom";
 import { talk } from "./controller";

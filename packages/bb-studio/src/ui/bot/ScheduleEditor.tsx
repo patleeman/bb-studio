@@ -3,7 +3,7 @@
 // window, quiet hours, an end date, the timezone and a raw cron (Advanced).
 // A one-time schedule (reminders) is a date and time with quick picks.
 // Below it, the schedule in words and how many BB automations it becomes.
-import { Input } from "@bb-studio/kit/ui";
+import { Input } from "../../kit/ui/index";
 import { useMemo } from "react";
 import { ALL_DAYS, compileSchedule, describeSchedule, localZone, SCHEDULE_PRESETS, type Schedule, type Weekday } from "../../schedule";
 

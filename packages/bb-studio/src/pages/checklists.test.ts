@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
+import { pageCheckboxes } from "../kit/page-checkbox";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checklistLabel, checklistPrompt, Checklists, checklistTitle, nextChecklistState } from "./checklists";
 import { HUMAN_USER_ID } from "./constants";

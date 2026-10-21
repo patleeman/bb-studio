@@ -11,7 +11,7 @@ import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
 import { registerExploreBuiltin } from "./src/explore/server";
-import { PAGES_SETTINGS } from "@bb-studio/kit/pages-contract";
+import { PAGES_SETTINGS } from "./src/kit/pages-contract";
 import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
@@ -21,7 +21,7 @@ import { SPEECH_SETTINGS } from "./src/speech/settings";
 import { registerSpeech } from "./src/speech/register";
 import { registerVoice, type BuiltinVoice } from "./src/voice/register";
 import { migrateOpenaiKey } from "./src/openai-key";
-import { subcommand, usage } from "@bb-studio/kit/cli";
+import { subcommand, usage } from "./src/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
@@ -40,9 +40,9 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
-import { relativeTime, untitled } from "@bb-studio/kit/format";
-import { serveBytes } from "@bb-studio/kit/server";
+import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
+import { relativeTime, untitled } from "./src/kit/format";
+import { serveBytes } from "./src/kit/server/index";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type ThreadOptionView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
@@ -92,7 +92,7 @@ function queryArg(arg: string): string {
   return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
 }
 
-import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "@bb-studio/kit/health";
+import { HEALTH_REALTIME_CHANNEL, healthSchemas } from "./src/kit/health";
 import { HealthMonitor } from "./src/health";
 import { healthContract } from "./src/health-contract";
 import { formatSetup, SetupService } from "./src/setup";

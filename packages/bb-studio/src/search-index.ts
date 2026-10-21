@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID } from "./kit/contract";
 import type { HubItem, StudioHub } from "./hub";
 import type { SearchStatus } from "./contract";
 

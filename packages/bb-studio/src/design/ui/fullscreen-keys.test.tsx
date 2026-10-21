@@ -9,8 +9,8 @@ import { Canvas } from "./canvas";
 import { PlayView } from "./play-view";
 import type { ScreenView } from "../shared";
 
-vi.mock("@bb-studio/kit/app", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@bb-studio/kit/app")>()),
+vi.mock("../../kit/app/index", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../kit/app/index")>()),
   Icon: () => null,
 }));
 

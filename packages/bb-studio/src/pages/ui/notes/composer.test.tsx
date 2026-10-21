@@ -25,8 +25,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
     useRealtime: (_channel: string, handler: (payload: unknown) => void) => { state.realtime.push(handler); },
   };
 });
-vi.mock("@bb-studio/kit/app", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
-vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => <span />, Tooltip: ({ children }: { children: unknown }) => children }));
+vi.mock("../../../kit/app/index", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
+vi.mock("../../../kit/ui/index", () => ({ Icon: () => <span />, Tooltip: ({ children }: { children: unknown }) => children }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { clearMovedText, expandLabel, ExpandToPage, NotesInProgress } from "./composer";

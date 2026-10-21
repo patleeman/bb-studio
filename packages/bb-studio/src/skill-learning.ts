@@ -35,7 +35,7 @@
 // Saves apply immediately. Advisory lint findings never block them.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
-import { isPassOutput } from "@bb-studio/kit/silent";
+import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
 
 type Sdk = BbPluginApi["sdk"];

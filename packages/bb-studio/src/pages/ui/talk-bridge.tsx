@@ -1,5 +1,5 @@
 // Opens a page when Talk's "Go back" asks for a dictation field of a page.
-import { openAppPath } from "@bb-studio/kit/app";
+import { openAppPath } from "../../kit/app/index";
 import { useEffect } from "react";
 import { pagePath } from "../constants";
 import { pageIdFromField, TALK_OPEN_FIELD_EVENT } from "./talk";

@@ -1,7 +1,7 @@
 // `::recording{id="rec_…"}` in a reply: the recording's summary and the start
 // of its transcript, read-only, under a header that opens the recording.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
+import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { Recording, Segment, rpcContract } from "../shared/contract";
 import { RECORDING_CHANGED, TALK_ICON, formatClock, formatLength, recordingHref } from "../shared/format";

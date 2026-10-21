@@ -2,7 +2,7 @@
 // demand by the tab. The grid sizes to the panel (useContainerWidth), so a
 // narrow panel gets the md/sm layout, and useDashboard's heartbeat counts the
 // tab as viewing, so widgets refresh and scripts can be approved here.
-import { BarTitle, ICON_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BarTitle, ICON_BUTTON, Icon } from "../../kit/app/index";
 import { DashboardBoard } from "./dashboard-view";
 import { useDashboard } from "./use-dashboard";
 

@@ -2,8 +2,8 @@
 // library shows it when filtered to recordings (Talk's own Recordings page
 // did before Talk was built into Studio), and a recording's page shows it
 // for that recording.
-import { OUTLINE_BUTTON, openWorkspaceItem, useOpenMain } from "@bb-studio/kit/app";
-import { Icon, cn } from "@bb-studio/kit/ui";
+import { OUTLINE_BUTTON, openWorkspaceItem, useOpenMain } from "../../kit/app/index";
+import { Icon, cn } from "../../kit/ui/index";
 import { RECORDINGS_ROOT, UNSENT_PATH } from "../shared/format";
 import { useTalkState } from "./controller";
 

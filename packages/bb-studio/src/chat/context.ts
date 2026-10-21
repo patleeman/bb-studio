@@ -1,7 +1,7 @@
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../kit/format";
 // What the agent is told about the item on screen: a pointer, not the
 // content. The add-on's own tools read the latest version.
-import type { StudioItem, StudioKind } from "@bb-studio/kit/contract";
+import type { StudioItem, StudioKind } from "../kit/contract";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk";
 import type { Viewed } from "./contract";
 

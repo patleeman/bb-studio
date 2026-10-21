@@ -2,7 +2,7 @@
 // the bb-studio marketplace with its status and health checks, one-click
 // install and enable, retired plugins to remove, and the CLI command for each
 // action. See src/setup.ts.
-import { Button, cn, Icon } from "@bb-studio/kit/ui";
+import { Button, cn, Icon } from "../../kit/ui/index";
 import { useState } from "react";
 import type { AddOnEntry, AddOnStatus, RetiredEntry } from "../../setup-contract";
 import { ProblemRow } from "../health/HealthViews";

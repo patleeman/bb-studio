@@ -1,5 +1,5 @@
 import { type useRpc } from "@get-bb/plugin-sdk/app";
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../../kit/format";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -10,20 +10,20 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@bb-studio/kit/ui";
-import { Icon } from "@bb-studio/kit/ui";
+} from "../../kit/ui/index";
+import { Icon } from "../../kit/ui/index";
 import { pagePath } from "../constants";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
-export { useProjects } from "@bb-studio/kit/app";
-export type { Project } from "@bb-studio/kit/app";
-import { CopyReferenceMenuItem, type Project } from "@bb-studio/kit/app";
+export { useProjects } from "../../kit/app/index";
+export type { Project } from "../../kit/app/index";
+import { CopyReferenceMenuItem, type Project } from "../../kit/app/index";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
 // Shared with every Studio plugin, so the chrome matches.
-export { ICON_BUTTON } from "@bb-studio/kit/app";
-export { relativeTime } from "@bb-studio/kit/format";
+export { ICON_BUTTON } from "../../kit/app/index";
+export { relativeTime } from "../../kit/format";
 
 export function actorName(key: string, bots: BotView[]): string {
   if (key === "user") return "you";

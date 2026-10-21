@@ -1,4 +1,4 @@
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract, SearchStatus } from "../contract";

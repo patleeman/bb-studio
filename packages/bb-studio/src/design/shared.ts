@@ -1,5 +1,5 @@
 // Names, paths and rules the server and the app share.
-import { DESIGN_SCREEN_ID } from "@bb-studio/kit/design-contract";
+import { DESIGN_SCREEN_ID } from "../kit/design-contract";
 
 /**
  * Designs are built into Studio, but keep the id of the plugin they came

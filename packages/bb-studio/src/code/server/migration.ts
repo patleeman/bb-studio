@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { studioSchemas } from "@bb-studio/kit/contract";
+import { studioSchemas } from "../../kit/contract";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { dirname, join, resolve } from "node:path";
-import { codeImportContract } from "@bb-studio/kit/code-import-contract";
-import { quiesceCode } from "@bb-studio/kit/code-handover";
+import { codeImportContract } from "../../kit/code-import-contract";
+import { quiesceCode } from "../../kit/code-handover";
 import { copyCodeFiles } from "./import-files";
 
 export const CODE_IMPORTED = "code:imported";

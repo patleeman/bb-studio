@@ -6,7 +6,7 @@ import { ArtifactBody, type ArtifactVersion } from "./artifact-body";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => rpc, Markdown: ({ content }: { content: string }) => content, experimental_SourceCode: ({ content }: { content: string }) => content }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   EmptyState: ({ title, children, actions }: { title: string; children: ReactNode; actions: ReactNode }) => createElement("section", {}, title, children, actions),
   Icon: () => null, OUTLINE_BUTTON: "button", cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
 }));

@@ -1,4 +1,4 @@
-import type { Fallback } from "@bb-studio/kit/decisions-legacy-contract";
+import type { Fallback } from "../../kit/decisions-legacy-contract";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   type PluginAppBuilder,
@@ -6,11 +6,11 @@ import {
   useRpc,
   useSettings,
 } from "@get-bb/plugin-sdk/app";
-import { Button } from "@bb-studio/kit/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
+import { Button } from "../../kit/ui/index";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
 import type { rpcContract } from "../contract";
 
-import { errorMessage as errorText } from "@bb-studio/kit/format";
+import { errorMessage as errorText } from "../../kit/format";
 
 /** Matches the host-rendered settings rows above: copy on the left, control on the right. */
 function Row({ label, description, children }: { label: string; description: ReactNode; children: ReactNode }) {

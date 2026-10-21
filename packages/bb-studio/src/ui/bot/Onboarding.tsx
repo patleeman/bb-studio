@@ -3,7 +3,7 @@
 // its setup (bot_create's `setup`): its first message has it introduce
 // itself, ask a couple of questions and then pick its own name, description
 // and look with bot_profile_update. Its chat then opens as BB's thread page.
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { TALK_FIELD_ATTR, TALK_FIELD_LABEL_ATTR, TALK_INSERT_EVENT, toggleTalk, useTalk } from "../../pages/ui/talk";
 import { BOT_STYLES, BotAvatar } from "./BotAvatar";

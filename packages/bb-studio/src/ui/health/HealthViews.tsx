@@ -1,8 +1,8 @@
 // Plugin health in the sidebar footer; Studio's Setup page (ui/setup) shows
 // the same problems. The footer item opens by itself when a problem appears
 // that the user hasn't seen.
-import { openAppPath, studioPath } from "@bb-studio/kit/app";
-import { Button, cn, Icon } from "@bb-studio/kit/ui";
+import { openAppPath, studioPath } from "../../kit/app/index";
+import { Button, cn, Icon } from "../../kit/ui/index";
 import { useEffect, useRef } from "react";
 import type { Problem } from "../../health-contract";
 import { useHealth, type HealthApi } from "./use-health";

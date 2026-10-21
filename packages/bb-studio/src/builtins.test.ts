@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
 import { ARTIFACT_TABLES, ArtifactStore } from "./artifacts/server/store";
 import { artifactProvider } from "./artifacts/server/provider";
-import { STUDIO_BUILTINS } from "@bb-studio/kit/contract";
+import { STUDIO_BUILTINS } from "./kit/contract";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt, builtinSegment, canonicalPath, legacyChatPath } from "./builtins";
 import { StudioHub, type HubSdk } from "./hub";
 import { parseWorkspace } from "./ui/workspace-state";

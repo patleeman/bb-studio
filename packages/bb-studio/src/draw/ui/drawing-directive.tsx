@@ -2,8 +2,8 @@
 // header that opens it in the thread's Studio tab. It doesn't load
 // Excalidraw: the picture is the server's thumbnail.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, THUMBNAIL, remember, openAppPath } from "@bb-studio/kit/app";
-import { relativeTime } from "@bb-studio/kit/format";
+import { ItemDirectiveCard, THUMBNAIL, remember, openAppPath } from "../../kit/app/index";
+import { relativeTime } from "../../kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";

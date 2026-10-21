@@ -27,9 +27,9 @@ import {
   ItemMenu,
   useOpenMain,
   cn,
-} from "@bb-studio/kit/app";
+} from "../../kit/app/index";
 
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import {
   useRealtime,
   useRealtimeConnectionState,

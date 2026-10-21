@@ -6,7 +6,7 @@ import { QuickOpen, toggleQuickOpen } from "./QuickOpen";
 
 const state = vi.hoisted(() => ({ rpc: { call: vi.fn(async (method: string) => method === "overview" ? { providers: [] } : []) } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_Icon: () => null, useRpc: () => state.rpc, useBbNavigate: () => ({}), useBbContext: () => ({ projectId: null }) }));
-vi.mock("@bb-studio/kit/app", () => ({ Icon: () => null, ItemTile: () => null, cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "), openAppPath: vi.fn(), projectName: () => "", threadLinkId: () => null, useProjects: () => [], useOpenTarget: () => ({ open: vi.fn(), anchor: null }) }));
+vi.mock("../kit/app/index", () => ({ Icon: () => null, ItemTile: () => null, cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "), openAppPath: vi.fn(), projectName: () => "", threadLinkId: () => null, useProjects: () => [], useOpenTarget: () => ({ open: vi.fn(), anchor: null }) }));
 vi.mock("./SearchFreshness", () => ({ SearchFreshness: () => null, useSearchFreshness: () => ({ revision: 0 }) }));
 
 let container: HTMLDivElement;

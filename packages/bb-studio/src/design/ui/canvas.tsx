@@ -4,7 +4,7 @@
 // come back through `api` (see the screen script), and holding Space drags
 // the canvas from anywhere, screens included.
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
-import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { ICON_BUTTON, Icon, cn } from "../../kit/app/index";
 import { isTypingTarget, keyInScope } from "../../ui/typing-target";
 
 type View = { x: number; y: number; scale: number };

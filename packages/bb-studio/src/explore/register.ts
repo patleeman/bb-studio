@@ -1,4 +1,4 @@
-import { parseFlags, subcommand } from "@bb-studio/kit/cli";
+import { parseFlags, subcommand } from "../kit/cli";
 // Explore's server: agents end answers with what they noticed along the way
 // (`::explore{items="…"}`, or the Next row's `btw` notes). This file adds the
 // Next row's click log (RPC), the instructions for `bb.agents.configure`, and

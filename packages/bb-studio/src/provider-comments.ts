@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Actor } from "@bb-studio/kit/server";
+import type { Actor } from "./kit/server/index";
 import type { ItemComment, Ref } from "./services";
 
 type Sdk = { plugins: { callRpc<T>(args: { pluginId: string; method: string; input: never; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T> } };

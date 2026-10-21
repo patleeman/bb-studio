@@ -3,7 +3,7 @@
 // with "Decide for me". Unanswered questions are left to the agent.
 import { useState } from "react";
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
-import { GHOST_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, PRIMARY_BUTTON, cn } from "../../kit/app/index";
 import { DECIDE, MAX_OTHER_CHARS, MAX_TEXT_CHARS, type Answer, type Answers, type Question, type QuestionForm } from "../questions";
 
 const CHIP = "rounded-lg border px-3 py-2 text-left text-sm transition-colors";

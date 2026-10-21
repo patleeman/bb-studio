@@ -1,8 +1,8 @@
 // Tidies dictated text or a recording segment. Callers retain the raw transcript.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { askModel } from "@bb-studio/kit/decisions";
-import { primaryHostId } from "@bb-studio/kit/server";
-import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
+import { askModel } from "../../kit/decisions";
+import { primaryHostId } from "../../kit/server/index";
+import type { ModelSelection } from "../../kit/decisions-contract";
 
 /** Longer dictations go in as spoken; a model rewrite of that much is slow and hard to check. */
 export const CLEANUP_MAX_CHARS = 12_000;

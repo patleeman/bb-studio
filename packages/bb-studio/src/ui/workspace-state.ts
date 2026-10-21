@@ -1,4 +1,4 @@
-import { workspaceItemPath, type WorkspaceItem, type WorkspacePlacement } from "@bb-studio/kit/app";
+import { workspaceItemPath, type WorkspaceItem, type WorkspacePlacement } from "../kit/app/index";
 import { canonicalPath } from "../builtins";
 /** `icon` is the item's emoji, else `kindIcon` names its kind's icon; both arrive once the item is visited. */
 export interface Tab { href: string; title: string; icon?: string | null; kindIcon?: string }

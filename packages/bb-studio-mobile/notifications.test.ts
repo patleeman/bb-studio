@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isQuietCompletion } from "./notifications.js";
-import { isSilentOutput } from "../bb-studio-kit/src/silent";
+import { isSilentOutput } from "../bb-studio/src/kit/silent";
 
 describe("quiet completions", () => {
   it.each(["", " \n\t", undefined, "[PASS]", " [pass]\n", "**[PASS]**", "`[Pass]`"])("suppresses %s", (body) => {

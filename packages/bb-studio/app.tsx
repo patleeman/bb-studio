@@ -8,7 +8,7 @@ import { ConversationPage } from "./src/chat/ui/ConversationComposer";
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind, project leads in
 // the Setup page, and Studio search.
-import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "@bb-studio/kit/app";
+import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, StudioBarSlot, usePathname, WORKSPACE_PATH } from "./src/kit/app/index";
 import { BUILTIN_ROUTES, builtinSegment, CHATS_PATH, legacyChatPath, STUDIO_ROOT } from "./src/builtins";
 import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
 import { isArtifactId } from "./src/artifacts/shared";

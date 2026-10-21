@@ -2,8 +2,8 @@
 // laid out like BB's own new-thread screen. Studio opens it in a split
 // beside the item; sending or picking turns the pane into that thread.
 import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useRpc, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, OUTLINE_BUTTON, StudioBar } from "@bb-studio/kit/app";
-import { errorMessage, quoteMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
+import { Icon, OUTLINE_BUTTON, StudioBar } from "../../kit/app/index";
+import { errorMessage, quoteMessage, untitled, type ItemQuote } from "../../kit/format";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";

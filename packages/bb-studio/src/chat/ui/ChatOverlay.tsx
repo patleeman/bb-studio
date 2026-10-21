@@ -10,8 +10,8 @@ import {
   type HomeThread,
   type ItemChatHost,
   type ItemChatRef,
-} from "@bb-studio/kit/app";
-import { errorMessage, type ItemQuote } from "@bb-studio/kit/format";
+} from "../../kit/app/index";
+import { errorMessage, type ItemQuote } from "../../kit/format";
 import { useSyncExternalStore, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, Viewed } from "../contract";

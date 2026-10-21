@@ -1,8 +1,8 @@
 // The Speech section of the Setup page: which engine, model and voice Studio
 // speaks with, and a sample to choose by ear. Keys live in Studio's plugin
 // settings, where BB keeps secrets. See src/speech/.
-import { Button, cn, Icon, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, Tooltip } from "@bb-studio/kit/ui";
-import { errorMessage } from "@bb-studio/kit/format";
+import { Button, cn, Icon, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, Tooltip } from "../../kit/ui/index";
+import { errorMessage } from "../../kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LocalSpeechStatus, speechContract, SpeechState } from "../../speech/contract";

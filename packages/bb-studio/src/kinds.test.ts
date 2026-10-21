@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import type { StudioProviderHandlers } from "@bb-studio/kit/server";
+import type { StudioProviderHandlers } from "./kit/server/index";
 import type { ProviderView } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
 import { builtinOn, frontendState, KINDS_KV_KEY, KindSettingsStore, parseKindSettings, replacements, resolveKind, resolveKinds, routeProviders, routingInstructions, type KindSettings } from "./kinds";

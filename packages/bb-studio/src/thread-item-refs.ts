@@ -1,4 +1,4 @@
-import { parseStudioMentionReference, studioTextReferences, type ReferenceOptions, type ReferenceProvider } from "@bb-studio/kit/contract";
+import { parseStudioMentionReference, studioTextReferences, type ReferenceOptions, type ReferenceProvider } from "./kit/contract";
 import type { Ref } from "./services";
 
 interface InputPart {

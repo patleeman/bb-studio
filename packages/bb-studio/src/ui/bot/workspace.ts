@@ -2,7 +2,7 @@
 // pane, its chat included), where its Info opens, and how its sidebar groups
 // the threads it started. No React components here, so app.tsx, the page and
 // the tabs can share it without import cycles.
-import { openAppPath } from "@bb-studio/kit/app";
+import { openAppPath } from "../../kit/app/index";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";

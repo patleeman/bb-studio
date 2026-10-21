@@ -7,7 +7,7 @@ vi.mock("../../pages/ui/talk", () => ({
   TALK_FIELD_ATTR: "data-talk-field", TALK_FIELD_LABEL_ATTR: "data-talk-label", TALK_INSERT_EVENT: "talk-insert",
   toggleTalk: () => {}, useTalk: () => ({ mode: "unavailable", phase: null }),
 }));
-vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => null }));
+vi.mock("../../kit/ui/index", () => ({ Icon: () => null }));
 
 const { IDEAS, Welcome } = await import("./Onboarding");
 const look = { shape: "blob", color: "#5b8def", emoji: "🤖" };

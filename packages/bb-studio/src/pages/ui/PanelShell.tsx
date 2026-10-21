@@ -1,7 +1,7 @@
 // The Page side-panel tab's frame: a page's metadata kept current, and its
 // live editor under a header.
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 export { usePanelPage } from "./use-panel-page";
 import { PagesUiContext } from "./context";

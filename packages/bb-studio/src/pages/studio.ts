@@ -1,9 +1,9 @@
 // Pages as a Studio kind: the `studio_*` methods Studio's hub calls in-process
 // to list and manage pages in its collection.
-import { copyTitle, eachId, fillTemplate, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { LEGACY_PAGE_FILES_URL, PAGE_FILES_URL } from "@bb-studio/kit/pages-contract";
-import { untitled } from "@bb-studio/kit/format";
-import { mustGet, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { copyTitle, eachId, fillTemplate, type StudioItem, type StudioKind } from "../kit/contract";
+import { LEGACY_PAGE_FILES_URL, PAGE_FILES_URL } from "../kit/pages-contract";
+import { untitled } from "../kit/format";
+import { mustGet, storeSearch, type StudioProviderHandlers } from "../kit/server/index";
 import { HUMAN_USER_ID, pagePath, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";
 import type { PagesService } from "./service";

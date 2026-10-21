@@ -1,8 +1,8 @@
 // A temp note's done actions, in its page's header: Send to thread, Keep as
 // page, Discard. Shown only while the page is an open note.
-import { BAR_BUTTON, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, ICON_BUTTON } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, cn } from "@bb-studio/kit/ui";
+import { BAR_BUTTON, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, ICON_BUTTON } from "../../../kit/app/index";
+import { errorMessage } from "../../../kit/format";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, cn } from "../../../kit/ui/index";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { toast } from "sonner";

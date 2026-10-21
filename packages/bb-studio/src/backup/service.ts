@@ -5,8 +5,8 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BACKUP_FORMAT, BACKUP_VERSION, STUDIO_BACKUP_METHOD, STUDIO_RESTORE_METHOD, studioBackupSchemas, type RestoreReport } from "@bb-studio/kit/backup";
-import { backupSessionRoot, runBackup, runRestore, type BackupHandlers } from "@bb-studio/kit/server";
+import { BACKUP_FORMAT, BACKUP_VERSION, STUDIO_BACKUP_METHOD, STUDIO_RESTORE_METHOD, studioBackupSchemas, type RestoreReport } from "../kit/backup";
+import { backupSessionRoot, runBackup, runRestore, type BackupHandlers } from "../kit/server/index";
 import { z } from "zod";
 import { ADDONS } from "../setup-addons";
 import { extractEntries, readEntry, readZip, zipDirectory, type ZipLimits, DEFAULT_LIMITS } from "./zip";

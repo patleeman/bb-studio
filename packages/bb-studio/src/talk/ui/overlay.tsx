@@ -12,10 +12,10 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
 import { HTTP_ROOT, NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
-import type { StudioCreateEventDetail } from "@bb-studio/kit/contract";
-import { Icon } from "@bb-studio/kit/ui";
-import { openAppPath, useOpenMain } from "@bb-studio/kit/app";
-import { cn } from "@bb-studio/kit/ui";
+import type { StudioCreateEventDetail } from "../../kit/contract";
+import { Icon } from "../../kit/ui/index";
+import { openAppPath, useOpenMain } from "../../kit/app/index";
+import { cn } from "../../kit/ui/index";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
 import { useInlineDictation } from "./inline-dictation";

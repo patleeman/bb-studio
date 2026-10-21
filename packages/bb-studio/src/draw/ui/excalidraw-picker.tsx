@@ -3,7 +3,7 @@
 // picking a drawing submits its id to the waiting backend call, which then
 // uploads the rendered image for the thread.
 import type { PluginPendingInteractionProps } from "@get-bb/plugin-sdk/app";
-import { EmptyState, GHOST_BUTTON, PAGE_TITLE } from "@bb-studio/kit/app";
+import { EmptyState, GHOST_BUTTON, PAGE_TITLE } from "../../kit/app/index";
 import { DRAW_ICON } from "../shared";
 import { DrawingCard, drawingName, type DrawingMeta } from "./drawing-card";
 

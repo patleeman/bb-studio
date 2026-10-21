@@ -1,4 +1,4 @@
-import { MIGRATIONS as CODE_MIGRATIONS } from "@bb-studio/kit/code-migrations";
+import { MIGRATIONS as CODE_MIGRATIONS } from "./kit/code-migrations";
 import { ARTIFACT_TABLES } from "./artifacts/server/store";
 import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
 import { DRAWING_TABLES } from "./draw/server/store";

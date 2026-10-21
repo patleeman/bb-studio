@@ -7,12 +7,12 @@
 import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
 import { useExploreRpc } from "../client";
 import { PLUGIN_ID } from "../constants";
 import { BUG_EMOJI, nextItemCount, parseNextItems, type BtwNote, type NextKind } from "../next";
 import { labelKey, type ExploreItem } from "../shared";
-import { composerFor } from "@bb-studio/kit/composer";
+import { composerFor } from "../../kit/composer";
 import { appendDraft } from "./composer";
 
 const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;

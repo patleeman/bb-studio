@@ -3,9 +3,9 @@
 // transcript, and the rest a card. Each opens the
 // item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
-import { studioItemProps } from "@bb-studio/kit/app";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
+import { studioItemProps } from "../../kit/app/index";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
 import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";

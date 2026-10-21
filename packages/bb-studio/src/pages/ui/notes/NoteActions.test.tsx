@@ -14,7 +14,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
   };
 });
 const { Pass } = vi.hoisted(() => ({ Pass: ({ children }: { children?: ReactNode }) => children ?? null }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../../kit/app/index", () => ({
   BAR_BUTTON: "bar",
   ICON_BUTTON: "icon",
   useOpenTarget: () => ({ open: () => {}, anchor: null }),
@@ -23,7 +23,7 @@ vi.mock("@bb-studio/kit/app", () => ({
   DropdownMenuContent: Pass,
   DropdownMenuItem: ({ children, onSelect }: { children?: ReactNode; onSelect(): void }) => <button type="button" data-menu-item="" onClick={onSelect}>{children}</button>,
 }));
-vi.mock("@bb-studio/kit/ui", () => ({
+vi.mock("../../../kit/ui/index", () => ({
   Icon: () => <span />,
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
   Button: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} />,

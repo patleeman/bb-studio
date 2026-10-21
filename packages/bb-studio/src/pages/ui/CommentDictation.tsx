@@ -1,4 +1,4 @@
-import { Icon } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
 import { ComponentsContext, type ComponentProps } from "@blocknote/react";
 import { components } from "@blocknote/shadcn";
 import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";

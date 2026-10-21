@@ -1895,7 +1895,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - Add-ons implement the Studio provider contract (`studio_describe`,
   `studio_list`, `studio_search`, `studio_create`, `studio_move`,
   `studio_archive`, `studio_delete`, `studio_action`) from
-  [`@bb-studio/kit`](../bb-studio-kit), and publish them for RPC discovery.
+  [Studio’s internal kit](src/kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
 - Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
@@ -2250,7 +2250,7 @@ that. It reads two things:
   with an error, doesn't work with this BB version, or has a background
   service that keeps restarting.
 - **Plugins' own checks.** A plugin can publish `studio_health` with
-  `registerHealth` from `@bb-studio/kit/health`. It reports problems only the
+  `registerHealth` from `src/kit/health`. It reports problems only the
   plugin can see, like a missing API key. Each problem has a fix link, which
   defaults to the plugin's settings page. Studio Decisions reports a missing
   or failing Jev provider and an unavailable fallback model.
@@ -2277,9 +2277,13 @@ pnpm test
 bb plugin build .
 ```
 
-`@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
-`package-lock.json` current (regenerate it in a clean clone, not the pnpm
-workspace), because BB's Git install runs `npm install` from it.
+Studio owns its contracts, helpers and UI under `src/kit`. Its runtime dependencies
+are declared directly in this package. Tailwind scans the internal sources.
+`gen-contracts.mjs` reads the same internal contract; generated Swift stays unchanged.
+The temporary `@bb-studio/kit` tarball contains only the Decisions and Code bridge
+contracts and handover helpers. `pack-kit.sh --check` checks those copies against
+Studio and validates the bridge locks. Mobile remains a separate plugin with no
+runtime kit dependency; its silent-output helper is already local.
 
 ## Templates and export
 

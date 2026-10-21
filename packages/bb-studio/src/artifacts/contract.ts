@@ -1,2 +1,2 @@
 // Studio's artifact RPC contract lives in the kit.
-export * from "@bb-studio/kit/artifacts-contract";
+export * from "../kit/artifacts-contract";

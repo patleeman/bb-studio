@@ -19,9 +19,9 @@ import {
   openAppPath,
   projectName,
   useProjects,
-} from "@bb-studio/kit/app";
+} from "../../kit/app/index";
 
-import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
+import { errorMessage, relativeTime, shortDateTime } from "../../kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";

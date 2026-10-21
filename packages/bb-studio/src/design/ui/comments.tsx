@@ -5,8 +5,8 @@
 // Open comments show as numbered pins on their elements.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
-import { Icon, cn } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { Icon, cn } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { frameSize, frameKey, type CommentView, type DesignView } from "../shared";

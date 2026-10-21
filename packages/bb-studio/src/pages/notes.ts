@@ -11,7 +11,7 @@
 //   kept notes stay in Notes as ordinary pages.
 import type Database from "better-sqlite3";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../kit/format";
 import { actorColor } from "./actors";
 import { HUMAN_USER_ID, pagePath, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";

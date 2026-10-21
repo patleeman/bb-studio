@@ -5,9 +5,9 @@
 // with it.
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
-import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, useHomeThread, useItemChat } from "@bb-studio/kit/app";
-import { mentionPrompt } from "@bb-studio/kit/contract";
-import { errorMessage, quoteMessage, type ItemQuote } from "@bb-studio/kit/format";
+import { GHOST_BUTTON, Icon, PRIMARY_BUTTON, useHomeThread, useItemChat } from "../../kit/app/index";
+import { mentionPrompt } from "../../kit/contract";
+import { errorMessage, quoteMessage, type ItemQuote } from "../../kit/format";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { SELECTION_MESSAGE } from "../shared";
 

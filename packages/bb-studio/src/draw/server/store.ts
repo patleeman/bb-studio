@@ -1,7 +1,7 @@
 // Drawings in Studio's SQLite database, stored as serialized Excalidraw
 // scenes (the JSON shape Excalidraw's "save to file" uses).
-import { newId } from "@bb-studio/kit/ids";
-import type { Actor } from "@bb-studio/kit/server";
+import { newId } from "../../kit/ids";
+import type { Actor } from "../../kit/server/index";
 import type Database from "better-sqlite3";
 import { elementCount, parseSceneData, serializeSceneData } from "../merge";
 

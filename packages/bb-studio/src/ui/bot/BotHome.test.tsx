@@ -58,12 +58,12 @@ vi.mock("./Onboarding", () => ({
   Welcome: ({ first, look, onCreate }: { first: boolean; look: { shape: string }; onCreate(goal: string): void }) => React.createElement("div", { "data-shape": look.shape }, first ? "Meet your Bot" : "Make another Bot",
     React.createElement("button", { onClick: () => onCreate("Watch my PRs") }, "Create Bot")),
 }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   StudioBar: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   openAppPath: vi.fn(), usePathname: () => state.pathname, DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
 }));
-vi.mock("@bb-studio/kit/ui", () => ({
+vi.mock("../../kit/ui/index", () => ({
   Icon: ({ name, className }: { name: string; className?: string }) => React.createElement("span", { "data-icon": name, className }),
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
   DropdownMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
@@ -337,7 +337,7 @@ test("Bot info keeps profile and history collapsed until asked, then saves profi
   expect(button("Profile changes").getAttribute("aria-expanded")).toBe("true");
   expect(container.textContent).toContain("Changed by Dot");
   await act(async () => button("Profile changes").click());
-  const { openAppPath } = await import("@bb-studio/kit/app");
+  const { openAppPath } = await import("../../kit/app/index");
   await act(async () => button("Memory").click());
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
   act(() => button("Skills…").click());
@@ -476,7 +476,7 @@ test("Check-ins offers presets, marks the current one, and applies one in a clic
 const scout = { ...dot, id: "bot_scout", name: "Scout", avatar: "🛰️", threadId: "thr_scout", primary: false };
 
 test("several Bots: the selected one (from the route) is expanded and scoped; a row opens its chat, its ⓘ its Info", async () => {
-  const { openAppPath } = await import("@bb-studio/kit/app");
+  const { openAppPath } = await import("../../kit/app/index");
   state.pathname = "/plugins/studio/studio/bot/bot_scout";
   state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: scout, run: null }, bot_activity: empty };
   await show(<BotThreadList {...listProps} />);

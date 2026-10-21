@@ -10,9 +10,9 @@
 // This was the Draw plugin (id `excalidraw`). Its items keep that id as their
 // namespace, its agent tools, skill, mention provider, message directive,
 // thread tab and composer entry keep their names (docs/merging-add-ons.md).
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
-import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { studioSchemas } from "../kit/contract";
+import { errorMessage } from "../kit/format";
+import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";

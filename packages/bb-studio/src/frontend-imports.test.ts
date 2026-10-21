@@ -10,8 +10,6 @@ import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const packageDir = resolve(__dirname, "..");
-const kitDir = resolve(packageDir, "../bb-studio-kit");
-const kitExports: Record<string, string> = JSON.parse(readFileSync(join(kitDir, "package.json"), "utf8")).exports;
 const importPattern = /^\s*(?:import|export)\s+(?!type\b)([^;]*?)\s+from\s+"([^"]+)"/gms;
 const typeOnly = /^\{\s*(?:type\s+[\w$]+(?:\s+as\s+[\w$]+)?\s*,?\s*)+\}$/;
 
@@ -36,10 +34,6 @@ function importersOf(entry: string, target: (spec: string) => boolean): string[]
       if (spec.startsWith(".")) {
         const next = resolveLocal(file, spec);
         if (next) walk(next);
-      } else if (spec.startsWith("@bb-studio/kit/")) {
-        // The kit ships as source, so its imports land in the bundle too.
-        const target = kitExports[`./${spec.slice("@bb-studio/kit/".length)}`];
-        if (target) walk(resolve(kitDir, target));
       }
     }
   };

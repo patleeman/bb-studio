@@ -1,9 +1,9 @@
-import { errorMessage as errorText } from "@bb-studio/kit/format";
+import { errorMessage as errorText } from "./kit/format";
 export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
 // publish `studio_describe` for discovery.
-import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "@bb-studio/kit/contract";
-import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "./kit/contract";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type StudioProviderHandlers } from "./kit/server/index";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";

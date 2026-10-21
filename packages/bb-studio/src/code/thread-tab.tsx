@@ -3,8 +3,8 @@ import type { CodeContract } from "./contract";
 // the agent's changes. Each thread has one; the tab is VS Code alone, with no bar.
 import { useEffect, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { BAR_BUTTON } from "../kit/app/index";
+import { errorMessage } from "../kit/format";
 import { WorkspaceView } from "./panel";
 
 

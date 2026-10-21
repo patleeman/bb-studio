@@ -10,10 +10,10 @@
 // their namespace, its agent tools, skill, mention provider and message
 // directive keep their names (docs/merging-add-ons.md).
 import { basename } from "node:path";
-import { parseFlags } from "@bb-studio/kit/cli";
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
-import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBytes, studioServices, threadRoots as rootsOf, type BackupHandlers, type ResolvedSource, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { parseFlags } from "../kit/cli";
+import { studioSchemas } from "../kit/contract";
+import { errorMessage } from "../kit/format";
+import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBytes, studioServices, threadRoots as rootsOf, type BackupHandlers, type ResolvedSource, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";

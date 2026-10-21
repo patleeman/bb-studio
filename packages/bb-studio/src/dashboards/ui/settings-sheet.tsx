@@ -2,7 +2,7 @@
 // and where its data comes from. Scripts show their exact command and wait
 // for the user to review and approve them in the approval dialog.
 import { useMemo, useState, type ReactNode } from "react";
-import { GHOST_BUTTON, ICON_BUTTON, Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, ICON_BUTTON, Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, cn } from "../../kit/app/index";
 import { LIMITS, WIDGET_TYPES, WIDGETS, type Op, type Source, type WidgetTypeView, type WidgetView } from "../shared";
 
 const FIELD = "w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";

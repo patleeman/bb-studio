@@ -6,7 +6,7 @@
 //
 // Chunks are stored as ArrayBuffers, not Blobs: WebKit web views (the BB
 // mobile app) have a history of losing Blobs stored in IndexedDB.
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 
 export interface OutboxSegment {
   recordingId: string;

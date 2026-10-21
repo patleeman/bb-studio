@@ -1,7 +1,7 @@
 // One dashboard as a Studio page: /plugins/studio/studio/dashboards/<id>, in
 // a workspace tab or the main view. Loaded on demand by app.tsx: it brings
 // the grid and the charts.
-import { openAppPath, WORKSPACE_PATH } from "@bb-studio/kit/app";
+import { openAppPath, WORKSPACE_PATH } from "../../kit/app/index";
 import { openCollection } from "../../ui/StudioPanel";
 import { closeWorkspaceTabs } from "../../ui/Workspace";
 import { dashboardHref } from "../shared";

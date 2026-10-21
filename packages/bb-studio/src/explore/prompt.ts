@@ -18,7 +18,7 @@ export function exploreInstructions(): string {
 }
 
 /** The default preferred quick replies (`explore_replyItems`), in the kit so the Pages bridge reads the same default. */
-export { DEFAULT_REPLIES } from "@bb-studio/kit/pages-contract";
+export { DEFAULT_REPLIES } from "../kit/pages-contract";
 
 /** The Next row's instructions. They replace Explore's own line. `replies` null: quick replies are off. */
 export function nextInstructions({ explore, replies }: { explore: boolean; replies: readonly string[] | null }): string {

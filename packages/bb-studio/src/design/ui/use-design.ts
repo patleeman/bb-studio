@@ -1,7 +1,7 @@
 // One design, loaded and kept current: the canvas, the thread tab and reply cards share it.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { DESIGN_UPDATE_TYPE, REALTIME_CHANNEL, type DesignView } from "../shared";

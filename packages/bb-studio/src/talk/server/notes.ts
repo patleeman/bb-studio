@@ -4,9 +4,9 @@
 // `pages.*` RPC, so Talk never touches Pages' tables. Action items are a Pages
 // checklist, so each can be handed to an agent from the page.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { askModel } from "@bb-studio/kit/decisions";
-import { primaryHostId } from "@bb-studio/kit/server";
-import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
+import { askModel } from "../../kit/decisions";
+import { primaryHostId } from "../../kit/server/index";
+import type { ModelSelection } from "../../kit/decisions-contract";
 import { z } from "zod";
 import type { Recording } from "../shared/contract";
 import type { TalkStore } from "./store";

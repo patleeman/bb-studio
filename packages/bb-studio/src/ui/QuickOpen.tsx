@@ -1,7 +1,7 @@
-import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type OpenPlace, type OpenTarget } from "@bb-studio/kit/app";
-import { untitled } from "@bb-studio/kit/format";
-import { mentionPrompt } from "@bb-studio/kit/contract";
-import { Dialog, DialogContent, DialogTitle } from "@bb-studio/kit/ui";
+import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type OpenPlace, type OpenTarget } from "../kit/app/index";
+import { untitled } from "../kit/format";
+import { mentionPrompt } from "../kit/contract";
+import { Dialog, DialogContent, DialogTitle } from "../kit/ui/index";
 import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { ProviderView, rpcContract } from "../contract";

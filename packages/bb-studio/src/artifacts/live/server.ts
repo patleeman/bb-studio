@@ -9,8 +9,8 @@
 //
 // Everything here comes from a page's script, so what reaches an agent is
 // wrapped in <artifact-data> as data, never instructions.
-import { parseFlags } from "@bb-studio/kit/cli";
-import { errorMessage } from "@bb-studio/kit/format";
+import { parseFlags } from "../../kit/cli";
+import { errorMessage } from "../../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";

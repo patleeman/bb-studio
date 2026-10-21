@@ -1,6 +1,6 @@
 // Filter choices live above the collection, leaving its full width for items.
-import { cn, Icon, TagDot } from "@bb-studio/kit/app";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, Popover, PopoverContent, PopoverTrigger } from "@bb-studio/kit/ui";
+import { cn, Icon, TagDot } from "../kit/app/index";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, Popover, PopoverContent, PopoverTrigger } from "../kit/ui/index";
 import { useState, type ReactNode } from "react";
 import type { SavedViewView, TagView } from "../contract";
 import { fieldValues, formatQuery, parseQuery, resolveValue, toggleFilter, UNTAGGED, type FacetCounts, type FieldValue, type FilterField, type Query, type QueryVocabulary } from "../query";

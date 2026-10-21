@@ -2,7 +2,7 @@
 // Two sources: BB's own status for every plugin (needs setup, error,
 // incompatible, a crashing service), and the `studio_health` checks plugins
 // publish for problems only they can see, like a missing API key.
-import { HEALTH_METHOD, pluginSettingsPath, type HealthSchemas } from "@bb-studio/kit/health";
+import { HEALTH_METHOD, pluginSettingsPath, type HealthSchemas } from "./kit/health";
 import type { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 

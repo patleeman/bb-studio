@@ -1,7 +1,7 @@
 // Pasting a lone link on an empty line turns it into an embed: a page,
 // thread, drawing, artifact, recording for a BB
 // link, a bookmark for anything else on the web.
-import { itemAtPath, parseStudioItemHref } from "@bb-studio/kit/contract";
+import { itemAtPath, parseStudioItemHref } from "../../kit/contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, type EmbedKind, type StudioEmbedKind } from "../schema-config";
 
 const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12}(?:[a-f0-9]{4})?)(?:\/|$)/;

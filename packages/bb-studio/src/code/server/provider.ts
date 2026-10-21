@@ -1,6 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { StudioItem, StudioKind } from "@bb-studio/kit/contract";
-import type { StudioProviderHandlers } from "@bb-studio/kit/server";
+import type { StudioItem, StudioKind } from "../../kit/contract";
+import type { StudioProviderHandlers } from "../../kit/server/index";
 import type { Workspace } from "../shared";
 import type { WorkspaceStore } from "./store";
 

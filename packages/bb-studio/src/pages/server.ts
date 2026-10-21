@@ -6,14 +6,14 @@
 // their namespace; its agent tools (`pages_*`), skill, `page` mention
 // provider, `::page` directive, thread panel and header actions keep their
 // names; and its RPC methods are Studio's `pages.*` (docs/merging-add-ons.md).
-import { createStudioNotifier, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { createStudioNotifier, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { BbPluginApi, PluginCliRegistration } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { untitled } from "@bb-studio/kit/format";
-import { PAGE_FILES_URL } from "@bb-studio/kit/pages-contract";
+import { studioSchemas } from "../kit/contract";
+import { untitled } from "../kit/format";
+import { PAGE_FILES_URL } from "../kit/pages-contract";
 import { pagesBackup } from "./backup";
 import * as Y from "yjs";
 import { z } from "zod";

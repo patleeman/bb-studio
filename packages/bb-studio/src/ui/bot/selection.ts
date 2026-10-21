@@ -4,7 +4,7 @@
 // /plugins/studio/studio/bot/new
 // the create flow ("New bot"). Every bot_* call on the page, its sidebar and
 // its tabs carries the selected Bot's id (none for the primary).
-import { usePathname } from "@bb-studio/kit/app";
+import { usePathname } from "../../kit/app/index";
 import { useMemo } from "react";
 
 export const BOT_PATH = "/plugins/studio/studio/bot";

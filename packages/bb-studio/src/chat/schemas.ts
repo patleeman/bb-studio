@@ -1,1 +1,1 @@
-export * from "@bb-studio/kit/chat-schemas";
+export * from "../kit/chat-schemas";

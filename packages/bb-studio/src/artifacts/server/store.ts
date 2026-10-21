@@ -1,9 +1,9 @@
-import type { Actor } from "@bb-studio/kit/server";
+import type { Actor } from "../../kit/server/index";
 // Artifacts in the plugin's SQLite database. An artifact is a titled item with
 // one or more versions; each version points at bytes stored once per sha256,
 // so saving an unchanged file again costs nothing.
 import { createHash, randomUUID } from "node:crypto";
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { MAX_ARTIFACT_BYTES, artifactType, formatBytes, type ArtifactType } from "../shared";
 

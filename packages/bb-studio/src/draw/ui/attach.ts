@@ -2,7 +2,7 @@
 // picker, render it to a PNG, and attach it to the conversation. Excalidraw
 // renders the PNG, so it loads only once a drawing is picked.
 import type { PluginComposerScope } from "@get-bb/plugin-sdk/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { toast } from "sonner";
 import { callRpc } from "./rpc";
 

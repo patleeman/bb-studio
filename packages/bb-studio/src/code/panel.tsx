@@ -1,8 +1,8 @@
 import type { CodeContract } from "./contract";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { BAR_BUTTON, Icon } from "../kit/app/index";
+import { errorMessage } from "../kit/format";
 import { toast } from "sonner";
 import { FileBrowser } from "./file-browser";
 import { themeChanges, useThemeSync } from "./theme-sync";

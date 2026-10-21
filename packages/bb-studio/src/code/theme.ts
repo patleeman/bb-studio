@@ -1,1 +1,1 @@
-export * from "@bb-studio/kit/code-theme";
+export * from "../kit/code-theme";

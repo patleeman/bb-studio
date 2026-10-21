@@ -1,9 +1,9 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import type { useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
-import { Button } from "@bb-studio/kit/ui";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@bb-studio/kit/ui";
-import { Icon } from "@bb-studio/kit/ui";
+import { Button } from "../../kit/ui/index";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../kit/ui/index";
+import { Icon } from "../../kit/ui/index";
 import type { BotView, PageMetaView, rpcContract, SnapshotView } from "../contract";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;

@@ -3,9 +3,9 @@
 // Run now, edit (name, job, schedule), delete; New runner; and Adopt as
 // runner for threads the Bot started that an automation wakes. Opening a
 // runner opens its thread as a BB thread.
-import { errorMessage } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "@bb-studio/kit/ui";
+import { errorMessage } from "../../kit/format";
+import { DANGER_BUTTON, GHOST_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "../../kit/ui/index";
 import { useState } from "react";
 import type { RunnerAdoptableView, RunnerView } from "../../contract";
 import { describeCron } from "../../schedule";

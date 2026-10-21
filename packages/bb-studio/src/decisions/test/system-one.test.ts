@@ -1,8 +1,8 @@
 import { test, vi, afterEach } from "vitest";
 afterEach(() => vi.restoreAllMocks());
 import assert from "node:assert/strict";
-import { publicContract } from "@bb-studio/kit/decisions-legacy-contract";
-import type { Questions } from "@bb-studio/kit/decisions-contract";
+import { publicContract } from "../../kit/decisions-legacy-contract";
+import type { Questions } from "../../kit/decisions-contract";
 import { askSystemOne, JevUnavailableError, UnavailableError } from "../server/system-one";
 
 const signal = () => AbortSignal.timeout(1000);

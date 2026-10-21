@@ -9,8 +9,8 @@
 // largest single version (MAX_ARTIFACT_BYTES).
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mapProject, restoreDecision } from "@bb-studio/kit/backup";
-import { fileSafeId, type BackupHandlers, type BackupReader } from "@bb-studio/kit/server";
+import { mapProject, restoreDecision } from "../../kit/backup";
+import { fileSafeId, type BackupHandlers, type BackupReader } from "../../kit/server/index";
 import type Database from "better-sqlite3";
 import type { z as Zod } from "zod";
 import { MAX_ARTIFACT_BYTES } from "../shared";

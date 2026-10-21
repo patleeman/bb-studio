@@ -2,13 +2,13 @@
 // thread, and a heartbeat that wakes it on a schedule (src/project-lead.ts).
 // The personal project's lead is the user's Bot, which has its own home
 // (src/ui/bot/BotHome.tsx); Setup links there instead of listing it.
-import { errorMessage } from "@bb-studio/kit/format";
-import { useProjects } from "@bb-studio/kit/app";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@bb-studio/kit/ui";
+import { errorMessage } from "../kit/format";
+import { useProjects } from "../kit/app/index";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "../kit/ui/index";
 import { useEffect, useState } from "react";
 import type { HeartbeatRun, ProjectLeadView, ThreadOptionView } from "../contract";
 import { useCall, useLive, type Cadence } from "./live";
-import { openAppPath } from "@bb-studio/kit/app";
+import { openAppPath } from "../kit/app/index";
 import type { BotView } from "../contract";
 
 const PERSONAL_PROJECT_ID = "proj_personal";

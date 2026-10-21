@@ -1,4 +1,4 @@
-import { SECTION_TITLE } from "@bb-studio/kit/app";
+import { SECTION_TITLE } from "../../kit/app/index";
 import { useEffect, useMemo, useState } from "react";
 import { TitleRecovery } from "./page-title";
 

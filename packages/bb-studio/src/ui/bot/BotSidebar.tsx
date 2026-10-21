@@ -12,8 +12,8 @@
 // A thread dragged onto a Bot's row (from Threads, or another Bot's list)
 // moves under that Bot (bot_thread_adopt); one from a Bot's list dropped on
 // Threads comes back to the user (ThreadsSection.tsx).
-import { Icon } from "@bb-studio/kit/ui";
-import { openAppPath, usePathname } from "@bb-studio/kit/app";
+import { Icon } from "../../kit/ui/index";
+import { openAppPath, usePathname } from "../../kit/app/index";
 import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";

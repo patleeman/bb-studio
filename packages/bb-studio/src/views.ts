@@ -1,5 +1,5 @@
 // Saved views: named collection queries (src/query.ts).
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "./kit/ids";
 import type Database from "better-sqlite3";
 
 export const MAX_VIEW_NAME = 60;

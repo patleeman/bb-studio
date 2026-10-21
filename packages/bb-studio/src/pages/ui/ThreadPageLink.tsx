@@ -1,9 +1,9 @@
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../../kit/format";
 import { useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
-import { openAppPath } from "@bb-studio/kit/app";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
+import { openAppPath } from "../../kit/app/index";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract } from "../contract";
 

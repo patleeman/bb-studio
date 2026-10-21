@@ -21,11 +21,11 @@ vi.mock("./connection", () => ({ PageConnection: class {
   retryRecovery = state.read;
 } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn(async () => ({ page: null })) }) }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   PAGE_TITLE: "",
   SECTION_TITLE: "",
 }));
-vi.mock("@bb-studio/kit/ui", () => ({ Icon: () => null }));
+vi.mock("../../kit/ui/index", () => ({ Icon: () => null }));
 vi.mock("./shared", () => ({ relativeTime: () => "now" }));
 vi.mock("./PanelShell", () => ({
   usePanelPage: () => ({ page: null, refetch: state.refetch }),

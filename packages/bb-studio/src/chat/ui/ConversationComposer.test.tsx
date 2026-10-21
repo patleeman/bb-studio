@@ -27,7 +27,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 vi.mock("./ThreadPicker", () => ({
   ThreadPicker: (props: any) => { state.picker = props; return <div>Threads</div>; },
 }));
-vi.mock("@bb-studio/kit/app", async importOriginal => ({ ...(await importOriginal<typeof import("@bb-studio/kit/app")>()), Icon: () => null }));
+vi.mock("../../kit/app/index", async importOriginal => ({ ...(await importOriginal<typeof import("../../kit/app/index")>()), Icon: () => null }));
 
 const item = { pluginId: "artifacts", id: "first", kind: "artifact", kindLabel: "Artifact", title: "Release diagram", kindIcon: "File", icon: null, projectId: "proj_release", href: "/plugins/artifacts/artifacts/first" };
 const ref = { pluginId: item.pluginId, id: item.id };

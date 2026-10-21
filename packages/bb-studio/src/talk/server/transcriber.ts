@@ -1,4 +1,4 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 // The transcription queue. Segments are transcribed in recorded order within a
 // recording (each uses the previous segment's text as its hint) and in
 // parallel across recordings. Failures back off and retry; nothing is dropped.

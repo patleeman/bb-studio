@@ -5,9 +5,9 @@
 // the item off after reviewing.
 import type Database from "better-sqlite3";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
-import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
-import { primaryHostId, studioServices } from "@bb-studio/kit/server";
+import { errorMessage, untitled } from "../kit/format";
+import { pageCheckboxes } from "../kit/page-checkbox";
+import { primaryHostId, studioServices } from "../kit/server/index";
 import { PLUGIN_ID } from "./constants";
 import { readMarkdown, tagChecklistThread } from "./doc";
 import type { PagesService } from "./service";

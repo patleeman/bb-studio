@@ -1,4 +1,4 @@
-import { untitled } from "@bb-studio/kit/format";
+import { untitled } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { createThread, listThreads, reply, setResolved, type ThreadView } from "./comments";

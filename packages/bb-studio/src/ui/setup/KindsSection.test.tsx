@@ -6,7 +6,7 @@ import type { KindsState } from "../../kinds-contract";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => rpc, useRealtime: () => {} }));
-vi.mock("@bb-studio/kit/ui", () => ({
+vi.mock("../../kit/ui/index", () => ({
   Button: ({ variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => React.createElement("button", props),
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
   Select: ({ children }: { children: React.ReactNode }) => React.createElement("div", { "data-select": true }, children),

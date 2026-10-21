@@ -1,5 +1,5 @@
 // The Backup and restore section of the Setup page. See use-backup.ts.
-import { Button, cn } from "@bb-studio/kit/ui";
+import { Button, cn } from "../../kit/ui/index";
 import { useRef } from "react";
 import type { RestoreResult } from "../../backup-contract";
 import { useBackup, type BackupApi } from "./use-backup";

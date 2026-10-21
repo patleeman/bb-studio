@@ -30,7 +30,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRealtime: () => {},
   useSdk: () => host.sdk,
 }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   ICON_BUTTON: "",
   PRIMARY_BUTTON: "",
   THUMBNAIL: "",

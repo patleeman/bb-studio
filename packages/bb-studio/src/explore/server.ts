@@ -9,8 +9,8 @@
 // click log (`next_suggestions`) moved from Pages' explore.db into Studio's
 // database, and `bb pages explore stats` is `bb studio pages explore stats`.
 // The work is in register.ts; this wires it into Studio.
-import { errorMessage } from "@bb-studio/kit/format";
-import { usage } from "@bb-studio/kit/cli";
+import { errorMessage } from "../kit/format";
+import { usage } from "../kit/cli";
 import type { BbPluginApi, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { rpcContract } from "./contract";

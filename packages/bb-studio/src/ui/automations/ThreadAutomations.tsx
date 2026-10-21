@@ -8,8 +8,8 @@ import {
   type PluginThreadHeaderActionProps,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { openAppPath } from "@bb-studio/kit/app";
-import { cn, Icon } from "@bb-studio/kit/ui";
+import { openAppPath } from "../../kit/app/index";
+import { cn, Icon } from "../../kit/ui/index";
 import { useLive } from "../live";
 import {
   AUTOMATIONS_PLUGIN_ID,

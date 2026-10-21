@@ -3,7 +3,7 @@
 // widgets only while someone looks.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { DASHBOARD_UPDATE_TYPE, DATA_UPDATE_TYPE, REALTIME_CHANNEL, type DashboardView, type Layouts, type Op } from "../shared";

@@ -1,6 +1,6 @@
 // Tags group Studio items across add-ons. Studio keeps them, keyed by
 // `<plugin>:<id>`, so every add-on's items can be tagged without the add-on
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "./kit/ids";
 import type Database from "better-sqlite3";
 
 /** Tag colours, picked in turn; each reads on light and dark backgrounds. */

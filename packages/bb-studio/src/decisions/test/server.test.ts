@@ -2,7 +2,7 @@ import { test, vi } from "vitest";
 import assert from "node:assert/strict";
 import { registerDecisions } from "../server";
 const plugin = (bb: any) => registerDecisions(bb, { get: async () => Object.fromEntries(Object.entries(await bb.settings.define().get()).map(([key, value]) => [`decisions_${key}`, value])), experimental_set: async () => {} });
-import { rpcContract } from "@bb-studio/kit/decisions-legacy-contract";
+import { rpcContract } from "../../kit/decisions-legacy-contract";
 
 function setup() {
   const handlers: Record<string, (input: any) => Promise<any>> = {};

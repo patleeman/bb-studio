@@ -5,7 +5,7 @@
 // Starting a side thread is BB's own "Reply in side chat". A row's click asks
 // Studio's app overlay to open the side thread beside the chat
 // (OPEN_SIDE_THREAD_EVENT; content scripts can't navigate).
-import { relativeTime } from "@bb-studio/kit/format";
+import { relativeTime } from "../../kit/format";
 import type { SideThreadView } from "../../contract";
 
 /** A row's click: `detail.threadId` is the side thread to open (SideThreadOpener). */

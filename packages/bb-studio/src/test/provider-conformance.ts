@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { studioIndex } from "@bb-studio/kit/server";
+import { studioIndex } from "../kit/server/index";
 import { afterEach, describe, expect, it } from "vitest";
 import { schemas } from "../contract";
 import { StudioHub, type HubSdk } from "../hub";

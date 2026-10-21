@@ -4,9 +4,9 @@
 // another provider happens here: thread_handoff_to_model hands the thread off
 // to a new one there ("Handing off to Codex…"), along the bot's chain. Nothing
 // is stored on the bot.
-import { GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@bb-studio/kit/ui";
+import { GHOST_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../kit/ui/index";
 import { experimental_ProviderModelPicker as ProviderModelPicker, experimental_useProviders as useProviders } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { useCall } from "../live";

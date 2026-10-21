@@ -7,8 +7,8 @@ import type { CodeContract } from "./contract";
 // Settings → Files can pin BB's preview instead.
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRpc, type PluginFileOpenerProps, type PluginFileOpenerSource } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
+import { BAR_BUTTON, Icon } from "../kit/app/index";
+import { errorMessage } from "../kit/format";
 import { CODE_TAB } from "./shared";
 
 /** Text and code files worth editing in VS Code. Markdown stays in BB's preview, which renders it. */

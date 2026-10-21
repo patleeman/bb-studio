@@ -2,7 +2,7 @@
 // frame, which opens the print dialog once its screens have loaded. Save as
 // PDF there makes the file: one page per slide or step, at the frame's size.
 import { useEffect, useState } from "react";
-import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { ICON_BUTTON, Icon, cn } from "../../kit/app/index";
 import { printUrl, type ScreenView } from "../shared";
 
 /** Gives up on a print page that never reports back. */

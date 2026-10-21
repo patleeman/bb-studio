@@ -2,8 +2,8 @@
 // shapes it doesn't know show a short note instead of failing the dashboard.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Icon, cn } from "@bb-studio/kit/ui";
-import { openAppPath, studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
+import { Icon, cn } from "../../kit/ui/index";
+import { openAppPath, studioItemProps, studioThreadProps } from "../../kit/app/index";
 import { ThreadTitle, useRpc } from "@get-bb/plugin-sdk/app";
 import { resolveChart, SERIES_COLORS } from "../../pages/chart-spec";
 import type { rpcContract as studioContract } from "../../contract";

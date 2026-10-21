@@ -1,7 +1,7 @@
 // "Expand to page" in a thread's composer, and the "Notes in progress" chip
 // above it. Registered by app.tsx with app.composer.customize.
-import { errorMessage } from "@bb-studio/kit/format";
-import { Icon, Tooltip } from "@bb-studio/kit/ui";
+import { errorMessage } from "../../../kit/format";
+import { Icon, Tooltip } from "../../../kit/ui/index";
 import { useComposer, useRpc, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { toast } from "sonner";

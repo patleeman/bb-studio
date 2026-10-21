@@ -90,4 +90,4 @@ export class TabStore {
 }
 
 /** Kept here for the tab code; the kit owns it so Studio Chat matches paths the same way. */
-export { itemAtPath } from "@bb-studio/kit/contract";
+export { itemAtPath } from "./kit/contract";

@@ -1,4 +1,4 @@
-import { healthSchemas, HEALTH_METHOD, type HealthCheck } from "@bb-studio/kit/health";
+import { healthSchemas, HEALTH_METHOD, type HealthCheck } from "./kit/health";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { checkHealth, HealthMonitor, statusProblem, type HealthPluginEntry, type HealthSdk } from "./health";

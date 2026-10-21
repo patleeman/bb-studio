@@ -1,6 +1,6 @@
 // A design in the thread's Studio tab: just its canvas, beside the
 // conversation. Loaded on demand by the tab.
-import { BarTitle, ICON_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BarTitle, ICON_BUTTON, Icon } from "../../kit/app/index";
 import { DesignBoard } from "./design-view";
 import { useDesign } from "./use-design";
 

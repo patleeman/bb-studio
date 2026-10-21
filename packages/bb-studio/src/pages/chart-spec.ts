@@ -1,4 +1,4 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../kit/format";
 import { z } from "zod";
 
 // Agents write charts and stat rows as fenced JSON in markdown

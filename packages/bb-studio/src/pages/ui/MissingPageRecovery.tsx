@@ -1,4 +1,4 @@
-import { PAGE_TITLE } from "@bb-studio/kit/app";
+import { PAGE_TITLE } from "../../kit/app/index";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { PageConnection } from "./connection";
 import { MissingTitleRecovery } from "./MissingTitleRecovery";

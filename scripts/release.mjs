@@ -36,7 +36,7 @@ const isAncestor = (ancestor, commit) => spawnSync("git", ["merge-base", "--is-a
 git("fetch", "--quiet", "origin");
 const sha = git("rev-parse", "--verify", `${option("--ref") ?? "origin/main"}^{commit}`);
 const short = sha.slice(0, 8);
-if (!isAncestor(sha, "origin/main")) throw new Error(`${short} isn't on origin/main. Push it to main first.`);
+if (!flag("--dry-run") && !isAncestor(sha, "origin/main")) throw new Error(`${short} isn't on origin/main. Push it to main first.`);
 const stable = spawnSync("git", ["rev-parse", "--verify", "--quiet", "origin/stable"], { cwd: repo, encoding: "utf8" }).stdout.trim() || null;
 if (stable === sha) { console.log(`stable is already at ${short}.`); process.exit(0); }
 if (stable && !isAncestor(stable, sha)) throw new Error(`${short} isn't a fast-forward of stable (${stable.slice(0, 8)}). Release a later commit on main.`);

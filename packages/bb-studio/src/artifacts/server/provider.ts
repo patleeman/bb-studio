@@ -1,7 +1,7 @@
 // Artifacts as a Studio kind: the same `studio_*` provider methods an add-on
 // publishes over RPC, called in-process by Studio's hub (src/hub.ts).
-import { copyTitle, eachId, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
-import { mustGet as requireItem, storeSearch, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { copyTitle, eachId, type StudioItem, type StudioKind } from "../../kit/contract";
+import { mustGet as requireItem, storeSearch, type StudioProviderHandlers } from "../../kit/server/index";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
 

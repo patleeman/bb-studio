@@ -9,9 +9,9 @@
 //
 // A new kind, not a merged add-on: items are `dashboards:<id>` and open at
 // /plugins/studio/studio/dashboards/<id>.
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
-import { createChangeBus, defineItemMention, studioServices, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { studioSchemas } from "../kit/contract";
+import { errorMessage } from "../kit/format";
+import { createChangeBus, defineItemMention, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";

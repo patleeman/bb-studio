@@ -1,4 +1,4 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 
 type Draft = { id: string; title: string; base: string; at: number; supersedes?: string };
 type Page = { title: string; updatedAt: number };

@@ -18,9 +18,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
+import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "../../kit/app/index";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
 import { chartSpecSchema, parseJsonWith, resolveChart, SERIES_COLORS, statItemsSchema, type StatItem } from "../chart-spec";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
 import { calloutConfig, chartConfig, EMBED_KINDS, type EmbedKind, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";

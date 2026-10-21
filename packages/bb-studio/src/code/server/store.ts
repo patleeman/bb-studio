@@ -1,11 +1,11 @@
 // Workspaces: a title, the project it belongs to, and the
 // folders it opens.
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { ID_PREFIX, type Workspace } from "../shared";
 
 
-export { MIGRATIONS } from "@bb-studio/kit/code-migrations";
+export { MIGRATIONS } from "../../kit/code-migrations";
 
 type Row = { id: string; title: string; project_id: string | null; thread_id: string | null; trusted: number; share: number; folders: string; archived: number; created_at: number; updated_at: number };
 

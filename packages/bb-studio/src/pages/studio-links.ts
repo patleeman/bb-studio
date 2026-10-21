@@ -1,5 +1,5 @@
-import { studioTextReferences, type ReferenceOptions } from "@bb-studio/kit/contract";
-import type { StudioLink, StudioRef } from "@bb-studio/kit/server";
+import { studioTextReferences, type ReferenceOptions } from "../kit/contract";
+import type { StudioLink, StudioRef } from "../kit/server/index";
 
 /** Item mentions and local Studio links in a page's Markdown. */
 export function outgoingStudioLinks(pageId: string, markdown: string, options: ReferenceOptions = {}): StudioLink[] {

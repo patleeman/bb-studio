@@ -14,8 +14,8 @@ import {
   useDictionary,
   useExtensionState,
 } from "@blocknote/react";
-import { errorMessage } from "@bb-studio/kit/format";
-import { Icon } from "@bb-studio/kit/ui";
+import { errorMessage } from "../../kit/format";
+import { Icon } from "../../kit/ui/index";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import type { PageSchema } from "./blocks";

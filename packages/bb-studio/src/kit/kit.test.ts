@@ -7,7 +7,7 @@ import { plural, relativeTime, snippet, untitled } from "./format";
 import { groupItems, nextSort, parseSort, formatSort, sortItems, toggleSelection, type CollectionItem } from "./app/selection";
 
 // Every value import must be supplied by the kit package or the BB host.
-const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as {
+const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, "../../package.json"), "utf8")) as {
   dependencies: Record<string, string>;
 };
 const RUNTIME = new Set([

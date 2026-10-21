@@ -1,4 +1,4 @@
-import { studioSchemas } from "@bb-studio/kit/contract";
+import { studioSchemas } from "../../kit/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { element, memoryStore, scene } from "../test/db";

@@ -1,7 +1,7 @@
 // What the Studio sidebar lists, from Studio's overview and its tabs: the
 // kinds (with item counts), saved views, tags, pinned items and recent ones.
 // Pure, so the grouping is tested directly.
-import type { CollectionItem } from "@bb-studio/kit/app";
+import type { CollectionItem } from "../kit/app/index";
 import type { ProviderView, SavedViewView, TabView, TagView } from "../contract";
 import { formatQuery } from "../query";
 

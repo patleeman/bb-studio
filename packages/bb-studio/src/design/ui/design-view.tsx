@@ -5,7 +5,7 @@
 // the size it was designed for.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "@bb-studio/kit/app";
+import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "../../kit/app/index";
 import { frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../shared";
 import { useDesign } from "./use-design";
 import { Canvas, type CanvasApi } from "./canvas";

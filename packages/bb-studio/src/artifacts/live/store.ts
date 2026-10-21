@@ -1,7 +1,7 @@
 // Live HTML artifacts: each artifact's shared state, its event log, and the
 // takes its page sent to an agent. State belongs to the artifact, not a
 // version, so saving a new version keeps what the user entered.
-import { newId } from "@bb-studio/kit/ids";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 
 /**

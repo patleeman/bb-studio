@@ -16,7 +16,7 @@ const rpc = { call: async (method: string, input: unknown) => {
   if (method === "rename") return { done: ["one"], failed: [] };
   return { tab: null };
 } };
-import { RetainedPanels, openWorkspaceItem } from "@bb-studio/kit/app";
+import { RetainedPanels, openWorkspaceItem } from "../kit/app/index";
 import { closeWorkspaceTabs, StudioWorkspace, WorkspaceBridge } from "./Workspace";
 const page = "/plugins/notes/notes/one", other = "/plugins/notes/notes/two";
 let cleanup = () => {};

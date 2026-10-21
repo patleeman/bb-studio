@@ -16,7 +16,7 @@
 // transaction with them: each external result is saved before the next call,
 // and every step can be retried without making a second one.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { rpcErrorStatus } from "@bb-studio/kit/server";
+import { rpcErrorStatus } from "./kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { ChiefOfStaffView, HeartbeatRun, NewThreadRequestInput, ProjectLeadView } from "./contract";

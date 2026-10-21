@@ -9,9 +9,10 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { MIGRATIONS, WorkspaceStore } from "./store";
 import { copyCodeFiles, rebuildPaths } from "./import-files";
 import { registerCodeImport } from "./migration";
-import { workspaceRow, commentRow } from "@bb-studio/kit/code-import-contract";
+import { workspaceRow, commentRow } from "../../kit/code-import-contract";
 
 vi.mock("@bb-studio/kit/code-handover", () => ({ quiesceCode: vi.fn(async () => {}) }));
+vi.mock("../../kit/code-handover", () => ({ quiesceCode: vi.fn(async () => {}) }));
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await dispose(); });
@@ -140,7 +141,7 @@ test("does not rewrite similarly named roots or project paths", () => {
 
 test("copies the old theme once and preserves the user's Studio theme on retry", async () => {
   const { source, call, bb } = await setup();
-  const { BB_THEME_VARIABLES } = await import("@bb-studio/kit/code-theme");
+  const { BB_THEME_VARIABLES } = await import("../../kit/code-theme");
   const theme = { mode: "dark", colors: Object.fromEntries(BB_THEME_VARIABLES.map((name) => [name, "#123456"])) };
   await call("code.importFiles", { sourceRoot: source, theme });
   expect(await bb.storage.kv.get("code:theme")).toEqual(theme);

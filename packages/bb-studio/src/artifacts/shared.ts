@@ -15,7 +15,7 @@ export const SAVE_ICON = "studio/artifact-save";
 /** Realtime channel: the server says when an artifact changed. */
 export const REALTIME_CHANNEL = "artifacts";
 export const ARTIFACT_UPDATE_TYPE = "artifact:updated";
-export { MAX_ARTIFACT_BYTES } from "@bb-studio/kit/artifacts-contract";
+export { MAX_ARTIFACT_BYTES } from "../kit/artifacts-contract";
 
 export function artifactHref(id: string): string {
   return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;
@@ -163,7 +163,7 @@ export function isTextType(type: ArtifactType): boolean {
   return type === "html" || type === "markdown" || type === "code" || type === "text";
 }
 
-export { formatBytes } from "@bb-studio/kit/format";
+export { formatBytes } from "../kit/format";
 
 /** The file name at the end of a path. */
 export function baseName(path: string): string {

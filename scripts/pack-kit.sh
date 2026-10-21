@@ -8,6 +8,15 @@
 set -eu
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 tarball="$repo_dir/packages/bb-studio-kit.tgz"
+# Bridge copies must match Studio's internal canonical sources. Keep this check
+# before packing too, so refresh-locks cannot bless a divergent contract.
+for source in "$repo_dir"/packages/bb-studio-kit/src/*.ts; do
+  case "$source" in *.test.ts) continue ;; esac
+  cmp -s "$source" "$repo_dir/packages/bb-studio/src/kit/$(basename "$source")" || {
+    echo "Bridge source differs from Studio: $source" >&2
+    exit 1
+  }
+done
 scratch_dir="$(mktemp -d "${TMPDIR:-/tmp}/bb-studio.XXXXXX")"
 trap 'rm -rf "$scratch_dir" "$tarball.tmp.$$"' EXIT HUP INT TERM
 (cd "$repo_dir/packages/bb-studio-kit" && npm pack --silent --pack-destination "$scratch_dir" >/dev/null)

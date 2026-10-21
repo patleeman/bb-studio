@@ -1,7 +1,7 @@
 // Designs in the plugin's SQLite database. A design holds rounds; a round
 // holds a few options; each option is one self-contained HTML screen.
-import type { Actor } from "@bb-studio/kit/server";
-import { newId } from "@bb-studio/kit/ids";
+import type { Actor } from "../../kit/server/index";
+import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { parseScreenId, parseSteps, parseViewport, screenUrl, type DesignView, type RoundView, type ScreenView, type Viewport } from "../shared";
 

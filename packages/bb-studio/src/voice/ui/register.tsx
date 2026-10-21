@@ -10,9 +10,9 @@
 // the rules). While you talk, your words stream into the input phrase by
 // phrase and are sent when you finish; while the Bot speaks, the piece being
 // read lights up in the transcript. New voice chat starts a thread with it on.
-import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "@bb-studio/kit/ui";
+import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "../../kit/ui/index";
 import { SpeechSection } from "../../ui/setup/SpeechSection";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { useBbNavigate, useComposer, useRealtime, useRpc, useSdk, type PluginAppBuilder, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";

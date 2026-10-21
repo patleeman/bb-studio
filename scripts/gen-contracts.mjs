@@ -1,7 +1,7 @@
 import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { studioSchemas } from "../packages/bb-studio-kit/src/contract.ts";
+import { studioSchemas } from "../packages/bb-studio/src/kit/contract.ts";
 import { nativeRpcInventory } from "./native-rpc-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "..");

@@ -1,1 +1,1 @@
-export * from "@bb-studio/kit/code-contract";
+export * from "../kit/code-contract";

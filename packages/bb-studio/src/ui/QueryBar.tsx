@@ -1,5 +1,5 @@
 // Search with optional query completion and a separate row of active filters.
-import { cn, Icon, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@bb-studio/kit/app";
+import { cn, Icon, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../kit/app/index";
 import { useId, useMemo, useRef, useState } from "react";
 import {
   describeFilter,

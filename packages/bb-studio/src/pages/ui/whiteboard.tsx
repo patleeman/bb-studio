@@ -2,9 +2,9 @@
 // a pen and an eraser for quick sketches. Strokes are saved to the drawing as
 // Excalidraw elements, so "Open drawing" shows them in the full editor.
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { errorMessage } from "@bb-studio/kit/format";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
+import { errorMessage } from "../../kit/format";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
 import { WHITEBOARD_COLORS, type WhiteboardStroke, type WhiteboardView } from "../whiteboard";
 import { usePagesUi } from "./context";
 

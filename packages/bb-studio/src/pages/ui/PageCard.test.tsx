@@ -15,7 +15,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
 });
 // Like the kit's: the last value for a key while the new one is undefined.
 const shown = vi.hoisted(() => new Map<string, unknown>());
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   remember: (key: string, value: unknown) => (value === undefined ? shown.get(key) : (shown.set(key, value), value)),
   panelHref: (plugin: string, path: string, sub: string) => `/plugins/${plugin}/${path}/${sub}`,
   ItemDirectiveCard: ({ state, title, body }: { state: string; title?: string; body?: unknown }) =>

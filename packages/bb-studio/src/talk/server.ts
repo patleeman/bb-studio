@@ -13,10 +13,10 @@
 // their namespace; its agent tools, skill, mention provider, message
 // directive and commands keep their names (docs/merging-add-ons.md).
 import { join } from "node:path";
-import { studioSchemas } from "@bb-studio/kit/contract";
-import { subcommand, takeOption } from "@bb-studio/kit/cli";
-import { newId } from "@bb-studio/kit/ids";
-import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "@bb-studio/kit/server";
+import { studioSchemas } from "../kit/contract";
+import { subcommand, takeOption } from "../kit/cli";
+import { newId } from "../kit/ids";
+import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi, PluginSettingsHandle } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";

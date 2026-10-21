@@ -1,7 +1,7 @@
 // A drawing's card in the composer picker: the server's
 // thumbnail over its name, in Studio's card style.
-import { Icon, THUMBNAIL, cn } from "@bb-studio/kit/app";
-import { relativeTime } from "@bb-studio/kit/format";
+import { Icon, THUMBNAIL, cn } from "../../kit/app/index";
+import { relativeTime } from "../../kit/format";
 import { DRAW_ICON, thumbnailUrl } from "../shared";
 
 export type DrawingMeta = {

@@ -1,4 +1,4 @@
-import { openAppPath, studioPath } from "@bb-studio/kit/app";
+import { openAppPath, studioPath } from "../../kit/app/index";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";

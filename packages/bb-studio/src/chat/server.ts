@@ -1,6 +1,6 @@
-import { defineItemMention } from "@bb-studio/kit/server";
-import { studioServices } from "@bb-studio/kit/server";
-import { quoteMessage } from "@bb-studio/kit/format";
+import { defineItemMention } from "../kit/server/index";
+import { studioServices } from "../kit/server/index";
+import { quoteMessage } from "../kit/format";
 // Studio's item chat server.
 //
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
@@ -12,7 +12,7 @@ import { quoteMessage } from "@bb-studio/kit/format";
 //   `link:<plugin>:<id>`): the one started or picked for it, else the thread
 //   that made it, as Studio records. `send` posts a quote there.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { STUDIO_ITEM_AT_METHOD, STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
+import { STUDIO_ITEM_AT_METHOD, STUDIO_PLUGIN_ID } from "../kit/contract";
 import { MENTION_PROVIDER_ID, pagesSchemas, rpcContract, schemas, type ItemRef } from "./contract";
 import { itemKey, missingNote, parseItemKey, pointerNote, toViewed, withItemPill } from "./context";
 

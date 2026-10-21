@@ -1,6 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { fallbackSchema } from "@bb-studio/kit/decisions-legacy-contract";
+import { fallbackSchema } from "../kit/decisions-legacy-contract";
 import { decisionsDefaults, LEGACY_DECISIONS_SETTINGS } from "./settings";
 
 export const IMPORTED = "decisions:imported";

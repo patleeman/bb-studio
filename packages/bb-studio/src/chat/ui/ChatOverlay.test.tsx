@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ItemChatHost } from "@bb-studio/kit/app";
+import type { ItemChatHost } from "../../kit/app/index";
 import type { Viewed } from "../contract";
 import { ChatOverlay } from "./ChatOverlay";
 import { chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => state.rpc,
 }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../../kit/app/index", () => ({
   usePathname: () => state.path,
   workspaceActivePath: () => state.active,
   subscribeWorkspace: () => () => {},

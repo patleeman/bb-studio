@@ -1,6 +1,6 @@
 // One design as a Studio page: /plugins/studio/studio/designs/<id>, in a
 // workspace tab or the main view. Loaded on demand by app.tsx.
-import { openAppPath, WORKSPACE_PATH } from "@bb-studio/kit/app";
+import { openAppPath, WORKSPACE_PATH } from "../../kit/app/index";
 import { openCollection } from "../../ui/StudioPanel";
 import { DesignPage } from "./design-view";
 

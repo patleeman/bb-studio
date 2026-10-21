@@ -1,7 +1,7 @@
 // `::page{id="pg_…"}` in a reply: the page shown inline, read-only, under a
 // header that opens it in the thread's workbench, beside the chat.
-import { ItemDirectiveCard, remember, openAppPath } from "@bb-studio/kit/app";
-import { untitled } from "@bb-studio/kit/format";
+import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
+import { untitled } from "../../kit/format";
 import { Markdown, useBbNavigate, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract } from "../contract";

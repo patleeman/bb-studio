@@ -25,8 +25,8 @@ import {
   openAppPath,
   WORKSPACE_PATH,
   useOpenMain,
-} from "@bb-studio/kit/app";
-import { errorMessage, formatBytes, shortDateTime, untitled } from "@bb-studio/kit/format";
+} from "../../kit/app/index";
+import { errorMessage, formatBytes, shortDateTime, untitled } from "../../kit/format";
 import {
   useBbNavigate,
   useRealtime,
@@ -43,8 +43,8 @@ import {
   recordingBadge,
   recordingHref,
 } from "../shared/format";
-import { Icon } from "@bb-studio/kit/ui";
-import { cn } from "@bb-studio/kit/ui";
+import { Icon } from "../../kit/ui/index";
+import { cn } from "../../kit/ui/index";
 import { talk, useTalkState } from "./controller";
 import { sameKey, type SetAsideSegment } from "./outbox";
 import { RecordingPlayer, type PlaybackState } from "./playback";

@@ -4,7 +4,7 @@
 // arrow keys, Space and the bar's buttons move between its slides, and
 // Full screen presents it alone.
 import { useEffect, useRef, useState } from "react";
-import { ICON_BUTTON, Icon, cn } from "@bb-studio/kit/app";
+import { ICON_BUTTON, Icon, cn } from "../../kit/app/index";
 import { isTypingTarget, keyInScope } from "../../ui/typing-target";
 import { ExportPdfButton } from "./export-pdf";
 import { clampSlide, frameSize, isDeck, screenDownloadUrl, screenUrl, type ScreenView } from "../shared";

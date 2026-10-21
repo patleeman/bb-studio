@@ -1,6 +1,6 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 import { z } from "zod";
-import { answerSchema, type Questions, type Answers } from "@bb-studio/kit/decisions-contract";
+import { answerSchema, type Questions, type Answers } from "../../kit/decisions-contract";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
 import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command";
 

@@ -3,12 +3,12 @@
 // schedule and next run; opening it shows the instruction (or script), the
 // last outcome, recent runs, and Pause/Resume, Run now, Edit and Delete.
 // New picks the kind; the editor holds the shared schedule editor.
-import { errorMessage } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
+import { errorMessage } from "../../kit/format";
+import { DANGER_BUTTON, GHOST_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon, Input,
-} from "@bb-studio/kit/ui";
+} from "../../kit/ui/index";
 import { useState } from "react";
 import type { BotAutomationRunView, BotAutomationView } from "../../contract";
 import { WEEKDAYS, type Schedule } from "../../schedule";

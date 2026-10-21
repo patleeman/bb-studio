@@ -2,8 +2,8 @@
 // often it runs, its limits and who proposed it, with Deny focused. Opening
 // it fetches a one-time nonce (server/approvals.ts); Approve spends it.
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon } from "@bb-studio/kit/ui";
-import { errorMessage } from "@bb-studio/kit/format";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon } from "../../kit/ui/index";
+import { errorMessage } from "../../kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { ago, describeBytes, describeEvery, WIDGETS, type ApprovalPrompt, type WidgetView } from "../shared";

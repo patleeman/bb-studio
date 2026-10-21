@@ -2,9 +2,9 @@
 // their live embeds show and edit: an artifact's content, a
 // recording. A plugin's UI can only call its own RPCs, so Pages asks each
 // add-on on its behalf.
-import { untitled } from "@bb-studio/kit/format";
-import type { StudioSchemas } from "@bb-studio/kit/contract";
-import { callProvider, indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
+import { untitled } from "../kit/format";
+import type { StudioSchemas } from "../kit/contract";
+import { callProvider, indexItem, studioIndex, type StudioIndexItem } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { changesData, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";

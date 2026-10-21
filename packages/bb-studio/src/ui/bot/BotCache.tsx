@@ -1,9 +1,9 @@
 // A Bot chat's prompt cache on the desktop (src/bot-cache.ts): the header
 // dot with its state tooltip and menu, the composer's
 // cold-send banner, and the Prompt cache section of Bot info.
-import { GHOST_BUTTON } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
+import { GHOST_BUTTON } from "../../kit/app/index";
+import { errorMessage } from "../../kit/format";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { useComposer, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { BotCacheStateView } from "../../contract";

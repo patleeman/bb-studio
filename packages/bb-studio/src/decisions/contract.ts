@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { rpcContract as legacy } from "@bb-studio/kit/decisions-legacy-contract";
+import { rpcContract as legacy } from "../kit/decisions-legacy-contract";
 export const decisionMethods = {
   "decisions.systemOne.ask": legacy["systemOne.ask"],
   "decisions.model.ask": legacy["model.ask"],

@@ -1,5 +1,5 @@
-import { openAppPath } from "@bb-studio/kit/app";
-import { errorMessage as message } from "@bb-studio/kit/format";
+import { openAppPath } from "../../kit/app/index";
+import { errorMessage as message } from "../../kit/format";
 // The capture controller: one per browser window, living at module scope so it
 // outlives route changes. The app overlay attaches it to RPC and renders it;
 // the composer content script and commands drive it.
@@ -27,7 +27,7 @@ import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contra
 import { RECORDINGS_ROOT, UNSENT_PATH, isEmptyRecording, recordingHref, isLongDictation, joinTranscript, transcriptionError } from "../shared/format";
 import { insertDictationIntoComposer, type MicState } from "./composer-dom";
 import { COMPOSE_PENDING_PREFIX, composerPendingKey, composerSource, visibleComposers } from "./composer-source";
-import type { OpenTarget } from "@bb-studio/kit/app";
+import type { OpenTarget } from "../../kit/app/index";
 import { textWithRecordings, type RecordingReference } from "./recording-reference";
 import {
   Outbox,

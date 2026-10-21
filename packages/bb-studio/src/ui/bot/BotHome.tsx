@@ -8,10 +8,10 @@
 // and opens its chat, where it sets itself up. "New bot"
 // (/plugins/studio/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts).
-import { errorMessage, relativeTime } from "@bb-studio/kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "@bb-studio/kit/app";
+import { errorMessage, relativeTime } from "../../kit/format";
+import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "../../kit/app/index";
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "@bb-studio/kit/ui";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotAvatarHistoryView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";

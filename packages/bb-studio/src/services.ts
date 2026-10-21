@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { newId } from "@bb-studio/kit/ids";
-import type { Actor } from "@bb-studio/kit/server";
+import { newId } from "./kit/ids";
+import type { Actor } from "./kit/server/index";
 import type Database from "better-sqlite3";
 
 export interface Ref { pluginId: string; id: string }

@@ -1,7 +1,7 @@
 // Live RPC data for Studio's views, such as project leads. Loads are shared
 // per method and input, and refetch on Studio's change signal.
-import { errorMessage } from "@bb-studio/kit/format";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { errorMessage } from "../kit/format";
+import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 

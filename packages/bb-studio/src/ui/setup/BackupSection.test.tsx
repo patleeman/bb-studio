@@ -7,7 +7,7 @@ import type { BackupApi, BackupState } from "./use-backup";
 
 vi.mock("./use-backup", () => ({ useBackup: () => { throw new Error("not used"); } }));
 vi.mock("./SetupPage", () => ({ CommandLine: ({ command }: { command: string }) => React.createElement("code", null, command) }));
-vi.mock("@bb-studio/kit/ui", () => ({
+vi.mock("../../kit/ui/index", () => ({
   Button: ({ variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => React.createElement("button", props),
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
 }));

@@ -25,8 +25,8 @@ const sdk = { system: { uiPreferences: {
 } } };
 const passthrough = ({ children }: { children?: React.ReactNode }) => React.createElement("div", null, children);
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useSdk: () => sdk, useRpc: () => rpc, useRealtime: () => {}, useBbContext: () => ({ projectId: null }) }));
-vi.mock("@bb-studio/kit/contract", () => ({ STUDIO_REALTIME_CHANNEL: "x" }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("../kit/contract", () => ({ STUDIO_REALTIME_CHANNEL: "x" }));
+vi.mock("../kit/app/index", () => ({
   createStudioItem: vi.fn(), DropdownMenu: passthrough, DropdownMenuContent: passthrough, DropdownMenuItem: passthrough,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children, Icon: () => null, TagDot: () => null,
   openAppPath: state.openAppPath, usePathname: () => state.pathname, useProjects: () => [],

@@ -1,4 +1,4 @@
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage } from "../../kit/format";
 // Mermaid diagrams: the block shows the rendered diagram and edits its source
 // in BlockNote's source popup (click the diagram, or Enter on it).
 import { createReactBlockSpec, SourceBlockWithPreview } from "@blocknote/react";
