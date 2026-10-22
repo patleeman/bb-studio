@@ -148,7 +148,10 @@ export default async function plugin(bb: BbPluginApi) {
   // resume's, plus Decisions under namespaced keys.
   const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
   const code = registerCode(bb, db);
-  const decisions = await registerDecisions(bb, settings);
+  // BB allows one message.dispatch hook per plugin; Decisions owns it and asks
+  // the runner guard (assigned below, once runners exist) first.
+  let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
+  const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
   // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
   await migrateOpenaiKey({ get: () => settings.get(), set: (values) => settings.experimental_set(values as never) })
     .then((moved) => { if (moved) bb.log.info("Moved the Bot avatars OpenAI key to Studio's OpenAI API key setting."); })
@@ -1317,7 +1320,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   let machineCheckTimer: ReturnType<typeof setTimeout> | null = null;
   bb.onDispose(() => { if (machineCheckTimer) clearTimeout(machineCheckTimer); });
-  bb.experimental_hooks.on("message.dispatch", async context => {
+  runnerDispatch = async context => {
     if (runners.isMovingThread(context.thread.id)) return { action: "reject", message: "Runner is moving to another machine; this run was skipped." };
     const runner = runners.forThread(context.thread.id);
     if (runner && !await runners.available(runner.id, false)) {
@@ -1328,8 +1331,8 @@ export default async function plugin(bb: BbPluginApi) {
       }, 0);
       return { action: "reject", message: "Machine offline; this runner run was skipped." };
     }
-    return { action: "proceed" };
-  });
+    return null;
+  };
   const describeRunner = (runner: Awaited<ReturnType<typeof runners.list>>[number]) =>
     `- ${runner.name} (${runner.id}, ${runner.state}${runner.machineName ? `, ${runner.machineName}${runner.machineOffline ? " — machine offline" : ""}` : ""}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
   const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never, botId: string) => Promise<string>) =>

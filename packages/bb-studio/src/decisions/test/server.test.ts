@@ -64,6 +64,27 @@ test("dispatch hook passes a message through when Smart Queue is off", async () 
   expect(list).toHaveBeenCalledTimes(1); // Dispatch never asks the SDK for plugin state.
 });
 
+test("the before guard runs first in the single dispatch hook, and its result wins", async () => {
+  const { bb, hooks } = setup();
+  const guarded = new Set(["thr_runner"]);
+  await registerDecisions(bb as never, { get: async () => ({}) }, async (context) => guarded.has(context.thread.id) ? { action: "reject", message: "Machine offline" } : null);
+  assert.deepEqual(Object.keys(hooks), ["message.dispatch"]);
+  const input = (id: string) => ({ attempt: "start-turn", initiator: "user", senderThreadId: null, experimental_submission: null, queuedMessages: [], thread: { id, status: "idle", visibility: "visible", originPluginId: null } });
+  assert.deepEqual(await hooks["message.dispatch"]!(input("thr_runner")), { action: "reject", message: "Machine offline" });
+  assert.deepEqual(await hooks["message.dispatch"]!(input("thr_other")), { action: "proceed" });
+});
+
+test("Studio registers exactly one message.dispatch hook, which BB requires", async () => {
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = join(__dirname, "../../..");
+  const files = [join(root, "server.ts")];
+  const walk = (dir: string) => { for (const name of readdirSync(dir)) { const path = join(dir, name); if (statSync(path).isDirectory()) walk(path); else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !path.includes("/test/")) files.push(path); } };
+  walk(join(root, "src"));
+  const registrations = files.flatMap((file) => [...readFileSync(file, "utf8").matchAll(/experimental_hooks\.on\(\s*"message\.dispatch"/g)].map(() => file));
+  assert.equal(registrations.length, 1, registrations.join("\n"));
+});
+
 test("an explicit model overrides an off fallback and retains the chosen execution settings", async () => {
   const { bb, handlers } = setup();
   const spawn = vi.fn(async () => ({ id: "temporary" }));

@@ -42,7 +42,8 @@ const standaloneCheckMs = 30_000;
 /** A Jev failure this recent still counts against its health. */
 const jevFailureWindowMs = 30 * 60_000;
 
-export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>> }) {
+/** `before` runs first on every dispatch; a result from it wins (BB allows one hook per plugin). */
+export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>> }, before?: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null>) {
   const config = async (): Promise<ClassifierSettings & { enabled: boolean }> => ({ ...decisionsDefaults, ...Object.fromEntries(Object.entries(await settings.get()).filter(([key]) => key.startsWith("decisions_")).map(([key, value]) => [key.slice(10), value])) }) as ClassifierSettings & { enabled: boolean };
   const sessions = new Set<string>();
   const lifetime = new AbortController();
@@ -349,7 +350,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     warn: (message) => bb.log.warn(message),
   });
 
-  bb.experimental_hooks.on("message.dispatch", (context) => queue.dispatch(context));
+  bb.experimental_hooks.on("message.dispatch", async (context) => (await before?.(context)) ?? queue.dispatch(context));
   bb.events.on("message.queued", ({ entry }) => queue.queued(entry));
   bb.events.on("message.dispatched", ({ entry }) => queue.gone(entry));
   bb.events.on("message.cancelled", ({ entry }) => queue.gone(entry));
