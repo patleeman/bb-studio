@@ -65,19 +65,30 @@ function useSidebarData() {
   const rpc = useRpc<typeof rpcContract>();
   const [data, setData] = useState<{ overview: Overview; tabs: TabView[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => {
-    Promise.all([rpc.call("overview", null), rpc.call("tabs", null)]).then(
-      ([overview, { tabs }]) => { setData({ overview, tabs }); setError(null); },
-      () => setError("Couldn't load Studio."),
-    );
+  const generation = useRef(0);
+  const load = useCallback(async () => {
+    const current = ++generation.current;
+    try {
+      const [overview, { tabs }] = await Promise.all([rpc.call("overview", null), rpc.call("tabs", null)]);
+      if (current !== generation.current) return;
+      setData({ overview, tabs });
+      setError(null);
+    } catch {
+      if (current === generation.current) setError("Couldn't load Studio.");
+    }
   }, [rpc]);
-  useEffect(load, [load]);
+  useEffect(() => { void load(); }, [load]);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    const onVisibility = () => { if (document.visibilityState === "visible") void load(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [load]);
   const soon = () => { clearTimeout(timer.current); timer.current = setTimeout(load, 500); };
   useRealtime(STUDIO_REALTIME_CHANNEL, soon);
   useRealtime(TABS_CHANNEL, soon);
-  return { data, error, rpc };
+  return { data, error, rpc, load };
 }
 
 function Section({ id, label, closed, onToggle, children }: { id: string; label: string; closed: Set<string>; onToggle(id: string): void; children: ReactNode }) {
@@ -95,7 +106,7 @@ function Section({ id, label, closed, onToggle, children }: { id: string; label:
 }
 
 function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
-  const { data, error, rpc } = useSidebarData();
+  const { data, error, rpc, load } = useSidebarData();
   const context = useBbContext();
   const projects = useProjects();
   const workspace = useWorkspace();
@@ -144,7 +155,9 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {!model ? <p className="px-2 text-xs text-muted-foreground">{error ?? "Loading…"}</p> : (
+      {error ? <p role="alert" className="px-2 text-xs text-destructive">{error} <button type="button" onClick={() => void load()}>Retry</button></p> : null}
+      {!model && !error ? <p className="px-2 text-xs text-muted-foreground">Loading…</p> : null}
+      {model ? (
         <>
           <div className="flex flex-col gap-px" role="group" aria-label="Kinds">
             <button type="button" data-testid="studio-sidebar-kind" aria-current={filterSelected("") ? "page" : undefined} onClick={() => filter("")} className={`${ROW} ${filterSelected("") ? ACTIVE : ""}`}>
@@ -184,7 +197,7 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
           {model.pinned.length ? <Section id="pinned" label="Pinned" closed={closed} onToggle={toggle}>{model.pinned.map(itemRow)}</Section> : null}
           {model.recent.length ? <Section id="recent" label="Recent" closed={closed} onToggle={toggle}>{model.recent.map(itemRow)}</Section> : null}
         </>
-      )}
+      ) : null}
     </nav>
   );
 }
