@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
+
+import { localLinkErrors } from "./docs-links.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const packages = join(root, "packages");
@@ -26,12 +28,20 @@ for (const packageDir of await readdir(packages)) {
     const bytes = await readFile(screenshot);
     if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) errors.push(`${packageDir}: screenshot is not a PNG`);
   } catch { errors.push(`${packageDir}: missing screenshot`); }
-  // Relative links and images must point at files that exist.
-  for (const [, target] of text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
-    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) continue;
-    const path = decodeURIComponent(target.split("#")[0]);
-    if (path && !(await exists(resolve(dirname(readme), path)))) errors.push(`${packageDir}: README links to missing ${target}`);
+  errors.push(...await localLinkErrors(readme, text));
+}
+// Package READMEs require staged screenshots. Repository guides only require
+// valid local links; archived reviews and drafts are not maintained guides.
+async function checkGuides(dir) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const file = join(dir, entry.name);
+    if (entry.isDirectory() && !["reviews", "drafts"].includes(entry.name)) await checkGuides(file);
+    else if (entry.isFile() && entry.name.endsWith(".md")) errors.push(...await localLinkErrors(file, await readFile(file, "utf8")));
   }
 }
+const rootReadme = join(root, "README.md");
+errors.push(...await localLinkErrors(rootReadme, await readFile(rootReadme, "utf8")));
+await checkGuides(join(root, "docs"));
+
 if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; }
-else console.log("Plugin README screenshots: OK");
+else console.log("Package README screenshots and local links in package READMEs, root README and maintained docs (excluding reviews/drafts): OK");
