@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { abortableWait } from "../talk/server/abortable-wait";
 import { speechChunks } from "../speech/chunks";
 import { SPEECH_HTTP_ROOT } from "../speech/contract";
 import type { SpeechService } from "../speech/service";
@@ -32,6 +33,14 @@ export async function registerVoice(bb: BbPluginApi, deps: {
 }): Promise<BuiltinVoice> {
   const sessions = new VoiceSessions({ sdk: bb.sdk, kv: bb.storage.kv as never, botThread: deps.botThread, warn: (message) => bb.log.warn(message) });
   await sessions.load();
+  bb.background.service("voice-results", {
+    async start(signal) {
+      while (!signal.aborted) {
+        await sessions.retryResults();
+        await abortableWait(30_000, signal);
+      }
+    },
+  });
 
   const state = (threadId: string): VoiceState => ({
     on: sessions.isOn(threadId),

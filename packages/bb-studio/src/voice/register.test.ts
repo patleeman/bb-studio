@@ -11,6 +11,7 @@ function fakeBb(session: { threadId: string } | null) {
     sdk: { threads: { events: { list: async () => [] }, getPluginMetadata: async () => ({}) } },
     storage: { kv: { get: async (key: string) => kv.get(key), set: async (key: string, value: unknown) => { kv.set(key, value); } } },
     rpc: { register: () => {} },
+    background: { service: () => {} },
     events: { on: (name: string, handler: (payload: never) => void) => { handlers[name] = handler; } },
     realtime: { publish: (channel: string, data: unknown) => published.push({ channel, data }) },
     agents: { registerTool: (tool: { name: string; execute(input: unknown, ctx: { threadId: string }): Promise<unknown> }) => { tools[tool.name] = tool; } },

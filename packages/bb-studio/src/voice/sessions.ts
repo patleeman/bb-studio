@@ -242,6 +242,15 @@ export class VoiceSessions {
     return true;
   }
 
+  /** Retry saved results after reconnecting or restarting Studio. */
+  async retryResults(): Promise<void> {
+    const targets = new Set(Object.values(this.state.delegations).flat().filter((entry) => entry.result !== undefined).map((entry) => entry.targetThreadId));
+    for (const target of targets) {
+      try { await this.idle(target, null); }
+      catch (error) { this.deps.warn(`Voice result for ${target} is still pending: ${String(error)}`); }
+    }
+  }
+
   /** Threads waiting on a reply for this voice thread. */
   pending(voiceThreadId: string): string[] {
     return [...new Set((this.state.delegations[voiceThreadId] ?? []).map((delegation) => delegation.targetThreadId))];

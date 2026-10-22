@@ -83,6 +83,22 @@ describe("VoiceSessions", () => {
     await expect(setup({ bot: null }).sessions.delegate("thr_voice", "bot", "Hi")).rejects.toThrow(/no Bot/);
   });
 
+  it("retries a saved result after reload even when the target's latest turn changes", async () => {
+    const { sessions, sdk, kv, events } = setup();
+    await sessions.delegate("thr_voice", "thr_work", "Run tests");
+    events.thr_work = [{ seq: 1, type: "client/turn/requested", data: { senderThreadId: "thr_voice" } }];
+    const send = vi.spyOn(sdk.threads, "send").mockRejectedValueOnce(new Error("offline"));
+    await expect(sessions.idle("thr_work", "Original result")).rejects.toThrow("offline");
+    const stored = kv.get(VOICE_KV_KEY);
+    const recovered = setup();
+    recovered.kv.set(VOICE_KV_KEY, stored);
+    await recovered.sessions.load();
+    await recovered.sessions.retryResults();
+    expect(recovered.sent[0]!.input[0]!.text).toContain("Original result");
+    expect(recovered.sessions.pending("thr_voice")).toEqual([]);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a failed result pending and coalesces concurrent delivery retries", async () => {
     const { sessions, sdk, events } = setup();
     await sessions.delegate("thr_voice", "thr_work", "Run tests");
