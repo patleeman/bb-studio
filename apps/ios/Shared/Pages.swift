@@ -119,16 +119,7 @@ extension BBClient {
             var threadId: String
             var botName: String?
         }
-        let request: JSONValue = [
-            "projectId": .string(projectId),
-            "providerId": .string(choice.providerId ?? "claude-code"),
-            "model": .string(choice.model ?? ""),
-            "reasoningLevel": .string(choice.reasoningLevel ?? "medium"),
-            "permissionMode": .string(choice.permissionMode ?? "auto"),
-            "executionInputSources": [:],
-            "environment": ["type": "project-default"],
-            "input": [["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]],
-        ]
+        let request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: mentions, choice: choice)
         let result: Result = try await self.rpc("studio", Studio.Method.pages_work, ["id": .string(id), "request": request])
         return (result.threadId, result.botName)
     }

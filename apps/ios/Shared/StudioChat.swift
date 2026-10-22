@@ -7,9 +7,17 @@ extension BBClient {
     /// Starts a thread about the item with the project's default agent.
     public func startStudioChat(pluginId: String, itemId: String, projectId: String, text: String) async throws -> String {
         struct Result: Decodable { var threadId: String }
-        let choice = ((try? await projectDefaults(projectId)) ?? nil) ?? ExecutionChoice()
+        let choice = try await projectDefaults(projectId) ?? ExecutionChoice()
+        let request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
+        let input: JSONValue = ["item": ["pluginId": .string(pluginId), "id": .string(itemId)], "request": request]
+        let result: Result = try await rpc("studio", Studio.Method.chat_start, input)
+        return result.threadId
+    }
+
+    /// The execution options shared by item chats and page work.
+    static func studioExecutionRequest(projectId: String, text: String, mentions: [Mention], choice: ExecutionChoice) -> JSONValue {
         let permission = choice.permissionMode.flatMap { PermissionMode.all.contains($0) ? $0 : nil } ?? "auto"
-        let request: JSONValue = [
+        return [
             "projectId": .string(projectId),
             "providerId": .string(choice.providerId ?? "claude-code"),
             "model": .string(choice.model ?? ""),
@@ -17,11 +25,8 @@ extension BBClient {
             "permissionMode": .string(permission),
             "executionInputSources": [:],
             "environment": ["type": "project-default"],
-            "input": [["type": "text", "text": .string(text), "mentions": []]],
+            "input": [["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]],
         ]
-        let input: JSONValue = ["item": ["pluginId": .string(pluginId), "id": .string(itemId)], "request": request]
-        let result: Result = try await rpc("studio", Studio.Method.chat_start, input)
-        return result.threadId
     }
 
     /// The item's current home thread, if one is still linked.

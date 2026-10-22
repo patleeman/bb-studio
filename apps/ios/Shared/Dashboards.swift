@@ -882,12 +882,12 @@ extension BBClient {
     /// An RPC result with object keys in the server's order. The Decodable `rpc`
     /// goes through dictionaries, which lose it.
     public func rpc<Result: OrderedRPCResult>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> Result {
-        let body = try JSONEncoder().encode(input)
-        let (status, data) = try await raw(method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: body)
-        guard (200..<300).contains(status), let envelope = try? OrderedJSON.parse(data), envelope["ok"]?.bool == true else {
-            throw BBError(status: status, message: Self.errorMessage(data) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        let data = try await rpcData(pluginId, method, input)
+        let envelope = try OrderedJSON.parse(data)
+        guard let result = envelope["result"] else {
+            throw BBError(status: 200, message: "Missing result for \(pluginId).\(method)")
         }
-        return try Result(orderedJSON: envelope["result"] ?? .null)
+        return try Result(orderedJSON: result)
     }
 
     /// One dashboard with its widgets' last data; nil when it's gone.

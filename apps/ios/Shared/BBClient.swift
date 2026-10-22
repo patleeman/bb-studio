@@ -136,37 +136,42 @@ public final class BBClient: @unchecked Sendable {
         try await request("PUT", path, body: body)
     }
 
+    private struct RPCStatus: Decodable { var ok: Bool }
+
     private struct RPCEnvelope<T: Decodable>: Decodable {
-        var ok: Bool
-        var result: T?
-        var error: JSONValue?
+        var result: T
+        private enum CodingKeys: String, CodingKey { case result }
+        init(from decoder: Decoder) throws {
+            // Even optional results require a result key. Only explicit null means no data.
+            result = try decoder.container(keyedBy: CodingKeys.self).decode(T.self, forKey: .result)
+        }
+    }
+
+    /// Shared status boundary for Codable and ordered RPC results.
+    func rpcData(_ pluginId: String, _ method: String, _ input: JSONValue) async throws -> Data {
+        let data = try encoder.encode(input)
+        let (status, responseData) = try await raw(
+            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
+        guard (200..<300).contains(status) else {
+            throw BBError(status: status, message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        let envelope = try decoder.decode(RPCStatus.self, from: responseData)
+        guard envelope.ok else {
+            throw BBError(status: status, message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        return responseData
     }
 
     /// Calls a plugin's `bb.rpc` method: `POST /api/v1/plugins/<id>/rpc/<method>` with the raw input as the body.
     public func rpc<T: Decodable>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> T {
-        let data = try encoder.encode(input)
-        let (status, responseData) = try await raw(
-            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
-        let envelope = try? decoder.decode(RPCEnvelope<T>.self, from: responseData)
-        guard let envelope, envelope.ok, let result = envelope.result else {
-            throw BBError(
-                status: status,
-                message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
-        }
-        return result
+        let data = try await rpcData(pluginId, method, input)
+        return try decoder.decode(RPCEnvelope<T>.self, from: data).result
     }
 
     /// For methods whose result can be `null`.
     public func rpcIfPresent<T: Decodable>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> T? {
-        let data = try encoder.encode(input)
-        let (status, responseData) = try await raw(
-            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
-        guard let envelope = try? decoder.decode(RPCEnvelope<T>.self, from: responseData), envelope.ok else {
-            throw BBError(
-                status: status,
-                message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
-        }
-        return envelope.result
+        let data = try await rpcData(pluginId, method, input)
+        return try decoder.decode(RPCEnvelope<T?>.self, from: data).result
     }
 
     static func errorMessage(_ data: Data) -> String? {
