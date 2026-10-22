@@ -20,6 +20,7 @@ struct DictationView: View {
     var gate: DictationGate?
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
 
+    @StateObject private var submission = DictationSubmission()
     @State private var text = ""
     @State private var creatingThread = false
     @State private var savingPage = false
@@ -143,11 +144,14 @@ struct DictationView: View {
             } else if let threadId {
                 Button {
                     Task {
-                        _ = try? await client.send(threadId, text: trimmed)
-                        operation.complete(on: app) { dismiss() }
+                        if await submission.send(trimmed, to: threadId, client: client) {
+                            operation.complete(on: app) { dismiss() }
+                        }
                     }
-                } label: { wide("Send to thread", "paperplane.fill") }
+                } label: { wide(submission.sending ? "Sending…" : "Send to thread", "paperplane.fill") }
                 .buttonStyle(.borderedProminent)
+                .disabled(submission.sending)
+                if let error = submission.error { Text(error).font(.footnote).foregroundStyle(.red) }
             } else if runningPlugins.split(separator: ",").contains("studio") {
                 Button { Task { await saveAsPage(trimmed) } } label: {
                     if savingPage { ProgressView().frame(maxWidth: .infinity) } else { wide("Save as Page", "doc.richtext") }
@@ -223,5 +227,25 @@ enum PageTitle {
             sentence += "…"
         }
         return sentence
+    }
+}
+
+@MainActor
+final class DictationSubmission: ObservableObject {
+    @Published private(set) var sending = false
+    @Published private(set) var error: String?
+
+    func send(_ text: String, to threadId: String, client: BBClient) async -> Bool {
+        guard !sending else { return false }
+        sending = true
+        error = nil
+        defer { sending = false }
+        do {
+            try await client.send(threadId, text: text)
+            return true
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return false
+        }
     }
 }
