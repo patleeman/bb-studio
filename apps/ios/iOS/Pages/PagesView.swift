@@ -69,19 +69,27 @@ final class PagesStore: ObservableObject {
         }
     }
 
+    private var loadGeneration = 0
+
     func load(_ client: BBClient) async {
         guard client.baseURL == serverURL else { return }
+        loadGeneration += 1
+        let generation = loadGeneration
         do {
             async let projects = try? client.projects()
             let pages = try await client.pages()
-            for project in await projects ?? [] { projectNames[project.id] = project.name }
+            let names = await projects ?? []
+            guard generation == loadGeneration else { return }
+            for project in names { projectNames[project.id] = project.name }
             self.pages = pages
             error = nil
             DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
+            guard generation == loadGeneration else { return }
             self.error = BBClient.describe(error, plugin: Self.plugin, server: client.baseURL)
         }
+        guard generation == loadGeneration else { return }
         loaded = true
     }
 
