@@ -22,8 +22,8 @@ import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
 import { NoteActions } from "./notes/NoteActions";
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
+import { PageIconPicker } from "./PageIconPicker";
 
-const PAGE_ICONS = ["📄", "📝", "📋", "✅", "📊", "📈", "🗺️", "🧭", "💡", "🚀", "🧪", "🛠️", "📚", "🗓️", "🎯", "🔥", "⭐", "🧠", "🤖", "📣"];
 type Chat = { threadId: string; createdAt: number };
 
 export function useConnection(pageId: string) {
@@ -108,28 +108,6 @@ function Smiley({ className }: { className?: string }) {
       <path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8" />
       <path d="M9 9.5h.01M15 9.5h.01" />
     </svg>
-  );
-}
-
-function IconPicker({ page, rpc, children }: { page: PageMetaView; rpc: Rpc; children: React.ReactNode }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64 p-2">
-        <div className="grid grid-cols-8 gap-1">
-          {PAGE_ICONS.map((icon) => (
-            <button key={icon} type="button" className="rounded p-1 text-lg hover:bg-state-hover" onClick={() => void rpc.call("pages.update", { id: page.id, icon })}>
-              {icon}
-            </button>
-          ))}
-        </div>
-        {page.icon ? (
-          <DropdownMenuItem className="mt-1" onSelect={() => void rpc.call("pages.update", { id: page.id, icon: "" })}>
-            <Icon name="X" className="size-4" /> Remove icon
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -399,15 +377,15 @@ export function PageView({
         <div className={cn("mx-auto w-full max-w-[828px] pt-12 pb-40 max-md:pt-6", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
           <div className="group/title px-[54px] max-md:px-4">
             {page.icon ? (
-              <IconPicker page={page} rpc={rpc}>
+              <PageIconPicker page={page} rpc={rpc}>
                 <button type="button" aria-label="Change icon" className="mb-3 rounded-md text-[44px] leading-none hover:bg-state-hover">
                   {page.icon}
                 </button>
-              </IconPicker>
+              </PageIconPicker>
             ) : null}
             <div className="relative">
               {!page.icon ? (
-                <IconPicker page={page} rpc={rpc}>
+                <PageIconPicker page={page} rpc={rpc}>
                   <button
                     type="button"
                     aria-label="Add icon"
@@ -416,7 +394,7 @@ export function PageView({
                   >
                     <Smiley className="size-[18px]" />
                   </button>
-                </IconPicker>
+                </PageIconPicker>
               ) : null}
               <TitleField
                 value={title}
