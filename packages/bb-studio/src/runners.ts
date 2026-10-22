@@ -29,6 +29,7 @@
 // never a runner's to hide (letting the runner go would show it again):
 // src/bot-owned.ts hides it with the rest of the Bot's chain. Anything that
 // needs the user still comes through runner_report.
+import { readAvailable } from "./kit/server/read-available";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -177,13 +178,13 @@ export class Runners {
 
   private async automations(projectIds: Iterable<string>, strict = false): Promise<(AutomationRow & { projectId: string })[]> {
     const lists = await Promise.all([...new Set(projectIds)].map(async (projectId) => {
-      const raw = await this.call("automations_list", { projectId }, z.unknown()).catch((error) => { if (strict) throw error; return []; });
-      if (strict && !Array.isArray(raw)) throw new Error("Automation list unavailable during runner cleanup.");
-      return (Array.isArray(raw) ? raw : []).flatMap((entry) => {
-        const parsed = automationRow.safeParse(entry);
-        if (strict && !parsed.success) throw parsed.error;
-        return parsed.success ? [{ ...parsed.data, projectId }] : [];
-      });
+      const result = await readAvailable(async () => z.array(automationRow).parse(await this.call("automations_list", { projectId }, z.unknown())));
+      if (result.status === "unavailable") {
+        console.warn(`[studio] Automation list unavailable for ${projectId}`, result.error);
+        throw result.error;
+      }
+      if (strict && result.status === "absent") throw new Error("Automation list unavailable during runner cleanup.");
+      return result.status === "ok" ? result.value.map((entry) => ({ ...entry, projectId })) : [];
     }));
     return lists.flat();
   }

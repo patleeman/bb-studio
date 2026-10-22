@@ -24,6 +24,7 @@
 // active watcher's recent runs every minute (automations_runs) and posts
 // the ones with output it hasn't seen. The script needs no bb CLI, token or
 // callback, and a missed minute is caught up on the next poll.
+import { readAvailable } from "./kit/server/read-available";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -205,8 +206,12 @@ export class Automations {
 
   private async bbList(projectIds: Iterable<string>): Promise<Map<string, BbAutomation>> {
     const lists = await Promise.all([...new Set(projectIds)].map(async (projectId) => {
-      const raw = await this.call("automations_list", { projectId }, z.unknown()).catch(() => []);
-      return (Array.isArray(raw) ? raw : []).flatMap((entry) => { const parsed = bbAutomation.safeParse(entry); return parsed.success ? [parsed.data] : []; });
+      const result = await readAvailable(async () => z.array(bbAutomation).parse(await this.call("automations_list", { projectId }, z.unknown())));
+      if (result.status === "unavailable") {
+        console.warn(`[studio] Automation list unavailable for ${projectId}`, result.error);
+        throw result.error;
+      }
+      return result.status === "ok" ? result.value : [];
     }));
     return new Map(lists.flat().map((each) => [each.id, each]));
   }

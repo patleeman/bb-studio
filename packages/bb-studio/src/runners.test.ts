@@ -369,3 +369,12 @@ it("reports failed phone push delivery instead of claiming success", async () =>
   x.callRpc.mockRejectedValueOnce(new Error("push offline"));
   await expect(x.runners.alert(runner.id, "Needs you")).rejects.toThrow("push offline");
 });
+
+it.each(["offline", "invalid"])("does not publish an empty runner schedule on %s reads", async (failure) => {
+  const x = await setup();
+  await x.runners.create({ name: "Inbox", job: "Check", schedule });
+  const before = await x.runners.list();
+  x.callRpc.mockImplementationOnce(async () => { if (failure === "offline") throw new Error("offline"); return [{}] as never; });
+  await expect(x.runners.list()).rejects.toThrow();
+  expect(await x.runners.list()).toEqual(before);
+});

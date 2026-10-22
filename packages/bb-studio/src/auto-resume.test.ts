@@ -37,9 +37,10 @@ async function setup() {
   const target: ResumeTarget = { automationId: "auto_1", projectId: "proj_p", botId: "bot_main", owner: "runner", ownerId: "run_1", name: "Lead", on: true };
   const resumed = vi.fn();
   const exhausted = vi.fn(async () => {});
-  const auto = new AutoResume({ db, sdk: bb.sdk, targets: () => [target], resumed, exhausted, now: () => now });
+  const log = vi.fn();
+  const auto = new AutoResume({ log, db, sdk: bb.sdk, targets: () => [target], resumed, exhausted, now: () => now });
   const resumes = () => callRpc.mock.calls.filter(([call]) => call.method === "automations_resume").length;
-  return { auto, db, threads, automation, failed, target, resumed, exhausted, resumes, setRuns: (next: Record<string, unknown>[]) => { runs = next; }, advance: (ms: number) => { now += ms; } };
+  return { callRpc, log, auto, db, threads, automation, failed, target, resumed, exhausted, resumes, setRuns: (next: Record<string, unknown>[]) => { runs = next; }, advance: (ms: number) => { now += ms; } };
 }
 
 it("classifies BB's failures: host disconnects and a not-runnable thread are transient, the rest aren't", () => {
@@ -137,4 +138,16 @@ it("retries an exhaustion notification until delivery succeeds, even after the c
   expect(x.exhausted).toHaveBeenCalledTimes(2);
   await x.auto.sweep();
   expect(x.exhausted).toHaveBeenCalledTimes(2);
+});
+
+it.each(["automations_list", "automations_runs"])("logs failed %s reads and resumes after recovery", async (method) => {
+  const x = await setup();
+  x.failed(DISCONNECT);
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (call) => { if (call.method === method) throw new Error("offline"); return original(call); });
+  expect(await x.auto.sweep()).toBe(0);
+  expect(x.log).toHaveBeenCalledTimes(1);
+  expect(x.resumes()).toBe(0);
+  x.callRpc.mockImplementation(original);
+  expect(await x.auto.sweep()).toBe(1);
 });

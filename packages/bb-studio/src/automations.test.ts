@@ -349,3 +349,13 @@ it("retries a partially applied pause with the desired paused state", async () =
   expect(x.automations.every((a) => !a.enabled)).toBe(true);
   expect((await x.auto.list()).find((v) => v.id === a.id)).toMatchObject({ state: "paused", lastOutcome: null });
 });
+
+it.each(["offline", "invalid"])("reports an unavailable automation list (%s) without changing stored schedules", async (failure) => {
+  const x = await setup();
+  await x.auto.create({ kind: "reminder", name: "Later", instruction: "Check", schedule: { type: "once", at: Date.now() + 7_200_000 } });
+  const before = x.db.prepare("SELECT * FROM bot_automations").all();
+  x.callRpc.mockImplementationOnce(async () => { if (failure === "offline") throw new Error("offline"); return [{}] as never; });
+  await expect(x.auto.list()).rejects.toThrow();
+  expect(x.db.prepare("SELECT * FROM bot_automations").all()).toEqual(before);
+  expect(await x.auto.list()).toHaveLength(2);
+});

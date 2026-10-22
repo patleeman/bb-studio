@@ -22,6 +22,7 @@
 //
 // When: at startup, on the five-minute sweep, and soon after a target thread
 // goes idle or fails (BB sends plugins no automation events).
+import { readAvailable, type Available } from "./kit/server/read-available";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -155,7 +156,7 @@ export class AutoResume {
   private async run(): Promise<number> {
     const targets = this.deps.targets().filter((target) => target.on);
     if (!targets.length) return 0;
-    const lists = new Map<string, Promise<Map<string, z.infer<typeof automationRow>> | null>>();
+    const lists = new Map<string, Promise<Available<z.infer<typeof automationRow>[]>>>();
     let resumed = 0;
     for (const target of targets) {
       try {
@@ -165,7 +166,8 @@ export class AutoResume {
           continue;
         }
         if (!lists.has(target.projectId)) lists.set(target.projectId, this.list(target.projectId));
-        const automation = (await lists.get(target.projectId)!)?.get(target.automationId);
+        const result = await lists.get(target.projectId)!;
+        const automation = result.status === "ok" ? result.value.find((row) => row.id === target.automationId) : undefined;
         if (automation && await this.check(target, automation)) resumed++;
       } catch (error) {
         this.deps.log?.(`Auto-resume of ${target.name} (${target.automationId}) failed: ${(error as Error)?.message ?? error}`);
@@ -174,17 +176,17 @@ export class AutoResume {
     return resumed;
   }
 
-  /** A project's automations by id; null when BB couldn't list them (nothing is taken for deleted). */
-  private async list(projectId: string): Promise<Map<string, z.infer<typeof automationRow>> | null> {
-    const raw = await this.call("automations_list", { projectId }).catch(() => null);
-    if (!Array.isArray(raw)) return null;
-    return new Map(raw.flatMap((entry) => { const parsed = automationRow.safeParse(entry); return parsed.success ? [[parsed.data.id, parsed.data] as const] : []; }));
+  private async list(projectId: string): Promise<Available<z.infer<typeof automationRow>[]>> {
+    const result = await readAvailable(async () => z.array(automationRow).parse(await this.call("automations_list", { projectId })));
+    if (result.status === "unavailable") this.deps.log?.(`Automation list unavailable for ${projectId}: ${String(result.error)}`);
+    return result;
   }
 
   private async runs(target: ResumeTarget): Promise<Run[]> {
-    const page = z.object({ runs: z.array(runRow) }).passthrough().safeParse(await this.call("automations_runs", { projectId: target.projectId, automationId: target.automationId, limit: 10 }).catch(() => null));
+    const result = await readAvailable(async () => z.object({ runs: z.array(runRow) }).passthrough().parse(await this.call("automations_runs", { projectId: target.projectId, automationId: target.automationId, limit: 10 })));
+    if (result.status === "unavailable") throw result.error;
     const at = (run: Run) => run.startedAt ?? run.scheduledFor ?? run.finishedAt ?? 0;
-    return page.success ? [...page.data.runs].sort((a, b) => at(b) - at(a)) : [];
+    return result.status === "ok" ? [...result.value.runs].sort((a, b) => at(b) - at(a)) : [];
   }
 
   /** True when the thread is there to run in: not missing, archived or deleted. */
