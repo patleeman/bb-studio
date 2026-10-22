@@ -2,15 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { addSegment, memoryStore } from "../test/db";
 import {
   NotesMaker,
-  PAGES_MISSING,
-  PagesUnavailableError,
   generateNotes,
   isNotesPageFor,
   mergeNotesPrompt,
   notesChunks,
   notesMarkdown,
   notesPrompt,
-  pagesClient,
   parseNotes,
   type PagesClient,
   type RecordingNotes,
@@ -37,7 +34,6 @@ function fakePages(overrides: Partial<PagesClient> = {}) {
   const pages = new Map<string, string>();
   let next = 0;
   const client = {
-    available: vi.fn(async () => true),
     exists: vi.fn(async (id: string) => pages.has(id)),
     create: vi.fn(async ({ markdown }: { markdown: string }) => {
       const id = `pg_${String(++next).padStart(12, "0")}`;
@@ -250,46 +246,12 @@ describe("NotesMaker", () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
-  it("says to install Pages when it is missing, before asking the model", async () => {
+  it("preserves the cause of a Pages write failure", async () => {
     const { store, id } = finishedRecording();
-    const { client } = fakePages({ available: vi.fn(async () => false) });
-    const generate = vi.fn();
-    const maker = new NotesMaker({ store, pages: client, generate, changed: () => {} });
-    await expect(maker.run(id)).rejects.toThrow(PAGES_MISSING);
-    await expect(maker.run(id)).rejects.toBeInstanceOf(PagesUnavailableError);
-    expect(generate).not.toHaveBeenCalled();
-    expect(store.recording(id)?.notesPageId).toBeNull();
-  });
-
-  it("reports Pages missing when it goes away mid-run", async () => {
-    const { store, id } = finishedRecording();
-    const available = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false);
-    const { client } = fakePages({ available, create: vi.fn(async () => { throw new Error("plugin not running"); }) });
+    const { client } = fakePages({ create: vi.fn(async () => { throw new Error("database write failed"); }) });
     const maker = new NotesMaker({ store, pages: client, generate: async () => ({ notes: NOTES, truncated: false }), changed: () => {} });
-    await expect(maker.run(id)).rejects.toThrow(PAGES_MISSING);
-  });
-});
-
-describe("pagesClient", () => {
-  it("treats a missing, disabled, failed or unlistable Studio as unavailable", async () => {
-    const client = (plugins: unknown[] | Error) => pagesClient({
-      list: async () => { if (plugins instanceof Error) throw plugins; return { plugins } as never; },
-      callRpc: vi.fn() as never,
-    });
-    expect(await client([]).available()).toBe(false);
-    expect(await client([{ id: "studio", enabled: false }]).available()).toBe(false);
-    expect(await client([{ id: "studio", enabled: true, status: "error" }]).available()).toBe(false);
-    expect(await client(new Error("down")).available()).toBe(false);
-    expect(await client([{ id: "studio", enabled: true, status: "running" }]).available()).toBe(true);
-  });
-
-  it("creates and replaces pages through Studio's pages RPC", async () => {
-    const callRpc = vi.fn(async ({ method }: { pluginId: string; method: string }) => (method === "pages.create" || method === "pages.replaceMarkdown" ? { page: { id: "pg_aaaaaaaaaaaa" } } : { page: null }));
-    const client = pagesClient({ list: async () => ({ plugins: [] }) as never, callRpc: callRpc as never });
-    expect(await client.create({ projectId: null, title: "T notes", markdown: "x" })).toBe("pg_aaaaaaaaaaaa");
-    await client.replace("pg_aaaaaaaaaaaa", "y");
-    expect(await client.exists("pg_aaaaaaaaaaaa")).toBe(false);
-    expect(callRpc.mock.calls.map(([call]) => [call.pluginId, call.method])).toEqual([["studio", "pages.create"], ["studio", "pages.replaceMarkdown"], ["studio", "pages.get"]]);
+    await expect(maker.run(id)).rejects.toThrow("database write failed");
+    expect(store.recording(id)?.notesPageId).toBeNull();
   });
 });
 

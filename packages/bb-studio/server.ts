@@ -139,8 +139,6 @@ export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
   const code = registerCode(bb, db);
   const decisions = await registerDecisions(bb, settings);
-  const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle);
-  bb.onDispose(() => recordings.dispose());
   // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
   await migrateOpenaiKey({ get: () => settings.get(), set: (values) => settings.experimental_set(values as never) })
     .then((moved) => { if (moved) bb.log.info("Moved the Bot avatars OpenAI key to Studio's OpenAI API key setting."); })
@@ -173,6 +171,9 @@ export default async function plugin(bb: BbPluginApi) {
 
   });
   bb.onDispose(() => pages.dispose());
+  const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes);
+  bb.onDispose(() => recordings.dispose());
+
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them.

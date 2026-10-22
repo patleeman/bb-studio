@@ -1,7 +1,7 @@
 // "Make notes": a recording's summary, decisions and action items as a Studio
 // Page. The model call goes through Studio Decisions (the same askModel path
 // and Summaries model as recording summaries); the page goes through Studio's
-// `pages.*` RPC, so Talk never touches Pages' tables. Action items are a Pages
+// in-process Pages service, so Talk never touches Pages' tables. Action items are a Pages
 // checklist, so each can be handed to an agent from the page.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "../../kit/decisions";
@@ -11,7 +11,6 @@ import { z } from "zod";
 import type { Recording } from "../shared/contract";
 import type { TalkStore } from "./store";
 
-export const PAGES_MISSING = "Pages aren't available; reload Studio to make notes.";
 export const notesPagePath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
 export interface RecordingNotes {
@@ -27,12 +26,6 @@ export const MAX_NOTES_CHUNKS = 6;
 const MAX_DECISIONS = 20;
 const MAX_ACTION_ITEMS = 30;
 const MAX_ITEM_CHARS = 300;
-
-export class PagesUnavailableError extends Error {
-  constructor() {
-    super(PAGES_MISSING);
-  }
-}
 
 /** Splits a transcript at whitespace into model-sized pieces. */
 export function notesChunks(transcript: string, size = NOTES_CHUNK_CHARS, max = MAX_NOTES_CHUNKS): { chunks: string[]; truncated: boolean } {
@@ -246,51 +239,11 @@ export async function generateNotes(
 // ── Pages ────────────────────────────────────────────────────────────────
 
 export interface PagesClient {
-  /** Pages answers (it's built into Studio, so it does whenever Studio runs). */
-  available(): Promise<boolean>;
   exists(pageId: string): Promise<boolean>;
   create(input: { projectId: string | null; title: string; markdown: string }): Promise<string>;
   markdown(pageId: string): Promise<string>;
   replace(pageId: string, markdown: string): Promise<void>;
   search(query: string): Promise<string[]>;
-}
-
-const LOADED_ERRORS = new Set(["error", "incompatible"]);
-const pageRef = z.object({ id: z.string() });
-
-type PluginsSdk = Pick<BbPluginApi["sdk"]["plugins"], "list" | "callRpc">;
-
-export function pagesClient(plugins: PluginsSdk): PagesClient {
-  const call = <T>(method: string, input: unknown, outputSchema: z.ZodType<T>) =>
-    plugins.callRpc({ pluginId: "studio", method: `pages.${method}`, input: input as never, outputSchema, signal: AbortSignal.timeout(30_000) });
-  return {
-    async available() {
-      try {
-        const { plugins: installed } = await plugins.list();
-        const entry = installed.find((plugin) => plugin.id === "studio");
-        return Boolean(entry?.enabled && !LOADED_ERRORS.has(String((entry as { status?: unknown }).status ?? "")));
-      } catch {
-        return false;
-      }
-    },
-    async exists(pageId) {
-      const { page } = await call("get", { id: pageId }, z.object({ page: pageRef.nullable() }));
-      return page !== null;
-    },
-    async create({ projectId, title, markdown }) {
-      const { page } = await call("create", { projectId, parentId: null, title, icon: "📝", markdown }, z.object({ page: pageRef }));
-      return page.id;
-    },
-    async markdown(pageId) {
-      return (await call("markdown", { id: pageId }, z.object({ markdown: z.string() }))).markdown;
-    },
-    async replace(pageId, markdown) {
-      await call("replaceMarkdown", { id: pageId, markdown, snapshotName: "Before Talk updated the notes" }, z.object({ page: pageRef }));
-    },
-    async search(query) {
-      return (await call("search", { query }, z.object({ pages: z.array(pageRef) }))).pages.map((page) => page.id);
-    },
-  };
 }
 
 export interface NotesResult {
@@ -342,7 +295,6 @@ export class NotesMaker {
     const recording = store.recording(id);
     const blocked = notesBlocker(recording);
     if (blocked) throw new Error(blocked);
-    if (!(await pages.available())) throw new PagesUnavailableError();
     const transcript = store.transcript(id);
     const { notes, truncated } = await this.deps.generate(id, transcript);
     // The recording can be deleted or resumed while the model works; notes
@@ -355,22 +307,17 @@ export class NotesMaker {
     if (!current) throw new Error("Recording not found.");
     const keys = notes.actionItems.map(itemKey);
     let pageId = current.notesPageId ?? null;
-    try {
-      if (pageId && !(await pages.exists(pageId))) pageId = null;
-      if (!pageId) pageId = await this.findPage(id);
-      if (pageId) {
-        const markdown = notesMarkdown({ recording: current, notes, truncated, existing: await pages.markdown(pageId), previousItems: store.notesItems(id) });
-        await pages.replace(pageId, markdown);
-        this.save(id, pageId, keys);
-        return { pageId, created: false };
-      }
-      const created = await pages.create({ projectId: current.projectId, title: notesTitle(current.title), markdown: notesMarkdown({ recording: current, notes, truncated }) });
-      this.save(id, created, keys);
-      return { pageId: created, created: true };
-    } catch (error) {
-      if (!(await pages.available())) throw new PagesUnavailableError();
-      throw error;
+    if (pageId && !(await pages.exists(pageId))) pageId = null;
+    if (!pageId) pageId = await this.findPage(id);
+    if (pageId) {
+      const markdown = notesMarkdown({ recording: current, notes, truncated, existing: await pages.markdown(pageId), previousItems: store.notesItems(id) });
+      await pages.replace(pageId, markdown);
+      this.save(id, pageId, keys);
+      return { pageId, created: false };
     }
+    const created = await pages.create({ projectId: current.projectId, title: notesTitle(current.title), markdown: notesMarkdown({ recording: current, notes, truncated }) });
+    this.save(id, created, keys);
+    return { pageId: created, created: true };
   }
 
   private async findPage(id: string): Promise<string | null> {

@@ -16,6 +16,12 @@ it("links pages and checklist handoffs directly, and reports activity failures w
   const services = new StudioServices(db);
   const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services);
   try {
+    const notesId = await pages.notes.create({ projectId: null, title: "Meeting notes", markdown: "First version" });
+    expect(await pages.notes.exists(notesId)).toBe(true);
+    expect(await pages.notes.exists("pg_missing")).toBe(false);
+    await pages.notes.replace(notesId, "New notes with token-notes");
+    expect(await pages.notes.markdown(notesId)).toContain("New notes with token-notes");
+    await expect(pages.notes.replace("pg_missing", "x")).rejects.toThrow("Page not found");
     const id = pages.createPage({ projectId: "proj_1", title: "Plan", markdown: "- [ ] Ship it" });
     await host.harness.behavior.callAgentTool("pages_edit", { page: id, ops: [{ op: "append", markdown: "@[Other](item:artifacts:art_other)" }] }, { threadId: "thr_editor" });
     expect(services.threadsForThread("thr_editor")).toMatchObject([{ ref: { pluginId: "pages", id }, role: "edited" }]);

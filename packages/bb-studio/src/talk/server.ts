@@ -33,7 +33,7 @@ import { Transcriber } from "./server/transcriber";
 import { Summaries, generateRecordingSummary } from "./server/meetings";
 import { cleanTranscript } from "./server/cleanup";
 import { talkModels } from "./server/models";
-import { NotesMaker, PAGES_MISSING, generateNotes, notesPagePath, pagesClient } from "./server/notes";
+import { NotesMaker, generateNotes, notesPagePath, type PagesClient } from "./server/notes";
 import { talkBackupHandlers } from "./server/backup";
 import { abortableWait } from "./server/abortable-wait";
 
@@ -72,7 +72,7 @@ export interface BuiltinRecordings {
 }
 
 /** Registers recordings' RPC, HTTP routes, background work, agent tools and mention provider on Studio. Studio has run the migrations. */
-export async function registerTalk(bb: BbPluginApi, db: Database.Database, settings: TalkSettingsHandle): Promise<BuiltinRecordings> {
+export async function registerTalk(bb: BbPluginApi, db: Database.Database, settings: TalkSettingsHandle, pages: PagesClient): Promise<BuiltinRecordings> {
   let config = await settings.get();
   settings.onChange((next) => {
     config = next;
@@ -145,7 +145,6 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   }
 
   // ── Notes pages ────────────────────────────────────────────────────────
-  const pages = pagesClient(bb.sdk.plugins);
   const notes = new NotesMaker({
     store,
     pages,
@@ -301,7 +300,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
       await meetingNotes(id, true);
       return { recording: mustGet(id) };
     },
-    "recordings.notes_status": async () => ({ pagesAvailable: await pages.available() }),
+    "recordings.notes_status": async () => ({ pagesAvailable: true }),
     "recordings.notes_make": async ({ id }) => {
       const result = await notes.run(id);
       return { ...result, recording: mustGet(id) };
@@ -532,7 +531,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
           return { exitCode: 0, stdout: `${created ? "Made" : "Updated"} notes page ${pageId}: ${notesPagePath(pageId)}` };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { exitCode: 1, stderr: message === PAGES_MISSING ? `${message} Then run "bb studio recordings notes ${id}" again.` : message };
+          return { exitCode: 1, stderr: message };
         }
       }
     }

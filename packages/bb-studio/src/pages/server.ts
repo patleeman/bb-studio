@@ -1,3 +1,4 @@
+import type { PagesClient } from "../talk/server/notes";
 import type { StudioServices } from "../services";
 // Pages, built into Studio: collaborative documents you write with your
 // agents, with live editing (Yjs over the `/pages/sync` WebSocket), comments,
@@ -42,6 +43,7 @@ export { PAGE_TOOLS } from "./tools";
 
 export interface BuiltinPages {
   store: PageStore;
+  notes: PagesClient;
   /** Studio's provider methods, which the hub calls in-process. */
   provider: StudioProviderHandlers;
   /** Its section of a Studio backup, still named `pages`. */
@@ -466,6 +468,16 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
 
   return {
     store,
+    notes: {
+      exists: async (id) => store.meta(id) !== null,
+      create: async (input) => service.createPage({ ...input, parentId: null, icon: "📝", actor: PLUGIN_RPC_ACTOR }).id,
+      markdown: async (id) => { requireMeta(id); return service.currentMarkdown(id)!; },
+      replace: async (id, markdown) => {
+        const actor = { key: PLUGIN_RPC_ACTOR, name: "Agent", color: actorColor(PLUGIN_RPC_ACTOR) };
+        service.replaceMarkdown(id, markdown, "Before Talk updated the notes", actor);
+      },
+      search: async (query) => store.search(query, undefined).map((page) => page.id),
+    },
     provider,
     backup,
     cli: (argv, ctx) => cli.run(argv, ctx),

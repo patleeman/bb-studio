@@ -222,18 +222,8 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
 // ── Notes page ───────────────────────────────────────────────────────────
 function useNotes(id: string, refetch: () => void) {
   const rpc = useRpc<TalkRpcContract>();
-  // null while checking.
-  const [pagesAvailable, setPagesAvailable] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
-  useEffect(() => {
-    let live = true;
-    rpc.call("recordings.notes_status", null).then(
-      (result) => live && setPagesAvailable(result.pagesAvailable),
-      () => live && setPagesAvailable(false),
-    );
-    return () => { live = false; };
-  }, [rpc]);
   const make = useCallback(() => {
     // The server also shares one run per recording; this keeps a double click to one request.
     if (running.current) return;
@@ -246,7 +236,6 @@ function useNotes(id: string, refetch: () => void) {
       },
       (cause) => {
         const message = errorMessage(cause);
-        if (message.includes(PAGES_MISSING)) setPagesAvailable(false);
         toast.error(message);
       },
     ).finally(() => {
@@ -256,19 +245,17 @@ function useNotes(id: string, refetch: () => void) {
   }, [rpc, id, refetch]);
   const canMake = (recording: Recording) =>
     recording.status === "done" && recording.pendingCount === 0 && recording.failedCount === 0 && recording.wordCount > 0;
-  return { pagesAvailable, busy, make, canMake };
+  return { busy, make, canMake };
 }
 
-const PAGES_MISSING = "Pages aren't available; reload Studio to make notes.";
 const notesPath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
 function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnType<typeof useNotes> }) {
   const pageId = recording.notesPageId ?? null;
   if (!notes.canMake(recording) && !pageId) return null;
-  const missing = notes.pagesAvailable === false;
   return (
     <section aria-label="Notes" className="mt-6 flex flex-wrap items-center gap-2">
-      {pageId && !missing ? (
+      {pageId ? (
         <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(notesPath(pageId))}>
           <Icon name="FileText" /> Open notes
         </button>
@@ -277,15 +264,14 @@ function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnTyp
         <button
           type="button"
           className={OUTLINE_BUTTON}
-          disabled={notes.busy || notes.pagesAvailable !== true}
-          title={missing ? PAGES_MISSING : "Summary, decisions and action items as a Studio Page"}
+          disabled={notes.busy}
+          title="Summary, decisions and action items as a Studio Page"
           onClick={notes.make}
         >
           {notes.busy ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : <Icon name="ListTodo" />}
           {notes.busy ? (pageId ? "Updating notes…" : "Making notes…") : pageId ? "Update notes" : "Make notes"}
         </button>
       ) : null}
-      {missing ? <span className="text-sm text-muted-foreground">{PAGES_MISSING}</span> : null}
     </section>
   );
 }
@@ -435,7 +421,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
                     <Icon name="AiContentGenerator01" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
                   </DropdownMenuItem>
                 ) : null}
-                {notes.canMake(recording) && notes.pagesAvailable ? (
+                {notes.canMake(recording) ? (
                   <DropdownMenuItem disabled={notes.busy} onSelect={notes.make}>
                     <Icon name="ListTodo" className="size-4" /> {recording.notesPageId ? "Update notes" : "Make notes"}
                   </DropdownMenuItem>
