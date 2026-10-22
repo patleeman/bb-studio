@@ -399,11 +399,7 @@ export class Bots {
 
   private view(row: BotRow): NonNullable<BotView["bot"]> {
     const primary = this.isPrimary(row);
-    let threadId = row.thread_id;
-    if (primary) {
-      threadId = this.deps.leads.storedLead(PERSONAL_PROJECT_ID);
-      if (threadId !== row.thread_id) this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
-    }
+    const threadId = primary ? this.deps.leads.storedLead(PERSONAL_PROJECT_ID) : row.thread_id;
     const memoryPageId = row.memory_page_id && this.deps.memory?.exists(row.memory_page_id) ? row.memory_page_id : null;
     return { id: row.id, name: row.name, avatar: row.avatar, state: row.state, threadId, memoryPageId, shape: row.shape ?? null, color: row.color ?? null, role: row.role ?? null, avatarImageUrl: row.avatar_image_id ? avatarImageUrl(row.id, row.avatar_image_id) : null, primary, kind: botKind(row.provider_id), providerId: row.provider_id ?? null, model: (threadId ? this.models.get(threadId) : null) ?? null, createdAt: row.created_at, updatedAt: row.updated_at };
   }

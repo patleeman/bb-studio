@@ -111,6 +111,17 @@ it("creates a Bot with a new chat in the personal project and names it in the he
   expect(prompts(x)).toEqual([botHeartbeat("Penny")]);
 });
 
+it("reads the primary thread from project leads without writing the Bot row", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const before = x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID);
+  x.add({ id: "thr_reconciled" });
+  x.db.prepare("UPDATE project_leads SET lead_thread_id = ? WHERE project_id = ?").run("thr_reconciled", PERSONAL_PROJECT_ID);
+
+  expect((await x.bots.get()).bot?.threadId).toBe("thr_reconciled");
+  expect(x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID)).toEqual(before);
+});
+
 it("the first-time flow's setup becomes a first message that has the Bot set its own profile", async () => {
   const x = await setup();
   await x.bots.create({ name: "Chief of Staff", avatar: "🤖", setup: "Watch my PRs" });
