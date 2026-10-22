@@ -1,4 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { PERSONAL_PROJECT_ID } from "./project-lead";
 type Sdk = BbPluginApi["sdk"];
 
 /** Keep checks shared by the UI, RPC and agent tools. */
@@ -50,7 +51,7 @@ export async function runnerMachineCheck(sdk: Sdk, input: { machine?: string | n
 
 export async function runnerEnvironment(sdk: Sdk, machine: string | null) {
   if (!machine) return { type: "project-default" as const };
-  const providers = await sdk.environments.listProviders({ hostId: machine });
+  const providers = await sdk.environments.listProviders({ projectId: PERSONAL_PROJECT_ID, hostId: machine }); // BB refuses hostId without projectId
   const personal = providers.find(p => (p.environmentProviderId ?? p.id) === "personal-workspace" && p.acceptsEmptyInputs && (!p.availability || p.availability.status === "available") && (!p.machineAvailability[machine] || p.machineAvailability[machine]?.status === "available"));
   return personal
     ? { type: "provider" as const, environmentProviderId: personal.environmentProviderId ?? personal.id, inputs: null, machine: { type: "existing" as const, hostId: machine } }

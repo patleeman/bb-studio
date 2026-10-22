@@ -47,7 +47,7 @@ async function setup() {
     hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw new Error("Unknown host"); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
     providers: { list: async () => [{ id: "codex", displayName: "Codex", strings: { signInHint: "Run codex login" } }] as never },
     system: { providerStates: async () => providerStates as never },
-    environments: { listProviders: async () => environmentProviders as never },
+    environments: { listProviders: (async (args: { projectId?: string; hostId?: string }) => { if (args?.hostId && !args.projectId) throw new Error("HTTP 400: hostId requires projectId"); return environmentProviders; }) as never },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
