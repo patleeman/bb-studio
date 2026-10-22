@@ -94,11 +94,10 @@ the packages they name are gone. The old-address mapping and item ids stay.
   reachable from app.tsx, or `@resvg/` from server.ts; add any new heavy
   package there. Move the package to Studio's `dependencies` (the server
   resolves files inside it at runtime, like Excalidraw's fonts).
-- Kit pieces that call "this plugin's" `studio_*` RPCs don't work for a
-  built-in kind: Studio has no such RPC, only `provider.call`.
-  `ThreadItemsPanel` takes a `call` (Draw's `useDrawingProvider`), and
-  `ItemMenu` takes `onMove`, which goes through `provider.call` with
-  `studio_move`.
+- Kit pieces that call a kind's `studio_*` methods need an injected call for a
+  built-in kind: Studio has no such RPC, only `provider.call`. Built-in
+  providers use `ProviderCall`; `ItemMenu` takes `onMove`, which goes through
+  `provider.call` with `studio_move`.
 - Version history (`provider-history.ts`) and backup (`BackupService`
   `builtins`) read the kind in-process. The backup section keeps the old
   plugin id, so old backups restore into Studio.
@@ -299,7 +298,7 @@ commit, run `bb <old> migrate`, and check the items in Studio
     contract (`decisions-contract` now uses the local `defineRpcContract`).
 - **Pages** (done) was the biggest and the most linked-to. What it added:
   - **Item namespace vs. host.** `PLUGIN_ID` stays `pages` (refs, mentions,
-    backups, `ThreadItemsPanel`), and a separate `HOST_PLUGIN_ID`/`HTTP_ROOT`
+    and backups), and a separate `HOST_PLUGIN_ID`/`HTTP_ROOT`
     builds RPC and HTTP addresses. Every `/api/v1/plugins/${PLUGIN_ID}/http`
     in the moved code was a bug waiting to happen.
   - **URLs inside content.** Pages embed their uploaded files' addresses in

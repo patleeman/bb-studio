@@ -1,7 +1,7 @@
 // Drawings' Studio provider methods (`studio_*`), from Studio's own app. They
 // aren't RPC methods of their own: Studio runs them in-process for
 // provider.call, as it does for other add-ons (kit callProvider).
-import type { ProviderCall } from "../../kit/app/index";
+import type { ProviderCall } from "../../kit/app/provider-call";
 import { STUDIO_PROVIDER_CALL_METHOD } from "../../kit/contract";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useMemo } from "react";

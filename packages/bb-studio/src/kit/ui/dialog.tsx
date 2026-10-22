@@ -4,7 +4,6 @@ import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "./utils";
 import { usePortalScopeProps } from "./portal-scope";
-import { useBrowserDimmingModal } from "./browser-dimming-modal";
 import {
   type ResponsiveOverlayContextValue,
   useResponsiveRoot,
@@ -222,7 +221,6 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   ) => {
     const { isCompactViewport, open, onOpenChange, titleId, descriptionId } =
       useResponsiveDialog();
-    useBrowserDimmingModal(open);
     const scopeProps = usePortalScopeProps();
 
     if (isCompactViewport) {

@@ -11,7 +11,7 @@ export {
   type CollectionKind,
   type CollectionTag,
 } from "./collection";
-export { ThreadItemsPanel, type ProviderCall } from "./thread-items";
+export type { ProviderCall } from "./provider-call";
 export { BarCrumb, BarSeparator, BarTitle, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, openNewItemThread, type ItemThread } from "./item-header";
 export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu";
 export { itemReferenceFrom } from "./item-reference";
