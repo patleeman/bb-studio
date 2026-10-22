@@ -2,6 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, workspaceBlock } from "./bot-maintenance";
 import { MIGRATIONS } from "./migrations";
+import { SkillLearning, type SkillState } from "./skill-learning";
 const DAY = 86_400_000;
 const now = 200 * DAY;
 const dispose: (() => Promise<void>)[] = [];
@@ -34,7 +35,7 @@ async function setup() {
   const maintenance = new BotMaintenance({ db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
   const enable = async () => { await maintenance.set("bot", { enabled: true }, now - DAY); archive.mockClear(); curate.mockClear(); };
   const local = (id: string, kind: string, state = "active", age = 1, target = "main", instruction = "report") => db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, state, schedule_json, project_id, created_at, updated_at, target, instruction, bb_ids) VALUES (?, 'bot', ?, ?, ?, '{}', 'proj', 0, ?, ?, ?, '[\"a\"]')").run(id, kind, id, state, now - age * DAY, target, instruction);
-  return { harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
+  return { bb, harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
 }
 it("defaults off and waits one day before going live", () => {
   const s = maintenanceDefaults(); expect(s.enabled).toBe(false); expect(s.memoryWords).toBe(8000);
@@ -194,4 +195,23 @@ it("pauses only external schedules with the same project, trigger and execution"
   add("morning", "p", "0 9 * * *"); add("evening", "p", "0 18 * * *"); add("other-project", "q", "0 9 * * *"); add("other-model", "p", "0 9 * * *", "different"); add("duplicate", "p", "0 9 * * *");
   await x.maintenance.run("bot", { now });
   expect(x.rpcCalls.filter((c) => c.method === "automations_pause").map((c) => c.input)).toEqual([{ projectId: "p", automationId: "duplicate" }]);
+});
+
+it("uses Maintenance's Skills rule for real curation, ignoring legacy curator Pause data", async () => {
+  const x = await setup();
+  const skill = { name: "old", description: "Old skill", body: "Old steps", state: "active" as SkillState, pinned: false, usedAt: 0, updatedAt: 0 };
+  const bot = { ...x.bot, name: "Dot" };
+  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, memoryPage: () => null, skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
+  await learning.view("bot");
+  x.db.prepare("UPDATE bot_learning SET curator_paused = 1 WHERE bot_id = 'bot'").run();
+  const maintenance = new BotMaintenance({ ...(x.maintenance as unknown as { deps: ConstructorParameters<typeof BotMaintenance>[0] }).deps, curate: (id, dryRun) => learning.curate(id, { dryRun, now }) });
+  await maintenance.tick(now);
+  expect(skill.state).toBe("active");
+  await maintenance.set("bot", { enabled: true, rules: { skills: false } }, now - DAY);
+  await maintenance.run("bot", { now });
+  expect(skill.state).toBe("active");
+  await maintenance.set("bot", { rules: { skills: true } });
+  await maintenance.run("bot", { now });
+  expect(skill.state).toBe("archived");
+  expect(x.db.prepare("SELECT curator_paused FROM bot_learning WHERE bot_id = 'bot'").get()).toEqual({ curator_paused: 1 });
 });

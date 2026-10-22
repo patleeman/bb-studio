@@ -8408,7 +8408,6 @@ public enum Studio {
     public var models: [String]?
     public var approval: Bool?
     public var consolidate: Bool?
-    public var curatorPaused: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
     public var reviewing: Bool?
@@ -8417,7 +8416,7 @@ public enum Studio {
     public var nextCuratorAt: Double?
     public var pending: [BotLearningOutputPendingItem]?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningOutputPendingItem]? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningOutputPendingItem]? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
@@ -8425,7 +8424,6 @@ public enum Studio {
       self.models = models
       self.approval = approval
       self.consolidate = consolidate
-      self.curatorPaused = curatorPaused
       self.toolTurns = toolTurns
       self.userTurns = userTurns
       self.reviewing = reviewing
@@ -8443,16 +8441,14 @@ public enum Studio {
     public var reviewModel: String?
     public var approval: Bool?
     public var consolidate: Bool?
-    public var curatorPaused: Bool?
 
-    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil) {
+    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, approval: Bool? = nil, consolidate: Bool? = nil) {
       self.botId = botId
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.approval = approval
       self.consolidate = consolidate
-      self.curatorPaused = curatorPaused
     }
   }
 
@@ -8526,7 +8522,6 @@ public enum Studio {
     public var models: [String]?
     public var approval: Bool?
     public var consolidate: Bool?
-    public var curatorPaused: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
     public var reviewing: Bool?
@@ -8535,7 +8530,7 @@ public enum Studio {
     public var nextCuratorAt: Double?
     public var pending: [BotLearningSetOutputPendingItem]?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningSetOutputPendingItem]? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningSetOutputPendingItem]? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
@@ -8543,7 +8538,6 @@ public enum Studio {
       self.models = models
       self.approval = approval
       self.consolidate = consolidate
-      self.curatorPaused = curatorPaused
       self.toolTurns = toolTurns
       self.userTurns = userTurns
       self.reviewing = reviewing
@@ -8686,7 +8680,6 @@ public enum Studio {
     public var models: [String]?
     public var approval: Bool?
     public var consolidate: Bool?
-    public var curatorPaused: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
     public var reviewing: Bool?
@@ -8695,7 +8688,7 @@ public enum Studio {
     public var nextCuratorAt: Double?
     public var pending: [BotSkillPendingResolveOutputPendingItem]?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, curatorPaused: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotSkillPendingResolveOutputLastReview? = nil, lastCurator: BotSkillPendingResolveOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotSkillPendingResolveOutputPendingItem]? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotSkillPendingResolveOutputLastReview? = nil, lastCurator: BotSkillPendingResolveOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotSkillPendingResolveOutputPendingItem]? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
@@ -8703,7 +8696,6 @@ public enum Studio {
       self.models = models
       self.approval = approval
       self.consolidate = consolidate
-      self.curatorPaused = curatorPaused
       self.toolTurns = toolTurns
       self.userTurns = userTurns
       self.reviewing = reviewing

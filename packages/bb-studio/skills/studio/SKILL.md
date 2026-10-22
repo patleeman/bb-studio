@@ -81,6 +81,10 @@ stuff".
   page); the first is the primary. In a bot's own thread these tools act on
   that bot; elsewhere on the primary.
 
+Skill curation follows each Bot's Maintenance setting and its Skills rule.
+There is no separate curator Pause control. To change scheduled curation, use
+**Bot info → Maintenance**. Pinned skills are exempt from retirement.
+
 ## In the app
 
 BB's sidebar groups threads by project. Each Studio item's ⋯ menu, the

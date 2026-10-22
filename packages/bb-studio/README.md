@@ -1599,13 +1599,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
     the result ("Saved 1 skill", "Nothing to save") and archives the fork.
     One review per bot at a time; a new turn in the bot's thread, Pause or
     Stop stops it, and so do 20 minutes. Review forks stay out of Activity.
-  - **Curator.** Weekly, once the bot's thread has been idle for 2 hours:
+  - **Curator.** The bot's built-in Maintenance runs skill curation:
     a skill unused for 30 days (not loaded or saved) becomes stale, for 90
     days archived. Archived skills leave the bot's list but are kept;
     **Restore** brings one back. Pinned skills are exempt; nothing is
-    deleted. It's listed in Automations as **Skill curator** (Pause, Run
-    now). With **Curator merges overlapping skills** on (off by default) it
-    also starts a fork that merges overlapping skills.
+    deleted. **Bot info → Maintenance** and its **Skills** rule control
+    scheduled curation. With **Curator merges overlapping skills** on (off by
+    default) it also starts a fork that merges overlapping skills.
   - **Immediate saves and history.** The Bot manages its own skills. Writes,
     patches, and review-fork changes apply immediately. **Bot info → Skills →
     Skill history** keeps every content version, its line diff, and advisory
@@ -1683,8 +1683,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `pluginSubmission` `{ pluginId: "studio", data: { kind: "cache-keepalive" } }`
     for `message.dispatch` hooks; Smart Queue only holds human sends to busy
     threads and pings only go to idle ones. Learn from work doesn't count a
-    ping as a user turn, a ping doesn't stop a running review, and the skill
-    curator's 2-hour idle wait ignores pings.
+    ping as a user turn, and a ping doesn't stop a running review.
+    Maintenance owns skill curation independently of these pings.
   - **Compaction before expiry**: when warming stops for the idle cutoff
     while the cache is still warm, Studio compacts the chat once, when the
     next ping would have been due (55 minutes after the last turn), through

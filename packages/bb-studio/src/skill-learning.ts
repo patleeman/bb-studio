@@ -1,5 +1,5 @@
 // Skills that learn: a Bot reviews its own work in the background and keeps
-// its skills current, and a weekly curator retires the ones it stopped using.
+// its skills current. Maintenance retires the skills it stopped using.
 // The ideas follow Hermes Agent's background review and curator
 // (NousResearch/hermes-agent: agent/background_review.py, agent/curator.py),
 // adapted to Studio's Bot skills (the bot_skills table). External bots learn
@@ -25,12 +25,11 @@
 // Bot's thread, Pause or Stop stops it; one still running after 20 minutes is
 // stopped.
 //
-// Curator. Weekly per Bot, once the Bot's thread has been idle for 2 hours:
+// Curator. The Bot's built-in Maintenance runs skill curation:
 // a skill unused for 30 days becomes stale, for 90 days archived (hidden
 // from the Bot, kept, restorable). Pinned skills are exempt; nothing is
-// deleted. It's listed with the Bot's automations as "Skill curator" and can
-// be paused or run now. Optionally it starts a consolidation fork that
-// merges overlapping skills (off by default).
+// deleted. Maintenance settings control scheduled curation. Optionally it
+// starts a consolidation fork that merges overlapping skills (off by default).
 //
 // Saves apply immediately. Advisory lint findings never block them.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -250,7 +249,7 @@ export interface LearningDeps {
 
 export type LearningView = {
   enabled: boolean; interval: number; reviewModel: string | null; defaultModel: string | null; models: string[];
-  approval: boolean; consolidate: boolean; curatorPaused: boolean;
+  approval: boolean; consolidate: boolean;
   toolTurns: number; userTurns: number; reviewing: boolean;
   lastReview: { at: number; result: string } | null;
   lastCurator: { at: number; result: string } | null;
@@ -316,7 +315,7 @@ export class SkillLearning {
     }
     return {
       enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models,
-      approval: false, consolidate: !!row.consolidate, curatorPaused: !!row.curator_paused,
+      approval: false, consolidate: !!row.consolidate,
       toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,
       lastCurator: row.curator_last_at && row.curator_last_result ? { at: row.curator_last_at, result: row.curator_last_result } : null,
@@ -325,14 +324,13 @@ export class SkillLearning {
     };
   }
 
-  async set(botId: string, input: { enabled?: boolean; interval?: number; reviewModel?: string | null; approval?: boolean; consolidate?: boolean; curatorPaused?: boolean }): Promise<LearningView> {
+  async set(botId: string, input: { enabled?: boolean; interval?: number; reviewModel?: string | null; approval?: boolean; consolidate?: boolean }): Promise<LearningView> {
     if (input.interval !== undefined && (!Number.isInteger(input.interval) || input.interval < 2 || input.interval > 200)) throw new Error("The interval is 2 to 200 turns.");
     this.save(botId, {
       ...(input.enabled !== undefined ? { enabled: input.enabled ? 1 : 0 } : {}),
       ...(input.interval !== undefined ? { every_turns: input.interval } : {}),
       ...(input.reviewModel !== undefined ? { review_model: input.reviewModel || null } : {}),
       ...(input.consolidate !== undefined ? { consolidate: input.consolidate ? 1 : 0 } : {}),
-      ...(input.curatorPaused !== undefined ? { curator_paused: input.curatorPaused ? 1 : 0, ...(input.curatorPaused ? {} : { curator_since: Date.now() }) } : {}),
     });
     this.deps.changed();
     return this.view(botId);
@@ -520,9 +518,9 @@ export class SkillLearning {
   // ---- Curator ----
 
   /** The curator’s last result. Built-in Maintenance owns its schedule. */
-  curatorState(botId: string): { paused: boolean; lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } {
+  curatorState(botId: string): { lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } {
     const row = this.row(botId);
-    return { paused: !!row.curator_paused, lastRunAt: row.curator_last_at, lastOutcome: row.curator_last_result, nextRunAt: null };
+    return { lastRunAt: row.curator_last_at, lastOutcome: row.curator_last_result, nextRunAt: null };
   }
 
   /** Runs the curator now: the transitions (applied unless dryRun) and, if on, a consolidation fork. */

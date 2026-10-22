@@ -598,7 +598,7 @@ test("Skills: learn from work, the last review, history, pins and archived skill
     ] },
     bot_skill_history: { versions: [{ id: 1, name: "deploy-check", body: "new", diff: "- old\n+ new", warnings: ["Advisory lint warning"], at: 1 }] },
     bot_learning: {
-      enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], approval: true, consolidate: false, curatorPaused: false,
+      enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], approval: true, consolidate: false,
       toolTurns: 3, userTurns: 1, reviewing: false, lastReview: { at: Date.now() - 2 * 3_600_000, result: "Saved 1 skill" }, lastCurator: null, nextCuratorAt: null,
       pending: [{ id: "pend_1", name: "deploy-check", action: "write", description: "Before a deploy", diff: "- old\n+ new", createdAt: 1 }],
     },

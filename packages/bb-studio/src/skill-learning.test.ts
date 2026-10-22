@@ -1,6 +1,7 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
+import { rpcContract } from "./contract";
 import {
   ARCHIVE_AFTER_MS, cheapestModel, curatorPlan, lineDiff, lintSkill, patchText, REVIEW_TOOLS, RETRY_PROMPT, reviewPrompt, gaveUpOnTools,
   SkillLearning, STALE_AFTER_MS, tallyTurns, type LearningSkill, type SkillState,
@@ -278,12 +279,9 @@ it("runs the curator explicitly from maintenance, with a dry run, pins exempt, a
   await x.learning.set("bot_main", { consolidate: true });
   await x.learning.curate("bot_main", { now });
   expect(Object.fromEntries(x.skills().map((skill) => [skill.name, skill.state]))).toEqual({ fresh: "active", old: "archived", pinned: "active" });
-  expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: false, lastOutcome: "1 archived" });
+  expect(x.learning.curatorState("bot_main")).toMatchObject({ lastOutcome: "1 archived" });
   // Two skills left unarchived: a consolidation fork.
   expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/Skill curator for "Dot"/) })] }));
-
-  await x.learning.set("bot_main", { curatorPaused: true });
-  expect(x.learning.curatorState("bot_main")).toMatchObject({ paused: true, nextRunAt: null });
 });
 
 it("pages through more than 100 new events", async () => {
@@ -322,4 +320,14 @@ it("keeps an unfinished tool turn across count calls and service restarts", asyn
   expect((await learning.view("bot_main")).toolTurns).toBe(1);
   await learning.count(x.bot);
   expect((await learning.view("bot_main")).toolTurns).toBe(1);
+});
+
+it("removes curator Pause from RPC settings and views while retaining legacy data", async () => {
+  const x = await setup();
+  await x.learning.view("bot_main");
+  x.db.prepare("UPDATE bot_learning SET curator_paused = 1").run();
+  expect(rpcContract.bot_learning_set.input.shape).not.toHaveProperty("curatorPaused");
+  expect(await x.learning.view("bot_main")).not.toHaveProperty("curatorPaused");
+  await x.learning.set("bot_main", { consolidate: true });
+  expect(x.db.prepare("SELECT curator_paused FROM bot_learning").get()).toEqual({ curator_paused: 1 });
 });

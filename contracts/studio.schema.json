@@ -10235,9 +10235,6 @@
           "consolidate": {
             "type": "boolean"
           },
-          "curatorPaused": {
-            "type": "boolean"
-          },
           "toolTurns": {
             "type": "number"
           },
@@ -10350,7 +10347,6 @@
           "models",
           "approval",
           "consolidate",
-          "curatorPaused",
           "toolTurns",
           "userTurns",
           "reviewing",
@@ -10397,9 +10393,6 @@
           },
           "consolidate": {
             "type": "boolean"
-          },
-          "curatorPaused": {
-            "type": "boolean"
           }
         }
       },
@@ -10435,9 +10428,6 @@
             "type": "boolean"
           },
           "consolidate": {
-            "type": "boolean"
-          },
-          "curatorPaused": {
             "type": "boolean"
           },
           "toolTurns": {
@@ -10552,7 +10542,6 @@
           "models",
           "approval",
           "consolidate",
-          "curatorPaused",
           "toolTurns",
           "userTurns",
           "reviewing",
@@ -10705,9 +10694,6 @@
           "consolidate": {
             "type": "boolean"
           },
-          "curatorPaused": {
-            "type": "boolean"
-          },
           "toolTurns": {
             "type": "number"
           },
@@ -10820,7 +10806,6 @@
           "models",
           "approval",
           "consolidate",
-          "curatorPaused",
           "toolTurns",
           "userTurns",
           "reviewing",

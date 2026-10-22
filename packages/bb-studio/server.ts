@@ -578,7 +578,7 @@ export default async function plugin(bb: BbPluginApi) {
     } catch (error) { bb.log.warn(`Thread resume: no host events (${errorText(error)})`); }
   }
   threadResume.startup();
-  // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work and the weekly curator.
+  // Skills that learn (src/skill-learning.ts): background reviews of a Bot's work; Maintenance owns curation.
   const learningBot = (bot: NonNullable<ReturnType<typeof bots.stored>>) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, kind: bot.kind ?? "studio" });
   // Side threads on a Bot's replies (src/bot-side-threads.ts).
   const sideThreads = new SideThreads({
@@ -638,7 +638,7 @@ export default async function plugin(bb: BbPluginApi) {
   // A cache-warming ping isn't a new turn by the user: it leaves a running review alone.
   bb.events.on("thread.active", ({ thread }) => { if (!warmer.pinging(thread.id)) void learning.active(thread.id).catch(() => {}); });
   bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
-  // Watchers' findings and end dates, once a minute; the skill curator and stuck reviews too.
+  // Watchers' findings and end dates, once a minute; Maintenance and stuck reviews too.
   const automationTimer = setInterval(() => {
     void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
     void maintenance.tick().catch((error) => bb.log.warn(`Maintenance tick failed: ${errorText(error)}`));
