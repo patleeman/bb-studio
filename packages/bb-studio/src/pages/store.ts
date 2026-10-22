@@ -3,8 +3,8 @@ import type Database from "better-sqlite3";
 
 // SQLite persistence. A page's content is its Yjs state (`state`); `markdown`
 // is a derived cache for search, mentions and previews, refreshed on save.
-// The schema as of the 2026-10-04 reset. Append new statements; never edit or
-// reorder these, since each database records the hash of every one it ran.
+// Historical schema for standalone store tests; Studio freezes its own copy.
+// Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS pages (
      id TEXT PRIMARY KEY,

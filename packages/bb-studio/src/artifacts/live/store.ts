@@ -5,8 +5,8 @@ import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 
 /**
- * Studio's MIGRATIONS (src/migrations.ts) runs this; BB checks each
- * statement against the hash it recorded, so never edit it.
+ * Historical live artifact schema; Studio freezes its own copy.
+ * Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
  */
 export const ARTIFACT_LIVE_TABLES = `CREATE TABLE artifact_live_state (
        artifact_id TEXT PRIMARY KEY REFERENCES artifacts (id) ON DELETE CASCADE,

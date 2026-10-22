@@ -6,9 +6,8 @@ import type Database from "better-sqlite3";
 import { parseScreenId, parseSteps, parseViewport, screenUrl, type DesignView, type RoundView, type ScreenView, type Viewport } from "../shared";
 
 /**
- * Append-only: statement index is the migration id, and BB checks each
- * statement against the hash it recorded, so never edit one (not even its
- * whitespace).
+ * Historical schema for standalone store tests; Studio freezes its own copy.
+ * Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
  */
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS designs (
@@ -67,7 +66,7 @@ export const MIGRATIONS = [
      );`,
 ];
 
-/** The Design plugin's statements, appended to Studio's migrations unchanged. */
+/** Historical statements; Studio's applied sequence is frozen in src/migrations.ts. */
 export const DESIGN_MIGRATIONS: readonly string[] = MIGRATIONS;
 
 /** A look the user picked, saved so later designs and decks can start from it. */

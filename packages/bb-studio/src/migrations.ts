@@ -1,14 +1,3 @@
-import { MIGRATIONS as CODE_MIGRATIONS } from "./kit/code-migrations";
-import { ARTIFACT_TABLES } from "./artifacts/server/store";
-import { ARTIFACT_LIVE_TABLES } from "./artifacts/live/store";
-import { DRAWING_TABLES } from "./draw/server/store";
-import { DESIGN_MIGRATIONS } from "./design/server/store";
-import { TALK_MIGRATIONS } from "./talk/server/store";
-import { MIGRATIONS as PAGE_MIGRATIONS } from "./pages/store";
-import { PAGE_NOTES_TABLE } from "./pages/notes";
-import { SIDE_THREADS_MANY, SIDE_THREADS_TABLE } from "./bot-side-threads";
-import { NEXT_LOG_MIGRATIONS } from "./explore/store";
-import { DASHBOARD_PROPOSALS_TABLE, DASHBOARD_TABLES } from "./dashboards/server/store";
 // Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
 // sidebar tabs (src/tabs.ts), item services (src/services.ts), search
 // (src/search-index.ts) and project leads (src/project-lead.ts). The space
@@ -17,7 +6,9 @@ import { DASHBOARD_PROPOSALS_TABLE, DASHBOARD_TABLES } from "./dashboards/server
 /**
  * Append-only: statement index is the migration id, and BB checks each
  * statement against the hash it recorded, so never edit one (not even its
- * whitespace). Add a new statement for every schema change.
+ * whitespace). Append every new statement at the END of this array.
+ * Keep SQL literal here: never import live store constants or spread domain
+ * arrays into this indexed history. migrations.test.ts pins the released prefix.
  */
 export const MIGRATIONS = [
   `CREATE TABLE tags (
@@ -156,7 +147,35 @@ export const MIGRATIONS = [
      ON CONFLICT (thread_id) DO UPDATE SET space_id = excluded.space_id;
    DROP TABLE chief_of_staff;`,
   // Artifacts are built in (src/artifacts): the old plugin's tables.
-  ARTIFACT_TABLES,
+  `CREATE TABLE IF NOT EXISTS artifacts (
+       id TEXT PRIMARY KEY,
+       title TEXT NOT NULL,
+       description TEXT NOT NULL DEFAULT '',
+       project_id TEXT,
+       source_thread_id TEXT,
+       source_path TEXT,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       updated_by TEXT,
+       archived_at INTEGER
+     );
+   CREATE UNIQUE INDEX IF NOT EXISTS artifacts_source ON artifacts (source_thread_id, source_path)
+     WHERE source_thread_id IS NOT NULL AND source_path IS NOT NULL;
+   CREATE TABLE IF NOT EXISTS artifact_versions (
+       id TEXT PRIMARY KEY,
+       artifact_id TEXT NOT NULL REFERENCES artifacts (id) ON DELETE CASCADE,
+       number INTEGER NOT NULL,
+       name TEXT NOT NULL,
+       mime TEXT NOT NULL,
+       size INTEGER NOT NULL,
+       sha256 TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       UNIQUE (artifact_id, number)
+     );
+   CREATE TABLE IF NOT EXISTS artifact_blobs (
+       sha256 TEXT PRIMARY KEY,
+       bytes BLOB NOT NULL
+     );`,
   // Spaces are gone; leads and heartbeats belong to BB projects (src/project-lead.ts).
   // Each Space's lead and heartbeat is queued here and put on its main project at
   // startup (ProjectLeads.finishMoves), which needs BB to say where the lead thread
@@ -197,15 +216,205 @@ export const MIGRATIONS = [
      SELECT automation_id, automation_project_id FROM space_runs WHERE automation_id IS NOT NULL;
    UPDATE space_runs SET enabled = 0, automation_id = NULL, automation_project_id = NULL;`,
   // Drawings are built in (src/draw): the Draw plugin's tables.
-  DRAWING_TABLES,
+  `CREATE TABLE IF NOT EXISTS drawings (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       data TEXT NOT NULL DEFAULT '{}',
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       project_id TEXT,
+       updated_by TEXT,
+       archived_at INTEGER,
+       template INTEGER NOT NULL DEFAULT 0
+     );
+   CREATE TABLE IF NOT EXISTS drawing_recovery_copies (
+       recovery_key TEXT PRIMARY KEY,
+       drawing_id TEXT NOT NULL
+     );`,
   // Designs are built in (src/design): the Design plugin's statements in order.
-  ...DESIGN_MIGRATIONS,
+  `CREATE TABLE IF NOT EXISTS designs (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       project_id TEXT,
+       updated_by TEXT,
+       archived_at INTEGER,
+       template INTEGER NOT NULL DEFAULT 0
+     );
+   CREATE TABLE IF NOT EXISTS design_rounds (
+       design_id TEXT NOT NULL REFERENCES designs(id) ON DELETE CASCADE,
+       round INTEGER NOT NULL,
+       title TEXT NOT NULL DEFAULT '',
+       intro TEXT NOT NULL DEFAULT '',
+       PRIMARY KEY (design_id, round)
+     );
+   CREATE TABLE IF NOT EXISTS design_screens (
+       design_id TEXT NOT NULL REFERENCES designs(id) ON DELETE CASCADE,
+       id TEXT NOT NULL,
+       round INTEGER NOT NULL,
+       title TEXT NOT NULL DEFAULT '',
+       caption TEXT NOT NULL DEFAULT '',
+       viewport TEXT NOT NULL DEFAULT 'desktop',
+       html TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       PRIMARY KEY (design_id, id)
+     );`,
+  `ALTER TABLE designs ADD COLUMN thread_id TEXT;`,
+  `CREATE TABLE IF NOT EXISTS design_comments (
+       id TEXT PRIMARY KEY,
+       design_id TEXT NOT NULL REFERENCES designs(id) ON DELETE CASCADE,
+       screen_id TEXT NOT NULL,
+       selector TEXT NOT NULL,
+       element_html TEXT NOT NULL DEFAULT '',
+       element_text TEXT NOT NULL DEFAULT '',
+       body TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       sent_at INTEGER,
+       resolved_at INTEGER
+     );
+   CREATE INDEX IF NOT EXISTS design_comments_design ON design_comments(design_id, created_at);`,
+  `ALTER TABLE design_comments ADD COLUMN step TEXT NOT NULL DEFAULT '';`,
+  `CREATE TABLE IF NOT EXISTS design_styles (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       notes TEXT NOT NULL DEFAULT '',
+       css TEXT NOT NULL,
+       source_design_id TEXT,
+       source_screen_id TEXT,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+     );`,
   // Recordings are built in (src/talk): the Talk plugin's statements in order.
-  ...TALK_MIGRATIONS,
+  `CREATE TABLE IF NOT EXISTS recordings (
+     id TEXT PRIMARY KEY,
+     title TEXT NOT NULL,
+     title_source TEXT NOT NULL,
+     title_chars INTEGER NOT NULL DEFAULT 0,
+     kind TEXT NOT NULL,
+     status TEXT NOT NULL,
+     project_id TEXT,
+     thread_id TEXT,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL,
+     ended_at INTEGER,
+     heartbeat_at INTEGER NOT NULL
+   , archived_at INTEGER, meeting_notes TEXT, audio_removed_at INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS segments (
+     recording_id TEXT NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+     id TEXT NOT NULL,
+     session_id TEXT NOT NULL,
+     idx INTEGER NOT NULL,
+     started_at INTEGER NOT NULL,
+     duration_ms INTEGER NOT NULL,
+     mime_type TEXT NOT NULL,
+     bytes INTEGER NOT NULL,
+     file TEXT NOT NULL,
+     status TEXT NOT NULL,
+     text TEXT,
+     error TEXT,
+     attempts INTEGER NOT NULL DEFAULT 0,
+     next_attempt_at INTEGER NOT NULL DEFAULT 0,
+     created_at INTEGER NOT NULL, cleaned_text TEXT,
+     PRIMARY KEY (recording_id, id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS segments_order ON segments(recording_id, started_at, idx)`,
+  `CREATE INDEX IF NOT EXISTS segments_pending ON segments(status, next_attempt_at)`,
+  `CREATE INDEX IF NOT EXISTS recordings_updated ON recordings(updated_at)`,
+  `ALTER TABLE recordings ADD COLUMN notes_page_id TEXT`,
+  `ALTER TABLE recordings ADD COLUMN notes_items TEXT`,
   // Pages are built in (src/pages): the Pages plugin's statements in order.
-  ...PAGE_MIGRATIONS,
+  `CREATE TABLE IF NOT EXISTS pages (
+     id TEXT PRIMARY KEY,
+     project_id TEXT,
+     parent_id TEXT,
+     title TEXT NOT NULL DEFAULT '',
+     icon TEXT NOT NULL DEFAULT '',
+     position REAL NOT NULL DEFAULT 0,
+     state BLOB,
+     markdown TEXT NOT NULL DEFAULT '',
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL,
+     updated_by TEXT NOT NULL DEFAULT '',
+     archived_at INTEGER,
+     refresh_bot_id TEXT,
+     refresh_cron TEXT,
+     refresh_instructions TEXT NOT NULL DEFAULT '',
+     refresh_last_at INTEGER
+   , template INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS snapshots (
+     id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     state BLOB NOT NULL,
+     label TEXT NOT NULL,
+     actor TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS files (
+     id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     name TEXT NOT NULL,
+     mime TEXT NOT NULL,
+     size INTEGER NOT NULL,
+     data BLOB NOT NULL,
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS requests (
+     id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     bot_id TEXT NOT NULL,
+     bot_name TEXT NOT NULL,
+     thread_id TEXT,
+     kind TEXT NOT NULL,
+     block_id TEXT,
+     comment_thread_id TEXT,
+     summary TEXT NOT NULL,
+     status TEXT NOT NULL,
+     error TEXT,
+     result TEXT,
+     dedupe_key TEXT NOT NULL UNIQUE,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS chats (
+     thread_id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS checklist_handoffs (
+     thread_id TEXT PRIMARY KEY,
+     page_id TEXT NOT NULL,
+     block_id TEXT NOT NULL,
+     title TEXT NOT NULL,
+     state TEXT NOT NULL,
+     note TEXT,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS pages_parent ON pages (project_id, parent_id, position)`,
+  `CREATE INDEX IF NOT EXISTS snapshots_page ON snapshots (page_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS requests_page ON requests (page_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS requests_thread ON requests (thread_id, status)`,
+  `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS checklist_handoffs_page ON checklist_handoffs (page_id, created_at)`,
+  `UPDATE requests SET status = 'failed',
+     error = COALESCE(NULLIF(error, ''), 'Bot profile automation was retired. Start a page chat to continue.'),
+     updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+   WHERE status IN ('queued', 'working')`,
   // Explore's Next row click log, which Pages kept in explore.db.
-  ...NEXT_LOG_MIGRATIONS,
+  `CREATE TABLE IF NOT EXISTS next_suggestions (
+     key TEXT PRIMARY KEY,
+     thread_id TEXT NOT NULL,
+     message_id TEXT NOT NULL,
+     kind TEXT NOT NULL,
+     emoji TEXT NOT NULL,
+     label TEXT NOT NULL,
+     shown_at INTEGER NOT NULL,
+     clicked_at INTEGER,
+     clicks INTEGER NOT NULL DEFAULT 0
+   )`,
+  `CREATE INDEX IF NOT EXISTS next_suggestions_shown ON next_suggestions (shown_at)`,
   // The user's Bot (src/bot.ts): an always-on agent with a name and avatar.
   // Its thread is the personal project's lead; an existing lead (the Chief of
   // Staff) becomes the Bot, keeping its thread and heartbeat.
@@ -358,17 +567,81 @@ export const MIGRATIONS = [
    CREATE TABLE bot_cache_banner_off (thread_id TEXT PRIMARY KEY, at INTEGER NOT NULL);`,
   // Dashboards (src/dashboards): dashboards, their widgets and layouts, the
   // custom widget library, widget data, script approvals and versions.
-  DASHBOARD_TABLES,
+  `CREATE TABLE dashboards (
+       id TEXT PRIMARY KEY, name TEXT NOT NULL, project_id TEXT,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT,
+       archived_at INTEGER, template INTEGER NOT NULL DEFAULT 0
+     );
+   CREATE TABLE dashboard_widgets (
+       dashboard_id TEXT NOT NULL, id TEXT NOT NULL, position INTEGER NOT NULL,
+       type TEXT NOT NULL, title TEXT, options TEXT NOT NULL DEFAULT '{}', source TEXT NOT NULL DEFAULT '{"kind":"none"}',
+       custom_type TEXT, html TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+       PRIMARY KEY (dashboard_id, id)
+     );
+   CREATE TABLE dashboard_layouts (
+       dashboard_id TEXT NOT NULL, breakpoint TEXT NOT NULL, layout TEXT NOT NULL DEFAULT '[]',
+       PRIMARY KEY (dashboard_id, breakpoint)
+     );
+   CREATE TABLE dashboard_widget_types (
+       id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', html TEXT NOT NULL,
+       default_options TEXT NOT NULL DEFAULT '{}', sample_data TEXT,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT
+     );
+   CREATE TABLE dashboard_data (
+       dashboard_id TEXT NOT NULL, widget_id TEXT NOT NULL, value TEXT, fetched_at INTEGER,
+       error TEXT, error_at INTEGER, attempted_at INTEGER,
+       PRIMARY KEY (dashboard_id, widget_id)
+     );
+   CREATE TABLE dashboard_script_approvals (
+       dashboard_id TEXT NOT NULL, widget_id TEXT NOT NULL, sha256 TEXT NOT NULL, command TEXT NOT NULL, cwd TEXT,
+       approved_at INTEGER NOT NULL,
+       PRIMARY KEY (dashboard_id, widget_id)
+     );
+   CREATE TABLE dashboard_versions (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, dashboard_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+       actor TEXT NOT NULL, label TEXT NOT NULL, doc TEXT NOT NULL
+     );
+   CREATE INDEX dashboard_versions_dashboard ON dashboard_versions (dashboard_id, id);`,
   // Who proposed each script widget's command, for the approval prompt.
-  DASHBOARD_PROPOSALS_TABLE,
+  `CREATE TABLE dashboard_script_proposals (
+       dashboard_id TEXT NOT NULL, widget_id TEXT NOT NULL, sha256 TEXT NOT NULL,
+       actor TEXT NOT NULL, thread_id TEXT, proposed_at INTEGER NOT NULL,
+       PRIMARY KEY (dashboard_id, widget_id)
+     );`,
   // Notes (src/pages/notes.ts): pages made from a thread's draft, and their thread.
-  PAGE_NOTES_TABLE,
+  `CREATE TABLE page_notes (
+     page_id TEXT PRIMARY KEY,
+     thread_id TEXT NOT NULL,
+     state TEXT NOT NULL,
+     created_at INTEGER NOT NULL,
+     resolved_at INTEGER
+   );
+   CREATE INDEX page_notes_thread ON page_notes (thread_id, state, created_at);`,
   // Side threads on a Bot's replies (src/bot-side-threads.ts): each fork and the reply it answers.
-  SIDE_THREADS_TABLE,
+  `CREATE TABLE bot_side_threads (
+       thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, source_thread_id TEXT NOT NULL, message_id TEXT NOT NULL,
+       replies INTEGER NOT NULL DEFAULT 0, last_reply_at INTEGER, created_at INTEGER NOT NULL
+     );
+   CREATE UNIQUE INDEX bot_side_threads_message ON bot_side_threads (source_thread_id, message_id);`,
   // Side threads are BB side chats now, a new one each time: a reply can have several.
-  SIDE_THREADS_MANY,
+  `DROP INDEX bot_side_threads_message;
+   CREATE INDEX bot_side_threads_message ON bot_side_threads (source_thread_id, message_id);`,
   // Live HTML artifacts (src/artifacts/live): shared state, event log and takes.
-  ARTIFACT_LIVE_TABLES,
+  `CREATE TABLE artifact_live_state (
+       artifact_id TEXT PRIMARY KEY REFERENCES artifacts (id) ON DELETE CASCADE,
+       state TEXT NOT NULL, version INTEGER NOT NULL, updated_by TEXT NOT NULL, updated_at INTEGER NOT NULL
+     );
+   CREATE TABLE artifact_live_events (
+       seq INTEGER PRIMARY KEY AUTOINCREMENT,
+       artifact_id TEXT NOT NULL REFERENCES artifacts (id) ON DELETE CASCADE,
+       type TEXT NOT NULL, name TEXT, data TEXT, by TEXT NOT NULL, at INTEGER NOT NULL
+     );
+   CREATE INDEX artifact_live_events_artifact ON artifact_live_events (artifact_id, seq);
+   CREATE TABLE artifact_takes (
+       id TEXT PRIMARY KEY,
+       artifact_id TEXT NOT NULL REFERENCES artifacts (id) ON DELETE CASCADE,
+       label TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL
+     );`,
   // Spaces are gone and nothing reads their folders any more.
   `DROP TABLE IF EXISTS space_folders`,
   // Prompt cache (src/bot-cache.ts): compaction before expiry, per Bot (on by
@@ -454,7 +727,21 @@ export const MIGRATIONS = [
    CREATE TRIGGER bot_maintenance_settings_no_delete BEFORE DELETE ON bot_maintenance_settings BEGIN SELECT RAISE(ABORT, 'append-only'); END;
    CREATE TRIGGER bot_maintenance_runs_no_update BEFORE UPDATE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;
    CREATE TRIGGER bot_maintenance_runs_no_delete BEFORE DELETE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;`,
-  ...CODE_MIGRATIONS,
+  `CREATE TABLE IF NOT EXISTS code_workspaces (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, project_id TEXT, folders TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+); CREATE INDEX IF NOT EXISTS code_workspaces_updated ON code_workspaces(updated_at);`,
+  `ALTER TABLE code_workspaces ADD COLUMN thread_id TEXT; CREATE INDEX IF NOT EXISTS code_workspaces_thread ON code_workspaces(thread_id);`,
+  `ALTER TABLE code_workspaces ADD COLUMN trusted INTEGER NOT NULL DEFAULT 1;`,
+  `ALTER TABLE code_workspaces ADD COLUMN share INTEGER NOT NULL DEFAULT 1;`,
+  `ALTER TABLE code_workspaces ADD COLUMN opened_at INTEGER;`,
+  `CREATE TABLE IF NOT EXISTS code_comments (
+  id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, path TEXT NOT NULL,
+  start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, line_text TEXT NOT NULL,
+  author TEXT NOT NULL, body TEXT NOT NULL, sent_to TEXT, sent_at INTEGER, resolved_at INTEGER,
+  created_at INTEGER NOT NULL
+); CREATE INDEX IF NOT EXISTS code_comments_workspace ON code_comments(workspace_id, created_at);`,
+  `ALTER TABLE code_workspaces ADD COLUMN review_thread_id TEXT;`,
   `ALTER TABLE bot_learning ADD COLUMN in_tool_turn INTEGER NOT NULL DEFAULT 0;`,
   // There can be only one open note per thread. Keep the newest one when older databases contain duplicates.
   `UPDATE page_notes

@@ -1,3 +1,5 @@
+// Historical Code schema; Studio freezes its own copy.
+// Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
 export const COMMENT_MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS code_comments (
   id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, path TEXT NOT NULL,

@@ -7,6 +7,8 @@ import { NEXT_KINDS, suggestionKey, type NextKind } from "./next";
  * kept explore.db beside Pages' database).
  * Each statement is exactly as Explore ran it, since a database records the
  * hash of every statement it ran; never edit or reorder them.
+ * Studio freezes its own copy. Append schema changes only at the END of
+ * MIGRATIONS in src/migrations.ts.
  */
 export const NEXT_LOG_MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS next_suggestions (

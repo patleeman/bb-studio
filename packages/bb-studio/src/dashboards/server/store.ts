@@ -8,9 +8,8 @@ import { BREAKPOINT_NAMES, EMPTY_LAYOUTS, jsonBytes, LIMITS, layoutItemSchema, s
 import { z } from "zod";
 
 /**
- * Studio's migration for dashboards (src/migrations.ts appends it). BB
- * checks each recorded statement against its hash: never edit it, append a
- * new statement instead.
+ * Historical dashboard schema; Studio freezes its own copy.
+ * Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
  */
 export const DASHBOARD_TABLES =
   `CREATE TABLE dashboards (
@@ -50,8 +49,8 @@ export const DASHBOARD_TABLES =
    CREATE INDEX dashboard_versions_dashboard ON dashboard_versions (dashboard_id, id);`;
 
 /**
- * Who proposed each script widget's command (src/migrations.ts appends it
- * after DASHBOARD_TABLES): the approval prompt names them. Keyed by the
+ * Who proposed each script widget's command: the approval prompt names them.
+ * Studio freezes this SQL in src/migrations.ts. Keyed by the
  * command's hash, so a later change by someone else replaces the row.
  */
 export const DASHBOARD_PROPOSALS_TABLE =

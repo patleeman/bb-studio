@@ -12,8 +12,8 @@ import type {
 } from "../shared/contract";
 import { countWords, defaultTitle, joinTranscript, tail } from "../shared/format";
 
-// The schema as of the 2026-10-04 reset. Append new statements; never edit or
-// reorder these, since each database records the hash of every one it ran.
+// Historical schema for standalone store tests; Studio freezes its own copy.
+// Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
 export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS recordings (
      id TEXT PRIMARY KEY,
@@ -53,7 +53,7 @@ export const MIGRATIONS = [
   `ALTER TABLE recordings ADD COLUMN notes_page_id TEXT`,
   `ALTER TABLE recordings ADD COLUMN notes_items TEXT`,
 ];
-/** Talk's statements, appended to Studio's migrations unchanged (src/migrations.ts). */
+/** Historical statements; Studio's applied sequence is frozen in src/migrations.ts. */
 export const TALK_MIGRATIONS = MIGRATIONS;
 
 interface RecordingRow {

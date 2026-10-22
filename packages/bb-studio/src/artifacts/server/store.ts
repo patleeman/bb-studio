@@ -8,10 +8,8 @@ import type Database from "better-sqlite3";
 import { MAX_ARTIFACT_BYTES, artifactType, formatBytes, type ArtifactType } from "../shared";
 
 /**
- * The artifact tables, as the old Artifacts plugin created them. Studio's
- * MIGRATIONS (src/migrations.ts) runs it; BB checks each statement against
- * the hash it recorded, so never edit it (not even its whitespace). Changes
- * go in new statements appended there.
+ * Historical artifact schema; Studio freezes its own copy.
+ * Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
  */
 export const ARTIFACT_TABLES =
   `CREATE TABLE IF NOT EXISTS artifacts (

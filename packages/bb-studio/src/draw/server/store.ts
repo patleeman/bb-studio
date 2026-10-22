@@ -6,10 +6,8 @@ import type Database from "better-sqlite3";
 import { elementCount, parseSceneData, serializeSceneData } from "../merge";
 
 /**
- * The Draw plugin's tables, byte for byte as it released them: Studio's
- * migrations (src/migrations.ts) append this statement, and the Draw upgrade
- * bridge keeps the same one. BB checks each statement against the hash it
- * recorded, so never edit it (not even its whitespace).
+ * Historical drawing schema; Studio freezes its own copy.
+ * Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
  */
 export const DRAWING_TABLES =
   `CREATE TABLE IF NOT EXISTS drawings (
