@@ -1,3 +1,4 @@
+import { useContentSearch } from "./use-content-search";
 // The Studio collection: one searchable, filterable list of items of any
 // kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on that
 // keeps its own page renders it alone for its own kind.
@@ -208,7 +209,8 @@ export function CollectionPage({
   const [sortText, setSortText] = useStoredState<string>(`${storageKey}:sort`, formatSort(DEFAULT_SORT));
   const sort = useMemo(() => parseSort(sortText), [sortText]);
   const setSort = useCallback((next: Sort) => setSortText(formatSort(next)), [setSortText]);
-  const [ownMatches, setContentMatches] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  const search = useContentSearch(query, filter ? undefined : handlers.onSearch);
+  const ownMatches = search.matches;
   const contentMatches = filter ? filter.snippets : ownMatches;
   const searched = filter ? filter.text : query;
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -243,26 +245,6 @@ export function CollectionPage({
     if (sort.key.startsWith("fact:") && !single?.columns.some((column) => `fact:${column.id}` === sort.key)) setSort(DEFAULT_SORT);
     if (sort.key === "kind" && single) setSort(DEFAULT_SORT);
   }, [single, sort.key, setSort]);
-
-  const { onSearch } = handlers;
-  useEffect(() => {
-    const text = query.trim();
-    if (!text || !onSearch) {
-      setContentMatches(new Map());
-      return;
-    }
-    let live = true;
-    const timer = setTimeout(() => {
-      onSearch(text).then(
-        (keys) => live && setContentMatches(keys),
-        () => {},
-      );
-    }, 200);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [onSearch, query]);
 
   const byKey = useMemo(() => new Map((items ?? []).map((item) => [itemKey(item), item])), [items]);
   const shown = useMemo(() => {
@@ -979,6 +961,8 @@ export function CollectionPage({
           </div>
 
           <div className="@container/list mt-3">
+            {!filter && search.loading ? <p role="status" className="py-2 text-sm text-muted-foreground">Searching content…</p> : null}
+            {!filter && search.error ? <p role="alert" className="py-2 text-sm text-destructive">Couldn't search content: {search.error} <button type="button" onClick={search.retry}>Retry search</button></p> : null}
             {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
             {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
             {filter && items !== null && !shown.length ? (

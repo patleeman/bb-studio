@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { PagesPanel } from "./PagesPanel";
+import { PagesPanel, usePagesData } from "./PagesPanel";
 
 const state = vi.hoisted(() => ({
-  call: vi.fn(), navigate: vi.fn(), handler: (_event: unknown) => {},
+  call: vi.fn(), navigate: vi.fn(), handlers: new Set<(event: unknown) => void>(),
+  handler(event: unknown) { for (const handler of this.handlers) handler(event); },
 }));
 const rpc = { call: state.call };
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => rpc,
   useBbNavigate: () => ({ toPluginPanel: state.navigate }),
-  useRealtime: (_channel: string, handler: typeof state.handler) => { state.handler = handler; },
+  useRealtime: (_channel: string, handler: (event: unknown) => void) => {
+    useEffect(() => { state.handlers.add(handler); return () => { state.handlers.delete(handler); }; }, [handler]);
+  },
 }));
 vi.mock("../../kit/app/index", () => ({
   openAppPath: vi.fn(), studioPath: vi.fn(),
@@ -25,6 +28,7 @@ let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  state.handlers.clear();
   state.call.mockImplementation((method: string) => Promise.resolve(method === "pages.tree" ? { pages: [] } : method === "bots" ? { available: false, reason: null, bots: [] } : { page: null }));
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
@@ -79,4 +83,16 @@ it("ignores an old route's response after changing pages", async () => {
   await act(async () => resolveOld({ page: { id: "pg_old", title: "Old page" } }));
   expect(container.textContent).toContain("Recovery for pg_new");
   expect(container.textContent).not.toContain("Live editor");
+});
+
+it("keeps page lists fresh in panel consumers and ignores an older tree response", async () => {
+  let resolveOld!: (result: unknown) => void;
+  let loads = 0;
+  state.call.mockImplementation((method: string) => method === "pages.tree" ? (++loads === 1 ? new Promise(resolve => { resolveOld = resolve; }) : Promise.resolve({ pages: [{ id: "new", title: "New title" }] })) : Promise.resolve({ page: null }));
+  function PanelConsumer() { const { pages } = usePagesData(rpc as never); return <p>{pages?.map(page => page.title).join(",")}</p>; }
+  await act(async () => root.render(<PanelConsumer />));
+  await act(async () => state.handler({ type: "tree", projectId: null }));
+  expect(container.textContent).toBe("New title");
+  await act(async () => resolveOld({ pages: [{ id: "old", title: "Old title" }] }));
+  expect(container.textContent).toBe("New title");
 });

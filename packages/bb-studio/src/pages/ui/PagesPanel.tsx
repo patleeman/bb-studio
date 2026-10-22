@@ -1,3 +1,5 @@
+import { requestGeneration } from "../../kit/ui/request-generation";
+import { usePanelPage } from "./use-panel-page";
 import { openAppPath, studioPath } from "../../kit/app/index";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,11 +13,17 @@ import { useProjects, type BotsState, type Rpc } from "./shared";
 export function usePagesData(rpc: Rpc) {
   const [pages, setPages] = useState<PageMetaView[] | null>(null);
   const [bots] = useState<BotsState>({ available: false, reason: null, bots: [] });
-  // The collection reports its own load errors; a failed refresh keeps the last list.
+  const [requests] = useState(requestGeneration);
+  // A failed refresh keeps the last list.
   const refetch = useCallback(() => {
-    rpc.call("pages.tree", {}).then((result) => setPages(result.pages), () => {});
-  }, [rpc]);
-  useEffect(() => { refetch(); }, [refetch]);
+    const current = requests.begin();
+    rpc.call("pages.tree", {}).then((result) => { if (current()) setPages(result.pages); }, () => {});
+  }, [rpc, requests]);
+  useEffect(() => { refetch(); return () => requests.invalidate(); }, [refetch, requests]);
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    const event = payload as RealtimeEvent;
+    if (event.type === "tree" || event.type === "deleted" || event.type === "page") refetch();
+  });
   return { pages, bots, refetch };
 }
 
@@ -73,37 +81,13 @@ export function PagesPanel({ subPath }: { subPath: string }) {
   const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
   const { pages, bots, refetch } = usePagesData(rpc);
 
-  const [pageMeta, setPageMeta] = useState<PageMetaView | null | undefined>(undefined);
-  const pageRequest = useRef(0);
-  const fetchPage = useCallback(() => {
-    const request = ++pageRequest.current;
-    if (!pageId) {
-      setPageMeta(undefined);
-      return;
-    }
-    rpc.call("pages.get", { id: pageId }).then(
-      (result) => request === pageRequest.current && setPageMeta(result.page),
-      () => request === pageRequest.current && setPageMeta(null),
-    );
-  }, [rpc, pageId]);
-  useEffect(() => {
-    setPageMeta(undefined);
-    fetchPage();
-    return () => { pageRequest.current++; };
-  }, [fetchPage]);
-  const showMissingPage = useCallback(() => {
-    pageRequest.current++;
-    setPageMeta(null);
-  }, []);
+  const { page: pageMeta, refetch: fetchPage, markMissing: showMissingPage } = usePanelPage(pageId);
 
   // The collection is Studio's.
   const toCollection = useCallback((replace = false) => openAppPath(studioPath("page"), { replace }), []);
   const [requestsVersion, setRequestsVersion] = useState(0);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as RealtimeEvent;
-    if (event.type === "tree" || event.type === "deleted" || event.type === "page") refetch();
-    if ((event.type === "page" && event.pageId === pageId) || event.type === "tree") fetchPage();
-    if (event.type === "deleted" && pageId && event.pageIds.includes(pageId)) showMissingPage();
     if (event.type === "requests" && event.pageId === pageId) setRequestsVersion((version) => version + 1);
   });
 

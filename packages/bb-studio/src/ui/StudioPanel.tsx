@@ -1,3 +1,5 @@
+import { useOverview } from "./use-overview";
+import { useContentSearch } from "../kit/app/use-content-search";
 // The Studio collection: every add-on's items in one list, filtered by one
 // query (src/query.ts) from search and the filter menus above it. It is the
 // workspace's new tab page, never a page of its own: openCollection starts it
@@ -26,21 +28,17 @@ import {
   type CollectionKind,
   type CollectionTag,
 } from "../kit/app/index";
-import { mentionPrompt, STUDIO_REALTIME_CHANNEL } from "../kit/contract";
+import { mentionPrompt } from "../kit/contract";
 import { errorMessage, untitled } from "../kit/format";
-import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { ProviderView, rpcContract, SavedViewView, SidebarView, TagView } from "../contract";
-import { applyItemChanges } from "../partial";
+import type { rpcContract, SavedViewView, SidebarView } from "../contract";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { QueryBar } from "./QueryBar";
 import { FilterToolbar } from "./FilterToolbar";
 
-type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] };
-const REFETCH_DEBOUNCE_MS = 300;
-const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
 
 const QUERY_KEY = "studio:query:all";
@@ -135,75 +133,6 @@ function defaultExportFormat(kind: string): string {
   return "markdown";
 }
 
-function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
-  const [data, setData] = useState<Overview | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // One request at a time; a change during a request fetches once more after.
-  const running = useRef(false);
-  const again = useRef(false);
-  const cursor = useRef<number | null>(null);
-  const refetch = useCallback(() => {
-    if (running.current) {
-      again.current = true;
-      return;
-    }
-    running.current = true;
-    Promise.all([rpc.call("changes", { since: 0 }), rpc.call("overview", null)])
-      .then(
-        ([checkpoint, result]) => {
-          setData(result);
-          cursor.current = checkpoint.cursor;
-          setError(null);
-          // An item can change while overview is being fetched.
-          rpc.call("changes", { since: checkpoint.cursor }).then((later) => {
-            if (later.reset || later.changes.length) refetch();
-          }, () => refetch());
-        },
-        (cause: unknown) => setError(errorMessage(cause)),
-      )
-      .finally(() => {
-        running.current = false;
-        if (again.current) {
-          again.current = false;
-          refetch();
-        }
-      });
-  }, [rpc]);
-
-  useEffect(() => {
-    refetch();
-    const onVisible = () => document.visibilityState === "visible" && refetch();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refetch]);
-
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const catchUp = useCallback(async () => {
-    if (cursor.current === null) { refetch(); return; }
-    try {
-      const result = await rpc.call("changes", { since: cursor.current });
-      if (result.reset) { refetch(); return; }
-      const groups = new Map<string, string[]>();
-      for (const change of result.changes) {
-        if (change.removed) continue;
-        groups.set(change.pluginId, [...(groups.get(change.pluginId) ?? []), change.id]);
-      }
-      const fetched = await Promise.all([...groups].map(([pluginId, ids]) => rpc.call("items", { pluginId, ids })));
-      const updated = fetched.flatMap(({ items }) => items);
-      setData((previous) => previous && {
-        ...previous,
-        items: applyItemChanges(previous.items, updated, result.changes.filter((change) => change.removed)),
-      });
-      cursor.current = result.cursor;
-    } catch { refetch(); }
-  }, [rpc, refetch]);
-  useRealtime(STUDIO_REALTIME_CHANNEL, () => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => { void catchUp(); }, REFETCH_DEBOUNCE_MS);
-  });
-  return { data, error, refetch, setData };
-}
 
 function useSidebar(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
   const [sidebar, setSidebar] = useState<SidebarView | null>(null);
@@ -263,24 +192,12 @@ export function StudioPanel() {
   // Words being typed after the last filter search; a field still waiting for its value doesn't.
   const searchText = useMemo(() => parseQuery(query.text).text.trim(), [query.text]);
   const freshness = useSearchFreshness(Boolean(searchText));
-  const [snippets, setSnippets] = useState<ReadonlyMap<string, string | null>>(() => new Map());
-  useEffect(() => {
-    if (!searchText) {
-      setSnippets(new Map());
-      return;
-    }
-    let live = true;
-    const timer = setTimeout(() => {
-      rpc.call("search", { query: searchText }).then(
-        ({ keys, snippets: found }) => live && setSnippets(new Map(keys.map((key) => [key, found[key] ?? null]))),
-        () => {},
-      );
-    }, SEARCH_DEBOUNCE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [rpc, searchText, freshness.revision]);
+  const search = useCallback(async (text: string) => {
+    const { keys, snippets } = await rpc.call("search", { query: text });
+    return new Map(keys.map((key) => [key, snippets[key] ?? null]));
+  }, [rpc]);
+  const contentSearch = useContentSearch(searchText, search, freshness.revision);
+  const snippets = contentSearch.matches;
   const compiled = useMemo(() => compileQuery({ filters: query.filters, text: searchText }, vocabulary), [query.filters, searchText, vocabulary]);
   const matchesText = useCallback(
     (item: CollectionItem) => !searchText || untitled(item.title).toLowerCase().includes(searchText.toLowerCase()) || snippets.has(itemKey(item)),
@@ -410,6 +327,8 @@ export function StudioPanel() {
       {/* Talk kept its own page for these; recordings are Studio's now. */}
       {onlyKind?.id === "recording" || onlyKind?.id === "dictation" ? <UnsentNotice className="mb-2" /> : null}
       {searchText ? <SearchFreshness {...freshness} /> : null}
+      {contentSearch.loading ? <p role="status" className="px-4 text-sm text-muted-foreground">Searching content…</p> : null}
+      {contentSearch.error ? <p role="alert" className="px-4 text-sm text-destructive">Couldn't search content: {contentSearch.error} <button type="button" onClick={contentSearch.retry}>Retry search</button></p> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name="AlertTriangle" className="size-4 shrink-0" />
