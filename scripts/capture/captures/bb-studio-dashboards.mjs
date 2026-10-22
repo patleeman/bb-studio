@@ -68,7 +68,7 @@ async function open(client, id, { empty = false } = {}) {
   const path = `/plugins/studio/studio/dashboards/${id}`;
   await client.navigate(path);
   await client.waitForSelector(`[data-studio-workspace-editor="${path}"]`, 30000);
-  await client.waitForSelector(empty ? "[data-dashboard-empty]" : "[data-dashboard-grid] .react-grid-layout", 30000);
+  await client.waitForSelector(`[data-studio-workspace-editor="${path}"] ${empty ? "[data-dashboard-empty]" : "[data-dashboard-grid] .react-grid-layout"}`, 30000);
 }
 
 const tileCount = (client) => client.evaluate(`document.querySelectorAll("[data-dashboard-grid] [data-widget-id]").length`);

@@ -1,10 +1,8 @@
-import { spawn } from "node:child_process";
-// Captures run against a staged BB (scripts/staged-bb.mjs), never the BB you
-// work in, whose projects and threads are private.
-if (!process.env.BB_SERVER_URL || !process.env.BB_DATA_DIR)
-  throw new Error('Source a staged BB\'s capture.env first: node scripts/staged-bb.mjs start, then . "$TMPDIR/bb-studio-staged/capture.env".');
-export const serverUrl = process.env.BB_SERVER_URL.replace(/\/$/, "");
-export const cdpPort = Number(process.env.BB_CAPTURE_CDP_PORT ?? "9222");
+import { runText } from "./process.mjs";
+import { readStagedInstance, captureEnv } from "../staged-instance.mjs";
+export const instance = readStagedInstance();
+export const serverUrl = instance.serverUrl;
+export const cdpPort = instance.cdpPort;
 export const projectId = process.env.BB_CAPTURE_PROJECT_ID;
 export const threadId = process.env.BB_CAPTURE_THREAD_ID;
 export const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
@@ -23,14 +21,5 @@ export async function pluginRpc(pluginId, method, input) {
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */
 export async function bbCli(args) {
-  const env = { ...process.env };
-  delete env.BB_THREAD_ID;
-  const child = spawn("bb", args, { env, stdio: ["ignore", "pipe", "pipe"] });
-  let stdout = "";
-  let stderr = "";
-  child.stdout.on("data", (chunk) => (stdout += chunk));
-  child.stderr.on("data", (chunk) => (stderr += chunk));
-  const code = await new Promise((resolvePromise) => child.on("close", resolvePromise));
-  if (code !== 0) throw new Error(`bb ${args.join(" ")} failed: ${stderr || stdout}`);
-  return stdout;
+  return runText(instance.cli, args, { env: captureEnv(instance) });
 }

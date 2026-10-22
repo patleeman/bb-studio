@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
+import { runText } from "./process.mjs";
+export { runText } from "./process.mjs";
 import { projectId, threadId, pluginRpc, bbCli, sleep } from "./bb.mjs";
 
 export async function seedPages() {
@@ -229,17 +230,6 @@ export async function talkRpc(method, input) {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-export async function runText(command, args) {
-  const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-  let stdout = "";
-  let stderr = "";
-  child.stdout.on("data", (chunk) => (stdout += chunk));
-  child.stderr.on("data", (chunk) => (stderr += chunk));
-  const code = await new Promise((resolvePromise) => child.on("close", resolvePromise));
-  if (code !== 0) throw new Error(`${command} failed: ${stderr}`);
-  return stdout;
 }
 
 /**

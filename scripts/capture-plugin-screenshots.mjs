@@ -3,6 +3,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runCapture } from "./capture/lifecycle.mjs";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
 import { projectId, threadId, pluginRpc, bbCli, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
@@ -41,10 +42,7 @@ try {
   });
   for (const capture of selected) {
     process.stdout.write(`Capturing ${capture.id}...\n`);
-    // Each capture starts as a fresh window: Studio keeps a sticky sidebar mode per window (sessionStorage).
-    await client.evaluate(`(() => { try { sessionStorage.removeItem("studio.sidebar.listMode"); } catch {} return true; })()`).catch(() => {});
-    const cleanup = await capture.setup(client);
-    try {
+    await runCapture(client, capture.setup, async () => {
       const outputPath = join(repoRoot, "packages", capture.packageDir, "assets", capture.fileName ?? "staged-preview.png");
       // Use BB's real collapsed-sidebar state so publication does not expose
       // unrelated local projects/threads alongside the deterministic fixtures.
@@ -68,9 +66,7 @@ try {
         await sleep(350);
       }
       process.stdout.write(`  ${outputPath}\n`);
-    } finally {
-      if (cleanup) await cleanup();
-    }
+    });
   }
 } finally {
   client.socket?.close();

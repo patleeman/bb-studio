@@ -23,17 +23,23 @@
  * saves to ~/.bb/pi-bridge-sessions, so don't use Pi in fixtures.
  */
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { chmod, cp, mkdir, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { confirmStopped } from "./staged-stop.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoSource = "git:github.com/patleeman/bb-studio";
 const releaseFeedUrl = "https://github.com/get-bb/bb/releases/download/desktop-latest/latest-mac.yml";
-const stagedDir = resolve(process.env.BB_STAGED_DIR || join(tmpdir(), "bb-studio-staged"));
+const requestedDir = resolve(process.env.BB_STAGED_DIR || join(tmpdir(), "bb-studio-staged"));
+let existingParent = dirname(requestedDir);
+while (!existsSync(existingParent)) existingParent = dirname(existingParent);
+const stagedDir = resolve(realpathSync(existingParent), relative(existingParent, requestedDir));
+if (existsSync(stagedDir) && realpathSync(stagedDir) !== stagedDir) throw new Error(`Refusing a symlinked BB_STAGED_DIR: ${stagedDir}`);
 // start and stop delete stagedDir: refuse anything that holds the repository,
 // the home directory, the current directory, or the BB you work in.
 {
@@ -70,6 +76,7 @@ function stagedEnv(extra) {
     ...env,
     PATH: `${shimDir}:${binDir}:${process.env.PATH}`,
     CODEX_HOME: codexHome,
+    npm_config_cache: join(stagedDir, "npm-cache"),
     ...(existsSync(join(shimDir, "claude")) ? { BB_CLAUDE_CODE_EXECUTABLE: join(shimDir, "claude") } : {}),
     ...extra,
   };
@@ -175,7 +182,7 @@ async function start() {
   for (const candidate of [port, port + 1, port + 2]) {
     if (!(await portFree(candidate))) throw new Error(`Port ${candidate} is in use. Set BB_STAGED_PORT to a free range of five ports.`);
   }
-  await rm(stagedDir, { recursive: true, force: true });
+  if (existsSync(stagedDir)) throw new Error(`Staged directory already exists: ${stagedDir}. Run stop first; failed instances keep their logs.`);
   await mkdir(stagedDir, { recursive: true });
   await useOwnAgentHomes();
 
@@ -189,12 +196,20 @@ async function start() {
     ["--bundled", "--data-dir", dataDir, "--server-port", String(port), "--host-daemon-port", String(port + 1)],
     { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0" }) },
   );
+  await new Promise((resolve, reject) => {
+    launcher.once("spawn", resolve);
+    launcher.once("error", reject);
+  });
   launcher.unref();
   await log.close();
+  await writeFile(join(stagedDir, "instance.json"), JSON.stringify({
+    kind: "bb-studio-staged", directory: stagedDir, dataDir, port, serverUrl,
+    cdpPort: port + 2, cli: join(binDir, "bb"), launcherPid: launcher.pid,
+  }, null, 2));
   // From here a failure or Ctrl-C stops the staged BB instead of leaving it
   // running; the directory stays for launcher.log until stop.
   const stopLaunched = async () => {
-    await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir], { quiet: true }).catch(() => {});
+    await stopOwned().catch((error) => { process.stderr.write(`Stop failed: ${error.message}. Keeping ${stagedDir}; logs: ${join(stagedDir, "launcher.log")}\n`); });
   };
   const interrupted = async () => {
     await stopLaunched();
@@ -262,6 +277,7 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   await writeFile(
     envFile,
     [
+      `export BB_CAPTURE_INSTANCE="${join(stagedDir, "instance.json")}"`,
       `export BB_DATA_DIR="${dataDir}"`,
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
@@ -312,16 +328,22 @@ async function which(name) {
   return undefined;
 }
 
+async function stopOwned() {
+  await confirmStopped({
+    stop: async () => {
+      if (existsSync(join(binDir, "bb-app"))) await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir]);
+    },
+    processes: async () => (await run("ps", ["-axo", "pid=,command="], { quiet: true }))
+      .split("\n").filter((line) => line.includes(`${stagedDir}/`)),
+    portsFree: async () => (await Promise.all([port, port + 1, port + 2].map(portFree))).every(Boolean),
+    sleep,
+  });
+}
+
 async function stop() {
-  // Stop even when /health doesn't answer (still starting, or wedged), so
-  // deleting the directory can't orphan a running BB.
-  if (existsSync(join(binDir, "bb-app"))) {
-    try {
-      await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir]);
-    } catch (error) {
-      if (await healthy()) throw error;
-    }
-  }
+  if (!existsSync(stagedDir)) return;
+  try { await stopOwned(); }
+  catch (error) { throw new Error(`${error.message}. Instance kept at ${stagedDir}; logs: ${join(stagedDir, "launcher.log")}`, { cause: error }); }
   await rm(stagedDir, { recursive: true, force: true });
   process.stdout.write(`Stopped the staged BB and removed ${stagedDir}\n`);
 }

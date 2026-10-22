@@ -1,3 +1,4 @@
+import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -26,6 +27,7 @@ export class CdpClient {
       this.socket.addEventListener("open", resolvePromise, { once: true });
       this.socket.addEventListener("error", reject, { once: true });
     });
+    await this.command("Page.enable");
   }
 
   command(method, params = {}, timeoutMs = 60000) {
@@ -70,9 +72,41 @@ export class CdpClient {
     return result.result?.value;
   }
 
+  async resetCaptureState() {
+    const token = String(++this.nextId);
+    const { identifier } = await this.command("Page.addScriptToEvaluateOnNewDocument", { source: `
+      if (location.origin === ${JSON.stringify(serverUrl)}) {
+        localStorage.removeItem("bb:studio-workspace:v1");
+        sessionStorage.removeItem("studio.sidebar.listMode");
+        window.__bbCaptureReset = ${JSON.stringify(token)};
+      }
+    ` });
+    this.captureReset = { identifier, token };
+  }
+
   async navigate(path) {
-    await this.command("Page.navigate", { url: `${serverUrl}${path}` });
-    await sleep(900);
+    if (path === "about:blank" && this.captureReset) {
+      await this.command("Page.removeScriptToEvaluateOnNewDocument", { identifier: this.captureReset.identifier });
+      this.captureReset = null;
+    }
+    const url = path === "about:blank" ? path : `${serverUrl}${path}`;
+    await this.command("Page.navigate", { url });
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      const reset = this.captureReset;
+      const resetDone = !reset || await this.poll(`window.__bbCaptureReset === ${JSON.stringify(reset.token)}`);
+      // Item routes can replace their URL once the loaded app opens its tab.
+      const ready = resetDone && await this.poll(`document.readyState === "complete" && (location.href === ${JSON.stringify(url)} || (${JSON.stringify(path)} !== "about:blank" && location.origin === ${JSON.stringify(serverUrl)} && location.pathname === "/plugins/studio/studio"))`);
+      if (ready) {
+        if (reset) {
+          await this.command("Page.removeScriptToEvaluateOnNewDocument", { identifier: reset.identifier });
+          this.captureReset = null;
+        }
+        return;
+      }
+      await sleep(100);
+    }
+    throw new Error(`Navigation did not finish: ${url}`);
   }
 
   /** Evaluates for a poll; a page that navigates mid-poll just isn't ready yet. */
@@ -394,9 +428,13 @@ async function findPageTarget() {
 }
 
 export async function ensureChrome() {
-  try {
-    return { webSocketUrl: await findPageTarget(), process: null };
-  } catch {
+  const free = await new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.listen(cdpPort, "127.0.0.1", () => server.close(() => resolve(true)));
+  });
+  if (!free) throw new Error(`Capture Chrome port ${cdpPort} is occupied; refusing to use an unrelated browser.`);
+  {
     const chromePath = process.env.BB_CAPTURE_CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
     const profileDir = await mkdtemp(join(tmpdir(), "bb-plugin-capture-"));
     const chromeProcess = spawn(
@@ -420,8 +458,10 @@ export async function ensureChrome() {
       ],
       { stdio: "ignore" },
     );
+    let launchError;
+    chromeProcess.once("error", (error) => { launchError = error; });
     const started = Date.now();
-    while (Date.now() - started < 20000) {
+    while (!launchError && chromeProcess.exitCode === null && Date.now() - started < 20000) {
       try {
         return { webSocketUrl: await findPageTarget(), process: chromeProcess, profileDir };
       } catch {
@@ -430,6 +470,6 @@ export async function ensureChrome() {
     }
     chromeProcess.kill();
     await rm(profileDir, { recursive: true, force: true });
-    throw new Error(`Timed out waiting for Chrome DevTools on port ${cdpPort}`);
+    throw new Error(`Could not start owned Chrome on port ${cdpPort}: ${launchError?.message ?? "timeout or early exit"}`);
   }
 }

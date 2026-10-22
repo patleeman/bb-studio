@@ -1,15 +1,14 @@
 import { createRequire } from "node:module";
-import { basename, dirname, join, resolve } from "node:path";
+import { join } from "node:path";
+
+import { readStagedInstance } from "../../staged-instance.mjs";
 
 const require = createRequire(import.meta.url);
-const Database = require("../../../packages/bb-studio/node_modules/better-sqlite3");
 const DAY = 86_400_000;
 
 function openStagedDb(name) {
-  const dataDir = resolve(process.env.BB_DATA_DIR ?? "");
-  if (basename(dataDir) !== "data" || !basename(dirname(dataDir)).startsWith("bb-studio-staged")) {
-    throw new Error(`Refusing fixture database access outside the staged BB: ${dataDir}`);
-  }
+  const { dataDir } = readStagedInstance();
+  const Database = require("../../../packages/bb-studio/node_modules/better-sqlite3");
   return new Database(join(dataDir, name), { timeout: 5000 });
 }
 
