@@ -251,13 +251,14 @@ describe("BotCacheWarmer", () => {
     expect(x.w.pinging("thr_main")).toBe(false);
   });
 
-  it("leaves an unread chat unread after a ping", async () => {
+  it("keeps the pre-ping activity baseline without marking an unread chat read", async () => {
     const x = await warmer({ read: false });
     x.advance(6 * MIN);
     await x.w.tick();
     await x.w.idle("thr_main");
     expect(x.markRead).not.toHaveBeenCalled();
-    expect(x.w.lastPing("thr_main")).toEqual({ sentAt: T0 + 6 * MIN });
+    expect(x.w.quietSince("thr_main", T0 + 7 * MIN)).toBe(T0 - 50 * MIN);
+    expect(x.w.quietSince("thr_main", T0 + 30 * MIN)).toBe(T0 + 30 * MIN);
   });
 
   it("doesn't ping small chats, external bots, OpenAI models or busy threads", async () => {

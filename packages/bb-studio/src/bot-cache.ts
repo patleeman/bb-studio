@@ -42,9 +42,8 @@
 // marks the send for message.dispatch hooks (Smart Queue only holds human
 // sends to busy threads, and a ping only goes to an idle one). BB marks a
 // thread unread when a turn ends, so Studio marks it read again when it was
-// read before the ping. Studio's own counters skip pings: Learn from work's
-// user-turn count (isPingRequest) and cache-ping activity baseline (quietSince), and
-// a review running beside the chat isn't stopped by one.
+// read before the ping. Learn from work skips cache pings by checking their
+// initiator; cache warming preserves the pre-ping activity timestamp too.
 //
 // Settings are per Bot (bot_cache_settings). Pings are logged (bot_cache_pings),
 // compactions before expiry too (bot_cache_compactions).
