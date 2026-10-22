@@ -848,10 +848,12 @@ export class Bots {
     const row = this.need(botId);
     if (row.state === "active") {
       const run = this.deps.leads.runs.get(this.runKey(row));
+      // Persist before external work; a failed Pause must keep this across retries.
+      if (run?.enabled) this.update(row, { heartbeat_was_on: 1 });
       if (run?.enabled) await this.writeRun(row, { ...run, enabled: false });
       // Its other check-ins, reminders and watchers too; Resume turns back on these.
       await this.deps.automations?.pauseAll(row.id, (id) => this.rememberPaused(row.id, "bot-automation", id));
-      this.update(this.need(row.id), { state: "paused", heartbeat_was_on: run?.enabled ? 1 : 0 });
+      this.update(this.need(row.id), { state: "paused" });
     }
     return this.get(row.id);
   }

@@ -710,3 +710,18 @@ it("pages skill history without preventing reverts or lint on older versions", a
   x.bots.revertSkill(first.id);
   expect(x.bots.skill("deploy")?.body).toBe("first");
 });
+
+it("remembers an enabled heartbeat across a failed Pause and retry", async () => {
+  const x = await setup();
+  const pauseAll = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, automations: { pauseAll, restore: async () => true, follow: async () => {} } });
+  x.add({ id: "retry_bot" });
+  await bots.setThread("retry_bot");
+  await bots.setRun({ enabled: true, cadence: "daily", time: "09:00" });
+  await expect(bots.pause()).rejects.toThrow("offline");
+  expect(x.leads.runs.get(PERSONAL_PROJECT_ID)?.enabled).toBe(false);
+  expect(bots.stored()?.state).toBe("active");
+  await bots.pause();
+  await bots.resume();
+  expect(x.leads.runs.get(PERSONAL_PROJECT_ID)?.enabled).toBe(true);
+});
