@@ -150,9 +150,9 @@ it("keeps a parent while a child thread is still open, since archiving cascades"
   const r = await x.maintenance.run("bot", { now });
   expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall.map((n) => n.threadId)).toEqual(["kid"]);
   x.status.mockResolvedValue(clean()); await x.maintenance.run("bot", { now: now + 1 });
-  expect(x.archive.mock.calls.map(([input]) => (input as { threadId: string }).threadId)).toEqual(["kid"]);
+  expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid"]);
   x.rows.splice(1, 1); await x.maintenance.run("bot", { now: now + 2 });
-  expect(x.archive.mock.calls.map(([input]) => (input as { threadId: string }).threadId)).toEqual(["kid", "child"]);
+  expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid", "child"]);
 });
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
