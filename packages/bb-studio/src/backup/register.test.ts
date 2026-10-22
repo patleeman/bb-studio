@@ -15,10 +15,10 @@ async function setup() {
   dirs.push(dir);
   const handlers: Record<string, (input: never) => Promise<unknown>> = {};
   const routes: Record<string, (context: unknown) => Promise<Response>> = {};
-  const outcome = { failed: false };
+  const outcome = { failed: false, skipped: false };
   const restore = vi.fn(async (_file: string, options: { dryRun: boolean }) => ({
     dryRun: options.dryRun, createdAt: "2026-10-07", projects: { mapped: 0, unmapped: [] },
-    sections: outcome.failed ? [{ pluginId: "pages", name: "Pages", status: "failed" as const, reason: "boom", report: null }] : [],
+    sections: outcome.failed ? [{ pluginId: "pages", name: "Pages", status: "failed" as const, reason: "boom", report: null }] : outcome.skipped ? [{ pluginId: "pages", name: "Pages", status: "skipped" as const, unresolved: true, reason: "Install Pages and restore again.", report: null }] : [],
   }));
   const service = { cleanup: async () => {}, restore, backup: vi.fn() } as unknown as BackupService;
   registerBackup({
@@ -89,6 +89,19 @@ it("keeps the uploaded file after a restore with failures, so it can run again",
   expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: true });
   expect((await stat(path)).size).toBe(3);
   outcome.failed = false;
+  expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: false });
+  await expect(stat(path)).rejects.toThrow();
+});
+
+it("keeps an upload while an included section is skipped and allows retry", async () => {
+  const { dir, call, outcome } = await setup();
+  const { uploadId } = await call<{ uploadId: string }>("backup.upload", { uploadId: null, offset: 0, data: b64("abc") });
+  const path = join(dir, "backup-uploads", `${uploadId}.zip`);
+  await call("backup.restore", { uploadId, dryRun: true });
+  outcome.skipped = true;
+  expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: true });
+  expect((await stat(path)).size).toBe(3);
+  outcome.skipped = false;
   expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: false });
   await expect(stat(path)).rejects.toThrow();
 });

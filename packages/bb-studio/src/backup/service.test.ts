@@ -255,3 +255,16 @@ it("backs up the Bot and its skills, and restores them only when this BB has no 
   await service(await temp(), takenDb).restore(file, { dryRun: false });
   expect(takenDb.prepare("SELECT name FROM bots").all()).toEqual([{ name: "Mine" }]);
 });
+
+it("reports skipped included sections as unresolved, but not sections absent from the backup", async () => {
+  const dataDir = await temp();
+  const studioData = studioDataBackup(studioDb(), { threadExists: async () => false });
+  const source = new BackupService({ dataDir, sdk: bb({ dataDir, projects: [], addOns: { notes: notesAddOn(new Map()) }, installed: ["notes"] }), bbVersion: async () => null, studioData });
+  const file = join(dataDir, "backup.zip");
+  await source.backup(file);
+  const target = new BackupService({ dataDir, sdk: bb({ dataDir, projects: [], addOns: {}, installed: [] }), bbVersion: async () => null, studioData });
+  const result = await target.restore(file, { dryRun: false });
+  expect(result.sections.find((section) => section.pluginId === "notes")).toMatchObject({ status: "skipped", unresolved: true });
+  expect(restoreFailed(result)).toBe(true);
+  expect(restoreFailed({ ...result, sections: result.sections.filter((section) => section.pluginId !== "notes") })).toBe(false);
+});

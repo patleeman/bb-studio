@@ -92,7 +92,7 @@ export function registerBackup(bb: Pick<BbPluginApi, "rpc" | "http" | "log" | "o
       const summary = await service.restore(path, { dryRun });
       if (dryRun && hash) checked.set(uploadId, hash);
       const result = restoreResult(summary);
-      // Keep the file when something failed, so the restore can run again without uploading it again.
+      // Keep the file when anything remains unrestored, so the restore can run again without uploading it again.
       if (!dryRun && !result.failed) {
         checked.delete(uploadId);
         await rm(path, { force: true });

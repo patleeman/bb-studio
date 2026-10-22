@@ -59,6 +59,8 @@ export interface BackupSummary {
 }
 
 export interface RestoreSection {
+  /** An included section could not be restored here yet. */
+  unresolved?: boolean;
   pluginId: string;
   name: string;
   status: "restored" | "skipped" | "failed";
@@ -277,11 +279,11 @@ export class BackupService {
           }
           const plugin = plugins.find((each) => each.id === section.pluginId);
           if (!plugin?.enabled) {
-            sections.push({ ...base, status: "skipped", reason: `${section.name} isn't ${plugin ? "turned on" : "installed"} here. Install it, then restore again: items already restored are left as they are.`, report: null });
+            sections.push({ ...base, status: "skipped", unresolved: true, reason: `${section.name} isn't ${plugin ? "turned on" : "installed"} here. Install it, then restore again: items already restored are left as they are.`, report: null });
             continue;
           }
           if (!able.has(section.pluginId)) {
-            sections.push({ ...base, status: "skipped", reason: discovered ? `This version of ${section.name} can't restore backups; update it and restore again.` : "BB couldn't list which add-ons restore backups.", report: null });
+            sections.push({ ...base, status: "skipped", unresolved: true, reason: discovered ? `This version of ${section.name} can't restore backups; update it and restore again.` : "BB couldn't list which add-ons restore backups.", report: null });
             continue;
           }
           try {
@@ -347,7 +349,7 @@ export function formatRestore(summary: RestoreSummary): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** True when any section failed or any item couldn't be restored. */
+/** True when an included section is unresolved or any item could not be restored. */
 export function restoreFailed(summary: RestoreSummary): boolean {
-  return summary.sections.some((section) => section.status === "failed" || (section.report?.failed ?? 0) > 0);
+  return summary.sections.some((section) => section.status === "failed" || section.unresolved === true || (section.report?.failed ?? 0) > 0);
 }
