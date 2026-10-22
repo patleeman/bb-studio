@@ -133,7 +133,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
       <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
       {bot.kind === "external"
         ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>
-        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} adoptOnly />}
+        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />

@@ -1,3 +1,4 @@
+import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerDecisions } from "./src/decisions/server";
@@ -237,7 +238,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_avatar_generate", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "runner_create", "runner_update", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /** A side thread (src/bot-side-threads.ts) talks about one reply: it reads the Bot, never changes it. */
   const SIDE_THREAD_TOOLS = ["bot_get", "bot_activity", "bot_skill_list", "bot_skill_view", "bot_history_search", "runner_list", "automation_list"] as const;
   // A fork inherits its Bot's session, tool list included, so configure can't
@@ -627,7 +628,7 @@ export default async function plugin(bb: BbPluginApi) {
   // host:changed comes over BB's realtime socket (SDK 0.6.37 has it); without it, the sweeps still run.
   if (typeof bb.sdk.subscribe === "function") {
     try {
-      const unsubscribe = bb.sdk.subscribe({ event: "host:changed", callback: (event) => { if (event.changes.includes("host-connected")) threadResume.hostConnected(); } });
+      const unsubscribe = bb.sdk.subscribe({ event: "host:changed", callback: (event) => { if (event.changes.includes("host-connected")) { threadResume.hostConnected(); void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`)); } } });
       bb.onDispose(() => unsubscribe());
     } catch (error) { bb.log.warn(`Thread resume: no host events (${errorText(error)})`); }
   }
@@ -692,9 +693,11 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.active", ({ thread }) => { if (!warmer.pinging(thread.id)) void learning.active(thread.id).catch(() => {}); });
   bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
   // Watchers' findings and end dates, once a minute; Maintenance and stuck reviews too.
+  void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
   void runners.retryCleanup();
   void automations.tick().catch((error) => bb.log.warn(`Automations startup failed: ${errorText(error)}`));
   const automationTimer = setInterval(() => {
+    void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
     void runners.retryCleanup();
     void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
     void maintenance.tick().catch((error) => bb.log.warn(`Maintenance tick failed: ${errorText(error)}`));
@@ -940,6 +943,10 @@ export default async function plugin(bb: BbPluginApi) {
     bot_runners: async ({ botId }) => { const [list, adoptable] = await Promise.all([runners.list(botId), runners.adoptable(botId)]); return { runners: list, adoptable }; },
     bot_runner_create: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
     bot_runner_update: ({ botId, ...input }) => runners.update(input, botId),
+    bot_runner_migrate: ({ botId, ...input }) => runners.migrate(input, botId),
+    bot_runner_machines: () => runners.machines(),
+    bot_runner_preflight: ({ botId, ...input }) => runners.preflight(input, botId),
+    bot_runner_install_provider: ({ botId, ...input }) => runners.installProvider(input, botId),
     bot_runner_pause: ({ botId, id }) => runners.setState(id, "paused", botId),
     bot_runner_resume: ({ botId, id }) => runners.setState(id, "active", botId),
     bot_runner_run_now: ({ botId, id }) => runners.runNow(id, botId),
@@ -1308,16 +1315,34 @@ export default async function plugin(bb: BbPluginApi) {
     time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional().describe("HH:MM local; the minute for hourly cadences. Default 09:00"),
     cron: z.string().max(100).optional().describe("Five-field cron, only with cadence custom"),
   });
+  let machineCheckTimer: ReturnType<typeof setTimeout> | null = null;
+  bb.onDispose(() => { if (machineCheckTimer) clearTimeout(machineCheckTimer); });
+  bb.experimental_hooks.on("message.dispatch", async context => {
+    if (runners.isMovingThread(context.thread.id)) return { action: "reject", message: "Runner is moving to another machine; this run was skipped." };
+    const runner = runners.forThread(context.thread.id);
+    if (runner && !await runners.available(runner.id, false)) {
+      // Leave core's admission lock before pausing the automation or alerting the Bot.
+      if (!machineCheckTimer) machineCheckTimer = setTimeout(() => {
+        machineCheckTimer = null;
+        void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
+      }, 0);
+      return { action: "reject", message: "Machine offline; this runner run was skipped." };
+    }
+    return { action: "proceed" };
+  });
   const describeRunner = (runner: Awaited<ReturnType<typeof runners.list>>[number]) =>
-    `- ${runner.name} (${runner.id}, ${runner.state}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
+    `- ${runner.name} (${runner.id}, ${runner.state}${runner.machineName ? `, ${runner.machineName}${runner.machineOffline ? " — machine offline" : ""}` : ""}${runner.adopted ? ", adopted" : ""}): ${runner.schedule.cadence}${runner.schedule.cadence === "custom" ? ` ${runner.schedule.cron}` : ` at ${runner.schedule.time}`}${runner.nextRunAt ? `, next ${new Date(runner.nextRunAt).toLocaleString()}` : ""}. Job: ${runner.job}${runner.lastReport ? `\n  Last report (${runner.lastLevel}): ${runner.lastReport}` : ""}${runner.threadId ? `\n  Thread: /threads/${runner.threadId}` : ""}`;
   const runnerTool = (name: string, description: string, parameters: z.ZodObject, execute: (input: never, botId: string) => Promise<string>) =>
-    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => execute(input as never, ownBot(ctx.threadId)) });
+    bb.agents.registerTool({ name, description, parameters, execute: async (input, ctx) => { try { return await execute(input as never, ownBot(ctx.threadId)); } catch (error) { if (error instanceof RunnerPreflightError) return JSON.stringify({ warnings: error.warnings, blocked: error.blocked, confirmRequired: !error.blocked }); throw error; } } });
   runnerTool("runner_create", "Make a runner: a long-lived thread that does a recurring job on its own schedule and stays quiet unless it has something to report (it tells you or the user through runner_report). Use it when a task becomes recurring, so your chat stays for the user. Its first run starts now.",
-    z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("A short instruction: what to check or do each run, and what counts as worth reporting"), schedule: scheduleParam }),
-    async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam> }, botId) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }, botId))}`);
+    z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("A short instruction: what to check or do each run, and what counts as worth reporting"), schedule: scheduleParam, machine: z.string().nullable().optional(), confirm: z.boolean().optional() }),
+    async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam>; machine?: string | null; confirm?: boolean }, botId) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }, botId))}`);
   runnerTool("runner_update", "Change a runner's name, job or schedule.",
-    z.object({ id: z.string().min(1).describe("Runner id or name"), name: z.string().trim().min(1).max(60).optional(), job: z.string().trim().min(1).max(2000).optional(), schedule: scheduleParam.optional() }),
-    async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam> }, botId) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined }, botId)));
+    z.object({ id: z.string().min(1).describe("Runner id or name"), name: z.string().trim().min(1).max(60).optional(), job: z.string().trim().min(1).max(2000).optional(), schedule: scheduleParam.optional(), machine: z.string().nullable().optional(), confirm: z.boolean().optional() }),
+    async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam>; machine?: string | null; confirm?: boolean }, botId) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined }, botId)));
+  runnerTool("runner_migrate", "Move a runner to a machine (host id or name); null moves it to the server. Keeps its schedule and reports. Refuses during a run. Review preflight warnings and retry with confirm: true. Installation and sign-in on the target are required.",
+    z.object({ id: z.string().min(1), machine: z.string().nullable(), confirm: z.boolean().optional() }),
+    async (input: { id: string; machine: string | null; confirm?: boolean }, botId) => describeRunner(await runners.migrate(input, botId)));
   runnerTool("runner_pause", "Pause a runner: its schedule stops until resumed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.setState(id, "paused", botId)));
   runnerTool("runner_resume", "Resume a paused runner.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.setState(id, "active", botId)));
   runnerTool("runner_run_now", "Run a runner now, outside its schedule.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.runNow(id, botId)));

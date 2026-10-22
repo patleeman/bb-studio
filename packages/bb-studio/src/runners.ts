@@ -1,3 +1,4 @@
+import { resolveRunnerMachine, runnerMachineCheck, runnerEnvironment, RunnerPreflightError } from "./runner-machines";
 // Runners: long-lived threads a Bot keeps on a schedule so its own chat
 // isn't flooded. Each runner is one thread, woken by its own automation, with
 // a name, a job (a short instruction), a state (active, paused) and its last
@@ -39,6 +40,7 @@ import { heartbeatRunSchema } from "./contract";
 import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 
 type Sdk = BbPluginApi["sdk"];
+type TimelineRow = Awaited<ReturnType<Sdk["threads"]["timeline"]>>["rows"][number];
 export type RunnerLevel = "log" | "tell" | "urgent";
 export type RunnerSchedule = Omit<HeartbeatRun, "enabled">;
 type RunnerRow = {
@@ -46,7 +48,7 @@ type RunnerRow = {
   cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; timezone: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
   /** 1 once Studio made the thread hidden. */
-  hidden: number; cleanup_pending: number;
+  hidden: number; cleanup_pending: number; machine: string | null; machine_name: string | null; machine_offline: number; machine_suspended: number;
   created_at: number; updated_at: number;
 };
 
@@ -98,7 +100,161 @@ export interface RunnerDeps {
 }
 
 export class Runners {
+  private readonly moving = new Set<string>();
   constructor(private readonly deps: RunnerDeps) {}
+
+  private readonly movingThreads = new Set<string>();
+
+  private requireNotMoving(row: RunnerRow): void {
+    if (this.moving.has(row.id)) throw new Error("This runner is moving to another machine. Wait for it to finish.");
+  }
+
+  isMovingThread(threadId: string): boolean { return this.movingThreads.has(threadId); }
+
+  async preflight(input: { machine?: string | null; job: string; id?: string }, botId?: string) {
+    const bot = this.bot(botId);
+    const row = input.id ? this.row(input.id, botId) : null;
+    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    return runnerMachineCheck(this.deps.sdk, { ...input, providerId: thread.providerId ?? "" });
+  }
+
+  async machines() {
+    return (await this.deps.sdk.hosts.list()).map(host => ({ id: host.id, name: host.name, connected: host.status === "connected" }));
+  }
+
+  async installProvider(input: { id?: string; machine: string }, botId?: string) {
+    const bot = this.bot(botId);
+    const row = input.id ? this.row(input.id, botId) : null;
+    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    const host = await resolveRunnerMachine(this.deps.sdk, input.machine);
+    if (!host || !thread.providerId) throw new Error("Choose a machine and provider first.");
+    await this.deps.sdk.hosts.installProviderCli({ hostId: host.id, provider: thread.providerId, actionKind: "install" });
+    return { ok: true as const };
+  }
+
+  /** No queue or fallback: a due run on an offline machine is skipped. */
+  async available(id: string, notify = true): Promise<boolean> {
+    let row = this.row(id);
+    if (!row.machine) return true;
+    const host = await this.deps.sdk.hosts.get({ hostId: row.machine }).catch(() => null);
+    row = this.row(id);
+    const offline = host?.status !== "connected";
+    if (!offline && row.machine_offline) this.changedRow(row.id, { machine_offline: 0 });
+    if (offline && !row.machine_offline) this.changedRow(row.id, { machine_offline: 1 });
+    // A dispatch hook runs under core's admission lock. It records the outage
+    // only; the lifecycle sweep sends the alert outside that lock.
+    if (offline && notify && row.machine_offline !== 2) {
+      this.changedRow(row.id, { machine_offline: 2 });
+      const bot = this.deps.bot(row.bot_id);
+      if (bot?.threadId) await this.tell(row, "tell", `Machine offline: ${row.machine_name ?? row.machine}. Runs are skipped until it reconnects.`, bot as RunnerBot & { threadId: string });
+    }
+    return !offline;
+  }
+
+  async checkMachines(): Promise<void> {
+    const rows = this.deps.db.prepare("SELECT id FROM bot_runners WHERE machine IS NOT NULL").all() as { id: string }[];
+    for (const { id } of rows) {
+      const online = await this.available(id, false);
+      let row = this.row(id);
+      if (this.moving.has(id) || !row.automation_id) continue;
+      const projectId = row.automation_project_id ?? row.project_id;
+      if (!online) {
+        if (!row.machine_suspended && row.state === "active") {
+          const automation = (await this.automations([projectId], true)).find(a => a.id === row.automation_id);
+          if (automation?.enabled) this.changedRow(id, { machine_suspended: 1 });
+        }
+        row = this.row(id);
+        if (row.machine_suspended) await this.call("automations_pause", { projectId, automationId: row.automation_id }, z.unknown());
+        await this.available(id); // Send outside the dispatch hook, after pausing retries.
+      } else if (row.machine_suspended) {
+        if (row.state === "active" && this.deps.bot(row.bot_id)?.state === "active") {
+          await this.call("automations_resume", { projectId, automationId: row.automation_id }, z.unknown());
+          this.changedRow(id, { machine_suspended: 0 });
+        } else if (row.state === "paused") this.changedRow(id, { machine_suspended: 0 });
+      }
+    }
+  }
+
+  private async handoff(row: RunnerRow): Promise<string> {
+    const reports = this.deps.db.prepare("SELECT summary FROM runner_reports WHERE runner_id = ? ORDER BY id DESC LIMIT 3").all(row.id) as { summary: string }[];
+    if (reports.length === 3) return reports.reverse().map(r => r.summary).join("\n");
+    // Older runners predate the report buffer. Recover bounded history from
+    // the old thread's runner_report calls before falling back to its last report.
+    const timeline = await this.deps.sdk.threads.timeline({ threadId: row.thread_id!, segmentLimit: "12", includeNestedRows: "true", summaryOnly: "false" }).catch(() => null);
+    const recovered: { at: number; summary: string }[] = [];
+    const visit = (rows: TimelineRow[]) => {
+      for (const entry of rows) {
+        if (entry.kind === "turn" && entry.children) visit(entry.children);
+        if (entry.kind === "work" && entry.workKind === "tool" && entry.toolName.endsWith("runner_report") && typeof entry.toolArgs?.summary === "string") recovered.push({ at: entry.createdAt, summary: entry.toolArgs.summary });
+      }
+    };
+    if (timeline) visit(timeline.rows);
+    if (recovered.length >= reports.length && recovered.length) return recovered.sort((a, b) => a.at - b.at).slice(-3).map(r => r.summary).join("\n");
+    return reports.length ? reports.reverse().map(r => r.summary).join("\n") : row.last_report ?? "No reports yet.";
+  }
+
+  async migrate(input: { id: string; machine: string | null; confirm?: boolean }, botId?: string): Promise<RunnerView> {
+    const row = this.row(input.id, botId);
+    if (this.moving.has(row.id)) throw new Error("This runner is already moving.");
+    if (!row.thread_id || !row.automation_id) throw new Error("This runner has no thread or automation to move.");
+    this.moving.add(row.id);
+    this.movingThreads.add(row.thread_id);
+    let newThreadId: string | null = null;
+    let retargeted = false;
+    let pausedForMove = false;
+    let original: AutomationRow | undefined;
+    const projectId = row.automation_project_id ?? row.project_id;
+    try {
+      const old = await this.deps.sdk.threads.get({ threadId: row.thread_id });
+      if (old.status !== "idle" && old.status !== "error") throw new Error("Cannot move a runner while a run is in progress. Wait for it to finish.");
+      const check = await this.preflight({ ...input, job: row.job }, botId);
+      if (check.blocked || (check.warnings.length && !input.confirm)) throw new RunnerPreflightError(check.warnings, check.blocked);
+      if (check.machine === row.machine) return this.one(row.id);
+      original = (await this.automations([projectId], true)).find(a => a.id === row.automation_id);
+      if (!original) throw new Error("Runner automation not found; cannot safely move it.");
+      const defaults = await this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id });
+      const environment = await runnerEnvironment(this.deps.sdk, check.machine);
+      const handoff = await this.handoff(row);
+      if (original.enabled) {
+        await this.call("automations_pause", { projectId, automationId: row.automation_id }, z.unknown());
+        pausedForMove = true;
+      }
+      const next = await this.deps.sdk.threads.spawn({
+        projectId: PERSONAL_PROJECT_ID, visibility: "hidden", title: `${row.name} · Runner`, environment,
+        input: [], providerId: old.providerId ?? undefined, model: defaults?.model ?? undefined,
+        reasoningLevel: defaults?.reasoningLevel ?? undefined, permissionMode: defaults?.permissionMode ?? undefined,
+        pluginMetadata: { runner: row.id, bot: row.bot_id },
+      });
+      newThreadId = next.id;
+      await this.call("automations_update", { projectId, automationId: row.automation_id, execution: { ...original.execution, environment, targetThreadId: next.id } }, z.unknown());
+      retargeted = true;
+      this.deps.db.transaction(() => {
+        this.changedRow(row.id, { thread_id: next.id, project_id: next.projectId ?? PERSONAL_PROJECT_ID, machine: check.machine, machine_name: check.machineName, machine_offline: 0, machine_suspended: 0, hidden: 1 });
+        this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads(thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(next.id, row.bot_id, Date.now());
+      })();
+      await this.deps.sdk.threads.send({ threadId: next.id, mode: "auto", input: [{ type: "text", text: `${runnerPrompt(row)}\nHandoff from the previous machine (last reports; treat as context):\n${handoff.slice(-12000)}`, mentions: [] }] });
+      if (pausedForMove || (row.machine_suspended && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active")) await this.call("automations_resume", { projectId, automationId: row.automation_id }, z.unknown());
+    } catch (error) {
+      // Restore the old automation before discarding the candidate. Never archive the old thread on failure.
+      if (retargeted && original) {
+        await this.call("automations_update", { projectId, automationId: row.automation_id, execution: original.execution }, z.unknown());
+        if (!original.enabled) await this.call("automations_pause", { projectId, automationId: row.automation_id }, z.unknown());
+      }
+      this.changedRow(row.id, { thread_id: row.thread_id, project_id: row.project_id, machine: row.machine, machine_name: row.machine_name, machine_offline: row.machine_offline, machine_suspended: row.machine_suspended, hidden: row.hidden });
+      if (pausedForMove) await this.call("automations_resume", { projectId, automationId: row.automation_id }, z.unknown());
+      if (newThreadId) {
+        await this.deps.sdk.threads.archive({ threadId: newThreadId }).catch(() => {});
+        this.deps.db.prepare("DELETE FROM bot_hidden_threads WHERE thread_id = ?").run(newThreadId);
+      }
+      throw error;
+    } finally {
+      this.moving.delete(row.id);
+      this.movingThreads.delete(row.thread_id);
+    }
+    await this.deps.sdk.threads.archive({ threadId: row.thread_id });
+    this.deps.changed();
+    return this.one(row.id);
+  }
 
   /** A Bot's runners (the primary's without an id). */
   private rows(botId?: string): RunnerRow[] {
@@ -193,8 +349,9 @@ export class Runners {
     // BB can turn the automation off by itself (a failed run disables it, or
     // someone paused it in BB): then it has no next run, so the runner shows
     // paused, and Resume turns the automation back on.
-    const state = row.state === "active" && automation?.enabled === false ? "paused" : row.state;
+    const state = row.state === "active" && !row.machine_offline && !row.machine_suspended && automation?.enabled === false ? "paused" : row.state;
     return {
+      machine: row.machine ?? null, machineName: row.machine_name ?? null, machineOffline: !!row.machine_offline,
       id: row.id, name: row.name, job: row.job, threadId: row.thread_id, state, adopted: !!row.adopted,
       schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}), ...((row.timezone ?? automation?.trigger.timezone) ? { timezone: row.timezone ?? automation!.trigger.timezone } : {}) },
       nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
@@ -230,8 +387,11 @@ export class Runners {
   }
 
   /** Makes the runner's thread (its first message is its first run) and its automation. */
-  async create(input: { name: string; job: string; schedule: RunnerSchedule }, botId?: string): Promise<RunnerView> {
+  async create(input: { name: string; job: string; schedule: RunnerSchedule; machine?: string | null; confirm?: boolean }, botId?: string): Promise<RunnerView> {
     const bot = this.bot(botId);
+    const check = await this.preflight(input, botId);
+    if (check.blocked || (check.warnings.length && !input.confirm)) throw new RunnerPreflightError(check.warnings, check.blocked);
+    const environment = await runnerEnvironment(this.deps.sdk, check.machine);
     const schedule = parseSchedule(input.schedule);
     const name = input.name.trim();
     automationName(this.deps.db, bot.id, name);
@@ -240,6 +400,7 @@ export class Runners {
     // The row comes first, so the thread's first turn gets runner instructions (forThread by metadata).
     this.deps.db.prepare(`INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, cron, created_at, updated_at)
       VALUES (?, ?, ?, ?, NULL, ?, 'active', ?, ?, ?, ?, ?)`).run(id, bot.id, name, input.job.trim(), PERSONAL_PROJECT_ID, schedule.cadence, schedule.time, schedule.cron ?? null, now, now);
+    this.changedRow(id, { machine: check.machine, machine_name: check.machineName });
     try {
       const [botThread, defaults] = await Promise.all([
         this.deps.sdk.threads.get({ threadId: bot.threadId }),
@@ -251,7 +412,7 @@ export class Runners {
         projectId: PERSONAL_PROJECT_ID,
         visibility: "hidden",
         title: `${name} · Runner`,
-        environment: { type: "project-default" },
+        environment,
         ...(botThread.providerId ? { providerId: botThread.providerId } : {}),
         ...(defaults?.model ? { model: defaults.model } : {}),
         pluginMetadata: { runner: id, bot: bot.id },
@@ -298,7 +459,7 @@ export class Runners {
       if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the runner's thread first.");
       const execution = {
         mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
-        permissionMode: defaults.permissionMode ?? "accept-edits", environment: { type: "project-default" }, targetThreadId: row.thread_id, prompt: runnerPrompt(row),
+        permissionMode: defaults.permissionMode ?? "accept-edits", environment: await runnerEnvironment(this.deps.sdk, row.machine ?? null), targetThreadId: row.thread_id, prompt: runnerPrompt(row),
       };
       let automationId = row.automation_id;
       if (automationId) {
@@ -311,12 +472,24 @@ export class Runners {
       }
       row = { ...row, automation_id: automationId, automation_project_id: thread.projectId };
     }
-    await this.call(row.state === "active" ? "automations_resume" : "automations_pause", { projectId: row.automation_project_id ?? projectId, automationId: row.automation_id }, z.unknown());
+    await this.call(row.state === "active" && !row.machine_offline && !row.machine_suspended ? "automations_resume" : "automations_pause", { projectId: row.automation_project_id ?? projectId, automationId: row.automation_id }, z.unknown());
   }
 
-  async update(input: { id: string; name?: string; job?: string; schedule?: RunnerSchedule }, botId?: string): Promise<RunnerView> {
-    const row = this.row(input.id, botId);
+  async update(input: { id: string; name?: string; job?: string; schedule?: RunnerSchedule; machine?: string | null; confirm?: boolean }, botId?: string): Promise<RunnerView> {
+    let row = this.row(input.id, botId);
+    this.requireNotMoving(row);
     const schedule = input.schedule ? parseSchedule(input.schedule) : null;
+    if (input.name !== undefined) automationName(this.deps.db, row.bot_id, input.name.trim(), row.id);
+    if (input.machine !== undefined) {
+      const target = await resolveRunnerMachine(this.deps.sdk, input.machine);
+      if ((target?.id ?? null) !== row.machine) {
+        // Check the edited job before moving as well as the stored job.
+        const check = await this.preflight({ ...input, job: input.job ?? row.job }, botId);
+        if (check.blocked || (check.warnings.length && !input.confirm)) throw new RunnerPreflightError(check.warnings, check.blocked);
+        await this.migrate({ id: row.id, machine: input.machine, confirm: input.confirm }, botId);
+        row = this.row(row.id);
+      }
+    }
     const name = input.name?.trim();
     if (input.name !== undefined) automationName(this.deps.db, row.bot_id, name ?? "", row.id);
     const next: RunnerRow = { ...row, ...(name ? { name } : {}), ...(input.job?.trim() ? { job: input.job.trim() } : {}), ...(schedule ? { cadence: schedule.cadence, time: schedule.time, cron: schedule.cron ?? null } : {}) };
@@ -329,7 +502,9 @@ export class Runners {
 
   async setState(id: string, state: "active" | "paused", botId?: string): Promise<RunnerView> {
     const row = this.row(id, botId);
+    this.requireNotMoving(row);
     if (state === "active") this.bot(row.bot_id);
+    if (state === "active" && !await this.available(row.id)) { this.changedRow(row.id, { state }); await this.checkMachines(); return this.one(row.id); }
     if (row.automation_id) await this.call(state === "active" ? "automations_resume" : "automations_pause", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
     this.changedRow(row.id, { state });
     return this.one(row.id);
@@ -355,6 +530,7 @@ export class Runners {
     const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
     if (!row) return false;
     if (row.state === "active") return true;
+    if (!await this.available(row.id)) { this.changedRow(row.id, { state: "active" }); await this.checkMachines(); return true; }
     if (row.automation_id) await this.call("automations_resume", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
     this.changedRow(row.id, { state: "active" });
     return true;
@@ -369,8 +545,10 @@ export class Runners {
   /** Runs it now, through its automation (so the run counts like a scheduled one). */
   async runNow(id: string, botId?: string): Promise<RunnerView> {
     const row = this.row(id, botId);
+    this.requireNotMoving(row);
     this.bot(row.bot_id);
     if (!row.automation_id) throw new Error("This runner has no schedule to run.");
+    if (!await this.available(row.id)) { await this.checkMachines(); return this.one(row.id); }
     await this.call("automations_run", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown());
     this.changedRow(row.id, { last_run_at: Date.now() });
     return this.one(row.id);
@@ -385,6 +563,7 @@ export class Runners {
    */
   async delete(id: string, botId?: string): Promise<{ deleted: true; kept: boolean }> {
     const row = this.row(id, botId);
+    this.requireNotMoving(row);
     this.changedRow(row.id, { cleanup_pending: 1 });
     if (row.thread_id && row.hidden) await this.deps.sdk.threads.update({ threadId: row.thread_id, visibility: "visible" } as never).catch((error) => { if (!missing(error)) throw error; });
     if (row.adopted) {
@@ -427,6 +606,8 @@ export class Runners {
     if (!row) throw new Error("Only a runner's thread can report.");
     const summary = input.summary.trim();
     const now = Date.now();
+    this.deps.db.prepare("INSERT INTO runner_reports(runner_id, summary) VALUES (?, ?)").run(row.id, summary);
+    this.deps.db.prepare("DELETE FROM runner_reports WHERE runner_id = ? AND id NOT IN (SELECT id FROM runner_reports WHERE runner_id = ? ORDER BY id DESC LIMIT 3)").run(row.id, row.id);
     this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, ...(input.level === "urgent" ? { urgent: 1 } : {}) });
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
@@ -448,7 +629,7 @@ export class Runners {
     const rows = this.deps.db.prepare("SELECT * FROM bot_runners WHERE automation_id IS NOT NULL").all() as RunnerRow[];
     return rows.map((row) => ({
       automationId: row.automation_id!, projectId: row.automation_project_id ?? row.project_id, botId: row.bot_id, ownerId: row.id, name: row.name,
-      on: !row.cleanup_pending && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active",
+      on: !row.machine_offline && !row.machine_suspended && !this.moving.has(row.id) && !row.cleanup_pending && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active",
     }));
   }
 

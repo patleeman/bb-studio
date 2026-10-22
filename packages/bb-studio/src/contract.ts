@@ -302,6 +302,7 @@ export type BotActivityView = z.infer<typeof botActivity>;
 const runnerSchedule = heartbeatRunSchema.omit({ enabled: true, time: true }).extend({ time: heartbeatRunSchema.shape.time.default("09:00") });
 const runnerLevel = z.enum(["log", "tell", "urgent"]);
 const runner = z.object({
+  machine: z.string().nullable().optional(), machineName: z.string().nullable().optional(), machineOffline: z.boolean().optional(),
   id: z.string(),
   name: z.string(),
   job: z.string(),
@@ -555,8 +556,12 @@ export const rpcContract = defineRpcContract({
   /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */
   bot_runners: { input: forBot, output: z.object({ runners: z.array(runner), adoptable: z.array(runnerAdoptable) }) },
   /** Makes a runner: its thread (first run now) and its schedule. */
-  bot_runner_create: { input: z.object({ botId, name: runnerName, job: runnerJob, schedule: runnerSchedule }), output: runner },
-  bot_runner_update: { input: z.object({ botId, id: runnerId, name: runnerName.optional(), job: runnerJob.optional(), schedule: runnerSchedule.optional() }), output: runner },
+  bot_runner_create: { input: z.object({ botId, name: runnerName, job: runnerJob, schedule: runnerSchedule, machine: z.string().nullable().optional(), confirm: z.boolean().optional() }), output: runner },
+  bot_runner_update: { input: z.object({ botId, id: runnerId, name: runnerName.optional(), job: runnerJob.optional(), schedule: runnerSchedule.optional(), machine: z.string().nullable().optional(), confirm: z.boolean().optional() }), output: runner },
+  bot_runner_migrate: { input: z.object({ botId, id: runnerId, machine: z.string().nullable(), confirm: z.boolean().optional() }), output: runner },
+  bot_runner_machines: { input: forBot, output: z.array(z.object({ id: z.string(), name: z.string(), connected: z.boolean() })) },
+  bot_runner_install_provider: { input: z.object({ botId, id: runnerId.optional(), machine: z.string() }), output: z.object({ ok: z.literal(true) }) },
+  bot_runner_preflight: { input: z.object({ botId, id: runnerId.optional(), machine: z.string().nullable().optional(), job: runnerJob }), output: z.object({ machine: z.string().nullable(), machineName: z.string().nullable(), warnings: z.array(z.string()), blocked: z.string().nullable(), install: z.boolean(), providerName: z.string(), signInHint: z.string().nullable() }) },
   bot_runner_pause: { input: z.object({ botId, id: runnerId }), output: runner },
   bot_runner_resume: { input: z.object({ botId, id: runnerId }), output: runner },
   bot_runner_run_now: { input: z.object({ botId, id: runnerId }), output: runner },

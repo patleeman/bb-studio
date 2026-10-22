@@ -121,3 +121,25 @@ pane sizes restore locally. Closing a tab does not delete its saved item. Conver
 
 Open only what the user asked to see or what you made for them, and close
 only tabs they asked you to close or that you opened.
+
+
+### Runner machines
+
+`runner_create` and `runner_update` accept `machine`: a host id or unique host
+name, resolved and stored as a host id. Omit it (or use null) for the server.
+`runner_migrate({ id, machine, confirm? })` moves an existing runner; null moves
+it back to the server. Wait until its current run ends. The runner id, Bot,
+schedule, automation and reports stay; the new thread receives the last 3
+reports, and the old thread is archived after successful retargeting and handoff.
+
+On a remote host Studio uses its installed `personal-workspace` environment
+provider if available. Otherwise it requests that host's default working
+folder (an unmanaged environment with null path). The Mac's Personal folder
+never travels with the runner.
+
+Review returned path and Mac-only-tool warnings, then retry with `confirm: true`
+only after accepting them. Confirmation cannot bypass a missing CLI or sign-in.
+Use Bot Info → Runners to install the provider CLI on the selected machine.
+Patrick signs in directly there using the provider hint; never copy credentials.
+An offline machine skips due runs without falling back to the Mac. Studio
+reports once per outage, shows machine offline, and resumes when it reconnects.

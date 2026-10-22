@@ -761,4 +761,10 @@ export const MIGRATIONS = [
   `ALTER TABLE bot_runners ADD COLUMN cleanup_pending INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE automation_auto_resumes ADD COLUMN delivered INTEGER NOT NULL DEFAULT 1;
    ALTER TABLE thread_auto_resumes ADD COLUMN delivered INTEGER NOT NULL DEFAULT 1;`,
+  `ALTER TABLE bot_runners ADD COLUMN machine TEXT;
+   ALTER TABLE bot_runners ADD COLUMN machine_name TEXT;
+   ALTER TABLE bot_runners ADD COLUMN machine_offline INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE bot_runners ADD COLUMN machine_suspended INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE runner_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, runner_id TEXT NOT NULL, summary TEXT NOT NULL);
+   CREATE INDEX runner_reports_runner ON runner_reports(runner_id, id);`,
 ];

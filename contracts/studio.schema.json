@@ -10588,6 +10588,21 @@
             "items": {
               "type": "object",
               "properties": {
+                "machine": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "machineName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "machineOffline": {
+                  "type": "boolean"
+                },
                 "id": {
                   "type": "string"
                 },
@@ -10825,6 +10840,15 @@
             "required": [
               "cadence"
             ]
+          },
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirm": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -10837,6 +10861,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -11029,6 +11068,15 @@
             "required": [
               "cadence"
             ]
+          },
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirm": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -11039,6 +11087,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -11174,6 +11237,349 @@
         "additionalProperties": false
       }
     },
+    "bot_runner_migrate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "machine"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "job": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          },
+          "adopted": {
+            "type": "boolean"
+          },
+          "schedule": {
+            "type": "object",
+            "properties": {
+              "cadence": {
+                "type": "string",
+                "enum": [
+                  "hourly",
+                  "daily",
+                  "weekdays",
+                  "every5minutes",
+                  "every15minutes",
+                  "every30minutes",
+                  "every2hours",
+                  "every6hours",
+                  "weekly",
+                  "custom"
+                ]
+              },
+              "time": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "cadence",
+              "time"
+            ],
+            "additionalProperties": false
+          },
+          "nextRunAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastRunAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "lastRunStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastLevel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "log",
+                  "tell",
+                  "urgent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastReport": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastReportAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "job",
+          "threadId",
+          "state",
+          "adopted",
+          "schedule",
+          "nextRunAt",
+          "lastRunAt",
+          "lastLevel",
+          "lastReport",
+          "lastReportAt",
+          "urgent"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_runner_machines": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "connected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "connected"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "bot_runner_install_provider": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "machine": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "machine"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_runner_preflight": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocked": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "install": {
+            "type": "boolean"
+          },
+          "providerName": {
+            "type": "string"
+          },
+          "signInHint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "machine",
+          "machineName",
+          "warnings",
+          "blocked",
+          "install",
+          "providerName",
+          "signInHint"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_runner_pause": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -11198,6 +11604,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -11357,6 +11778,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -11516,6 +11952,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -11765,6 +12216,21 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },

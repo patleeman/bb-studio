@@ -2,6 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { ADOPT_NOTE, parseSchedule, runnerInstructions, runnerPrompt, Runners, tellLine } from "./runners";
+import { resolveRunnerMachine, runnerEnvironment, RunnerPreflightError } from "./runner-machines";
 import { Automations } from "./automations";
 import { heartbeatCron } from "./project-lead";
 
@@ -31,11 +32,22 @@ async function setup() {
     if (method === "automations_delete") { automations.splice(automations.indexOf(row!), 1); return { ok: true }; }
     return { ok: true, sent: 1 };
   });
+  const hosts = [{ id: "host_red4", name: "red4", status: "connected" }];
+  const cli = { codex: { installed: true, displayName: "Codex" } };
+  const providerStates = { providers: [{ providerId: "codex", status: "ready", loginCommand: "codex login" }] };
+  const pathsExist = vi.fn(async ({ paths }: { paths: string[] }) => ({ existence: Object.fromEntries(paths.map(path => [path, !path.startsWith("/Users")])) }));
+  const installProviderCli = vi.fn(async () => []);
+  const timeline = vi.fn(async () => ({ rows: [] as unknown[] }));
+  const environmentProviders = [{ id: "personal-workspace", acceptsEmptyInputs: true, availability: { status: "available" }, machineAvailability: {} }];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
-      spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
+      timeline: timeline as never, spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
       defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
+    hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw new Error("Unknown host"); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
+    providers: { list: async () => [{ id: "codex", displayName: "Codex", strings: { signInHint: "Run codex login" } }] as never },
+    system: { providerStates: async () => providerStates as never },
+    environments: { listProviders: async () => environmentProviders as never },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
@@ -47,7 +59,7 @@ async function setup() {
   const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
   const changed = vi.fn(() => bb.realtime.publish("studio-changed", { pluginId: "studio" }));
   const runners = new Runners({ db, sdk: bb.sdk, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
-  return { changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
+  return { timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -401,4 +413,180 @@ it("exposes the last automation failure separately from a previous successful re
   await x.runners.report(runner.threadId!, { level: "tell", summary: "All clear" });
   Object.assign(x.automations[0]!, { lastRunAt: Date.now() + 60_000, lastRunStatus: "failed" });
   expect((await x.runners.list())[0]).toMatchObject({ lastRunStatus: "failed", lastLevel: "tell" });
+});
+
+
+it("resolves machine ids and unique names, refuses ambiguous or missing names", async () => {
+  const x = await setup();
+  expect(await resolveRunnerMachine(x.sdk, "")).toBeNull();
+  expect((await resolveRunnerMachine(x.sdk, "RED4"))?.id).toBe("host_red4");
+  expect((await resolveRunnerMachine(x.sdk, "host_red4"))?.name).toBe("red4");
+  await expect(resolveRunnerMachine(x.sdk, "missing")).rejects.toThrow("No machine");
+  x.hosts.push({ id: "duplicate", name: "red4", status: "connected" });
+  await expect(resolveRunnerMachine(x.sdk, "red4")).rejects.toThrow("ambiguous");
+});
+
+it("checks paths and Mac tools before creating, requires confirmation without making a row", async () => {
+  const x = await setup();
+  const input = { name: "Files", job: "Use Beeper and osascript for /Users/patrick/mail and ~/notes", schedule, machine: "red4" };
+  const check = await x.runners.preflight(input);
+  expect(check.warnings).toEqual(expect.arrayContaining([expect.stringContaining("/Users/patrick/mail"), expect.stringContaining("Beeper"), expect.stringContaining("osascript")]));
+  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_red4", paths: ["/Users/patrick/mail", "~/notes"] });
+  await expect(x.runners.create(input)).rejects.toBeInstanceOf(RunnerPreflightError);
+  expect(await x.runners.list()).toEqual([]);
+  const runner = await x.runners.create({ ...input, confirm: true });
+  expect(runner).toMatchObject({ machine: "host_red4", machineName: "red4" });
+  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ environment: { type: "provider", environmentProviderId: "personal-workspace", inputs: null, machine: { type: "existing", hostId: "host_red4" } } }));
+});
+
+it("blocks missing CLI and sign-in even when confirmed, installs only on the selected host", async () => {
+  const x = await setup();
+  const input = { name: "Files", job: "Check files", schedule, machine: "red4", confirm: true };
+  x.cli.codex.installed = false;
+  await expect(x.runners.create(input)).rejects.toThrow("Install Codex on red4");
+  await x.runners.installProvider({ machine: "red4" });
+  expect(x.installProviderCli).toHaveBeenCalledWith({ hostId: "host_red4", provider: "codex", actionKind: "install" });
+  x.cli.codex.installed = true;
+  x.providerStates.providers[0]!.status = "unauthenticated";
+  await expect(x.runners.create(input)).rejects.toThrow("needs sign-in on red4. Run codex login");
+  expect(x.spawn).not.toHaveBeenCalled();
+});
+
+it("skips offline runs, alerts once per outage and clears state on reconnection", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "red4" });
+  x.hosts[0]!.status = "disconnected";
+  await x.runners.runNow(runner.id);
+  await x.runners.runNow(runner.id);
+  await x.runners.checkMachines();
+  expect(x.calls.filter(c => c.method === "automations_run")).toHaveLength(0);
+  expect(x.send).toHaveBeenCalledTimes(1);
+  expect((await x.runners.get(runner.id)).machineOffline).toBe(true);
+  expect(x.runners.resumeTargets()[0]?.on).toBe(false);
+  x.hosts[0]!.status = "connected";
+  await x.runners.checkMachines();
+  expect((await x.runners.get(runner.id)).machineOffline).toBe(false);
+  await x.runners.runNow(runner.id);
+  expect(x.calls.filter(c => c.method === "automations_run")).toHaveLength(1);
+  x.hosts[0]!.status = "disconnected";
+  await x.runners.checkMachines();
+  expect(x.send).toHaveBeenCalledTimes(2);
+});
+
+it("migrates the same row and automation with the last 3 reports, then archives; moves back too", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
+  for (const summary of ["discard", "one", "two", "three"]) await x.runners.report(runner.threadId!, { level: "log", summary });
+  const automationId = x.runners.automation(runner.id)!.id;
+  const moved = await x.runners.migrate({ id: runner.id, machine: "red4" });
+  expect(moved).toMatchObject({ id: runner.id, machine: "host_red4", name: runner.name, job: runner.job, schedule: runner.schedule, lastReport: "three" });
+  expect(moved.threadId).not.toBe(runner.threadId);
+  expect(x.runners.automation(runner.id)?.id).toBe(automationId);
+  expect(x.automations[0]).toMatchObject({ execution: { targetThreadId: moved.threadId } });
+  const text = (x.send.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
+  expect(text).toContain("one\ntwo\nthree");
+  expect(text).not.toContain("discard");
+  expect(x.threads.get(runner.threadId!)?.archivedAt).toBe(5);
+  expect(x.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ?").get(moved.threadId)).toEqual({ bot_id: "bot_main" });
+  const back = await x.runners.migrate({ id: runner.id, machine: null });
+  expect(back.machine).toBeNull();
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ environment: { type: "project-default" } }));
+});
+
+it("refuses migration during a run or to an unready provider", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
+  const old = x.threads.get(runner.threadId!)!;
+  x.threads.set(old.id, { ...old, status: "active" });
+  await expect(x.runners.migrate({ id: runner.id, machine: "red4" })).rejects.toThrow("run is in progress");
+  x.threads.set(old.id, { ...old, status: "idle" });
+  x.cli.codex.installed = false;
+  await expect(x.runners.migrate({ id: runner.id, machine: "red4", confirm: true })).rejects.toThrow("Install Codex");
+  expect(x.spawn).toHaveBeenCalledTimes(1);
+  expect(x.archive).not.toHaveBeenCalled();
+});
+
+it.each(["spawn", "retarget", "seed"])("keeps the old runner intact after %s failure", async failure => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
+  const execution = structuredClone(x.automations[0]!.execution);
+  if (failure === "spawn") x.spawn.mockRejectedValueOnce(new Error("spawn failed"));
+  if (failure === "retarget") {
+    const original = x.callRpc.getMockImplementation()!;
+    x.callRpc.mockImplementationOnce(async args => original(args)); // automation list
+    x.callRpc.mockImplementationOnce(async args => original(args)); // temporary pause
+    x.callRpc.mockImplementationOnce(async () => { throw new Error("retarget failed"); });
+  }
+  if (failure === "seed") x.send.mockRejectedValueOnce(new Error("seed failed"));
+  await expect(x.runners.migrate({ id: runner.id, machine: "red4" })).rejects.toThrow(`${failure} failed`);
+  expect((await x.runners.get(runner.id)).threadId).toBe(runner.threadId);
+  expect(x.automations[0]!.execution).toEqual(execution);
+  expect(x.automations[0]!.enabled).toBe(true);
+  expect(x.threads.get(runner.threadId!)?.archivedAt).toBeNull();
+  expect(x.archive).not.toHaveBeenCalledWith({ threadId: runner.threadId });
+});
+
+it("uses the target default directory when personal workspace is unavailable", async () => {
+  const x = await setup();
+  x.environmentProviders.splice(0);
+  expect(await runnerEnvironment(x.sdk, "host_red4")).toEqual({ type: "host", hostId: "host_red4", workspace: { type: "unmanaged", path: null } });
+});
+
+it("records offline admission without sending a nested dispatch; the sweep alerts once", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "red4" });
+  x.hosts[0]!.status = "disconnected";
+  expect(await x.runners.available(runner.id, false)).toBe(false);
+  expect(x.send).not.toHaveBeenCalled();
+  await Promise.all([x.runners.checkMachines(), x.runners.checkMachines()]);
+  expect(x.send).toHaveBeenCalledTimes(1);
+});
+
+it("ignores URL paths during preflight and respects host-specific provider availability", async () => {
+  const x = await setup();
+  const check = await x.runners.preflight({ machine: "red4", job: "Check https://example.com/news and /srv/data" });
+  expect(check.warnings).toEqual([]);
+  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_red4", paths: ["/srv/data"] });
+  x.environmentProviders[0]!.machineAvailability = { host_red4: { status: "unavailable" } } as never;
+  expect(await runnerEnvironment(x.sdk, "host_red4")).toMatchObject({ type: "host", hostId: "host_red4" });
+});
+
+it("suspends the automation through an outage and resumes on reconnection without replaying a run", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "red4" });
+  x.hosts[0]!.status = "disconnected";
+  await x.runners.checkMachines();
+  expect(x.automations[0]!.enabled).toBe(false);
+  expect((await x.runners.get(runner.id))).toMatchObject({ state: "active", machineOffline: true });
+  await x.runners.checkMachines();
+  expect(x.send).toHaveBeenCalledTimes(1);
+  expect(x.calls.filter(c => c.method === "automations_run")).toEqual([]);
+  x.hosts[0]!.status = "connected";
+  await x.runners.checkMachines();
+  expect(x.automations[0]!.enabled).toBe(true);
+  expect((await x.runners.get(runner.id)).machineOffline).toBe(false);
+  expect(x.calls.filter(c => c.method === "automations_run")).toEqual([]);
+});
+
+it("keeps a user's pause during an outage and across reconnection", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "red4" });
+  x.hosts[0]!.status = "disconnected";
+  await x.runners.checkMachines();
+  await x.runners.setState(runner.id, "paused");
+  x.hosts[0]!.status = "connected";
+  await x.runners.checkMachines();
+  expect(x.automations[0]!.enabled).toBe(false);
+  expect((await x.runners.get(runner.id)).state).toBe("paused");
+});
+
+
+it("recovers pre-buffer reports from the old thread for migration", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
+  x.timeline.mockResolvedValue({ rows: [1, 2, 3, 4].map(n => ({ kind: "turn", children: [{ kind: "work", workKind: "tool", toolName: "mcp__studio__runner_report", toolArgs: { summary: `old ${n}` }, createdAt: n }] })) });
+  await x.runners.migrate({ id: runner.id, machine: "red4" });
+  const text = (x.send.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
+  expect(text).toContain("old 2\nold 3\nold 4");
+  expect(text).not.toContain("old 1");
 });

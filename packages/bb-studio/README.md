@@ -1798,6 +1798,35 @@ of Staff", with the same thread and check-ins; rename it from its page.
   paused), its last run and its last report. The Bot makes one with
   `runner_create` when a task becomes recurring; its first run starts at
   once, and each scheduled run's prompt carries the job.
+  - **Machines**: `runner_create` and `runner_update` accept an optional
+    `machine` (host id or unique host name); Studio stores the resolved id.
+    Empty or null keeps the server's Personal project and `project-default`
+    environment. Bot Info → Runners has a machine picker and **Move to machine…**;
+    remote machine names also appear beside runners in Schedule.
+    On another machine Studio requests the installed `personal-workspace`
+    environment provider when available there. That provider creates a directory
+    on the selected host, without using the Mac's Personal folder. If unavailable,
+    Studio uses an unmanaged environment with a null path on that host, allowing
+    BB to choose its default working directory. BB resolves that host-default
+    request; if its default requires an unavailable provider, creation fails
+    instead of falling back to the Mac.
+  - **Before moving**: absolute and home-relative paths are checked on the target.
+    Jobs naming Mac-only tools produce warnings. Review the confirmation dialog,
+    or pass `confirm: true` after reviewing tool warnings. The target must have
+    the runner's provider CLI installed and signed in; **Install <Provider> on
+    <machine>** installs through BB. Sign in directly on that machine using the
+    displayed provider hint. Studio never copies credentials.
+  - **Migration**: `runner_migrate({ id, machine, confirm? })` (null means server)
+    refuses while a run is in progress. It keeps the runner id, Bot, job,
+    schedule, reports and automation, starts a new hidden thread with the last
+    3 reports as a handoff, retargets the automation, then archives the old thread.
+    Spawn, retarget or handoff failures preserve the old thread and target.
+  - **Offline machines**: due runs are skipped, with **machine offline** in the
+    runner state and one Bot alert per outage. There is no queue or fallback.
+    Studio suspends the automation during the outage so BB does not retry the
+    skipped run. A connection check clears the state and resumes that automation
+    when the host returns, unless the runner or Bot was paused. Admission uses SDK 0.6.37's
+    `experimental_hooks` dispatch checkpoint, its only available admission API.
   - **Quiet by default**: a runner never writes to the Bot's chat. It
     reports with `runner_report({ level, summary })`, a tool only runner
     threads get: `log` stays in its thread and the Bot's Info; `tell` posts

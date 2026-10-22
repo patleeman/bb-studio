@@ -105,6 +105,10 @@ public enum Studio {
     public static let bot_runners = "bot_runners"
     public static let bot_runner_create = "bot_runner_create"
     public static let bot_runner_update = "bot_runner_update"
+    public static let bot_runner_migrate = "bot_runner_migrate"
+    public static let bot_runner_machines = "bot_runner_machines"
+    public static let bot_runner_install_provider = "bot_runner_install_provider"
+    public static let bot_runner_preflight = "bot_runner_preflight"
     public static let bot_runner_pause = "bot_runner_pause"
     public static let bot_runner_resume = "bot_runner_resume"
     public static let bot_runner_run_now = "bot_runner_run_now"
@@ -503,6 +507,16 @@ public enum Studio {
   public typealias BotRunnerCreate = BotRunnerCreateOutput
 
   public typealias BotRunnerUpdate = BotRunnerUpdateOutput
+
+  public typealias BotRunnerMigrate = BotRunnerMigrateOutput
+
+  public typealias BotRunnerMachinesOutput = [BotRunnerMachinesOutputItem]
+
+  public typealias BotRunnerMachines = BotRunnerMachinesOutput
+
+  public typealias BotRunnerInstallProvider = BotRunnerInstallProviderOutput
+
+  public typealias BotRunnerPreflight = BotRunnerPreflightOutput
 
   public typealias BotRunnerPause = BotRunnerPauseOutput
 
@@ -8638,6 +8652,9 @@ public enum Studio {
   }
 
   public struct BotRunnersOutputRunnersItem: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -8654,7 +8671,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -8768,12 +8788,16 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var schedule: BotRunnerCreateInputSchedule?
+    public var machine: String?
+    public var confirm: Bool?
 
-    public init(botId: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerCreateInputSchedule? = nil) {
+    public init(botId: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerCreateInputSchedule? = nil, machine: String? = nil, confirm: Bool? = nil) {
       self.botId = botId
       self.name = name
       self.job = job
       self.schedule = schedule
+      self.machine = machine
+      self.confirm = confirm
     }
   }
 
@@ -8891,6 +8915,9 @@ public enum Studio {
   }
 
   public struct BotRunnerCreateOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -8907,7 +8934,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -8992,13 +9022,17 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var schedule: BotRunnerUpdateInputSchedule?
+    public var machine: String?
+    public var confirm: Bool?
 
-    public init(botId: String? = nil, id: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerUpdateInputSchedule? = nil) {
+    public init(botId: String? = nil, id: String? = nil, name: String? = nil, job: String? = nil, schedule: BotRunnerUpdateInputSchedule? = nil, machine: String? = nil, confirm: Bool? = nil) {
       self.botId = botId
       self.id = id
       self.name = name
       self.job = job
       self.schedule = schedule
+      self.machine = machine
+      self.confirm = confirm
     }
   }
 
@@ -9116,6 +9150,9 @@ public enum Studio {
   }
 
   public struct BotRunnerUpdateOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -9132,7 +9169,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -9148,6 +9188,249 @@ public enum Studio {
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
       self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerMigrateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var machine: String?
+    public var confirm: Bool?
+
+    public init(botId: String? = nil, id: String? = nil, machine: String? = nil, confirm: Bool? = nil) {
+      self.botId = botId
+      self.id = id
+      self.machine = machine
+      self.confirm = confirm
+    }
+  }
+
+  public enum BotRunnerMigrateOutputState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotRunnerMigrateOutputScheduleCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerMigrateOutputSchedule: Sendable, Hashable, Codable {
+    public var cadence: BotRunnerMigrateOutputScheduleCadence?
+    public var time: String?
+    public var cron: String?
+    public var timezone: String?
+
+    public init(cadence: BotRunnerMigrateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+      self.timezone = timezone
+    }
+  }
+
+  public enum BotRunnerMigrateOutputLastLevel: Sendable, Hashable, Codable {
+    case log
+    case tell
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "log": self = .log
+      case "tell": self = .tell
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .log: try container.encode("log")
+      case .tell: try container.encode("tell")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotRunnerMigrateOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
+    public var id: String?
+    public var name: String?
+    public var job: String?
+    public var threadId: String?
+    public var providerId: String?
+    public var state: BotRunnerMigrateOutputState?
+    public var adopted: Bool?
+    public var schedule: BotRunnerMigrateOutputSchedule?
+    public var nextRunAt: Double?
+    public var lastRunAt: Double?
+    public var lastRunStatus: String?
+    public var lastLevel: BotRunnerMigrateOutputLastLevel?
+    public var lastReport: String?
+    public var lastReportAt: Double?
+    public var urgent: Bool?
+
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerMigrateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerMigrateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerMigrateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
+      self.id = id
+      self.name = name
+      self.job = job
+      self.threadId = threadId
+      self.providerId = providerId
+      self.state = state
+      self.adopted = adopted
+      self.schedule = schedule
+      self.nextRunAt = nextRunAt
+      self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
+      self.lastLevel = lastLevel
+      self.lastReport = lastReport
+      self.lastReportAt = lastReportAt
+      self.urgent = urgent
+    }
+  }
+
+  public struct BotRunnerMachinesInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotRunnerMachinesOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var connected: Bool?
+
+    public init(id: String? = nil, name: String? = nil, connected: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.connected = connected
+    }
+  }
+
+  public struct BotRunnerInstallProviderInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var machine: String?
+
+    public init(botId: String? = nil, id: String? = nil, machine: String? = nil) {
+      self.botId = botId
+      self.id = id
+      self.machine = machine
+    }
+  }
+
+  public struct BotRunnerInstallProviderOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotRunnerPreflightInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var id: String?
+    public var machine: String?
+    public var job: String?
+
+    public init(botId: String? = nil, id: String? = nil, machine: String? = nil, job: String? = nil) {
+      self.botId = botId
+      self.id = id
+      self.machine = machine
+      self.job = job
+    }
+  }
+
+  public struct BotRunnerPreflightOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var warnings: [String]?
+    public var blocked: String?
+    public var install: Bool?
+    public var providerName: String?
+    public var signInHint: String?
+
+    public init(machine: String? = nil, machineName: String? = nil, warnings: [String]? = nil, blocked: String? = nil, install: Bool? = nil, providerName: String? = nil, signInHint: String? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.warnings = warnings
+      self.blocked = blocked
+      self.install = install
+      self.providerName = providerName
+      self.signInHint = signInHint
     }
   }
 
@@ -9275,6 +9558,9 @@ public enum Studio {
   }
 
   public struct BotRunnerPauseOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -9291,7 +9577,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -9434,6 +9723,9 @@ public enum Studio {
   }
 
   public struct BotRunnerResumeOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -9450,7 +9742,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -9593,6 +9888,9 @@ public enum Studio {
   }
 
   public struct BotRunnerRunNowOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -9609,7 +9907,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
@@ -9796,6 +10097,9 @@ public enum Studio {
   }
 
   public struct BotRunnerAdoptOutput: Sendable, Hashable, Codable {
+    public var machine: String?
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var name: String?
     public var job: String?
@@ -9812,7 +10116,10 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+      self.machine = machine
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.name = name
       self.job = job
