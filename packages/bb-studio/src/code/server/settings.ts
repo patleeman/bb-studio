@@ -89,15 +89,6 @@ export async function applyLayout(workspaceDir: string): Promise<boolean> {
   return true;
 }
 
-/** Brings every workspace folder under `root/workspaces` to the current layout. */
-export async function applyLayoutEverywhere(root: string, warn: (message: string) => void): Promise<void> {
-  const base = join(root, "workspaces");
-  const ids = existsSync(base) ? await readdir(base) : [];
-  for (const id of ids) {
-    if (!(await applyLayout(join(base, id)).catch(() => false))) warn(`workspace ${id}: settings.json isn't plain JSON; left its layout alone`);
-  }
-}
-
 /** Applies the theme to every workspace folder under `root/workspaces`. */
 export async function applyThemeEverywhere(root: string, theme: BbTheme, warn: (message: string) => void): Promise<void> {
   const base = join(root, "workspaces");

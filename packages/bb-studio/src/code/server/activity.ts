@@ -95,14 +95,6 @@ const at = (from: string | null, file: string) => {
   return isAbsolute(file) ? resolve(file) : from ? resolve(from, file) : null;
 };
 
-/**
- * The first activity in one thread event, or null. `base` is the thread's
- * working folder, for relative paths that don't say where they ran.
- */
-export function activityFrom(event: Event, base: string | null): Activity | null {
-  return activitiesFrom(event, base)[0] ?? null;
-}
-
 /** Every activity in one event: one command can read several files, one change touch several. */
 export function activitiesFrom(event: Event, base: string | null = null): Activity[] {
   if (event.type === "turn/started") return [{ kind: "turn", state: "working" }];

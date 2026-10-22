@@ -356,22 +356,6 @@ async function seedSettings(dir: string): Promise<void> {
 }
 
 /**
- * Processes in `ps -axo pid=,command=` output that are this plugin's
- * watchdogs or run code-server from its install folder. Nothing else: BB's
- * own plugin host may name the plugin's folder too.
- */
-export function leftoverPids(ps: string, root: string, self: number): number[] {
-  const base = root.replace(/\/+$/, "");
-  const markers = [`${base}/code-server/`, `${base}/watchdog.cjs`];
-  return ps.split("\n").flatMap((line) => {
-    const match = /^\s*(\d+)\s+(.*)$/.exec(line);
-    if (!match || !markers.some((marker) => match[2]!.includes(marker))) return [];
-    const pid = Number(match[1]);
-    return pid === self ? [] : [pid];
-  });
-}
-
-/**
  * Runs code-server (argv[2]…) in its own process group and stops the whole
  * group, extension hosts and terminals' pty host included, on Stop or when
  * stdin closes, which is when BB exits.

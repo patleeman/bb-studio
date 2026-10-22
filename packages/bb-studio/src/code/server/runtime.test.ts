@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CODE_SERVER_VERSION, leftoverPids, releaseAsset, workspaceFile, workspaceFileName } from "./runtime";
+import { CODE_SERVER_VERSION, releaseAsset, workspaceFile, workspaceFileName } from "./runtime";
 
 describe("code-server runtime", () => {
   it("picks the release for this machine", () => {
@@ -18,19 +18,24 @@ describe("code-server runtime", () => {
   });
 });
 
-describe("leftover servers", () => {
+it("quiesces only this runtime's servers and descendants", async () => {
+  const { processRows, quiesceCode } = await import("../../kit/code-handover");
   const root = "/data/plugins/studio-code";
-  const ps = [
-    `  101 ${root}/code-server/code-server-${CODE_SERVER_VERSION}-macos-arm64/lib/node ${root}/watchdog.cjs ${root}/code-server/x/bin/code-server`,
-    `  102 ${root}/code-server/x/lib/node ${root}/code-server/x/out/node/entry.js --bind-addr 127.0.0.1:5000`,
-    `  103 /usr/bin/node /bb/plugin-host.js ${root}/server.js`,
-    `  104 /usr/bin/vim notes.txt`,
-    `  105 ${root}/code-server/x/lib/node self`,
-  ].join("\n");
-
-  it("finds this plugin's code-servers and watchdogs, and nothing else", () => {
-    expect(leftoverPids(ps, `${root}/`, 105)).toEqual([101, 102]);
+  const rows = processRows([
+    `101 1 ${root}/watchdog.cjs`,
+    `102 101 node extension-host`,
+    `103 1 node /bb/plugin-host.js ${root}/server.js`,
+    `104 1 vim notes.txt`,
+    `${process.pid} 1 ${root}/code-server/self`,
+    `106 1 ${root}/code-server/x/bin/code-server`,
+  ].join("\n"));
+  const stopped: number[] = [];
+  let listed = false;
+  await quiesceCode(root, {
+    list: async () => { if (listed) return []; listed = true; return rows; },
+    stop: (pid) => { stopped.push(pid); }, pause: async () => {},
   });
+  expect(stopped.sort()).toEqual([101, 102, 106]);
 });
 
 // No real process or server is launched: this tests the ownership fence itself.
