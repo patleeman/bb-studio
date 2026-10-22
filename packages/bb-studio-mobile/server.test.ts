@@ -1,5 +1,5 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import plugin from "./server.js";
@@ -125,6 +125,24 @@ async function configuredHost() {
 }
 
 describe("notify", () => {
+  it("replaces the signing token when an equal-length PEM changes", async () => {
+    const requests = recordingSession();
+    const host = await configuredHost();
+    try {
+      await host.bb.storage.kv.set("devices", { ["apns:" + "a".repeat(64)]: Date.now() });
+      const input = { title: "Build", body: "Running", kind: "turn-finished", threadId: "thr_a", projectId: "proj_demo" } as const;
+      await host.harness.behavior.callRpc("notify", input);
+      const replacement = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+      const key = replacement.privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+      await host.harness.behavior.setSettings({ apnsKey: key });
+      await host.harness.behavior.callRpc("notify", input);
+      const jwt = requests[1]!.headers.authorization!.replace(/^bearer /, "");
+      const [header, payload, signature] = jwt.split(".");
+      expect(verify("sha256", Buffer.from(`${header}.${payload}`), { key: replacement.publicKey, dsaEncoding: "ieee-p1363" }, Buffer.from(signature!, "base64url"))).toBe(true);
+      expect(requests[1]!.headers.authorization).not.toBe(requests[0]!.headers.authorization);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
   it("sends the coalesce key as a collapse id, hashing keys over 64 bytes", async () => {
     const requests = recordingSession();
     const host = await configuredHost();

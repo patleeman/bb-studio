@@ -11,7 +11,7 @@
 // Once a notified thread is read or answered anywhere, a silent push tells the
 // app to remove its notifications (see clear.ts).
 import { readFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -137,7 +137,7 @@ export default async function plugin(bb: BbPluginApi) {
       bundleId: values.bundleId.trim(),
       environment: values.apnsEnvironment as ApnsConfig["environment"],
     };
-    const fingerprint = `${config.keyId}:${config.teamId}:${keyPem.length}:${keyPem.slice(-16)}`;
+    const fingerprint = `${config.keyId}:${config.teamId}:${createHash("sha256").update(keyPem).digest("hex")}`;
     if (tokenCache?.fingerprint !== fingerprint) {
       try {
         tokenCache = { fingerprint, token: new ProviderToken(config) };
