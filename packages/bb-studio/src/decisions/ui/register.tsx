@@ -1,5 +1,5 @@
 import type { Fallback } from "../../kit/decisions-legacy-contract";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   type PluginAppBuilder,
   experimental_ProviderModelPicker as ProviderModelPicker,
@@ -29,13 +29,17 @@ function JevConnection() {
   const rpc = useRpc<typeof rpcContract>();
   const { values } = useSettings();
   const [status, setStatus] = useState<{ provider: string; routes: { name: string; model: string }[]; problems: string[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [check, setCheck] = useState<{ state: "idle" | "running" } | { state: "done"; text: string; ok: boolean }>({
     state: "idle",
   });
 
   // Secret keys are not in `values`, so also refresh after a check and on focus.
   const refresh = useCallback(() => {
-    rpc.call("decisions.jev.status", null).then(setStatus, () => setStatus(null));
+    setLoading(true);
+    setError(null);
+    void rpc.call("decisions.jev.status", null).then(setStatus, (cause) => setError(errorText(cause))).finally(() => setLoading(false));
   }, [rpc]);
   useEffect(refresh, [refresh, JSON.stringify(values)]);
   useEffect(() => {
@@ -65,7 +69,9 @@ function JevConnection() {
         label={status?.provider === "auto" || !status ? "Providers auto will try" : "Provider"}
         description="Only providers with a key, or a complete custom endpoint, are used. Keys stay on the server."
       >
-        {routes.length ? (
+        {error ? (
+          <><p role="alert" className="text-xs text-destructive">{error}</p><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></>
+        ) : loading ? <span className="text-sm text-muted-foreground">Loading…</span> : routes.length ? (
           <ol className="flex flex-col items-start gap-1 text-sm sm:items-end" aria-label="Jev providers in order">
             {routes.map((route, index) => (
               <li key={route.name} className="text-foreground">
@@ -75,7 +81,7 @@ function JevConnection() {
             ))}
           </ol>
         ) : (
-          <span className="text-sm text-muted-foreground">{status ? "None configured" : "Loading…"}</span>
+          <span className="text-sm text-muted-foreground">None configured</span>
         )}
         {status?.problems.map((problem) => (
           <p key={problem} className="text-xs text-destructive">
@@ -108,11 +114,25 @@ function FallbackModel() {
   const [value, setValue] = useState<Fallback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    rpc.call("decisions.fallback.get", null).then(setValue, (cause) => setError(errorText(cause)));
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [suggestionFailed, setSuggestionFailed] = useState(false);
+  const refresh = useCallback(() => {
+    setError(null);
+    void rpc.call("decisions.fallback.get", null).then(setValue, (cause) => setError(errorText(cause)));
   }, [rpc]);
+  useEffect(refresh, [refresh]);
 
-  const save = async (next: Fallback) => {
+  const run = async (action: () => Promise<void>) => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError(null);
+    setSuggestionFailed(false);
+    try { await action(); } finally { pending.current = false; setBusy(false); }
+  };
+
+  const persist = async (next: Fallback) => {
     const previous = value;
     setValue(next);
     setError(null);
@@ -124,22 +144,28 @@ function FallbackModel() {
     }
   };
 
-  const chooseMode = async (mode: Fallback["mode"]) => {
-    if (mode !== "model") return save({ mode });
+  const save = (next: Fallback) => run(() => persist(next));
+  const chooseMode = (mode: Fallback["mode"]) => run(async () => {
+    if (mode !== "model") return persist({ mode });
     // Start from a real catalog entry so the picker never shows an empty model.
-    const suggestion = await rpc.call("decisions.fallback.suggest", null).catch(() => null);
-    if (!suggestion) return setError("No available provider has a model to choose.");
-    await save(suggestion);
-  };
+    try {
+      const suggestion = await rpc.call("decisions.fallback.suggest", null);
+      if (!suggestion) return setError("No available provider has a model to choose.");
+      await persist(suggestion);
+    } catch (cause) {
+      setError(errorText(cause));
+      setSuggestionFailed(true);
+    }
+  });
 
-  if (!value) return <p className="text-sm text-muted-foreground">{error ?? "Loading…"}</p>;
+  if (!value) return <div><p className="text-sm text-muted-foreground">{error ?? "Loading…"}</p>{error && <Button size="sm" variant="outline" onClick={refresh}>Retry</Button>}</div>;
   return (
     <div className="divide-y divide-border rounded-lg border border-border bg-card px-4">
       <Row
         label="Use"
         description="Decides when no Jev provider answers, in a hidden thread that is deleted afterwards. Off sends every undecided Smart Queue message as a follow-up."
       >
-        <Select value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>
+        <Select disabled={busy} value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>
           <SelectTrigger className="w-56" aria-label="Fallback model source">
             <SelectValue />
           </SelectTrigger>
@@ -160,6 +186,7 @@ function FallbackModel() {
       {value.mode === "model" && (
         <Row label="Model" description="Pick a fast, inexpensive model. A classifier needs little reasoning.">
           <ProviderModelPicker
+            disabled={busy}
             align="end"
             value={{
               providerId: value.providerId,
@@ -179,7 +206,8 @@ function FallbackModel() {
           />
         </Row>
       )}
-      {error && <p className="py-2 text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="py-2 text-xs text-destructive">{error}</p>}
+      {suggestionFailed && <Button size="sm" variant="outline" disabled={busy} onClick={() => void chooseMode("model")}>Retry</Button>}
     </div>
   );
 }
