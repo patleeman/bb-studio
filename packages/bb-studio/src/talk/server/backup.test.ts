@@ -207,3 +207,53 @@ describe("Talk backup and restore", () => {
     expect(target.store.recording(REC)!.projectId).toBeNull();
   });
 });
+
+it.each(["edit", "resume", "segment"])("keeps local work that changes during audio copy: %s", async (change) => {
+  const source = await seeded();
+  const { dir } = await backupOf(source);
+  const target = await talk(1);
+  target.store.create({ id: REC, kind: "recording", projectId: "proj_a", threadId: null });
+  await target.segment(REC, "s1", 0, "local audio");
+  target.db.prepare("UPDATE recordings SET status = 'done' WHERE id = ?").run(REC);
+  const original = target.store.recording(REC)!;
+  const originalFile = target.store.segmentFile(REC, "s1-0")!.file;
+  let changed = false;
+  class Editing extends BackupReader {
+    override path(relative: string) {
+      const path = super.path(relative);
+      if (!changed && relative.startsWith(`audio/${REC}/`)) {
+        changed = true;
+        queueMicrotask(() => {
+          if (change === "edit") { target.clock.set(9_000_000); target.store.rename(REC, "New local title", "user"); }
+          if (change === "resume") target.db.prepare("UPDATE recordings SET status = 'recording' WHERE id = ?").run(REC);
+          // Even a segment update within the same clock tick invalidates the plan.
+          if (change === "segment") target.db.prepare("UPDATE segments SET text = 'New local transcript' WHERE recording_id = ?").run(REC);
+        });
+      }
+      return path;
+    }
+  }
+  const report = await restore(target, new Editing(dir));
+  expect(changed).toBe(true);
+  expect(report).toMatchObject({ kept: 1, updated: 0, failed: 0 });
+  expect(target.store.recording(REC)).toMatchObject({ title: change === "edit" ? "New local title" : original.title, status: change === "resume" ? "recording" : "done" });
+  expect((await target.files.read(originalFile)).toString()).toBe("local audio");
+  expect(await readdir(target.files.inside(REC))).toEqual(["s1-0.webm"]);
+  expect(target.changed).not.toContain(REC);
+});
+
+it("concurrent restores publish each recording once and keep accepted audio", async () => {
+  const source = await seeded();
+  const { dir } = await backupOf(source);
+  const target = await talk();
+  const reports = await Promise.all([restore(target, new BackupReader(dir)), restore(target, new BackupReader(dir))]);
+  expect(reports.reduce((count, report) => count + report.created, 0)).toBe(2);
+  expect(reports.reduce((count, report) => count + report.kept + report.unchanged, 0)).toBe(2);
+  expect(reports.every((report) => report.failed === 0)).toBe(true);
+  for (const id of [REC, LIVE]) {
+    expect(await readdir(target.files.inside(id))).toHaveLength(2);
+    const session = id === REC ? "s1" : "s2";
+    const file = target.store.segmentFile(id, `${session}-0`)!.file;
+    expect((await target.files.read(file)).toString()).toBe(id === REC ? "audio-one" : "live-one");
+  }
+});

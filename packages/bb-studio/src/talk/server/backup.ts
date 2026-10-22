@@ -5,10 +5,10 @@
 //   audio/<recordingId>/<file>      that recording's segment audio, hard-linked or copied
 //
 // Restore is keyed by recording id, so running it twice changes nothing, and a
-// newer copy here is never overwritten. Audio is copied into place (temp file,
-// fsync, rename) before one transaction writes every row.
+// newer copy here is never overwritten. Audio is staged at unique paths
+// before one transaction rechecks local rows and publishes accepted recordings.
 import { randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, rmSync } from "node:fs";
 import { copyFile, mkdir, open, readdir, rename, rm } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import type Database from "better-sqlite3";
@@ -150,7 +150,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
   const { db, files } = deps;
   const recordingRow = db.prepare(`SELECT * FROM recordings WHERE id = ?`);
   const segmentRows = db.prepare(`SELECT * FROM segments WHERE recording_id = ? ORDER BY started_at, session_id, idx`);
-  const localRow = db.prepare(`SELECT updated_at, status FROM recordings WHERE id = ?`);
+  const localSnapshot = (id: string) => JSON.stringify({ row: recordingRow.get(id), segments: segmentRows.all(id) });
 
   return {
     version: TALK_BACKUP_VERSION,
@@ -261,8 +261,12 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         item: TalkBackupItem;
         decision: "create" | "update";
         unmapped: boolean;
-        /** Local audio paths this restore wrote, to undo for a failed create. */
+        /** Unique audio paths to discard when staging fails or the plan is rejected. */
         placed: string[];
+        audioPaths: Map<string, string>;
+        expected: string;
+        oldFiles: string[];
+        accepted: boolean;
       }
       const planned: Planned[] = [];
       const seen = new Set<string>();
@@ -285,7 +289,8 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         }
         seen.add(item.id);
         const ref = { id: item.id, title: item.title };
-        const local = localRow.get(item.id) as { updated_at: number; status: string } | undefined;
+        const local = recordingRow.get(item.id) as RecordingRow | undefined;
+        const expected = localSnapshot(item.id);
         const decision = restoreDecision(local?.updated_at ?? null, item.updatedAt);
         if (decision === "unchanged" || decision === "keep") {
           tally.decided(decision, ref);
@@ -297,6 +302,8 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         }
         // Check every audio file before touching anything.
         const placed: string[] = [];
+        const audioPaths = new Map<string, string>();
+        let oldFiles: string[] = [];
         try {
           const name = fileSafeId(item.id);
           const audio = item.segments.flatMap((segment) => (segment.audio ? [segment.audio] : []));
@@ -304,20 +311,28 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
             if (!(await reader.exists(`audio/${name}/${file}`))) throw new Error(`Its audio file ${file} is missing from the backup.`);
           }
           if (!dryRun) {
-            for (const file of audio) {
-              const target = files.inside(`${item.id}/${file}`);
+            const referenced = new Set((segmentRows.all(item.id) as SegmentRow[]).map((row) => basename(row.file)));
+            oldFiles = (await readdir(files.inside(item.id), { withFileTypes: true }).catch(() => []))
+              .filter((entry) => entry.isFile()).map((entry) => entry.name)
+              .filter((file) => !file.startsWith("restore-") || referenced.has(file));
+            for (const file of new Set(audio)) {
+              // Unique paths keep staged audio from overwriting live audio. Only
+              // accepted database rows publish these paths to the player.
+              const relative = `${item.id}/restore-${randomUUID()}.${file.split(".").pop()}`;
+              const target = files.inside(relative);
+              audioPaths.set(file, relative);
               await placeFile(reader.path(`audio/${name}/${file}`), target);
               placed.push(target);
             }
           }
         } catch (error) {
-          if (decision === "create") await Promise.all(placed.map((target) => rm(target, { force: true })));
+          await Promise.all(placed.map((target) => rm(target, { force: true })));
           tally.record("failed", ref, error instanceof Error ? error.message : String(error));
           continue;
         }
         const mapped = mapProject(projects, item.projectId);
         if (item.status !== "done" || item.segments.some((segment) => segment.status === "pending")) inProgress += 1;
-        planned.push({ item: { ...settled(item), projectId: mapped.projectId }, decision, unmapped: mapped.unmapped, placed });
+        planned.push({ item: { ...settled(item), projectId: mapped.projectId }, decision, unmapped: mapped.unmapped, placed, audioPaths, expected, oldFiles, accepted: dryRun });
       }
 
       if (!dryRun && planned.length) {
@@ -344,7 +359,13 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
               @text, @error, @attempts, 0, @createdAt, @cleanedText)`,
         );
         const write = db.transaction((items: Planned[]) => {
-          for (const { item } of items) {
+          for (const entry of items) {
+            const { item } = entry;
+            if (localSnapshot(item.id) !== entry.expected) {
+              tally.record("kept", { id: item.id, title: item.title }, "It changed here while restore was preparing its audio; it was kept.");
+              continue;
+            }
+            entry.accepted = true;
             upsert.run({ ...item, meetingNotes: item.meetingNotes ? JSON.stringify(item.meetingNotes) : null, notesItems: item.notesItems ? JSON.stringify(item.notesItems) : null });
             deleteSegments.run(item.id);
             for (const segment of item.segments) {
@@ -352,31 +373,37 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
                 ...segment,
                 recordingId: item.id,
                 // A segment whose audio wasn't saved keeps a path; the player reports it missing.
-                file: `${item.id}/${segment.audio ?? `${segment.id}.${extensionFor(segment.mimeType)}`}`,
+                file: segment.audio ? entry.audioPaths.get(segment.audio)! : `${item.id}/${segment.id}.${extensionFor(segment.mimeType)}`,
               });
             }
           }
         });
         try {
-          write(planned);
+          write.immediate(planned);
         } catch (error) {
           for (const entry of planned) {
-            if (entry.decision === "create") await Promise.all(entry.placed.map((target) => rm(target, { force: true })));
+            await Promise.all(entry.placed.map((target) => rm(target, { force: true })));
           }
           throw error;
         }
-        // An updated recording's audio that the backup no longer lists is stale.
-        for (const { item, decision } of planned) {
-          if (decision !== "update") continue;
-          const keep = new Set(item.segments.flatMap((segment) => (segment.audio ? [segment.audio] : [])));
-          const dir = files.inside(item.id);
-          const present = await readdir(dir).catch(() => [] as string[]);
-          await Promise.all(present.filter((file) => !keep.has(file) && !file.endsWith(".tmp")).map((file) => rm(`${dir}/${file}`, { force: true })));
+        // No await between the transaction and cleanup: capture cannot resume
+        // and reuse an old path before it is removed. Other restores' unique
+        // staged files are never included in this recording's oldFiles.
+        for (const entry of planned) {
+          if (!entry.accepted) {
+            for (const path of entry.placed) rmSync(path, { force: true });
+            continue;
+          }
+          for (const file of entry.oldFiles) {
+            if (file.endsWith(".tmp")) continue;
+            rmSync(files.inside(`${entry.item.id}/${file}`), { force: true });
+          }
         }
-        for (const { item } of planned) deps.changed(item.id);
+        for (const { item, accepted } of planned) if (accepted) deps.changed(item.id);
       }
 
-      for (const { item, decision, unmapped } of planned) {
+      for (const { item, decision, unmapped, accepted } of planned) {
+        if (!accepted) continue;
         const ref = { id: item.id, title: item.title };
         tally.decided(decision, ref);
         if (unmapped) tally.unmapped(ref);
