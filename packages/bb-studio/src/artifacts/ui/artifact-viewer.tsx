@@ -25,6 +25,8 @@ import { errorMessage, relativeTime, shortDateTime } from "../../kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
+import type { rpcContract as minisContract } from "../../minis/contract";
+import { miniHref } from "../../minis/shared";
 import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { ArtifactBody, type BodyView } from "./artifact-body";
 import { QuoteCard, useSelectionPick, type Picked } from "./artifact-quote";
@@ -47,6 +49,7 @@ export function ArtifactViewer({
   onBack: (replace?: boolean) => void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
+  const minis = useRpc<typeof minisContract>();
   const navigate = useBbNavigate();
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -161,6 +164,19 @@ export function ArtifactViewer({
     }
   }
 
+  /** A live HTML artifact as a mini app: its page and state, with records and access of its own. */
+  async function convertToMini() {
+    setBusy(true);
+    try {
+      const { mini } = await minis.call("minis.fromArtifact", { artifactId });
+      toast.success("Made a mini app", { action: { label: "Open", onClick: () => openAppPath(miniHref(mini.id)) } });
+    } catch (failure) {
+      toast.error(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function move(projectId: string | null) {
     try {
       await rpc.call("artifacts.move", { id: artifactId, projectId });
@@ -218,6 +234,11 @@ export function ArtifactViewer({
           {text && version.type !== "html" ? (
             <DropdownMenuItem disabled={busy} onSelect={() => void saveAsPage()}>
               <Icon name="studio/pages" fallback="FileText" className="size-4" /> Save as page
+            </DropdownMenuItem>
+          ) : null}
+          {version.type === "html" ? (
+            <DropdownMenuItem disabled={busy} onSelect={() => void convertToMini()}>
+              <Icon name="AppWindow" className="size-4" /> Convert to mini app
             </DropdownMenuItem>
           ) : null}
           {versions.length > 1 ? (

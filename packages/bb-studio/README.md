@@ -783,6 +783,27 @@ Agents are told to make a mini app, rather than a playground or a one-off
 HTML file, whenever you want something to use or come back to: a tracker, a
 board, a calculator, a form, a poll, a chart to play with.
 
+![Live BB screenshot of a mini app open as a Studio tab](assets/minis-preview.png)
+
+The seeded "Deal pipeline" mini app as a Studio tab in a staged BB, in dark
+mode: Kit's badges, tabs, data table, fields, select and button, stat tiles
+from `@studio/kit/charts`, a Lucide icon and Tailwind classes, over five
+records. The tabs above it switch to its records, source and settings.
+
+![The same mini app embedded in a page](assets/minis-page.png)
+
+The same app embedded in a page, in light mode. During the capture a record
+is added through the server, as an agent's `minis_data` would, and the page
+block shows "Stark · renewal" and the new total without a reload.
+
+![The access approval dialog](assets/minis-approval.png)
+
+An app that asks to reach an API with a stored secret: the banner over the
+app, and the approval dialog. Recapture all three with
+`BB_CAPTURE_ONLY=minis,minis-page,minis-approval`; the captures read the
+text inside each sandboxed frame, check the frame isn't same-origin, and
+check that an approval with a made-up nonce is refused.
+
 ### What a mini app is
 
 - **Source and manifest.** Files keyed by path: JSX, TSX, JS, TS, CSS, JSON,
@@ -842,6 +863,14 @@ server checks collections, capabilities and rate limits again.
 
 Backups keep each app's current source, state and records; approvals and
 secrets aren't backed up, so a restored app asks again.
+
+### Elsewhere in Studio
+
+- **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
+  becomes the app's `index.html` and its live state carries over. Agents do
+  the same with `minis_create` and `fromArtifactId`.
+- **Dashboards:** an Embed tile whose link is a mini app runs the app itself,
+  live, sharing its data.
 
 ### Agents
 

@@ -1,6 +1,7 @@
 /** The README capture entry modules, in capture order. Other files in captures/ are helpers. */
 import bb_studio_draw from "./captures/bb-studio-draw.mjs";
 import bb_studio_dashboards from "./captures/bb-studio-dashboards.mjs";
+import bb_studio_minis from "./captures/bb-studio-minis.mjs";
 import bb_studio_talk from "./captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./captures/bb-studio-pages.mjs";
 import bb_studio_notes from "./captures/bb-studio-notes.mjs";
@@ -21,6 +22,7 @@ export function loadCaptures(context) {
     ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
     ...bb_studio_draw(context),
     ...bb_studio_dashboards(context),
+    ...bb_studio_minis(context),
     ...bb_studio_talk(context),
     ...bb_studio_pages(context),
     ...bb_studio_notes(context),

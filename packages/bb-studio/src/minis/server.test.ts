@@ -208,4 +208,16 @@ describe("mini apps on Studio", () => {
       expect(text(await running)).toContain('"added": 1');
     });
   });
+
+  it("makes a mini app from a live HTML artifact, keeping its page and state", async () => {
+    await withHost(async (host) => {
+      const result = text(await tool(host, "minis_create", { name: "Report", fromArtifactId: "art_1" }));
+      const id = /id (mini_[0-9a-f]{16})/.exec(result)![1]!;
+      const { mini } = await call(host, "minis.get", { id });
+      expect(mini.manifest.entry).toBe("index.html");
+      expect(mini.files["index.html"]).toBe("<h1>Q3</h1>");
+      expect(text(await tool(host, "minis_live", { miniId: id, op: "state" }))).toContain('"filter": "EU"');
+      expect(text(await tool(host, "minis_create", { name: "Nope", fromArtifactId: "art_missing" }))).toContain("not found");
+    }, { artifactSource: (artifactId) => (artifactId === "art_1" ? { title: "Q3 report", html: "<h1>Q3</h1>", state: { filter: "EU" }, projectId: null } : null) });
+  });
 });

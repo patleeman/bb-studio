@@ -109,6 +109,8 @@ export interface BuiltinArtifacts {
   store: ArtifactStore;
   getArtifact(id: string): ArtifactDto | null;
   readText(id: string, versionId: string): { text: string | null; truncated: boolean };
+  /** A live HTML artifact's shared state. */
+  liveState(id: string): unknown;
   /** Studio's provider methods, which the hub calls in-process. */
   provider: StudioProviderHandlers;
   /** Its section of a Studio backup, still named `artifacts`. */
@@ -601,6 +603,8 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
     store,
     getArtifact,
     readText,
+    /** A live HTML artifact's shared state, for turning it into a mini app. */
+    liveState: (id: string) => liveStore.state(id).state,
     provider: artifactProvider({ store, changed }),
     backup: artifactBackupHandlers(z, { db, store, changed }),
     cli: (argv, ctx) => cli.run(argv, ctx),

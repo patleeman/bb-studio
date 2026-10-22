@@ -121,6 +121,8 @@ export function registerMinis(
     resolve?: (host: string) => Promise<string[]>;
     shelfDirs?: readonly string[];
     studioList?: (input: { query?: string; kind?: string; limit: number }) => Promise<{ id: string; kind: string; title: string; href: string | null; updatedAt: number | null }[]>;
+    /** An HTML artifact's page and live state, to make a mini app from it. */
+    artifactSource?: (id: string) => { title: string; html: string; state: unknown; projectId: string | null } | null;
   } = {},
 ): BuiltinMinis {
   const now = options.now ?? Date.now;
@@ -205,6 +207,16 @@ export function registerMinis(
       throw error;
     }
     return store.get(row.id)!;
+  }
+
+  /** A mini app from a live HTML artifact: its page as the entry, its state carried over. Its records start empty. */
+  function fromArtifact(artifactId: string, input: { by: Actor; threadId?: string | null; projectId?: string | null; name?: string }): MiniRow {
+    const source = options.artifactSource?.(artifactId);
+    if (!source) throw new Error(`Artifact ${artifactId} not found.`);
+    const files: SourceFiles = { "mini.json": `${JSON.stringify({ entry: "index.html", description: `Made from the artifact "${source.title}".` }, null, 2)}\n`, "index.html": source.html };
+    const row = create({ name: input.name ?? source.title, projectId: input.projectId !== undefined ? input.projectId : source.projectId, threadId: input.threadId ?? null, by: input.by, files, note: "Made from an artifact" });
+    if (source.state !== null && source.state !== undefined) store.setState(row.id, source.state, input.by);
+    return row;
   }
 
   function duplicate(id: string, input: { name: string; projectId: string | null; withData: boolean }): MiniRow {
@@ -362,6 +374,9 @@ export function registerMinis(
       store.rename(id, name, "user");
       changed(id);
       return { ok: true };
+    },
+    "minis.fromArtifact"({ artifactId }) {
+      return { mini: meta(fromArtifact(artifactId, { by: "user" })) };
     },
     "minis.duplicate"({ id, withData }) {
       const row = mustGet(id);
@@ -589,10 +604,18 @@ export function registerMinis(
   bb.agents.registerTool({
     name: "minis_create",
     description: `Create a Studio mini app: a small interactive app with its own data that shows live in chat (::mini{id="…"}), in pages and in its own tab. Use it instead of a playground or an HTML artifact whenever the user wants something to interact with, keep data in, or come back to.\n${API_HELP}`,
-    parameters: z.object({ name: z.string().trim().min(1).max(LIMITS.name), files: filesParam, note: z.string().max(200).optional() }),
-    execute({ name, files, note }, toolCtx) {
+    parameters: z.object({
+      name: z.string().trim().min(1).max(LIMITS.name),
+      files: filesParam.optional(),
+      fromArtifactId: z.string().max(100).optional().describe("Make it from a live HTML artifact instead of files: its page becomes index.html and its state carries over; then improve it with minis_update."),
+      note: z.string().max(200).optional(),
+    }),
+    execute({ name, files, fromArtifactId, note }, toolCtx) {
       try {
-        const row = create({ name, projectId: toolCtx.projectId ?? null, threadId: toolCtx.threadId ?? null, by: "agent", files, note: note ?? "Created" });
+        if (!files && !fromArtifactId) return fail("Pass files, or fromArtifactId.");
+        const row = fromArtifactId
+          ? fromArtifact(fromArtifactId, { by: "agent", threadId: toolCtx.threadId ?? null, projectId: toolCtx.projectId ?? null, name })
+          : create({ name, projectId: toolCtx.projectId ?? null, threadId: toolCtx.threadId ?? null, by: "agent", files, note: note ?? "Created" });
         if (toolCtx.threadId) services.created({ pluginId: PLUGIN_ID, id: row.id }, toolCtx.threadId);
         return [`Created mini app "${displayName(row)}" (id ${row.id}). Link: ${link(row)}`, card(row), pendingNote(row.id)].filter(Boolean).join("\n");
       } catch (error) {

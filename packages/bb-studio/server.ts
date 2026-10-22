@@ -10,6 +10,7 @@ import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
 import { MINI_INSTRUCTIONS, MINI_TOOLS, registerMinis } from "./src/minis/server";
+import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
 import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
@@ -145,6 +146,14 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
+    artifactSource: (id) => {
+      const artifact = artifacts.store.get(id);
+      if (!artifact) return null;
+      if (artifactVersionType(artifact.version) !== "html") throw new Error("Only an HTML artifact can become a mini app.");
+      const bytes = artifacts.store.bytes(artifact.version.sha256);
+      if (!bytes) return null;
+      return { title: artifactTitle(artifact), html: bytes.toString("utf8"), state: artifacts.liveState(id), projectId: artifact.project_id };
+    },
     studioList: async ({ query, kind, limit }) => {
       const { items } = await hub.overview();
       const needle = query?.trim().toLowerCase() ?? "";

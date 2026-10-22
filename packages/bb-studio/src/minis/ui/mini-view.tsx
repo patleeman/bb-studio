@@ -442,7 +442,15 @@ function SettingsSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
   );
 }
 
-// ---- Embedded: page blocks and chat cards ---------------------------------------------------
+// ---- Embedded: dashboard tiles, page blocks and chat cards --------------------------------------
+
+/** The app filling a box, as a dashboard tile: no chrome, the access banner when it waits. */
+export function MiniTile({ miniId }: { miniId: string }) {
+  const { mini, rpc } = useMini(miniId);
+  if (mini === null) return <p className="p-3 text-xs text-muted-foreground">This mini app was deleted.</p>;
+  if (!mini) return null;
+  return <MiniApp mini={mini} rpc={rpc} threadId={null} />;
+}
 
 /** The app in a page block or a chat card, fitted to its content, with a strip to open it. */
 export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId: string; threadId: string | null; onOpen?(): void; chrome?: boolean }) {

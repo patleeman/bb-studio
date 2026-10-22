@@ -139,8 +139,8 @@ export const WIDGETS: Record<WidgetType, WidgetInfo> = {
     w: 4, h: 4, usesData: false,
   },
   embed: {
-    label: "Embed", icon: "Layers", description: "A Studio item, a thread, or a web page in a sandboxed frame.",
-    data: "none", options: "href (a Studio item link), threadId, or url (http/https)",
+    label: "Embed", icon: "Layers", description: "A Studio item, a thread, or a web page in a sandboxed frame. A mini app's link runs the app itself, live, sharing its data.",
+    data: "none", options: "href (a Studio item link, e.g. /plugins/studio/studio/minis/<id> for a mini app), threadId, or url (http/https)",
     w: 6, h: 6, usesData: false,
   },
   clock: {

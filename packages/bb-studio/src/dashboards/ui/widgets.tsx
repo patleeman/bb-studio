@@ -1,6 +1,6 @@
 // The built-in widgets. Each reads its data value and options leniently:
 // shapes it doesn't know show a short note instead of failing the dashboard.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Icon, cn } from "../../kit/ui/index";
 import { openAppPath, studioItemProps, studioThreadProps } from "../../kit/app/index";
@@ -10,6 +10,10 @@ import type { rpcContract as studioContract } from "../../contract";
 import type { WidgetView, WidgetTypeView } from "../shared";
 import { CustomFrame, type WidgetTheme } from "./custom-frame";
 import { Markdown } from "./markdown";
+import { isMiniId } from "../../minis/shared";
+
+// A mini app tile is the app itself; its host loads when a dashboard first shows one.
+const MiniTile = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.MiniTile })));
 
 export interface WidgetProps {
   widget: WidgetView;
@@ -390,6 +394,8 @@ function EmbedWidget({ widget }: WidgetProps) {
   const href = str(widget.options.href).trim();
   const threadId = str(widget.options.threadId).trim();
   const url = safeUrl(widget.options.url);
+  const mini = /^\/plugins\/studio\/studio\/minis\/([^/?#]+)/.exec(href)?.[1];
+  if (mini && isMiniId(decodeURIComponent(mini))) return <Suspense fallback={null}><div className="h-full" data-widget-body="mini"><MiniTile miniId={decodeURIComponent(mini)} /></div></Suspense>;
   if (href.startsWith("/plugins/")) return <ItemEmbed href={href} />;
   if (threadId) {
     return (

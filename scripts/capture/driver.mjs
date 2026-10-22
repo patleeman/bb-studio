@@ -30,7 +30,7 @@ export class CdpClient {
     await this.command("Page.enable");
   }
 
-  command(method, params = {}, timeoutMs = 60000) {
+  command(method, params = {}, timeoutMs = 60000, sessionId = undefined) {
     const id = ++this.nextId;
     return new Promise((resolvePromise, reject) => {
       // A wedged page never answers; fail the capture instead of hanging it.
@@ -44,7 +44,7 @@ export class CdpClient {
       };
       this.pending.set(id, { resolve: settle(resolvePromise), reject: settle(reject) });
       try {
-        this.socket.send(JSON.stringify({ id, method, params }));
+        this.socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
       } catch (error) {
         // A socket that never opened or already closed: don't leave the timer holding the process open.
         this.pending.delete(id);
@@ -128,6 +128,42 @@ export class CdpClient {
     }
     const bodyText = await this.evaluate("document.body?.innerText ?? \"\"");
     throw new Error(`Timed out waiting for ${JSON.stringify(text)}.\n${bodyText.slice(-1200)}`);
+  }
+
+  /**
+   * The text of every child frame. Sandboxed frames (mini apps, custom
+   * widgets) are other origins, and Chrome runs them out of process, so each
+   * is attached as its own target and read there.
+   */
+  async frameTexts() {
+    const { targetInfos } = await this.command("Target.getTargets");
+    const texts = [];
+    for (const target of targetInfos.filter((info) => info.type === "iframe")) {
+      let sessionId = null;
+      try {
+        ({ sessionId } = await this.command("Target.attachToTarget", { targetId: target.targetId, flatten: true }));
+        const result = await this.command("Runtime.evaluate", { expression: "document.body?.innerText ?? \"\"", returnByValue: true }, 10000, sessionId);
+        texts.push(result.result?.value ?? "");
+      } catch {
+        // A frame that went away while we looked.
+      } finally {
+        if (sessionId) await this.command("Target.detachFromTarget", { sessionId }).catch(() => {});
+      }
+    }
+    return texts;
+  }
+
+  /** Waits until one child frame shows every text. */
+  async waitForFrameText(texts, timeoutMs = 15000) {
+    const wanted = Array.isArray(texts) ? texts : [texts];
+    const started = Date.now();
+    let last = [];
+    while (Date.now() - started < timeoutMs) {
+      last = await this.frameTexts();
+      if (last.some((text) => wanted.every((each) => text.includes(each)))) return;
+      await sleep(300);
+    }
+    throw new Error(`Timed out waiting for a frame showing ${JSON.stringify(wanted)}.\n${last.map((text) => text.slice(0, 600)).join("\n---\n")}`);
   }
 
   async waitForSelector(selector, timeoutMs = 15000) {

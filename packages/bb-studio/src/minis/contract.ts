@@ -57,6 +57,8 @@ export const rpcContract = defineRpcContract({
   "minis.save": { input: z.object({ id, files, note: z.string().max(200).optional() }), output: z.object({ mini: miniViewSchema }) },
   "minis.restoreVersion": { input: z.object({ id, versionId: id }), output: z.object({ mini: miniViewSchema }) },
   "minis.rename": { input: z.object({ id, name: z.string().min(1).max(LIMITS.name) }), output: ok },
+  /** A mini app from a live HTML artifact (Convert to mini app). */
+  "minis.fromArtifact": { input: z.object({ artifactId: id }), output: z.object({ mini: miniMetaSchema }) },
   "minis.duplicate": { input: z.object({ id, withData: z.boolean() }), output: z.object({ mini: miniMetaSchema }) },
 
   // The frame's playground API, relayed by its host.
