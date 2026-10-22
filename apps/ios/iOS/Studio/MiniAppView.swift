@@ -12,32 +12,24 @@ struct MiniAppView: View {
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     let id: String
-    @State private var mini: MiniApp?
-    @State private var missing = false
-    @State private var error: String?
-    /// What the app's own code last threw, from its frame.
-    @State private var appError: String?
-    @State private var host: MiniHost?
-    @State private var listener: UUID?
-    @State private var loads = 0
-    @State private var changeReload: Task<Void, Never>?
+    @State private var session: MiniSession?
     @State private var showingWeb = false
     @State private var showingRelated = false
 
     var body: some View {
         Group {
-            if let mini, let host {
-                content(mini, host: host)
-            } else if missing {
+            if let session, let mini = session.mini {
+                content(mini, session: session)
+            } else if session?.missing == true {
                 ContentUnavailableView("Mini app not found", systemImage: StudioKind.of("mini").symbol,
                     description: Text("It may have been deleted."))
-            } else if let error {
+            } else if let error = session?.error {
                 ContentUnavailableView("Couldn't open mini app", systemImage: StudioKind.of("mini").symbol, description: Text(error))
             } else {
                 ProgressView()
             }
         }
-        .navigationTitle(mini?.displayName ?? "Mini app")
+        .navigationTitle(session?.mini?.displayName ?? "Mini app")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Menu {
@@ -53,56 +45,26 @@ struct MiniAppView: View {
             NavigationStack {
                 WebView(url: client.baseURL.appending(path: "plugins/studio/studio/minis/\(id)"))
                     .ignoresSafeArea(edges: .bottom)
-                    .navigationTitle(mini?.displayName ?? "Mini app")
+                    .navigationTitle(session?.mini?.displayName ?? "Mini app")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { Button("Done") { showingWeb = false } }
             }
         }
         .task(id: id) {
-            let host = self.host ?? MiniHost(client: client, miniId: id)
-            let model = app
-            host.onNotice = { [weak model] message in model?.flash(message) }
-            host.onError = { message in appError = message }
-            self.host = host
-            if let listener { app.realtime.removeListener(listener) }
-            listener = app.realtime.listen { event in
-                switch event {
-                // Studio publishes state, record changes and edits on its `minis` channel.
-                case .pluginSignal("studio", "minis", let payload):
-                    switch MiniRelay.event(payload, miniId: id, clientId: host.clientId) {
-                    case .post(let message)?: host.post(message)
-                    case .reload?: Task { await load() }
-                    case .changed?: reloadSoon()
-                    case nil: break
-                    }
-                case .connected:
-                    Task { await load() }
-                default: break
-                }
-            }
-            await load()
+            let session = self.session ?? MiniSession(client: client, id: id)
+            self.session = session
+            await session.start(app)
         }
-        .onDisappear {
-            if let listener { app.realtime.removeListener(listener) }
-            listener = nil
-            changeReload?.cancel()
-        }
+        .onDisappear { session?.stop() }
         .accessibilityIdentifier("miniAppView")
     }
 
     @ViewBuilder
-    private func content(_ mini: MiniApp, host: MiniHost) -> some View {
+    private func content(_ mini: MiniApp, session: MiniSession) -> some View {
         VStack(spacing: 0) {
-            if let access = mini.accessText {
-                MiniStrip(symbol: "lock.shield", tint: .orange, text: access + " Approve it in BB on your computer.")
-                    .accessibilityIdentifier("miniAccessBanner")
-            }
-            if let appError {
-                MiniStrip(symbol: "exclamationmark.triangle", tint: .red,
-                    text: "The app hit an error. " + (appError.split(separator: "\n").first.map(String.init) ?? ""))
-            }
+            MiniStrips(mini: mini, appError: session.appError)
             if let versionId = mini.versionId {
-                MiniFrameView(host: host, versionId: versionId, granted: mini.granted, dark: colorScheme == .dark)
+                MiniFrameView(host: session.host, versionId: versionId, granted: mini.granted, dark: colorScheme == .dark)
                     .accessibilityLabel(mini.displayName)
             } else {
                 ContentUnavailableView("No source yet", systemImage: StudioKind.of("mini").symbol,
@@ -110,6 +72,74 @@ struct MiniAppView: View {
             }
         }
         .background(Color(.systemBackground))
+    }
+}
+
+/// One mini app on screen, full screen or in a reply card: what it is, kept
+/// current from Studio's `minis` signal, and its host, which that signal's
+/// state, record changes and agent commands go to while it runs.
+@MainActor
+@Observable
+final class MiniSession {
+    let id: String
+    let client: BBClient
+    let host: MiniHost
+    private(set) var mini: MiniApp?
+    private(set) var missing = false
+    private(set) var error: String?
+    /// What the app's own code last threw, from its frame.
+    private(set) var appError: String?
+    /// The frame's content height, once it has measured itself.
+    private(set) var contentHeight: Double?
+    @ObservationIgnored private weak var realtime: BBRealtime?
+    @ObservationIgnored private var listener: UUID?
+    @ObservationIgnored private var loads = 0
+    @ObservationIgnored private var changeReload: Task<Void, Never>?
+
+    init(client: BBClient, id: String) {
+        self.client = client
+        self.id = id
+        host = MiniHost(client: client, miniId: id)
+    }
+
+    /// Listens for changes and loads the mini app. The frame opens its copy
+    /// on the server when `MiniFrameView` shows it, and closes it when it goes.
+    func start(_ app: AppModel) async {
+        let model = app
+        host.onNotice = { [weak model] message in model?.flash(message) }
+        host.onError = { [weak self] message in self?.appError = message }
+        host.onSize = { [weak self] height in
+            guard let self, height != contentHeight else { return }
+            contentHeight = height
+        }
+        if let listener { realtime?.removeListener(listener) }
+        realtime = app.realtime
+        let id = id, clientId = host.clientId
+        listener = app.realtime.listen { [weak self] event in
+            guard let self else { return }
+            switch event {
+            // Studio publishes state, record changes and edits on its `minis` channel.
+            case .pluginSignal("studio", "minis", let payload):
+                switch MiniRelay.event(payload, miniId: id, clientId: clientId) {
+                case .post(let message)?: host.post(message)
+                case .reload?: Task { await self.load() }
+                case .changed?: reloadSoon()
+                case nil: break
+                }
+            case .connected:
+                Task { await self.load() }
+            default: break
+            }
+        }
+        await load()
+    }
+
+    /// Stops listening. The frame, if it shows, keeps its copy until it goes.
+    func stop() {
+        if let listener { realtime?.removeListener(listener) }
+        listener = nil
+        changeReload?.cancel()
+        changeReload = nil
     }
 
     /// Record writes also say "changed"; a burst of them loads once.
@@ -122,7 +152,7 @@ struct MiniAppView: View {
         }
     }
 
-    private func load() async {
+    func load() async {
         loads += 1
         let load = loads
         do {
@@ -138,6 +168,23 @@ struct MiniAppView: View {
         } catch {
             guard load == loads else { return }
             if mini == nil { self.error = BBClient.describe(error, server: client.baseURL) }
+        }
+    }
+}
+
+/// The strips over the app: its access request and its last error.
+struct MiniStrips: View {
+    let mini: MiniApp
+    let appError: String?
+
+    var body: some View {
+        if let access = mini.accessText {
+            MiniStrip(symbol: "lock.shield", tint: .orange, text: access + " Approve it in BB on your computer.")
+                .accessibilityIdentifier("miniAccessBanner")
+        }
+        if let appError {
+            MiniStrip(symbol: "exclamationmark.triangle", tint: .red,
+                text: "The app hit an error. " + (appError.split(separator: "\n").first.map(String.init) ?? ""))
         }
     }
 }
@@ -197,12 +244,15 @@ final class MiniHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WK
     let clientId = UUID().uuidString.lowercased()
     var onNotice: ((String) -> Void)?
     var onError: ((String?) -> Void)?
+    /// The frame's content height, for cards that fit it.
+    var onSize: ((Double) -> Void)?
     private weak var view: WKWebView?
     private var shown: String?
     private var dark = false
     private var actions: [String] = []
     private var touched = Date.distantPast
     private var heartbeat: Task<Void, Never>?
+    private var crashes: [Date] = []
 
     init(client: BBClient, miniId: String) {
         self.client = client
@@ -246,6 +296,8 @@ final class MiniHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WK
         // The frame scrolls itself; the host page fills the screen.
         view.scrollView.isScrollEnabled = false
         view.scrollView.contentInsetAdjustmentBehavior = .never
+        view.scrollView.bounces = false
+        view.allowsLinkPreview = false
         view.navigationDelegate = self
         view.uiDelegate = self
         self.view = view
@@ -287,9 +339,11 @@ final class MiniHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WK
 
     /// The screen went away: the server stops counting this copy.
     func close() {
+        guard heartbeat != nil || view != nil else { return }
         heartbeat?.cancel()
         heartbeat = nil
         shown = nil
+        crashes = []
         if let view {
             view.configuration.userContentController.removeAllScriptMessageHandlers()
             view.navigationDelegate = nil
@@ -351,8 +405,9 @@ final class MiniHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WK
             onNotice?(MiniRelay.sendRefused)
         case "error":
             onError?(MiniRelay.jsString(message["message"]))
+        case "size":
+            if let height = MiniRelay.size(message) { onSize?(height) }
         default:
-            // `size` matters only to embeds that fit their content; this one fills the screen.
             break
         }
     }
@@ -404,8 +459,14 @@ final class MiniHost: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WK
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        // Load it again from the start, as a fresh copy.
+        // Load it again from the start, as a fresh copy, unless it keeps dying.
         guard let shown, let versionId = shown.split(separator: "|", omittingEmptySubsequences: false).first else { return }
+        let (reload, recent) = MiniRelay.reloadAfterCrash(crashes, now: Date())
+        crashes = recent
+        guard reload else {
+            onError?("It stopped responding. Open it again to retry.")
+            return
+        }
         load(versionId: String(versionId))
     }
 }

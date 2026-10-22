@@ -189,4 +189,118 @@ final class MiniAppTests: XCTestCase {
         XCTAssertEqual(MiniRelay.event(["type": "grants", "miniId": .string(miniId)], miniId: miniId, clientId: clientId), .reload)
         XCTAssertEqual(MiniRelay.event(["type": "changed", "miniId": .string(miniId)], miniId: miniId, clientId: clientId), .changed)
     }
+
+    // MARK: Reply cards
+
+    func testCardHeightFitsTheContentBetweenTheManifestsBounds() throws {
+        let size = MiniApp.Manifest.Size(minHeight: 200, maxHeight: 500)
+        XCTAssertEqual(MiniSizing.height(content: 320, size: size), 320)
+        XCTAssertEqual(MiniSizing.height(content: 90, size: size), 200)
+        XCTAssertEqual(MiniSizing.height(content: 1400, size: size), 500)
+        // Before the frame measures itself, as the desktop: at least 240.
+        XCTAssertEqual(MiniSizing.height(content: nil, size: size), 240)
+        XCTAssertEqual(MiniSizing.height(content: nil, size: .init(minHeight: 300, maxHeight: nil)), 300)
+        // Without bounds, the desktop's 120 to 720.
+        XCTAssertEqual(MiniSizing.height(content: 40, size: nil), 120)
+        XCTAssertEqual(MiniSizing.height(content: 4000, size: .init(minHeight: nil, maxHeight: nil)), 720)
+        XCTAssertEqual(MiniSizing.height(content: .infinity, size: nil), 240)
+
+        // The frame scrolls inside only past the maximum.
+        XCTAssertFalse(MiniSizing.scrolls(content: 500, size: size))
+        XCTAssertTrue(MiniSizing.scrolls(content: 501, size: size))
+        XCTAssertFalse(MiniSizing.scrolls(content: nil, size: size))
+        XCTAssertTrue(MiniSizing.scrolls(content: 800, size: nil))
+
+        let manifest = try JSONDecoder().decode(MiniApp.Manifest.self, from: Data(#"{"size":{"minHeight":160,"maxHeight":480}}"#.utf8))
+        XCTAssertEqual(manifest.size, .init(minHeight: 160, maxHeight: 480))
+        XCTAssertNil(try JSONDecoder().decode(MiniApp.Manifest.self, from: Data("{}".utf8)).size)
+    }
+
+    func testSizeMessages() throws {
+        XCTAssertEqual(MiniRelay.size(try json(#"{"type":"bb-mini","op":"size","height":312.4}"#)), 312)
+        XCTAssertNil(MiniRelay.size(try json(#"{"type":"bb-mini","op":"size","height":"312"}"#)))
+        XCTAssertNil(MiniRelay.size(try json(#"{"type":"bb-mini","op":"size"}"#)))
+        XCTAssertNil(MiniRelay.size(try json(#"{"type":"bb-mini","op":"touch","height":1}"#)))
+        XCTAssertEqual(MiniRelay.size(try json(#"{"type":"bb-mini","op":"size","height":-4}"#)), 0)
+    }
+
+    func testDistanceFromTheScreen() {
+        let viewport = CGRect(x: 0, y: 1000, width: 400, height: 800)
+        XCTAssertEqual(MiniCardLiveness<Int>.distance(of: CGRect(x: 0, y: 1200, width: 400, height: 300), in: viewport), 0)
+        XCTAssertEqual(MiniCardLiveness<Int>.distance(of: CGRect(x: 0, y: 700, width: 400, height: 400), in: viewport), 0, "partly on screen")
+        XCTAssertEqual(MiniCardLiveness<Int>.distance(of: CGRect(x: 0, y: 2100, width: 400, height: 300), in: viewport), 300, "below")
+        XCTAssertEqual(MiniCardLiveness<Int>.distance(of: CGRect(x: 0, y: 400, width: 400, height: 300), in: viewport), 300, "above")
+    }
+
+    func testCardsRunNearTheScreenAndStopFarAway() {
+        var cards = MiniCardLiveness<String>(cap: 3, near: 400, far: 1200)
+        cards.report("a", distance: 900)
+        XCTAssertEqual(cards.live, [], "not near yet: no web view")
+        cards.report("a", distance: 400)
+        XCTAssertEqual(cards.live, ["a"])
+        // Running cards keep running until they're far, so the edge doesn't flap.
+        cards.report("a", distance: 1000)
+        XCTAssertEqual(cards.live, ["a"])
+        cards.report("a", distance: 1300)
+        XCTAssertEqual(cards.live, [], "far away: torn down")
+        cards.report("a", distance: 1000)
+        XCTAssertEqual(cards.live, [], "starts again only once near")
+        cards.report("a", distance: 0)
+        XCTAssertEqual(cards.live, ["a"])
+        // Gone (scrolled out of the thread's lazy stack, or collapsed): torn down.
+        cards.report("a", distance: nil)
+        XCTAssertEqual(cards.live, [])
+        XCTAssertEqual(cards.count, 0)
+    }
+
+    func testAtMostThreeCardsRunAtOnce() {
+        var cards = MiniCardLiveness<String>()
+        XCTAssertEqual(cards.cap, 3)
+        for id in ["a", "b", "c", "d"] { cards.report(id, distance: 0) }
+        XCTAssertEqual(cards.live, ["a", "b", "c"], "the first three on screen")
+
+        // The user taps the paused one: it runs instead of the oldest.
+        cards.pick("d")
+        XCTAssertEqual(cards.live.count, 3)
+        XCTAssertTrue(cards.live.contains("d"))
+        XCTAssertFalse(cards.live.contains("c"), "c was reported last of the others")
+
+        // One scrolls off: the paused one on screen takes its place.
+        cards.report("a", distance: 300)
+        XCTAssertEqual(cards.live, ["b", "c", "d"])
+        // On-screen cards go before ones that are only near.
+        cards.report("e", distance: 200)
+        XCTAssertFalse(cards.live.contains("e"))
+        cards.report("b", distance: nil)
+        cards.report("c", distance: nil)
+        XCTAssertEqual(cards.live, ["a", "d", "e"])
+    }
+
+    func testRunningCardsKeepTheirPlaceOverNearerOnes() {
+        var cards = MiniCardLiveness<String>(cap: 2)
+        cards.report("a", distance: 0)
+        cards.report("b", distance: 0)
+        cards.report("a", distance: 700)
+        cards.report("c", distance: 100)
+        XCTAssertEqual(cards.live, ["a", "b"], "scrolling doesn't swap a running app for a nearer one off screen")
+        cards.report("a", distance: 1300)
+        XCTAssertEqual(cards.live, ["b", "c"])
+        // A pick for a card that isn't there does nothing.
+        cards.pick("z")
+        XCTAssertEqual(cards.live, ["b", "c"])
+    }
+
+    func testCrashesReloadUntilTheyRepeat() {
+        let start = Date(timeIntervalSince1970: 1000)
+        var deaths: [Date] = []
+        for second in [0.0, 10, 20] {
+            let (reload, recent) = MiniRelay.reloadAfterCrash(deaths, now: start + second)
+            XCTAssertTrue(reload)
+            deaths = recent
+        }
+        XCTAssertFalse(MiniRelay.reloadAfterCrash(deaths, now: start + 30).reload, "a fourth death within a minute stops")
+        let later = MiniRelay.reloadAfterCrash(deaths, now: start + 75)
+        XCTAssertTrue(later.reload, "deaths more than a minute old don't count")
+        XCTAssertEqual(later.recent.count, 2)
+    }
 }

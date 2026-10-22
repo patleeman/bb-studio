@@ -16,7 +16,14 @@ public struct MiniApp: Decodable, Identifiable, Hashable, Sendable {
     }
 
     public struct Manifest: Decodable, Hashable, Sendable {
+        /// The height range an embedded copy fits its content into.
+        public struct Size: Decodable, Hashable, Sendable {
+            public var minHeight: Double?
+            public var maxHeight: Double?
+        }
+
         public var description: String?
+        public var size: Size?
     }
 
     public var id: String
@@ -208,6 +215,24 @@ public enum MiniRelay {
         case changed
     }
 
+    /// The content height a frame's `op:"size"` reports; nil when it isn't a finite number.
+    public static func size(_ message: OrderedJSON) -> Double? {
+        guard message["op"]?.string == "size", case .number(let height)? = message["height"], height.isFinite else { return nil }
+        return max(0, height.rounded())
+    }
+
+    /// How many times the web content may die in `crashWindow` before the
+    /// host stops loading it again, so a page that kills its process can't loop.
+    public static let crashLimit = 3
+    public static let crashWindow: TimeInterval = 60
+
+    /// Whether to load the frame again after the web content died at `now`,
+    /// given the earlier deaths; returns the deaths still in the window, `now` included.
+    public static func reloadAfterCrash(_ earlier: [Date], now: Date) -> (reload: Bool, recent: [Date]) {
+        let recent = earlier.filter { now.timeIntervalSince($0) < crashWindow } + [now]
+        return (recent.count <= crashLimit, recent)
+    }
+
     public static func event(_ payload: JSONValue, miniId: String, clientId: String) -> Event? {
         guard payload["miniId"]?.stringValue == miniId else { return nil }
         let header: [OrderedJSON.Field] = [.init("type", .string(message))]
@@ -291,6 +316,103 @@ public enum MiniRelay {
         case .string(let text)?: !text.isEmpty
         default: true
         }
+    }
+}
+
+// MARK: Embedded copies
+
+/// The height of a mini app embedded in a reply card, as mini-frame.tsx fits
+/// it: its content's height, kept between the manifest's `size.minHeight`
+/// and `size.maxHeight`. Past the maximum, the app scrolls inside its frame.
+public enum MiniSizing {
+    public static let minHeight: Double = 120
+    public static let maxHeight: Double = 720
+    /// The height before the frame has measured itself.
+    public static let unmeasured: Double = 240
+
+    public static func height(content: Double?, size: MiniApp.Manifest.Size?) -> Double {
+        let (low, high) = range(size)
+        guard let content, content.isFinite else { return max(low, unmeasured) }
+        return min(high, max(low, content))
+    }
+
+    /// Whether the content is taller than the card lets it be, so the frame
+    /// takes vertical drags; otherwise the thread scrolls over it.
+    public static func scrolls(content: Double?, size: MiniApp.Manifest.Size?) -> Bool {
+        guard let content, content.isFinite else { return false }
+        return content > range(size).high
+    }
+
+    private static func range(_ size: MiniApp.Manifest.Size?) -> (low: Double, high: Double) {
+        (size?.minHeight ?? minHeight, size?.maxHeight ?? maxHeight)
+    }
+}
+
+/// Which reply cards run their mini app. A card runs when it comes within
+/// `near` points of the screen, and stops past `far`, so one at the edge
+/// doesn't start and stop as the thread moves. At most `cap` run at once:
+/// cards on screen first, the one the user picked last first among them; then
+/// the ones already running, so scrolling doesn't swap apps back and forth;
+/// then the nearest.
+public struct MiniCardLiveness<ID: Hashable> {
+    public static var cap: Int { 3 }
+    public static var near: Double { 400 }
+    public static var far: Double { 1200 }
+
+    public let cap: Int
+    public let near: Double
+    public let far: Double
+    public private(set) var live: Set<ID> = []
+    private var distances: [ID: Double] = [:]
+    /// Lower goes first among cards as near as each other.
+    private var order: [ID: Int] = [:]
+    private var next = 0
+    private var picked = 0
+
+    public init(cap: Int = Self.cap, near: Double = Self.near, far: Double = Self.far) {
+        self.cap = cap
+        self.near = near
+        self.far = far
+    }
+
+    /// A card's distance from the screen in points, 0 when it shows; nil when
+    /// it's gone, collapsed or no longer has an app to run.
+    public mutating func report(_ id: ID, distance: Double?) {
+        if let distance {
+            distances[id] = max(0, distance)
+            if order[id] == nil {
+                order[id] = next
+                next += 1
+            }
+        } else {
+            distances[id] = nil
+            order[id] = nil
+        }
+        settle()
+    }
+
+    /// The user asked this card to run: it goes ahead of the others as near as it.
+    public mutating func pick(_ id: ID) {
+        guard distances[id] != nil else { return }
+        picked -= 1
+        order[id] = picked
+        settle()
+    }
+
+    public var count: Int { distances.count }
+
+    /// The points between a card and the visible part of its scroll view.
+    public static func distance(of frame: CGRect, in viewport: CGRect) -> Double {
+        Double(max(0, frame.minY - viewport.maxY, viewport.minY - frame.maxY))
+    }
+
+    private mutating func settle() {
+        let wanted = distances.filter { id, distance in distance <= (live.contains(id) ? far : near) }
+        func rank(_ id: ID) -> (Int, Int, Int, Double, Int) {
+            let distance = wanted[id]!, order = order[id, default: 0]
+            return (distance == 0 ? 0 : 1, min(order, 0), live.contains(id) ? 0 : 1, distance, order)
+        }
+        live = Set(wanted.keys.sorted { rank($0) < rank($1) }.prefix(cap))
     }
 }
 

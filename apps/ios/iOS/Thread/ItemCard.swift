@@ -110,6 +110,8 @@ struct StudioCardChrome<Icon: View, Preview: View>: View {
     let missing: Bool
     let hasPreview: Bool
     let identifier: String
+    /// Says what the header does, such as "Open", in place of its chevron.
+    var action: String? = nil
     @ViewBuilder let icon: () -> Icon
     @ViewBuilder let preview: () -> Preview
     /// One setting for every Studio card, as on the web.
@@ -131,7 +133,15 @@ struct StudioCardChrome<Icon: View, Preview: View>: View {
                             }
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                        if let action {
+                            Text(action)
+                                .font(.footnote.weight(.semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(.fill.tertiary, in: .capsule)
+                        } else {
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                        }
                     }
                     .contentShape(.rect)
                 }
@@ -165,8 +175,21 @@ struct StudioCardChrome<Icon: View, Preview: View>: View {
     }
 }
 
-/// A reply card for a page, drawing, table, design or recording.
+/// A reply card for a page, drawing, table, design, recording or mini app.
 struct ReplyItemCard: View {
+    let item: ReplyItem
+
+    var body: some View {
+        if case .mini(let id) = item {
+            MiniReplyCard(id: id)
+        } else {
+            ReplyItemSummaryCard(item: item)
+        }
+    }
+}
+
+/// A reply card that shows a read-only preview of its item.
+private struct ReplyItemSummaryCard: View {
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     let item: ReplyItem
@@ -260,15 +283,9 @@ struct ReplyItemCard: View {
             return Summary(title: title.isEmpty ? "Untitled recording" : title,
                 detail: "\(length) · \(words) word\(words == 1 ? "" : "s")",
                 preview: .recording(RecordingPreview(output)))
-        case .mini(let id):
-            // The app runs when it's opened; the card says what it is and holds.
-            return try await client.mini(id).map { mini in
-                let records = mini.recordCount
-                let description = mini.manifest?.description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                return Summary(title: mini.displayName,
-                    detail: mini.collections.isEmpty ? nil : records == 1 ? "1 record" : "\(records) records",
-                    preview: description.isEmpty ? nil : .note(description))
-            }
+        case .mini:
+            // `MiniReplyCard` runs the app itself.
+            return nil
         }
     }
 }
