@@ -473,3 +473,41 @@ it("disposes listeners and upload retries before a replacement attaches", async 
   expect(kick).not.toHaveBeenCalled();
   await replacement.dispose();
 });
+
+it("waits for an old upload before a replacement drains the shared outbox", async () => {
+  const segment: OutboxSegment = { recordingId: "rec_pending", sessionId: "s", index: 0, startedAt: 1, mimeType: "audio/webm", lastPartAt: 1, durationMs: 1000, complete: true, parts: [new ArrayBuffer(1)] };
+  vi.mocked(Outbox.prototype.all).mockResolvedValue([segment]);
+  vi.spyOn(Outbox.prototype, "remove").mockImplementation(async () => { vi.mocked(Outbox.prototype.all).mockResolvedValue([]); });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const oldCall = vi.fn(async () => { await gate; });
+  const old = new TalkController();
+  old.attach({ call: oldCall } as never);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(oldCall).toHaveBeenCalledTimes(1);
+  const disposal = old.dispose();
+  const replacementCall = vi.fn(async () => {});
+  const replacement = new TalkController(disposal);
+  replacement.attach({ call: replacementCall } as never);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(replacementCall).not.toHaveBeenCalled();
+  release();
+  await disposal;
+  await vi.advanceTimersByTimeAsync(0);
+  expect(replacementCall).not.toHaveBeenCalled();
+  await replacement.dispose();
+});
+
+it("can replace a controller from a bundle predating dispose", async () => {
+  const key = Symbol.for("bb-studio.talk.controller");
+  const global = window as unknown as Record<symbol, unknown>;
+  const previous = global[key];
+  const stop = vi.fn(async () => {});
+  global[key] = { stop };
+  vi.resetModules();
+  try {
+    const replacement = await import("./controller");
+    expect(stop).toHaveBeenCalledWith(false);
+    await replacement.talk.dispose();
+  } finally { global[key] = previous; }
+});

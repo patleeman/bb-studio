@@ -568,6 +568,7 @@ export class TalkController {
       // recovery metadata through transient RPC failures, including while online.
       return;
     }
+    if (this.disposed) return;
     this.insertOnDone = saved.insert === true && !interrupted;
     this.composePath = typeof saved.composePath === "string" ? saved.composePath : null;
     this.set({
@@ -1176,11 +1177,13 @@ export class TalkController {
 
   /** Re-reads the active recording; called on realtime signals and polls. */
   async refresh(changedId?: string): Promise<void> {
+    if (this.disposed) return;
     if (changedId) void this.checkSettling(changedId);
     const id = this.state.recordingId;
     if (!id || !this.rpc || (changedId && changedId !== id)) return;
     try {
       const { recording, segments } = await this.rpc.call("recordings.recording_get", { id });
+      if (this.disposed) return;
       if (this.state.recordingId !== id) return;
       this.set({ recording, transcript: joinTranscript(segments) });
       if (this.state.phase !== "transcribing") return;
@@ -1755,7 +1758,7 @@ export class TalkController {
 // keeps the transcript as a recording rather than typing it in unseen.
 const CURRENT = Symbol.for("bb-studio.talk.controller");
 const previous = (window as unknown as Record<symbol, TalkController | undefined>)[CURRENT];
-export const talk = new TalkController(previous?.dispose().catch((error) => {
+export const talk = new TalkController((previous?.dispose?.() ?? previous?.stop(false))?.catch((error) => {
   toast.error(`Talk couldn't finish its previous capture: ${message(error)}`);
 }));
 (window as unknown as Record<symbol, TalkController>)[CURRENT] = talk;
