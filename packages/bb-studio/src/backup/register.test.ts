@@ -105,3 +105,30 @@ it("keeps an upload while an included section is skipped and allows retry", asyn
   expect(await call("backup.restore", { uploadId, dryRun: false })).toMatchObject({ failed: false });
   await expect(stat(path)).rejects.toThrow();
 });
+
+it("serializes simultaneous retries at the same offset", async () => {
+  const { dir, call } = await setup();
+  const { uploadId } = await call<{ uploadId: string }>("backup.upload", { uploadId: null, offset: 0, data: b64("abc") });
+  await Promise.all(Array.from({ length: 8 }, () => call("backup.upload", { uploadId, offset: 3, data: b64("def") })));
+  expect(await readFile(join(dir, "backup-uploads", `${uploadId}.zip`), "utf8")).toBe("abcdef");
+});
+
+it.each([true, false])("seals an upload throughout restore (dryRun=%s)", async (dryRun) => {
+  const { call, restore } = await setup();
+  const { uploadId } = await call<{ uploadId: string }>("backup.upload", { uploadId: null, offset: 0, data: b64("abc") });
+  await call("backup.restore", { uploadId, dryRun: true });
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  let release!: () => void;
+  const paused = new Promise<void>((resolve) => { release = resolve; });
+  const original = restore.getMockImplementation()!;
+  restore.mockImplementationOnce(async (...args) => { entered(); await paused; return original(...args); });
+  const running = call("backup.restore", { uploadId, dryRun });
+  await started;
+  try {
+    await expect(call("backup.upload", { uploadId, offset: 3, data: b64("def") })).rejects.toThrow(/being checked or restored/);
+    await expect(call("backup.discard", { uploadId })).rejects.toThrow(/being checked or restored/);
+    await expect(call("backup.restore", { uploadId, dryRun })).rejects.toThrow(/being checked or restored/);
+  } finally { release(); await running; }
+  await expect(call("backup.discard", { uploadId })).resolves.toEqual({ ok: true });
+});

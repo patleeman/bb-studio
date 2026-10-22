@@ -39,13 +39,36 @@ export function registerBackup(bb: Pick<BbPluginApi, "rpc" | "http" | "log" | "o
   /** The content hash each upload had when its dry run was shown; a real restore needs the same file. */
   const checked = new Map<string, string>();
 
+  // Each upload has one ordered file operation. Restores reserve it immediately,
+  // including while an earlier append finishes, so its checked bytes stay sealed.
+  const pending = new Map<string, Promise<unknown>>();
+  const restoring = new Set<string>();
+  async function serial<T>(id: string, operation: () => Promise<T>): Promise<T> {
+    const previous = pending.get(id) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    pending.set(id, next);
+    try { return await next; }
+    finally { if (pending.get(id) === next) pending.delete(id); }
+  }
+  function mutable(id: string): void {
+    if (restoring.has(id)) throw new Error("That upload is being checked or restored; try again when it finishes.");
+  }
+
   // Leftovers from a crash or an abandoned upload.
   void (async () => {
     await service.cleanup();
     const now = Date.now();
     for (const name of await readdir(uploads).catch(() => [] as string[])) {
-      const info = await stat(join(uploads, name)).catch(() => null);
-      if (info && now - info.mtimeMs > UPLOAD_TTL_MS) await rm(join(uploads, name), { force: true });
+      const match = /^(up_[a-f0-9]{24})\.zip$/.exec(name);
+      if (!match) continue;
+      await serial(match[1]!, async () => {
+        if (restoring.has(match[1]!)) return;
+        const info = await stat(join(uploads, name)).catch(() => null);
+        if (info && now - info.mtimeMs > UPLOAD_TTL_MS) {
+          checked.delete(match[1]!);
+          await rm(join(uploads, name), { force: true });
+        }
+      });
     }
   })().catch((error) => bb.log.warn(`Backup cleanup failed: ${error instanceof Error ? error.message : String(error)}`));
 
@@ -69,40 +92,53 @@ export function registerBackup(bb: Pick<BbPluginApi, "rpc" | "http" | "log" | "o
       if (bytes.length > UPLOAD_CHUNK_BYTES) throw new Error("Upload chunks are at most 4 MB.");
       const id = uploadId ?? `up_${randomBytes(12).toString("hex")}`;
       if (!uploadId && offset !== 0) throw new Error("A new upload starts at offset 0.");
-      await mkdir(uploads, { recursive: true });
-      const path = uploadPath(id);
-      const size = uploadId ? (await stat(path).catch(() => null))?.size : 0;
-      if (size === undefined || size === null) throw new Error("That upload no longer exists; choose the file again.");
-      // Chunks arrive in order; a repeated chunk after a lost response is accepted once.
-      if (offset + bytes.length <= size) return { uploadId: id, received: size };
-      if (offset !== size) throw new Error(`Upload out of order: expected offset ${size}, got ${offset}.`);
-      if (size + bytes.length > MAX_UPLOAD) throw new Error("This backup is larger than 4 GB, which the Setup page can't take. Use bb studio restore <file> instead.");
-      const handle = await open(path, uploadId ? "a" : "wx");
-      try {
-        await handle.write(bytes);
-      } finally {
-        await handle.close();
-      }
-      return { uploadId: id, received: size + bytes.length };
+      mutable(id);
+      return serial(id, async () => {
+        await mkdir(uploads, { recursive: true });
+        const path = uploadPath(id);
+        const size = uploadId ? (await stat(path).catch(() => null))?.size : 0;
+        if (size === undefined || size === null) throw new Error("That upload no longer exists; choose the file again.");
+        // Chunks arrive in order; a repeated chunk after a lost response is accepted once.
+        if (offset + bytes.length <= size) return { uploadId: id, received: size };
+        if (offset !== size) throw new Error(`Upload out of order: expected offset ${size}, got ${offset}.`);
+        if (size + bytes.length > MAX_UPLOAD) throw new Error("This backup is larger than 4 GB, which the Setup page can't take. Use bb studio restore <file> instead.");
+        const handle = await open(path, uploadId ? "a" : "wx");
+        try {
+          await handle.write(bytes);
+        } finally {
+          await handle.close();
+        }
+        checked.delete(id);
+        return { uploadId: id, received: size + bytes.length };
+      });
     },
     "backup.restore": async ({ uploadId, dryRun }) => {
-      const path = uploadPath(uploadId);
-      const hash = await fileHash(path).catch(() => null);
-      if (!dryRun && (!hash || checked.get(uploadId) !== hash)) throw new Error("Check this file first: restore only runs on the exact file that was just checked. Choose it again.");
-      const summary = await service.restore(path, { dryRun });
-      if (dryRun && hash) checked.set(uploadId, hash);
-      const result = restoreResult(summary);
-      // Keep the file when anything remains unrestored, so the restore can run again without uploading it again.
-      if (!dryRun && !result.failed) {
-        checked.delete(uploadId);
-        await rm(path, { force: true });
-      }
-      return result;
+      mutable(uploadId);
+      restoring.add(uploadId);
+      try {
+        return await serial(uploadId, async () => {
+          const path = uploadPath(uploadId);
+          const hash = await fileHash(path).catch(() => null);
+          if (!dryRun && (!hash || checked.get(uploadId) !== hash)) throw new Error("Check this file first: restore only runs on the exact file that was just checked. Choose it again.");
+          const summary = await service.restore(path, { dryRun });
+          if (dryRun && hash) checked.set(uploadId, hash);
+          const result = restoreResult(summary);
+          // Keep the file when anything remains unrestored, so the restore can run again without uploading it again.
+          if (!dryRun && !result.failed) {
+            checked.delete(uploadId);
+            await rm(path, { force: true });
+          }
+          return result;
+        });
+      } finally { restoring.delete(uploadId); }
     },
     "backup.discard": async ({ uploadId }) => {
-      checked.delete(uploadId);
-      await rm(uploadPath(uploadId), { force: true });
-      return { ok: true };
+      mutable(uploadId);
+      return serial(uploadId, async () => {
+        checked.delete(uploadId);
+        await rm(uploadPath(uploadId), { force: true });
+        return { ok: true };
+      });
     },
   });
 
