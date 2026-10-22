@@ -95,3 +95,10 @@ describe("describeCron", () => {
     expect(describeSchedule({ type: "cron", cron: "5 7,17 * * *" })).toBe("Daily 7:05 AM and 5:05 PM");
   });
 });
+
+it.each(["2026-02-30", "2026-13-01", "2026-00-01", "2026-01-00", "2026-04-31", "2026-02-29"])("rejects impossible end date %s", (date) => {
+  expect(() => endOfDay(date, "UTC")).toThrow(/valid calendar date/);
+});
+it("accepts a leap day", () => {
+  expect(new Date(endOfDay("2028-02-29", "UTC")).toISOString()).toBe("2028-02-29T23:59:59.999Z");
+});

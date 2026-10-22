@@ -138,6 +138,8 @@ export function endOfDay(date: string, timezone: string): number {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) throw new Error(`"${date}" isn't a date like 2026-12-31.`);
   const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const day = new Date(Date.UTC(y, m - 1, d));
+  if (day.getUTCFullYear() !== y || day.getUTCMonth() !== m - 1 || day.getUTCDate() !== d) throw new Error(`"${date}" isn't a valid calendar date.`);
   // Midnight starting the next day, in the zone: guess UTC, then correct by the zone's offset there.
   const guess = Date.UTC(y, m - 1, d + 1);
   const offset = (at: number) => {
