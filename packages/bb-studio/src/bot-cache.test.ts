@@ -1,4 +1,4 @@
-import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BotCacheWarmer, breakEvenHours, CACHE_TTL_MS, coldSendUsd, decideWarm, DEFAULT_WARM, formatTokens, formatUsd, inOverage,
@@ -199,7 +199,7 @@ describe("costs", () => {
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
-async function warmer(options: { model?: string; tokens?: number; lastTurnAt?: number; lastUserAt?: number; status?: string; read?: boolean } = {}) {
+async function warmer(options: { model?: string; tokens?: number; lastTurnAt?: number; lastUserAt?: number; status?: ReturnType<typeof makeThreadResponse>["status"]; read?: boolean; queuedMessageCount?: number; activeBackgroundAgentCount?: number; interaction?: string } = {}) {
   let now = T0;
   const events: Record<string, { type: string; createdAt: number; data: unknown }[]> = {
     "thread/tokenUsage/updated": [{ type: "thread/tokenUsage/updated", createdAt: options.lastTurnAt ?? T0 - 50 * MIN, data: {} }],
@@ -211,7 +211,8 @@ async function warmer(options: { model?: string; tokens?: number; lastTurnAt?: n
   const markRead = vi.fn(async () => ({}));
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
-      get: (async ({ threadId }: { threadId: string }) => ({ id: threadId, status: options.status ?? "idle", updatedAt: T0 - 50 * MIN, lastReadAt: options.read === false ? null : T0, latestAttentionAt: T0 - 50 * MIN })) as never,
+      get: async ({ threadId }) => makeThreadResponse({ id: threadId, status: options.status ?? "idle", updatedAt: T0 - 50 * MIN, lastReadAt: options.read === false ? null : T0, latestAttentionAt: T0 - 50 * MIN, queuedMessageCount: options.queuedMessageCount ?? 0, activeBackgroundAgentCount: options.activeBackgroundAgentCount ?? 0 }),
+      interactions: { list: (async () => options.interaction ? [{ status: options.interaction }] : []) as never },
       context: (async () => ({ usage: { usedTokens: options.tokens ?? 300_000, modelContextWindow: 1_000_000, estimated: false } })) as never,
       defaultExecutionOptions: (async () => ({ model: options.model ?? "claude-opus-5-5" })) as never,
       events: { list: (async ({ types }: { types: string[] }) => events[types[0]!] ?? []) as never },
@@ -261,7 +262,7 @@ describe("BotCacheWarmer", () => {
   });
 
   it("doesn't ping small chats, external bots, OpenAI models or busy threads", async () => {
-    for (const options of [{ tokens: 50_000 }, { model: "gpt-5.5" }, { status: "active" }]) {
+    for (const options of [{ tokens: 50_000 }, { model: "gpt-5.5" }, { status: "active" as const }]) {
       const x = await warmer(options);
       x.advance(6 * MIN);
       expect(await x.w.tick()).toBe(0);
@@ -320,4 +321,12 @@ describe("BotCacheWarmer", () => {
     expect(await x.w.state("thr_other")).toMatchObject({ botId: null, label: "", banner: false });
     expect(await x.w.state("thr_ext")).toMatchObject({ botId: null });
   });
+});
+
+it.each([{ queuedMessageCount: 1 }, { activeBackgroundAgentCount: 1 }, { interaction: "pending" }, { interaction: "resolving" }])("keeps idle threads with work busy: %j", async (options) => {
+  const x = await warmer(options);
+  x.advance(6 * MIN);
+  expect(await x.w.tick()).toBe(0);
+  expect(x.send).not.toHaveBeenCalled();
+  expect(x.compact).not.toHaveBeenCalled();
 });

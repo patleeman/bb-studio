@@ -311,7 +311,7 @@ export class BotCacheWarmer {
     const cached = this.observed.get(threadId);
     if (cached && now - cached.at < maxAgeMs) return cached;
     const { sdk } = this.deps;
-    const [thread, context, options, usage, limits, requests, compactions] = await Promise.all([
+    const [thread, context, options, usage, limits, requests, compactions, interactions] = await Promise.all([
       sdk.threads.get({ threadId }).catch(() => null),
       sdk.threads.context({ threadId }).catch(() => null),
       sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null),
@@ -319,8 +319,8 @@ export class BotCacheWarmer {
       sdk.threads.events.list({ threadId, types: ["provider/rateLimits/updated"], order: "desc", limit: "1" }).catch(() => []),
       sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "30" }).catch(() => []),
       sdk.threads.events.list({ threadId, types: ["thread/compacted"], order: "desc", limit: "1" }).catch(() => []),
+      sdk.threads.interactions.list({ threadId }).catch(() => null),
     ]);
-    const loose = thread as unknown as { status?: string; hasPendingInteraction?: boolean; queuedWork?: unknown[] | null; updatedAt?: number; lastReadAt?: number | null; latestAttentionAt?: number } | null;
     const lastUsage = (usage as EventRow[])[0];
     const lastLimit = (limits as EventRow[])[0];
     const userRequest = (requests as EventRow[]).find((event) => isUserRequest(event.data));
@@ -333,13 +333,13 @@ export class BotCacheWarmer {
     const stale = compactedAt != null && compactedAt >= (lastUsage?.createdAt ?? 0);
     const observed: Observed = {
       at: now, botId: bot.id, threadId, model, price: priceFor(model),
-      busy: !loose || ["active", "pending", "starting", "stopping"].includes(loose.status ?? "") || !!loose.hasPendingInteraction || !!loose.queuedWork?.length,
+      busy: !thread || ["active", "pending", "starting", "stopping"].includes(thread.status) || thread.queuedMessageCount > 0 || thread.activeBackgroundAgentCount > 0 || !interactions || interactions.some((i) => i.status === "pending" || i.status === "resolving"),
       contextTokens: typeof usedTokens === "number" && !stale ? usedTokens : null,
       lastTurnAt,
       lastUserAt: userRequest?.createdAt ?? null,
       overage: inOverage((lastLimit?.data as { rateLimits?: RateLimits } | undefined)?.rateLimits, lastLimit?.createdAt, now),
-      updatedAt: loose?.updatedAt ?? null,
-      wasRead: loose?.lastReadAt != null && loose.latestAttentionAt != null && loose.lastReadAt >= loose.latestAttentionAt,
+      updatedAt: thread?.updatedAt ?? null,
+      wasRead: thread?.lastReadAt != null && thread.latestAttentionAt != null && thread.lastReadAt >= thread.latestAttentionAt,
     };
     this.observed.set(threadId, observed);
     return observed;
