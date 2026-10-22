@@ -71,3 +71,14 @@ test("after a restore with failures it offers to run again, and drops the offer 
   act(() => root.render(<BackupView api={api({ step: "restored", fileName: "b.zip", result: { ...failed, failed: false }, uploadId: null })} />));
   expect(button("Restore again")).toBeUndefined();
 });
+
+test("keeps retry and cancel beside a confirm error", async () => {
+  const view = api({ step: "planned", fileName: "b.zip", uploadId: "up_1", plan, error: "Restore is busy" });
+  act(() => root.render(<BackupView api={view} />));
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Restore is busy");
+  expect(container.textContent).not.toContain("Nothing has changed yet");
+  await act(async () => button("Restore")!.click());
+  expect(view.confirm).toHaveBeenCalled();
+  await act(async () => button("Cancel")!.click());
+  expect(view.cancel).toHaveBeenCalled();
+});

@@ -79,8 +79,11 @@ export function BackupView({ api }: { api: BackupApi }) {
       {state.step === "checking" ? <p className="text-xs text-muted-foreground">Checking {state.fileName}…</p> : null}
       {state.step === "planned" || state.step === "restoring" ? (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-          <p className="text-xs text-foreground">Restoring {state.fileName} (backed up {new Date(state.plan.createdAt).toLocaleString()}) would do this. Nothing has changed yet.</p>
+          <p className="text-xs text-foreground">{state.step === "planned" && state.error
+            ? `Restore did not finish for ${state.fileName}. Retry or cancel below.`
+            : `Restoring ${state.fileName} (backed up ${new Date(state.plan.createdAt).toLocaleString()}) would do this. Nothing has changed yet.`}</p>
           <Outcome result={state.plan} />
+          {state.step === "planned" && state.error ? <p role="alert" className="text-xs text-destructive">{state.error}</p> : null}
           <div className="flex items-center gap-1.5">
             <Button size="sm" disabled={state.step === "restoring"} onClick={() => void api.confirm()}>{state.step === "restoring" ? "Restoring…" : "Restore"}</Button>
             <Button size="sm" variant="ghost" disabled={state.step === "restoring"} onClick={api.cancel}>Cancel</Button>
