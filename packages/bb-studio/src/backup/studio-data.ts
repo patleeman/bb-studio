@@ -1,3 +1,4 @@
+import { readAvailable } from "../kit/server/read-available";
 // Studio's own section of a backup (docs/backup.md): tags and which items
 // have them, saved views, project leads and their heartbeat settings (the
 // personal project's lead is the Chief of Staff), and the item services
@@ -135,7 +136,14 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         ...data.bots.flatMap((bot) => bot.thread_id ? [bot.thread_id] : []),
       ]);
       const existing = new Set<string>();
-      for (const threadId of threadIds) if (await deps.threadExists(threadId).catch(() => false)) existing.add(threadId);
+      for (const threadId of threadIds) {
+        const result = await readAvailable(() => deps.threadExists(threadId));
+        if (result.status === "unavailable") {
+          console.warn(`[studio] Backup thread ${threadId} unavailable`, result.error);
+          throw new Error(`Cannot check backup thread ${threadId}: ${String(result.error)}`);
+        }
+        if (result.status === "ok" && result.value) existing.add(threadId);
+      }
       try {
         db.transaction(() => {
           apply(db, data, { projects, blobs, threads: existing, tally });

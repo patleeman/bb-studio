@@ -99,3 +99,29 @@ describe("Studio services", () => {
     expect(db.prepare("SELECT COUNT(*) AS count FROM item_blobs").get()).toEqual({ count: 1 });
   });
 });
+
+it("preserves every item link through an unavailable thread lookup and retries confirmed states", async () => {
+  const { services } = setup();
+  for (const ref of [page, task]) services.linkThread({ threadId: "thr_1", ref, role: "chat", state: "working", createdAt: 1, updatedAt: 2, metadata: {} });
+  const before = services.threadsForThread("thr_1");
+  const errors: unknown[] = [];
+  const log = (error: unknown) => { errors.push(error); };
+  expect(await services.reconcileThread("thr_1", async () => { throw new Error("offline"); }, log)).toBe(false);
+  expect(errors).toHaveLength(1);
+  expect(services.threadsForThread("thr_1")).toEqual(before);
+  expect(await services.reconcileThread("thr_1", async () => ({ archivedAt: 1 }), log)).toBe(true);
+  expect(services.threadsForThread("thr_1").map((thread) => thread.state)).toEqual(["archived", "archived"]);
+  await services.reconcileThread("thr_1", async () => { throw { status: 404 }; }, log);
+  expect(services.threadsForThread("thr_1").map((thread) => thread.state)).toEqual(["deleted", "deleted"]);
+});
+
+it("keeps a live thread event that arrives during a reconciliation read", async () => {
+  const { services } = setup();
+  const thread = { threadId: "thr_1", ref: page, role: "chat", state: "idle", createdAt: 1, updatedAt: 2, metadata: {} };
+  services.linkThread(thread);
+  await services.reconcileThread("thr_1", async () => {
+    services.linkThread({ ...thread, state: "working", updatedAt: 3 });
+    return { archivedAt: 1 };
+  }, () => {});
+  expect(services.threadsForThread("thr_1")[0]?.state).toBe("working");
+});

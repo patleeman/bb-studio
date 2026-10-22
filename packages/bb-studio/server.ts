@@ -295,17 +295,20 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   const providerComments = new ProviderComments(bb.sdk);
-  const threadState = async (threadId: string) => {
-    try {
-      const thread = await bb.sdk.threads.get({ threadId });
-      return thread.archivedAt ? "archived" : "idle";
-    } catch { return "deleted"; }
-  };
-  for (const thread of services.activeThreads()) {
-    const state = await threadState(thread.threadId);
-    services.linkThread({ ...thread, state, updatedAt: Date.now() });
-  }
+  const pendingThreadChecks = new Set(services.activeThreads().map((thread) => thread.threadId));
+  let reconcilingThreads: Promise<void> | null = null;
+  const reconcileThreads = (): Promise<void> => reconcilingThreads ??= (async () => {
+    for (const threadId of pendingThreadChecks) {
+      const complete = await services.reconcileThread(threadId, () => bb.sdk.threads.get({ threadId }),
+        (error) => bb.log.warn(`Thread ${threadId} unavailable: ${errorText(error)}`));
+      if (complete) pendingThreadChecks.delete(threadId);
+    }
+  })().finally(() => { reconcilingThreads = null; });
+  await reconcileThreads();
+  const threadCheckTimer = setInterval(() => void reconcileThreads().catch((error) => bb.log.warn(`Thread reconciliation failed: ${errorText(error)}`)), 60_000);
+  bb.onDispose(async () => { clearInterval(threadCheckTimer); await reconcilingThreads; });
   const updateThread = (threadId: string, state: string) => {
+    pendingThreadChecks.delete(threadId);
     for (const found of services.threadsForThread(threadId)) services.linkThread({ ...found, state, updatedAt: Date.now() });
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
@@ -1610,7 +1613,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   // Backup and restore of every Studio item (src/backup/, docs/backup.md).
-  const threadExists = (threadId: string) => bb.sdk.threads.get({ threadId }).then((thread) => thread.deletedAt == null, () => false);
+  const threadExists = (threadId: string) => bb.sdk.threads.get({ threadId }).then((thread) => thread.deletedAt == null);
   const backups = new BackupService({
     dataDir: bb.server.experimental_dataDir,
     sdk: bb.sdk,

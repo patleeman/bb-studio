@@ -138,3 +138,26 @@ it("captures version blobs before the writer yields to deletion", async () => {
   expect(report.failed).toBe(0);
   expect(target.prepare("SELECT bytes FROM item_blobs WHERE sha256 = ?").get(sha)).toEqual({ bytes });
 });
+
+it("fails unavailable thread checks before restoring any links or Bots, and can retry", async () => {
+  const source = database();
+  lead(source, "thr_main");
+  const dir = join(await folder(), "studio");
+  const backup = await runBackup(dir, studioDataBackup(source, { threadExists: async () => true }));
+  const target = database();
+  await expect(runRestore(dir, studioDataBackup(target, { threadExists: async () => { throw new Error("offline"); } }), { version: backup.version, projects: {}, dryRun: false })).rejects.toThrow("offline");
+  expect(target.prepare("SELECT * FROM project_leads").all()).toEqual([]);
+  await runRestore(dir, studioDataBackup(target, { threadExists: async () => true }), { version: backup.version, projects: {}, dryRun: false });
+  expect(target.prepare("SELECT lead_thread_id FROM project_leads").all()).toEqual([{ lead_thread_id: "thr_main" }]);
+});
+
+it("omits only confirmed missing threads during restore", async () => {
+  const source = database();
+  lead(source, "thr_missing");
+  const dir = join(await folder(), "studio");
+  const backup = await runBackup(dir, studioDataBackup(source, { threadExists: async () => true }));
+  const target = database();
+  const result = await runRestore(dir, studioDataBackup(target, { threadExists: async () => { throw { status: 404 }; } }), { version: backup.version, projects: {}, dryRun: false });
+  expect(result.notes.join(" ")).toContain("isn't");
+  expect(target.prepare("SELECT * FROM project_leads").all()).toEqual([]);
+});

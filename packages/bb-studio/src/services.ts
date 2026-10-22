@@ -1,3 +1,4 @@
+import { readAvailable } from "./kit/server/read-available";
 import { createHash } from "node:crypto";
 import { newId } from "./kit/ids";
 import type { Actor } from "./kit/server/index";
@@ -51,6 +52,20 @@ export class StudioServices {
   threadsForThread(threadId: string): ItemThread[] {
     const rows = this.db.prepare("SELECT plugin_id, item_id FROM item_threads WHERE thread_id = ?").all(threadId) as { plugin_id: string; item_id: string }[];
     return rows.flatMap((row) => this.threads(readRef(row.plugin_id, row.item_id)).filter((thread) => thread.threadId === threadId));
+  }
+
+  /** Returns false only when a lookup needs retrying. Never replaces a newer thread event. */
+  async reconcileThread(threadId: string, read: () => Promise<{ archivedAt?: number | null; deletedAt?: number | null }>, log: (error: unknown) => void): Promise<boolean> {
+    const before = this.threadsForThread(threadId);
+    const result = await readAvailable(read);
+    if (result.status === "unavailable") { log(result.error); return false; }
+    const state = result.status === "absent" || result.value.deletedAt ? "deleted" : result.value.archivedAt ? "archived" : "idle";
+    for (const thread of this.threadsForThread(threadId)) {
+      if (before.some((old) => old.ref.pluginId === thread.ref.pluginId && old.ref.id === thread.ref.id && old.updatedAt === thread.updatedAt && old.state === thread.state)) {
+        this.linkThread({ ...thread, state, updatedAt: Date.now() });
+      }
+    }
+    return true;
   }
 
   /**
