@@ -321,7 +321,7 @@ export default function maintenanceCaptures(context) {
           liveSummary: live.summary,
         };
         process.stdout.write(`Maintenance staged observations: ${JSON.stringify(observed)}\n`);
-        if (!cleanArchived || dirtyArchived || pendingArchived || targetedArchived || interaction?.status !== "pending" || !automationUntouched || !reminderDone || reminderBeforeMaintenance.state !== "active" || !actualRuns[0]?.actions.some((action) => action.includes("Move done reminder to Done:")) || actualRuns.length !== 1 || !actualRuns[0]?.summary.startsWith("Archived 1 finished threads") || archiveActions.length !== 1 || !archiveActions[0]?.includes("Maintenance clean workspace thread") || !live.needsCall.some((entry) => entry.threadId === fixture.dirty) || !initialDryRun.eligible || !initialDryRun.dirtyNeedsCall || !refreshedDryRun.eligible || !refreshedDryRun.dirtyNeedsCall) {
+        if (!cleanArchived || dirtyArchived || pendingArchived || targetedArchived || interaction?.status !== "pending" || !automationUntouched || !reminderDone || reminderBeforeMaintenance.state !== "active" || !actualRuns[0]?.actions.some((action) => action.includes("Move done reminder to Done:")) || actualRuns.length !== 1 || !actualRuns[0]?.summary.startsWith("Archived 1 finished thread,") || archiveActions.length !== 1 || !archiveActions[0]?.includes("Maintenance clean workspace thread") || !live.needsCall.some((entry) => entry.threadId === fixture.dirty) || !initialDryRun.eligible || !initialDryRun.dirtyNeedsCall || !refreshedDryRun.eligible || !refreshedDryRun.dirtyNeedsCall) {
           throw new Error(`Staged maintenance acceptance failed: expected only the clean finished thread to archive. Observed ${JSON.stringify(observed)}`);
         }
       };
