@@ -4,9 +4,10 @@
 // socket named in STUDIO_CODE_BRIDGE, which the plugin sets per workspace.
 // The source is plain JavaScript (no build), kept here as text so the
 // bundled plugin can write it out.
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 /** Raise with every change to the extension, so workspaces get the new one. */
 export const BRIDGE_VERSION = "0.6.0";
@@ -704,8 +705,10 @@ exports.edit = edit;
 type RegistryEntry = { identifier?: { id?: string }; version?: string; [key: string]: unknown };
 
 async function readJson<T>(file: string, fallback: T): Promise<T> {
-  if (!existsSync(file)) return fallback;
-  try { return JSON.parse(await readFile(file, "utf8")) as T; } catch { return fallback; }
+  try { return JSON.parse(await readFile(file, "utf8")) as T; } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return fallback;
+    throw error;
+  }
 }
 
 /**
@@ -715,7 +718,24 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
  * for removal (.obsolete), so the bridge adds its entry and clears that
  * mark. Older versions are removed.
  */
-export async function installBridge(extensionsDir: string): Promise<void> {
+const installations = new Map<string, Promise<void>>();
+
+export function installBridge(extensionsDir: string): Promise<void> {
+  const dir = resolve(extensionsDir);
+  const pending = (installations.get(dir) ?? Promise.resolve()).catch(() => {}).then(() => install(dir));
+  installations.set(dir, pending);
+  return pending.finally(() => { if (installations.get(dir) === pending) installations.delete(dir); });
+}
+
+async function writeJson(file: string, value: unknown): Promise<void> {
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value));
+    await rename(temporary, file);
+  } finally { await rm(temporary, { force: true }); }
+}
+
+async function install(extensionsDir: string): Promise<void> {
   const name = `${BRIDGE_ID}-${BRIDGE_VERSION}`;
   const folder = join(extensionsDir, name);
   await mkdir(extensionsDir, { recursive: true });
@@ -730,15 +750,16 @@ export async function installBridge(extensionsDir: string): Promise<void> {
   }
   const registryFile = join(extensionsDir, "extensions.json");
   const registry = await readJson<RegistryEntry[]>(registryFile, []);
-  const others = Array.isArray(registry) ? registry.filter((entry) => entry.identifier?.id !== BRIDGE_ID) : [];
+  if (!Array.isArray(registry) || registry.some((entry) => !entry || typeof entry !== "object")) throw new Error("Invalid extension registry; left it unchanged.");
+  const others = registry.filter((entry) => entry.identifier?.id !== BRIDGE_ID);
   const ours = { identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION, location: { $mid: 1, path: folder, scheme: "file" }, relativeLocation: name, metadata: { installedTimestamp: Date.now(), source: "resource" } };
-  const kept = Array.isArray(registry) ? registry.find((entry) => entry.identifier?.id === BRIDGE_ID && entry.version === BRIDGE_VERSION) : undefined;
-  if (!kept || registry.length !== others.length + 1) await writeFile(registryFile, JSON.stringify([...others, kept ?? ours]));
+  const kept = registry.find((entry) => entry.identifier?.id === BRIDGE_ID && entry.version === BRIDGE_VERSION);
+  if (!kept || registry.length !== others.length + 1) await writeJson(registryFile, [...others, kept ?? ours]);
   const obsoleteFile = join(extensionsDir, ".obsolete");
   const obsolete = await readJson<Record<string, boolean>>(obsoleteFile, {});
   if (Object.keys(obsolete).some((key) => key.startsWith(`${BRIDGE_ID}-`))) {
     const rest = Object.fromEntries(Object.entries(obsolete).filter(([key]) => !key.startsWith(`${BRIDGE_ID}-`)));
-    if (Object.keys(rest).length) await writeFile(obsoleteFile, JSON.stringify(rest));
+    if (Object.keys(rest).length) await writeJson(obsoleteFile, rest);
     else await rm(obsoleteFile, { force: true });
   }
 }

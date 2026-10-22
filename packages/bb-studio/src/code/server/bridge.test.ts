@@ -208,3 +208,23 @@ describe("broadcast", () => {
     }
   });
 });
+
+it.each(["{broken", "{}", "[null]"])("preserves an unreadable extension registry: %s", async (text) => {
+  const { installBridge } = await import("./bridge-extension");
+  const { mkdtemp, readFile, writeFile } = await import("node:fs/promises");
+  const extensions = await mkdtemp(join(dir, "bad-registry-"));
+  const file = join(extensions, "extensions.json");
+  await writeFile(file, text);
+  await expect(installBridge(extensions)).rejects.toThrow();
+  expect(await readFile(file, "utf8")).toBe(text);
+});
+
+it("serializes concurrent bridge installations without losing other extensions", async () => {
+  const { installBridge, BRIDGE_ID } = await import("./bridge-extension");
+  const { mkdtemp, readFile, writeFile } = await import("node:fs/promises");
+  const extensions = await mkdtemp(join(dir, "parallel-registry-"));
+  const other = { identifier: { id: "other.ext" }, version: "1" };
+  await writeFile(join(extensions, "extensions.json"), JSON.stringify([other]));
+  await Promise.all(Array.from({ length: 5 }, () => installBridge(extensions)));
+  expect(JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"))).toEqual([other, expect.objectContaining({ identifier: { id: BRIDGE_ID } })]);
+});
