@@ -218,13 +218,17 @@ extension BBClient {
     public func timeline(_ threadId: String, before cursor: TimelineCursor? = nil, after: Int? = nil, segments: Int = 8)
         async throws -> TimelinePage
     {
-        var path = "/api/v1/threads/\(threadId)/timeline?segmentLimit=\(segments)"
-        if let after { path += "&afterSequence=\(after)" }
+        var parts = URLComponents()
+        parts.path = "/api/v1/threads/\(threadId)/timeline"
+        parts.queryItems = [URLQueryItem(name: "segmentLimit", value: String(segments))]
+        if let after { parts.queryItems?.append(URLQueryItem(name: "afterSequence", value: String(after))) }
         if let cursor {
-            let anchor = cursor.anchorId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor.anchorId
-            path += "&beforeAnchorSeq=\(cursor.anchorSeq)&beforeAnchorId=\(anchor)"
+            parts.queryItems?.append(URLQueryItem(name: "beforeAnchorSeq", value: String(cursor.anchorSeq)))
+            parts.queryItems?.append(URLQueryItem(name: "beforeAnchorId", value: cursor.anchorId))
         }
-        return try await get(path)
+        // Some servers decode + as a form space; preserve literal plus signs.
+        parts.percentEncodedQuery = parts.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return try await get(parts.string!)
     }
 
     @discardableResult
@@ -424,8 +428,11 @@ extension BBClient {
 
     /// Title and message search; needs at least two non-space characters.
     public func search(_ query: String, limit: Int = 20) async throws -> ThreadSearchResults {
-        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        return try await get("/api/v1/threads/search?query=\(encoded)&limitPerGroup=\(limit)")
+        var parts = URLComponents()
+        parts.path = "/api/v1/threads/search"
+        parts.queryItems = [URLQueryItem(name: "query", value: query), URLQueryItem(name: "limitPerGroup", value: String(limit))]
+        parts.percentEncodedQuery = parts.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return try await get(parts.string!)
     }
 
     // MARK: New-thread options
