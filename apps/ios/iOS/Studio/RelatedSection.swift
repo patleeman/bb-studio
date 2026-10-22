@@ -72,6 +72,7 @@ struct RelatedSection: View {
                 : plugin == "talk" ? "/plugins/studio/studio/recordings/\(id)"
                 : plugin == "pages" ? "/plugins/studio/studio/pages/\(id)"
                 : plugin == "dashboards" ? "/plugins/studio/studio/dashboards/\(id)"
+                : plugin == "minis" ? "/plugins/studio/studio/minis/\(id)"
                 : "/plugins/studio/studio/designs/\(id)"
             if let route = Route(href: href) {
                 NavigationLink(value: route) { Label(label, systemImage: "link") }

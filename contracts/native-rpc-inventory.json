@@ -548,6 +548,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/Minis.swift",
+      "plugin": "studio",
+      "method": "minis.get",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/ModelHandoff.swift",
       "plugin": "studio",
       "method": "thread_handoff_to_model",
@@ -816,6 +822,42 @@
       "plugin": "studio",
       "method": "artifacts.importFile",
       "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.close",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.save",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.emit",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.result",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "call",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "apps/ios/iOS/Thread/InlineVis.swift",

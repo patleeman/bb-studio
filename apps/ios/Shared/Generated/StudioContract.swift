@@ -260,6 +260,38 @@ public enum Studio {
     public static let dashboards_widgetTypes = "dashboards.widgetTypes"
     public static let dashboards_saveWidgetType = "dashboards.saveWidgetType"
     public static let dashboards_deleteWidgetType = "dashboards.deleteWidgetType"
+    public static let minis_list = "minis.list"
+    public static let minis_get = "minis.get"
+    public static let minis_create = "minis.create"
+    public static let minis_save = "minis.save"
+    public static let minis_restoreVersion = "minis.restoreVersion"
+    public static let minis_rename = "minis.rename"
+    public static let minis_fromArtifact = "minis.fromArtifact"
+    public static let minis_duplicate = "minis.duplicate"
+    public static let minis_live_save = "minis.live.save"
+    public static let minis_live_emit = "minis.live.emit"
+    public static let minis_live_open = "minis.live.open"
+    public static let minis_live_touch = "minis.live.touch"
+    public static let minis_live_close = "minis.live.close"
+    public static let minis_live_result = "minis.live.result"
+    public static let minis_live_take = "minis.live.take"
+    public static let minis_db_find = "minis.db.find"
+    public static let minis_db_count = "minis.db.count"
+    public static let minis_db_get = "minis.db.get"
+    public static let minis_db_insert = "minis.db.insert"
+    public static let minis_db_update = "minis.db.update"
+    public static let minis_db_patch = "minis.db.patch"
+    public static let minis_db_remove = "minis.db.remove"
+    public static let minis_fetch = "minis.fetch"
+    public static let minis_fetchLog = "minis.fetchLog"
+    public static let minis_bb_threads = "minis.bb.threads"
+    public static let minis_bb_studio = "minis.bb.studio"
+    public static let minis_bb_canOpen = "minis.bb.canOpen"
+    public static let minis_requestApproval = "minis.requestApproval"
+    public static let minis_approve = "minis.approve"
+    public static let minis_revoke = "minis.revoke"
+    public static let minis_setSecret = "minis.setSecret"
+    public static let minis_removeSecret = "minis.removeSecret"
     public static let speech_state = "speech.state"
     public static let speech_update = "speech.update"
     public static let speech_models = "speech.models"
@@ -839,6 +871,70 @@ public enum Studio {
   public typealias DashboardsSaveWidgetType = DashboardsSaveWidgetTypeOutput
 
   public typealias DashboardsDeleteWidgetType = DashboardsDeleteWidgetTypeOutput
+
+  public typealias MinisList = MinisListOutput
+
+  public typealias MinisGet = MinisGetOutput
+
+  public typealias MinisCreate = MinisCreateOutput
+
+  public typealias MinisSave = MinisSaveOutput
+
+  public typealias MinisRestoreVersion = MinisRestoreVersionOutput
+
+  public typealias MinisRename = MinisRenameOutput
+
+  public typealias MinisFromArtifact = MinisFromArtifactOutput
+
+  public typealias MinisDuplicate = MinisDuplicateOutput
+
+  public typealias MinisLiveSave = MinisLiveSaveOutput
+
+  public typealias MinisLiveEmit = MinisLiveEmitOutput
+
+  public typealias MinisLiveOpen = MinisLiveOpenOutput
+
+  public typealias MinisLiveTouch = MinisLiveTouchOutput
+
+  public typealias MinisLiveClose = MinisLiveCloseOutput
+
+  public typealias MinisLiveResult = MinisLiveResultOutput
+
+  public typealias MinisLiveTake = MinisLiveTakeOutput
+
+  public typealias MinisDbFind = MinisDbFindOutput
+
+  public typealias MinisDbCount = MinisDbCountOutput
+
+  public typealias MinisDbGet = MinisDbGetOutput
+
+  public typealias MinisDbInsert = MinisDbInsertOutput
+
+  public typealias MinisDbUpdate = MinisDbUpdateOutput
+
+  public typealias MinisDbPatch = MinisDbPatchOutput
+
+  public typealias MinisDbRemove = MinisDbRemoveOutput
+
+  public typealias MinisFetch = MinisFetchOutput
+
+  public typealias MinisFetchLog = MinisFetchLogOutput
+
+  public typealias MinisBbThreads = MinisBbThreadsOutput
+
+  public typealias MinisBbStudio = MinisBbStudioOutput
+
+  public typealias MinisBbCanOpen = MinisBbCanOpenOutput
+
+  public typealias MinisRequestApproval = MinisRequestApprovalOutput
+
+  public typealias MinisApprove = MinisApproveOutput
+
+  public typealias MinisRevoke = MinisRevokeOutput
+
+  public typealias MinisSetSecret = MinisSetSecretOutput
+
+  public typealias MinisRemoveSecret = MinisRemoveSecretOutput
 
   public typealias SpeechStateInput = StudioJSONValue
 
@@ -20919,6 +21015,1422 @@ public enum Studio {
   }
 
   public struct DashboardsDeleteWidgetTypeOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisListInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct MinisListOutputMinisItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+    }
+  }
+
+  public struct MinisListOutput: Sendable, Hashable, Codable {
+    public var minis: [MinisListOutputMinisItem]?
+
+    public init(minis: [MinisListOutputMinisItem]? = nil) {
+      self.minis = minis
+    }
+  }
+
+  public struct MinisGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct MinisGetOutputMiniManifestCollectionsValue: Sendable, Hashable, Codable {
+    public var indexes: [String]?
+
+    public init(indexes: [String]? = nil) {
+      self.indexes = indexes
+    }
+  }
+
+  public struct MinisGetOutputMiniManifestSize: Sendable, Hashable, Codable {
+    public var minHeight: Double?
+    public var maxHeight: Double?
+
+    public init(minHeight: Double? = nil, maxHeight: Double? = nil) {
+      self.minHeight = minHeight
+      self.maxHeight = maxHeight
+    }
+  }
+
+  public struct MinisGetOutputMiniManifest: Sendable, Hashable, Codable {
+    public var entry: String?
+    public var libs: [String]?
+    public var collections: [String: MinisGetOutputMiniManifestCollectionsValue]?
+    public var capabilities: [String]?
+    public var size: MinisGetOutputMiniManifestSize?
+    public var description: String?
+
+    public init(entry: String? = nil, libs: [String]? = nil, collections: [String: MinisGetOutputMiniManifestCollectionsValue]? = nil, capabilities: [String]? = nil, size: MinisGetOutputMiniManifestSize? = nil, description: String? = nil) {
+      self.entry = entry
+      self.libs = libs
+      self.collections = collections
+      self.capabilities = capabilities
+      self.size = size
+      self.description = description
+    }
+  }
+
+  public struct MinisGetOutputMiniVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+    public var by: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, note: String? = nil, by: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.note = note
+      self.by = by
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct MinisGetOutputMiniSecretsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var header: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, header: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.header = header
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisGetOutputMiniCollectionsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var count: Double?
+
+    public init(name: String? = nil, count: Double? = nil) {
+      self.name = name
+      self.count = count
+    }
+  }
+
+  public struct MinisGetOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedBy: String?
+    public var threadId: String?
+    public var files: [String: String]?
+    public var manifest: MinisGetOutputMiniManifest?
+    public var versions: [MinisGetOutputMiniVersionsItem]?
+    public var granted: [String]?
+    public var pending: [String]?
+    public var secrets: [MinisGetOutputMiniSecretsItem]?
+    public var collections: [MinisGetOutputMiniCollectionsItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedBy: String? = nil, threadId: String? = nil, files: [String: String]? = nil, manifest: MinisGetOutputMiniManifest? = nil, versions: [MinisGetOutputMiniVersionsItem]? = nil, granted: [String]? = nil, pending: [String]? = nil, secrets: [MinisGetOutputMiniSecretsItem]? = nil, collections: [MinisGetOutputMiniCollectionsItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedBy = updatedBy
+      self.threadId = threadId
+      self.files = files
+      self.manifest = manifest
+      self.versions = versions
+      self.granted = granted
+      self.pending = pending
+      self.secrets = secrets
+      self.collections = collections
+    }
+  }
+
+  public struct MinisGetOutput: Sendable, Hashable, Codable {
+    public var mini: MinisGetOutputMini?
+
+    public init(mini: MinisGetOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisCreateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.projectId = projectId
+    }
+  }
+
+  public struct MinisCreateOutputMiniManifestCollectionsValue: Sendable, Hashable, Codable {
+    public var indexes: [String]?
+
+    public init(indexes: [String]? = nil) {
+      self.indexes = indexes
+    }
+  }
+
+  public struct MinisCreateOutputMiniManifestSize: Sendable, Hashable, Codable {
+    public var minHeight: Double?
+    public var maxHeight: Double?
+
+    public init(minHeight: Double? = nil, maxHeight: Double? = nil) {
+      self.minHeight = minHeight
+      self.maxHeight = maxHeight
+    }
+  }
+
+  public struct MinisCreateOutputMiniManifest: Sendable, Hashable, Codable {
+    public var entry: String?
+    public var libs: [String]?
+    public var collections: [String: MinisCreateOutputMiniManifestCollectionsValue]?
+    public var capabilities: [String]?
+    public var size: MinisCreateOutputMiniManifestSize?
+    public var description: String?
+
+    public init(entry: String? = nil, libs: [String]? = nil, collections: [String: MinisCreateOutputMiniManifestCollectionsValue]? = nil, capabilities: [String]? = nil, size: MinisCreateOutputMiniManifestSize? = nil, description: String? = nil) {
+      self.entry = entry
+      self.libs = libs
+      self.collections = collections
+      self.capabilities = capabilities
+      self.size = size
+      self.description = description
+    }
+  }
+
+  public struct MinisCreateOutputMiniVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+    public var by: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, note: String? = nil, by: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.note = note
+      self.by = by
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct MinisCreateOutputMiniSecretsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var header: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, header: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.header = header
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisCreateOutputMiniCollectionsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var count: Double?
+
+    public init(name: String? = nil, count: Double? = nil) {
+      self.name = name
+      self.count = count
+    }
+  }
+
+  public struct MinisCreateOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedBy: String?
+    public var threadId: String?
+    public var files: [String: String]?
+    public var manifest: MinisCreateOutputMiniManifest?
+    public var versions: [MinisCreateOutputMiniVersionsItem]?
+    public var granted: [String]?
+    public var pending: [String]?
+    public var secrets: [MinisCreateOutputMiniSecretsItem]?
+    public var collections: [MinisCreateOutputMiniCollectionsItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedBy: String? = nil, threadId: String? = nil, files: [String: String]? = nil, manifest: MinisCreateOutputMiniManifest? = nil, versions: [MinisCreateOutputMiniVersionsItem]? = nil, granted: [String]? = nil, pending: [String]? = nil, secrets: [MinisCreateOutputMiniSecretsItem]? = nil, collections: [MinisCreateOutputMiniCollectionsItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedBy = updatedBy
+      self.threadId = threadId
+      self.files = files
+      self.manifest = manifest
+      self.versions = versions
+      self.granted = granted
+      self.pending = pending
+      self.secrets = secrets
+      self.collections = collections
+    }
+  }
+
+  public struct MinisCreateOutput: Sendable, Hashable, Codable {
+    public var mini: MinisCreateOutputMini?
+
+    public init(mini: MinisCreateOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisSaveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var files: [String: String]?
+    public var note: String?
+
+    public init(id: String? = nil, files: [String: String]? = nil, note: String? = nil) {
+      self.id = id
+      self.files = files
+      self.note = note
+    }
+  }
+
+  public struct MinisSaveOutputMiniManifestCollectionsValue: Sendable, Hashable, Codable {
+    public var indexes: [String]?
+
+    public init(indexes: [String]? = nil) {
+      self.indexes = indexes
+    }
+  }
+
+  public struct MinisSaveOutputMiniManifestSize: Sendable, Hashable, Codable {
+    public var minHeight: Double?
+    public var maxHeight: Double?
+
+    public init(minHeight: Double? = nil, maxHeight: Double? = nil) {
+      self.minHeight = minHeight
+      self.maxHeight = maxHeight
+    }
+  }
+
+  public struct MinisSaveOutputMiniManifest: Sendable, Hashable, Codable {
+    public var entry: String?
+    public var libs: [String]?
+    public var collections: [String: MinisSaveOutputMiniManifestCollectionsValue]?
+    public var capabilities: [String]?
+    public var size: MinisSaveOutputMiniManifestSize?
+    public var description: String?
+
+    public init(entry: String? = nil, libs: [String]? = nil, collections: [String: MinisSaveOutputMiniManifestCollectionsValue]? = nil, capabilities: [String]? = nil, size: MinisSaveOutputMiniManifestSize? = nil, description: String? = nil) {
+      self.entry = entry
+      self.libs = libs
+      self.collections = collections
+      self.capabilities = capabilities
+      self.size = size
+      self.description = description
+    }
+  }
+
+  public struct MinisSaveOutputMiniVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+    public var by: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, note: String? = nil, by: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.note = note
+      self.by = by
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct MinisSaveOutputMiniSecretsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var header: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, header: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.header = header
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisSaveOutputMiniCollectionsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var count: Double?
+
+    public init(name: String? = nil, count: Double? = nil) {
+      self.name = name
+      self.count = count
+    }
+  }
+
+  public struct MinisSaveOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedBy: String?
+    public var threadId: String?
+    public var files: [String: String]?
+    public var manifest: MinisSaveOutputMiniManifest?
+    public var versions: [MinisSaveOutputMiniVersionsItem]?
+    public var granted: [String]?
+    public var pending: [String]?
+    public var secrets: [MinisSaveOutputMiniSecretsItem]?
+    public var collections: [MinisSaveOutputMiniCollectionsItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedBy: String? = nil, threadId: String? = nil, files: [String: String]? = nil, manifest: MinisSaveOutputMiniManifest? = nil, versions: [MinisSaveOutputMiniVersionsItem]? = nil, granted: [String]? = nil, pending: [String]? = nil, secrets: [MinisSaveOutputMiniSecretsItem]? = nil, collections: [MinisSaveOutputMiniCollectionsItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedBy = updatedBy
+      self.threadId = threadId
+      self.files = files
+      self.manifest = manifest
+      self.versions = versions
+      self.granted = granted
+      self.pending = pending
+      self.secrets = secrets
+      self.collections = collections
+    }
+  }
+
+  public struct MinisSaveOutput: Sendable, Hashable, Codable {
+    public var mini: MinisSaveOutputMini?
+
+    public init(mini: MinisSaveOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisRestoreVersionInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniManifestCollectionsValue: Sendable, Hashable, Codable {
+    public var indexes: [String]?
+
+    public init(indexes: [String]? = nil) {
+      self.indexes = indexes
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniManifestSize: Sendable, Hashable, Codable {
+    public var minHeight: Double?
+    public var maxHeight: Double?
+
+    public init(minHeight: Double? = nil, maxHeight: Double? = nil) {
+      self.minHeight = minHeight
+      self.maxHeight = maxHeight
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniManifest: Sendable, Hashable, Codable {
+    public var entry: String?
+    public var libs: [String]?
+    public var collections: [String: MinisRestoreVersionOutputMiniManifestCollectionsValue]?
+    public var capabilities: [String]?
+    public var size: MinisRestoreVersionOutputMiniManifestSize?
+    public var description: String?
+
+    public init(entry: String? = nil, libs: [String]? = nil, collections: [String: MinisRestoreVersionOutputMiniManifestCollectionsValue]? = nil, capabilities: [String]? = nil, size: MinisRestoreVersionOutputMiniManifestSize? = nil, description: String? = nil) {
+      self.entry = entry
+      self.libs = libs
+      self.collections = collections
+      self.capabilities = capabilities
+      self.size = size
+      self.description = description
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+    public var by: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, note: String? = nil, by: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.note = note
+      self.by = by
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniSecretsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var header: String?
+    public var updatedAt: Double?
+
+    public init(name: String? = nil, header: String? = nil, updatedAt: Double? = nil) {
+      self.name = name
+      self.header = header
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMiniCollectionsItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var count: Double?
+
+    public init(name: String? = nil, count: Double? = nil) {
+      self.name = name
+      self.count = count
+    }
+  }
+
+  public struct MinisRestoreVersionOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedBy: String?
+    public var threadId: String?
+    public var files: [String: String]?
+    public var manifest: MinisRestoreVersionOutputMiniManifest?
+    public var versions: [MinisRestoreVersionOutputMiniVersionsItem]?
+    public var granted: [String]?
+    public var pending: [String]?
+    public var secrets: [MinisRestoreVersionOutputMiniSecretsItem]?
+    public var collections: [MinisRestoreVersionOutputMiniCollectionsItem]?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedBy: String? = nil, threadId: String? = nil, files: [String: String]? = nil, manifest: MinisRestoreVersionOutputMiniManifest? = nil, versions: [MinisRestoreVersionOutputMiniVersionsItem]? = nil, granted: [String]? = nil, pending: [String]? = nil, secrets: [MinisRestoreVersionOutputMiniSecretsItem]? = nil, collections: [MinisRestoreVersionOutputMiniCollectionsItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedBy = updatedBy
+      self.threadId = threadId
+      self.files = files
+      self.manifest = manifest
+      self.versions = versions
+      self.granted = granted
+      self.pending = pending
+      self.secrets = secrets
+      self.collections = collections
+    }
+  }
+
+  public struct MinisRestoreVersionOutput: Sendable, Hashable, Codable {
+    public var mini: MinisRestoreVersionOutputMini?
+
+    public init(mini: MinisRestoreVersionOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisRenameInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct MinisRenameOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisFromArtifactInput: Sendable, Hashable, Codable {
+    public var artifactId: String?
+
+    public init(artifactId: String? = nil) {
+      self.artifactId = artifactId
+    }
+  }
+
+  public struct MinisFromArtifactOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+    }
+  }
+
+  public struct MinisFromArtifactOutput: Sendable, Hashable, Codable {
+    public var mini: MinisFromArtifactOutputMini?
+
+    public init(mini: MinisFromArtifactOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisDuplicateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var withData: Bool?
+
+    public init(id: String? = nil, withData: Bool? = nil) {
+      self.id = id
+      self.withData = withData
+    }
+  }
+
+  public struct MinisDuplicateOutputMini: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var versionId: String?
+    public var updatedAt: Double?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.versionId = versionId
+      self.updatedAt = updatedAt
+      self.archived = archived
+    }
+  }
+
+  public struct MinisDuplicateOutput: Sendable, Hashable, Codable {
+    public var mini: MinisDuplicateOutputMini?
+
+    public init(mini: MinisDuplicateOutputMini? = nil) {
+      self.mini = mini
+    }
+  }
+
+  public struct MinisLiveSaveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var state: StudioJSONValue?
+
+    public init(id: String? = nil, clientId: String? = nil, state: StudioJSONValue? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.state = state
+    }
+  }
+
+  public struct MinisLiveSaveOutput: Sendable, Hashable, Codable {
+    public var version: Double?
+
+    public init(version: Double? = nil) {
+      self.version = version
+    }
+  }
+
+  public struct MinisLiveEmitInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var data: StudioJSONValue?
+
+    public init(id: String? = nil, name: String? = nil, data: StudioJSONValue? = nil) {
+      self.id = id
+      self.name = name
+      self.data = data
+    }
+  }
+
+  public struct MinisLiveEmitOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisLiveOpenInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var actions: [String]?
+
+    public init(id: String? = nil, clientId: String? = nil, actions: [String]? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.actions = actions
+    }
+  }
+
+  public struct MinisLiveOpenOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisLiveTouchInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+
+    public init(id: String? = nil, clientId: String? = nil) {
+      self.id = id
+      self.clientId = clientId
+    }
+  }
+
+  public struct MinisLiveTouchOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisLiveCloseInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+
+    public init(id: String? = nil, clientId: String? = nil) {
+      self.id = id
+      self.clientId = clientId
+    }
+  }
+
+  public struct MinisLiveCloseOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisLiveResultInput: Sendable, Hashable, Codable {
+    public var commandId: String?
+    public var clientId: String?
+    public var ok: Bool?
+    public var value: StudioJSONValue?
+    public var error: String?
+
+    public init(commandId: String? = nil, clientId: String? = nil, ok: Bool? = nil, value: StudioJSONValue? = nil, error: String? = nil) {
+      self.commandId = commandId
+      self.clientId = clientId
+      self.ok = ok
+      self.value = value
+      self.error = error
+    }
+  }
+
+  public struct MinisLiveResultOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisLiveTakeInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var data: StudioJSONValue?
+
+    public init(id: String? = nil, label: String? = nil, data: StudioJSONValue? = nil) {
+      self.id = id
+      self.label = label
+      self.data = data
+    }
+  }
+
+  public struct MinisLiveTakeOutput: Sendable, Hashable, Codable {
+    public var takeId: String?
+
+    public init(takeId: String? = nil) {
+      self.takeId = takeId
+    }
+  }
+
+  public struct MinisDbFindInputQuery: Sendable, Hashable, Codable {
+    public var `where`: [String: StudioJSONValue]?
+    public var order: String?
+    public var limit: Int?
+    public var offset: Int?
+
+    public init(`where`: [String: StudioJSONValue]? = nil, order: String? = nil, limit: Int? = nil, offset: Int? = nil) {
+      self.`where` = `where`
+      self.order = order
+      self.limit = limit
+      self.offset = offset
+    }
+  }
+
+  public struct MinisDbFindInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var collection: String?
+    public var query: MinisDbFindInputQuery?
+
+    public init(id: String? = nil, collection: String? = nil, query: MinisDbFindInputQuery? = nil) {
+      self.id = id
+      self.collection = collection
+      self.query = query
+    }
+  }
+
+  public enum MinisDbFindOutputRecordsItemCreatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MinisDbFindOutputRecordsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var rev: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var createdBy: MinisDbFindOutputRecordsItemCreatedBy?
+    public var data: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, rev: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, createdBy: MinisDbFindOutputRecordsItemCreatedBy? = nil, data: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.rev = rev
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.createdBy = createdBy
+      self.data = data
+    }
+  }
+
+  public struct MinisDbFindOutput: Sendable, Hashable, Codable {
+    public var records: [MinisDbFindOutputRecordsItem]?
+
+    public init(records: [MinisDbFindOutputRecordsItem]? = nil) {
+      self.records = records
+    }
+  }
+
+  public struct MinisDbCountInputQuery: Sendable, Hashable, Codable {
+    public var `where`: [String: StudioJSONValue]?
+
+    public init(`where`: [String: StudioJSONValue]? = nil) {
+      self.`where` = `where`
+    }
+  }
+
+  public struct MinisDbCountInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var collection: String?
+    public var query: MinisDbCountInputQuery?
+
+    public init(id: String? = nil, collection: String? = nil, query: MinisDbCountInputQuery? = nil) {
+      self.id = id
+      self.collection = collection
+      self.query = query
+    }
+  }
+
+  public struct MinisDbCountOutput: Sendable, Hashable, Codable {
+    public var count: Double?
+
+    public init(count: Double? = nil) {
+      self.count = count
+    }
+  }
+
+  public struct MinisDbGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var collection: String?
+    public var recordId: String?
+
+    public init(id: String? = nil, collection: String? = nil, recordId: String? = nil) {
+      self.id = id
+      self.collection = collection
+      self.recordId = recordId
+    }
+  }
+
+  public enum MinisDbGetOutputRecordCreatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MinisDbGetOutputRecord: Sendable, Hashable, Codable {
+    public var id: String?
+    public var rev: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var createdBy: MinisDbGetOutputRecordCreatedBy?
+    public var data: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, rev: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, createdBy: MinisDbGetOutputRecordCreatedBy? = nil, data: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.rev = rev
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.createdBy = createdBy
+      self.data = data
+    }
+  }
+
+  public struct MinisDbGetOutput: Sendable, Hashable, Codable {
+    public var record: MinisDbGetOutputRecord?
+
+    public init(record: MinisDbGetOutputRecord? = nil) {
+      self.record = record
+    }
+  }
+
+  public struct MinisDbInsertInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var collection: String?
+    public var data: [String: StudioJSONValue]?
+    public var recordId: String?
+
+    public init(id: String? = nil, clientId: String? = nil, collection: String? = nil, data: [String: StudioJSONValue]? = nil, recordId: String? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.collection = collection
+      self.data = data
+      self.recordId = recordId
+    }
+  }
+
+  public enum MinisDbInsertOutputRecordCreatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MinisDbInsertOutputRecord: Sendable, Hashable, Codable {
+    public var id: String?
+    public var rev: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var createdBy: MinisDbInsertOutputRecordCreatedBy?
+    public var data: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, rev: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, createdBy: MinisDbInsertOutputRecordCreatedBy? = nil, data: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.rev = rev
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.createdBy = createdBy
+      self.data = data
+    }
+  }
+
+  public struct MinisDbInsertOutput: Sendable, Hashable, Codable {
+    public var record: MinisDbInsertOutputRecord?
+
+    public init(record: MinisDbInsertOutputRecord? = nil) {
+      self.record = record
+    }
+  }
+
+  public struct MinisDbUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var collection: String?
+    public var recordId: String?
+    public var data: [String: StudioJSONValue]?
+    public var rev: Int?
+
+    public init(id: String? = nil, clientId: String? = nil, collection: String? = nil, recordId: String? = nil, data: [String: StudioJSONValue]? = nil, rev: Int? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.collection = collection
+      self.recordId = recordId
+      self.data = data
+      self.rev = rev
+    }
+  }
+
+  public enum MinisDbUpdateOutputRecordCreatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MinisDbUpdateOutputRecord: Sendable, Hashable, Codable {
+    public var id: String?
+    public var rev: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var createdBy: MinisDbUpdateOutputRecordCreatedBy?
+    public var data: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, rev: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, createdBy: MinisDbUpdateOutputRecordCreatedBy? = nil, data: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.rev = rev
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.createdBy = createdBy
+      self.data = data
+    }
+  }
+
+  public struct MinisDbUpdateOutput: Sendable, Hashable, Codable {
+    public var record: MinisDbUpdateOutputRecord?
+
+    public init(record: MinisDbUpdateOutputRecord? = nil) {
+      self.record = record
+    }
+  }
+
+  public struct MinisDbPatchInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var collection: String?
+    public var recordId: String?
+    public var fields: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, clientId: String? = nil, collection: String? = nil, recordId: String? = nil, fields: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.collection = collection
+      self.recordId = recordId
+      self.fields = fields
+    }
+  }
+
+  public enum MinisDbPatchOutputRecordCreatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MinisDbPatchOutputRecord: Sendable, Hashable, Codable {
+    public var id: String?
+    public var rev: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var createdBy: MinisDbPatchOutputRecordCreatedBy?
+    public var data: [String: StudioJSONValue]?
+
+    public init(id: String? = nil, rev: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, createdBy: MinisDbPatchOutputRecordCreatedBy? = nil, data: [String: StudioJSONValue]? = nil) {
+      self.id = id
+      self.rev = rev
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.createdBy = createdBy
+      self.data = data
+    }
+  }
+
+  public struct MinisDbPatchOutput: Sendable, Hashable, Codable {
+    public var record: MinisDbPatchOutputRecord?
+
+    public init(record: MinisDbPatchOutputRecord? = nil) {
+      self.record = record
+    }
+  }
+
+  public struct MinisDbRemoveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var clientId: String?
+    public var collection: String?
+    public var recordId: String?
+
+    public init(id: String? = nil, clientId: String? = nil, collection: String? = nil, recordId: String? = nil) {
+      self.id = id
+      self.clientId = clientId
+      self.collection = collection
+      self.recordId = recordId
+    }
+  }
+
+  public struct MinisDbRemoveOutput: Sendable, Hashable, Codable {
+    public var removed: Bool?
+
+    public init(removed: Bool? = nil) {
+      self.removed = removed
+    }
+  }
+
+  public struct MinisFetchInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var url: String?
+    public var method: String?
+    public var headers: [String: String]?
+    public var body: String?
+    public var auth: String?
+
+    public init(id: String? = nil, url: String? = nil, method: String? = nil, headers: [String: String]? = nil, body: String? = nil, auth: String? = nil) {
+      self.id = id
+      self.url = url
+      self.method = method
+      self.headers = headers
+      self.body = body
+      self.auth = auth
+    }
+  }
+
+  public struct MinisFetchOutput: Sendable, Hashable, Codable {
+    public var status: Double?
+    public var statusText: String?
+    public var headers: [String: String]?
+    public var body: String?
+    public var url: String?
+
+    public init(status: Double? = nil, statusText: String? = nil, headers: [String: String]? = nil, body: String? = nil, url: String? = nil) {
+      self.status = status
+      self.statusText = statusText
+      self.headers = headers
+      self.body = body
+      self.url = url
+    }
+  }
+
+  public struct MinisFetchLogInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct MinisFetchLogOutputEntriesItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var method: String?
+    public var url: String?
+    public var status: Double?
+    public var error: String?
+    public var ms: Double?
+    public var bytes: Double?
+
+    public init(at: Double? = nil, method: String? = nil, url: String? = nil, status: Double? = nil, error: String? = nil, ms: Double? = nil, bytes: Double? = nil) {
+      self.at = at
+      self.method = method
+      self.url = url
+      self.status = status
+      self.error = error
+      self.ms = ms
+      self.bytes = bytes
+    }
+  }
+
+  public struct MinisFetchLogOutput: Sendable, Hashable, Codable {
+    public var entries: [MinisFetchLogOutputEntriesItem]?
+
+    public init(entries: [MinisFetchLogOutputEntriesItem]? = nil) {
+      self.entries = entries
+    }
+  }
+
+  public struct MinisBbThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var limit: Int?
+
+    public init(id: String? = nil, limit: Int? = nil) {
+      self.id = id
+      self.limit = limit
+    }
+  }
+
+  public struct MinisBbThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var updatedAt: String?
+
+    public init(id: String? = nil, title: String? = nil, updatedAt: String? = nil) {
+      self.id = id
+      self.title = title
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisBbThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [MinisBbThreadsOutputThreadsItem]?
+
+    public init(threads: [MinisBbThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct MinisBbStudioInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var query: String?
+    public var kind: String?
+    public var limit: Int?
+
+    public init(id: String? = nil, query: String? = nil, kind: String? = nil, limit: Int? = nil) {
+      self.id = id
+      self.query = query
+      self.kind = kind
+      self.limit = limit
+    }
+  }
+
+  public struct MinisBbStudioOutputItemsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct MinisBbStudioOutput: Sendable, Hashable, Codable {
+    public var items: [MinisBbStudioOutputItemsItem]?
+
+    public init(items: [MinisBbStudioOutputItemsItem]? = nil) {
+      self.items = items
+    }
+  }
+
+  public struct MinisBbCanOpenInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct MinisBbCanOpenOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisRequestApprovalInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct MinisRequestApprovalOutput: Sendable, Hashable, Codable {
+    public var nonce: String?
+    public var notBefore: Double?
+    public var expiresAt: Double?
+    public var capabilities: [String]?
+    public var versionId: String?
+
+    public init(nonce: String? = nil, notBefore: Double? = nil, expiresAt: Double? = nil, capabilities: [String]? = nil, versionId: String? = nil) {
+      self.nonce = nonce
+      self.notBefore = notBefore
+      self.expiresAt = expiresAt
+      self.capabilities = capabilities
+      self.versionId = versionId
+    }
+  }
+
+  public struct MinisApproveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var nonce: String?
+    public var capabilities: [String]?
+
+    public init(id: String? = nil, nonce: String? = nil, capabilities: [String]? = nil) {
+      self.id = id
+      self.nonce = nonce
+      self.capabilities = capabilities
+    }
+  }
+
+  public struct MinisApproveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisRevokeInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var capabilities: [String]?
+
+    public init(id: String? = nil, capabilities: [String]? = nil) {
+      self.id = id
+      self.capabilities = capabilities
+    }
+  }
+
+  public struct MinisRevokeOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisSetSecretInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var header: String?
+    public var value: String?
+
+    public init(id: String? = nil, name: String? = nil, header: String? = nil, value: String? = nil) {
+      self.id = id
+      self.name = name
+      self.header = header
+      self.value = value
+    }
+  }
+
+  public struct MinisSetSecretOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct MinisRemoveSecretInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct MinisRemoveSecretOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

@@ -149,7 +149,11 @@ public final class BBClient: @unchecked Sendable {
 
     /// Shared status boundary for Codable and ordered RPC results.
     func rpcData(_ pluginId: String, _ method: String, _ input: JSONValue) async throws -> Data {
-        let data = try encoder.encode(input)
+        try await rpcData(pluginId, method, body: try encoder.encode(input))
+    }
+
+    /// The same, for an input already encoded as JSON.
+    func rpcData(_ pluginId: String, _ method: String, body data: Data) async throws -> Data {
         let (status, responseData) = try await raw(
             method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
         guard (200..<300).contains(status) else {

@@ -2,13 +2,14 @@ import SwiftUI
 import WebKit
 
 /// The Studio item a reply card opens: `::page{id="pg_…"}`, `::drawing{…}`,
-/// `::design{…}` or `::recording{…}` on its own line.
+/// `::design{…}`, `::recording{…}` or `::mini{…}` on its own line.
 /// Artifacts have `ArtifactCard`.
 enum ReplyItem: Hashable {
     case page(String)
     case drawing(String)
     case design(String)
     case recording(String)
+    case mini(String)
 
     init?(_ directive: Directive) {
         guard let id = directive.attributes["id"]?.trimmingCharacters(in: .whitespaces), !id.isEmpty,
@@ -18,13 +19,14 @@ enum ReplyItem: Hashable {
         case "drawing": self = .drawing(id)
         case "design" where BBClient.isDesignId(id): self = .design(id)
         case "recording" where id.wholeMatch(of: /rec_[a-z0-9]{8,32}/) != nil: self = .recording(id)
+        case "mini" where MiniApp.isId(id): self = .mini(id)
         default: return nil
         }
     }
 
     var id: String {
         switch self {
-        case .page(let id), .drawing(let id), .design(let id), .recording(let id): id
+        case .page(let id), .drawing(let id), .design(let id), .recording(let id), .mini(let id): id
         }
     }
 
@@ -34,6 +36,7 @@ enum ReplyItem: Hashable {
         case .drawing(let id): .drawing(id: id)
         case .design(let id): .design(id: id)
         case .recording(let id): .recording(id: id)
+        case .mini(let id): .mini(id: id)
         }
     }
 
@@ -43,6 +46,7 @@ enum ReplyItem: Hashable {
         case .drawing: StudioKind.of("drawing")
         case .design: StudioKind.of("design")
         case .recording: StudioKind.of("recording")
+        case .mini: StudioKind.of("mini")
         }
     }
 }
@@ -256,6 +260,15 @@ struct ReplyItemCard: View {
             return Summary(title: title.isEmpty ? "Untitled recording" : title,
                 detail: "\(length) · \(words) word\(words == 1 ? "" : "s")",
                 preview: .recording(RecordingPreview(output)))
+        case .mini(let id):
+            // The app runs when it's opened; the card says what it is and holds.
+            return try await client.mini(id).map { mini in
+                let records = mini.recordCount
+                let description = mini.manifest?.description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return Summary(title: mini.displayName,
+                    detail: mini.collections.isEmpty ? nil : records == 1 ? "1 record" : "\(records) records",
+                    preview: description.isEmpty ? nil : .note(description))
+            }
         }
     }
 }

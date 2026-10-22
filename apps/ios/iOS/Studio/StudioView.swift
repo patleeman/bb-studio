@@ -314,6 +314,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
         StudioKind(id: "dashboard", label: "Dashboard", plural: "Dashboards", symbol: "square.grid.2x2", tint: .indigo),
+        StudioKind(id: "mini", label: "Mini app", plural: "Mini apps", symbol: "macwindow", tint: .mint),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -797,6 +798,7 @@ struct StudioView: View {
         case "artifacts": .artifact(id: item.itemId)
         case "design": .design(id: item.itemId)
         case "dashboards": .dashboard(id: item.itemId)
+        case "minis": .mini(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }
@@ -875,6 +877,7 @@ struct StudioView: View {
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
         case "dashboard": "Ask an agent for a dashboard, or make one in BB on the desktop. Widgets refresh while it's open."
+        case "mini": "Ask an agent for a mini app: a small app with its own data, such as a tracker or a board."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }

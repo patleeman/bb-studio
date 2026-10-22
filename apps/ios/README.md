@@ -3,7 +3,7 @@
 A personal native iOS and watchOS app for BB and
 [BB Studio](https://github.com/patleeman/bb-studio): BB's threads, approvals,
 terminals and automations, plus the Studio suite of plugins (Studio, Pages,
-Talk, Draw, Artifacts, Design and Dashboards; item chat ships inside Studio). Everything else opens the BB web
+Talk, Draw, Artifacts, Design, Dashboards and mini apps; item chat ships inside Studio). Everything else opens the BB web
 app in an in-app web view (the safari button on every thread, Pages, Drawings and Design).
 
 Studio features need the matching plugins from the bb-studio marketplace on the
@@ -37,6 +37,7 @@ are unchanged, and old `bbgo://` links still open.
 | Related links, item threads, and comments with reply and resolve on Studio items | `iOS/Studio/RelatedSection.swift` |
 | Studio Design: a design's rounds, newest first, each a row of its live screens; tap one to play it full screen (Fit or Fill, start at a prototype step). Shows the reviewer's status and the comments; pinning new comments opens BB web. It reloads when the design plugin signals a change to this design, and after a socket reconnect, instead of polling | `iOS/Studio/DesignView.swift`, `iOS/Thread/ItemCard.swift`, `Shared/Designs.swift` |
 | Studio Dashboards, read-only: the widgets in one column, ordered by the narrowest layout's rows then columns. Stat (delta and sparkline), line, bar, area and pie charts (Swift Charts), table (scrolls sideways), list and feed (links open in Safari), ticker (a strip you scroll, no marquee), note, progress bar or gauge, clock and countdown, image, and embeds (Studio items and threads open in the app, web pages in Safari) are native. Custom widgets run their HTML in a WKWebView with the desktop's sandbox document and CSP (no network, nothing stored, no navigation) and get `{data, options, theme, size}`; they may ask for more height. Each tile says when its data came in, or what failed. Pull to refresh calls `dashboards.refresh`. While the screen is on top and the app active, the phone sends the `dashboards.view` heartbeat every 30 s, so the server keeps url and script widgets fresh, and leaves when either stops; it reloads on the `dashboards` realtime signal instead of polling. Editing, settings and script approval stay on the desktop ("Approve on desktop") | `iOS/Studio/DashboardView.swift`, `Shared/Dashboards.swift` |
+| Studio mini apps, live: the app runs in a WKWebView holding its sandboxed frame, and the phone is its host, as BB's desktop is. It answers the frame's record calls (`minis.db.*`) and saves its shared state (`minis.live.save`), keeps the copy open for agent actions (`minis.live.open`, `touch`, `close`, `result`), and passes on other copies' state, record changes and agent commands from the `minis` realtime signal. Only messages from that frame are read. Network, BB access and sending to the agent are refused with "Open this mini app in BB on your computer to …"; access waiting for approval shows as a banner, approved on the desktop. Light and dark follow the phone. `::mini{id}` reply cards show the name, record count and description, and open it | `iOS/Studio/MiniAppView.swift`, `Shared/Minis.swift`, `iOS/Thread/ItemCard.swift` |
 | Studio reply cards: `::page`, `::drawing`, `::design`, `::recording` and `::artifact` lines show the item under its name, read-only, as BB web does: the page's text, the drawing, the newest round's first screens, the recording's summary and first transcript lines, or the artifact's image, page, PDF or text. The eye button hides or shows every card's preview; tap the name to open the item | `iOS/Thread/ItemCard.swift`, `iOS/Studio/ArtifactView.swift` |
 | Edit the whole page as one continuous Markdown text, styled as you type: headings stand out, checkboxes toggle on tap, and Return continues lists. Heading, list, checklist, link, and dictation controls sit above the keyboard. Edits autosave a moment after typing stops; the server rewrites only changed blocks through the live Yjs document, keeps blocks with comments intact, and asks for a reload if the page changed elsewhere. Empty pages open in the editor. Keep updated status and agent activity are visible on the page | `iOS/Pages/PageEditor.swift`, `iOS/Pages/PageTextView.swift`, `iOS/Pages/PageActivity.swift` |
 | Automations: create agent schedules; edit names, prompts and schedules; browse runs by project, run now, pause and resume | `iOS/Tools/AutomationsView.swift`, `iOS/Tools/AutomationEditor.swift` |
@@ -351,6 +352,12 @@ server with Studio (`TEST_RUNNER_BBGO_QA_SERVER=http://127.0.0.1:<port>`, for
 example a staged BB; nothing is sent): Listening with ✓ and ✕, ✕ restoring
 what was typed, and ✓ leaving the result in the field
 (`/tmp/qa-composer-dictation.png`).
+
+`MiniAppUITests` opens a mini app on a staged BB
+(`TEST_RUNNER_BBGO_QA_MINI=mini_…`) whose app has "Add task", "Count <n>" and
+"Fetch" buttons: Add task writes a record through the phone's relay, Count
+saves shared state, and Fetch shows the phone's refusal
+(`/tmp/qa-mini-*.png`).
 
 `StudioPagingUITests` swipes Studio between its kinds and drags an item row
 partway open (`/tmp/qa-studio-paging-*.png`).
