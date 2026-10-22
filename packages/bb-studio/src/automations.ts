@@ -28,6 +28,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { BotAutomationRunView, BotAutomationView, HeartbeatRun } from "./contract";
+import { automationId, automationName } from "./automation-names";
 import { resumeLog } from "./auto-resume";
 import { compileSchedule, describeSchedule, endOfDay, fromHeartbeat, localZone, type Schedule, type Trigger } from "./schedule";
 
@@ -379,7 +380,7 @@ export class Automations {
     const bot = this.bot(botId);
     if (bot.state !== "active") throw new Error(`${bot.name} is ${bot.state}. Resume it first.`);
     const name = input.name.trim();
-    if (!name) throw new Error("Give it a name.");
+    automationName(this.deps.db, bot.id, name);
     if (input.kind === "runner") {
       const runner = await this.deps.runners.create({ name, job: (input.instruction ?? "").trim(), schedule: runnerSchedule(input.schedule) }, bot.id);
       return this.one(runner.id, bot.id);
@@ -388,7 +389,6 @@ export class Automations {
     if (input.kind !== "reminder" && input.schedule.type === "once") throw new Error("Use a reminder for one time.");
     if (input.kind !== "watcher" && !input.instruction?.trim()) throw new Error("Say what it should do.");
     if (input.kind === "watcher" && !input.script?.body.trim()) throw new Error("A watcher needs a script.");
-    if (this.rows(bot.id).some((row) => row.name.toLowerCase() === name.toLowerCase()) || name.toLowerCase() === HEARTBEAT_NAME.toLowerCase()) throw new Error(`There's already an automation named "${name}".`);
     const target = input.kind === "watcher" ? this.target(input.target, bot.id) : "main";
     compileSchedule(input.schedule);
     const id = `aut_${Math.random().toString(36).slice(2, 12)}`;
@@ -423,7 +423,8 @@ export class Automations {
 
   private target(target: string | null | undefined, botId: string): string {
     if (!target || target === "main") return "main";
-    const runner = this.deps.db.prepare("SELECT id FROM bot_runners WHERE bot_id = ? AND (id = ? OR lower(name) = lower(?))").get(botId, target, target) as { id: string } | undefined;
+    const id = automationId(this.deps.db, botId, target);
+    const runner = this.deps.db.prepare("SELECT id FROM bot_runners WHERE bot_id = ? AND id = ?").get(botId, id) as { id: string } | undefined;
     if (!runner) throw new Error(`No runner "${target}" to wake.`);
     return runner.id;
   }
@@ -441,6 +442,8 @@ export class Automations {
 
   async update(input: UpdateInput, botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
+    input = { ...input, id: automationId(this.deps.db, bot.id, input.id) };
+    if (input.name !== undefined) automationName(this.deps.db, bot.id, input.name.trim(), input.id);
     if (input.id === MAINTENANCE_ID) throw new Error("Maintenance settings are in Bot info → Maintenance.");
     if (input.id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
@@ -456,7 +459,6 @@ export class Automations {
     }
     const row = this.row(input.id, bot.id);
     const name = input.name?.trim();
-    if (name && name.toLowerCase() !== row.name.toLowerCase() && this.rows(bot.id).some((each) => each.name.toLowerCase() === name.toLowerCase())) throw new Error(`There's already an automation named "${name}".`);
     if (input.schedule) {
       if (row.kind === "reminder" && input.schedule.type !== "once") throw new Error("A reminder is one time.");
       if (row.kind !== "reminder" && input.schedule.type === "once") throw new Error("Use a reminder for one time.");
@@ -486,6 +488,7 @@ export class Automations {
 
   async setState(id: string, state: "active" | "paused", botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
+    id = automationId(this.deps.db, bot.id, id);
     if (state === "active" && bot.state !== "active") throw new Error(`${bot.name} is ${bot.state}. Resume it first.`);
     if (id === MAINTENANCE_ID && this.deps.maintenance) { await this.deps.maintenance.setPaused(bot.id, state === "paused"); return this.one(MAINTENANCE_ID, bot.id); }
     if (id === HEARTBEAT_ID) {
@@ -510,6 +513,7 @@ export class Automations {
 
   async runNow(id: string, botId?: string): Promise<BotAutomationView> {
     const bot = this.bot(botId);
+    id = automationId(this.deps.db, bot.id, id);
     if (bot.state !== "active") throw new Error(`${bot.name} is ${bot.state}. Resume it first.`);
     if (id === MAINTENANCE_ID && this.deps.maintenance) { await this.deps.maintenance.run(bot.id); return this.one(MAINTENANCE_ID, bot.id); }
     let target: { id: string; projectId: string } | null = null;
@@ -527,6 +531,7 @@ export class Automations {
 
   async delete(id: string, botId?: string): Promise<{ deleted: true }> {
     const bot = this.bot(botId);
+    id = automationId(this.deps.db, bot.id, id);
     if (id === MAINTENANCE_ID) throw new Error("Maintenance cannot be deleted; turn it off in Bot info.");
     if (id === HEARTBEAT_ID) {
       const run = this.deps.heartbeat.get(bot.id);
@@ -551,6 +556,7 @@ export class Automations {
   /** Recent runs of every BB automation behind one Studio automation, newest first. */
   async runs(id: string, botId?: string, limit = 10): Promise<BotAutomationRunView[]> {
     const bot = this.bot(botId);
+    id = automationId(this.deps.db, bot.id, id);
     let kind: AutomationKind = "checkin";
     let targets: { id: string; projectId: string }[] = [];
     if (id === MAINTENANCE_ID) {

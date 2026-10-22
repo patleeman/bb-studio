@@ -303,3 +303,16 @@ it("retains each resource project during a failed handoff and deletes with those
   await x.auto.delete(made.id);
   expect(x.calls.filter((c) => c.method === "automations_delete").map((c) => c.input.projectId)).toEqual(["proj_new", "proj_personal"]);
 });
+
+it("rejects reserved and runner names consistently and refuses ambiguous legacy names", async () => {
+  const x = await setup();
+  const input = { kind: "checkin" as const, instruction: "x", schedule: { type: "cron" as const, cron: "0 8 * * *" } };
+  for (const name of ["heartbeat", "Maintenance", "Check-in"]) await expect(x.auto.create({ ...input, name })).rejects.toThrow(/already|reserved/);
+  const made = await x.auto.create({ ...input, name: "Brief" });
+  await expect(x.auto.update({ id: made.id, name: "heartbeat" })).rejects.toThrow(/already|reserved/);
+  x.db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, project_id, state, cadence, time, created_at, updated_at) VALUES ('run_old', 'bot_main', 'Brief', 'x', 'proj_personal', 'active', 'daily', '09:00', 1, 1)").run();
+  await expect(x.auto.delete("Brief")).rejects.toThrow(/ambiguous/);
+  await expect(x.auto.create({ ...input, name: "Brief" })).rejects.toThrow(/already/);
+  await x.auto.delete(made.id);
+  expect(x.db.prepare("SELECT id FROM bot_runners WHERE id = 'run_old'").get()).toBeTruthy();
+});

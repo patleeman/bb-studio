@@ -33,6 +33,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { HeartbeatRun, RunnerAdoptableView, RunnerView } from "./contract";
+import { automationName } from "./automation-names";
 import { heartbeatRunSchema } from "./contract";
 import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 
@@ -226,7 +227,7 @@ export class Runners {
     const bot = this.bot(botId);
     const schedule = parseSchedule(input.schedule);
     const name = input.name.trim();
-    if (this.rows(bot.id).some((row) => row.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
+    automationName(this.deps.db, bot.id, name);
     const id = `run_${Math.random().toString(36).slice(2, 12)}`;
     const now = Date.now();
     // The row comes first, so the thread's first turn gets runner instructions (forThread by metadata).
@@ -300,7 +301,7 @@ export class Runners {
     const row = this.row(input.id, botId);
     const schedule = input.schedule ? parseSchedule(input.schedule) : null;
     const name = input.name?.trim();
-    if (name && name.toLowerCase() !== row.name.toLowerCase() && this.rows(row.bot_id).some((each) => each.name.toLowerCase() === name.toLowerCase())) throw new Error(`You already have a runner named "${name}".`);
+    if (input.name !== undefined) automationName(this.deps.db, row.bot_id, name ?? "", row.id);
     const next: RunnerRow = { ...row, ...(name ? { name } : {}), ...(input.job?.trim() ? { job: input.job.trim() } : {}), ...(schedule ? { cadence: schedule.cadence, time: schedule.time, cron: schedule.cron ?? null } : {}) };
     // The automation first: if it refuses the schedule, nothing changes.
     if (schedule || (!row.adopted && (next.name !== row.name || next.job !== row.job))) await this.provision(next);
@@ -482,6 +483,7 @@ export class Runners {
     if (!candidate) throw new Error("Only a recurring cron agent automation on a thread your Bot started can be adopted.");
     const automation = (await this.automations([candidate.projectId])).find((each) => each.id === candidate.automationId)!;
     const name = (input.name?.trim() || candidate.title.replace(/\s*·\s*Runner$/i, "")).slice(0, 60);
+    automationName(this.deps.db, bot.id, name);
     const prompt = automation.execution.prompt ?? "";
     const job = (input.job?.trim() || prompt.split("\n")[0]?.trim() || "Follow your automation's prompt.").slice(0, 2000);
     const cron = automation.trigger.cron!;
