@@ -18,29 +18,29 @@ export function useSetup() {
   /** What's running now: "check", "install-all", or a plugin id. */
   const [busy, setBusy] = useState<string | null>(null);
 
-  /** Counts summaries applied; a load that started before the latest one is stale and dropped. */
-  const applied = useRef(0);
+  /** The newest request or setup action owns the summary and error state. */
+  const generation = useRef(0);
 
   const load = useCallback(async (maxAgeMs: number) => {
-    const started = applied.current;
+    const current = ++generation.current;
     try {
       const fresh = await rpc.call("setup.summary", { maxAgeMs });
-      if (applied.current !== started) return;
-      applied.current++;
+      if (generation.current !== current) return;
       setSummary(fresh);
       setError(null);
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (generation.current === current) setError(errorMessage(cause));
     }
   }, [rpc]);
   useEffect(() => { void load(FRESH_MS); }, [load]);
   useRealtime(HEALTH_REALTIME_CHANNEL, () => void load(CACHED_MS));
 
   const act = useCallback(async (key: string, ids: readonly string[], work: () => Promise<SetupActionResult>) => {
+    generation.current++;
     setBusy(key);
     try {
       const result = await work();
-      applied.current++;
+      generation.current++;
       setSummary(result.summary);
       setFailures((current) => {
         const next = { ...current };

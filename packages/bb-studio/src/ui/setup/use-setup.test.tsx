@@ -10,6 +10,12 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => rpc, useRealtime: () =>
 const { useSetup } = await import("./use-setup");
 
 const summary = (checkedAt: number) => ({ checkedAt } as SetupSummary);
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+};
 
 test("a summary that was requested before an install finished doesn't replace the install's result", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -30,5 +36,38 @@ test("a summary that was requested before an install finished doesn't replace th
   expect(api.summary?.checkedAt).toBe(3);
   await act(async () => resolvers.late!(summary(2)));
   expect(api.summary?.checkedAt).toBe(3);
+  act(() => root.unmount());
+});
+
+test("the latest requested summary wins when an older request completes first", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const older = deferred<SetupSummary>();
+  const latest = deferred<SetupSummary>();
+  let loads = 0;
+  rpc.call.mockReset().mockImplementation((method: string) => method === "setup.summary" ? (loads++ === 0 ? older.promise : latest.promise) : Promise.resolve({ summary: summary(3), failures: [] }));
+  let api!: ReturnType<typeof useSetup>;
+  function Probe() { api = useSetup(); return null; }
+  const root = createRoot(document.createElement("div"));
+  await act(async () => root.render(<Probe />));
+  let check!: Promise<void>;
+  act(() => { check = api.checkAgain(); });
+  await act(async () => { older.resolve(summary(1)); });
+  await act(async () => { latest.resolve(summary(2)); await check; });
+  expect(api.summary?.checkedAt).toBe(2);
+  act(() => root.unmount());
+});
+
+test("an old summary failure cannot replace a successful install result", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const older = deferred<SetupSummary>();
+  rpc.call.mockReset().mockImplementation((method: string) => method === "setup.summary" ? older.promise : Promise.resolve({ summary: summary(3), failures: [] }));
+  let api!: ReturnType<typeof useSetup>;
+  function Probe() { api = useSetup(); return null; }
+  const root = createRoot(document.createElement("div"));
+  await act(async () => root.render(<Probe />));
+  await act(async () => { await api.install(["pages"]); });
+  await act(async () => { older.reject(new Error("offline")); await Promise.resolve(); });
+  expect(api.summary?.checkedAt).toBe(3);
+  expect(api.error).toBeNull();
   act(() => root.unmount());
 });
