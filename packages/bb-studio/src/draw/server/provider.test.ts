@@ -51,6 +51,29 @@ describe("the Draw Studio provider", () => {
     expect(Buffer.from(png.files[0].data, "base64").subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(vi.mocked(readdir).mock.calls.length).toBeGreaterThan(afterFailure);
   });
+  it("exports every element and text line beyond thumbnail limits", async () => {
+    const { store, call } = setup();
+    const row = store.create({ name: "Large", by: "app" });
+    const longLine = "x".repeat(600) + "end-of-long-line";
+    const elements = Array.from({ length: 2001 }, (_, i) => element("rectangle", { x: i }));
+    elements.push(element("text", { text: [...Array(201).fill("line"), longLine, "last-line"].join("\n"), height: 6000 }));
+    store.write(row.id, scene(elements), "app");
+    const result = await call("studio_export", { id: row.id, format: "svg" });
+    const svg = Buffer.from(result.files[0].data, "base64").toString();
+    expect(svg.match(/<rect /g)).toHaveLength(2001);
+    expect(svg).toContain(longLine);
+    expect(svg).toContain("last-line");
+  });
+
+  it("rejects empty, unsupported and missing-image exports instead of silently losing content", async () => {
+    const { store, call } = setup();
+    const row = store.create({ name: "Unsupported", by: "app" });
+    for (const elements of [[], [element("new-shape")], [element("image", { fileId: "missing" })]]) {
+      store.write(row.id, scene(elements), "app");
+      await expect(call("studio_export", { id: row.id, format: "svg" })).rejects.toThrow(/Excalidraw file instead/);
+    }
+  });
+
   it("exports SVG and PNG from a stored scene", async () => {
     const { store, call } = setup();
     const row = store.create({ name: "Sketch", by: "app" });

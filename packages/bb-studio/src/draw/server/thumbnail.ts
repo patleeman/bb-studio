@@ -94,7 +94,7 @@ function fontFamily(value: unknown): string {
   return "'Liberation Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 }
 
-function text(element: SceneElement): string {
+function text(element: SceneElement, full: boolean): string {
   const content = typeof element.text === "string" ? element.text : "";
   if (!content.trim()) return "";
   const size = Math.max(1, num(element.fontSize, 20));
@@ -104,14 +104,14 @@ function text(element: SceneElement): string {
   const width = num(element.width);
   const align = element.textAlign === "center" ? "middle" : element.textAlign === "right" ? "end" : "start";
   const anchorX = align === "middle" ? x + width / 2 : align === "end" ? x + width : x;
-  const lines = content.split("\n").slice(0, 200);
+  const lines = full ? content.split("\n") : content.split("\n").slice(0, 200);
   const spans = lines
-    .map((line, index) => `<tspan x="${anchorX}" y="${y + index * lineHeight + size}">${escape(line.slice(0, 500))}</tspan>`)
+    .map((line, index) => `<tspan x="${anchorX}" y="${y + index * lineHeight + size}">${escape(full ? line : line.slice(0, 500))}</tspan>`)
     .join("");
   return `<text font-family="${escape(fontFamily(element.fontFamily))}" font-size="${size}" text-anchor="${align}" fill="${color(element.strokeColor, DEFAULT_STROKE)}">${spans}</text>`;
 }
 
-function shape(element: SceneElement, scene: StoredScene, images: ImageDefs): string {
+function shape(element: SceneElement, scene: StoredScene, images: ImageDefs, full: boolean): string {
   const x = num(element.x);
   const y = num(element.y);
   const width = num(element.width);
@@ -130,7 +130,10 @@ function shape(element: SceneElement, scene: StoredScene, images: ImageDefs): st
     case "arrow":
     case "freedraw": {
       const list = points(element).map(([px, py]) => [x + px, y + py] as [number, number]);
-      if (list.length < 2) return "";
+      if (list.length < 2) {
+        if (full) throw new Error("Cannot export a line without at least two points. Download the Excalidraw file instead.");
+        return "";
+      }
       const closed = element.type === "line" && fill(element) !== "none";
       const path = `<polyline points="${list.map(([px, py]) => `${px},${py}`).join(" ")}" fill="${closed ? fill(element) : "none"}" ${stroke}/>`;
       if (element.type !== "arrow") return path;
@@ -142,7 +145,7 @@ function shape(element: SceneElement, scene: StoredScene, images: ImageDefs): st
       );
     }
     case "text":
-      return text(element);
+      return text(element, full);
     case "frame":
     case "magicframe":
       return `<rect x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}" rx="6" fill="none" stroke="#bbb" stroke-width="1.5"/>`;
@@ -154,39 +157,65 @@ function shape(element: SceneElement, scene: StoredScene, images: ImageDefs): st
       if (
         !symbol &&
         /^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(url) &&
-        url.length <= MAX_IMAGE_CHARS &&
-        images.chars + url.length <= MAX_TOTAL_IMAGE_CHARS
+        (full || (url.length <= MAX_IMAGE_CHARS && images.chars + url.length <= MAX_TOTAL_IMAGE_CHARS))
       ) {
         symbol = `img${images.ids.size}`;
         images.ids.set(fileId, symbol);
         images.chars += url.length;
         images.markup.push(`<symbol id="${symbol}" viewBox="0 0 1 1" preserveAspectRatio="none"><image width="1" height="1" preserveAspectRatio="none" href="${url}"/></symbol>`);
       }
+      if (!symbol && full) throw new Error(`Cannot export image ${fileId || "without a file"}: embedded PNG, JPEG, GIF or WebP data is required. Download the Excalidraw file instead.`);
       if (!symbol) return `<rect x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}" fill="#eee"/>`;
       return `<use href="#${symbol}" x="${x}" y="${y}" width="${Math.abs(width)}" height="${Math.abs(height)}"/>`;
     }
     default:
+      if (full) throw new Error(`Cannot export element type ${String(element.type)}. Download the Excalidraw file instead.`);
       return "";
   }
 }
 
 /** The scene as a standalone SVG document, or null when it's empty. */
 export function sceneThumbnail(scene: StoredScene | null): string | null {
+  return renderScene(scene, false);
+}
+
+/** Full exports keep every element and text line, or report unsupported content. */
+export function sceneExport(scene: StoredScene | null): string {
+  const svg = renderScene(scene, true);
+  if (!svg) throw new Error("The drawing has no visible content to export. Download the Excalidraw file instead.");
+  return svg;
+}
+
+function renderScene(scene: StoredScene | null, full: boolean): string | null {
   if (!scene) return null;
-  const elements = getNonDeletedElements(scene).slice(0, MAX_ELEMENTS);
+  const visible = getNonDeletedElements(scene);
+  const elements = full ? visible : visible.slice(0, MAX_ELEMENTS);
   if (!elements.length) return null;
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const parts: string[] = [];
   const images: ImageDefs = { ids: new Map(), markup: [], chars: 0 };
   for (const element of elements) {
-    const markup = shape(element, scene, images);
+    if (full && element.type === "arrow" && (element.elbowed || [element.startArrowhead, element.endArrowhead].some((head) => head && head !== "arrow"))) {
+      throw new Error("Cannot export this arrow style. Download the Excalidraw file instead.");
+    }
+    if (full && element.type === "image" && (element.crop || (Array.isArray(element.scale) && element.scale.some((scale) => scale !== 1)))) {
+      throw new Error("Cannot export cropped or flipped images. Download the Excalidraw file instead.");
+    }
+    const markup = shape(element, scene, images, full);
     if (!markup) continue;
     const b = bounds(element);
-    box.minX = Math.min(box.minX, b.minX);
-    box.minY = Math.min(box.minY, b.minY);
-    box.maxX = Math.max(box.maxX, b.maxX);
-    box.maxY = Math.max(box.maxY, b.maxY);
     const angle = num(element.angle);
+    const centerX = (b.minX + b.maxX) / 2;
+    const centerY = (b.minY + b.maxY) / 2;
+    const boundsAngle = full ? angle : 0;
+    for (const [px, py] of [[b.minX, b.minY], [b.maxX, b.minY], [b.minX, b.maxY], [b.maxX, b.maxY]] as [number, number][]) {
+      const x = centerX + (px - centerX) * Math.cos(boundsAngle) - (py - centerY) * Math.sin(boundsAngle);
+      const y = centerY + (px - centerX) * Math.sin(boundsAngle) + (py - centerY) * Math.cos(boundsAngle);
+      box.minX = Math.min(box.minX, x);
+      box.minY = Math.min(box.minY, y);
+      box.maxX = Math.max(box.maxX, x);
+      box.maxY = Math.max(box.maxY, y);
+    }
     const opacity = Math.min(100, Math.max(0, num(element.opacity, 100))) / 100;
     const cx = (b.minX + b.maxX) / 2;
     const cy = (b.minY + b.maxY) / 2;

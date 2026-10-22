@@ -5,7 +5,7 @@ import { mustGet as requireItem, storeActions, storeSearch, type StudioProviderH
 import { getNonDeletedElements, parseSceneData } from "../merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
-import { sceneThumbnail } from "./thumbnail";
+import { sceneExport, sceneThumbnail } from "./thumbnail";
 import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -172,7 +172,7 @@ export function drawingProvider(deps: { store: DrawingStore; changed(id: string)
     studio_export: async ({ id, format }) => {
       const row = mustGet(id);
       if (format === "svg" || format === "png") {
-        const svg = sceneThumbnail(parseSceneData(row.data)) ?? '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+        const svg = sceneExport(parseSceneData(row.data));
         const bytes = format === "png"
           ? new (await loadResvg()).Resvg(svg, { font: { fontBuffers: await loadExportFonts(), ...EXPORT_FONT_OPTIONS } }).render().asPng()
           : Buffer.from(svg);
