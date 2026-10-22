@@ -105,7 +105,7 @@ export function pageProvider(service: PagesService): StudioProviderHandlers {
     const make = (pageId: string, parentId: string | null): StudioItem => {
       const page = requireMeta(pageId);
       // An open page's newest edits may not be saved yet; comments stay behind.
-      const source = service.hub.has(pageId) ? readMarkdown(service.hub.open(pageId).doc) : (store.get(pageId)?.markdown ?? "");
+      const source = service.currentMarkdown(pageId) ?? "";
       const created = service.createPage({ projectId, parentId, title: render(variables ? page.title : copyTitle(page.title)), icon: page.icon,
         markdown: render(source), actor: HUMAN_USER_ID });
       let markdown = store.get(created.id)?.markdown ?? "";
@@ -123,7 +123,7 @@ export function pageProvider(service: PagesService): StudioProviderHandlers {
   return {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: null, kinds: [PAGE_KIND] }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const meta = store.meta(id); return meta ? [toStudioItem(meta, store.get(id)?.markdown ?? null)] : []; }) }),
-    studio_read: ({ id, format }) => { const markdown = store.get(id)?.markdown ?? null; return { content: markdown === null ? null : format === "markdown" ? markdown : plainText(markdown) }; },
+    studio_read: ({ id, format }) => { const markdown = service.currentMarkdown(id); return { content: markdown === null ? null : format === "markdown" ? markdown : plainText(markdown) }; },
     studio_list: () => {
       const markdown = store.markdownHeads();
       return { items: store.list({ includeArchived: true }).map((meta) => toStudioItem(meta, markdown.get(meta.id) ?? null)) };
@@ -140,7 +140,7 @@ export function pageProvider(service: PagesService): StudioProviderHandlers {
     studio_instantiate: ({ id, projectId, variables }) => { if (!requireMeta(id).template) throw new Error("Page is not a template."); return { item: duplicate(id, projectId, true, variables) }; },
     studio_export: async ({ id, format }) => {
       const page = requireMeta(id);
-      let markdown = store.get(id)?.markdown ?? "";
+      let markdown = service.currentMarkdown(id) ?? "";
       const name = page.title.trim() || "Untitled page";
       const assets = store.files(id).map((file) => {
         const assetName = `assets/${file.id}-${file.name.replace(/[/\\]/g, "_")}`;

@@ -66,6 +66,12 @@ export class PagesService {
     });
   }
 
+  currentMarkdown(pageId: string): string | null {
+    const page = this.store.get(pageId);
+    if (!page) return null;
+    return this.hub.has(pageId) ? readMarkdown(this.hub.open(pageId).doc) : page.markdown;
+  }
+
   publish(event: RealtimeEvent): void {
     try {
       this.bb.realtime.publish(REALTIME_CHANNEL, event);

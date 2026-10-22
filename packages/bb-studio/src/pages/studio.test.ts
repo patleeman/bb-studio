@@ -108,6 +108,19 @@ describe("the Studio provider", async () => {
     service.hub.disposeAll();
   });
 
+  it("reads and exports the current Markdown from an open page", async () => {
+    const { store, service, create, call } = setup();
+    const { applyEdits } = await import("./doc");
+    const id = create("Plan", "proj_a");
+    applyEdits(service.hub.open(id).doc, [{ op: "append", markdown: "Typed just now" }], "user");
+
+    expect(store.get(id)!.markdown).not.toContain("Typed just now");
+    expect(await call("studio_read", { id, format: "markdown" })).toEqual({ content: "Typed just now\n" });
+    const exported = await call("studio_export", { id, format: "markdown" });
+    expect(Buffer.from(exported.files[0]!.data, "base64").toString()).toBe("Typed just now\n");
+    service.hub.disposeAll();
+  });
+
   it("moves sub-pages along, and detaches a page from a parent left behind", async () => {
     const { store, create, call, events } = setup();
     const parent = create("Parent", "proj_a");
