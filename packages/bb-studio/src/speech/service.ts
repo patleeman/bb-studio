@@ -118,37 +118,49 @@ export class SpeechService {
     if (hit) return { mimeType: hit.mimeType, size: hit.size, body: Readable.toWeb(createReadStream(hit.path)) as ReadableStream<Uint8Array> };
     const pending = this.making.get(key);
     if (pending) {
-      await pending.catch(() => {});
+      await pending;
       const made = await this.cached(key);
       if (made) return { mimeType: made.mimeType, size: made.size, body: Readable.toWeb(createReadStream(made.path)) as ReadableStream<Uint8Array> };
     }
-    const entry = this.prepared.get(key);
-    if (!entry) return null;
-    const config = this.options.config();
-    if (this.engineIdentity(config) !== entry.engineIdentity) throw new Error("The speech engine settings changed since this audio was asked for; ask again.");
-    // The client's request can end early; the engine's audio is still saved for next time.
-    const audio = await this.engine(config).synthesize(entry.request);
-    const [toClient, toCache] = audio.body.tee();
-    const saving = this.save(key, audio.mimeType, toCache);
-    this.making.set(key, saving);
-    void saving.catch((error) => this.options.warn(`Studio couldn't cache speech ${key}: ${String(error)}`)).finally(() => this.making.delete(key));
-    return { mimeType: audio.mimeType, body: toClient };
+    if (!this.prepared.has(key)) return null;
+    let ready!: (audio: { mimeType: string; body: ReadableStream<Uint8Array> }) => void;
+    let fail!: (error: unknown) => void;
+    const first = new Promise<{ mimeType: string; body: ReadableStream<Uint8Array> }>((resolve, reject) => { ready = resolve; fail = reject; });
+    void this.generate(key, ready).catch(fail);
+    return first;
   }
 
-  /** Start making the audio for text now, into the cache, so a player that asks for it soon gets it sooner. Returns the key. */
-  warm(text: string, overrides: SpeechOverrides = {}): string {
-    const key = this.prepare(text, overrides);
-    if (this.making.has(key)) return key;
+  /** One job owns synthesis and the cache write, including while the engine starts. */
+  private generate(key: string, ready?: (audio: { mimeType: string; body: ReadableStream<Uint8Array> }) => void): Promise<void> {
     const entry = this.prepared.get(key)!;
     const making = (async () => {
-      if (await this.cached(key)) return;
+      const hit = await this.cached(key);
+      if (hit) {
+        ready?.({ mimeType: hit.mimeType, body: Readable.toWeb(createReadStream(hit.path)) as ReadableStream<Uint8Array> });
+        return;
+      }
       const config = this.options.config();
       if (this.engineIdentity(config) !== entry.engineIdentity) throw new Error("The speech engine settings changed since this audio was asked for; ask again.");
       const audio = await this.engine(config).synthesize(entry.request);
-      await this.save(key, audio.mimeType, audio.body);
+      if (ready) {
+        const [toClient, toCache] = audio.body.tee();
+        ready({ mimeType: audio.mimeType, body: toClient });
+        await this.save(key, audio.mimeType, toCache);
+      } else {
+        await this.save(key, audio.mimeType, audio.body);
+      }
     })();
     this.making.set(key, making);
-    void making.catch((error) => this.options.warn(`Studio couldn't make speech ${key}: ${String(error)}`)).finally(() => this.making.delete(key));
+    void making.catch((error) => this.options.warn(`Studio couldn't make speech ${key}: ${String(error)}`)).finally(() => {
+      if (this.making.get(key) === making) this.making.delete(key);
+    });
+    return making;
+  }
+
+  /** Start making audio now, using the same job as fetching it. */
+  warm(text: string, overrides: SpeechOverrides = {}): string {
+    const key = this.prepare(text, overrides);
+    if (!this.making.has(key)) void this.generate(key).catch(() => {});
     return key;
   }
 

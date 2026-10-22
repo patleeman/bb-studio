@@ -43,6 +43,25 @@ describe("SpeechService", () => {
     expect(requests).toHaveLength(1);
   });
 
+  it("shares a cold synthesis across concurrent fetches and warming", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const synthesize = vi.fn(async () => {
+      await gate;
+      return { mimeType: "audio/mpeg", body: new Response("once").body! };
+    });
+    const service = new SpeechService({ config: () => config, cacheDir: dir, warn: () => {}, engineFor: () => ({ id: "openrouter", label: "Fake", models: async () => [], synthesize }) });
+    const key = service.prepare("Hello");
+    const first = service.audio(key);
+    const second = service.audio(key);
+    await vi.waitFor(() => expect(synthesize).toHaveBeenCalledTimes(1));
+    service.warm("Hello");
+    release();
+    const clips = await Promise.all([first, second]);
+    expect(await Promise.all(clips.map((clip) => text(clip!.body)))).toEqual(["once", "once"]);
+    expect(synthesize).toHaveBeenCalledTimes(1);
+  });
+
   it("gives a Fish model a fixed voice when none is chosen, so a reply keeps one voice", async () => {
     const { service, requests, setConfig } = setup();
     setConfig({ model: "fish-audio/drama-3", voice: "" });

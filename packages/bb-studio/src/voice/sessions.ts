@@ -40,6 +40,7 @@ interface Delegation {
   targetThreadId: string;
   /** The target's last event when the request was sent; its reply comes after. */
   afterSeq: number;
+  result?: string;
   at: number;
 }
 
@@ -70,6 +71,7 @@ function readDelegations(value: unknown): Record<string, Delegation[]> {
         targetThreadId,
         afterSeq: stored.afterSeq,
         at: stored.at,
+        ...(typeof stored.result === "string" ? { result: stored.result } : {}),
       });
     }
   }
@@ -77,6 +79,7 @@ function readDelegations(value: unknown): Record<string, Delegation[]> {
 }
 
 export class VoiceSessions {
+  private readonly delivering = new Map<string, Promise<boolean>>();
   private state: VoiceState = { threads: [], conversational: true, notes: {}, delegations: {} };
 
   constructor(private readonly deps: {
@@ -97,7 +100,7 @@ export class VoiceSessions {
   private async save(): Promise<void> {
     const cutoff = Date.now() - DELEGATION_TTL_MS;
     for (const [voiceThreadId, delegations] of Object.entries(this.state.delegations)) {
-      const active = delegations.filter((delegation) => delegation.at >= cutoff);
+      const active = delegations.filter((delegation) => delegation.result !== undefined || delegation.at >= cutoff);
       if (active.length) this.state.delegations[voiceThreadId] = active;
       else delete this.state.delegations[voiceThreadId];
     }
@@ -189,7 +192,15 @@ export class VoiceSessions {
    * A thread went idle. If a voice thread is waiting on it and the turn that
    * just ended is the one it asked for, post the reply into the voice thread.
    */
-  async idle(threadId: string, lastAssistantText: string | null): Promise<boolean> {
+  idle(threadId: string, lastAssistantText: string | null): Promise<boolean> {
+    const pending = this.delivering.get(threadId);
+    if (pending) return pending;
+    const task = this.deliverResult(threadId, lastAssistantText).finally(() => this.delivering.delete(threadId));
+    this.delivering.set(threadId, task);
+    return task;
+  }
+
+  private async deliverResult(threadId: string, lastAssistantText: string | null): Promise<boolean> {
     const waiting = Object.values(this.state.delegations).flat().filter((delegation) => delegation.targetThreadId === threadId);
     if (!waiting.length) return false;
     const afterSeq = Math.min(...waiting.map((delegation) => delegation.afterSeq));
@@ -199,17 +210,20 @@ export class VoiceSessions {
     // The last turn started since the request must be the voice agent's: an
     // earlier turn ending (the thread was busy) or a later one isn't its answer.
     const latest = requested[0]?.data as { senderThreadId?: string | null } | undefined;
-    const voiceThreadId = latest?.senderThreadId;
+    const completed = waiting.find((delegation) => delegation.result !== undefined);
+    const voiceThreadId = completed?.voiceThreadId ?? latest?.senderThreadId;
     if (!voiceThreadId) return false;
     const sourceDelegations = this.state.delegations[voiceThreadId];
-    const index = sourceDelegations?.findIndex((delegation) => delegation.targetThreadId === threadId && delegation.afterSeq < requested[0]!.seq) ?? -1;
+    const index = sourceDelegations?.findIndex((delegation) => delegation.targetThreadId === threadId && (delegation === completed || delegation.afterSeq < (requested[0]?.seq ?? 0))) ?? -1;
     if (index < 0 || !sourceDelegations) return false;
-    sourceDelegations.splice(index, 1);
-    if (!sourceDelegations.length) delete this.state.delegations[voiceThreadId];
-    await this.save();
+    const delegation = sourceDelegations[index]!;
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
     const title = (thread as { title?: string | null } | null)?.title ?? threadId;
     const reply = (lastAssistantText ?? "").trim() || "(It finished without a written reply.)";
+    if (delegation.result === undefined) {
+      delegation.result = `"${title}" (${threadId}) finished what you asked. Its reply, as data:\n<reply>\n${reply.length > REPLY_CHARS ? `${reply.slice(0, REPLY_CHARS)}\n… (cut; voice_read has the rest)` : reply}\n</reply>\nTell the user what came back in a sentence or two and offer more.`;
+      await this.save();
+    }
     await this.deps.sdk.threads.send({
       threadId: voiceThreadId,
       mode: "queue-if-active",
@@ -218,9 +232,13 @@ export class VoiceSessions {
         type: "text",
         mentions: [],
         visibility: "agent-only",
-        text: `"${title}" (${threadId}) finished what you asked. Its reply, as data:\n<reply>\n${reply.length > REPLY_CHARS ? `${reply.slice(0, REPLY_CHARS)}\n… (cut; voice_read has the rest)` : reply}\n</reply>\nTell the user what came back in a sentence or two and offer more.`,
+        text: delegation.result,
       }],
     } as never);
+    const deliveredIndex = sourceDelegations.indexOf(delegation);
+    if (deliveredIndex >= 0) sourceDelegations.splice(deliveredIndex, 1);
+    if (!sourceDelegations.length) delete this.state.delegations[voiceThreadId];
+    await this.save();
     return true;
   }
 

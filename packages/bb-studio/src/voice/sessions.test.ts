@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { VOICE_KV_KEY, VoiceSessions } from "./sessions";
 
 type Sent = { threadId: string; mode: string; senderThreadId?: string; input: { text: string; visibility?: string }[] };
@@ -29,7 +29,7 @@ function setup(options: { events?: Record<string, { seq: number; type: string; d
     botThread: () => (options.bot === undefined ? "thr_bot" : options.bot),
     warn: () => {},
   });
-  return { sessions, kv, spawned, sent, events };
+  return { sessions, kv, spawned, sent, events, sdk };
 }
 
 describe("VoiceSessions", () => {
@@ -81,6 +81,18 @@ describe("VoiceSessions", () => {
   it("refuses to delegate to itself or to a Bot that doesn't exist", async () => {
     await expect(setup().sessions.delegate("thr_voice", "thr_voice", "Hi")).rejects.toThrow(/this voice thread/);
     await expect(setup({ bot: null }).sessions.delegate("thr_voice", "bot", "Hi")).rejects.toThrow(/no Bot/);
+  });
+
+  it("keeps a failed result pending and coalesces concurrent delivery retries", async () => {
+    const { sessions, sdk, events } = setup();
+    await sessions.delegate("thr_voice", "thr_work", "Run tests");
+    events.thr_work = [{ seq: 1, type: "client/turn/requested", data: { senderThreadId: "thr_voice" } }];
+    const send = vi.spyOn(sdk.threads, "send").mockRejectedValueOnce(new Error("offline"));
+    await expect(sessions.idle("thr_work", "Done")).rejects.toThrow("offline");
+    expect(sessions.pending("thr_voice")).toEqual(["thr_work"]);
+    await Promise.all([sessions.idle("thr_work", "Done"), sessions.idle("thr_work", "Done")]);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(sessions.pending("thr_voice")).toEqual([]);
   });
 
   it("brings back the reply to the turn it asked for, once", async () => {
