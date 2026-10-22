@@ -45,9 +45,10 @@ function Dialog({
   children,
   open: controlledOpen,
   onOpenChange: controlledOnChange,
+  defaultOpen,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const responsiveRoot = useResponsiveRoot(controlledOpen, controlledOnChange);
+  const responsiveRoot = useResponsiveRoot(controlledOpen, controlledOnChange, defaultOpen);
   const generatedTitleId = React.useId();
   const generatedDescriptionId = React.useId();
   const [titleId, setTitleId] = React.useState(generatedTitleId);
