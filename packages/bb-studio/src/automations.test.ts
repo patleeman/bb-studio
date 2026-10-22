@@ -49,7 +49,7 @@ async function setup() {
       list: async () => runnerList, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
     },
   });
-  return { auto, automations, runs, calls, send, bot, setHeartbeat, db, heartbeat: () => heartbeat };
+  return { auto, automations, runs, calls, callRpc, send, bot, threads, setHeartbeat, db, heartbeat: () => heartbeat };
 }
 
 it("lists the original check-in first, unchanged, then new ones", async () => {
@@ -152,7 +152,7 @@ it("Stop pauses them and Resume restores exactly those; they follow a handoff", 
   expect(x.automations.map((each) => each.enabled)).toEqual([true, false]);
   x.bot.state = "active";
   x.bot.threadId = "bot9";
-  await x.auto.list();
+  await x.auto.follow(x.bot);
   expect((x.automations[0]!.execution as { targetThreadId: string }).targetThreadId).toBe("bot9");
 });
 
@@ -217,9 +217,9 @@ it("single-flights overlapping watcher ticks and releases the watcher afterward"
   x.send.mockImplementationOnce(async () => { entered(); await blocked; return { ok: true }; });
   const first = x.auto.tick();
   await sending;
-  await x.auto.tick();
+  const second = x.auto.tick();
   release();
-  await first;
+  await Promise.all([first, second]);
   expect(x.send).toHaveBeenCalledTimes(1);
   x.runs.get("a1")!.push({ id: "r2", status: "succeeded", output: "v3", exitCode: 0, finishedAt: t + 1 });
   await x.auto.tick();
@@ -238,4 +238,68 @@ it("catches up every watcher page and later-visible runs at the cursor timestamp
   expect(x.send).toHaveBeenCalledTimes(46);
   await x.auto.tick();
   expect(x.send).toHaveBeenCalledTimes(46);
+});
+
+
+it("keeps reads pure after handoff and reminder completion", async () => {
+  const x = await setup();
+  const a = await x.auto.create({ kind: "reminder", name: "Remind", instruction: "x", schedule: { type: "once", at: Date.now() + 10000 } });
+  x.bot.threadId = "bot9";
+  Object.assign(x.automations[0]!, { nextRunAt: null, lastRunAt: Date.now() });
+  const before = x.db.prepare("SELECT * FROM bot_automations").all();
+  x.calls.length = 0;
+  expect((await x.auto.list()).find((v) => v.id === a.id)?.state).toBe("done");
+  expect(x.db.prepare("SELECT * FROM bot_automations").all()).toEqual(before);
+  expect(x.calls.every((c) => c.method === "automations_list")).toBe(true);
+});
+
+it("retains desired configuration after a partial update and retries on tick", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "old", schedule: { type: "times", days: [1], times: ["08:00", "18:30"] } });
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_update" && args.input.automationId === "a2") throw new Error("offline");
+    return original(args);
+  });
+  await expect(x.auto.update({ id: made.id, instruction: "desired" })).rejects.toThrow("offline");
+  expect((await x.auto.list()).find((v) => v.id === made.id)).toMatchObject({ instruction: "desired", lastOutcome: expect.stringContaining("retry") });
+  x.callRpc.mockImplementation(original);
+  await x.auto.tick();
+  expect(x.automations.every((a) => String((a.execution as { prompt: string }).prompt).includes("desired"))).toBe(true);
+  expect((await x.auto.list()).find((v) => v.id === made.id)?.lastOutcome).toBeNull();
+});
+
+it("retains failed creation cleanup and retries without leaving enabled resources", async () => {
+  const x = await setup();
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_resume" || args.method === "automations_delete") throw new Error("offline");
+    return original(args);
+  });
+  await expect(x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "cron", cron: "0 8 * * *" } })).rejects.toThrow("offline");
+  expect(x.db.prepare("SELECT * FROM bot_automations").all()).toHaveLength(1);
+  x.callRpc.mockImplementation(original);
+  await x.auto.tick();
+  expect(x.automations).toHaveLength(0);
+  expect(x.db.prepare("SELECT * FROM bot_automations").all()).toHaveLength(0);
+});
+
+
+it("retains each resource project during a failed handoff and deletes with those identities", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "times", days: [1], times: ["08:00", "18:30"] } });
+  x.threads.set("bot1", makeThreadResponse({ id: "bot1", projectId: "proj_new", providerId: "codex" }));
+  const original = x.callRpc.getMockImplementation()!;
+  let count = 0;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_delete" && ++count === 2) throw new Error("offline");
+    return original(args);
+  });
+  await expect(x.auto.update({ id: made.id, instruction: "new" })).rejects.toThrow("offline");
+  const row = x.db.prepare("SELECT resources FROM bot_automations WHERE id = ?").get(made.id) as { resources: string };
+  expect(JSON.parse(row.resources).map((r: { projectId: string }) => r.projectId)).toEqual(["proj_new", "proj_personal"]);
+  x.callRpc.mockImplementation(original);
+  x.calls.length = 0;
+  await x.auto.delete(made.id);
+  expect(x.calls.filter((c) => c.method === "automations_delete").map((c) => c.input.projectId)).toEqual(["proj_new", "proj_personal"]);
 });

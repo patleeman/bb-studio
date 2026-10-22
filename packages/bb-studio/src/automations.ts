@@ -45,7 +45,7 @@ type Row = {
   script: string | null; interpreter: string | null; timeout_ms: number | null; env_json: string | null; working_dir: string | null;
   target: string; schedule_json: string; provider_id: string | null; model: string | null; reasoning: string | null;
   state: "active" | "paused" | "done" | "ended"; project_id: string; bb_ids: string; target_thread_id: string | null;
-  seen_ids: string; seen_until: number; last_fired_at: number | null; last_fire: string | null; created_at: number; updated_at: number;
+  resources: string | null; provision_pending: number; cleanup_pending: number; seen_ids: string; seen_until: number; last_fired_at: number | null; last_fire: string | null; created_at: number; updated_at: number;
 };
 
 const bbAutomation = z.object({
@@ -160,6 +160,7 @@ function runnerSchedule(schedule: Schedule): { cadence: "custom"; time: string; 
 }
 
 export class Automations {
+  private ticking: Promise<void> | null = null;
   private readonly watching = new Set<string>();
   constructor(private readonly deps: AutomationDeps) {}
 
@@ -184,8 +185,14 @@ export class Automations {
     return row;
   }
 
-  private ids(row: Row): string[] {
-    return JSON.parse(row.bb_ids) as string[];
+  private resources(row: Row): { id: string; projectId: string }[] {
+    return row.resources ? JSON.parse(row.resources) : (JSON.parse(row.bb_ids) as string[]).map((id) => ({ id, projectId: row.project_id }));
+  }
+
+  private ids(row: Row): string[] { return this.resources(row).map((r) => r.id); }
+
+  private saveResources(row: Row, resources: { id: string; projectId: string }[]): void {
+    this.save(row.id, { resources: JSON.stringify(resources), bb_ids: JSON.stringify(resources.map((r) => r.id)) });
   }
 
   private save(id: string, fields: Partial<Row>): void {
@@ -243,44 +250,53 @@ export class Automations {
       const prompt = row.kind === "checkin" ? checkinPrompt(row.name, row.instruction) : reminderPrompt(row.name, row.instruction, row.created_at);
       ({ projectId, execution } = await this.agentExecution(row, bot.threadId, prompt));
     }
-    const current = this.ids(row);
-    const next: string[] = [];
+    // The row describes the desired configuration until the complete group is applied.
+    this.save(row.id, { provision_pending: 1 });
+    const current = this.resources(row);
+    const resources = [...current];
+    const next: { id: string; projectId: string }[] = [];
     const name = (i: number) => `${bot.name} · ${row.name}${triggers.length > 1 ? ` (${i + 1}/${triggers.length})` : ""}`;
     for (const [i, trigger] of triggers.entries()) {
-      let id: string | null = current[i] ?? null;
-      if (id && row.project_id !== projectId) {
-        await this.call("automations_delete", { projectId: row.project_id, automationId: id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+      let id: string | null = resources[i]?.id ?? null;
+      if (id && resources[i]!.projectId !== projectId) {
+        await this.call("automations_delete", { projectId: resources[i]!.projectId, automationId: id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+        // Remove the old identity before creating its replacement in another project.
+        resources.splice(i, 1, { id: "", projectId });
+        this.saveResources(row, resources.filter((r) => r.id));
         id = null;
       }
       if (id) await this.call("automations_update", { projectId, automationId: id, name: name(i), trigger, execution }, z.unknown()).catch((error) => { if (!missing(error)) throw error; id = null; });
       if (!id) id = (await this.call("automations_create", { projectId, name: name(i), enabled: false, origin: "app", trigger, execution }, z.object({ id: z.string() }))).id;
-      next.push(id);
-      // Saved as each is made, so a failure midway leaves none orphaned.
-      this.deps.db.prepare("UPDATE bot_automations SET bb_ids = ?, project_id = ? WHERE id = ?").run(JSON.stringify([...next, ...current.slice(i + 1)]), projectId, row.id);
+      next.push({ id, projectId });
+      resources[i] = { id, projectId };
+      this.saveResources(row, resources.filter((r) => r.id));
     }
-    for (const id of current.slice(triggers.length)) await this.call("automations_delete", { projectId: row.project_id, automationId: id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+    for (const resource of current.slice(triggers.length)) {
+      await this.call("automations_delete", { projectId: resource.projectId, automationId: resource.id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+      resources.splice(resources.findIndex((r) => r.id === resource.id), 1);
+      this.saveResources(row, resources.filter((r) => r.id));
+    }
     const on = row.state === "active" && bot.state === "active";
-    for (const id of next) await this.call(on ? "automations_resume" : "automations_pause", { projectId, automationId: id }, z.unknown());
-    this.save(row.id, { bb_ids: JSON.stringify(next), project_id: projectId, target_thread_id: target });
+    for (const resource of next) await this.call(on ? "automations_resume" : "automations_pause", { projectId: resource.projectId, automationId: resource.id }, z.unknown());
+    this.save(row.id, { bb_ids: JSON.stringify(next.map((r) => r.id)), resources: JSON.stringify(next), project_id: projectId, target_thread_id: target, provision_pending: 0 });
     return this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row;
   }
 
   private async setBb(row: Row, on: boolean): Promise<void> {
-    for (const id of this.ids(row)) {
-      await this.call(on ? "automations_resume" : "automations_pause", { projectId: row.project_id, automationId: id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+    for (const resource of this.resources(row)) {
+      await this.call(on ? "automations_resume" : "automations_pause", { projectId: resource.projectId, automationId: resource.id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
     }
   }
 
   // ---- The list ----
 
-  async list(botId?: string): Promise<BotAutomationView[]> {
+  async list(botId?: string, onlyId?: string): Promise<BotAutomationView[]> {
     const bot = this.bot(botId);
-    await this.follow(bot);
-    const rows = this.rows(bot.id);
+    const rows = this.rows(bot.id).filter((row) => !onlyId || row.id === onlyId);
     const heartbeat = bot.kind === "external" && !this.deps.heartbeat.get(bot.id) ? null : this.deps.heartbeat.get(bot.id);
-    const hbAutomation = this.deps.heartbeat.automation(bot.id);
-    const runners = bot.kind === "external" ? [] : await this.deps.runners.list(bot.id);
-    const bb = await this.bbList([PERSONAL, ...rows.map((row) => row.project_id), ...(hbAutomation ? [hbAutomation.projectId] : [])]);
+    const hbAutomation = !onlyId || onlyId === HEARTBEAT_ID ? this.deps.heartbeat.automation(bot.id) : null;
+    const runners = bot.kind === "external" || (onlyId && (rows.length || [HEARTBEAT_ID, MAINTENANCE_ID].includes(onlyId))) ? [] : await this.deps.runners.list(bot.id);
+    const bb = await this.bbList([PERSONAL, ...rows.flatMap((row) => this.resources(row).map((r) => r.projectId)), ...(hbAutomation ? [hbAutomation.projectId] : [])]);
     const views: BotAutomationView[] = [];
     if (heartbeat) {
       const automation = hbAutomation ? bb.get(hbAutomation.id) : undefined;
@@ -308,14 +324,14 @@ export class Automations {
       const last = automations.map((each) => each.lastRunAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
       let state = row.state;
       // A reminder is done once BB has run it and has nothing left to run.
-      if (row.kind === "reminder" && state === "active" && last && !automations.some((each) => each.nextRunAt)) { state = "done"; this.save(row.id, { state }); }
+      if (row.kind === "reminder" && state === "active" && last && !automations.some((each) => each.nextRunAt)) { state = "done"; }
       const schedule = JSON.parse(row.schedule_json) as Schedule;
       const runner = row.target !== "main" ? runners.find((each) => each.id === row.target) : null;
       views.push({
         id: row.id, kind: row.kind, name: row.name, original: false, instruction: row.instruction,
         schedule, scheduleText: describeSchedule(schedule),
         state, nextRunAt: state === "active" && Number.isFinite(next) ? next : null, lastRunAt: Math.max(last, row.last_fired_at ?? 0) || null,
-        lastOutcome: this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
+        lastOutcome: row.cleanup_pending ? "Cleanup incomplete; will retry" : row.provision_pending ? "Provisioning incomplete; will retry" : this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
         model: row.kind === "watcher" ? null : { model: row.model, reasoning: row.reasoning },
         script: row.kind === "watcher" ? { body: row.script ?? "", interpreter: (row.interpreter ?? "bash") as Interpreter, timeoutMs: row.timeout_ms ?? 120_000, workingDirectory: row.working_dir ?? null, envKeys: row.env_json ? Object.keys(JSON.parse(row.env_json) as object) : [] } : null,
         target: row.target, targetName: runner?.name ?? bot.name, threadId: runner ? runner.threadId : bot.threadId,
@@ -343,8 +359,8 @@ export class Automations {
   resumeTargets(): { automationId: string; projectId: string; botId: string; ownerId: string; name: string; on: boolean }[] {
     const rows = this.deps.db.prepare("SELECT * FROM bot_automations WHERE kind != 'reminder'").all() as Row[];
     return rows.flatMap((row) => {
-      const on = row.state === "active" && this.deps.bot(row.bot_id)?.state === "active";
-      return this.ids(row).map((automationId) => ({ automationId, projectId: row.project_id, botId: row.bot_id, ownerId: row.id, name: row.name, on }));
+      const on = !row.cleanup_pending && !row.provision_pending && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active";
+      return this.resources(row).map(({ id: automationId, projectId }) => ({ automationId, projectId, botId: row.bot_id, ownerId: row.id, name: row.name, on }));
     });
   }
 
@@ -352,7 +368,7 @@ export class Automations {
   async follow(bot: AutomationBot): Promise<void> {
     if (!bot.threadId) return;
     for (const row of this.rows(bot.id)) {
-      if (row.kind === "watcher" || row.state !== "active" || !row.target_thread_id || row.target_thread_id === bot.threadId) continue;
+      if (row.cleanup_pending || row.provision_pending || row.kind === "watcher" || row.state !== "active" || !row.target_thread_id || row.target_thread_id === bot.threadId) continue;
       await this.provision(row).catch((error) => console.warn(`[studio] automation ${row.id} didn't follow the Bot's thread`, error));
     }
   }
@@ -386,9 +402,8 @@ export class Automations {
     try {
       await this.provision(this.row(id, bot.id));
     } catch (error) {
-      const row = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(id) as Row | undefined;
-      for (const bbId of row ? this.ids(row) : []) await this.call("automations_delete", { projectId: row!.project_id, automationId: bbId }, z.unknown()).catch(() => {});
-      this.deps.db.prepare("DELETE FROM bot_automations WHERE id = ?").run(id);
+      this.save(id, { cleanup_pending: 1, provision_pending: 0, state: "paused" });
+      await this.delete(id, bot.id).catch((cleanupError) => console.warn(`[studio] automation ${id} cleanup pending`, cleanupError));
       throw error;
     }
     this.deps.changed();
@@ -414,7 +429,7 @@ export class Automations {
   }
 
   private async one(id: string, botId: string): Promise<BotAutomationView> {
-    const found = (await this.list(botId)).find((each) => each.id === id);
+    const found = (await this.list(botId, id)).find((each) => each.id === id);
     if (!found) throw new Error(`No automation "${id}".`);
     return found;
   }
@@ -458,9 +473,14 @@ export class Automations {
       ...(input.schedule && (row.state === "done" || row.state === "ended") ? { state: "active" as const } : {}),
     };
     if (next.kind !== "watcher" && !next.instruction) throw new Error("Say what it should do.");
-    // BB first: if it refuses, nothing changes here.
-    await this.provision(next);
-    this.save(row.id, { name: next.name, instruction: next.instruction, schedule_json: next.schedule_json, model: next.model, reasoning: next.reasoning, script: next.script, interpreter: next.interpreter, timeout_ms: next.timeout_ms, env_json: next.env_json, working_dir: next.working_dir, target: next.target, state: next.state });
+    compileSchedule(JSON.parse(next.schedule_json) as Schedule);
+    if (next.kind === "watcher" && !next.script?.trim()) throw new Error("A watcher needs a script.");
+    if (next.kind !== "watcher") {
+      if (!bot.threadId) throw new Error(`${bot.name} has no thread yet.`);
+      await this.agentExecution(next, bot.threadId, "");
+    }
+    this.save(row.id, { name: next.name, instruction: next.instruction, schedule_json: next.schedule_json, model: next.model, reasoning: next.reasoning, script: next.script, interpreter: next.interpreter, timeout_ms: next.timeout_ms, env_json: next.env_json, working_dir: next.working_dir, target: next.target, state: next.state, provision_pending: 1 });
+    await this.provision(this.row(row.id, bot.id));
     return this.one(row.id, bot.id);
   }
 
@@ -498,8 +518,7 @@ export class Automations {
       const runnerId = this.isRunner(id, bot.id);
       if (runnerId) { await this.deps.runners.runNow(runnerId, bot.id); return this.one(runnerId, bot.id); }
       const row = this.row(id, bot.id);
-      const first = this.ids(row)[0];
-      target = first ? { id: first, projectId: row.project_id } : null;
+      target = this.resources(row)[0] ?? null;
     }
     if (!target) throw new Error("It has no schedule to run; turn it on first.");
     await this.call("automations_run", { projectId: target.projectId, automationId: target.id, idempotencyKey: `studio-${id}-${Date.now()}` }, z.unknown());
@@ -517,7 +536,13 @@ export class Automations {
     const runnerId = this.isRunner(id, bot.id);
     if (runnerId) { await this.deps.runners.delete(runnerId, bot.id); return { deleted: true }; }
     const row = this.row(id, bot.id);
-    for (const bbId of this.ids(row)) await this.call("automations_delete", { projectId: row.project_id, automationId: bbId }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+    this.save(row.id, { cleanup_pending: 1, provision_pending: 0 });
+    const resources = this.resources(row);
+    for (const resource of [...resources]) {
+      await this.call("automations_delete", { projectId: resource.projectId, automationId: resource.id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+      resources.splice(resources.indexOf(resource), 1);
+      this.saveResources(row, resources);
+    }
     this.deps.db.prepare("DELETE FROM bot_automations WHERE id = ?").run(row.id);
     this.deps.changed();
     return { deleted: true };
@@ -536,7 +561,7 @@ export class Automations {
     else {
       const runnerId = this.isRunner(id, bot.id);
       if (runnerId) { kind = "runner"; const one = this.deps.runners.automation(runnerId); targets = one ? [one] : []; }
-      else { const row = this.row(id, bot.id); kind = row.kind; targets = this.ids(row).map((bbId) => ({ id: bbId, projectId: row.project_id })); }
+      else { const row = this.row(id, bot.id); kind = row.kind; targets = this.resources(row); }
     }
     const runs = (await Promise.all(targets.map((target) => this.bbRuns(target, limit)))).flat();
     const views: BotAutomationRunView[] = runs.map((run) => ({
@@ -581,8 +606,24 @@ export class Automations {
   // ---- The minute tick: watchers and end dates ----
 
   /** Posts new watcher findings and ends schedules past their end date. Errors are per automation. */
-  async tick(now = Date.now()): Promise<void> {
-    const rows = this.deps.db.prepare("SELECT * FROM bot_automations WHERE state = 'active'").all() as Row[];
+  tick(now = Date.now()): Promise<void> {
+    return this.ticking ??= this.reconcile(now).finally(() => { this.ticking = null; });
+  }
+
+  private async reconcile(now: number): Promise<void> {
+    const pending = this.deps.db.prepare("SELECT * FROM bot_automations WHERE cleanup_pending = 1 OR provision_pending = 1").all() as Row[];
+    for (const row of pending) {
+      try {
+        if (row.cleanup_pending) await this.delete(row.id, row.bot_id);
+        else await this.provision(row);
+      } catch (error) { console.warn(`[studio] automation ${row.id} reconciliation pending`, error); }
+    }
+    // Handoff is reconciled by the Bot hook immediately, and retried here after failures.
+    for (const botId of new Set((this.deps.db.prepare("SELECT DISTINCT bot_id FROM bot_automations").all() as { bot_id: string }[]).map((r) => r.bot_id))) {
+      const bot = this.deps.bot(botId);
+      if (bot) await this.follow(bot);
+    }
+    const rows = this.deps.db.prepare("SELECT * FROM bot_automations WHERE state = 'active' AND cleanup_pending = 0 AND provision_pending = 0").all() as Row[];
     for (const row of rows) {
       try {
         const schedule = JSON.parse(row.schedule_json) as Schedule;
@@ -609,11 +650,11 @@ export class Automations {
       row = current;
       const seen = new Set<string>(JSON.parse(row.seen_ids));
       const runs: BbRun[] = [];
-      for (const id of this.ids(row)) {
+      for (const { id, projectId } of this.resources(row)) {
         let cursor: string | undefined;
         const cursors = new Set<string>();
         do {
-          const page = await this.call("automations_runs", { projectId: row.project_id, automationId: id, limit: 20, ...(cursor ? { cursor } : {}) },
+          const page = await this.call("automations_runs", { projectId, automationId: id, limit: 20, ...(cursor ? { cursor } : {}) },
             z.object({ runs: z.array(bbRun), nextCursor: z.string().nullish() }));
           runs.push(...page.runs.filter((run) => run.finishedAt && (run.finishedAt > row.seen_until || (run.finishedAt === row.seen_until && !seen.has(run.id)))));
           // Finish the entire boundary timestamp, including a boundary split across pages.

@@ -638,6 +638,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.active", ({ thread }) => { if (!warmer.pinging(thread.id)) void learning.active(thread.id).catch(() => {}); });
   bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
   // Watchers' findings and end dates, once a minute; Maintenance and stuck reviews too.
+  void automations.tick().catch((error) => bb.log.warn(`Automations startup failed: ${errorText(error)}`));
   const automationTimer = setInterval(() => {
     void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
     void maintenance.tick().catch((error) => bb.log.warn(`Maintenance tick failed: ${errorText(error)}`));
