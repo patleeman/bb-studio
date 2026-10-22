@@ -3,7 +3,7 @@
 // (this thread's items, then recent ones; search and a kind filter), and an
 // item opens in place in its kind's editor, with a way back; an add-on's item
 // opens its page in BB's main area. Cards open it with `{ kind, id }`; see
-// ./model.ts for params, kinds and the old per-kind tab ids.
+// ./model.ts for params and kinds.
 import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "../../kit/app/index";
 import { errorMessage, relativeTime, untitled } from "../../kit/format";
 import { useRealtime, useRpc, useSdk, type JsonValue } from "@get-bb/plugin-sdk/app";
@@ -47,11 +47,11 @@ export function ItemView({ kind, id, threadId, onBack }: { kind: TabKind; id: st
   );
 }
 
-export function StudioTab({ threadId, params, initial }: { threadId: string; params: JsonValue | null; initial?: { target: TabTarget; filter: string | null } }) {
+export function StudioTab({ threadId, params }: { threadId: string; params: JsonValue | null }) {
   const enabled = useMemo(() => enabledKinds(appliedKinds()?.off ?? new Set()), []);
-  const asked = useMemo(() => initial?.target ?? tabTarget(params, enabled), [initial, params, enabled]);
+  const asked = useMemo(() => tabTarget(params, enabled), [params, enabled]);
   const [target, setTarget] = useState<TabTarget>(asked);
-  const [filter, setFilter] = useState<string | null>(initial?.filter ?? null);
+  const [filter, setFilter] = useState<string | null>(null);
   // BB keeps this tab mounted when a card opens it on another item, so a new
   // target replaces the one on screen.
   const [openedWith, setOpenedWith] = useState(asked);

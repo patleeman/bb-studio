@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { aliasParams, collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, TAB_KINDS, type ListedItem } from "./model";
+import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, TAB_KINDS, type ListedItem } from "./model";
 
 const DESIGN = "dsn_0123456789abcdef";
 const DASHBOARD = "dsh_0123456789abcdef";
 const DRAWING = "drw_0123456789abcdef";
 const ARTIFACT = "art_0123456789abcdef";
-
 describe("Studio tab params", () => {
+  it("does not retain per-kind tab restoration metadata", () => {
+    expect(TAB_KINDS.some((each) => "legacyAction" in each || "legacyParam" in each)).toBe(false);
+    expect(tabTarget({ pageId: "pg_1" })).toEqual({ view: "list" });
+  });
+
   it("routes { kind, id } to that kind's view", () => {
     expect(tabTarget({ kind: "page", id: "pg_1" })).toEqual({ view: "item", kind: "page", id: "pg_1" });
     expect(tabTarget({ kind: "design", id: DESIGN })).toEqual({ view: "item", kind: "design", id: DESIGN });
@@ -37,35 +41,9 @@ describe("Studio tab params", () => {
     expect(tabTarget({ view: "save" }, enabledKinds(new Set(["artifact"])))).toEqual({ view: "list" });
   });
 
-  it("still reads the old tabs' params", () => {
-    expect(tabTarget({ pageId: "pg_1" })).toEqual({ view: "item", kind: "page", id: "pg_1" });
-    expect(tabTarget({ designId: DESIGN })).toEqual({ view: "item", kind: "design", id: DESIGN });
+  it("opens the save picker from Studio params", () => {
     expect(tabTarget({ view: "save", seq: 4 })).toEqual({ view: "save", seq: 4 });
     expect(tabTarget({ view: "save", seq: -1 })).toEqual({ view: "save", seq: null });
-  });
-});
-
-describe("old per-kind tab ids", () => {
-  it("open the Studio tab on the item they had", () => {
-    expect(aliasParams("page", { pageId: "pg_1" })).toEqual({ target: { view: "item", kind: "page", id: "pg_1" }, filter: null });
-    expect(aliasParams("excalidraw", { drawingId: DRAWING })).toEqual({ target: { view: "item", kind: "drawing", id: DRAWING }, filter: null });
-    expect(aliasParams("design", { designId: DESIGN })).toEqual({ target: { view: "item", kind: "design", id: DESIGN }, filter: null });
-    expect(aliasParams("dashboards", { dashboardId: DASHBOARD })).toEqual({ target: { view: "item", kind: "dashboard", id: DASHBOARD }, filter: null });
-    expect(aliasParams("save-to-studio", { artifactId: ARTIFACT })).toEqual({ target: { view: "item", kind: "artifact", id: ARTIFACT }, filter: null });
-  });
-
-  it("open the collection filtered to their kind without one", () => {
-    expect(aliasParams("excalidraw", null)).toEqual({ target: { view: "list" }, filter: "excalidraw:drawing" });
-    expect(aliasParams("dashboards", { dashboardId: "nope" })).toEqual({ target: { view: "list" }, filter: "dashboards:dashboard" });
-  });
-
-  it("keep the old Artifacts tab the save picker", () => {
-    expect(aliasParams("save-to-studio", null)).toEqual({ target: { view: "save", seq: null }, filter: null });
-    expect(aliasParams("save-to-studio", { seq: 3 })).toEqual({ target: { view: "save", seq: 3 }, filter: null });
-  });
-
-  it("cover every tab kind", () => {
-    expect(TAB_KINDS.flatMap((each) => (each.legacyAction ? [each.legacyAction] : [])).sort()).toEqual(["dashboards", "design", "excalidraw", "page", "save-to-studio"]);
   });
 });
 

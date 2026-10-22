@@ -51,7 +51,6 @@ vi.mock("../../artifacts/ui/artifact-viewer", () => view("ArtifactViewer", "arti
 vi.mock("../../artifacts/ui/save-picker", () => ({ SavePicker: ({ params }: { params: unknown }) => <p data-view="SavePicker">{JSON.stringify(params)}</p> }));
 
 const { StudioTab } = await import("./StudioTab");
-const { aliasParams } = await import("./model");
 
 let root: Root;
 let container: HTMLDivElement;
@@ -130,8 +129,8 @@ describe("Studio tab", () => {
     expect(container.textContent).toContain("Plan");
   });
 
-  it("opens an old Artifacts tab as the save picker", async () => {
-    await render(<StudioTab threadId="thr_1" params={{ seq: 2 }} initial={aliasParams("save-to-studio", { seq: 2 })} />);
+  it("opens the save picker from Studio params", async () => {
+    await render(<StudioTab threadId="thr_1" params={{ view: "save", seq: 2 }} />);
     expect(shown()).toBe('{"seq":2}');
   });
 

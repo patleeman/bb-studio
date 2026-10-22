@@ -1,10 +1,9 @@
-// The Studio tab in a thread's workbench (one panel action for every kind):
-// what its params mean, which kinds it shows, and how the old per-kind tab
-// ids map onto it. Pure, so cards, app.tsx and tests share it.
-import { ARTIFACT_ICON, ARTIFACTS_TAB, PLUGIN_ID as ARTIFACTS_PLUGIN, REALTIME_CHANNEL as ARTIFACTS_CHANNEL, isArtifactId } from "../../artifacts/shared";
-import { DASHBOARD_ICON, DASHBOARD_KIND, DASHBOARD_TAB, PLUGIN_ID as DASHBOARDS_PLUGIN, REALTIME_CHANNEL as DASHBOARDS_CHANNEL, isDashboardId } from "../../dashboards/shared";
-import { DESIGN_ICON, DESIGN_TAB, PLUGIN_ID as DESIGN_PLUGIN, REALTIME_CHANNEL as DESIGN_CHANNEL, isDesignId } from "../../design/shared";
-import { DRAW_ICON, DRAWINGS_TAB, PLUGIN_ID as DRAW_PLUGIN, REALTIME_CHANNEL as DRAW_CHANNEL, isDrawingId } from "../../draw/shared";
+// The Studio tab in a thread's workbench: what its params mean and which
+// kinds it shows. Pure, so cards, app.tsx and tests share it.
+import { ARTIFACT_ICON, PLUGIN_ID as ARTIFACTS_PLUGIN, REALTIME_CHANNEL as ARTIFACTS_CHANNEL, isArtifactId } from "../../artifacts/shared";
+import { DASHBOARD_ICON, DASHBOARD_KIND, PLUGIN_ID as DASHBOARDS_PLUGIN, REALTIME_CHANNEL as DASHBOARDS_CHANNEL, isDashboardId } from "../../dashboards/shared";
+import { DESIGN_ICON, PLUGIN_ID as DESIGN_PLUGIN, REALTIME_CHANNEL as DESIGN_CHANNEL, isDesignId } from "../../design/shared";
+import { DRAW_ICON, PLUGIN_ID as DRAW_PLUGIN, REALTIME_CHANNEL as DRAW_CHANNEL, isDrawingId } from "../../draw/shared";
 import { PLUGIN_ID as PAGES_PLUGIN, REALTIME_CHANNEL as PAGES_CHANNEL, isPageId } from "../../pages/constants";
 import { PLUGIN_ID as TALK_PLUGIN, RECORDING_CHANGED, TALK_ICON, isRecordingId } from "../../talk/shared/format";
 import { BUILTIN_PLUGIN_IDS } from "../../builtins";
@@ -12,9 +11,6 @@ import { BUILTIN_PLUGIN_IDS } from "../../builtins";
 /** The Studio tab's action id. */
 export const STUDIO_TAB = "studio";
 export const STUDIO_TAB_ICON = "studio/studio";
-/** The old Pages tab's id; its persisted tabs still open (as the Studio tab). */
-export const PAGE_TAB = "page";
-
 export type TabKind = "page" | "drawing" | "design" | "dashboard" | "artifact" | "recording" | "dictation";
 
 export interface TabKindInfo {
@@ -26,9 +22,6 @@ export interface TabKindInfo {
   plural: string;
   icon: string;
   isId(id: string): boolean;
-  /** The old per-kind tab's action id, and the param it took the item in (none for kinds that never had a tab). */
-  legacyAction: string | null;
-  legacyParam: string | null;
   /** The built-in kind (Setup → Kinds) that turns this one off. */
   gate: string;
   /** Kept out of All, as in Studio's library; its chip and search still find it. */
@@ -37,13 +30,13 @@ export interface TabKindInfo {
 
 /** Kinds the Studio tab can open in place, in its filter order. */
 export const TAB_KINDS: readonly TabKindInfo[] = [
-  { kind: "page", pluginId: PAGES_PLUGIN, channel: PAGES_CHANNEL, label: "Page", plural: "Pages", icon: "studio/pages", isId: isPageId, legacyAction: PAGE_TAB, legacyParam: "pageId", gate: "page" },
-  { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Drawing", plural: "Drawings", icon: DRAW_ICON, isId: isDrawingId, legacyAction: DRAWINGS_TAB, legacyParam: "drawingId", gate: "drawing" },
-  { kind: "design", pluginId: DESIGN_PLUGIN, channel: DESIGN_CHANNEL, label: "Design", plural: "Designs", icon: DESIGN_ICON, isId: isDesignId, legacyAction: DESIGN_TAB, legacyParam: "designId", gate: "design" },
-  { kind: DASHBOARD_KIND as "dashboard", pluginId: DASHBOARDS_PLUGIN, channel: DASHBOARDS_CHANNEL, label: "Dashboard", plural: "Dashboards", icon: DASHBOARD_ICON, isId: isDashboardId, legacyAction: DASHBOARD_TAB, legacyParam: "dashboardId", gate: "dashboard" },
-  { kind: "artifact", pluginId: ARTIFACTS_PLUGIN, channel: ARTIFACTS_CHANNEL, label: "Artifact", plural: "Artifacts", icon: ARTIFACT_ICON, isId: isArtifactId, legacyAction: ARTIFACTS_TAB, legacyParam: "artifactId", gate: "artifact" },
-  { kind: "recording", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Recording", plural: "Recordings", icon: TALK_ICON, isId: isRecordingId, legacyAction: null, legacyParam: null, gate: "recording" },
-  { kind: "dictation", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Dictation", plural: "Dictations", icon: "Mic", isId: isRecordingId, legacyAction: null, legacyParam: null, gate: "recording", background: true },
+  { kind: "page", pluginId: PAGES_PLUGIN, channel: PAGES_CHANNEL, label: "Page", plural: "Pages", icon: "studio/pages", isId: isPageId, gate: "page" },
+  { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Drawing", plural: "Drawings", icon: DRAW_ICON, isId: isDrawingId, gate: "drawing" },
+  { kind: "design", pluginId: DESIGN_PLUGIN, channel: DESIGN_CHANNEL, label: "Design", plural: "Designs", icon: DESIGN_ICON, isId: isDesignId, gate: "design" },
+  { kind: DASHBOARD_KIND as "dashboard", pluginId: DASHBOARDS_PLUGIN, channel: DASHBOARDS_CHANNEL, label: "Dashboard", plural: "Dashboards", icon: DASHBOARD_ICON, isId: isDashboardId, gate: "dashboard" },
+  { kind: "artifact", pluginId: ARTIFACTS_PLUGIN, channel: ARTIFACTS_CHANNEL, label: "Artifact", plural: "Artifacts", icon: ARTIFACT_ICON, isId: isArtifactId, gate: "artifact" },
+  { kind: "recording", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Recording", plural: "Recordings", icon: TALK_ICON, isId: isRecordingId, gate: "recording" },
+  { kind: "dictation", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Dictation", plural: "Dictations", icon: "Mic", isId: isRecordingId, gate: "recording", background: true },
 ];
 
 export function tabKind(kind: string): TabKindInfo | null {
@@ -72,7 +65,7 @@ const record = (params: Params): Record<string, unknown> | null =>
 
 /**
  * Where params land. A kind that's off, or an id that isn't that kind's,
- * opens the list. The old tabs' params (`{ pageId }`, `{ seq }` …) still work.
+ * opens the list.
  */
 export function tabTarget(params: Params, enabled: readonly TabKindInfo[] = TAB_KINDS): TabTarget {
   const value = record(params);
@@ -83,26 +76,7 @@ export function tabTarget(params: Params, enabled: readonly TabKindInfo[] = TAB_
     const info = on(value.kind);
     return info?.isId(value.id) ? { view: "item", kind: info.kind, id: value.id } : { view: "list" };
   }
-  for (const info of enabled) {
-    if (!info.legacyParam) continue;
-    const id = value[info.legacyParam];
-    if (typeof id === "string" && info.isId(id)) return { view: "item", kind: info.kind, id };
-  }
   return { view: "list" };
-}
-
-/**
- * A tab BB restored under an old per-kind action id, as Studio tab params:
- * the item it showed, the save picker for the old Artifacts tab, or the list
- * of that kind.
- */
-export function aliasParams(actionId: string, params: Params): { target: TabTarget; filter: string | null } {
-  const info = TAB_KINDS.find((each) => each.legacyAction === actionId) ?? null;
-  const value = record(params);
-  // The old Artifacts tab was the save picker unless a card opened it on one.
-  if (info?.kind === "artifact" && typeof value?.artifactId !== "string") return { target: { view: "save", seq: seqOf(value?.seq) }, filter: null };
-  const target = tabTarget(params);
-  return { target, filter: target.view === "list" && info ? kindKey(info) : null };
 }
 
 /** The params a card or note opens the Studio tab with. */
