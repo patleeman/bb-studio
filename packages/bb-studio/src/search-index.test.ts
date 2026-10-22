@@ -284,3 +284,24 @@ it("detects plugin disable and re-enable from inventory without a content-change
     expect(index.status()).toMatchObject({ state: "stale", discoveryIncomplete: true });
   } finally { await index.dispose(); db.close(); }
 });
+
+it.each(["provider", "full"])("repairs unexpected %s reconciliation failures automatically", async (scope) => {
+  const { db, hub, index, state } = fixture();
+  await index.ensure();
+  const original = hub.overview;
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+  hub.overview = async () => { throw new Error("offline"); };
+  await expect(scope === "full" ? index.rebuild() : index.changed("pages")).rejects.toThrow("offline");
+  expect(index.status().state).toBe("stale");
+  expect(scope === "full" ? index.status().discoveryIncomplete : index.status().pendingProviders.includes("pages")).toBe(true);
+  expect(warning).toHaveBeenCalledTimes(1);
+  expect(index.search("First")).toHaveLength(1);
+  hub.overview = original;
+  state.items = [item("b", "Repaired")];
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(index.search("Repaired")).toHaveLength(1);
+  expect(index.status().state).toBe("current");
+  await index.dispose();
+  warning.mockRestore();
+  db.close();
+});

@@ -1,3 +1,4 @@
+import { readAvailable } from "./kit/server/read-available";
 import type Database from "better-sqlite3";
 import { STUDIO_PLUGIN_ID } from "./kit/contract";
 import type { HubItem, StudioHub } from "./hub";
@@ -162,7 +163,10 @@ export class SearchIndex {
   }
 
   private async reconcile(only?: ReadonlySet<string>): Promise<number> {
-    const result = await this.hub.overview(only);
+    const read = await readAvailable(() => this.hub.overview(only));
+    // An overview endpoint disappearing is not evidence its items were deleted.
+    if (read.status !== "ok") throw read.status === "unavailable" ? read.error : new Error("Search overview not found");
+    const result = read.value;
     const discoveryComplete = result.discoveryComplete !== false;
     this.discoveryIncomplete = !discoveryComplete;
     const installed = new Set(result.providers.map((provider) => provider.pluginId));
@@ -202,9 +206,14 @@ export class SearchIndex {
     this.checkInventory();
   }
 
-  private queue(work: () => Promise<void>): Promise<void> {
+  private queue(work: () => Promise<void>, pluginId?: string): Promise<void> {
     this.queued += 1;
-    this.syncing = this.syncing.catch(() => {}).then(() => this.disposed ? undefined : work()).finally(() => {
+    this.syncing = this.syncing.catch(() => {}).then(() => this.disposed ? undefined : work()).catch((error) => {
+      if (pluginId) this.pending.add(pluginId);
+      else this.discoveryIncomplete = true;
+      console.warn(`[studio] Search reconciliation unavailable${pluginId ? ` for ${pluginId}` : ""}`, error);
+      throw error;
+    }).finally(() => {
       this.queued -= 1;
       this.revision += 1;
       this.scheduleRecovery();
@@ -227,7 +236,7 @@ export class SearchIndex {
         else for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
         await this.add(found);
       }
-    });
+    }, pluginId);
   }
 
   search(raw: string, options: { kinds?: string[]; projectId?: string | null; limit?: number } = {}): SearchHit[] {
