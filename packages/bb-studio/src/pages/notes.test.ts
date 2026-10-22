@@ -194,4 +194,21 @@ describe("Notes", () => {
     const next = await notes.create({ threadId: "thr_1", text: "y", timeZone: "UTC" });
     expect(next.appended).toBe(false);
   });
+
+  it("deletes note and checklist ownership rows for every page in a deleted tree", () => {
+    const { db, service } = setup();
+    const parent = service.createPage({ projectId: "proj_a", parentId: null, title: "Parent", actor: "user" });
+    const child = service.createPage({ projectId: "proj_a", parentId: parent.id, title: "Child", actor: "user" });
+    const note = db.prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at) VALUES (?, ?, 'open', ?)");
+    note.run(parent.id, "thr_parent", AT);
+    note.run(child.id, "thr_child", AT);
+    const handoff = db.prepare("INSERT INTO checklist_handoffs (thread_id, page_id, block_id, title, state, created_at, updated_at) VALUES (?, ?, 'block', 'Task', 'working', ?, ?)");
+    handoff.run("thr_parent", parent.id, AT, AT);
+    handoff.run("thr_child", child.id, AT, AT);
+
+    service.deletePage(parent.id);
+
+    expect(db.prepare("SELECT page_id FROM page_notes").all()).toEqual([]);
+    expect(db.prepare("SELECT page_id FROM checklist_handoffs").all()).toEqual([]);
+  });
 });

@@ -225,6 +225,7 @@ export class PageStore {
   }
 
   delete(ids: string[]): void {
+    const hasNotes = Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'page_notes'").get());
     const tx = this.db.transaction((all: string[]) => {
       for (const id of all) {
         this.db.prepare("DELETE FROM pages WHERE id = ?").run(id);
@@ -232,6 +233,8 @@ export class PageStore {
         this.db.prepare("DELETE FROM files WHERE page_id = ?").run(id);
         this.db.prepare("DELETE FROM requests WHERE page_id = ?").run(id);
         this.db.prepare("DELETE FROM chats WHERE page_id = ?").run(id);
+        this.db.prepare("DELETE FROM checklist_handoffs WHERE page_id = ?").run(id);
+        if (hasNotes) this.db.prepare("DELETE FROM page_notes WHERE page_id = ?").run(id);
       }
     });
     tx(ids);
