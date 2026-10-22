@@ -128,9 +128,13 @@ export class CommentStore {
     return this.threads(workspaceId).flatMap((thread) => thread.comments.filter((each) => each.pending).map((each) => ({ thread, comment: each })));
   }
 
-  /** Marks a workspace's pending comments sent to a thread. */
-  markSent(workspaceId: string, threadId: string): void {
-    this.db.prepare("UPDATE code_comments SET sent_to = ?, sent_at = ? WHERE workspace_id = ? AND author = 'user' AND sent_at IS NULL").run(threadId, Date.now(), workspaceId);
+  /** Acknowledge only the unchanged drafts included in the delivered message. */
+  markSent(workspaceId: string, threadId: string, items: { comment: ReviewComment }[]): void {
+    const update = this.db.prepare("UPDATE code_comments SET sent_to = ?, sent_at = ? WHERE workspace_id = ? AND id = ? AND body = ? AND author = 'user' AND sent_at IS NULL");
+    this.db.transaction(() => {
+      const now = Date.now();
+      for (const { comment } of items) update.run(threadId, now, workspaceId, comment.id, comment.body);
+    })();
   }
 
   /** Open threads that were sent to an agent's thread: what code_comments lists. */

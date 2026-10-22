@@ -20,7 +20,7 @@ describe("review comments", () => {
     expect(store.pending("ws").map((each) => each.comment.body)).toEqual(["Why twice?", "And no backoff?"]);
     expect(store.openFor("thr_a")).toEqual([]);
 
-    store.markSent("ws", "thr_a");
+    store.markSent("ws", "thr_a", store.pending("ws"));
     expect(store.pending("ws")).toEqual([]);
     expect(store.openFor("thr_a").map((thread) => thread.id)).toEqual([id]);
     expect(store.openFor("thr_b")).toEqual([]);
@@ -40,7 +40,7 @@ describe("review comments", () => {
     store.edit("ws", reply, "better draft");
     store.delete("ws", reply);
     expect(store.threads("ws")[0]!.comments.map((each) => each.body)).toEqual(["Typo"]);
-    store.markSent("ws", "thr_a");
+    store.markSent("ws", "thr_a", store.pending("ws"));
     expect(() => store.edit("ws", id, "changed")).toThrow("haven't been submitted");
     expect(() => store.edit("other", id, "changed")).toThrow("gone");
     // Deleting a thread's first comment takes the thread.
@@ -53,7 +53,7 @@ describe("review comments", () => {
   it("writes one message for the review, with each comment's lines and thread id", () => {
     const store = setup();
     const first = store.add("ws", { ...line, body: "Why twice?" });
-    store.markSent("ws", "thr_a");
+    store.markSent("ws", "thr_a", store.pending("ws"));
     store.reply(first, "agent", "It retries once on timeout.", "thr_a");
     store.reply(first, "user", "Then name it retryOnce.");
     const second = store.add("ws", { path: "/repo/README.md", startLine: 3, endLine: 3, lineText: "Install with npm", body: "Say pnpm." });
@@ -69,8 +69,21 @@ describe("review comments", () => {
   it("describes a thread for the agent without the user's unsent replies", () => {
     const store = setup();
     const id = store.add("ws", { ...line, body: "Why twice?" });
-    store.markSent("ws", "thr_a");
+    store.markSent("ws", "thr_a", store.pending("ws"));
     store.reply(id, "user", "draft, not sent");
     expect(describeThread(store.threads("ws")[0]!, shown)).toBe(`${id}\tsrc/retry.ts:42–43\n  User: Why twice?`);
   });
+});
+
+
+it("acknowledges only unchanged comments in the delivered snapshot", () => {
+  const store = setup();
+  const first = store.add("ws", { ...line, body: "first" });
+  const changed = store.reply(first, "user", "before");
+  const snapshot = store.pending("ws");
+  store.edit("ws", changed, "after");
+  store.add("ws", { ...line, body: "added during send" });
+  store.markSent("ws", "thr_a", snapshot);
+  expect(store.pending("ws").map((each) => each.comment.body)).toEqual(["after", "added during send"]);
+  expect(store.threads("ws")[0]!.comments[0]!.pending).toBe(false);
 });

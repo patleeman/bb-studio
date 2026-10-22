@@ -439,6 +439,7 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     if (!thread || thread.archivedAt) return null;
     return { threadId, title: thread.title?.trim() || "the chat" };
   };
+  const submitting = new Set<string>();
   commentCall = async (workspaceId, raw) => {
     const call = commentCallSchema.parse(raw);
     const workspace = must(workspaceId);
@@ -467,15 +468,19 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
         comments.resolve(call.threadId, call.resolved);
         break;
       case "submit": {
-        const items = comments.pending(workspaceId);
-        if (!items.length) throw new Error("There are no comments to submit.");
-        const target = await reviewTarget(workspaceId);
-        if (!target) throw new Error("Open this editor from a thread's VS Code tab first, so the review knows which agent to go to.");
-        const text = reviewMessage({ workspace: workspace.title, items, shown: (path) => shown(path, workspace.folders) });
-        await bb.sdk.threads.send({ threadId: target.threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }] } as never);
-        comments.markSent(workspaceId, target.threadId);
-        commentsChanged(workspaceId);
-        return { ...(await list()), sent: items.length, sentTo: target.title };
+        if (submitting.has(workspaceId)) throw new Error("A review is already being submitted.");
+        submitting.add(workspaceId);
+        try {
+          const items = comments.pending(workspaceId);
+          if (!items.length) throw new Error("There are no comments to submit.");
+          const target = await reviewTarget(workspaceId);
+          if (!target) throw new Error("Open this editor from a thread's VS Code tab first, so the review knows which agent to go to.");
+          const text = reviewMessage({ workspace: workspace.title, items, shown: (path) => shown(path, workspace.folders) });
+          await bb.sdk.threads.send({ threadId: target.threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }] } as never);
+          comments.markSent(workspaceId, target.threadId, items);
+          commentsChanged(workspaceId);
+          return { ...(await list()), sent: items.length, sentTo: target.title };
+        } finally { submitting.delete(workspaceId); }
       }
     }
     commentsChanged(workspaceId);
