@@ -360,3 +360,12 @@ it.each(["offline", "invalid"])("reports an unavailable automation list (%s) wit
   expect(x.db.prepare("SELECT * FROM bot_automations").all()).toEqual(before);
   expect(await x.auto.list()).toHaveLength(2);
 });
+
+
+it("includes runner machine metadata in automation responses for Schedule", async () => {
+  const x = await setup();
+  x.listRunners.mockResolvedValue([{ id: "remote", name: "Security", job: "Check dependencies", threadId: "thr_remote", state: "active",
+    schedule: { cadence: "hourly", time: "09:00" }, nextRunAt: null, lastRunAt: null, lastReport: null, lastLevel: null, lastReportAt: null,
+    machineName: "red4", machineOffline: true }]);
+  expect((await x.auto.list()).find(item => item.id === "remote")).toMatchObject({ machineName: "red4", machineOffline: true });
+});

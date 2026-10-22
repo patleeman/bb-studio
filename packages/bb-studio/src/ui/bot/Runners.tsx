@@ -48,7 +48,7 @@ export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackPr
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
       <ProviderStatusMark providerId={runner.providerId ?? fallbackProviderId} tone={tone} providers={providers} />
       <span className={`min-w-0 flex-1 truncate ${runner.state === "paused" ? "text-muted-foreground" : ""}`}>{botItemName(runner.name, botName)}{runner.machineName ? <span className="text-muted-foreground"> · {runner.machineName}</span> : null}</span>
-      <span className={`shrink-0 text-[11px] ${!agenda && last.failed ? "text-destructive" : "text-muted-foreground"}`}>{runner.machineOffline ? "machine offline" : agenda ? runner.state === "paused" ? "paused" : runner.nextRunAt ? sidebarTime(runner.nextRunAt) : "" : last.text}</span>
+      <span className={`shrink-0 text-[11px] ${!agenda && last.failed ? "text-destructive" : "text-muted-foreground"}`}>{runner.machineOffline ? agenda ? "offline" : "machine offline" : agenda ? runner.state === "paused" ? "paused" : runner.nextRunAt ? sidebarTime(runner.nextRunAt) : "" : last.text}</span>
     </button>
   );
 }

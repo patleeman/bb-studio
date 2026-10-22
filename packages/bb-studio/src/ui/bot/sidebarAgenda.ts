@@ -14,7 +14,7 @@ export function sidebarTime(at: number, now = Date.now()): string {
   });
 }
 
-export type SidebarAgendaItem = Pick<BotAutomationView, "id" | "name" | "nextRunAt" | "state" | "lastRunAt" | "scheduleText"> & {
+export type SidebarAgendaItem = Pick<BotAutomationView, "id" | "name" | "nextRunAt" | "state" | "lastRunAt" | "scheduleText" | "machineName" | "machineOffline"> & {
   kind: BotAutomationView["kind"] | BotScheduledView["kind"];
   schedule: BotAutomationView["schedule"] | null;
 };

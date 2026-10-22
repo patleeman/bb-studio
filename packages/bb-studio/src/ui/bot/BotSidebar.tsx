@@ -410,8 +410,8 @@ function RecurringRow({ item, botName, done = false }: { item: SidebarAgendaItem
   return (
     <div data-agenda={item.id} className={`flex h-7 min-w-0 items-center gap-2 px-2 text-[13px] ${done ? "opacity-50" : ""}`} title={item.scheduleText}>
       <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className={`min-w-0 flex-1 truncate ${item.state !== "active" ? "text-muted-foreground" : ""}`}>{botItemName(item.name, botName)}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{item.state === "paused" ? "paused" : done ? "done" : next}</span>
+      <span className={`min-w-0 flex-1 truncate ${item.state !== "active" ? "text-muted-foreground" : ""}`}>{botItemName(item.name, botName)}{item.kind === "runner" && item.machineName ? <span className="text-muted-foreground"> · {item.machineName}</span> : null}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{item.kind === "runner" && item.machineOffline ? "offline" : item.state === "paused" ? "paused" : done ? "done" : next}</span>
     </div>
   );
 }

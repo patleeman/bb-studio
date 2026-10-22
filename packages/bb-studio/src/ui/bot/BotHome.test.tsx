@@ -779,3 +779,31 @@ test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens
   await show(<BotThreadList {...listProps} />);
   expect(runners.querySelector(".text-destructive")?.textContent).toContain("failed");
 });
+
+
+test("Schedule runner rows show machine and offline metadata even without runner details", async () => {
+  const remote = { id: "remote", kind: "runner", name: "Dot · Security", state: "active", nextRunAt: Date.now() + 60_000,
+    schedule: { type: "times" }, scheduleText: "Hourly", machineName: "red4", machineOffline: true };
+  const server = { ...remote, id: "server", name: "Dot · Inbox", machineName: null, machineOffline: false };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, bot_runners: null,
+    bot_automations: { automations: [remote, server] } };
+  await show(<BotThreadList {...listProps} />);
+  const schedule = container.querySelector('section[aria-label="Schedule"]')!;
+  const remoteRow = schedule.querySelector('[data-agenda="remote"]')!;
+  const serverRow = schedule.querySelector('[data-agenda="server"]')!;
+  expect(remoteRow.textContent).toContain("Security · red4");
+  expect(remoteRow.textContent).toContain("offline");
+  expect(remoteRow.querySelector(".truncate .text-muted-foreground")?.textContent).toBe(" · red4");
+  expect(serverRow.textContent).toContain("Inbox");
+  expect(serverRow.textContent).not.toContain(" · ");
+  expect(serverRow.textContent).not.toContain("offline");
+
+  // The full runner renderer presents the same machine and state in Schedule.
+  state.data.bot_runners = { runners: [{ ...remote, threadId: "thr_remote", urgent: false,
+    schedule: { cadence: "hourly", time: "09:00" } }], adoptable: [] };
+  await show(<BotThreadList {...listProps} />);
+  const matched = schedule.querySelector('[data-agenda="remote"]')!;
+  expect(matched.tagName).toBe("BUTTON");
+  expect(matched.textContent).toContain("Security · red4");
+  expect(matched.textContent).toContain("offline");
+});

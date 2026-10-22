@@ -10263,6 +10263,8 @@ public enum Studio {
   }
 
   public struct BotAutomationsOutputAutomationsItem: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationsOutputAutomationsItemKind?
     public var name: String?
@@ -10281,7 +10283,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationsOutputAutomationsItemKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationsOutputAutomationsItemState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationsOutputAutomationsItemModel? = nil, script: BotAutomationsOutputAutomationsItemScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationsOutputAutomationsItemKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationsOutputAutomationsItemState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationsOutputAutomationsItemModel? = nil, script: BotAutomationsOutputAutomationsItemScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name
@@ -10535,6 +10539,8 @@ public enum Studio {
   }
 
   public struct BotAutomationCreateOutput: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationCreateOutputKind?
     public var name: String?
@@ -10553,7 +10559,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationCreateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationCreateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationCreateOutputModel? = nil, script: BotAutomationCreateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationCreateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationCreateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationCreateOutputModel? = nil, script: BotAutomationCreateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name
@@ -10769,6 +10777,8 @@ public enum Studio {
   }
 
   public struct BotAutomationUpdateOutput: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationUpdateOutputKind?
     public var name: String?
@@ -10787,7 +10797,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationUpdateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationUpdateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationUpdateOutputModel? = nil, script: BotAutomationUpdateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationUpdateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationUpdateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationUpdateOutputModel? = nil, script: BotAutomationUpdateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name
@@ -10935,6 +10947,8 @@ public enum Studio {
   }
 
   public struct BotAutomationPauseOutput: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationPauseOutputKind?
     public var name: String?
@@ -10953,7 +10967,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationPauseOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationPauseOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationPauseOutputModel? = nil, script: BotAutomationPauseOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationPauseOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationPauseOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationPauseOutputModel? = nil, script: BotAutomationPauseOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name
@@ -11101,6 +11117,8 @@ public enum Studio {
   }
 
   public struct BotAutomationResumeOutput: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationResumeOutputKind?
     public var name: String?
@@ -11119,7 +11137,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationResumeOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationResumeOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationResumeOutputModel? = nil, script: BotAutomationResumeOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationResumeOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationResumeOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationResumeOutputModel? = nil, script: BotAutomationResumeOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name
@@ -11267,6 +11287,8 @@ public enum Studio {
   }
 
   public struct BotAutomationRunNowOutput: Sendable, Hashable, Codable {
+    public var machineName: String?
+    public var machineOffline: Bool?
     public var id: String?
     public var kind: BotAutomationRunNowOutputKind?
     public var name: String?
@@ -11285,7 +11307,9 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationRunNowOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationRunNowOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationRunNowOutputModel? = nil, script: BotAutomationRunNowOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, kind: BotAutomationRunNowOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationRunNowOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationRunNowOutputModel? = nil, script: BotAutomationRunNowOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+      self.machineName = machineName
+      self.machineOffline = machineOffline
       self.id = id
       self.kind = kind
       self.name = name

@@ -344,6 +344,9 @@ const automationKind = z.enum(["checkin", "runner", "reminder", "watcher"]);
 const interpreter = z.enum(["bash", "sh", "node", "python3"]);
 /** One of a Bot's automations (src/automations.ts): check-in, runner, reminder or watcher. */
 const botAutomation = z.object({
+  /** Runner machine metadata also travels with Schedule rows when runner details are unavailable. */
+  machineName: z.string().nullable().optional(),
+  machineOffline: z.boolean().optional(),
   id: z.string(),
   kind: automationKind,
   name: z.string(),

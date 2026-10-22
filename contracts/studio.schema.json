@@ -12387,6 +12387,15 @@
             "items": {
               "type": "object",
               "properties": {
+                "machineName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "machineOffline": {
+                  "type": "boolean"
+                },
                 "id": {
                   "type": "string"
                 },
@@ -13287,6 +13296,15 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -14174,6 +14192,15 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -14662,6 +14689,15 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -15150,6 +15186,15 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -15638,6 +15683,15 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "machineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "machineOffline": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },

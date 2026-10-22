@@ -54,3 +54,10 @@ it("merges plain BB schedules and deduplicates every BB id of a Studio job witho
   // Plain BB schedules still render while Studio's separate request is loading.
   expect(sidebarAgenda([], [scheduled("bb-inbox", 10)]).upcoming.map(each => each.name)).toEqual(["bb-inbox"]);
 });
+
+
+it("preserves runner machine metadata in the Schedule agenda", () => {
+  const remote = { ...item("remote", "runner", 20), machineName: "red4", machineOffline: true };
+  const server = { ...item("server", "runner", 10), machineName: null, machineOffline: false };
+  expect(sidebarAgenda([remote, server]).upcoming).toEqual([server, remote]);
+});
