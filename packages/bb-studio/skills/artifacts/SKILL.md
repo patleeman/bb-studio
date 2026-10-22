@@ -1,6 +1,7 @@
 ---
 name: artifacts
-description: Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/studio/studio/artifacts/<id> link (or an older /plugins/artifacts/artifacts/<id> one) or an @artifact mention. For repository coding tasks, use only when the user explicitly requests an artifact export.
+description: >-
+  Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/studio/studio/artifacts/<id> link (or an older /plugins/artifacts/artifacts/<id> one) or an @artifact mention. For repository coding tasks, use only when the user explicitly requests an artifact export.
 ---
 
 # Studio Artifacts

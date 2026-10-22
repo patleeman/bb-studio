@@ -29,6 +29,20 @@ for (const packageDir of await readdir(packages)) {
     if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) errors.push(`${packageDir}: screenshot is not a PNG`);
   } catch { errors.push(`${packageDir}: missing screenshot`); }
   errors.push(...await localLinkErrors(readme, text));
+  // Skills: BB parses frontmatter as YAML and skips a skill whose name or
+  // description fails. An unquoted value containing ": " is the usual cause.
+  const skills = join(base, "skills");
+  if (await exists(skills)) for (const skill of await readdir(skills)) {
+    const file = join(skills, skill, "SKILL.md");
+    if (!(await exists(file))) continue;
+    const front = /^---\n([\s\S]*?)\n---/.exec(await readFile(file, "utf8"))?.[1];
+    if (!front) { errors.push(`${packageDir}/skills/${skill}: SKILL.md has no frontmatter`); continue; }
+    for (const key of ["name", "description"]) {
+      const value = new RegExp(`^${key}:(.*)$`, "m").exec(front)?.[1]?.trim();
+      if (value === undefined || value === "") errors.push(`${packageDir}/skills/${skill}: frontmatter has no ${key}`);
+      else if (!/^["'|>]/.test(value) && value.includes(": ")) errors.push(`${packageDir}/skills/${skill}: unquoted ${key} contains ": ", which breaks YAML; quote it or use >-`);
+    }
+  }
 }
 // Package READMEs require staged screenshots. Repository guides only require
 // valid local links; archived reviews and drafts are not maintained guides.
