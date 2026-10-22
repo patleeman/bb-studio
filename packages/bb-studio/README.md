@@ -1777,9 +1777,20 @@ of Staff", with the same thread and check-ins; rename it from its page.
     new. Stderr never wakes anyone.
 
   How it works: BB runs scripts without an agent and tells plugins nothing
-  when a run ends, so Studio reads each active watcher's recent runs once a
-  minute (`automations_runs`) and posts each new one with output once. The
-  script needs no bb CLI, token or callback.
+  when a run ends, so Studio reads each active watcher's runs at startup and
+  once a minute (`automations_runs`). It pages back to its saved completion
+  boundary to catch up after downtime, including runs sharing a completion
+  timestamp. It saves progress after each successful delivery. A crash after
+  sending but before saving can repeat a finding. The script needs no bb CLI,
+  token or callback.
+
+  Listing automations only reads state. Startup and minute reconciliation retry
+  incomplete provisioning, handoffs and cleanup; the list's outcome shows
+  pending provisioning or cleanup. Grouped schedules retain the desired
+  configuration and each BB resource's project until reconciliation completes.
+  Exhaustion alerts stay pending until chat and phone delivery succeed; a retry
+  after a phone failure can repeat the chat line (phone pushes use the same
+  coalescing key).
 - **Runners** (`src/runners.ts`, table `bot_runners`): automated sub-agents
   so the Bot's chat isn't flooded. A runner is one long-lived thread with a
   name, a job (a short instruction), a schedule (an automation that wakes

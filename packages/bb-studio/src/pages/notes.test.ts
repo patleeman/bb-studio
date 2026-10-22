@@ -250,13 +250,15 @@ describe("Notes", () => {
 
   it("keeps the newest open note when applying the unique-thread migration", () => {
     const db = new Database(":memory:");
-    for (const sql of MIGRATIONS.slice(0, -1)) db.exec(sql);
+    const migration = MIGRATIONS.findIndex((sql) => sql.includes("CREATE UNIQUE INDEX page_notes_one_open_thread"));
+    expect(migration).toBeGreaterThan(0);
+    for (const sql of MIGRATIONS.slice(0, migration)) db.exec(sql);
     const insert = db.prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at) VALUES (?, 'thr_dupe', 'open', ?)");
     insert.run("pg_old", 1);
     insert.run("pg_a", 3);
     insert.run("pg_z", 3);
 
-    db.exec(MIGRATIONS.at(-1)!);
+    db.exec(MIGRATIONS[migration]!);
 
     expect(db.prepare("SELECT page_id, state FROM page_notes WHERE thread_id = 'thr_dupe' ORDER BY page_id").all()).toEqual([
       { page_id: "pg_a", state: "kept" },

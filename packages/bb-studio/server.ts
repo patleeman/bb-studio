@@ -487,6 +487,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     runners: {
       list: (botId) => runners.list(botId),
+      get: (id, botId) => runners.get(id, botId),
       create: (input, botId) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
       update: (input, botId) => runners.update(input, botId),
       setState: (id, state, botId) => runners.setState(id, state, botId),

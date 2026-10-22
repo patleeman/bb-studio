@@ -42,14 +42,15 @@ async function setup() {
   let heartbeat: HeartbeatRun | null = { enabled: true, cadence: "weekdays", time: "08:00" };
   const setHeartbeat = vi.fn(async (_botId: string, run: HeartbeatRun) => { heartbeat = run; });
   const runnerList: AutomationRunner[] = [];
+  const listRunners = vi.fn(async () => runnerList);
   const auto = new Automations({
     db, sdk: bb.sdk, changed: () => {}, bot: () => bot,
     heartbeat: { get: () => heartbeat, set: setHeartbeat, automation: () => ({ id: "hb", projectId: "proj_personal" }) },
     runners: {
-      list: async () => runnerList, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
+      list: listRunners, get: vi.fn() as never, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
     },
   });
-  return { auto, automations, runs, calls, callRpc, send, bot, threads, setHeartbeat, db, heartbeat: () => heartbeat };
+  return { auto, automations, runs, calls, callRpc, send, bot, threads, listRunners, setHeartbeat, db, heartbeat: () => heartbeat };
 }
 
 it("lists the original check-in first, unchanged, then new ones", async () => {
@@ -171,7 +172,7 @@ it("lists the skill curator, pauses it and runs it now, but won't edit or delete
   const auto = new Automations({
     db: x.db, sdk: (x.auto as unknown as { deps: { sdk: never } }).deps.sdk, changed: () => {}, bot: () => x.bot,
     heartbeat: { get: () => null, set: vi.fn(), automation: () => null },
-    runners: { list: async () => [], create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null },
+    runners: { list: async () => [], get: vi.fn() as never, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null },
     maintenance: {
       get: () => state,
       setPaused: async (_botId, paused) => { state.paused = paused; },
@@ -315,4 +316,36 @@ it("rejects reserved and runner names consistently and refuses ambiguous legacy 
   await expect(x.auto.create({ ...input, name: "Brief" })).rejects.toThrow(/already/);
   await x.auto.delete(made.id);
   expect(x.db.prepare("SELECT id FROM bot_runners WHERE id = 'run_old'").get()).toBeTruthy();
+});
+
+
+it("returns the changed automation without reading unrelated runners", async () => {
+  const x = await setup();
+  x.listRunners.mockRejectedValue(new Error("unrelated runner unavailable"));
+  const a = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "cron", cron: "0 8 * * *" } });
+  expect(await x.auto.update({ id: a.id, instruction: "new" })).toMatchObject({ instruction: "new" });
+  expect(x.listRunners).not.toHaveBeenCalled();
+});
+
+it("completes reminders during reconciliation while reads stay pure", async () => {
+  const x = await setup();
+  const a = await x.auto.create({ kind: "reminder", name: "Remind", instruction: "x", schedule: { type: "once", at: Date.now() + 10000 } });
+  Object.assign(x.automations[0]!, { lastRunAt: Date.now(), nextRunAt: null });
+  await x.auto.list();
+  expect(x.db.prepare("SELECT state FROM bot_automations WHERE id = ?").get(a.id)).toEqual({ state: "active" });
+  await x.auto.tick();
+  expect(x.db.prepare("SELECT state FROM bot_automations WHERE id = ?").get(a.id)).toEqual({ state: "done" });
+  expect(await x.auto.restore(a.id)).toBe(false);
+});
+
+it("retries a partially applied pause with the desired paused state", async () => {
+  const x = await setup();
+  const a = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "times", days: [1], times: ["08:00", "18:30"] } });
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_pause" && args.input.automationId === "a2") throw new Error("offline"); return original(args); });
+  await expect(x.auto.setState(a.id, "paused")).rejects.toThrow("offline");
+  x.callRpc.mockImplementation(original);
+  await x.auto.tick();
+  expect(x.automations.every((a) => !a.enabled)).toBe(true);
+  expect((await x.auto.list()).find((v) => v.id === a.id)).toMatchObject({ state: "paused", lastOutcome: null });
 });

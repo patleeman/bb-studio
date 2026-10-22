@@ -178,7 +178,12 @@ export class Runners {
   private async automations(projectIds: Iterable<string>, strict = false): Promise<(AutomationRow & { projectId: string })[]> {
     const lists = await Promise.all([...new Set(projectIds)].map(async (projectId) => {
       const raw = await this.call("automations_list", { projectId }, z.unknown()).catch((error) => { if (strict) throw error; return []; });
-      return (Array.isArray(raw) ? raw : []).flatMap((entry) => { const parsed = automationRow.safeParse(entry); return parsed.success ? [{ ...parsed.data, projectId }] : []; });
+      if (strict && !Array.isArray(raw)) throw new Error("Automation list unavailable during runner cleanup.");
+      return (Array.isArray(raw) ? raw : []).flatMap((entry) => {
+        const parsed = automationRow.safeParse(entry);
+        if (strict && !parsed.success) throw parsed.error;
+        return parsed.success ? [{ ...parsed.data, projectId }] : [];
+      });
     }));
     return lists.flat();
   }
@@ -190,7 +195,7 @@ export class Runners {
     const state = row.state === "active" && automation?.enabled === false ? "paused" : row.state;
     return {
       id: row.id, name: row.name, job: row.job, threadId: row.thread_id, state, adopted: !!row.adopted,
-      schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}), ...(row.timezone ? { timezone: row.timezone } : {}) },
+      schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}), ...((row.timezone ?? automation?.trigger.timezone) ? { timezone: row.timezone ?? automation!.trigger.timezone } : {}) },
       nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
       lastRunAt: Math.max(automation?.lastRunAt ?? 0, row.last_run_at ?? 0) || null,
       lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at, urgent: !!row.urgent,
@@ -262,6 +267,10 @@ export class Runners {
     return this.one(id);
   }
 
+  async get(id: string, botId?: string): Promise<RunnerView> {
+    return this.one(this.row(id, botId).id);
+  }
+
   private async one(id: string): Promise<RunnerView> {
     const row = this.row(id);
     const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((a) => a.id === row.automation_id);
@@ -273,7 +282,13 @@ export class Runners {
   private async provision(row: RunnerRow): Promise<void> {
     if (!row.thread_id) throw new Error("This runner has no thread.");
     const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId: row.thread_id }), this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null)]);
-    const trigger = { triggerType: "schedule", cron: heartbeatCron({ enabled: true, cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) }), timezone: row.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone };
+    let timezone = row.timezone;
+    if (!timezone && row.adopted && row.automation_id) {
+      const existing = (await this.automations([row.automation_project_id ?? row.project_id], true)).find((a) => a.id === row.automation_id);
+      timezone = existing?.trigger.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+      this.changedRow(row.id, { timezone });
+    }
+    const trigger = { triggerType: "schedule", cron: heartbeatCron({ enabled: true, cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) }), timezone: timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone };
     const projectId = row.automation_project_id ?? thread.projectId;
     if (row.adopted && row.automation_id) {
       await this.call("automations_update", { projectId, automationId: row.automation_id, trigger }, z.unknown());

@@ -2,6 +2,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { afterEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { ADOPT_NOTE, parseSchedule, runnerInstructions, runnerPrompt, Runners, tellLine } from "./runners";
+import { Automations } from "./automations";
 import { heartbeatCron } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -45,7 +46,7 @@ async function setup() {
   add({ id: "bot2", title: "Scout" });
   const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
   const runners = new Runners({ db, sdk: bb.sdk, changed: () => {}, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
-  return { runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db };
+  return { runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -332,4 +333,39 @@ it("retains failed creation rollback until the remote thread can be archived", a
   expect(x.db.prepare("SELECT id FROM bot_runners").all()).toHaveLength(1);
   await x.runners.retryCleanup();
   expect(x.db.prepare("SELECT id FROM bot_runners").all()).toHaveLength(0);
+});
+
+
+it("keeps the timezone when editing an adopted runner through unified automations", async () => {
+  const x = await setup();
+  x.add({ id: "thr_cron", title: "Tokyo" });
+  x.started.push({ id: "thr_cron", title: "Tokyo", projectId: "proj_personal" });
+  x.automations.push({ id: "cron", projectId: "proj_personal", name: "Tokyo", enabled: true, trigger: { triggerType: "schedule", cron: "0 8 * * *", timezone: "Asia/Tokyo" }, execution: { mode: "agent", targetThreadId: "thr_cron", prompt: "Check" } });
+  const runner = await x.runners.adopt({ threadId: "thr_cron", automationId: "cron" });
+  // Registrations made before timezone storage existed recover it from BB.
+  x.db.prepare("UPDATE bot_runners SET timezone = NULL WHERE id = ?").run(runner.id);
+  const auto = new Automations({ db: x.db, sdk: x.sdk, bot: () => ({ ...x.bot, primary: true, kind: "studio" }), changed: () => {}, heartbeat: { get: () => null, set: vi.fn(), automation: () => null }, runners: x.runners });
+  const view = await auto.update({ id: runner.id, schedule: { type: "cron", cron: "0 10 * * *", timezone: "Asia/Tokyo" } });
+  expect(view.schedule).toMatchObject({ timezone: "Asia/Tokyo", cron: "0 10 * * *" });
+  expect(x.automations[0]).toMatchObject({ trigger: { timezone: "Asia/Tokyo", cron: "0 10 * * *" } });
+});
+
+it("retains adopted runner registration when removing its reporting note fails", async () => {
+  const x = await setup();
+  x.add({ id: "thr_cron", title: "Cron" });
+  x.started.push({ id: "thr_cron", title: "Cron", projectId: "proj_personal" });
+  x.automations.push({ id: "cron", projectId: "proj_personal", name: "Cron", enabled: true, trigger: { triggerType: "schedule", cron: "0 8 * * *" }, execution: { mode: "agent", targetThreadId: "thr_cron", prompt: "Check" } });
+  const runner = await x.runners.adopt({ threadId: "thr_cron", automationId: "cron" });
+  x.callRpc.mockRejectedValueOnce(new Error("offline"));
+  await expect(x.runners.delete(runner.id)).rejects.toThrow("offline");
+  expect(x.db.prepare("SELECT cleanup_pending FROM bot_runners WHERE id = ?").get(runner.id)).toEqual({ cleanup_pending: 1 });
+  await x.runners.retryCleanup();
+  expect(x.automations[0]).toMatchObject({ execution: { prompt: "Check" } });
+});
+
+it("reports failed phone push delivery instead of claiming success", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check", schedule });
+  x.callRpc.mockRejectedValueOnce(new Error("push offline"));
+  await expect(x.runners.alert(runner.id, "Needs you")).rejects.toThrow("push offline");
 });

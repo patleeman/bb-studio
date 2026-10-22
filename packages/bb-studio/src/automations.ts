@@ -120,6 +120,7 @@ export interface AutomationDeps {
   };
   runners: {
     list(botId: string): Promise<AutomationRunner[]>;
+    get(id: string, botId: string): Promise<AutomationRunner>;
     create(input: { name: string; job: string; schedule: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string } }, botId: string): Promise<AutomationRunner>;
     update(input: { id: string; name?: string; job?: string; schedule?: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string } }, botId: string): Promise<AutomationRunner>;
     setState(id: string, state: "active" | "paused", botId: string): Promise<AutomationRunner>;
@@ -150,12 +151,12 @@ const MAINTENANCE_ID = "maintenance";
 const MAINTENANCE_SCHEDULE: Schedule = { type: "cron", cron: "0 4 * * *" };
 const HEARTBEAT_NAME = "Check-in";
 
-/** A Bot's runner schedule from a compiled schedule: one cron in the server's timezone. */
-function runnerSchedule(schedule: Schedule): { cadence: "custom"; time: string; cron: string } {
+/** One repeating cron, retaining an adopted runner's timezone when supplied. */
+function runnerSchedule(schedule: Schedule, timezone = localZone()): { cadence: "custom"; time: string; cron: string } {
   const triggers = compileSchedule(schedule);
   const only = triggers[0];
   if (triggers.length !== 1 || only?.triggerType !== "schedule") throw new Error("A runner (and the original check-in) takes one repeating cron; simplify the times, or make a check-in instead.");
-  if (only.timezone !== localZone()) throw new Error(`This one runs in the server's timezone (${localZone()}).`);
+  if (only.timezone !== timezone) throw new Error(`This one runs in timezone ${timezone}.`);
   if (schedule.type !== "once" && schedule.until) throw new Error("This one has no end date; pause or delete it instead.");
   return { cadence: "custom", time: "09:00", cron: only.cron };
 }
@@ -180,8 +181,7 @@ export class Automations {
   }
 
   private row(id: string, botId: string): Row {
-    const row = (this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ? AND bot_id = ?").get(id, botId)
-      ?? this.rows(botId).find((each) => each.name.toLowerCase() === id.toLowerCase())) as Row | undefined;
+    const row = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ? AND bot_id = ?").get(id, botId) as Row | undefined;
     if (!row) throw new Error(`No automation "${id}".`);
     return row;
   }
@@ -296,7 +296,15 @@ export class Automations {
     const rows = this.rows(bot.id).filter((row) => !onlyId || row.id === onlyId);
     const heartbeat = bot.kind === "external" && !this.deps.heartbeat.get(bot.id) ? null : this.deps.heartbeat.get(bot.id);
     const hbAutomation = !onlyId || onlyId === HEARTBEAT_ID ? this.deps.heartbeat.automation(bot.id) : null;
-    const runners = bot.kind === "external" || (onlyId && (rows.length || [HEARTBEAT_ID, MAINTENANCE_ID].includes(onlyId))) ? [] : await this.deps.runners.list(bot.id);
+    let runners: AutomationRunner[] = [];
+    if (bot.kind !== "external") {
+      if (!onlyId) runners = await this.deps.runners.list(bot.id);
+      else {
+        const target = rows[0]?.target;
+        const runnerId = target ? target === "main" ? null : target : [HEARTBEAT_ID, MAINTENANCE_ID].includes(onlyId) ? null : onlyId;
+        if (runnerId) runners = [await this.deps.runners.get(runnerId, bot.id)];
+      }
+    }
     const bb = await this.bbList([PERSONAL, ...rows.flatMap((row) => this.resources(row).map((r) => r.projectId)), ...(hbAutomation ? [hbAutomation.projectId] : [])]);
     const views: BotAutomationView[] = [];
     if (heartbeat) {
@@ -325,7 +333,7 @@ export class Automations {
       const last = automations.map((each) => each.lastRunAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
       let state = row.state;
       // A reminder is done once BB has run it and has nothing left to run.
-      if (row.kind === "reminder" && state === "active" && last && !automations.some((each) => each.nextRunAt)) { state = "done"; }
+      if (!row.provision_pending && !row.cleanup_pending && row.kind === "reminder" && state === "active" && last && !automations.some((each) => each.nextRunAt)) { state = "done"; }
       const schedule = JSON.parse(row.schedule_json) as Schedule;
       const runner = row.target !== "main" ? runners.find((each) => each.id === row.target) : null;
       views.push({
@@ -436,7 +444,7 @@ export class Automations {
   }
 
   private isRunner(id: string, botId: string): string | null {
-    const row = this.deps.db.prepare("SELECT id FROM bot_runners WHERE bot_id = ? AND (id = ? OR lower(name) = lower(?))").get(botId, id, id) as { id: string } | undefined;
+    const row = this.deps.db.prepare("SELECT id FROM bot_runners WHERE bot_id = ? AND id = ?").get(botId, id) as { id: string } | undefined;
     return row?.id ?? null;
   }
 
@@ -454,7 +462,9 @@ export class Automations {
     }
     const runnerId = this.isRunner(input.id, bot.id);
     if (runnerId) {
-      await this.deps.runners.update({ id: runnerId, ...(input.name ? { name: input.name } : {}), ...(input.instruction ? { job: input.instruction } : {}), ...(input.schedule ? { schedule: runnerSchedule(input.schedule) } : {}) }, bot.id);
+      const stored = this.deps.db.prepare("SELECT timezone FROM bot_runners WHERE id = ?").get(runnerId) as { timezone: string | null };
+      const timezone = stored.timezone ?? (await this.deps.runners.get(runnerId, bot.id)).schedule.timezone ?? localZone();
+      await this.deps.runners.update({ id: runnerId, ...(input.name ? { name: input.name } : {}), ...(input.instruction ? { job: input.instruction } : {}), ...(input.schedule ? { schedule: runnerSchedule(input.schedule.type === "once" ? input.schedule : { ...input.schedule, timezone: input.schedule.timezone || timezone }, timezone) } : {}) }, bot.id);
       return this.one(runnerId, bot.id);
     }
     const row = this.row(input.id, bot.id);
@@ -501,13 +511,8 @@ export class Automations {
     if (runnerId) { await this.deps.runners.setState(runnerId, state, bot.id); return this.one(runnerId, bot.id); }
     const row = this.row(id, bot.id);
     if (row.state === "done" || row.state === "ended") throw new Error(state === "active" ? "It's over; give it a new time or end date to bring it back." : "It's already over.");
-    if (state === "active") {
-      // Its BB automations come back to match (a schedule may have changed while paused).
-      await this.provision({ ...row, state });
-    } else {
-      await this.setBb(row, false);
-    }
-    this.save(row.id, { state });
+    this.save(row.id, { state, provision_pending: 1 });
+    await this.provision(this.row(row.id, bot.id));
     return this.one(row.id, bot.id);
   }
 
@@ -623,6 +628,14 @@ export class Automations {
         if (row.cleanup_pending) await this.delete(row.id, row.bot_id);
         else await this.provision(row);
       } catch (error) { console.warn(`[studio] automation ${row.id} reconciliation pending`, error); }
+    }
+    const reminders = this.deps.db.prepare("SELECT * FROM bot_automations WHERE kind = 'reminder' AND state = 'active' AND provision_pending = 0 AND cleanup_pending = 0").all() as Row[];
+    if (reminders.length) {
+      const bb = await this.bbList(reminders.flatMap((r) => this.resources(r).map((ref) => ref.projectId)));
+      for (const row of reminders) {
+        const runs = this.ids(row).map((id) => bb.get(id));
+        if (runs.length && runs.every((r) => r && r.lastRunAt && !r.nextRunAt)) this.save(row.id, { state: "done" });
+      }
     }
     // Handoff is reconciled by the Bot hook immediately, and retried here after failures.
     for (const botId of new Set((this.deps.db.prepare("SELECT DISTINCT bot_id FROM bot_automations").all() as { bot_id: string }[]).map((r) => r.bot_id))) {
