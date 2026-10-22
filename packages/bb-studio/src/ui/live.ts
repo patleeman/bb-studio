@@ -3,8 +3,8 @@ import { errorMessage } from "../kit/format";
 import { requestGeneration } from "../kit/ui/request-generation";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import type { rpcContract } from "../contract";
-import { useRealtime, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
-import { useCallback, useSyncExternalStore } from "react";
+import { useRealtime, useRealtimeConnectionState, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 type Contract = typeof rpcContract;
 export type Method = keyof Contract;
@@ -111,6 +111,14 @@ export function useLive<M extends Method>(method: M, input: RpcInput<M>, options
   const refresh = useCallback(() => { if (entry) loadLive(entry); }, [entry]);
   const soon = useCallback(() => { if (entry) scheduleLive(entry); }, [entry]);
   useRealtime(STUDIO_REALTIME_CHANNEL, soon);
+  // Signals are not replayed after a socket reconnect. Reconcile anything
+  // created, changed or deleted while this window was disconnected.
+  const connection = useRealtimeConnectionState();
+  const previousConnection = useRef(connection);
+  useEffect(() => {
+    if (connection === "connected" && previousConnection.current !== "connected") soon();
+    previousConnection.current = connection;
+  }, [connection, soon]);
   return { ...state, refresh };
 }
 

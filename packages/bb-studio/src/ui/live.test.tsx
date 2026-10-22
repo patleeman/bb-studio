@@ -5,10 +5,10 @@ import { expect, expectTypeOf, it, vi } from "vitest";
 import { useCall, useLive } from "./live";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
-const realtime = vi.hoisted(() => ({ listeners: new Set<() => void>() }));
+const realtime = vi.hoisted(() => ({ listeners: new Set<() => void>(), connection: "connected" }));
 vi.mock("@get-bb/plugin-sdk/app", async () => {
   const { useEffect } = await import("react");
-  return { useRpc: () => rpc, useRealtime: (_channel: string, handler: () => void) => {
+  return { useRealtimeConnectionState: () => realtime.connection, useRpc: () => rpc, useRealtime: (_channel: string, handler: () => void) => {
     useEffect(() => { realtime.listeners.add(handler); return () => { realtime.listeners.delete(handler); }; }, [handler]);
   } };
 });
@@ -81,3 +81,30 @@ function contractTypes() {
   void call("bot_thread_owner", {});
 }
 void contractTypes;
+
+
+it("refreshes runner create, update and delete signals, and reconciles missed signals on reconnect", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.useFakeTimers();
+  let runners: { id: string; name: string }[] = [];
+  rpc.call.mockReset().mockImplementation(async () => ({ runners, adoptable: [] }));
+  let api!: ReturnType<typeof useLive<"bot_runners">>;
+  function Reader() { api = useLive("bot_runners", { botId: "runner-refresh" }, { pollMs: 0 }); return null; }
+  const root = createRoot(document.createElement("div"));
+  try {
+    await act(async () => root.render(<Reader />));
+    expect(api.data?.runners).toEqual([]);
+    for (const next of [[{ id: "security", name: "Security" }], [{ id: "security", name: "Security audit" }], []]) {
+      runners = next;
+      await act(async () => { for (const listener of realtime.listeners) listener(); await vi.advanceTimersByTimeAsync(250); });
+      expect(api.data?.runners).toEqual(next);
+    }
+    realtime.connection = "reconnecting";
+    await act(async () => root.render(<Reader />));
+    runners = [{ id: "missed", name: "Created while disconnected" }];
+    realtime.connection = "connected";
+    await act(async () => { root.render(<Reader />); });
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(api.data?.runners).toEqual(runners);
+  } finally { act(() => root.unmount()); realtime.connection = "connected"; vi.useRealTimers(); }
+});
