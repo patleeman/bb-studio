@@ -37,6 +37,7 @@ export const VOICE_MODELS: readonly VoiceModel[] = [
 
 interface Delegation {
   voiceThreadId: string;
+  targetThreadId: string;
   /** The target's last event when the request was sent; its reply comes after. */
   afterSeq: number;
   at: number;
@@ -49,11 +50,31 @@ interface VoiceState {
   conversational: boolean;
   /** The last note each thread's spoken messages carried, so turning conversational off is said once. */
   notes: Record<string, "on" | "off">;
-  /** Target thread id → the voice thread waiting for its reply. */
-  delegations: Record<string, Delegation>;
+  /** Source voice thread id → its pending delegations. */
+  delegations: Record<string, Delegation[]>;
 }
 
 type EventRow = { seq: number; type: string; data?: unknown };
+
+function readDelegations(value: unknown): Record<string, Delegation[]> {
+  const result: Record<string, Delegation[]> = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return result;
+  for (const [key, raw] of Object.entries(value)) {
+    for (const entry of Array.isArray(raw) ? raw : [raw]) {
+      if (!entry || typeof entry !== "object") continue;
+      const stored = entry as Partial<Delegation>;
+      const targetThreadId = typeof stored.targetThreadId === "string" ? stored.targetThreadId : Array.isArray(raw) ? null : key;
+      if (typeof stored.voiceThreadId !== "string" || typeof stored.afterSeq !== "number" || typeof stored.at !== "number" || !targetThreadId) continue;
+      (result[stored.voiceThreadId] ??= []).push({
+        voiceThreadId: stored.voiceThreadId,
+        targetThreadId,
+        afterSeq: stored.afterSeq,
+        at: stored.at,
+      });
+    }
+  }
+  return result;
+}
 
 export class VoiceSessions {
   private state: VoiceState = { threads: [], conversational: true, notes: {}, delegations: {} };
@@ -67,16 +88,18 @@ export class VoiceSessions {
   }) {}
 
   async load(): Promise<void> {
-    const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as (Partial<VoiceState> & { session?: { threadId?: string } | null }) | null;
+    const stored = (await this.deps.kv.get(VOICE_KV_KEY).catch(() => null)) as (Partial<VoiceState> & { session?: { threadId?: string } | null; delegations?: unknown }) | null;
     // Before voice was a mode there was one current session.
     const old = stored?.session?.threadId ? [stored.session.threadId] : [];
-    this.state = { threads: stored?.threads ?? old, conversational: stored?.conversational ?? true, notes: stored?.notes ?? {}, delegations: stored?.delegations ?? {} };
+    this.state = { threads: stored?.threads ?? old, conversational: stored?.conversational ?? true, notes: stored?.notes ?? {}, delegations: readDelegations(stored?.delegations) };
   }
 
   private async save(): Promise<void> {
     const cutoff = Date.now() - DELEGATION_TTL_MS;
-    for (const [threadId, delegation] of Object.entries(this.state.delegations)) {
-      if (delegation.at < cutoff) delete this.state.delegations[threadId];
+    for (const [voiceThreadId, delegations] of Object.entries(this.state.delegations)) {
+      const active = delegations.filter((delegation) => delegation.at >= cutoff);
+      if (active.length) this.state.delegations[voiceThreadId] = active;
+      else delete this.state.delegations[voiceThreadId];
     }
     await this.deps.kv.set(VOICE_KV_KEY, this.state);
   }
@@ -148,7 +171,7 @@ export class VoiceSessions {
     if (threadId === voiceThreadId) throw new Error("That's this voice thread; delegate to the Bot or another thread.");
     const thread = await this.deps.sdk.threads.get({ threadId });
     const tip = (await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => [])) as EventRow[];
-    this.state.delegations[threadId] = { voiceThreadId, afterSeq: tip[0]?.seq ?? 0, at: Date.now() };
+    (this.state.delegations[voiceThreadId] ??= []).push({ voiceThreadId, targetThreadId: threadId, afterSeq: tip[0]?.seq ?? 0, at: Date.now() });
     await this.save();
     await this.deps.sdk.threads.send({
       threadId,
@@ -167,22 +190,28 @@ export class VoiceSessions {
    * just ended is the one it asked for, post the reply into the voice thread.
    */
   async idle(threadId: string, lastAssistantText: string | null): Promise<boolean> {
-    const delegation = this.state.delegations[threadId];
-    if (!delegation) return false;
+    const waiting = Object.values(this.state.delegations).flat().filter((delegation) => delegation.targetThreadId === threadId);
+    if (!waiting.length) return false;
+    const afterSeq = Math.min(...waiting.map((delegation) => delegation.afterSeq));
     const requested = (await this.deps.sdk.threads.events.list({
-      threadId, afterSeq: String(delegation.afterSeq), order: "desc", limit: "20", types: ["client/turn/requested"],
+      threadId, afterSeq: String(afterSeq), order: "desc", limit: "20", types: ["client/turn/requested"],
     }).catch(() => [])) as EventRow[];
     // The last turn started since the request must be the voice agent's: an
     // earlier turn ending (the thread was busy) or a later one isn't its answer.
     const latest = requested[0]?.data as { senderThreadId?: string | null } | undefined;
-    if (latest?.senderThreadId !== delegation.voiceThreadId) return false;
-    delete this.state.delegations[threadId];
+    const voiceThreadId = latest?.senderThreadId;
+    if (!voiceThreadId) return false;
+    const sourceDelegations = this.state.delegations[voiceThreadId];
+    const index = sourceDelegations?.findIndex((delegation) => delegation.targetThreadId === threadId && delegation.afterSeq < requested[0]!.seq) ?? -1;
+    if (index < 0 || !sourceDelegations) return false;
+    sourceDelegations.splice(index, 1);
+    if (!sourceDelegations.length) delete this.state.delegations[voiceThreadId];
     await this.save();
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null);
     const title = (thread as { title?: string | null } | null)?.title ?? threadId;
     const reply = (lastAssistantText ?? "").trim() || "(It finished without a written reply.)";
     await this.deps.sdk.threads.send({
-      threadId: delegation.voiceThreadId,
+      threadId: voiceThreadId,
       mode: "queue-if-active",
       senderThreadId: threadId,
       input: [{
@@ -197,6 +226,6 @@ export class VoiceSessions {
 
   /** Threads waiting on a reply for this voice thread. */
   pending(voiceThreadId: string): string[] {
-    return Object.entries(this.state.delegations).filter(([, each]) => each.voiceThreadId === voiceThreadId).map(([threadId]) => threadId);
+    return [...new Set((this.state.delegations[voiceThreadId] ?? []).map((delegation) => delegation.targetThreadId))];
   }
 }

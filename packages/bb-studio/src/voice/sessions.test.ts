@@ -96,6 +96,31 @@ describe("VoiceSessions", () => {
     expect(await sessions.idle("thr_work", "Again.")).toBe(false);
   });
 
+  it("keeps delegations from two voice chats to the same Bot and routes each reply to its source", async () => {
+    const { sessions, sent, events } = setup({ events: { thr_bot: [{ seq: 7, type: "turn/completed" }] } });
+    await sessions.delegate("thr_voice_a", "bot", "Check the build.");
+    await sessions.delegate("thr_voice_b", "bot", "Review the release.");
+    expect(sessions.pending("thr_voice_a")).toEqual(["thr_bot"]);
+    expect(sessions.pending("thr_voice_b")).toEqual(["thr_bot"]);
+
+    events.thr_bot!.push(
+      { seq: 8, type: "client/turn/requested", data: { senderThreadId: "thr_voice_a" } },
+      { seq: 9, type: "client/turn/requested", data: { senderThreadId: "thr_voice_b" } },
+    );
+    expect(await sessions.idle("thr_bot", "Release review complete.")).toBe(true);
+    expect(sent.at(-1)).toMatchObject({ threadId: "thr_voice_b", senderThreadId: "thr_bot" });
+    expect(sessions.pending("thr_voice_a")).toEqual(["thr_bot"]);
+    expect(sessions.pending("thr_voice_b")).toEqual([]);
+    // A repeated idle callback for the same Bot turn must not consume A's request.
+    expect(await sessions.idle("thr_bot", "Duplicate reply.")).toBe(false);
+    expect(sessions.pending("thr_voice_a")).toEqual(["thr_bot"]);
+
+    events.thr_bot!.push({ seq: 10, type: "client/turn/requested", data: { senderThreadId: "thr_voice_a" } });
+    expect(await sessions.idle("thr_bot", "Build check complete.")).toBe(true);
+    expect(sent.at(-1)).toMatchObject({ threadId: "thr_voice_a", senderThreadId: "thr_bot" });
+    expect(sessions.pending("thr_voice_a")).toEqual([]);
+  });
+
   it("waits when the turn that ended isn't the one it asked for", async () => {
     const { sessions, sent, events } = setup({ events: { thr_work: [{ seq: 3, type: "turn/completed" }] } });
     await sessions.delegate("thr_voice", "thr_work", "Run the tests.");
@@ -136,9 +161,13 @@ describe("VoiceSessions", () => {
 
 describe("VoiceSessions from the one-session days", () => {
   it("keeps the old session's thread in voice mode", async () => {
-    const kv = new Map<string, unknown>([[VOICE_KV_KEY, { session: { threadId: "thr_old", modelId: "luna-fast", startedAt: 1 }, delegations: {} }]]);
+    const kv = new Map<string, unknown>([[VOICE_KV_KEY, {
+      session: { threadId: "thr_old", modelId: "luna-fast", startedAt: 1 },
+      delegations: { thr_work: { voiceThreadId: "thr_old", afterSeq: 3, at: Date.now() } },
+    }]]);
     const sessions = new VoiceSessions({ sdk: {} as never, kv: { get: async (key) => kv.get(key), set: async () => {} }, botThread: () => null, warn: () => {} });
     await sessions.load();
     expect(sessions.isOn("thr_old")).toBe(true);
+    expect(sessions.pending("thr_old")).toEqual(["thr_work"]);
   });
 });
