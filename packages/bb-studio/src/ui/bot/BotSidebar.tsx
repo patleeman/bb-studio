@@ -18,7 +18,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotAutomationView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -28,7 +28,7 @@ import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSectio
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
-import { botItemName, sidebarAgenda, sidebarTime } from "./sidebarAgenda";
+import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -238,7 +238,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
   const automations = useLive("bot_automations", { botId: bot.id }, { pollMs: 15_000 });
-  const agenda = sidebarAgenda(automations.data?.automations ?? []);
+  const agenda = sidebarAgenda(automations.data?.automations ?? [], activity.data?.scheduled ?? []);
   const [showDone, setShowDone] = useState(false);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree botName={bot.name} nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
@@ -405,7 +405,7 @@ function SideThreadRow({ botName, thread, active, onOpen }: { botName: string; t
   );
 }
 
-function RecurringRow({ item, botName, done = false }: { item: BotAutomationView; botName: string; done?: boolean }) {
+function RecurringRow({ item, botName, done = false }: { item: SidebarAgendaItem; botName: string; done?: boolean }) {
   const next = item.nextRunAt ? sidebarTime(item.nextRunAt) : null;
   return (
     <div data-agenda={item.id} className={`flex h-7 min-w-0 items-center gap-2 px-2 text-[13px] ${done ? "opacity-50" : ""}`} title={item.scheduleText}>

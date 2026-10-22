@@ -346,6 +346,8 @@ const botAutomation = z.object({
   id: z.string(),
   kind: automationKind,
   name: z.string(),
+  /** BB automation ids represented by this Studio job (a schedule can compile to several). */
+  bbIds: z.array(z.string()).optional(),
   /** The Bot's original check-in (its heartbeat): its instruction is the Memory page's Check-in section. */
   original: z.boolean(),
   instruction: z.string(),

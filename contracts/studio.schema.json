@@ -11936,6 +11936,12 @@
                 "name": {
                   "type": "string"
                 },
+                "bbIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "original": {
                   "type": "boolean"
                 },
@@ -12830,6 +12836,12 @@
           "name": {
             "type": "string"
           },
+          "bbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "original": {
             "type": "boolean"
           },
@@ -13711,6 +13723,12 @@
           "name": {
             "type": "string"
           },
+          "bbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "original": {
             "type": "boolean"
           },
@@ -14192,6 +14210,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "bbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "original": {
             "type": "boolean"
@@ -14675,6 +14699,12 @@
           "name": {
             "type": "string"
           },
+          "bbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "original": {
             "type": "boolean"
           },
@@ -15156,6 +15186,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "bbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "original": {
             "type": "boolean"

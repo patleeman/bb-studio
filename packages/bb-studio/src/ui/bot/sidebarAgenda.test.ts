@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { BotAutomationView, RunnerView } from "../../contract";
+import type { BotAutomationView, BotScheduledView, RunnerView } from "../../contract";
 import { botItemName, runnerLastRun, sidebarAgenda, sidebarTime } from "./sidebarAgenda";
 
 it("strips only the exact owning Bot prefix", () => {
@@ -35,4 +35,22 @@ it("describes the last run, including silent runs after an older report and fail
   expect(runnerLastRun({ ...runner, lastRunStatus: "failed" })).toEqual({ text: expect.stringMatching(/failed$/), failed: true });
   expect(runnerLastRun({ ...runner, state: "paused" })).toEqual({ text: "paused", failed: false });
   expect(runnerLastRun({ ...runner, lastRunAt: null }).text).toBe("");
+});
+
+
+it("merges plain BB schedules and deduplicates every BB id of a Studio job without comparing names", () => {
+  const studio = { ...item("studio-check", "checkin", 20), bbIds: ["bb-am", "bb-pm"] };
+  const heartbeat = { ...item("heartbeat", "checkin", 5), original: true, bbIds: ["bb-heartbeat"] };
+  const scheduled = (id: string, nextRunAt: number | null, enabled = true, name = id): BotScheduledView => ({ id, kind: "automation", name, cron: "0 * * * *", enabled, nextRunAt });
+  const agenda = sidebarAgenda([studio, heartbeat, item("runner", "runner", 30)], [
+    scheduled("bb-am", 20), scheduled("bb-pm", 40), scheduled("bb-heartbeat", 5),
+    { ...scheduled("heartbeat", null), kind: "heartbeat" },
+    scheduled("bb-inbox", 10, true, "Inbox sweep"), scheduled("bb-child", 25),
+    scheduled("bb-same-name", 15, true, "studio-check"), scheduled("bb-off", 1, false),
+  ]);
+  expect(agenda.upcoming.map(each => each.id)).toEqual(["heartbeat", "bb-inbox", "bb-same-name", "studio-check", "bb-child", "runner", "bb-off"]);
+  expect(agenda.upcoming.at(-1)).toMatchObject({ state: "paused", nextRunAt: null });
+  expect(agenda.done).toEqual([]);
+  // Plain BB schedules still render while Studio's separate request is loading.
+  expect(sidebarAgenda([], [scheduled("bb-inbox", 10)]).upcoming.map(each => each.name)).toEqual(["bb-inbox"]);
 });

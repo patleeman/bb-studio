@@ -747,10 +747,16 @@ test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens
       automation("done", "reminder", "Dot · Finished", null, "done"), automation("off", "reminder", "Dot · Off", null, "paused"),
       automation("paused", "watcher", "Dot · Paused watch", null, "paused")] },
   };
+  state.data.bot_activity = { ...empty, scheduled: [
+    { id: "bb-inbox", kind: "automation", name: "Dot · Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: now + 150_000 },
+    { id: "bb-off", kind: "automation", name: "Dot · Off BB job", cron: "0 * * * *", enabled: false, nextRunAt: null },
+  ] };
   await show(<BotThreadList {...listProps} />);
   const schedule = container.querySelector('section[aria-label="Schedule"]')!;
   const runners = container.querySelector('section[aria-label="Runners"]')!;
-  expect([...schedule.querySelectorAll("[data-agenda]")].map(row => row.getAttribute("data-agenda"))).toEqual(["check", "remind", "security", "watch", "paused"]);
+  expect([...schedule.querySelectorAll("[data-agenda]")].map(row => row.getAttribute("data-agenda"))).toEqual(["check", "remind", "security", "bb-inbox", "watch", "bb-off", "paused"]);
+  expect(schedule.textContent).toContain("Inbox sweep");
+  expect(schedule.querySelector('[data-agenda="bb-off"]')?.textContent).toContain("paused");
   expect(schedule.textContent).toContain("Check-in");
   expect(schedule.textContent).not.toContain("Dot · ");
   expect(schedule.textContent).toContain("Scout · Watch");

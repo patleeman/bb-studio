@@ -9959,6 +9959,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationsOutputAutomationsItemKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -9973,10 +9974,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationsOutputAutomationsItemKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationsOutputAutomationsItemState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationsOutputAutomationsItemModel? = nil, script: BotAutomationsOutputAutomationsItemScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationsOutputAutomationsItemKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationsOutputAutomationsItemState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationsOutputAutomationsItemModel? = nil, script: BotAutomationsOutputAutomationsItemScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule
@@ -10229,6 +10231,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationCreateOutputKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -10243,10 +10246,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationCreateOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationCreateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationCreateOutputModel? = nil, script: BotAutomationCreateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationCreateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationCreateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationCreateOutputModel? = nil, script: BotAutomationCreateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule
@@ -10461,6 +10465,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationUpdateOutputKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -10475,10 +10480,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationUpdateOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationUpdateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationUpdateOutputModel? = nil, script: BotAutomationUpdateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationUpdateOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationUpdateOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationUpdateOutputModel? = nil, script: BotAutomationUpdateOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule
@@ -10625,6 +10631,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationPauseOutputKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -10639,10 +10646,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationPauseOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationPauseOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationPauseOutputModel? = nil, script: BotAutomationPauseOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationPauseOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationPauseOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationPauseOutputModel? = nil, script: BotAutomationPauseOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule
@@ -10789,6 +10797,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationResumeOutputKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -10803,10 +10812,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationResumeOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationResumeOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationResumeOutputModel? = nil, script: BotAutomationResumeOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationResumeOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationResumeOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationResumeOutputModel? = nil, script: BotAutomationResumeOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule
@@ -10953,6 +10963,7 @@ public enum Studio {
     public var id: String?
     public var kind: BotAutomationRunNowOutputKind?
     public var name: String?
+    public var bbIds: [String]?
     public var original: Bool?
     public var instruction: String?
     public var schedule: StudioJSONValue?
@@ -10967,10 +10978,11 @@ public enum Studio {
     public var targetName: String?
     public var threadId: String?
 
-    public init(id: String? = nil, kind: BotAutomationRunNowOutputKind? = nil, name: String? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationRunNowOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationRunNowOutputModel? = nil, script: BotAutomationRunNowOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
+    public init(id: String? = nil, kind: BotAutomationRunNowOutputKind? = nil, name: String? = nil, bbIds: [String]? = nil, original: Bool? = nil, instruction: String? = nil, schedule: StudioJSONValue? = nil, scheduleText: String? = nil, state: BotAutomationRunNowOutputState? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastOutcome: String? = nil, model: BotAutomationRunNowOutputModel? = nil, script: BotAutomationRunNowOutputScript? = nil, target: String? = nil, targetName: String? = nil, threadId: String? = nil) {
       self.id = id
       self.kind = kind
       self.name = name
+      self.bbIds = bbIds
       self.original = original
       self.instruction = instruction
       self.schedule = schedule

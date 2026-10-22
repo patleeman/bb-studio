@@ -315,7 +315,7 @@ export class Automations {
     if (heartbeat) {
       const automation = hbAutomation ? bb.get(hbAutomation.id) : undefined;
       views.push({
-        id: HEARTBEAT_ID, kind: "checkin", name: HEARTBEAT_NAME, original: true,
+        id: HEARTBEAT_ID, kind: "checkin", name: HEARTBEAT_NAME, original: true, bbIds: hbAutomation ? [hbAutomation.id] : [],
         instruction: "What your Memory page's Check-in section says.",
         schedule: fromHeartbeat(heartbeat), scheduleText: describeSchedule(fromHeartbeat(heartbeat)),
         state: heartbeat.enabled ? "active" : "paused", nextRunAt: heartbeat.enabled ? automation?.nextRunAt ?? null : null, lastRunAt: automation?.lastRunAt ?? null,
@@ -342,7 +342,7 @@ export class Automations {
       const schedule = JSON.parse(row.schedule_json) as Schedule;
       const runner = row.target !== "main" ? runners.find((each) => each.id === row.target) : null;
       views.push({
-        id: row.id, kind: row.kind, name: row.name, original: false, instruction: row.instruction,
+        id: row.id, kind: row.kind, name: row.name, original: false, bbIds: this.ids(row), instruction: row.instruction,
         schedule, scheduleText: describeSchedule(schedule),
         state, nextRunAt: state === "active" && Number.isFinite(next) ? next : null, lastRunAt: Math.max(last, row.last_fired_at ?? 0) || null,
         lastOutcome: row.cleanup_pending ? "Cleanup incomplete; will retry" : row.provision_pending ? "Provisioning incomplete; will retry" : this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),

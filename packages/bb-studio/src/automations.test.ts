@@ -57,7 +57,7 @@ it("lists the original check-in first, unchanged, then new ones", async () => {
   const x = await setup();
   const list = await x.auto.list();
   expect(list).toHaveLength(1);
-  expect(list[0]).toMatchObject({ id: "heartbeat", kind: "checkin", name: "Check-in", original: true, state: "active", scheduleText: "Weekdays 8:00 AM" });
+  expect(list[0]).toMatchObject({ id: "heartbeat", kind: "checkin", name: "Check-in", original: true, bbIds: ["hb"], state: "active", scheduleText: "Weekdays 8:00 AM" });
   expect(x.setHeartbeat).not.toHaveBeenCalled();
   expect(x.calls.some((call) => call.method !== "automations_list")).toBe(false);
 });
@@ -66,6 +66,7 @@ it("makes a check-in with two times as one automation, on a cheaper model", asyn
   const x = await setup();
   const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "Summarize my day.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00", "18:30"], timezone: "America/New_York" }, model: { model: "gpt-mini", reasoning: "low" } });
   expect(x.automations).toHaveLength(2);
+  expect(made.bbIds).toEqual(x.automations.map(automation => automation.id));
   expect(x.automations.map((a) => (a.trigger as { cron: string }).cron)).toEqual(["0 8 * * 1-5", "30 18 * * 1-5"]);
   expect(x.automations.every((a) => a.enabled)).toBe(true);
   expect(x.automations[0]!.execution).toMatchObject({ mode: "agent", targetThreadId: "bot1", model: "gpt-mini", reasoningLevel: "low", prompt: checkinPrompt("Brief", "Summarize my day.") });
