@@ -14,6 +14,7 @@ import type { RestoreTally } from "../kit/backup";
 import type { BackupHandlers } from "../kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { BOT_ID } from "../bot";
 import { PERSONAL_PROJECT_ID } from "../project-lead";
 
 const text = z.string().max(100_000);
@@ -27,7 +28,8 @@ const viewRow = z.object({ id, name: z.string().min(1).max(60), query: z.string(
 const runRow = z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) });
 const leadRow = z.object({ project_id: id, lead_thread_id: nullable(id), created_at: time, updated_at: time, run: nullable(runRow) });
 const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
-const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string().min(1).max(16), state: z.enum(["active", "paused", "stopped"]), memory_page_id: nullable(id), shape: z.string().max(20).nullable().optional(), color: z.string().max(20).nullable().optional(), role: z.string().max(400).nullable().optional(), created_at: time, updated_at: time });
+// Version 1 omitted thread/provider fields; only its primary can inherit the personal lead.
+const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string().min(1).max(16), state: z.enum(["active", "paused", "stopped"]), thread_id: nullable(id).optional(), provider_id: nullable(id).optional(), memory_page_id: nullable(id), shape: z.string().max(20).nullable().optional(), color: z.string().max(20).nullable().optional(), role: z.string().max(400).nullable().optional(), created_at: time, updated_at: time });
 const botSkillRow = z.object({ bot_id: id, name: z.string().min(1).max(64), description: z.string().max(500), body: z.string().max(20_000), created_at: time, updated_at: time });
 const linkRow = z.object({ from_plugin: id, from_id: id, to_plugin: id, to_id: id, kind: z.string().max(50), source: z.string().max(300) });
 const threadRow = z.object({ thread_id: id, plugin_id: id, item_id: id, role: z.string().max(50), state: z.string().max(50), created_at: time, updated_at: time, metadata: text });
@@ -40,7 +42,7 @@ const FILES = {
   itemTags: ["item-tags.json", z.array(itemTagRow)],
   views: ["views.json", z.array(viewRow)],
   leads: ["project-leads.json", z.array(leadRow)],
-  /** The Bot (its thread is the personal project's lead) and its own skills. */
+  /** Each Bot's conversation, provider identity and own skills. */
   bots: ["bots.json", z.array(botRow).max(10)],
   botSkills: ["bot-skills.json", z.array(botSkillRow)],
   links: ["links.json", z.array(linkRow)],
@@ -73,7 +75,7 @@ export interface StudioDataDeps {
 
 export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): BackupHandlers {
   return {
-    version: 1,
+    version: 2,
     async backup(writer) {
       const all = <T>(sql: string) => db.prepare(sql).all() as T[];
       const data: Data = {
@@ -82,7 +84,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
         leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
           .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
-        bots: all("SELECT id, name, avatar, state, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
+        bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
         botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at FROM bot_skills ORDER BY bot_id, name"),
         links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
         threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
@@ -126,6 +128,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         ...data.threads.map((row) => row.thread_id),
         ...data.leads.flatMap((lead) => (lead.lead_thread_id ? [lead.lead_thread_id] : [])),
         ...data.chief.map((row) => row.thread_id),
+        ...data.bots.flatMap((bot) => bot.thread_id ? [bot.thread_id] : []),
       ]);
       const existing = new Set<string>();
       for (const threadId of threadIds) if (await deps.threadExists(threadId).catch(() => false)) existing.add(threadId);
@@ -138,7 +141,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         if (!(error instanceof DryRun)) throw error;
       }
       const missing = threadIds.size - existing.size;
-      if (missing) tally.note(`${missing} BB thread${missing === 1 ? "" : "s"} from the backup ${missing === 1 ? "isn't" : "aren't"} on this BB; item chats and leads for ${missing === 1 ? "it" : "them"} were left out.`);
+      if (missing) tally.note(`${missing} BB thread${missing === 1 ? "" : "s"} from the backup ${missing === 1 ? "isn't" : "aren't"} on this BB; item chats, leads and Bot conversation links for ${missing === 1 ? "it" : "them"} were left out.`);
       if (!dryRun) deps.changed?.();
     },
   };
@@ -211,18 +214,32 @@ function apply(
     tally.record("created", item);
   }
 
-  // The Bot comes back only when there is none here; its thread is the personal project's lead (above).
+  // Bots come back only when there are none here. Only the primary follows the personal lead.
   // A paused Bot stays paused; an active one's check-ins come back off, as Heartbeats do.
   const hasBot = !!db.prepare("SELECT 1 FROM bots").get();
+  const primary = data.bots.find((bot) => bot.id === BOT_ID) ?? [...data.bots].sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))[0];
   for (const bot of data.bots) {
     const item = { id: bot.id, title: bot.name };
     if (hasBot) {
       tally.record(db.prepare("SELECT 1 FROM bots WHERE id = ?").get(bot.id) ? "unchanged" : "kept", item, "This BB already has a Bot; it stayed.");
       continue;
     }
-    const thread = (db.prepare("SELECT lead_thread_id FROM project_leads WHERE project_id = ?").get(PERSONAL_PROJECT_ID) as { lead_thread_id: string | null } | undefined)?.lead_thread_id ?? null;
-    db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, memory_page_id, shape, color, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)")
-      .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.memory_page_id, bot.shape ?? null, bot.color ?? null, bot.role ?? null, bot.created_at, bot.updated_at);
+    let thread = bot.thread_id && threads.has(bot.thread_id) ? bot.thread_id : null;
+    if (bot.id === primary?.id) {
+      const lead = (db.prepare("SELECT lead_thread_id FROM project_leads WHERE project_id = ?").get(PERSONAL_PROJECT_ID) as { lead_thread_id: string | null } | undefined)?.lead_thread_id;
+      if (lead) thread = lead;
+      else if (thread) {
+        if (db.prepare("SELECT 1 FROM project_leads WHERE lead_thread_id = ?").get(thread)) {
+          thread = null;
+          tally.note("The primary Bot's conversation already leads another project here; it was left unattached.");
+        } else {
+          db.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT (project_id) DO UPDATE SET lead_thread_id = excluded.lead_thread_id, updated_at = excluded.updated_at")
+            .run(PERSONAL_PROJECT_ID, thread, bot.created_at, bot.updated_at);
+        }
+      }
+    }
+    db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, provider_id, heartbeat_was_on, memory_page_id, shape, color, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)")
+      .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.provider_id ?? null, bot.memory_page_id, bot.shape ?? null, bot.color ?? null, bot.role ?? null, bot.created_at, bot.updated_at);
     tally.record("created", item);
   }
   const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
