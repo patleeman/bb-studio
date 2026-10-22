@@ -78,4 +78,27 @@ describe("checklists", () => {
     checklists.signal("thr_1", "failed", "Boom");
     expect(await checklists.handOff({ pageId: page.id, blockId: item!.blockId })).toEqual({ threadId: "thr_2" });
   });
+
+  it("falls back only when the project has no Git repository", async () => {
+    const { service, checklists, bb } = setup(() => ({}));
+    const page = service.createPage({ projectId: "proj_1", parentId: null, title: "Plan", markdown: "- [ ] Ship it\n", actor: HUMAN_USER_ID });
+    const [item] = pageCheckboxes(readMarkdown(service.hub.open(page.id).doc, { ids: true }));
+    bb.sdk.threads.spawn.mockRejectedValueOnce(new Error("This project is not a Git repository."));
+
+    await expect(checklists.handOff({ pageId: page.id, blockId: item!.blockId })).resolves.toEqual({ threadId: "thr_new" });
+    expect(bb.sdk.threads.spawn).toHaveBeenCalledTimes(2);
+    expect(bb.sdk.threads.spawn.mock.calls[0]![0]).toMatchObject({ environment: { workspace: { type: "managed-worktree" } } });
+    expect(bb.sdk.threads.spawn.mock.calls[1]![0]).toMatchObject({ environment: { workspace: { type: "unmanaged" } } });
+  });
+
+  it("preserves other worktree spawn failures", async () => {
+    const { service, checklists, bb, db } = setup(() => ({}));
+    const page = service.createPage({ projectId: "proj_1", parentId: null, title: "Plan", markdown: "- [ ] Ship it\n", actor: HUMAN_USER_ID });
+    const [item] = pageCheckboxes(readMarkdown(service.hub.open(page.id).doc, { ids: true }));
+    bb.sdk.threads.spawn.mockRejectedValueOnce(new Error("Host permission denied."));
+
+    await expect(checklists.handOff({ pageId: page.id, blockId: item!.blockId })).rejects.toThrow("Host permission denied.");
+    expect(bb.sdk.threads.spawn).toHaveBeenCalledOnce();
+    expect(db.prepare("SELECT * FROM checklist_handoffs").all()).toEqual([]);
+  });
 });

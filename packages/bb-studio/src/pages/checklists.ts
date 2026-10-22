@@ -129,8 +129,14 @@ export class Checklists {
         environment: { type: "host", hostId, workspace },
         pluginMetadata: { pageId: meta.id, blockId: checkbox.blockId },
       } as never);
-    // A worktree keeps the agent's changes apart; a folder that isn't a Git repository can't have one.
-    const thread = await spawn({ type: "managed-worktree", baseBranch: { kind: "default" } }).catch(() => spawn({ type: "unmanaged", path: null }));
+    // A worktree keeps the agent's changes apart; only a non-Git project needs an unmanaged workspace.
+    let thread;
+    try {
+      thread = await spawn({ type: "managed-worktree", baseBranch: { kind: "default" } });
+    } catch (error) {
+      if (!/not (?:a )?git repository/i.test(errorMessage(error))) throw error;
+      thread = await spawn({ type: "unmanaged", path: null });
+    }
     const now = Date.now();
     this.db.prepare("INSERT OR IGNORE INTO checklist_handoffs (thread_id, page_id, block_id, title, state, note, created_at, updated_at) VALUES (?, ?, ?, ?, 'starting', NULL, ?, ?)")
       .run(thread.id, meta.id, checkbox.blockId, title, now, now);
