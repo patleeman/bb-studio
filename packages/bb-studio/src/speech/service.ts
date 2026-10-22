@@ -27,7 +27,7 @@ export interface SpeechOverrides {
   instructions?: string;
 }
 
-interface Prepared { engine: SpeechConfig["engine"]; request: SpeechRequest; at: number }
+interface Prepared { engineIdentity: string; request: SpeechRequest; at: number }
 
 export class SpeechService {
   private readonly prepared = new Map<string, Prepared>();
@@ -44,6 +44,10 @@ export class SpeechService {
 
   private engine(config = this.options.config()): SpeechEngine {
     return (this.options.engineFor ?? engineFor)(config);
+  }
+
+  private engineIdentity(config: SpeechConfig): string {
+    return JSON.stringify([config.engine, config.engine === "custom" ? config.endpoint.trim() : ""]);
   }
 
   /** Why speech can't run with the current settings, or null when it can. */
@@ -83,7 +87,7 @@ export class SpeechService {
     const request = this.request(text, overrides, config);
     const key = createHash("sha256").update(JSON.stringify([config.engine, config.engine === "custom" ? config.endpoint : "", request.model, request.voice, request.instructions ?? "", request.text])).digest("hex").slice(0, 40);
     this.prepared.delete(key);
-    this.prepared.set(key, { engine: config.engine, request, at: Date.now() });
+    this.prepared.set(key, { engineIdentity: this.engineIdentity(config), request, at: Date.now() });
     this.forgetOld();
     return key;
   }
@@ -121,7 +125,7 @@ export class SpeechService {
     const entry = this.prepared.get(key);
     if (!entry) return null;
     const config = this.options.config();
-    if (config.engine !== entry.engine) throw new Error("The speech engine changed since this audio was asked for; ask again.");
+    if (this.engineIdentity(config) !== entry.engineIdentity) throw new Error("The speech engine settings changed since this audio was asked for; ask again.");
     // The client's request can end early; the engine's audio is still saved for next time.
     const audio = await this.engine(config).synthesize(entry.request);
     const [toClient, toCache] = audio.body.tee();
@@ -138,7 +142,9 @@ export class SpeechService {
     const entry = this.prepared.get(key)!;
     const making = (async () => {
       if (await this.cached(key)) return;
-      const audio = await this.engine().synthesize(entry.request);
+      const config = this.options.config();
+      if (this.engineIdentity(config) !== entry.engineIdentity) throw new Error("The speech engine settings changed since this audio was asked for; ask again.");
+      const audio = await this.engine(config).synthesize(entry.request);
       await this.save(key, audio.mimeType, audio.body);
     })();
     this.making.set(key, making);

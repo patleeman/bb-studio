@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpeechConfig, SpeechEngine, SpeechRequest } from "./engines";
 import { SpeechService } from "./service";
 
@@ -65,6 +65,36 @@ describe("SpeechService", () => {
     expect(service.prepare("Hi.", { voice: "v2" })).not.toBe(first);
     setConfig({ model: "m2" });
     expect(service.prepare("Hi.")).not.toBe(first);
+  });
+
+  it("binds prepared audio and warming to the custom endpoint", async () => {
+    let current: SpeechConfig = { ...config, engine: "custom", endpoint: "http://a.test/v1" };
+    const synthesized: string[] = [];
+    const warnings: string[] = [];
+    const service = new SpeechService({
+      config: () => current,
+      cacheDir: dir,
+      warn: (warning) => warnings.push(warning),
+      engineFor: (next) => ({
+        id: "custom",
+        label: "Custom",
+        models: async () => [],
+        synthesize: async () => {
+          synthesized.push(next.endpoint);
+          return { mimeType: "audio/mpeg", body: new Response("audio").body! };
+        },
+      }),
+    });
+
+    const prepared = service.prepare("Prepared for A");
+    current = { ...current, endpoint: "http://b.test/v1" };
+    await expect(service.audio(prepared)).rejects.toThrow(/settings changed/);
+    expect(synthesized).toEqual([]);
+
+    service.warm("Warm for B");
+    current = { ...current, endpoint: "http://c.test/v1" };
+    await vi.waitFor(() => expect(warnings.join(" ")).toMatch(/settings changed/));
+    expect(synthesized).toEqual([]);
   });
 
   it("refuses empty or over-long text and an engine that isn't set up", () => {
