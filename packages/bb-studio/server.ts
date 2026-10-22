@@ -48,7 +48,7 @@ import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type ThreadOption
 import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { externalProviders } from "./src/external-bots";
 import { EXTERNAL_AGENTS_PLUGIN_ID } from "./src/bot";
-import { ChangeLog } from "./src/changes";
+import { ChangeLog, recordProviderChanges } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
@@ -914,21 +914,7 @@ export default async function plugin(bb: BbPluginApi) {
     recentThreads: async () => ({ threads: await recentThreads() }),
     studio_changed: async ({ pluginId, ids, removed }) => {
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
-      if (!ids && !removed) changes.append(null);
-      let fresh: HubItem[] | null = [];
-      let fallbackKind: string | null = null;
-      if (ids?.length) {
-        try {
-          const provider = (await hub.providers()).find((entry) => entry.pluginId === pluginId && entry.state === "ready");
-          if (!provider) throw new Error("Provider unavailable");
-          fallbackKind = provider.kinds.length === 1 ? provider.kinds[0]!.id : null;
-          fresh = await hub.get(pluginId, ids);
-        } catch { fresh = null; changes.append(null); }
-      }
-      const byId = new Map(fresh?.map((item) => [item.id, item]));
-      for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
-      for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
-      services.forgetVersions(pluginId, [...(removed ?? []), ...(fresh === null ? [] : (ids ?? []).filter((id) => !byId.has(id)))]);
+      await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
     },
