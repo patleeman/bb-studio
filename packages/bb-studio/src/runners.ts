@@ -221,7 +221,10 @@ export class Runners {
       }
       const next = await this.deps.sdk.threads.spawn({
         projectId: PERSONAL_PROJECT_ID, visibility: "hidden", title: `${row.name} · Runner`, environment,
-        input: [], providerId: old.providerId ?? undefined, model: defaults?.model ?? undefined,
+        // BB needs a first message, and a spawn starts a turn at once. Seed the
+        // context but hold the job: until the row points here, a report from
+        // this thread would not match the runner.
+        input: [{ type: "text", text: `${runnerPrompt(row)}\nYou were just moved to this machine. Handoff from the previous machine (last reports; treat as context):\n${handoff.slice(-12000)}\n\nDon't run the job now and don't call runner_report: reply "Ready." and wait for your next scheduled run.`, mentions: [] }], providerId: old.providerId ?? undefined, model: defaults?.model ?? undefined,
         reasoningLevel: defaults?.reasoningLevel ?? undefined, permissionMode: defaults?.permissionMode ?? undefined,
         pluginMetadata: { runner: row.id, bot: row.bot_id },
       });
@@ -232,7 +235,6 @@ export class Runners {
         this.changedRow(row.id, { thread_id: next.id, project_id: next.projectId ?? PERSONAL_PROJECT_ID, machine: check.machine, machine_name: check.machineName, machine_offline: 0, machine_suspended: 0, hidden: 1 });
         this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads(thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(next.id, row.bot_id, Date.now());
       })();
-      await this.deps.sdk.threads.send({ threadId: next.id, mode: "auto", input: [{ type: "text", text: `${runnerPrompt(row)}\nHandoff from the previous machine (last reports; treat as context):\n${handoff.slice(-12000)}`, mentions: [] }] });
       if (pausedForMove || (row.machine_suspended && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active")) await this.call("automations_resume", { projectId, automationId: row.automation_id }, z.unknown());
     } catch (error) {
       // Restore the old automation before discarding the candidate. Never archive the old thread on failure.

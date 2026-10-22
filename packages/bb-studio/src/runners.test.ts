@@ -15,7 +15,8 @@ async function setup() {
   let count = 0;
   const add = (fields: Partial<Thread> & { id: string }) => { const thread = makeThreadResponse({ projectId: "proj_personal", providerId: "codex", ...fields }); threads.set(thread.id, thread); return thread; };
   add({ id: "bot1", title: "Bot" });
-  const spawn = vi.fn(async (args: { projectId: string; title?: string }) => add({ id: `thr_r${++count}`, projectId: args.projectId, title: args.title ?? null }));
+  // Like BB: a spawn needs at least one input entry.
+  const spawn = vi.fn(async (args: { projectId: string; title?: string; input?: unknown[] }) => { if (!args.input?.length) throw new Error("HTTP 400: input must contain at least one entry"); return add({ id: `thr_r${++count}`, projectId: args.projectId, title: args.title ?? null }); });
   const get = vi.fn(async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; });
   const send = vi.fn(async () => ({ ok: true, delivery: "sent" }));
   const update = vi.fn(async (args: { threadId: string; parentThreadId?: string | null; title?: string }) => { const thread = threads.get(args.threadId)!; threads.set(args.threadId, { ...thread, ...args } as Thread); return {}; });
@@ -483,9 +484,10 @@ it("migrates the same row and automation with the last 3 reports, then archives;
   expect(moved.threadId).not.toBe(runner.threadId);
   expect(x.runners.automation(runner.id)?.id).toBe(automationId);
   expect(x.automations[0]).toMatchObject({ execution: { targetThreadId: moved.threadId } });
-  const text = (x.send.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
+  const text = (x.spawn.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
   expect(text).toContain("one\ntwo\nthree");
   expect(text).not.toContain("discard");
+  expect(text).toContain("Don't run the job now");
   expect(x.threads.get(runner.threadId!)?.archivedAt).toBe(5);
   expect(x.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ?").get(moved.threadId)).toEqual({ bot_id: "bot_main" });
   const back = await x.runners.migrate({ id: runner.id, machine: null });
@@ -506,7 +508,7 @@ it("refuses migration during a run or to an unready provider", async () => {
   expect(x.archive).not.toHaveBeenCalled();
 });
 
-it.each(["spawn", "retarget", "seed"])("keeps the old runner intact after %s failure", async failure => {
+it.each(["spawn", "retarget"])("keeps the old runner intact after %s failure", async failure => {
   const x = await setup();
   const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
   const execution = structuredClone(x.automations[0]!.execution);
@@ -517,7 +519,6 @@ it.each(["spawn", "retarget", "seed"])("keeps the old runner intact after %s fai
     x.callRpc.mockImplementationOnce(async args => original(args)); // temporary pause
     x.callRpc.mockImplementationOnce(async () => { throw new Error("retarget failed"); });
   }
-  if (failure === "seed") x.send.mockRejectedValueOnce(new Error("seed failed"));
   await expect(x.runners.migrate({ id: runner.id, machine: "red4" })).rejects.toThrow(`${failure} failed`);
   expect((await x.runners.get(runner.id)).threadId).toBe(runner.threadId);
   expect(x.automations[0]!.execution).toEqual(execution);
@@ -586,7 +587,7 @@ it("recovers pre-buffer reports from the old thread for migration", async () => 
   const runner = await x.runners.create({ name: "Files", job: "Check files", schedule });
   x.timeline.mockResolvedValue({ rows: [1, 2, 3, 4].map(n => ({ kind: "turn", children: [{ kind: "work", workKind: "tool", toolName: "mcp__studio__runner_report", toolArgs: { summary: `old ${n}` }, createdAt: n }] })) });
   await x.runners.migrate({ id: runner.id, machine: "red4" });
-  const text = (x.send.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
+  const text = (x.spawn.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
   expect(text).toContain("old 2\nold 3\nold 4");
   expect(text).not.toContain("old 1");
 });
