@@ -12,6 +12,7 @@ export const DASHBOARD_ICON = "studio/dashboard";
 export const DASHBOARD_TAB = "dashboards";
 /** Realtime channel: dashboard edits and fresh widget data. */
 export const REALTIME_CHANNEL = "dashboards";
+/** Both event types invalidate the full view, even at the same document updatedAt. */
 export const DASHBOARD_UPDATE_TYPE = "dashboard:updated";
 export const DATA_UPDATE_TYPE = "dashboard:data";
 
