@@ -58,6 +58,14 @@ describe("ProviderToken", () => {
 });
 
 describe("apnsPayload", () => {
+  it("can remove the body entirely when fixed fields leave no room for an ellipsis", () => {
+    const base = { to: "apns:x", title: "", body: "" };
+    const title = "x".repeat(4096 - Buffer.byteLength(apnsPayload(base)));
+    const payload = apnsPayload({ ...base, title, body: "long body" });
+    expect(Buffer.byteLength(payload)).toBe(4096);
+    expect(JSON.parse(payload).aps.alert.body).toBe("");
+  });
+
   it.each([{ title: "x".repeat(5000) }, { data: { extra: "x".repeat(5000) } }])("rejects fixed fields that cannot fit: %j", async (fields) => {
     const send = recordingSend({});
     const message = { to: `apns:${token}`, body: "long".repeat(2000), ...fields };

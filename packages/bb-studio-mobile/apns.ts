@@ -127,10 +127,11 @@ export function apnsPayload(message: ExpoMessage): string {
   const body = message.body ?? "";
   const full = renderPayload(message, body);
   if (Buffer.byteLength(full) <= APNS_MAX_PAYLOAD_BYTES) return full;
-  const minimum = renderPayload(message, "…");
+  const minimum = renderPayload(message, "");
   if (Buffer.byteLength(minimum) > APNS_MAX_PAYLOAD_BYTES) {
     throw new Error("PayloadTooLarge: APNs title or data exceeds the 4096-byte payload budget");
   }
+  if (Buffer.byteLength(renderPayload(message, "…")) > APNS_MAX_PAYLOAD_BYTES) return minimum;
   // Shorten the body by whole code points so multi-byte text is never split.
   const chars = Array.from(body);
   let low = 0;
