@@ -10,10 +10,10 @@
 // It's checked out alone in a temporary worktree, so other
 // agents' uncommitted work in this checkout can't make it pass or fail, and
 // these must pass there: the repo checks, every package's typecheck and tests
-// (unless --skip-tests).
+// (tests only are omitted with --skip-tests).
 // Then origin/stable moves to it. Never force: a non-fast-forward is refused.
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,18 +48,7 @@ const results = [];
 let failed = false;
 try {
   git("worktree", "add", "--quiet", "--detach", tree, sha);
-  // Reuse this checkout's installed dependencies; package-local clean installs
-  // below still verify that each plugin declares everything it needs.
-  const link = (relative) => {
-    const from = join(repo, relative, "node_modules");
-    const to = join(tree, relative, "node_modules");
-    if (!existsSync(from) || !existsSync(join(tree, relative)) || existsSync(to)) return;
-    mkdirSync(to);
-    for (const entry of readdirSync(from)) symlinkSync(join(from, entry), join(to, entry));
-  };
-  link(".");
   const packages = readdirSync(join(tree, "packages"), { withFileTypes: true }).filter((entry) => entry.isDirectory() && existsSync(join(tree, "packages", entry.name, "package.json"))).map((entry) => entry.name);
-  for (const name of packages) link(join("packages", name));
 
   const env = { ...process.env, npm_config_cache: process.env.npm_config_cache || join(work, "npm-cache") };
   const step = (label, command, argv, cwd = tree) => {
@@ -72,30 +61,35 @@ try {
     return ok;
   };
 
+  // Validate the selected commit with its own lockfile, including native bindings.
+  if (!step("frozen workspace install", "pnpm", ["install", "--frozen-lockfile"], tree)) {
+    throw new Error("Frozen workspace install failed; release checks cannot use caller dependencies.");
+  }
+
+  const scriptTests = join(tree, "scripts", "test");
+  if (existsSync(scriptTests)) step("script regressions", process.execPath, ["--test", ...readdirSync(scriptTests).filter((file) => file.endsWith(".test.mjs")).map((file) => join(scriptTests, file))]);
+
   console.log(`Checking ${short} for stable${stable ? ` (now ${stable.slice(0, 8)})` : ""}:`);
   for (const check of ["check-marketplace", "check-docs", "check-icons", "check-sdk-compat", "check-native-payload-fixtures"]) {
     step(check, process.execPath, [join("scripts", `${check}.mjs`)]);
   }
   step("contracts", join(tree, "node_modules", ".bin", "tsx"), [join("scripts", "gen-contracts.mjs"), "--check"]);
-  if (!flag("--skip-tests")) {
-    for (const name of packages) {
-      const dir = join(tree, "packages", name);
-      const bin = (tool) => join(dir, "node_modules", ".bin", tool);
-      const config = readdirSync(dir).find((file) => /^vitest\.config\.[cm]?[jt]s$/.test(file));
-      const hasTests = Boolean(config) || existsSync(join(dir, "test")) || readdirSync(dir).some((file) => file.endsWith(".test.ts"));
-      // A package whose dependencies this checkout never installed (a new
-      // package before `pnpm install`) would otherwise skip its checks silently.
-      if (existsSync(join(dir, "tsconfig.json")) && !existsSync(bin("tsc"))) {
-        failed = true;
-        results.push({ label: `${name} typecheck`, ok: false });
-        console.log(`FAIL  ${name} typecheck: its dependencies aren't installed in this checkout; run pnpm install, then release again`);
-      } else if (existsSync(bin("tsc"))) step(`${name} typecheck`, bin("tsc"), ["--noEmit"], dir);
-      if (hasTests && !existsSync(bin("vitest"))) {
-        failed = true;
-        results.push({ label: `${name} tests`, ok: false });
-        console.log(`FAIL  ${name} tests: its dependencies aren't installed in this checkout; run pnpm install, then release again`);
-      } else if (hasTests) step(`${name} tests`, bin("vitest"), ["run", ...(config ? ["--config", config] : [])], dir);
-    }
+  for (const name of packages) {
+    const dir = join(tree, "packages", name);
+    const bin = (tool) => join(dir, "node_modules", ".bin", tool);
+    const config = readdirSync(dir).find((file) => /^vitest\.config\.[cm]?[jt]s$/.test(file));
+    const hasTests = Boolean(config) || existsSync(join(dir, "test")) || readdirSync(dir).some((file) => file.endsWith(".test.ts"));
+    // A missing package tool must fail rather than silently skip validation.
+    if (existsSync(join(dir, "tsconfig.json")) && !existsSync(bin("tsc"))) {
+      failed = true;
+      results.push({ label: `${name} typecheck`, ok: false });
+      console.log(`FAIL  ${name} typecheck: its frozen install did not provide the required tool`);
+    } else if (existsSync(bin("tsc"))) step(`${name} typecheck`, bin("tsc"), ["--noEmit"], dir);
+    if (!flag("--skip-tests") && hasTests && !existsSync(bin("vitest"))) {
+      failed = true;
+      results.push({ label: `${name} tests`, ok: false });
+      console.log(`FAIL  ${name} tests: its frozen install did not provide the required tool`);
+    } else if (!flag("--skip-tests") && hasTests) step(`${name} tests`, bin("vitest"), ["run", ...(config ? ["--config", config] : [])], dir);
   }
   // Build each plugin the way BB installs it from Git: its package directory
   // alone, `npm install --omit=dev` as BB runs it, then `bb plugin build`.
