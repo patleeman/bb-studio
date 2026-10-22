@@ -35,9 +35,21 @@ export function isApproved(store: DashboardStore, dashboardId: string, widget: W
   return store.commandApproved(dashboardId, scriptHash(widget.source));
 }
 
+type RefreshJob = {
+  dashboardId: string;
+  widget: Widget;
+  pending: Widget | null;
+  generation: number;
+  invalidated: boolean;
+  done: Promise<void>;
+  resolve(): void;
+};
+
 export class Refresher {
   private readonly viewers = new Map<string, Map<string, number>>();
-  private readonly running = new Set<string>();
+  private readonly jobs = new Map<string, RefreshJob>();
+  private readonly queue: RefreshJob[] = [];
+  private active = 0;
   private readonly now: () => number;
 
   constructor(private readonly deps: RefresherDeps) {
@@ -114,43 +126,86 @@ export class Refresher {
     return work.map((each) => each.widget.id);
   }
 
-  private async run(work: { dashboardId: string; widget: Widget }[]): Promise<void> {
-    if (this.deps.enabled && !this.deps.enabled()) return;
-    const queue = work.filter((each) => !this.running.has(`${each.dashboardId}:${each.widget.id}`));
-    const touched = new Map<string, string[]>();
-    const worker = async () => {
-      for (let next = queue.shift(); next; next = queue.shift()) {
-        await this.refreshOne(next.dashboardId, next.widget);
-        touched.set(next.dashboardId, [...(touched.get(next.dashboardId) ?? []), next.widget.id]);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(this.deps.concurrency ?? 4, queue.length) }, worker));
-    for (const [dashboardId, ids] of touched) this.deps.changed(dashboardId, ids);
+  /** Source edits invalidate even a command changed away and then back while it runs. */
+  invalidate(dashboardId: string, widgetIds: string[]): void {
+    for (const widgetId of widgetIds) {
+      const job = this.jobs.get(`${dashboardId}:${widgetId}`);
+      if (job) { job.generation++; job.pending = null; job.invalidated = true; }
+    }
   }
 
-  private async refreshOne(dashboardId: string, widget: Widget): Promise<void> {
+  private async run(work: { dashboardId: string; widget: Widget }[]): Promise<void> {
+    if (this.deps.enabled && !this.deps.enabled()) return;
+    const waiting = work.map(({ dashboardId, widget }) => {
+      const key = `${dashboardId}:${widget.id}`;
+      const existing = this.jobs.get(key);
+      if (existing) {
+        if (JSON.stringify(existing.widget.source) !== JSON.stringify(widget.source) || existing.invalidated) {
+          existing.invalidated = false;
+          existing.widget = widget;
+          existing.pending = widget;
+          existing.generation++;
+        }
+        return existing.done;
+      }
+      let resolve!: () => void;
+      const done = new Promise<void>((finish) => { resolve = finish; });
+      const job: RefreshJob = { dashboardId, widget, pending: widget, generation: 0, invalidated: false, done, resolve };
+      this.jobs.set(key, job);
+      this.queue.push(job);
+      return done;
+    });
+    this.drain();
+    await Promise.all(waiting);
+  }
+
+  private drain(): void {
+    while (this.active < (this.deps.concurrency ?? 4) && this.queue.length) {
+      const job = this.queue.shift()!;
+      this.active++;
+      void this.runJob(job);
+    }
+  }
+
+  private async runJob(job: RefreshJob): Promise<void> {
+    try {
+      while (job.pending) {
+        const widget = job.pending;
+        const generation = job.generation;
+        job.pending = null;
+        await this.refreshOne(job.dashboardId, widget, () => job.generation === generation);
+      }
+    } catch (error) {
+      this.deps.log?.(`Dashboard ${job.dashboardId} widget ${job.widget.id}: ${errorMessage(error)}`);
+    } finally {
+      this.jobs.delete(`${job.dashboardId}:${job.widget.id}`);
+      this.active--;
+      job.resolve();
+      this.drain();
+    }
+  }
+
+  private async refreshOne(dashboardId: string, widget: Widget, valid: () => boolean): Promise<void> {
     const { store } = this.deps;
     if (this.deps.enabled && !this.deps.enabled()) return;
     const current = store.doc(dashboardId).widgets.find((each) => each.id === widget.id);
-    if (!current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
+    if (!valid() || !current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
     if (current.source.kind === "script" && !isApproved(store, dashboardId, current)) return;
-    const key = `${dashboardId}:${widget.id}`;
-    this.running.add(key);
-    // The attempt counts before it runs, so a failure isn't retried at once.
+    // runJob owns the reservation's finally, including storage failures here.
     store.markAttempt(dashboardId, widget.id, this.now());
     try {
       const raw = widget.source.kind === "url" ? await this.deps.fetchUrl(widget.source) : await this.deps.runScript(widget.source);
       // The widget may have changed or gone while this ran.
       const current = store.doc(dashboardId).widgets.find((each) => each.id === widget.id);
-      if (!current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
+      if (!valid() || !current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
       store.setValue(dashboardId, widget.id, keepValue(raw, widget.source.select), this.now());
+      this.deps.changed(dashboardId, [widget.id]);
     } catch (error) {
       const current = store.doc(dashboardId).widgets.find((each) => each.id === widget.id);
-      if (!current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
+      if (!valid() || !current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
       store.setError(dashboardId, widget.id, errorMessage(error), this.now());
+      this.deps.changed(dashboardId, [widget.id]);
       this.deps.log?.(`Dashboard ${dashboardId} widget ${widget.id}: ${errorMessage(error)}`);
-    } finally {
-      this.running.delete(key);
     }
   }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyOps } from "../ops";
 import { EMPTY_LAYOUTS, type Source } from "../shared";
 import { memoryStore } from "../test/host";
@@ -139,5 +139,63 @@ describe("refresh gating", () => {
     const off = new Refresher({ store: t.store, fetchUrl: async () => { throw new Error("should not run"); }, runScript: async () => null, changed: () => {}, enabled: () => false });
     await off.tick();
     expect(t.store.dataFor(t.row.id, t.widgets[0]!.id)).toBeNull();
+  });
+});
+
+
+describe("shared refresh queue", () => {
+  it("reserves queued widgets across overlapping ticks and manual refreshes", async () => {
+    const t = setup(Array.from({ length: 6 }, (_, i) => ({ kind: "script", command: `echo ${i}` })));
+    for (const widget of t.widgets) t.store.approve(t.row.id, widget.id, scriptHash(widget.source), widget.source.command!, null);
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const ran: string[] = [];
+    let active = 0, peak = 0;
+    const refresher = new Refresher({
+      store: t.store, concurrency: 2, now: () => 10_000_000_000,
+      fetchUrl: async () => null,
+      runScript: async (source) => {
+        active++; peak = Math.max(peak, active); ran.push(source.command!);
+        await blocked;
+        active--; return 7;
+      }, changed: () => {},
+    });
+    const first = refresher.tick();
+    const second = refresher.tick();
+    const manual = refresher.refreshNow(t.row.id);
+    release();
+    await Promise.all([first, second, manual]);
+    expect(peak).toBe(2);
+    expect(ran.sort()).toEqual(t.widgets.map((widget) => widget.source.command!).sort());
+  });
+
+  it("releases a reservation when marking the attempt fails", async () => {
+    const t = setup([{ kind: "url", url: "https://example.com" }]);
+    vi.spyOn(t.store, "markAttempt").mockImplementationOnce(() => { throw new Error("busy"); });
+    await t.refresher.tick().catch(() => {});
+    await t.refresher.tick();
+    expect(t.fetched).toHaveLength(1);
+  });
+
+  it("queues the newest source behind an active refresh and discards its old result", async () => {
+    const t = setup([{ kind: "url", url: "https://example.com/old" }]);
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const fetched: string[] = [];
+    const refresher = new Refresher({
+      store: t.store, now: () => 10_000_000_000,
+      fetchUrl: async (source) => { fetched.push(source.url!); if (fetched.length === 1) await blocked; return source.url; },
+      runScript: async () => null, changed: () => {},
+    });
+    const first = refresher.tick();
+    const doc = t.store.doc(t.row.id);
+    doc.widgets[0]!.source = { kind: "url", url: "https://example.com/new" };
+    t.store.write(t.row.id, doc, "user", "edit");
+    t.store.clearData(t.row.id, doc.widgets[0]!.id);
+    const second = refresher.tick();
+    release();
+    await Promise.all([first, second]);
+    expect(fetched).toEqual(["https://example.com/old", "https://example.com/new"]);
+    expect(JSON.parse(t.store.dataFor(t.row.id, doc.widgets[0]!.id)!.value!)).toBe("https://example.com/new");
   });
 });
