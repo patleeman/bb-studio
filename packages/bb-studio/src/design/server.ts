@@ -25,7 +25,7 @@ import { DesignStore, displayName, type Writer } from "./server/store";
 import { designProvider, screenText } from "./server/provider";
 import { designBackupHandlers } from "./server/backup";
 import { withScreenScript } from "./server/screen-script";
-import { VERDICT_DONE, parseVerdict, reviewTargets, reviewerPrompt } from "./server/review";
+import { runDesignReview } from "./server/review-runner";
 import { MAX_REVIEWS_IN_A_ROW, ReviewQueue } from "./server/review-queue";
 import type { CommentRow, DesignRow, ScreenRow } from "./server/store";
 import { MAX_OTHER_CHARS, MAX_TEXT_CHARS, summarizeAnswers, type Answers, type QuestionForm } from "./questions";
@@ -124,7 +124,10 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   // Agents write a screen at a time; Studio only needs to hear about it now and then.
   const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
-  const changed = (id: string, updatedAt: number, by: Writer | "studio") => changeBus.changed(id, updatedAt, by);
+  const changed = (id: string, updatedAt: number, by: Writer | "studio") => {
+    reviews.screensChanged(id);
+    changeBus.changed(id, updatedAt, by);
+  };
   /** Tells Studio an agent made a design, so it is linked to the thread. */
   const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
 
@@ -132,15 +135,13 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   // Reviews (src/server/review.ts, src/server/review-queue.ts). The latest per
   // design lives in memory: a restart forgets it, and the canvas then shows no status.
   // ---------------------------------------------------------------------
-  /** Bounds a review: a stuck reviewer is stopped, and the round counts as unreviewed. */
-  const REVIEW_TIMEOUT_MS = 15 * 60_000;
-
   const pausedNote = [
     `That's ${MAX_REVIEWS_IN_A_ROW} reviews in a row that found problems, so automatic review is paused for this design.`,
     "Fix what you can, then tell the user plainly: review paused after " + MAX_REVIEWS_IN_A_ROW + " rounds, and what still needs work.",
     "Don't call design_ready again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
   ].join(" ");
   const reviews = new ReviewQueue({
+    revision: (designId, screenIds) => JSON.stringify(screenIds.map((id) => store.screen(designId, id)?.updated_at ?? null)),
     publish(designId) {
       if (store.get(designId)) changed(designId, store.bump(designId, "agent"), "agent");
     },
@@ -155,56 +156,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
         mode: "queue-if-active",
       });
     },
-    /** Runs one review in a hidden thread beside the design's own. */
-    async run(designId, { screenIds, requesterThreadId }, disposed) {
-      const row = store.get(designId);
-      if (!row) throw new Error("Design not found.");
-      const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
-      let reviewerId: string | null = null;
-      try {
-        const requester = await bb.sdk.threads.get({ threadId: requesterThreadId });
-        const hostId = (await bb.sdk.system.config()).primaryHostId;
-        if (!hostId) throw new Error("This BB server has no local machine to run the reviewer's browser on.");
-        const screens = screenIds.flatMap((id) => {
-          const screen = store.screen(designId, id);
-          return screen ? [{ id, caption: screen.caption, viewport: parseViewport(screen.viewport) ?? "desktop", steps: parseSteps(screen.html), url: screenUrl(designId, id, screen.updated_at) }] : [];
-        });
-        const prompt = reviewerPrompt({
-          designName: displayName(row),
-          designId,
-          round,
-          screens,
-          targets: reviewTargets(bb.server.loopbackBaseUrl, screens),
-          hostId,
-          rules: "The \"Taste rules\" and \"Writing screens\" sections of the design skill. Read the skill first.",
-        });
-        const reviewer = await bb.sdk.threads.spawn({
-          projectId: requester.projectId,
-          environment: { type: "reuse", environmentId: requester.environmentId },
-          providerId: requester.providerId,
-          title: `Review: ${displayName(row)}${round ? `, round ${round}` : ""}`,
-          visibility: "hidden",
-          pluginMetadata: { role: "design-reviewer", designId },
-          prompt,
-        } as Parameters<typeof bb.sdk.threads.spawn>[0]);
-        reviewerId = reviewer.id;
-        const signal = AbortSignal.any([disposed, AbortSignal.timeout(REVIEW_TIMEOUT_MS)]);
-        // Wait for it to start, then to finish; a fast reviewer may already be done.
-        await bb.sdk.threads.wait({ threadId: reviewer.id, status: "active", timeoutMs: 60_000, signal }).catch(() => undefined);
-        await bb.sdk.threads.wait({ threadId: reviewer.id, status: "idle", signal });
-        const { output } = await bb.sdk.threads.output({ threadId: reviewer.id });
-        const { verdict, findings } = parseVerdict(output ?? "");
-        if (verdict === "needs_work") return { verdict, findings };
-        if (verdict === "done") return { verdict };
-        throw new Error(`The reviewer ended without a verdict (expected "${VERDICT_DONE}" or "needs_work").`);
-      } finally {
-        // Hidden workers must always be released, or the agent process lingers.
-        if (reviewerId) {
-          await bb.sdk.threads.archive({ threadId: reviewerId }).catch(() => undefined);
-          await bb.sdk.threads.stop({ threadId: reviewerId }).catch(() => undefined);
-        }
-      }
-    },
+    run: (designId, request, signal) => runDesignReview(bb, store, designId, request, signal),
   });
 
   /** Posts a comment to the design's conversation; it waits for a running turn instead of cutting in. */

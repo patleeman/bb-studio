@@ -19,7 +19,9 @@ export type ReviewDeps = {
   /** Runs one reviewer and returns its verdict; throws when the review fails. */
   run(designId: string, request: ReviewRequest, signal: AbortSignal): Promise<ReviewResult>;
   /** Announces a design's new review state (bumps it so open canvases refetch). */
-  publish(designId: string, review: ReviewState): void;
+  publish(designId: string, review: ReviewState | null): void;
+  /** The selected screens' current stored revisions, in request order. */
+  revision(designId: string, screenIds: string[]): string;
   /** Posts the findings to the design's thread; `paused` when this was the last review in a row. */
   report(designId: string, request: ReviewRequest, findings: string, paused: boolean): Promise<void>;
   warn(message: string): void;
@@ -33,6 +35,7 @@ function roundOf(screenIds: string[]): number | null {
 }
 
 export class ReviewQueue {
+  private readonly revisions = new Map<string, string>();
   private readonly states = new Map<string, ReviewState>();
   private readonly running = new Map<string, Promise<void>>();
   /** One follow-up per design, asked for while a review ran; the latest call wins. */
@@ -47,6 +50,7 @@ export class ReviewQueue {
 
   /** The design's latest review, while it's remembered. */
   state(designId: string): ReviewState | null {
+    this.screensChanged(designId);
     return this.states.get(designId) ?? null;
   }
 
@@ -73,9 +77,19 @@ export class ReviewQueue {
     this.streaks.delete(designId);
   }
 
+  /** Screen writes invalidate verdicts without resetting the user's pause rule. */
+  screensChanged(designId: string): void {
+    const state = this.states.get(designId);
+    if (!state || this.revisions.get(designId) === this.deps.revision(designId, state.screens)) return;
+    this.states.delete(designId);
+    this.revisions.delete(designId);
+    this.deps.publish(designId, null);
+  }
+
   /** The design was deleted: forget its reviews, and ignore one still running. */
   forget(designId: string): void {
     this.states.delete(designId);
+    this.revisions.delete(designId);
     this.queued.delete(designId);
     this.streaks.delete(designId);
     this.generations.set(designId, (this.generations.get(designId) ?? 0) + 1);
@@ -108,7 +122,14 @@ export class ReviewQueue {
 
   private async runOne(designId: string, request: ReviewRequest): Promise<void> {
     const generation = this.generations.get(designId) ?? 0;
-    const live = () => !this.disposed.signal.aborted && (this.generations.get(designId) ?? 0) === generation;
+    const revision = this.deps.revision(designId, request.screenIds);
+    this.revisions.set(designId, revision);
+    const live = () => {
+      if (this.disposed.signal.aborted || (this.generations.get(designId) ?? 0) !== generation) return false;
+      if (this.deps.revision(designId, request.screenIds) === revision) return true;
+      this.screensChanged(designId);
+      return false;
+    };
     const base = { round: roundOf(request.screenIds), screens: request.screenIds };
     this.set(designId, { ...base, state: "reviewing", summary: null });
     try {

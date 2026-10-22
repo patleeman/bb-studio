@@ -8,6 +8,7 @@ function harness() {
     run: vi.fn((designId: string, request: { screenIds: string[] }) => new Promise<ReviewResult>((resolve, reject) => {
       runs.push({ designId, screenIds: request.screenIds, finish: (result) => (result instanceof Error ? reject(result) : resolve(result)) });
     })),
+    revision: vi.fn(() => "v1"),
     publish: vi.fn(),
     report: vi.fn(async () => {}),
     warn: vi.fn(),
@@ -123,4 +124,23 @@ describe("design_ready's description", () => {
     expect(DESIGN_READY_DESCRIPTION).toContain("in the design's own thread");
     expect(DESIGN_READY_DESCRIPTION).not.toContain("in this thread");
   });
+});
+
+
+it("discards a verdict for edited screens and invalidates previously completed reviews", async () => {
+  const { deps, runs, queue } = harness();
+  queue.request("dsn_a", request());
+  deps.revision.mockReturnValue("v2");
+  runs[0]!.finish({ verdict: "needs_work", findings: "obsolete" });
+  await queue.settled("dsn_a");
+  expect(queue.state("dsn_a")).toBeNull();
+  expect(deps.report).not.toHaveBeenCalled();
+  queue.request("dsn_a", request());
+  runs[1]!.finish({ verdict: "done" });
+  await queue.settled("dsn_a");
+  expect(queue.state("dsn_a")?.state).toBe("done");
+  deps.revision.mockReturnValue("v3");
+  queue.screensChanged("dsn_a");
+  expect(queue.state("dsn_a")).toBeNull();
+  expect(deps.publish).toHaveBeenLastCalledWith("dsn_a", null);
 });
