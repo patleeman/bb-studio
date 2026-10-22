@@ -517,7 +517,7 @@ export async function alertBot(sdk: Sdk, input: { botThreadId: string; senderThr
       pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
       // turn-finished on the Bot's thread: the phone shows its Reply action, and a reply goes to the Bot.
       input: { title: input.push.title, body: input.push.body.slice(0, 4000), kind: "turn-finished", threadId: input.botThreadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: input.push.coalesceKey } as never,
-    }).catch(() => {});
+    }).catch((error) => { console.warn("[studio] Bot push delivery failed", error); throw error; });
   }
 }
 

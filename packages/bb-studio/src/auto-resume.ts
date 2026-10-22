@@ -80,7 +80,7 @@ const automationRow = z.object({
 }).passthrough();
 const runRow = z.object({ id: z.string(), status: z.string(), error: z.string().nullish(), startedAt: z.number().nullish(), finishedAt: z.number().nullish(), scheduledFor: z.number().nullish() }).passthrough();
 type Run = z.infer<typeof runRow>;
-type LogRow = { id: number; automation_id: string; bot_id: string; owner: string; owner_id: string; event: "resumed" | "exhausted" | "cleared"; reason: string | null; run_id: string | null; message: string | null; at: number };
+type LogRow = { delivered: number; id: number; automation_id: string; bot_id: string; owner: string; owner_id: string; event: "resumed" | "exhausted" | "cleared"; reason: string | null; run_id: string | null; message: string | null; at: number };
 
 /** The resume line a runner or Bot automation logs. */
 export function resumedLine(reason: string, count: number): string {
@@ -114,8 +114,8 @@ export class AutoResume {
   }
 
   private append(target: ResumeTarget, event: LogRow["event"], fields: { reason?: string | null; runId?: string | null; message?: string | null } = {}): void {
-    this.deps.db.prepare("INSERT INTO automation_auto_resumes (automation_id, bot_id, owner, owner_id, event, reason, run_id, message, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(target.automationId, target.botId, target.owner, target.ownerId, event, fields.reason ?? null, fields.runId ?? null, fields.message ?? null, this.now());
+    this.deps.db.prepare("INSERT INTO automation_auto_resumes (automation_id, bot_id, owner, owner_id, event, reason, run_id, message, at, delivered) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(target.automationId, target.botId, target.owner, target.ownerId, event, fields.reason ?? null, fields.runId ?? null, fields.message ?? null, this.now(), event === "exhausted" ? 0 : 1);
   }
 
   private latest(automationId: string): LogRow | undefined {
@@ -159,6 +159,11 @@ export class AutoResume {
     let resumed = 0;
     for (const target of targets) {
       try {
+        const pending = this.latest(target.automationId);
+        if (pending?.event === "exhausted" && !pending.delivered) {
+          await this.deliver(target, pending);
+          continue;
+        }
         if (!lists.has(target.projectId)) lists.set(target.projectId, this.list(target.projectId));
         const automation = (await lists.get(target.projectId)!)?.get(target.automationId);
         if (automation && await this.check(target, automation)) resumed++;
@@ -186,6 +191,11 @@ export class AutoResume {
   private async threadAlive(threadId: string): Promise<boolean> {
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as { archivedAt?: number | null; deletedAt?: number | null } | null;
     return !!thread && !thread.archivedAt && !thread.deletedAt;
+  }
+
+  private async deliver(target: ResumeTarget, row: LogRow): Promise<void> {
+    await this.deps.exhausted(target, row.message ?? exhaustedLine(target.name, row.reason ?? "failed"));
+    this.deps.db.prepare("UPDATE automation_auto_resumes SET delivered = 1 WHERE id = ?").run(row.id);
   }
 
   private async check(target: ResumeTarget, automation: z.infer<typeof automationRow>): Promise<boolean> {
@@ -217,7 +227,7 @@ export class AutoResume {
       if (handled.some((row) => row.event === "exhausted")) return false;
       const line = exhaustedLine(target.name, reason);
       this.append(target, "exhausted", { reason, runId: last.id, message: line });
-      await this.deps.exhausted(target, line);
+      await this.deliver(target, this.latest(target.automationId)!);
       return false;
     }
     await this.call("automations_resume", { projectId: target.projectId, automationId: target.automationId });

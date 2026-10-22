@@ -107,7 +107,7 @@ export interface ThreadResumeDeps {
   graceMs?: number;
 }
 
-type Row = { id: number; thread_id: string; event_id: string; event: "resumed" | "exhausted" | "send-failed" | "cleared"; bot_id: string | null; title: string | null; reason: string | null; message: string | null; at: number };
+type Row = { delivered: number; id: number; thread_id: string; event_id: string; event: "resumed" | "exhausted" | "send-failed" | "cleared"; bot_id: string | null; title: string | null; reason: string | null; message: string | null; at: number };
 type ThreadLike = { id: string; status?: string; title?: string | null; titleFallback?: string | null; projectId?: string | null; archivedAt?: number | null; deletedAt?: number | null; environmentId?: string | null };
 
 export function resumedLog(reason: RestartReason, count: number): string {
@@ -157,8 +157,8 @@ export class ThreadResume {
   }
 
   private append(threadId: string, eventId: string, event: Row["event"], fields: { botId?: string | null; title?: string | null; reason?: string | null; message?: string | null } = {}): void {
-    this.deps.db.prepare("INSERT INTO thread_auto_resumes (thread_id, event_id, event, bot_id, title, reason, message, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(threadId, eventId, event, fields.botId ?? null, fields.title ?? null, fields.reason ?? null, fields.message ?? null, this.now());
+    this.deps.db.prepare("INSERT INTO thread_auto_resumes (thread_id, event_id, event, bot_id, title, reason, message, at, delivered) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(threadId, eventId, event, fields.botId ?? null, fields.title ?? null, fields.reason ?? null, fields.message ?? null, this.now(), event === "exhausted" ? 0 : 1);
   }
 
   /** A Bot's threads past the cap and still where Studio left them, for Needs you. */
@@ -282,6 +282,12 @@ export class ThreadResume {
     if (!thread || thread.archivedAt || thread.deletedAt || thread.status !== "error") return "skipped";
     const owner = this.deps.owner(threadId);
     if (owner && !owner.active) return "skipped";
+    const pending = this.deps.db.prepare("SELECT * FROM thread_auto_resumes WHERE thread_id = ? ORDER BY id DESC LIMIT 1").get(threadId) as Row | undefined;
+    if (pending?.event === "exhausted" && !pending.delivered) {
+      await this.deps.exhausted({ id: threadId, title: pending.title ?? "Untitled thread", projectId: thread.projectId ?? null }, owner, pending.message!);
+      this.deps.db.prepare("UPDATE thread_auto_resumes SET delivered = 1 WHERE id = ?").run(pending.id);
+      return "exhausted";
+    }
     const interruption = await restartInterruption(this.deps.sdk, threadId);
     if (!interruption) return "skipped";
     const handled = this.rows(threadId, interruption.eventId);
@@ -295,6 +301,7 @@ export class ThreadResume {
       this.append(threadId, interruption.eventId, "exhausted", { botId: owner?.botId, title, reason: interruption.reason, message: line });
       this.warn(`${threadId}: ${line}`);
       await this.deps.exhausted({ id: threadId, title, projectId: thread.projectId ?? null }, owner, line);
+      this.deps.db.prepare("UPDATE thread_auto_resumes SET delivered = 1 WHERE thread_id = ? AND event_id = ? AND event = 'exhausted'").run(threadId, interruption.eventId);
       return "exhausted";
     }
     try {

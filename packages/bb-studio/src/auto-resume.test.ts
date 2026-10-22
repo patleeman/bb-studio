@@ -124,3 +124,17 @@ it("resumes at most three times a day, then Needs you once until it's on again",
   expect(await x.auto.sweep()).toBe(1);
   expect(x.resumes()).toBe(RESUME_CAP + 1);
 });
+
+it("retries an exhaustion notification until delivery succeeds, even after the cap window", async () => {
+  const x = await setup();
+  for (let i = 0; i < RESUME_CAP; i++) { x.failed(DISCONNECT); await x.auto.sweep(); x.advance(60000); }
+  x.failed(DISCONNECT);
+  x.exhausted.mockRejectedValueOnce(new Error("offline"));
+  await x.auto.sweep();
+  expect(x.exhausted).toHaveBeenCalledTimes(1);
+  x.advance(25 * 60 * 60000);
+  await x.auto.sweep();
+  expect(x.exhausted).toHaveBeenCalledTimes(2);
+  await x.auto.sweep();
+  expect(x.exhausted).toHaveBeenCalledTimes(2);
+});

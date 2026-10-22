@@ -759,4 +759,6 @@ export const MIGRATIONS = [
    ALTER TABLE bot_automations ADD COLUMN provision_pending INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE bot_automations ADD COLUMN cleanup_pending INTEGER NOT NULL DEFAULT 0;`,
   `ALTER TABLE bot_runners ADD COLUMN cleanup_pending INTEGER NOT NULL DEFAULT 0;`,
+  `ALTER TABLE automation_auto_resumes ADD COLUMN delivered INTEGER NOT NULL DEFAULT 1;
+   ALTER TABLE thread_auto_resumes ADD COLUMN delivered INTEGER NOT NULL DEFAULT 1;`,
 ];

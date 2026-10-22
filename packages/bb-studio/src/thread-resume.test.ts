@@ -212,3 +212,16 @@ it("sweeps soon after a host connects", async () => {
   await vi.advanceTimersByTimeAsync(6_000);
   expect(x.send).toHaveBeenCalledTimes(1);
 });
+
+it("retries failed exhaustion delivery without losing the pending alert", async () => {
+  const x = await setup();
+  for (let i = 0; i < RESUME_CAP; i++) { x.cut("thr_a"); await x.resume.attempt("thr_a"); vi.advanceTimersByTime(60000); }
+  x.cut("thr_a");
+  x.exhausted.mockRejectedValueOnce(new Error("offline"));
+  await expect(x.resume.attempt("thr_a")).rejects.toThrow("offline");
+  vi.advanceTimersByTime(2 * 60 * 60000);
+  expect(await x.resume.attempt("thr_a")).toBe("exhausted");
+  expect(x.exhausted).toHaveBeenCalledTimes(2);
+  expect(await x.resume.attempt("thr_a")).toBe("skipped");
+  expect(x.exhausted).toHaveBeenCalledTimes(2);
+});
