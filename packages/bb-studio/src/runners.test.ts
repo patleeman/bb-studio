@@ -45,8 +45,9 @@ async function setup() {
   const started: { id: string; title: string; projectId: string | null; parentThreadId?: string | null }[] = [];
   add({ id: "bot2", title: "Scout" });
   const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
-  const runners = new Runners({ db, sdk: bb.sdk, changed: () => {}, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
-  return { runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
+  const changed = vi.fn(() => bb.realtime.publish("studio-changed", { pluginId: "studio" }));
+  const runners = new Runners({ db, sdk: bb.sdk, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
+  return { changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -377,4 +378,27 @@ it.each(["offline", "invalid"])("does not publish an empty runner schedule on %s
   x.callRpc.mockImplementationOnce(async () => { if (failure === "offline") throw new Error("offline"); return [{}] as never; });
   await expect(x.runners.list()).rejects.toThrow();
   expect(await x.runners.list()).toEqual(before);
+});
+
+
+it("publishes sidebar invalidation after creating, updating and deleting a runner", async () => {
+  const x = await setup();
+  for (const mutate of [
+    async () => { await x.runners.create({ name: "Security", job: "Check dependencies", schedule }); },
+    async () => { await x.runners.update({ id: "Security", name: "Security audit" }); },
+    async () => { await x.runners.delete("Security audit"); },
+  ]) {
+    const before = x.harness.realtimeSignals.length;
+    await mutate();
+    expect(x.harness.realtimeSignals.slice(before)).toContainEqual(expect.objectContaining({ channel: "studio-changed" }));
+  }
+  expect(await x.runners.list()).toEqual([]);
+});
+
+it("exposes the last automation failure separately from a previous successful report", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Security", job: "Check dependencies", schedule });
+  await x.runners.report(runner.threadId!, { level: "tell", summary: "All clear" });
+  Object.assign(x.automations[0]!, { lastRunAt: Date.now() + 60_000, lastRunStatus: "failed" });
+  expect((await x.runners.list())[0]).toMatchObject({ lastRunStatus: "failed", lastLevel: "tell" });
 });

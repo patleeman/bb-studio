@@ -13,6 +13,8 @@ import { useCall, useLive, type Method, type RpcInput, type Cadence } from "../l
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { ProviderStatusMark, runnerStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
 
+import { botItemName, runnerLastRun, sidebarTime } from "./sidebarAgenda";
+
 export type RunnersData = { runners: RunnerView[]; adoptable: RunnerAdoptableView[] };
 export const useRunners = (botId: string) => useLive("bot_runners", { botId }, { pollMs: 15_000 });
 
@@ -38,14 +40,15 @@ const dotOf = (runner: RunnerView) => runner.urgent ? "bg-warning" : runner.stat
 const dotLabel = (runner: RunnerView) => runner.urgent ? "Needs you" : runner.state === "paused" ? "Paused" : "Active";
 
 /** A runner in the Bots sidebar. */
-export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackProviderId }: { runner: RunnerView; active: boolean; onOpen(runner: RunnerView): void; providers: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null }) {
-  const tone = runnerStatusTone(runner.state, runner.urgent);
+export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackProviderId, botName, agenda = false }: { botName: string; agenda?: boolean; runner: RunnerView; active: boolean; onOpen(runner: RunnerView): void; providers: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null }) {
+  const last = runnerLastRun(runner);
+  const tone = !agenda && last.failed ? "failed" : runnerStatusTone(runner.state, runner.urgent);
   return (
-    <button type="button" data-runner={runner.id} aria-current={active ? "true" : undefined} title={runnerTitle(runner)} disabled={!runner.threadId} onClick={() => onOpen(runner)}
+    <button type="button" data-runner={runner.id} data-agenda={agenda ? runner.id : undefined} aria-current={active ? "true" : undefined} title={runnerTitle(runner)} disabled={!runner.threadId} onClick={() => onOpen(runner)}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
       <ProviderStatusMark providerId={runner.providerId ?? fallbackProviderId} tone={tone} providers={providers} />
-      <span className={`min-w-0 flex-1 truncate ${runner.state === "paused" ? "text-muted-foreground" : ""}`}>{runner.name}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{runner.state === "paused" ? "paused" : runner.nextRunAt ? new Date(runner.nextRunAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : scheduleLabel(runner.schedule)}</span>
+      <span className={`min-w-0 flex-1 truncate ${runner.state === "paused" ? "text-muted-foreground" : ""}`}>{botItemName(runner.name, botName)}</span>
+      <span className={`shrink-0 text-[11px] ${!agenda && last.failed ? "text-destructive" : "text-muted-foreground"}`}>{agenda ? runner.state === "paused" ? "paused" : runner.nextRunAt ? sidebarTime(runner.nextRunAt) : "" : last.text}</span>
     </button>
   );
 }

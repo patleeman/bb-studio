@@ -160,6 +160,7 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
       completed: [thread("t2", "Research CI"), thread("t4", "Weekly digest")],
       scheduled: [{ id: "a1", kind: "automation", name: "Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: null }],
     },
+    bot_automations: { automations: [{ id: "a1", kind: "checkin", name: "Inbox sweep", state: "active", schedule: { type: "interval" }, nextRunAt: null }] },
     bot_chain: { threadIds: ["thr_old", "thr_bot"], threads: [{ id: "thr_old", title: "Relay" }, { id: "thr_bot", title: "Dot" }] },
   };
   await show(<BotThreadList {...listProps} />);
@@ -731,4 +732,44 @@ test("Recent hides old idle threads and Show archived reveals them in one click"
   act(() => button("Show archived").click());
   expect(container.textContent).toContain("Earlier job"); expect(container.textContent).toContain("Archived job");
   act(() => button("Hide archived").click()); expect(container.textContent).not.toContain("Earlier job");
+});
+
+
+test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens runner threads from either section", async () => {
+  const now = Date.now();
+  const runner = { id: "security", name: "Dot · Security", threadId: "thr_security", providerId: "codex", state: "active", urgent: false,
+    schedule: { cadence: "hourly", time: "09:00" }, nextRunAt: now + 120_000, lastRunAt: now - 60_000, lastReportAt: now - 60_000, lastLevel: "tell" };
+  const automation = (id: string, kind: string, name: string, nextRunAt: number | null, status = "active") => ({ id, kind, name, nextRunAt, state: status, schedule: { type: "once" }, scheduleText: "Once" });
+  state.data = {
+    bot_get: { bot: dot, run: null }, bot_activity: empty, bot_runners: { runners: [runner], adoptable: [] },
+    bot_automations: { automations: [automation("security", "runner", runner.name, runner.nextRunAt), automation("check", "checkin", "Dot · Check-in", now + 60_000),
+      automation("watch", "watcher", "Scout · Watch", now + 180_000), automation("remind", "reminder", "Dot · Remind me", now + 90_000),
+      automation("done", "reminder", "Dot · Finished", null, "done"), automation("off", "reminder", "Dot · Off", null, "paused"),
+      automation("paused", "watcher", "Dot · Paused watch", null, "paused")] },
+  };
+  await show(<BotThreadList {...listProps} />);
+  const schedule = container.querySelector('section[aria-label="Schedule"]')!;
+  const runners = container.querySelector('section[aria-label="Runners"]')!;
+  expect([...schedule.querySelectorAll("[data-agenda]")].map(row => row.getAttribute("data-agenda"))).toEqual(["check", "remind", "security", "watch", "paused"]);
+  expect(schedule.textContent).toContain("Check-in");
+  expect(schedule.textContent).not.toContain("Dot · ");
+  expect(schedule.textContent).toContain("Scout · Watch");
+  expect(schedule.textContent).toContain("paused");
+  expect(schedule.textContent).not.toContain("Finished");
+  expect(button("2 done").getAttribute("aria-expanded")).toBe("false");
+  act(() => button("2 done").click());
+  expect(schedule.querySelector('[data-agenda="done"]')?.className).toContain("opacity-50");
+  expect(schedule.querySelector('[data-agenda="off"]')?.textContent).toContain("paused");
+  expect(runners.textContent).toContain("reported");
+  expect(runners.textContent).not.toContain("Dot · ");
+  expect(schedule.querySelector('[data-runner] [data-logo="codex"]')).not.toBeNull();
+  expect(schedule.querySelector('[data-runner]')?.className).toContain("h-7");
+  await act(async () => click(schedule.querySelector('[data-runner]')));
+  expect(state.toThread).toHaveBeenCalledWith("thr_security");
+  state.toThread.mockClear();
+  await act(async () => click(runners.querySelector('[data-runner]')));
+  expect(state.toThread).toHaveBeenCalledWith("thr_security");
+  Object.assign(runner, { lastRunStatus: "failed" });
+  await show(<BotThreadList {...listProps} />);
+  expect(runners.querySelector(".text-destructive")?.textContent).toContain("failed");
 });

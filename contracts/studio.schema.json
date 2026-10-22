@@ -10668,6 +10668,12 @@
                     "null"
                   ]
                 },
+                "lastRunStatus": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "lastLevel": {
                   "anyOf": [
                     {
@@ -10911,6 +10917,12 @@
               "null"
             ]
           },
+          "lastRunStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "lastLevel": {
             "anyOf": [
               {
@@ -11107,6 +11119,12 @@
               "null"
             ]
           },
+          "lastRunStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "lastLevel": {
             "anyOf": [
               {
@@ -11257,6 +11275,12 @@
           "lastRunAt": {
             "type": [
               "number",
+              "null"
+            ]
+          },
+          "lastRunStatus": {
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -11413,6 +11437,12 @@
               "null"
             ]
           },
+          "lastRunStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "lastLevel": {
             "anyOf": [
               {
@@ -11563,6 +11593,12 @@
           "lastRunAt": {
             "type": [
               "number",
+              "null"
+            ]
+          },
+          "lastRunStatus": {
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -11806,6 +11842,12 @@
           "lastRunAt": {
             "type": [
               "number",
+              "null"
+            ]
+          },
+          "lastRunStatus": {
+            "type": [
+              "string",
               "null"
             ]
           },

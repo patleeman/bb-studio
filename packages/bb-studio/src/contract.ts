@@ -314,6 +314,7 @@ const runner = z.object({
   schedule: heartbeatRunSchema.omit({ enabled: true }).extend({ timezone: z.string().optional() }),
   nextRunAt: z.number().nullable(),
   lastRunAt: z.number().nullable(),
+  lastRunStatus: z.string().nullable().optional(),
   lastLevel: runnerLevel.nullable(),
   lastReport: z.string().nullable(),
   lastReportAt: z.number().nullable(),

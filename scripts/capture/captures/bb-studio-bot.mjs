@@ -196,8 +196,34 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
 
   /** The Bot's chat, BB's own thread page, with the Bots list and the threads it started in the sidebar. */
   const chat = async (client) => {
+    const { bot } = await seededRunners();
+    let { automations } = await pluginRpc("studio", "bot_automations", { botId: bot.id });
+    let reminder = automations.find(item => item.name === "Dot · Deploy reminder");
+    if (!reminder) reminder = await pluginRpc("studio", "bot_automation_create", {
+      botId: bot.id, kind: "reminder", name: "Dot · Deploy reminder", instruction: "Check the deploy.",
+      schedule: { type: "once", at: Date.now() + 86400_000 },
+    });
+    if (reminder.state === "active") await pluginRpc("studio", "bot_automation_pause", { botId: bot.id, id: reminder.id });
     await workspace(client);
     await dismissProblems(client);
+    ({ automations } = await pluginRpc("studio", "bot_automations", { botId: bot.id }));
+    const upcoming = automations.filter(item => item.nextRunAt !== null).sort((a, b) => a.nextRunAt - b.nextRunAt || a.name.localeCompare(b.name));
+    if (!upcoming.some(item => item.kind === "runner") || !upcoming.some(item => item.kind === "checkin")) throw new Error("Agenda fixture needs an upcoming runner and check-in");
+    await client.evaluate(`(() => new Promise((resolve, reject) => {
+      const started = Date.now();
+      const tick = () => {
+        const nav = document.querySelector('${SIDEBAR}');
+        const schedule = [...(nav?.querySelectorAll("section") ?? [])].find(section => section.getAttribute("aria-label") === "Schedule");
+        const runners = [...(nav?.querySelectorAll("section") ?? [])].find(section => section.getAttribute("aria-label") === "Runners");
+        const ids = [...(schedule?.querySelectorAll("[data-agenda]") ?? [])].map(row => row.dataset.agenda);
+        const expected = ${JSON.stringify(upcoming.map(item => item.id))};
+        const done = [...(schedule?.querySelectorAll("button") ?? [])].find(button => /^\\d+ done$/.test(button.textContent.trim()));
+        if (expected.every((id, i) => ids.indexOf(id) >= 0 && (i === 0 || ids.indexOf(id) > ids.indexOf(expected[i - 1]))) && done && done.getAttribute("aria-expanded") === "false" && /reported|quiet/.test(runners?.textContent ?? "")) return resolve(true);
+        if (Date.now() - started > 30000) return reject(new Error("Bot sidebar lacks the sorted runner/check-in agenda, collapsed done reminders, or last-run outcome"));
+        setTimeout(tick, 250);
+      };
+      tick();
+    }))()`, true);
     await sleep(1500);
   };
 

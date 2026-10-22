@@ -8648,12 +8648,13 @@ public enum Studio {
     public var schedule: BotRunnersOutputRunnersItemSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnersOutputRunnersItemLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -8664,6 +8665,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -8899,12 +8901,13 @@ public enum Studio {
     public var schedule: BotRunnerCreateOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerCreateOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -8915,6 +8918,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -9122,12 +9126,13 @@ public enum Studio {
     public var schedule: BotRunnerUpdateOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerUpdateOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -9138,6 +9143,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -9279,12 +9285,13 @@ public enum Studio {
     public var schedule: BotRunnerPauseOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerPauseOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -9295,6 +9302,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -9436,12 +9444,13 @@ public enum Studio {
     public var schedule: BotRunnerResumeOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerResumeOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -9452,6 +9461,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -9593,12 +9603,13 @@ public enum Studio {
     public var schedule: BotRunnerRunNowOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerRunNowOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -9609,6 +9620,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
@@ -9794,12 +9806,13 @@ public enum Studio {
     public var schedule: BotRunnerAdoptOutputSchedule?
     public var nextRunAt: Double?
     public var lastRunAt: Double?
+    public var lastRunStatus: String?
     public var lastLevel: BotRunnerAdoptOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
@@ -9810,6 +9823,7 @@ public enum Studio {
       self.schedule = schedule
       self.nextRunAt = nextRunAt
       self.lastRunAt = lastRunAt
+      self.lastRunStatus = lastRunStatus
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt

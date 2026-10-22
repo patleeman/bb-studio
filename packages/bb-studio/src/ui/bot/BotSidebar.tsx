@@ -18,7 +18,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotAutomationView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -27,6 +27,8 @@ import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./thre
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
+
+import { botItemName, sidebarAgenda, sidebarTime } from "./sidebarAgenda";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -235,8 +237,11 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
   const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
+  const automations = useLive("bot_automations", { botId: bot.id }, { pollMs: 15_000 });
+  const agenda = sidebarAgenda(automations.data?.automations ?? []);
+  const [showDone, setShowDone] = useState(false);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
-  const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
+  const tree = (nodes: TreeNode[]) => <ThreadTree botName={bot.name} nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
   const drop = useThreadDrop(bot);
 
   return (
@@ -262,26 +267,37 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
         {groups.needsYou.length ? (
           <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={groups.needsYou.length}>
-            {groups.needsYou.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)}
+            {groups.needsYou.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)}
           </Group>
         ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
         {runners.data?.runners.length ? (
           <Group id="runners" title="Runners" closed={layout.closed} onToggle={toggle}>
-            {runners.data.runners.map((runner) => <RunnerSidebarRow key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />)}
+            {runners.data.runners.map((runner) => <RunnerSidebarRow botName={bot.name} key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />)}
           </Group>
         ) : null}
-        {groups.recurring.length ? (
+        {agenda.upcoming.length || agenda.done.length ? (
           <Group id="recurring" title="Schedule" closed={layout.closed} onToggle={toggle}>
-            {groups.recurring.map((item) => <RecurringRow key={item.id} item={item} />)}
+            {agenda.upcoming.map((item) => {
+              const runner = item.kind === "runner" ? runners.data?.runners.find(runner => runner.id === item.id) : null;
+              return runner
+                ? <RunnerSidebarRow agenda botName={bot.name} key={item.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />
+                : <RecurringRow key={item.id} item={item} botName={bot.name} />;
+            })}
+            {agenda.done.length ? <>
+              <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="flex h-7 items-center gap-2 rounded-md px-2 text-left text-[11px] text-muted-foreground hover:bg-state-hover">
+                <Icon name={showDone ? "ChevronDown" : "ChevronRight"} className="size-3.5" />{agenda.done.length} done
+              </button>
+              {showDone ? agenda.done.map(item => <RecurringRow key={item.id} item={item} botName={bot.name} done />) : null}
+            </> : null}
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
         {bot.kind !== "external" ? <button type="button" className="self-start px-2 text-xs text-muted-foreground hover:text-foreground" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Hide archived" : "Show archived"}</button> : null}
-        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />) : null}
+        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />) : null}
         {sideThreads.data?.threads.length ? (
           <Group id="threads" title="Side threads" closed={layout.closed} onToggle={toggle}>
-            {sideThreads.data.threads.map((thread) => <SideThreadRow key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
+            {sideThreads.data.threads.map((thread) => <SideThreadRow botName={bot.name} key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
           </Group>
         ) : null}
         {!groups.needsYou.length && !groups.running.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
@@ -293,7 +309,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
               <button key={id} type="button" onClick={() => onOpen(id)} aria-current={active === id ? "true" : undefined}
                 className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
                 <Icon name="Clock" className="size-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{titles.get(id) || "Untitled"}</span>
+                <span className="min-w-0 flex-1 truncate">{botItemName(titles.get(id) || "Untitled", bot.name)}</span>
               </button>
             ))}
           </Group>
@@ -318,27 +334,27 @@ function Group({ id, title, closed, onToggle, badge, children }: { id: string; t
   );
 }
 
-function ThreadTree({ nodes, depth, active, onOpen, providers }: { nodes: TreeNode[]; depth: number; active: string | null; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
+function ThreadTree({ botName, nodes, depth, active, onOpen, providers }: { botName: string; nodes: TreeNode[]; depth: number; active: string | null; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
   return (
     <ul className={depth ? "relative ml-[15px] border-l border-border/70 pl-1" : "flex flex-col"}>
       {nodes.map((node) => (
         <li key={node.thread.id}>
-          <Row thread={node.thread} depth={depth} active={active === node.thread.id} onOpen={onOpen} providers={providers} />
-          {node.children.length ? <ThreadTree nodes={node.children} depth={depth + 1} active={active} onOpen={onOpen} providers={providers} /> : null}
+          <Row botName={botName} thread={node.thread} depth={depth} active={active === node.thread.id} onOpen={onOpen} providers={providers} />
+          {node.children.length ? <ThreadTree botName={botName} nodes={node.children} depth={depth + 1} active={active} onOpen={onOpen} providers={providers} /> : null}
         </li>
       ))}
     </ul>
   );
 }
 
-function Row({ thread, active, onOpen, providers }: { thread: BotThreadView; depth: number; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
+function Row({ botName, thread, active, onOpen, providers }: { botName: string; thread: BotThreadView; depth: number; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
   const tone = threadStatusTone(thread.status, thread.needsYou);
   return (
     <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
       draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
       <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} />
-      <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{thread.title}</span>
+      <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{botItemName(thread.title, botName)}</span>
       <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>
     </button>
   );
@@ -349,12 +365,12 @@ function Row({ thread, active, onOpen, providers }: { thread: BotThreadView; dep
  * title, replies and age, with BB's own Archive on hover and its thread
  * menu (right-click or the hover ⋯) to rename, pin or delete it.
  */
-function SideThreadRow({ thread, active, onOpen }: { thread: BotSideThreadListView; active: boolean; onOpen(threadId: string): void }) {
+function SideThreadRow({ botName, thread, active, onOpen }: { botName: string; thread: BotSideThreadListView; active: boolean; onOpen(threadId: string): void }) {
   const [renaming, setRenaming] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const replies = thread.replies === 1 ? "1 reply" : `${thread.replies} replies`;
-  // Titled "<Bot> · <reply>"; under its Bot, the reply is enough (and the name may have changed).
-  const title = thread.title.replace(/^[^·]{1,60} · /, "");
+  // Only the current owning Bot prefix is redundant.
+  const title = botItemName(thread.title, botName);
   const target = { id: thread.threadId, ...thread.menu, status: thread.menu.status as never, archivedAt: null, environment: null };
   return (
     <ThreadActionsContextMenu thread={target} requestRename={() => setRenaming(true)} disabled={renaming}>
@@ -389,13 +405,13 @@ function SideThreadRow({ thread, active, onOpen }: { thread: BotSideThreadListVi
   );
 }
 
-function RecurringRow({ item }: { item: BotScheduledView }) {
-  const next = item.nextRunAt ? new Date(item.nextRunAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }) : null;
+function RecurringRow({ item, botName, done = false }: { item: BotAutomationView; botName: string; done?: boolean }) {
+  const next = item.nextRunAt ? sidebarTime(item.nextRunAt) : null;
   return (
-    <div className="flex h-7 min-w-0 items-center gap-2 px-2 text-[13px]" title={next ? `Next: ${next}` : undefined}>
-      <Icon name="Repeat" className={`size-3.5 shrink-0 ${item.enabled ? "text-muted-foreground" : "text-muted-foreground/40"}`} />
-      <span className={`min-w-0 flex-1 truncate ${item.enabled ? "" : "text-muted-foreground"}`}>{item.name}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{item.enabled ? next ?? "on" : "off"}</span>
+    <div data-agenda={item.id} className={`flex h-7 min-w-0 items-center gap-2 px-2 text-[13px] ${done ? "opacity-50" : ""}`} title={item.scheduleText}>
+      <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className={`min-w-0 flex-1 truncate ${item.state !== "active" ? "text-muted-foreground" : ""}`}>{botItemName(item.name, botName)}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{item.state === "paused" ? "paused" : done ? "done" : next}</span>
     </div>
   );
 }

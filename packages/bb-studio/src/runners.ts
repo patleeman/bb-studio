@@ -54,7 +54,7 @@ const automationRow = z.object({
   id: z.string(), name: z.string(), enabled: z.boolean(),
   trigger: z.object({ triggerType: z.string().optional(), cron: z.string().optional(), timezone: z.string().optional() }).passthrough(),
   execution: z.object({ targetThreadId: z.string().nullish(), prompt: z.string().nullish() }).passthrough(),
-  nextRunAt: z.number().nullish(), lastRunAt: z.number().nullish(), createdByThreadId: z.string().nullish(),
+  nextRunAt: z.number().nullish(), lastRunAt: z.number().nullish(), lastRunStatus: z.string().nullish(), createdByThreadId: z.string().nullish(),
 }).passthrough();
 type AutomationRow = z.infer<typeof automationRow>;
 const missing = (error: unknown) => (error as { status?: number })?.status === 404 || /not found/i.test(String((error as Error)?.message ?? ""));
@@ -199,6 +199,7 @@ export class Runners {
       schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}), ...((row.timezone ?? automation?.trigger.timezone) ? { timezone: row.timezone ?? automation!.trigger.timezone } : {}) },
       nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
       lastRunAt: Math.max(automation?.lastRunAt ?? 0, row.last_run_at ?? 0) || null,
+      lastRunStatus: automation?.lastRunStatus ?? null,
       lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at, urgent: !!row.urgent,
     };
   }
