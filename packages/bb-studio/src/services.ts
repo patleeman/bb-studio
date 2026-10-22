@@ -4,12 +4,8 @@ import { newId } from "./kit/ids";
 import type { Actor } from "./kit/server/index";
 import type Database from "better-sqlite3";
 
-export interface Ref { pluginId: string; id: string }
-export interface ItemLink { from: Ref; to: Ref; kind: "mention" | "embed" | "task-link" | "related"; source: string }
-export interface ItemActivity { actor: Actor; verb: string; ref: Ref; at: number; summary: string }
-export interface ItemThread { threadId: string; ref: Ref; role: string; state: string; createdAt: number; updatedAt: number; metadata: Record<string, string> }
-export interface ItemComment { id: string; ref: Ref; parentId: string | null; anchor: string | null; actor: Actor; body: string; createdAt: number; resolvedAt: number | null }
-export interface ItemVersion { id: string; ref: Ref; sha256: string; label: string; actor: Actor; createdAt: number }
+export type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment, ItemVersion } from "./kit/item-services-contract";
+import type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment, ItemVersion } from "./kit/item-services-contract";
 
 const readActor = (raw: string): Actor => JSON.parse(raw) as Actor;
 const readRef = (pluginId: string, id: string): Ref => ({ pluginId, id });
