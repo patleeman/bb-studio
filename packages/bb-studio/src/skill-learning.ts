@@ -64,8 +64,8 @@ export type SkillState = "active" | "stale" | "archived";
 type EventRow = { seq?: number; type: string; data?: Record<string, unknown> | null };
 
 /** Counts tool turns and user turns in events, oldest first; `skillWrite` says the Bot saved a skill (tool turns count from after it). */
-export function tallyTurns(events: readonly EventRow[]): { toolTurns: number; userTurns: number; skillWrite: boolean; lastSeq: number } {
-  let toolTurns = 0, userTurns = 0, inTurn = 0, skillWrite = false, lastSeq = 0;
+export function tallyTurns(events: readonly EventRow[], inTurn = 0): { toolTurns: number; userTurns: number; skillWrite: boolean; lastSeq: number; inTurn: number } {
+  let toolTurns = 0, userTurns = 0, skillWrite = false, lastSeq = 0;
   for (const event of events) {
     lastSeq = Math.max(lastSeq, event.seq ?? 0);
     const data = (event.data ?? {}) as { initiator?: string; item?: { type?: string; tool?: string; name?: string } };
@@ -79,7 +79,7 @@ export function tallyTurns(events: readonly EventRow[]): { toolTurns: number; us
       inTurn = 0;
     }
   }
-  return { toolTurns, userTurns, skillWrite, lastSeq };
+  return { toolTurns, userTurns, skillWrite, lastSeq, inTurn };
 }
 
 /**
@@ -224,7 +224,7 @@ export function consolidatePrompt(name: string): string {
 
 type LearningRow = {
   bot_id: string; enabled: number; every_turns: number; review_model: string | null; consolidate: number; curator_paused: number;
-  thread_id: string | null; seen_seq: number; tool_turns: number; user_turns: number;
+  thread_id: string | null; seen_seq: number; in_tool_turn: number; tool_turns: number; user_turns: number;
   last_review_at: number | null; last_review_result: string | null; curator_since: number | null; curator_last_at: number | null; curator_last_result: string | null;
 };
 type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
@@ -363,22 +363,23 @@ export class SkillLearning {
       if (row.thread_id !== threadId) {
         // A new thread (first look or a handoff): start from its tip, keep the counts.
         const tip = await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "1" }).catch(() => []);
-        this.save(bot.id, { thread_id: threadId, seen_seq: (tip as EventRow[])[0]?.seq ?? 0 });
+        this.save(bot.id, { thread_id: threadId, seen_seq: (tip as EventRow[])[0]?.seq ?? 0, in_tool_turn: 0 });
         return;
       }
       let after = row.seen_seq;
-      let tools = row.tool_turns, users = row.user_turns;
+      let tools = row.tool_turns, users = row.user_turns, inTurn = row.in_tool_turn;
       // BB pages events 100 at a time.
       for (let page = 0; page < 100; page++) {
         const events = await this.deps.sdk.threads.events.list({ threadId, afterSeq: String(after), order: "asc", limit: String(EVENT_PAGE), types: ["client/turn/requested", "item/completed", "turn/completed"] }) as EventRow[];
         if (!events.length) break;
-        const tally = tallyTurns(events);
+        const tally = tallyTurns(events, inTurn);
+        inTurn = tally.inTurn;
         tools = tally.skillWrite ? tally.toolTurns : tools + tally.toolTurns;
         users += tally.userTurns;
         after = Math.max(after, tally.lastSeq);
         if (events.length < EVENT_PAGE) break;
       }
-      this.save(bot.id, { seen_seq: after, tool_turns: tools, user_turns: users });
+      this.save(bot.id, { seen_seq: after, tool_turns: tools, user_turns: users, in_tool_turn: inTurn });
     } finally {
       this.counting.delete(bot.threadId);
     }

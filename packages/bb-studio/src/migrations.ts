@@ -455,4 +455,5 @@ export const MIGRATIONS = [
    CREATE TRIGGER bot_maintenance_runs_no_update BEFORE UPDATE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;
    CREATE TRIGGER bot_maintenance_runs_no_delete BEFORE DELETE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;`,
   ...CODE_MIGRATIONS,
+  `ALTER TABLE bot_learning ADD COLUMN in_tool_turn INTEGER NOT NULL DEFAULT 0;`,
 ];

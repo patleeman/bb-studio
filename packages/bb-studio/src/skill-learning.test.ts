@@ -18,7 +18,7 @@ const turn = (seq: number, items: string[], opts: { user?: boolean; tool?: strin
 
 it("counts tool turns and user turns, and a skill write resets the tool count", () => {
   const events = [...turn(1, ["reasoning", "commandExecution", "agentMessage"], { user: true }), ...turn(10, ["agentMessage"], { user: true }), ...turn(20, ["fileRead", "mcpToolCall"])];
-  expect(tallyTurns(events)).toEqual({ toolTurns: 2, userTurns: 2, skillWrite: false, lastSeq: 23 });
+  expect(tallyTurns(events)).toEqual({ toolTurns: 2, userTurns: 2, skillWrite: false, lastSeq: 23, inTurn: 0 });
   const reset = [...turn(1, ["commandExecution"]), ...turn(10, ["toolCall"], { tool: "mcp__bb-bridge__bot_skill_patch" }), ...turn(20, ["commandExecution"])];
   expect(tallyTurns(reset)).toMatchObject({ toolTurns: 1, skillWrite: true });
   // An automation's turn isn't the user's.
@@ -300,4 +300,26 @@ it("bounds diff memory while retaining all lines for long skills", () => {
   const diff = lineDiff(before, after);
   expect(diff.split("\n").filter((line) => line === "- old")).toHaveLength(1100);
   expect(diff.split("\n").filter((line) => line === "+ new")).toHaveLength(1100);
+});
+
+it("counts a tool turn split across event pages", async () => {
+  const x = await setup();
+  await x.learning.count(x.bot);
+  const filler = Array.from({ length: 99 }, (_, i) => ({ seq: i + 1, type: "item/completed", data: { item: { type: "reasoning" } } }));
+  x.setEvents([...filler, ...turn(99, ["commandExecution"])]);
+  await x.learning.count(x.bot);
+  expect((await x.learning.view("bot_main")).toolTurns).toBe(1);
+});
+it("keeps an unfinished tool turn across count calls and service restarts", async () => {
+  const x = await setup();
+  await x.learning.count(x.bot);
+  x.setEvents([{ seq: 1, type: "item/completed", data: { item: { type: "commandExecution" } } }]);
+  await x.learning.count(x.bot);
+  expect((await x.learning.view("bot_main")).toolTurns).toBe(0);
+  x.setEvents([{ seq: 2, type: "turn/completed", data: {} }]);
+  const learning = new SkillLearning({ ...(x.learning as unknown as { deps: ConstructorParameters<typeof SkillLearning>[0] }).deps });
+  await learning.count(x.bot);
+  expect((await learning.view("bot_main")).toolTurns).toBe(1);
+  await learning.count(x.bot);
+  expect((await learning.view("bot_main")).toolTurns).toBe(1);
 });
