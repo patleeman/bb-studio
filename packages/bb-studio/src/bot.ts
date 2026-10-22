@@ -226,7 +226,7 @@ export function checkSelfEdit(changes: Record<string, unknown>): Partial<Record<
   return out;
 }
 
-type SkillRow = { bot_id: string; name: string; description: string; body: string; created_at: number; updated_at: number; state: "active" | "stale" | "archived"; pinned: number; used_at: number | null };
+type SkillRow = import("./bot-skill-record").BotSkillRecord;
 const skillView = (skill: SkillRow): BotSkillView => ({ name: skill.name, description: skill.description, updatedAt: skill.updated_at, state: skill.state, pinned: !!skill.pinned, usedAt: skill.used_at ?? null });
 
 /** A provider's display name for a handoff note. */

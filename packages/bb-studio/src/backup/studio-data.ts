@@ -14,6 +14,7 @@ import type { RestoreTally } from "../kit/backup";
 import type { BackupHandlers } from "../kit/server/index";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { botSkillRecord } from "../bot-skill-record";
 import { BOT_ID } from "../bot";
 import { PERSONAL_PROJECT_ID } from "../project-lead";
 
@@ -30,7 +31,7 @@ const leadRow = z.object({ project_id: id, lead_thread_id: nullable(id), created
 const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
 // Version 1 omitted thread/provider fields; only its primary can inherit the personal lead.
 const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string().min(1).max(16), state: z.enum(["active", "paused", "stopped"]), thread_id: nullable(id).optional(), provider_id: nullable(id).optional(), memory_page_id: nullable(id), shape: z.string().max(20).nullable().optional(), color: z.string().max(20).nullable().optional(), role: z.string().max(400).nullable().optional(), created_at: time, updated_at: time });
-const botSkillRow = z.object({ bot_id: id, name: z.string().min(1).max(64), description: z.string().max(500), body: z.string().max(20_000), created_at: time, updated_at: time });
+
 const linkRow = z.object({ from_plugin: id, from_id: id, to_plugin: id, to_id: id, kind: z.string().max(50), source: z.string().max(300) });
 const threadRow = z.object({ thread_id: id, plugin_id: id, item_id: id, role: z.string().max(50), state: z.string().max(50), created_at: time, updated_at: time, metadata: text });
 const commentRow = z.object({ id, plugin_id: id, item_id: id, parent_id: nullable(id), anchor: nullable(text), actor: text, body: text, created_at: time, resolved_at: nullable(time) });
@@ -44,7 +45,7 @@ const FILES = {
   leads: ["project-leads.json", z.array(leadRow)],
   /** Each Bot's conversation, provider identity and own skills. */
   bots: ["bots.json", z.array(botRow).max(10)],
-  botSkills: ["bot-skills.json", z.array(botSkillRow)],
+  botSkills: ["bot-skills.json", z.array(botSkillRecord)],
   links: ["links.json", z.array(linkRow)],
   threads: ["item-chats.json", z.array(threadRow)],
   comments: ["comments.json", z.array(commentRow)],
@@ -61,6 +62,7 @@ export const STUDIO_EXCLUDED = [
   "Item chats and project leads (the Chief of Staff is the personal project's lead) point at BB threads; they're restored only when that thread exists on this BB.",
   "A project's lead, and the Chief of Staff, is restored only when that project has none on this BB.",
   "Heartbeats come back switched off; turn them on again.",
+  "Bot skill edit history and later lint reviews are excluded; current skill content, state, pinning, usage and saved warnings are included.",
   "The Bot (name, avatar, state, Memory page and its skills) is restored only when this BB has no Bot.",
 ];
 
@@ -75,29 +77,31 @@ export interface StudioDataDeps {
 
 export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): BackupHandlers {
   return {
-    version: 2,
+    version: 3,
     async backup(writer) {
       const all = <T>(sql: string) => db.prepare(sql).all() as T[];
-      const data: Data = {
-        tags: all("SELECT id, name, color, created_at FROM tags ORDER BY created_at, id"),
-        itemTags: all("SELECT plugin_id, item_id, tag_id, created_at FROM item_tags ORDER BY plugin_id, item_id, tag_id"),
-        views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
-        leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
-          .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
-        bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
-        botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at FROM bot_skills ORDER BY bot_id, name"),
-        links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
-        threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
-        comments: all("SELECT * FROM item_comments ORDER BY created_at, id"),
-        versions: all("SELECT * FROM item_versions ORDER BY created_at, id"),
-        activity: all("SELECT plugin_id, item_id, actor, verb, at, summary FROM item_activity ORDER BY id"),
-        // The Chief of Staff is saved as the personal project's lead.
-        chief: [],
-      };
+      const { data, blobs } = db.transaction(() => {
+        const data: Data = {
+          tags: all("SELECT id, name, color, created_at FROM tags ORDER BY created_at, id"),
+          itemTags: all("SELECT plugin_id, item_id, tag_id, created_at FROM item_tags ORDER BY plugin_id, item_id, tag_id"),
+          views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
+          leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
+            .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
+          bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
+          botSkills: all("SELECT bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings FROM bot_skills ORDER BY bot_id, name"),
+          links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
+          threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
+          comments: all("SELECT * FROM item_comments ORDER BY created_at, id"),
+          versions: all("SELECT * FROM item_versions ORDER BY created_at, id"),
+          activity: all("SELECT plugin_id, item_id, actor, verb, at, summary FROM item_activity ORDER BY id"),
+          // The Chief of Staff is saved as the personal project's lead.
+          chief: [],
+        };
+        const blobs = db.prepare("SELECT sha256, bytes FROM item_blobs WHERE sha256 IN (SELECT sha256 FROM item_versions) ORDER BY sha256").all() as { sha256: string; bytes: Buffer }[];
+        return { data, blobs };
+      })();
       for (const key of Object.keys(FILES) as (keyof Data)[]) await writer.json(FILES[key][0], data[key]);
-      const blobs = db.prepare("SELECT sha256 FROM item_blobs WHERE sha256 IN (SELECT sha256 FROM item_versions) ORDER BY sha256").all() as { sha256: string }[];
-      const read = db.prepare("SELECT bytes FROM item_blobs WHERE sha256 = ?");
-      for (const { sha256 } of blobs) await writer.bytesAt(`blobs/${sha256}`, (read.get(sha256) as { bytes: Buffer }).bytes);
+      for (const { sha256, bytes } of blobs) await writer.bytesAt(`blobs/${sha256}`, bytes);
       return {
         counts: { tags: data.tags.length, taggings: data.itemTags.length, views: data.views.length, leads: data.leads.length, bots: data.bots.length, botSkills: data.botSkills.length, links: data.links.length, itemChats: data.threads.length, comments: data.comments.length, versions: data.versions.length, activity: data.activity.length },
         notes: STUDIO_EXCLUDED,
@@ -242,10 +246,10 @@ function apply(
       .run(bot.id, bot.name, bot.avatar, bot.state, thread, bot.provider_id ?? null, bot.memory_page_id, bot.shape ?? null, bot.color ?? null, bot.role ?? null, bot.created_at, bot.updated_at);
     tally.record("created", item);
   }
-  const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
+  const skill = db.prepare("INSERT OR IGNORE INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.botSkills) {
     if (!db.prepare("SELECT 1 FROM bots WHERE id = ?").get(row.bot_id)) continue;
-    counted(skill.run(row.bot_id, row.name, row.description, row.body, row.created_at, row.updated_at).changes, { id: `${row.bot_id}:${row.name}`, title: row.name });
+    counted(skill.run(row.bot_id, row.name, row.description, row.body, row.created_at, row.updated_at, row.state, row.pinned, row.used_at, row.lint_warnings).changes, { id: `${row.bot_id}:${row.name}`, title: row.name });
   }
 
   const link = db.prepare("INSERT OR IGNORE INTO item_links (from_plugin, from_id, to_plugin, to_id, kind, source) VALUES (?, ?, ?, ?, ?, ?)");

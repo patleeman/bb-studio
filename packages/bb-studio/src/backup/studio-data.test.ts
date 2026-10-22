@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { BackupWriter } from "../kit/server/index";
 import Database from "better-sqlite3";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -45,7 +47,7 @@ it("round-trips each Bot's conversation and provider, including additional and e
   expect(new Set(checked)).toEqual(new Set(["thr_main", "thr_extra", "thr_external"]));
   await runRestore(dir, handlers, { ...input, dryRun: false });
   expect(bots(target)).toEqual(bots(source));
-  expect(backup.version).toBe(2);
+  expect(backup.version).toBe(3);
   await runRestore(dir, handlers, { ...input, dryRun: false });
   expect(bots(target)).toEqual(bots(source));
 
@@ -99,4 +101,40 @@ it("keeps a primary Bot conversation assigned to another project's lead in place
   expect(target.prepare("SELECT project_id, lead_thread_id FROM project_leads").all()).toEqual([{ project_id: "proj_other", lead_thread_id: "thr_main" }]);
   expect(bots(target)).toEqual([{ id: "bot_main", thread_id: null, provider_id: "codex" }]);
   expect(result.notes).toContain("The primary Bot's conversation already leads another project here; it was left unattached.");
+});
+
+it("preserves all current skill fields and reads old skill records", async () => {
+  const source = database();
+  source.exec("INSERT INTO bots (id, name, avatar, state, created_at, updated_at) VALUES ('bot_main', 'Main', 'B', 'paused', 1, 2)");
+  source.exec(`INSERT INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, pinned, used_at, lint_warnings)
+    VALUES ('bot_main', 'deploy', 'Deploy', 'Steps', 1, 2, 'archived', 1, 42, '["Check target"]')`);
+  const dir = join(await folder(), "studio");
+  await runBackup(dir, studioDataBackup(source, { threadExists: async () => true }));
+  const target = database();
+  await runRestore(dir, studioDataBackup(target, { threadExists: async () => true }), { version: 1, projects: {}, dryRun: false });
+  expect(target.prepare("SELECT * FROM bot_skills").all()).toEqual(source.prepare("SELECT * FROM bot_skills").all());
+  await writeFile(join(dir, "bot-skills.json"), JSON.stringify([{ bot_id: "bot_main", name: "old", description: "Old", body: "Steps", created_at: 1, updated_at: 2 }]));
+  await runRestore(dir, studioDataBackup(target, { threadExists: async () => true }), { version: 1, projects: {}, dryRun: false });
+  expect(target.prepare("SELECT state, pinned, used_at, lint_warnings FROM bot_skills WHERE name = 'old'").get()).toEqual({ state: "active", pinned: 0, used_at: null, lint_warnings: "[]" });
+});
+
+it("captures version blobs before the writer yields to deletion", async () => {
+  const db = database();
+  const bytes = Buffer.from("version content");
+  const sha = createHash("sha256").update(bytes).digest("hex");
+  db.prepare("INSERT INTO item_blobs (sha256, bytes) VALUES (?, ?)").run(sha, bytes);
+  db.prepare("INSERT INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES ('v1', 'pages', 'p1', ?, 'Saved', '{}', 1)").run(sha);
+  const dir = join(await folder(), "studio");
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(dir));
+  class Deleting extends BackupWriter {
+    override async json(...args: Parameters<BackupWriter["json"]>) {
+      db.exec("DELETE FROM item_versions; DELETE FROM item_blobs");
+      return super.json(...args);
+    }
+  }
+  await studioDataBackup(db, { threadExists: async () => true }).backup(new Deleting(dir));
+  const target = database();
+  const report = await runRestore(dir, studioDataBackup(target, { threadExists: async () => true }), { version: 1, projects: {}, dryRun: false });
+  expect(report.failed).toBe(0);
+  expect(target.prepare("SELECT bytes FROM item_blobs WHERE sha256 = ?").get(sha)).toEqual({ bytes });
 });
