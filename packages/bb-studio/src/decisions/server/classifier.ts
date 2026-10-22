@@ -1,7 +1,7 @@
 import { errorMessage } from "../../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import type { Fallback } from "../../kit/decisions-legacy-contract";
+import type { Fallback } from "../contract";
 import { askSystemOne, JevUnavailableError, UnavailableError, type SystemOneSettings } from "./system-one";
 
 export type Action = "steer" | "followup";

@@ -601,7 +601,6 @@ export default async function plugin(bb: BbPluginApi) {
     skills: (botId) => bots.skills(botId).map((skill) => ({ name: skill.name, description: skill.description, body: bots.skill(skill.name, botId)?.body ?? "", state: skill.state ?? "active", pinned: !!skill.pinned, usedAt: skill.usedAt ?? null, updatedAt: skill.updatedAt })),
     setState: (botId, name, state) => { bots.setSkillState(name, state, botId); },
     log: (message) => bb.log.warn(message),
-    quietSince: (threadId, updatedAt) => warmer.quietSince(threadId, updatedAt),
   });
   const maintenance = new BotMaintenance({
     db, sdk: bb.sdk, changed: tagsChanged,
@@ -871,7 +870,6 @@ export default async function plugin(bb: BbPluginApi) {
     bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
     bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
     // Deprecated for one release: old iOS clients receive an empty pending list.
-    bot_skill_pending_resolve: ({ botId }) => learning.view(learnerId(botId)),
     bot_skill_history: ({ botId, before }) => ({ versions: bots.skillHistory(botId, before) }),
     bot_skill_revert: ({ botId, versionId }) => { bots.revertSkill(versionId, botId); return { reverted: true }; },
     bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),

@@ -251,11 +251,14 @@ it("doesn't fork a busy bot thread", async () => {
   expect(await x.learning.start("bot_main", "review")).toBe(false);
 });
 
-it("ignores the retired approval setting and exposes no pending changes", async () => {
+it("removes retired approval and pending skill fields from the RPC contract", async () => {
   const x = await setup();
-  await x.learning.set("bot_main", { approval: true });
-  expect((await x.learning.view("bot_main")).approval).toBe(false);
-  expect((await x.learning.view("bot_main")).pending).toEqual([]);
+  expect(rpcContract.bot_learning_set.input.shape).not.toHaveProperty("approval");
+  expect(rpcContract.bot_learning.output.shape).not.toHaveProperty("approval");
+  expect(rpcContract.bot_learning.output.shape).not.toHaveProperty("pending");
+  expect(rpcContract).not.toHaveProperty("bot_skill_pending_resolve");
+  expect(await x.learning.view("bot_main")).not.toHaveProperty("approval");
+  expect(await x.learning.view("bot_main")).not.toHaveProperty("pending");
   expect(reviewPrompt({ name: "Dot", memoryPageId: null, reason: "manual" })).toContain("apply immediately");
 });
 
@@ -279,7 +282,7 @@ it("runs the curator explicitly from maintenance, with a dry run, pins exempt, a
   await x.learning.set("bot_main", { consolidate: true });
   await x.learning.curate("bot_main", { now });
   expect(Object.fromEntries(x.skills().map((skill) => [skill.name, skill.state]))).toEqual({ fresh: "active", old: "archived", pinned: "active" });
-  expect(x.learning.curatorState("bot_main")).toMatchObject({ lastOutcome: "1 archived" });
+  expect((await x.learning.view("bot_main")).lastCurator).toMatchObject({ result: "1 archived" });
   // Two skills left unarchived: a consolidation fork.
   expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ input: [expect.objectContaining({ text: expect.stringMatching(/Skill curator for "Dot"/) })] }));
 });

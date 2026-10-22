@@ -2,7 +2,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "../../kit/decisions";
 import { primaryHostId } from "../../kit/server/index";
-import type { ModelSelection } from "../../kit/decisions-contract";
+import type { ModelSelection } from "../../decisions/contract";
 
 /** Longer dictations go in as spoken; a model rewrite of that much is slow and hard to check. */
 export const CLEANUP_MAX_CHARS = 12_000;

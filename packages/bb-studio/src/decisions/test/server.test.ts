@@ -1,8 +1,8 @@
-import { afterEach, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import assert from "node:assert/strict";
 import { registerDecisions } from "../server";
-const plugin = (bb: any) => registerDecisions(bb, { get: async () => Object.fromEntries(Object.entries(await bb.settings.define().get()).map(([key, value]) => [`decisions_${key}`, value])), experimental_set: async () => {} });
-import { rpcContract } from "../../kit/decisions-legacy-contract";
+const plugin = (bb: any) => registerDecisions(bb, { get: async () => Object.fromEntries(Object.entries(await bb.settings.define().get()).map(([key, value]) => [`decisions_${key}`, value])) });
+import { rpcContract } from "../contract";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -35,29 +35,33 @@ test("RPC handlers keep unavailable distinct from a failed call", async () => {
   const { bb, handlers, stored, warnings } = setup();
   await plugin(bb as never);
   const questions = { action: { type: "noul", instructions: "Is this urgent?" } };
-  const ask = rpcContract["systemOne.ask"].input.parse({ caller: "test", state: {}, questions });
-  const noJev = rpcContract["systemOne.ask"].output.parse(await handlers["decisions.systemOne.ask"]!(ask));
+  const ask = rpcContract["decisions.systemOne.ask"].input.parse({ caller: "test", state: {}, questions });
+  const noJev = rpcContract["decisions.systemOne.ask"].output.parse(await handlers["decisions.systemOne.ask"]!(ask));
   assert.equal(noJev.ok, false);
   if (!noJev.ok) assert.equal(noJev.unavailable, true);
   assert.equal(warnings.length, 0);
   assert.deepEqual(await handlers["decisions.fallback.get"]!(null), { mode: "thread" });
   await handlers["decisions.fallback.set"]!({ mode: "off" });
   assert.deepEqual(stored.get("decisions:fallback"), { mode: "off" });
-  const model = rpcContract["model.ask"].input.parse({ caller: "test", requestId: "one", hostId: "host", prompt: "Classify", providerId: null });
-  const noModel = rpcContract["model.ask"].output.parse(await handlers["decisions.model.ask"]!(model));
+  const model = rpcContract["decisions.model.ask"].input.parse({ caller: "test", requestId: "one", hostId: "host", prompt: "Classify", providerId: null });
+  const noModel = rpcContract["decisions.model.ask"].output.parse(await handlers["decisions.model.ask"]!(model));
   assert.equal(noModel.ok, false);
   if (!noModel.ok) assert.equal(noModel.unavailable, true);
 });
 
 test("dispatch hook passes a message through when Smart Queue is off", async () => {
   const { bb, hooks } = setup();
+  const list = vi.fn(async () => ({ plugins: [] }));
+  bb.sdk.plugins.list = list as never;
   await plugin(bb as never);
   const hook = hooks["message.dispatch"]!;
+  expect(list).toHaveBeenCalledTimes(1); // Registration initializes the cache.
   assert.deepEqual(await hook({
     attempt: "start-turn", initiator: "user", senderThreadId: null,
     experimental_submission: null, queuedMessages: [],
     thread: { id: "thr_1", status: "idle", visibility: "visible", originPluginId: null },
   }), { action: "proceed" });
+  expect(list).toHaveBeenCalledTimes(1); // Dispatch never asks the SDK for plugin state.
 });
 
 test("an explicit model overrides an off fallback and retains the chosen execution settings", async () => {
@@ -75,13 +79,13 @@ test("an explicit model overrides an off fallback and retains the chosen executi
     caller: "talk", requestId: "cleanup:one", hostId: "host", prompt: "Clean up", providerId: null,
     modelSelection: { providerId: "chosen", model: "small", reasoningLevel: "low", serviceTier: "fast" },
   };
-  const result = await handlers["decisions.model.ask"]!(rpcContract["model.ask"].input.parse(request));
+  const result = await handlers["decisions.model.ask"]!(rpcContract["decisions.model.ask"].input.parse(request));
   assert.equal(result.text, "Cleaned text");
   assert.equal(result.via, "chosen/small");
   assert.deepEqual(expectSelection(spawn.mock.calls[0]), request.modelSelection);
   assert.equal(stop.mock.calls.length, 1);
   assert.equal(remove.mock.calls.length, 1);
-  assert.equal(rpcContract["model.ask"].input.safeParse({ ...request, modelSelection: { ...request.modelSelection, model: " " } }).success, false);
+  assert.equal(rpcContract["decisions.model.ask"].input.safeParse({ ...request, modelSelection: { ...request.modelSelection, model: " " } }).success, false);
 });
 
 function expectSelection(call: unknown) {
@@ -130,18 +134,17 @@ test("Smart Queue decides once for migrated data and a fresh install without a b
   } }), { headers: { "content-type": "application/json" } }));
   globalThis.fetch = fetchMock as typeof fetch;
   try {
-    for (const scenario of [
-      { name: "migrated data with a leftover bridge", installed: [{ id: "smart-decisions", enabled: true, version: "0.5.0" }], migrated: true },
-      { name: "fresh install without the old plugin", installed: [], migrated: false },
-    ]) {
+    const scenarios: { name: string; installed: { id: string; enabled: boolean; version?: string }[]; settings: Record<string, unknown> }[] = [
+      { name: "migrated settings with a leftover bridge", installed: [{ id: "smart-decisions", enabled: true, version: "0.5.0" }], settings: { enabled: true, jevProvider: "custom", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev" } },
+      { name: "fresh settings without the old plugin", installed: [], settings: { jevProvider: "custom", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev" } },
+    ];
+    for (const scenario of scenarios) {
       const { bb, hooks, stored } = setup();
       const events: Record<string, (payload: any) => unknown> = {};
-      bb.settings.define = () => ({ get: async () => ({
-        enabled: true, jevProvider: "custom", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev",
-      }) });
-      bb.sdk.plugins.list = async () => ({ plugins: scenario.installed }) as never;
+      bb.settings.define = () => ({ get: async () => scenario.settings as never });
+      const list = vi.fn(async () => ({ plugins: scenario.installed }));
+      bb.sdk.plugins.list = list as never;
       (bb.events as any).on = (name: string, handler: (payload: any) => unknown) => { events[name] = handler; };
-      if (scenario.migrated) stored.set("decisions:imported", true);
       Object.assign(bb.sdk, {
         threads: {
           get: async () => ({ id: "thr_1", status: "active", visibility: "visible", originPluginId: null, title: "Work", environmentId: null }),
@@ -150,12 +153,14 @@ test("Smart Queue decides once for migrated data and a fresh install without a b
         },
       });
       await plugin(bb as never);
+      assert.equal(list.mock.calls.length, 1, `${scenario.name}: initialize standalone queue outside dispatch`);
       assert.deepEqual(Object.keys(hooks), ["message.dispatch"], scenario.name);
       const initial = await hooks["message.dispatch"]!({
         attempt: "join-turn", initiator: "user", senderThreadId: null,
         experimental_submission: null, queuedMessages: [],
         thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
       });
+      assert.equal(list.mock.calls.length, 1, `${scenario.name}: dispatch uses cached plugin state`);
       assert.equal(initial.action, "wait", scenario.name);
       if (initial.action === "wait") {
         assert.match(initial.reason, /Smart Queue is deciding/, scenario.name);
@@ -210,6 +215,6 @@ test("recovery cleans hidden classifier sessions owned by both IDs and preserves
   } });
   await plugin(bb as never);
   await services["decisions-recovery"]!.start(new AbortController().signal);
-  assert.deepEqual(owners, ["studio", "smart-decisions"]);
-  assert.deepEqual(removed, ["studio-stale", "smart-decisions-stale"]);
+  assert.deepEqual(owners, ["studio"]);
+  assert.deepEqual(removed, ["studio-stale"]);
 });

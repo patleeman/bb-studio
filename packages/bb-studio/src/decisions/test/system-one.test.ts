@@ -1,8 +1,7 @@
 import { test, vi, afterEach } from "vitest";
 afterEach(() => vi.restoreAllMocks());
 import assert from "node:assert/strict";
-import { publicContract } from "../../kit/decisions-legacy-contract";
-import type { Questions } from "../../kit/decisions-contract";
+import { publicContract, type Questions } from "../contract";
 import { askSystemOne, JevUnavailableError, UnavailableError } from "../server/system-one";
 
 const signal = () => AbortSignal.timeout(1000);
@@ -53,13 +52,13 @@ test("no provider is unavailable, which callers treat as expected", async () => 
 });
 
 test("the public contract bounds what other plugins can send", () => {
-  const ask = publicContract["systemOne.ask"].input;
+  const ask = publicContract["decisions.systemOne.ask"].input;
   assert.equal(ask.safeParse({ caller: "bot-teams", state: { a: 1 }, questions }).success, true);
   assert.equal(ask.safeParse({ caller: "bot-teams", state: "x".repeat(70_000), questions }).success, false);
   assert.equal(ask.safeParse({ caller: "bot-teams", state: {}, questions: {} }).success, false);
   const oneOption = { q: { type: "choice", instructions: "Pick.", criteria: { only: "The only one." } } };
   assert.equal(ask.safeParse({ caller: "bot-teams", state: {}, questions: oneOption }).success, false);
-  const model = publicContract["model.ask"].input;
+  const model = publicContract["decisions.model.ask"].input;
   const request = { caller: "bot-teams", requestId: "msg_1", hostId: "host_1", prompt: "Classify.", providerId: null };
   assert.equal(model.safeParse(request).success, true);
   assert.equal(model.safeParse({ ...request, prompt: "" }).success, false);

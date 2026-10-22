@@ -19,7 +19,7 @@ import {
   type ModelTarget,
   type Situation,
 } from "./server/classifier";
-import { defaultFallback, fallbackSchema, type Fallback } from "../kit/decisions-legacy-contract";
+import { defaultFallback, fallbackSchema, type Fallback } from "./contract";
 import { jevRoutes } from "./server/jev-providers";
 import { askSystemOne } from "./server/system-one";
 import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./server/queue";
@@ -42,25 +42,8 @@ const standaloneCheckMs = 30_000;
 /** A Jev failure this recent still counts against its health. */
 const jevFailureWindowMs = 30 * 60_000;
 
-export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>>; experimental_set(values: Record<string, unknown>): Promise<unknown> }) {
+export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>> }) {
   const config = async (): Promise<ClassifierSettings & { enabled: boolean }> => ({ ...decisionsDefaults, ...Object.fromEntries(Object.entries(await settings.get()).filter(([key]) => key.startsWith("decisions_")).map(([key, value]) => [key.slice(10), value])) }) as ClassifierSettings & { enabled: boolean };
-  // Settings descriptors intentionally omit defaults. Store them once on the
-  // first request without inspecting or waiting for a retired bridge.
-  let defaultsReady: Promise<void> | null = null;
-  const settingsReady = () => {
-    if (defaultsReady) return defaultsReady;
-    defaultsReady = (async () => {
-      const current = await settings.get();
-      const missing = Object.fromEntries(Object.entries(decisionsDefaults)
-        .filter(([key]) => current[`decisions_${key}`] === undefined)
-        .map(([key, value]) => [`decisions_${key}`, value]));
-      if (Object.keys(missing).length) await settings.experimental_set(missing);
-    })().catch((error) => {
-      defaultsReady = null;
-      throw error;
-    });
-    return defaultsReady;
-  };
   const sessions = new Set<string>();
   const lifetime = new AbortController();
   bb.onDispose(async () => {
@@ -193,12 +176,10 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
   bb.rpc.register(decisionMethods, {
     "decisions.systemOne.ask": ({ caller, state, questions }) =>
       answer(caller, "Jev", async () => {
-        await settingsReady();
         return tracked(askSystemOne(await config(), { state, questions }, AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000)])));
       }),
     "decisions.model.ask": ({ caller, requestId, hostId, prompt, providerId, modelSelection }) =>
       answer(caller, "Fallback model", async () => {
-        await settingsReady();
         return runModel(
           bb,
           modelSelection ? { mode: "model", ...modelSelection } : await fallback(),
@@ -243,9 +224,10 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     return { projectId, hostId: environment.hostId, requestId: queuedMessageId, defaultProviderId: thread.providerId };
   }
 
-  // Cached, so the dispatch hook never waits on the plugin list.
+  // Read the standalone queue outside dispatch. The dispatch hook only reads
+  // this cached flag; the background watcher refreshes it after startup.
   let standaloneQueue = { on: false, checkedAt: 0 };
-  async function standaloneQueueOn() {
+  async function refreshStandaloneQueue() {
     if (Date.now() - standaloneQueue.checkedAt < standaloneCheckMs) return standaloneQueue.on;
     try {
       const { plugins } = await bb.sdk.plugins.list();
@@ -256,10 +238,8 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     }
     return standaloneQueue.on;
   }
-  const queueEnabled = async () => {
-    await settingsReady();
-    return (await config()).enabled && !(await standaloneQueueOn());
-  };
+  await refreshStandaloneQueue();
+  const queueEnabled = async () => (await config()).enabled && !standaloneQueue.on;
 
   // One read-modify-write at a time, so concurrent decisions don't drop each other.
   let recording: Promise<unknown> = Promise.resolve();
@@ -384,6 +364,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
       while (!signal.aborted) {
         const listedAt = Date.now();
         try {
+          await refreshStandaloneQueue();
           if (await queueEnabled()) queue.sync(await bb.sdk.threads.queue.list({ signal }), listedAt);
         } catch (error) {
           if (!signal.aborted) bb.log.warn(`Studio Decisions could not read queued messages: ${String(error)}`);
@@ -399,7 +380,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
       // first: deleting while paging by offset would skip threads.
       if (signal.aborted) return;
       const stale: string[] = [];
-      for (const owner of ["studio", "smart-decisions"]) {
+      for (const owner of ["studio"]) {
         for (let offset = 0, page = 0; page < 100; offset += 100, page++) {
           const threads = await bb.sdk.threads.list({
             originPluginId: owner,
@@ -427,7 +408,6 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     "  bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
   ].join("\n");
   const cli = async (argv: string[]) => {
-      await settingsReady();
       const json = argv.includes("--json");
       const args = argv.filter((arg) => arg !== "--json");
       const [command, ...rest] = args;
@@ -444,7 +424,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
           const current = await config();
           const jev = await jevStatus();
           const fallbackNow = await fallback();
-          const standalone = await standaloneQueueOn();
+          const standalone = standaloneQueue.on;
           const status = {
             enabled: current.enabled,
             pausedForSmartQueuePlugin: current.enabled && standalone,

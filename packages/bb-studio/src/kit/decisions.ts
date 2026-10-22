@@ -1,8 +1,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { publicContract, type ModelSelection } from "./decisions-contract";
+import { publicContract, type ModelSelection } from "../decisions/contract";
 
-export { publicContract } from "./decisions-contract";
-export type { Answer, Answers, Question, Questions } from "./decisions-contract";
+export { publicContract } from "../decisions/contract";
+export type { Answer, Answers, Question, Questions } from "../decisions/contract";
 
 export class DecisionsUnavailableError extends Error {}
 
@@ -26,7 +26,7 @@ export async function askModel(
   try {
     const result = await bb.sdk.plugins.callRpc({
       signal, pluginId: "studio", method: "decisions.model.ask", input: request,
-      outputSchema: publicContract["model.ask"].output,
+      outputSchema: publicContract["decisions.model.ask"].output,
     });
     signal.throwIfAborted();
     return unwrap(result as { ok: true; text: string | null; via: string; ms: number } | Failure);

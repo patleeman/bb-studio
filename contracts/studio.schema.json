@@ -7997,9 +7997,6 @@
                   "automations": {
                     "type": "boolean"
                   },
-                  "runtimes": {
-                    "type": "boolean"
-                  },
                   "memory": {
                     "type": "boolean"
                   },
@@ -8014,7 +8011,6 @@
                   "threads",
                   "workers",
                   "automations",
-                  "runtimes",
                   "memory",
                   "skills",
                   "adopt"
@@ -8151,9 +8147,6 @@
               "automations": {
                 "type": "boolean"
               },
-              "runtimes": {
-                "type": "boolean"
-              },
               "memory": {
                 "type": "boolean"
               },
@@ -8198,9 +8191,6 @@
                   "automations": {
                     "type": "boolean"
                   },
-                  "runtimes": {
-                    "type": "boolean"
-                  },
                   "memory": {
                     "type": "boolean"
                   },
@@ -8215,7 +8205,6 @@
                   "threads",
                   "workers",
                   "automations",
-                  "runtimes",
                   "memory",
                   "skills",
                   "adopt"
@@ -10173,9 +10162,6 @@
               "type": "string"
             }
           },
-          "approval": {
-            "type": "boolean"
-          },
           "consolidate": {
             "type": "boolean"
           },
@@ -10233,54 +10219,6 @@
                 "type": "null"
               }
             ]
-          },
-          "nextCuratorAt": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "pending": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "write",
-                    "delete"
-                  ]
-                },
-                "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "diff": {
-                  "type": "string"
-                },
-                "createdAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "action",
-                "description",
-                "diff",
-                "createdAt"
-              ],
-              "additionalProperties": false
-            }
           }
         },
         "required": [
@@ -10289,15 +10227,12 @@
           "reviewModel",
           "defaultModel",
           "models",
-          "approval",
           "consolidate",
           "toolTurns",
           "userTurns",
           "reviewing",
           "lastReview",
-          "lastCurator",
-          "nextCuratorAt",
-          "pending"
+          "lastCurator"
         ],
         "additionalProperties": false
       }
@@ -10330,10 +10265,6 @@
                 "type": "null"
               }
             ]
-          },
-          "approval": {
-            "description": "Deprecated; ignored. Saves apply immediately.",
-            "type": "boolean"
           },
           "consolidate": {
             "type": "boolean"
@@ -10368,9 +10299,6 @@
               "type": "string"
             }
           },
-          "approval": {
-            "type": "boolean"
-          },
           "consolidate": {
             "type": "boolean"
           },
@@ -10428,54 +10356,6 @@
                 "type": "null"
               }
             ]
-          },
-          "nextCuratorAt": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "pending": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "write",
-                    "delete"
-                  ]
-                },
-                "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "diff": {
-                  "type": "string"
-                },
-                "createdAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "action",
-                "description",
-                "diff",
-                "createdAt"
-              ],
-              "additionalProperties": false
-            }
           }
         },
         "required": [
@@ -10484,15 +10364,12 @@
           "reviewModel",
           "defaultModel",
           "models",
-          "approval",
           "consolidate",
           "toolTurns",
           "userTurns",
           "reviewing",
           "lastReview",
-          "lastCurator",
-          "nextCuratorAt",
-          "pending"
+          "lastCurator"
         ],
         "additionalProperties": false
       }
@@ -10576,187 +10453,6 @@
           "changes",
           "consolidating",
           "result"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "bot_skill_pending_resolve": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "botId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "approve": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "approve"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "interval": {
-            "type": "number"
-          },
-          "reviewModel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "defaultModel": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "models": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "approval": {
-            "type": "boolean"
-          },
-          "consolidate": {
-            "type": "boolean"
-          },
-          "toolTurns": {
-            "type": "number"
-          },
-          "userTurns": {
-            "type": "number"
-          },
-          "reviewing": {
-            "type": "boolean"
-          },
-          "lastReview": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "at": {
-                    "type": "number"
-                  },
-                  "result": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "at",
-                  "result"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "lastCurator": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "at": {
-                    "type": "number"
-                  },
-                  "result": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "at",
-                  "result"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nextCuratorAt": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "pending": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "write",
-                    "delete"
-                  ]
-                },
-                "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "diff": {
-                  "type": "string"
-                },
-                "createdAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "action",
-                "description",
-                "diff",
-                "createdAt"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "enabled",
-          "interval",
-          "reviewModel",
-          "defaultModel",
-          "models",
-          "approval",
-          "consolidate",
-          "toolTurns",
-          "userTurns",
-          "reviewing",
-          "lastReview",
-          "lastCurator",
-          "nextCuratorAt",
-          "pending"
         ],
         "additionalProperties": false
       }

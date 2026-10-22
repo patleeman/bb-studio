@@ -1,5 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { modelSelectionSchema, type ModelSelection } from "../../kit/decisions-contract";
+import { modelSelectionSchema, type ModelSelection } from "../../decisions/contract";
 import type { ModelPreferences, ModelPurpose } from "../shared/contract";
 
 /** Studio's KV key for a purpose's model; the Talk plugin used `model:<purpose>`. */

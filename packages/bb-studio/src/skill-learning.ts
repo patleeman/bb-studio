@@ -43,11 +43,8 @@ type ThreadLike = { id: string; status?: string; updatedAt?: number | null; arch
 export const LEARN_INTERVAL = 10;
 export const STALE_AFTER_MS = 30 * 86_400_000;
 export const ARCHIVE_AFTER_MS = 90 * 86_400_000;
-export const CURATOR_EVERY_MS = 7 * 86_400_000;
-export const CURATOR_IDLE_MS = 2 * 3_600_000;
 export const REVIEW_TIMEOUT_MS = 20 * 60_000;
 export const SKILL_SOFT_LIMIT = 8000;
-export const CURATOR_ID = "skill-curator";
 /** BB's largest page of thread events. */
 const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
@@ -222,9 +219,9 @@ export function consolidatePrompt(name: string): string {
 // ---- The service ----
 
 type LearningRow = {
-  bot_id: string; enabled: number; every_turns: number; review_model: string | null; consolidate: number; curator_paused: number;
+  bot_id: string; enabled: number; every_turns: number; review_model: string | null; consolidate: number;
   thread_id: string | null; seen_seq: number; in_tool_turn: number; tool_turns: number; user_turns: number;
-  last_review_at: number | null; last_review_result: string | null; curator_since: number | null; curator_last_at: number | null; curator_last_result: string | null;
+  last_review_at: number | null; last_review_result: string | null; curator_last_at: number | null; curator_last_result: string | null;
 };
 type ReviewRow = { thread_id: string; bot_id: string; kind: "review" | "consolidate"; status: "running" | "done"; saved: number; memory: number; started_at: number; finished_at: number | null; result: string | null };
 
@@ -241,20 +238,16 @@ export interface LearningDeps {
   skills(botId: string): LearningSkill[];
   setState(botId: string, name: string, state: SkillState): void;
   log?(message: string): void;
-  /** When a Bot's chat was last really active, discounting cache-warming pings (BotCacheWarmer.quietSince). */
-  quietSince?(threadId: string, updatedAt: number | null): number | null;
   /** How often to look for a fork's workspace; tests make it fast. */
   pollMs?: number;
 }
 
 export type LearningView = {
   enabled: boolean; interval: number; reviewModel: string | null; defaultModel: string | null; models: string[];
-  approval: boolean; consolidate: boolean;
+  consolidate: boolean;
   toolTurns: number; userTurns: number; reviewing: boolean;
   lastReview: { at: number; result: string } | null;
   lastCurator: { at: number; result: string } | null;
-  nextCuratorAt: number | null;
-  pending: { id: string; name: string; action: "write" | "delete"; description: string | null; diff: string; createdAt: number }[];
 };
 
 export class SkillLearning {
@@ -270,7 +263,7 @@ export class SkillLearning {
   constructor(private readonly deps: LearningDeps) {}
 
   private row(botId: string): LearningRow {
-    this.deps.db.prepare("INSERT OR IGNORE INTO bot_learning (bot_id, curator_since) VALUES (?, ?)").run(botId, Date.now());
+    this.deps.db.prepare("INSERT OR IGNORE INTO bot_learning (bot_id) VALUES (?)").run(botId);
     return this.deps.db.prepare("SELECT * FROM bot_learning WHERE bot_id = ?").get(botId) as LearningRow;
   }
 
@@ -315,16 +308,14 @@ export class SkillLearning {
     }
     return {
       enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models,
-      approval: false, consolidate: !!row.consolidate,
+      consolidate: !!row.consolidate,
       toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,
       lastCurator: row.curator_last_at && row.curator_last_result ? { at: row.curator_last_at, result: row.curator_last_result } : null,
-      nextCuratorAt: null, // Built-in Maintenance owns the schedule.
-      pending: [],
     };
   }
 
-  async set(botId: string, input: { enabled?: boolean; interval?: number; reviewModel?: string | null; approval?: boolean; consolidate?: boolean }): Promise<LearningView> {
+  async set(botId: string, input: { enabled?: boolean; interval?: number; reviewModel?: string | null; consolidate?: boolean }): Promise<LearningView> {
     if (input.interval !== undefined && (!Number.isInteger(input.interval) || input.interval < 2 || input.interval > 200)) throw new Error("The interval is 2 to 200 turns.");
     this.save(botId, {
       ...(input.enabled !== undefined ? { enabled: input.enabled ? 1 : 0 } : {}),
@@ -516,12 +507,6 @@ export class SkillLearning {
   }
 
   // ---- Curator ----
-
-  /** The curator’s last result. Built-in Maintenance owns its schedule. */
-  curatorState(botId: string): { lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } {
-    const row = this.row(botId);
-    return { lastRunAt: row.curator_last_at, lastOutcome: row.curator_last_result, nextRunAt: null };
-  }
 
   /** Runs the curator now: the transitions (applied unless dryRun) and, if on, a consolidation fork. */
   async curate(botId: string, options: { dryRun?: boolean; now?: number } = {}): Promise<{ changes: { name: string; from: SkillState; to: SkillState }[]; consolidating: boolean; result: string }> {

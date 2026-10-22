@@ -42,6 +42,16 @@ it("defaults off and waits one day before going live", () => {
   expect(maintenanceDryRun(s, now)).toBe(true); s.enabled = true; s.enabledAt = now;
   expect(maintenanceDryRun(s, now + DAY - 1)).toBe(true); expect(maintenanceDryRun(s, now + DAY)).toBe(false);
 });
+it("drops the retired runtime rule from saved settings", async () => {
+  const x = await setup();
+  x.db.prepare("INSERT INTO bot_maintenance_settings (bot_id, at, settings) VALUES ('bot', ?, ?)").run(now, JSON.stringify({
+    enabled: true, enabledAt: now, memoryWords: 1200,
+    rules: { threads: false, workers: true, automations: true, runtimes: false, memory: true, skills: false, adopt: true },
+  }));
+  const settings = x.maintenance.view("bot").settings;
+  expect(settings.rules).toEqual({ threads: false, workers: true, automations: true, memory: true, skills: false, adopt: true });
+  expect(settings).not.toHaveProperty("runtimes");
+});
 it("distinguishes finished threads from running, queued, pending and open plans", () => {
   const t = thread(); expect(finished(t as never, false, [])).toBe(true);
   for (const patch of [{ status: "active" }, { queuedWork: "waiting" }, { hasPendingInteraction: true }, { activity: { activePlanModeCount: 1 } }]) expect(finished({ ...t, ...patch } as never, false, [])).toBe(false);

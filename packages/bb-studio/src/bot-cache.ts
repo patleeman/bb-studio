@@ -43,7 +43,7 @@
 // sends to busy threads, and a ping only goes to an idle one). BB marks a
 // thread unread when a turn ends, so Studio marks it read again when it was
 // read before the ping. Studio's own counters skip pings: Learn from work's
-// user-turn count (isPingRequest), the curator's idle wait (quietSince), and
+// user-turn count (isPingRequest) and cache-ping activity baseline (quietSince), and
 // a review running beside the chat isn't stopped by one.
 //
 // Settings are per Bot (bot_cache_settings). Pings are logged (bot_cache_pings),
@@ -287,8 +287,8 @@ export class BotCacheWarmer {
   pinging(threadId: string): boolean { return this.pending.has(threadId); }
 
   /**
-   * When the thread was last really active: its updatedAt, unless that came
-   * from Studio's last ping, then what it was before the pings.
+   * When the thread's update timestamp came from a recent cache ping, return
+   * the saved pre-ping timestamp so cache warming does not look like activity.
    */
   quietSince(threadId: string, updatedAt: number | null | undefined): number | null {
     if (updatedAt == null) return null;
@@ -426,7 +426,7 @@ export class BotCacheWarmer {
   private async ping(bot: CacheBot, observed: Observed): Promise<boolean> {
     const threadId = observed.threadId;
     const now = this.now();
-    // What the thread's updatedAt was before Studio's pings, for the curator's idle wait.
+    // Preserve the thread's activity timestamp before this cache ping.
     const quiet = this.quietSince(threadId, observed.updatedAt);
     this.pending.set(threadId, { sentAt: now, wasRead: observed.wasRead });
     try {

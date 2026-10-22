@@ -310,12 +310,6 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
-      "method": "chief_of_staff",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Bot.swift",
-      "plugin": "studio",
       "method": "bot_list",
       "coverage": "generated method"
     },
@@ -365,12 +359,6 @@
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
       "method": "bot_learning_set",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Bot.swift",
-      "plugin": "studio",
-      "method": "bot_skill_pending_resolve",
       "coverage": "generated method"
     },
     {

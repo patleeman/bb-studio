@@ -100,7 +100,6 @@ public enum Studio {
     public static let bot_learning_set = "bot_learning_set"
     public static let bot_learning_review = "bot_learning_review"
     public static let bot_skill_curate = "bot_skill_curate"
-    public static let bot_skill_pending_resolve = "bot_skill_pending_resolve"
     public static let bot_skill_history = "bot_skill_history"
     public static let bot_skill_revert = "bot_skill_revert"
     public static let bot_runners = "bot_runners"
@@ -494,8 +493,6 @@ public enum Studio {
   public typealias BotLearningReview = BotLearningReviewOutput
 
   public typealias BotSkillCurate = BotSkillCurateOutput
-
-  public typealias BotSkillPendingResolve = BotSkillPendingResolveOutput
 
   public typealias BotSkillHistory = BotSkillHistoryOutput
 
@@ -6854,16 +6851,14 @@ public enum Studio {
     public var threads: Bool?
     public var workers: Bool?
     public var automations: Bool?
-    public var runtimes: Bool?
     public var memory: Bool?
     public var skills: Bool?
     public var adopt: Bool?
 
-    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
       self.threads = threads
       self.workers = workers
       self.automations = automations
-      self.runtimes = runtimes
       self.memory = memory
       self.skills = skills
       self.adopt = adopt
@@ -6942,16 +6937,14 @@ public enum Studio {
     public var threads: Bool?
     public var workers: Bool?
     public var automations: Bool?
-    public var runtimes: Bool?
     public var memory: Bool?
     public var skills: Bool?
     public var adopt: Bool?
 
-    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
       self.threads = threads
       self.workers = workers
       self.automations = automations
-      self.runtimes = runtimes
       self.memory = memory
       self.skills = skills
       self.adopt = adopt
@@ -6976,16 +6969,14 @@ public enum Studio {
     public var threads: Bool?
     public var workers: Bool?
     public var automations: Bool?
-    public var runtimes: Bool?
     public var memory: Bool?
     public var skills: Bool?
     public var adopt: Bool?
 
-    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, runtimes: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
+    public init(threads: Bool? = nil, workers: Bool? = nil, automations: Bool? = nil, memory: Bool? = nil, skills: Bool? = nil, adopt: Bool? = nil) {
       self.threads = threads
       self.workers = workers
       self.automations = automations
-      self.runtimes = runtimes
       self.memory = memory
       self.skills = skills
       self.adopt = adopt
@@ -8327,79 +8318,31 @@ public enum Studio {
     }
   }
 
-  public enum BotLearningOutputPendingItemAction: Sendable, Hashable, Codable {
-    case write
-    case delete
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "write": self = .write
-      case "delete": self = .delete
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .write: try container.encode("write")
-      case .delete: try container.encode("delete")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotLearningOutputPendingItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var action: BotLearningOutputPendingItemAction?
-    public var description: String?
-    public var diff: String?
-    public var createdAt: Double?
-
-    public init(id: String? = nil, name: String? = nil, action: BotLearningOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
-      self.id = id
-      self.name = name
-      self.action = action
-      self.description = description
-      self.diff = diff
-      self.createdAt = createdAt
-    }
-  }
-
   public struct BotLearningOutput: Sendable, Hashable, Codable {
     public var enabled: Bool?
     public var interval: Double?
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
-    public var approval: Bool?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
     public var reviewing: Bool?
     public var lastReview: BotLearningOutputLastReview?
     public var lastCurator: BotLearningOutputLastCurator?
-    public var nextCuratorAt: Double?
-    public var pending: [BotLearningOutputPendingItem]?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningOutputPendingItem]? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
-      self.approval = approval
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns
       self.reviewing = reviewing
       self.lastReview = lastReview
       self.lastCurator = lastCurator
-      self.nextCuratorAt = nextCuratorAt
-      self.pending = pending
     }
   }
 
@@ -8408,15 +8351,13 @@ public enum Studio {
     public var enabled: Bool?
     public var interval: Int?
     public var reviewModel: String?
-    public var approval: Bool?
     public var consolidate: Bool?
 
-    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, approval: Bool? = nil, consolidate: Bool? = nil) {
+    public init(botId: String? = nil, enabled: Bool? = nil, interval: Int? = nil, reviewModel: String? = nil, consolidate: Bool? = nil) {
       self.botId = botId
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
-      self.approval = approval
       self.consolidate = consolidate
     }
   }
@@ -8441,79 +8382,31 @@ public enum Studio {
     }
   }
 
-  public enum BotLearningSetOutputPendingItemAction: Sendable, Hashable, Codable {
-    case write
-    case delete
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "write": self = .write
-      case "delete": self = .delete
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .write: try container.encode("write")
-      case .delete: try container.encode("delete")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotLearningSetOutputPendingItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var action: BotLearningSetOutputPendingItemAction?
-    public var description: String?
-    public var diff: String?
-    public var createdAt: Double?
-
-    public init(id: String? = nil, name: String? = nil, action: BotLearningSetOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
-      self.id = id
-      self.name = name
-      self.action = action
-      self.description = description
-      self.diff = diff
-      self.createdAt = createdAt
-    }
-  }
-
   public struct BotLearningSetOutput: Sendable, Hashable, Codable {
     public var enabled: Bool?
     public var interval: Double?
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
-    public var approval: Bool?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
     public var reviewing: Bool?
     public var lastReview: BotLearningSetOutputLastReview?
     public var lastCurator: BotLearningSetOutputLastCurator?
-    public var nextCuratorAt: Double?
-    public var pending: [BotLearningSetOutputPendingItem]?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotLearningSetOutputPendingItem]? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
-      self.approval = approval
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns
       self.reviewing = reviewing
       self.lastReview = lastReview
       self.lastCurator = lastCurator
-      self.nextCuratorAt = nextCuratorAt
-      self.pending = pending
     }
   }
 
@@ -8564,114 +8457,6 @@ public enum Studio {
       self.changes = changes
       self.consolidating = consolidating
       self.result = result
-    }
-  }
-
-  public struct BotSkillPendingResolveInput: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var id: String?
-    public var approve: Bool?
-
-    public init(botId: String? = nil, id: String? = nil, approve: Bool? = nil) {
-      self.botId = botId
-      self.id = id
-      self.approve = approve
-    }
-  }
-
-  public struct BotSkillPendingResolveOutputLastReview: Sendable, Hashable, Codable {
-    public var at: Double?
-    public var result: String?
-
-    public init(at: Double? = nil, result: String? = nil) {
-      self.at = at
-      self.result = result
-    }
-  }
-
-  public struct BotSkillPendingResolveOutputLastCurator: Sendable, Hashable, Codable {
-    public var at: Double?
-    public var result: String?
-
-    public init(at: Double? = nil, result: String? = nil) {
-      self.at = at
-      self.result = result
-    }
-  }
-
-  public enum BotSkillPendingResolveOutputPendingItemAction: Sendable, Hashable, Codable {
-    case write
-    case delete
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "write": self = .write
-      case "delete": self = .delete
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .write: try container.encode("write")
-      case .delete: try container.encode("delete")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotSkillPendingResolveOutputPendingItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var action: BotSkillPendingResolveOutputPendingItemAction?
-    public var description: String?
-    public var diff: String?
-    public var createdAt: Double?
-
-    public init(id: String? = nil, name: String? = nil, action: BotSkillPendingResolveOutputPendingItemAction? = nil, description: String? = nil, diff: String? = nil, createdAt: Double? = nil) {
-      self.id = id
-      self.name = name
-      self.action = action
-      self.description = description
-      self.diff = diff
-      self.createdAt = createdAt
-    }
-  }
-
-  public struct BotSkillPendingResolveOutput: Sendable, Hashable, Codable {
-    public var enabled: Bool?
-    public var interval: Double?
-    public var reviewModel: String?
-    public var defaultModel: String?
-    public var models: [String]?
-    public var approval: Bool?
-    public var consolidate: Bool?
-    public var toolTurns: Double?
-    public var userTurns: Double?
-    public var reviewing: Bool?
-    public var lastReview: BotSkillPendingResolveOutputLastReview?
-    public var lastCurator: BotSkillPendingResolveOutputLastCurator?
-    public var nextCuratorAt: Double?
-    public var pending: [BotSkillPendingResolveOutputPendingItem]?
-
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, approval: Bool? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotSkillPendingResolveOutputLastReview? = nil, lastCurator: BotSkillPendingResolveOutputLastCurator? = nil, nextCuratorAt: Double? = nil, pending: [BotSkillPendingResolveOutputPendingItem]? = nil) {
-      self.enabled = enabled
-      self.interval = interval
-      self.reviewModel = reviewModel
-      self.defaultModel = defaultModel
-      self.models = models
-      self.approval = approval
-      self.consolidate = consolidate
-      self.toolTurns = toolTurns
-      self.userTurns = userTurns
-      self.reviewing = reviewing
-      self.lastReview = lastReview
-      self.lastCurator = lastCurator
-      self.nextCuratorAt = nextCuratorAt
-      self.pending = pending
     }
   }
 

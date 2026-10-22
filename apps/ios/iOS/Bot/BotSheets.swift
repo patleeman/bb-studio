@@ -209,7 +209,7 @@ struct BotProfileSheet: View {
 
 // MARK: Skills
 
-/// The procedures the Bot saved for itself, how it learns them, and changes waiting for approval.
+/// The procedures the Bot saved for itself, and its learning history.
 struct BotSkillsSheet: View {
     let name: String
     var botId: String? = nil
@@ -230,21 +230,6 @@ struct BotSkillsSheet: View {
                         Toggle("Learn from work", isOn: Binding(get: { learning.enabled }, set: { on in act { _ = try await app.client.setBotLearning(enabled: on, botId: botId) } }))
                     } footer: {
                         Text([learning.enabled ? "Reviews its work every \(learning.interval) turns and saves what's worth keeping." : "Off: it saves skills only when it decides to.", learning.status()].compactMap { $0 }.joined(separator: " "))
-                    }
-                    if !learning.pending.isEmpty {
-                        Section("Waiting for your approval") {
-                            ForEach(learning.pending) { change in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(change.action == "delete" ? "Delete \(change.name)" : change.name).font(.body.monospaced().weight(.medium))
-                                    Text(change.diff).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(8)
-                                    HStack {
-                                        Button("Approve") { act { try await app.client.resolveBotSkillChange(change.id, approve: true, botId: botId) } }
-                                        Button("Reject", role: .destructive) { act { try await app.client.resolveBotSkillChange(change.id, approve: false, botId: botId) } }
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
-                            }
-                        }
                     }
                 }
                 Section {

@@ -3,7 +3,7 @@
 // prefix, shared by Studio's app and the iOS app's generated contract.
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { modelSelectionSchema } from "./decisions-contract";
+import { modelSelectionSchema } from "../decisions/contract";
 
 // Studio's frontend imports this file, and a plugin's frontend bundle can't
 // resolve the root SDK. The SDK's helper only returns its argument.

@@ -10,7 +10,7 @@ const DAY = 86_400_000;
 /** "1 finished thread", "2 workers". */
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
-export const maintenanceRules = ["threads", "workers", "automations", "runtimes", "memory", "skills", "adopt"] as const;
+export const maintenanceRules = ["threads", "workers", "automations", "memory", "skills", "adopt"] as const;
 export type MaintenanceRule = typeof maintenanceRules[number];
 export interface MaintenanceSettings { enabled: boolean; enabledAt: number | null; memoryWords: number; rules: Record<MaintenanceRule, boolean> }
 export interface MaintenanceRun { at: number; dryRun: boolean; summary: string; actions: string[]; needsCall: { threadId: string; title: string; reason: string }[]; suggestions: { text: string; threadId?: string; automationId?: string }[] }
@@ -63,7 +63,14 @@ export class BotMaintenance {
   constructor(private readonly deps: MaintenanceDeps) {}
   view(botId: string): MaintenanceView {
     const row = this.deps.db.prepare("SELECT settings FROM bot_maintenance_settings WHERE bot_id = ? ORDER BY id DESC LIMIT 1").get(botId) as { settings: string } | undefined;
-    const settings = row ? JSON.parse(row.settings) as MaintenanceSettings : maintenanceDefaults();
+    const saved = row ? JSON.parse(row.settings) as Partial<MaintenanceSettings> : {};
+    const defaults = maintenanceDefaults();
+    const settings: MaintenanceSettings = {
+      enabled: saved.enabled ?? defaults.enabled,
+      enabledAt: saved.enabledAt ?? defaults.enabledAt,
+      memoryWords: saved.memoryWords ?? defaults.memoryWords,
+      rules: Object.fromEntries(maintenanceRules.map((rule) => [rule, saved.rules?.[rule] ?? defaults.rules[rule]])) as MaintenanceSettings["rules"],
+    };
     const runs = (this.deps.db.prepare("SELECT result FROM bot_maintenance_runs WHERE bot_id = ? ORDER BY id DESC LIMIT 30").all(botId) as { result: string }[]).map((r) => JSON.parse(r.result) as MaintenanceRun);
     return { settings, liveAt: settings.enabled && settings.enabledAt !== null ? settings.enabledAt + DAY : null, runs };
   }
@@ -215,8 +222,7 @@ export class BotMaintenance {
         }
       }
 
-      // The stable SDK lists running turns, but cannot identify loaded idle
-      // runtimes. Do not stop threads based solely on their last update time.
+      // Do not stop threads based solely on their last update time.
       if (settings.rules.memory && bot.threadId) {
         const memory = this.deps.memory(botId);
         if (memory && memoryNeedsTidy(memory.markdown, settings.memoryWords, memory.updatedAt, now)) await act("Memory tidy requested", () => this.deps.sdk.threads.send({ threadId: bot.threadId!, mode: "auto", input: [{ type: "text", text: `Maintenance: rewrite Memory page ${memory.id}. Merge duplicates, drop entries older than 60 days that are stale or contradicted, preserve useful facts, and stay under ${settings.memoryWords} words. Page history preserves the old version. Reply exactly [PASS].`, mentions: [], visibility: "agent-only" }] }));

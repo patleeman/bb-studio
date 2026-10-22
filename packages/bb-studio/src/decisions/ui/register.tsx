@@ -1,4 +1,4 @@
-import type { Fallback } from "../../kit/decisions-legacy-contract";
+import type { Fallback } from "../contract";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   type PluginAppBuilder,

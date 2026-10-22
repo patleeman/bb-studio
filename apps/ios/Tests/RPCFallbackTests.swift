@@ -24,6 +24,8 @@ final class RPCFallbackTests: XCTestCase {
         XCTAssertTrue(BBClient.isMissingRPC(BBError(status: 503, message: "")))
         XCTAssertFalse(BBClient.isMissingRPC(BBError(status: 500, message: "")))
         XCTAssertFalse(BBClient.isMissingRPC(URLError(.timedOut)))
+        XCTAssertTrue(BBClient.isUnknownRPC(BBError(status: 404, message: "")))
+        XCTAssertFalse(BBClient.isUnknownRPC(BBError(status: 503, message: "")))
     }
 
     func testSidebarPreferencesComeFromBBsThreadList() async throws {

@@ -6,7 +6,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "../../kit/decisions";
 import { primaryHostId } from "../../kit/server/index";
-import type { ModelSelection } from "../../kit/decisions-contract";
+import type { ModelSelection } from "../../decisions/contract";
 import { z } from "zod";
 import type { Recording } from "../shared/contract";
 import type { TalkStore } from "./store";

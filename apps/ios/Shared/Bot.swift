@@ -6,31 +6,20 @@ import Foundation
 /// with a name, an emoji and a state. Its thread is the lead of BB's personal
 /// project, which the app, widgets, Siri and the watch all go to first.
 extension BBClient {
-    /// The Bot, or nil when there is none, or when Studio is absent. A Studio that
-    /// predates the Bot answers through `chief_of_staff` as a Bot named "Chief of
-    /// Staff". Remembers the answer per server so widgets can draw while offline.
-    /// With a `botId`, that bot instead of the primary one.
+    /// The Bot, or nil when there is none or Studio has no `bot_get` RPC.
+    /// A successful response is remembered per server so widgets can draw offline;
+    /// a failed request leaves the last known Bot intact. With a `botId`, that bot
+    /// instead of the primary one.
     public func bot(_ botId: String? = nil) async throws -> BotInfo? {
+        let output: BotWire
         do {
-            let output: BotWire = try await rpc("studio", Studio.Method.bot_get, Self.scoped(botId))
-            let info = output.info
-            if botId == nil || info?.primary == true { remember(info) }
-            return info
-        } catch where Self.isMissingRPC(error) && botId == nil {
-            do {
-                let output: Studio.ChiefOfStaffOutput = try await rpc("studio", Studio.Method.chief_of_staff, .object([:]))
-                let run = output.run
-                let info = output.threadId.map { _ in
-                    BotInfo(name: "Chief of Staff", avatar: BotInfo.defaultAvatar, state: .active,
-                            lead: ThreadLead(threadId: output.threadId, enabled: run?.enabled, cadence: run?.cadence, time: run?.time, cron: run?.cron))
-                }
-                remember(info)
-                return info
-            } catch where Self.isMissingRPC(error) {
-                remember(nil)
-                return nil
-            }
+            output = try await rpc("studio", Studio.Method.bot_get, Self.scoped(botId))
+        } catch where Self.isUnknownRPC(error) {
+            return nil
         }
+        let info = output.info
+        if botId == nil || info?.primary == true { remember(info) }
+        return info
     }
 
     /// The Bot's thread, nil when there is no Bot or Studio is absent.
@@ -47,7 +36,7 @@ extension BBClient {
             let list = BotInfo.ordered(output.bots.map { BotWire(bot: $0, run: nil).info! })
             if let primary = list.first(where: \.primary) { remember(primary) }
             return list
-        } catch where Self.isMissingRPC(error) {
+        } catch where Self.isUnknownRPC(error) {
             return try await bot().map { [$0] } ?? []
         }
     }
@@ -133,7 +122,7 @@ extension BBClient {
         return output.skills
     }
 
-    /// The Bot's skill learning: settings, the last review and changes waiting for approval.
+    /// The Bot's skill learning settings and latest review.
     public func botLearning(botId: String? = nil) async throws -> BotLearning {
         try await rpc("studio", Studio.Method.bot_learning, Self.scoped(botId))
     }
@@ -142,12 +131,6 @@ extension BBClient {
     @discardableResult
     public func setBotLearning(enabled: Bool, botId: String? = nil) async throws -> BotLearning {
         try await rpc("studio", Studio.Method.bot_learning_set, Self.scoped(botId, ["enabled": .bool(enabled)]))
-    }
-
-    /// Approves or rejects a review's staged skill change.
-    @discardableResult
-    public func resolveBotSkillChange(_ id: String, approve: Bool, botId: String? = nil) async throws -> BotLearning {
-        try await rpc("studio", Studio.Method.bot_skill_pending_resolve, Self.scoped(botId, ["id": .string(id), "approve": .bool(approve)]))
     }
 
     /// Pins a skill (the curator leaves it alone) or unpins it.
@@ -519,19 +502,10 @@ public struct BotSkill: Decodable, Hashable, Sendable, Identifiable {
 /// A Bot's skill learning (`bot_learning`).
 public struct BotLearning: Decodable, Hashable, Sendable {
     public struct Result: Decodable, Hashable, Sendable { public var at: Double; public var result: String }
-    public struct Change: Decodable, Hashable, Sendable, Identifiable {
-        public var id: String
-        public var name: String
-        /// "write" or "delete".
-        public var action: String
-        public var diff: String
-    }
     public var enabled: Bool
     public var interval: Int
     public var reviewing: Bool
-    public var approval: Bool
     public var lastReview: Result?
-    public var pending: [Change]
 
     /// "Saved 1 skill · 2h ago", "Reviewing now…" or nil before the first review.
     public func status(now: Date = Date()) -> String? {

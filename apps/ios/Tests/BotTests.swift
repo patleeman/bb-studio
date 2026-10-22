@@ -23,11 +23,10 @@ final class BotTests: XCTestCase {
     }
 
     func testSkillLearningDecodesAndSaysTheLastReview() async throws {
-        let learning = #"{"ok":true,"result":{"enabled":true,"interval":10,"reviewModel":null,"defaultModel":"haiku","models":[],"approval":true,"consolidate":false,"curatorPaused":false,"toolTurns":3,"userTurns":1,"reviewing":false,"lastReview":{"at":1000,"result":"Saved 1 skill"},"lastCurator":null,"nextCuratorAt":null,"pending":[{"id":"pend_1","name":"deploy","action":"write","description":null,"diff":"+ step","createdAt":1}]}}"#
+        let learning = #"{"ok":true,"result":{"enabled":true,"interval":10,"reviewModel":null,"defaultModel":"haiku","models":[],"consolidate":false,"toolTurns":3,"userTurns":1,"reviewing":false,"lastReview":{"at":1000,"result":"Saved 1 skill"},"lastCurator":null}}"#
         let skills = #"{"ok":true,"result":{"skills":[{"name":"deploy","description":"d","updatedAt":1,"state":"stale","pinned":true,"usedAt":1},{"name":"old","description":"d","updatedAt":1}]}}"#
         let c = client(a, ["bot_learning": (200, learning), "bot_skills": (200, skills)])
         let result = try await c.botLearning()
-        XCTAssertEqual(result.pending.map(\.diff), ["+ step"])
         XCTAssertTrue(result.status(now: Date(timeIntervalSince1970: 3601))?.hasPrefix("Saved 1 skill · ") ?? false)
         let list = try await c.botSkills()
         XCTAssertEqual(list.map(\.state), ["stale", nil])
@@ -52,21 +51,31 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(BBClient(baseURL: b).cachedBotThreadId, "thr_b")
     }
 
-    func testOlderStudioAnswersThroughChiefOfStaff() async throws {
-        let old = client(a, ["chief_of_staff": (200, #"{"ok":true,"result":{"threadId":"thr_c","run":{"enabled":true,"cadence":"every15minutes","time":"09:30"}}}"#)])
+    func testUnknownBotRPCDoesNotCallChiefOfStaffOrClearCachedBot() async throws {
+        let server = URL(string: "https://bot-unknown.invalid")!
+        _ = try await client(server, ["bot_get": bot("thr_cached")]).bot()
+        let calls = Calls()
+        let old = client(server, ["bot_get": (404, #"{"ok":false,"error":{"code":"unknown_method","message":"no"}}"#),
+                                  "chief_of_staff": (200, #"{"ok":true,"result":{"threadId":"thr_old","run":null}}"#)], sent: { method, body in calls.add(method, body) })
         let info = try await old.bot()
-        XCTAssertEqual(info?.name, "Chief of Staff")
-        XCTAssertEqual(info?.lead, ThreadLead(threadId: "thr_c", heartbeat: "every15minutes", time: "09:30"))
-        let threadId = try await old.botThreadId()
-        XCTAssertEqual(threadId, "thr_c")
+        XCTAssertNil(info)
+        XCTAssertEqual(BBClient(baseURL: server).cachedBotThreadId, "thr_cached")
+        XCTAssertEqual(calls.all.map(\.0), ["bot_get"])
     }
 
     func testNoStudioMeansNoBot() async throws {
-        let none = try await client(a, [:]).bot()
+        let none = try await client(URL(string: "https://bot-absent.invalid")!, [:]).bot()
         XCTAssertNil(none)
-        let stopped = client(b, ["bot_get": (503, #"{"ok":false,"error":{"message":"not running"}}"#)])
-        let alsoNone = try await stopped.botThreadId()
-        XCTAssertNil(alsoNone)
+        let server = URL(string: "https://bot-offline.invalid")!
+        _ = try await client(server, ["bot_get": bot("thr_cached")]).bot()
+        let stopped = client(server, ["bot_get": (503, #"{"ok":false,"error":{"message":"not running"}}"#)])
+        do {
+            _ = try await stopped.botThreadId()
+            XCTFail("A stopped Studio must remain an error")
+        } catch {
+            XCTAssertEqual((error as? BBError)?.status, 503)
+        }
+        XCTAssertEqual(BBClient(baseURL: server).cachedBotThreadId, "thr_cached")
     }
 
     func testStateAndHeartbeatUseBotRPCs() async throws {
@@ -136,6 +145,24 @@ final class BotTests: XCTestCase {
         let older = try await client(b, ["bot_get": bot("thr_b")]).bots()
         XCTAssertEqual(older.map(\.lead.threadId), ["thr_b"])
         XCTAssertEqual(older.first?.primary, true)
+    }
+
+    func testBotListPropagatesStudioUnavailableInsteadOfFallingBack() async throws {
+        let calls = Calls()
+        let server = URL(string: "https://bot-list-offline.invalid")!
+        _ = try await client(server, ["bot_get": bot("thr_cached")]).bot()
+        let stopped = client(server, [
+            "bot_list": (503, #"{"ok":false,"error":{"message":"not running"}}"#),
+            "bot_get": bot("thr_other"),
+        ], sent: { method, body in calls.add(method, body) })
+        do {
+            _ = try await stopped.bots()
+            XCTFail("A stopped Studio must remain an error")
+        } catch {
+            XCTAssertEqual((error as? BBError)?.status, 503)
+        }
+        XCTAssertEqual(calls.all.map(\.0), ["bot_list"])
+        XCTAssertEqual(BBClient(baseURL: server).cachedBotThreadId, "thr_cached")
     }
 
     func testBotIdScopesEveryCall() async throws {
@@ -213,9 +240,9 @@ final class BotTests: XCTestCase {
     }
 
     func testCadenceIdKeepsUnknownValues() {
-        XCTAssertEqual(ThreadLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.every2hours), "every2hours")
-        XCTAssertEqual(ThreadLead.cadenceId(Studio.ChiefOfStaffOutputRunCadence.unknown("every10minutes")), "every10minutes")
-        XCTAssertNil(ThreadLead.cadenceId(Optional<Studio.ChiefOfStaffOutputRunCadence>.none))
+        XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.every2hours), "every2hours")
+        XCTAssertEqual(ThreadLead.cadenceId(Studio.BotGetOutputRunCadence.unknown("every10minutes")), "every10minutes")
+        XCTAssertNil(ThreadLead.cadenceId(Optional<Studio.BotGetOutputRunCadence>.none))
     }
 
     func testHeartbeatTimeRoundTrips() {

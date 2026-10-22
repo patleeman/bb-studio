@@ -355,7 +355,7 @@ keeps a list of known add-ons, since every kind that had one is built in.
 
 ## Decisions merge (21 October 2026)
 
-Decisions is a service, with no item routes or database tables. Its server and settings live in `src/decisions`, with `decisions.*` RPCs and commands under `bb studio decisions`. The retired bridge copied ordinary settings, five secrets, fallback configuration and recent decisions while preserving destination values. Those import RPCs and bridge gates are removed now that migration is complete. Smart Queue uses Studio's local settings and still pauses for the standalone `smart-queue` plugin; recovery cleans stale classifier threads owned by either plugin id.
+Decisions is a service, with no item routes or database tables. Its server and settings live in `src/decisions`, with `decisions.*` RPCs and commands under `bb studio decisions`. The retired bridge copied ordinary settings, five secrets, fallback configuration and recent decisions while preserving destination values. Those import RPCs and bridge gates are removed now that migration is complete. Smart Queue uses Studio's local settings and still pauses for the standalone `smart-queue` plugin; recovery cleans stale classifier threads owned by Studio.
 
 ## Code merge (21 October 2026)
 

@@ -2,7 +2,7 @@ import type { PluginSettingDescriptor } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { jevProviderChoices } from "./server/jev-providers";
 export const typesafeModels = ["jev-latest", "jev-preview", "jev-1.13.0"];
-export const LEGACY_DECISIONS_SETTINGS = {
+const decisionsSettingDescriptors = {
     enabled: {
       type: "boolean",
       label: "Smart Queue",
@@ -102,9 +102,5 @@ export const LEGACY_DECISIONS_SETTINGS = {
     },
 } satisfies Record<string, PluginSettingDescriptor>;
 
-// No declarative defaults: an absent value must be distinguishable from an explicit destination choice.
-export const DECISIONS_SETTINGS = Object.fromEntries(Object.entries(LEGACY_DECISIONS_SETTINGS).map(([key, descriptor]) => {
-  const { default: _default, ...rest } = descriptor as typeof descriptor & { default?: unknown };
-  return [`decisions_${key}`, rest];
-}));
-export const decisionsDefaults = Object.fromEntries(Object.entries(LEGACY_DECISIONS_SETTINGS).flatMap(([key, descriptor]) => "default" in descriptor ? [[key, descriptor.default]] : []));
+export const DECISIONS_SETTINGS = Object.fromEntries(Object.entries(decisionsSettingDescriptors).map(([key, descriptor]) => [`decisions_${key}`, descriptor]));
+export const decisionsDefaults = Object.fromEntries(Object.entries(decisionsSettingDescriptors).flatMap(([key, descriptor]) => "default" in descriptor ? [[key, descriptor.default]] : []));

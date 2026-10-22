@@ -34,6 +34,11 @@ extension BBClient {
         return error.status == 404 || error.status == 503
     }
 
+    /// The RPC does not exist. Unlike 503, this does not mean Studio is temporarily unavailable.
+    public static func isUnknownRPC(_ error: Error) -> Bool {
+        (error as? BBError)?.status == 404
+    }
+
     /// What a screen says when the plugin it needs isn't installed or running.
     public static func missingPluginMessage(_ plugin: String) -> String { "Install \(plugin) to use this." }
 

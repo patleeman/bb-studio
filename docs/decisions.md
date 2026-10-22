@@ -164,8 +164,8 @@ Studio's [plugin health](../packages/bb-studio/README.md#plugin-health) check
 
 ## For other plugins
 
-Studio Decisions publishes two plugin RPC methods under the plugin ID
-`smart-decisions`. Each takes a `caller`, the calling plugin's ID, for its
+Studio Decisions publishes two plugin RPC methods through the `studio` plugin.
+Each takes a `caller`, the calling plugin's ID, for its
 logs.
 
 - `decisions.systemOne.ask` takes `state` (any JSON, at most 64,000 characters) and

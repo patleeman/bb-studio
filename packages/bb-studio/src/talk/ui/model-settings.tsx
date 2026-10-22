@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { experimental_ProviderModelPicker as ProviderModelPicker, useRpc } from "@get-bb/plugin-sdk/app";
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
 import { errorMessage } from "../../kit/format";
-import type { ModelSelection } from "../../kit/decisions-contract";
+import type { ModelSelection } from "../../decisions/contract";
 import type { ModelPreferences, ModelPurpose, TalkRpcContract } from "../shared/contract";
 
 const purposes: { id: ModelPurpose; label: string; description: string }[] = [

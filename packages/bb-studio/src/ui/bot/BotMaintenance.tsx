@@ -5,7 +5,7 @@ import type { MaintenanceRule, MaintenanceView } from "../../bot-maintenance";
 import { useCall, useLive } from "../live";
 import { useOpenThread } from "./workspace";
 
-const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", workers: "Hidden workers", automations: "Automations and reminders", runtimes: "Idle runtimes (when supported by BB)", memory: "Memory page", skills: "Skills (pinned skills exempt)", adopt: "Runner suggestions" };
+const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", workers: "Hidden workers", automations: "Automations and reminders", memory: "Memory page", skills: "Skills (pinned skills exempt)", adopt: "Runner suggestions" };
 export function BotMaintenance({ botId }: { botId: string }) {
   const live = useLive<MaintenanceView>("bot_maintenance_get", { botId });
   const call = useCall();
