@@ -201,7 +201,7 @@ function AutomationRow({ row, now, onToggle }: { row: ThreadAutomation; now: num
 
 /** The automation clock remains on regular threads; Bot threads use their Bot info button instead. */
 export function ThreadAutomationsBadge(props: PluginThreadHeaderActionProps) {
-  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId: props.threadId }, { pollMs: 120_000 });
+  const owner = useLive("bot_thread_owner", { threadId: props.threadId }, { pollMs: 120_000 });
   if (owner.loading || owner.data?.botId) return null;
   return <RegularThreadAutomationsBadge {...props} />;
 }

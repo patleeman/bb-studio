@@ -9,12 +9,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useState } from "react";
 import type { RunnerAdoptableView, RunnerView } from "../../contract";
 import { describeCron } from "../../schedule";
-import { useCall, useLive, type Cadence } from "../live";
+import { useCall, useLive, type Method, type RpcInput, type Cadence } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { ProviderStatusMark, runnerStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
 
 export type RunnersData = { runners: RunnerView[]; adoptable: RunnerAdoptableView[] };
-export const useRunners = (botId: string) => useLive<RunnersData>("bot_runners", { botId }, { pollMs: 15_000 });
+export const useRunners = (botId: string) => useLive("bot_runners", { botId }, { pollMs: 15_000 });
 
 const CADENCE: Record<Cadence, string> = {
   every5minutes: "Every 5 min", every15minutes: "Every 15 min", every30minutes: "Every 30 min", hourly: "Hourly", every2hours: "Every 2 h",
@@ -70,9 +70,9 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = useOpenRunner(botId, onOpen, data.refresh);
-  const run = async (method: string, input: unknown) => {
+  const run = async <M extends Method,>(method: M, input: RpcInput<M>) => {
     setBusy(true); setError(null);
-    try { await call(method, { ...(input as object), botId }); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+    try { await call(method, { ...input, botId }); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };
   const runners = data.data?.runners ?? [];
   // Adoption suggestions now live in the maintenance summary.

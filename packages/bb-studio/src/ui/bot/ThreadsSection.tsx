@@ -126,7 +126,7 @@ export function ThreadsSection({ activeThreadId, onNavigate }: { activeThreadId:
   const open = (threadId: string, split: boolean) => { navigate.toThread(threadId, split ? { split: true } : undefined); onNavigate(); };
   const [limit, setLimit] = useState(PAGE);
   const [closed, setClosed] = useState(false);
-  const listed = useLive<{ threadIds: string[] }>("bot_listed_threads", {}, { pollMs: 60_000 });
+  const listed = useLive("bot_listed_threads", {}, { pollMs: 60_000 });
   const botThreads = useMemo(() => new Set(listed.data?.threadIds ?? []), [listed.data]);
   const [view, setView] = useThreadsView();
   const rows = useMemo(() => listedThreads(state.threads, botThreads, view.sort), [state.threads, botThreads, view.sort]);

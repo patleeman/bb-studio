@@ -33,7 +33,7 @@ function Value({ change, side }: { change: BotProfileChangeView; side: "old" | "
 /** The Bot's own profile edits, newest first; `limit` rows, or all. */
 export function ProfileChanges({ botId, onChanged, limit = 5 }: { botId: string; onChanged(): void; limit?: number }) {
   const [expanded, setExpanded] = useState(false);
-  const changes = useLive<{ changes: BotProfileChangeView[] }>("bot_profile_changes", { botId }, { pollMs: 30_000 });
+  const changes = useLive("bot_profile_changes", { botId }, { pollMs: 30_000 });
   const { run, busy, error } = useAction(() => { changes.refresh(); onChanged(); }, botId);
   const list = (changes.data?.changes ?? []).slice(0, limit);
   return (

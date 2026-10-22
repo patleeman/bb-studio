@@ -1,20 +1,20 @@
 import { GHOST_BUTTON } from "../../kit/app/index";
 import { errorMessage } from "../../kit/format";
 import { useState } from "react";
-import type { MaintenanceRule, MaintenanceView } from "../../bot-maintenance";
-import { useCall, useLive } from "../live";
+import type { MaintenanceRule } from "../../bot-maintenance";
+import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { useOpenThread } from "./workspace";
 
 const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", workers: "Hidden workers", automations: "Automations and reminders", memory: "Memory page", skills: "Skills (pinned skills exempt)", adopt: "Runner suggestions" };
 export function BotMaintenance({ botId }: { botId: string }) {
-  const live = useLive<MaintenanceView>("bot_maintenance_get", { botId });
+  const live = useLive("bot_maintenance_get", { botId });
   const call = useCall();
   const open = useOpenThread();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const act = async (method: string, input: object) => {
+  const act = async <M extends Method,>(method: M, input: RpcInput<M>) => {
     setBusy(true); setError(null);
-    try { await call(method, { botId, ...input }); live.refresh(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    try { await call(method, { ...input, botId }); live.refresh(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   };
   const view = live.data;
   const last = view?.runs[0];
@@ -31,7 +31,7 @@ export function BotMaintenance({ botId }: { botId: string }) {
       {last ? <div className="space-y-2 pt-2"><p role="status">{last.summary}</p>
         {last.actions.length ? <details><summary className="cursor-pointer">{last.dryRun ? "Proposed actions" : "Actions"}</summary><ul className="list-disc space-y-1 pl-4">{last.actions.map((action, i) => <li key={i}>{action}</li>)}</ul></details> : null}
         {last.needsCall.length ? <div><h4 className="font-medium">Needs your call</h4>{last.needsCall.map((entry) => <p key={entry.threadId}><button className="underline" onClick={() => open(entry.threadId)}>{entry.title}</button>: {entry.reason}</p>)}</div> : null}
-        {last.suggestions.map((suggestion, i) => <p key={i}>{suggestion.text}{suggestion.threadId && suggestion.automationId ? <> · <button className="underline" disabled={busy} onClick={() => void act("bot_runner_adopt", { threadId: suggestion.threadId, automationId: suggestion.automationId })}>Adopt</button></> : null}</p>)}
+        {last.suggestions.map((suggestion, i) => <p key={i}>{suggestion.text}{suggestion.threadId && suggestion.automationId ? <> · <button className="underline" disabled={busy} onClick={() => void act("bot_runner_adopt", { threadId: suggestion.threadId!, automationId: suggestion.automationId! })}>Adopt</button></> : null}</p>)}
       </div> : null}
     </> : <p>{live.loading ? "Loading…" : live.error}</p>}
     {error ? <p role="alert" className="text-destructive">{error}</p> : null}

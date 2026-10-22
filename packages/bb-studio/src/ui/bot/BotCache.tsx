@@ -8,7 +8,7 @@ import { useComposer, type PluginThreadHeaderActionProps } from "@get-bb/plugin-
 import { useEffect, useState } from "react";
 import type { BotCacheStateView } from "../../contract";
 import { formatTokens, formatUsd } from "../../bot-cache-format";
-import { useCall, useLive } from "../live";
+import { useCall, useLive, type Method, type RpcInput } from "../live";
 
 const POLL_MS = 60_000;
 
@@ -57,14 +57,14 @@ const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour:
 
 /** The header chip on a Bot's chat; nothing on other threads. */
 export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
-  const live = useLive<BotCacheStateView>("bot_cache_state", { threadId }, { pollMs: POLL_MS });
+  const live = useLive("bot_cache_state", { threadId }, { pollMs: POLL_MS });
   const call = useCall();
   const [error, setError] = useState<string | null>(null);
   useTick(30_000);
   const state = live.data;
   if (!state?.botId) return null;
   const indicator = cacheIndicator(state);
-  const act = (method: string, input: object) => { setError(null); void call(method, input).then(() => live.refresh(), (cause: unknown) => setError(errorMessage(cause))); };
+  const act = <M extends Method,>(method: M, input: RpcInput<M>) => { setError(null); void call(method, input).then(() => live.refresh(), (cause: unknown) => setError(errorMessage(cause))); };
   const cost = costLine(state);
   return (
     <DropdownMenu>
@@ -85,7 +85,7 @@ export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
           {error ? <span role="alert" className="text-destructive">{error}</span> : null}
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => act("bot_cache_set", { botId: state.botId, enabled: !state.settings.enabled })}>
+        <DropdownMenuItem onSelect={() => act("bot_cache_set", { botId: state.botId ?? undefined, enabled: !state.settings.enabled })}>
           <Icon name={state.settings.enabled ? "Pause" : "Play"} />{state.settings.enabled ? "Turn warming off" : "Turn warming on"}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => { if (confirm("Compact this chat? BB summarizes its history; the next send writes the shorter context.")) act("bot_cache_compact", { threadId }); }}>
@@ -107,7 +107,7 @@ export function BotCacheBanner() {
 }
 
 function ColdBanner({ threadId }: { threadId: string }) {
-  const live = useLive<BotCacheStateView>("bot_cache_state", { threadId }, { pollMs: POLL_MS });
+  const live = useLive("bot_cache_state", { threadId }, { pollMs: POLL_MS });
   const call = useCall();
   const [hidden, setHidden] = useState(dismissed.has(threadId));
   const state = live.data;
@@ -128,14 +128,14 @@ const IDLE_HOURS = [1, 2, 3, 4, 6, 8];
 
 /** Bot info's Prompt cache section: the state, warming's cost, its settings, and Compact. */
 export function BotCacheSection({ botId, threadId }: { botId: string; threadId: string | null }) {
-  const live = useLive<BotCacheStateView>("bot_cache_state", { botId }, { pollMs: POLL_MS });
+  const live = useLive("bot_cache_state", { botId }, { pollMs: POLL_MS });
   const call = useCall();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useTick(30_000);
   const state = live.data;
   if (!threadId || !state?.botId) return null;
-  const run = async (method: string, input: object) => {
+  const run = async <M extends Method,>(method: M, input: RpcInput<M>) => {
     setBusy(true); setError(null);
     try { await call(method, input); live.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };

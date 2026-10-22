@@ -10,9 +10,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon, Input,
 } from "../../kit/ui/index";
 import { useState } from "react";
-import type { BotAutomationRunView, BotAutomationView } from "../../contract";
+import type { BotAutomationView } from "../../contract";
 import { WEEKDAYS, type Schedule } from "../../schedule";
-import { useCall, useLive } from "../live";
+import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { ScheduleEditor, schedulePreview } from "./ScheduleEditor";
 
 type Kind = BotAutomationView["kind"];
@@ -24,7 +24,7 @@ export const KIND: Record<Kind, { label: string; icon: string; blurb: string }> 
 };
 const STATE: Record<BotAutomationView["state"], string> = { active: "", paused: "Paused", done: "Done", ended: "Ended" };
 const at = (time: number) => new Date(time).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-export const useAutomations = (botId: string) => useLive<{ automations: BotAutomationView[] }>("bot_automations", { botId }, { pollMs: 20_000 });
+export const useAutomations = (botId: string) => useLive("bot_automations", { botId }, { pollMs: 20_000 });
 
 type Sheet = { kind: "new"; type: Kind } | { kind: "edit"; automation: BotAutomationView } | { kind: "delete"; automation: BotAutomationView } | null;
 
@@ -35,9 +35,9 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = async (method: string, input: unknown, close = true) => {
+  const run = async <M extends Method,>(method: M, input: RpcInput<M>, close = true) => {
     setBusy(true); setError(null);
-    try { await call(method, { ...(input as object), botId }); if (close) setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+    try { await call(method, { ...input, botId }); if (close) setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
   };
   const list = data.data?.automations ?? [];
   const [showDone, setShowDone] = useState(false);
@@ -69,7 +69,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
       {list.some((a) => a.state === "done" || a.state === "ended") ? <button className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
       {sheet?.kind === "new" || sheet?.kind === "edit" ? (
         <AutomationDialog type={sheet.kind === "new" ? sheet.type : sheet.automation.kind} automation={sheet.kind === "edit" ? sheet.automation : null} runners={list.filter((each) => each.kind === "runner")} busy={busy} error={error} onClose={() => setSheet(null)}
-          onSave={(input) => void run(sheet.kind === "edit" ? "bot_automation_update" : "bot_automation_create", sheet.kind === "edit" ? { id: sheet.automation.id, ...input } : { kind: sheet.type, ...input })} />
+          onSave={(input) => void run(sheet.kind === "edit" ? "bot_automation_update" : "bot_automation_create", sheet.kind === "edit" ? { id: sheet.automation.id, ...input } : { ...input, kind: sheet.type, name: input.name ?? "", schedule: input.schedule })} />
       ) : null}
       {sheet?.kind === "delete" ? (
         <Dialog open onOpenChange={(next) => !next && setSheet(null)}>
@@ -92,7 +92,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
 
 function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, onOpen, onAction, onEdit, onDelete }: {
   botId: string; automation: BotAutomationView; expanded: boolean; busy: boolean; disabled: boolean;
-  onToggle(): void; onOpen(threadId: string): void; onAction(method: string): void; onEdit(): void; onDelete(): void;
+  onToggle(): void; onOpen(threadId: string): void; onAction(method: "bot_automation_pause" | "bot_automation_resume" | "bot_automation_run_now" | "bot_maintenance_dry_run"): void; onEdit(): void; onDelete(): void;
 }) {
   const off = automation.state !== "active";
   const when = off ? STATE[automation.state] : automation.nextRunAt ? at(automation.nextRunAt) : automation.scheduleText;
@@ -129,7 +129,7 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
 }
 
 function RecentRuns({ botId, id, onOpen }: { botId: string; id: string; onOpen(threadId: string): void }) {
-  const runs = useLive<{ runs: BotAutomationRunView[] }>("bot_automation_runs", { botId, id, limit: 6 }, { pollMs: 30_000 });
+  const runs = useLive("bot_automation_runs", { botId, id, limit: 6 }, { pollMs: 30_000 });
   const list = runs.data?.runs ?? [];
   if (!list.length) return <p className="text-xs text-muted-foreground">{runs.loading ? "Loading runs…" : "No runs yet."}</p>;
   return (
@@ -160,7 +160,7 @@ exit 0`;
 
 /** New or Edit, for any kind: name, instruction or script, model for agent kinds, and the schedule. */
 function AutomationDialog({ type, automation, runners, busy, error, onClose, onSave }: {
-  type: Kind; automation: BotAutomationView | null; runners: BotAutomationView[]; busy: boolean; error: string | null; onClose(): void; onSave(input: Record<string, unknown>): void;
+  type: Kind; automation: BotAutomationView | null; runners: BotAutomationView[]; busy: boolean; error: string | null; onClose(): void; onSave(input: Omit<RpcInput<"bot_automation_update">, "id"> & { schedule: Schedule }): void;
 }) {
   const [name, setName] = useState(automation?.name ?? "");
   const [instruction, setInstruction] = useState(automation?.original ? "" : automation?.instruction ?? "");

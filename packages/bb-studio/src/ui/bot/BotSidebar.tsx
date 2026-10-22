@@ -18,7 +18,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotActivityView, BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotScheduledView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -109,11 +109,11 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
   useEffect(() => forgetThreadStrips(), []);
   const route = useBotSelection();
   // On a thread the route names no Bot: its owner does, or the Bot last selected here until that answers.
-  const owner = useLive<{ botId: string | null }>("bot_thread_owner", { threadId: threadId ?? "" }, { pollMs: 120_000, enabled: !!threadId });
+  const owner = useLive("bot_thread_owner", { threadId: threadId ?? "" }, { pollMs: 120_000, enabled: !!threadId });
   const botId = threadId ? owner.data?.botId ?? lastBot() : route.botId;
   const creating = !threadId && route.creating;
-  const list = useLive<{ bots: BotSummary[] }>("bot_list", {}, { pollMs: 30_000 });
-  const view = useLive<BotView>("bot_get", forBot(botId), { pollMs: 30_000 });
+  const list = useLive("bot_list", {}, { pollMs: 30_000 });
+  const view = useLive("bot_get", forBot(botId), { pollMs: 30_000 });
   const bots = list.data?.bots ?? [];
   const selected = creating ? null : view.data?.bot ?? null;
   useEffect(() => { if (selected) rememberBot(selected.id); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,15 +211,15 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
 /** One bot: its row, and (it's the selected bot) its threads under it. */
 function BotEntry({ view, onNavigate, active, onThread, providers }: { view: BotView; onNavigate(): void; active: string | null; onThread: boolean; providers: readonly ProviderCatalogEntry[] }) {
   const bot = view.bot!;
-  const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
-  const chain = useLive<{ threadIds: string[]; threads?: { id: string; title: string }[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
+  const activity = useLive("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
+  const chain = useLive("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
   const [layout, setLayout] = useLayout();
   const openThread = useOpenThread();
   const openBot = useOpenBot(onNavigate);
   const running = runningCount(activity.data);
   const status = statusLabel(view.run, bot.state, running);
   const [showArchived, setShowArchived] = useState(false);
-  const older = useLive<{ threads: BotThreadView[] }>("bot_maintenance_threads", { botId: bot.id }, { enabled: showArchived && bot.kind !== "external" });
+  const older = useLive("bot_maintenance_threads", { botId: bot.id }, { enabled: showArchived && bot.kind !== "external" });
   const recentActivity = activity.data ? { ...activity.data, completed: activity.data.completed.filter((t) => Date.now() - t.updatedAt < 7 * 86_400_000) } : null;
   const groups = sidebarGroups(recentActivity);
   const ids = chain.data?.threadIds ?? [];
@@ -233,7 +233,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const accent = { "--bot-accent": color } as CSSProperties;
   const toggle = (id: string) => setLayout({ closed: layout.closed.includes(id) ? layout.closed.filter((each) => each !== id) : [...layout.closed, id] });
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
-  const sideThreads = useLive<{ threads: BotSideThreadListView[] }>("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
+  const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
   const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;

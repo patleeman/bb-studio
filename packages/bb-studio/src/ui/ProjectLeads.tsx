@@ -6,10 +6,9 @@ import { errorMessage } from "../kit/format";
 import { useProjects } from "../kit/app/index";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "../kit/ui/index";
 import { useEffect, useState } from "react";
-import type { HeartbeatRun, ProjectLeadView, ThreadOptionView } from "../contract";
-import { useCall, useLive, type Cadence } from "./live";
+import type { HeartbeatRun } from "../contract";
+import { useCall, useLive, type Method, type RpcInput, type Cadence } from "./live";
 import { openAppPath } from "../kit/app/index";
-import type { BotView } from "../contract";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 const RUN_LABELS: Record<Cadence, string> = {
@@ -72,8 +71,8 @@ const leadLabel = (projectId: string) => (projectId === PERSONAL_PROJECT_ID ? "C
 /** One project's lead and heartbeat. The lead can be any open thread. */
 export function ProjectLeadDialog({ project, onClose }: { project: { id: string; name: string }; onClose(): void }) {
   const call = useCall();
-  const lead = useLive<ProjectLeadView>("project_lead", { projectId: project.id }, { pollMs: 0 });
-  const recent = useLive<{ threads: ThreadOptionView[] }>("recentThreads", null, { pollMs: 0 });
+  const lead = useLive("project_lead", { projectId: project.id }, { pollMs: 0 });
+  const recent = useLive("recentThreads", null, { pollMs: 0 });
   // The project's own threads first.
   const threads = [...(recent.data?.threads ?? [])].sort((a, b) => Number(b.projectId === project.id) - Number(a.projectId === project.id));
   const leadId = lead.data?.leadThreadId ?? null;
@@ -81,7 +80,7 @@ export function ProjectLeadDialog({ project, onClose }: { project: { id: string;
   const [error, setError] = useState<string | null>(null);
   const form = useHeartbeatForm((lead.data?.run ?? null) as Run);
 
-  const perform = async (method: string, input: unknown) => {
+  const perform = async <M extends Method,>(method: M, input: RpcInput<M>) => {
     setBusy(true);
     setError(null);
     try {
@@ -138,12 +137,12 @@ const describeRun = (run: HeartbeatRun | null) => (run?.enabled ? `heartbeat ${R
 /** Every project, with its lead and heartbeat, for the Setup page. */
 export function ProjectLeadsSection() {
   const projects = useProjects();
-  const leads = useLive<{ leads: ProjectLeadView[] }>("project_leads", {}, { pollMs: 0 });
-  const recent = useLive<{ threads: ThreadOptionView[] }>("recentThreads", null, { pollMs: 0 });
+  const leads = useLive("project_leads", {}, { pollMs: 0 });
+  const recent = useLive("recentThreads", null, { pollMs: 0 });
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const byProject = new Map((leads.data?.leads ?? []).map((lead) => [lead.projectId, lead]));
   const titles = new Map((recent.data?.threads ?? []).map((thread) => [thread.id, thread.title]));
-  const bot = useLive<BotView>("bot_get", {}, { pollMs: 0 });
+  const bot = useLive("bot_get", {}, { pollMs: 0 });
   // The personal project's lead is the Bot, set in its own home.
   const ordered = projects.filter((project) => project.id !== PERSONAL_PROJECT_ID).sort((a, b) => a.name.localeCompare(b.name));
   return (

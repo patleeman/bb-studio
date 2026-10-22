@@ -13,12 +13,12 @@ import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, P
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-import type { BotActivityView, BotAvatarHistoryView, BotLearningView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import type { BotActivityView, BotLearningView, BotScheduledView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
-import { useCall, useLive } from "../live";
+import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
-import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE } from "./BotAvatar";
+import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE, isBotShape } from "./BotAvatar";
 import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
@@ -68,7 +68,7 @@ export function useAction(refresh: () => void, botId?: string) {
   const call = useCall();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const run = async (method: string, input: object = {}) => {
+  const run = async <M extends Extract<Method, `bot_${string}`>,>(method: M, input: RpcInput<M> = {} as RpcInput<M>) => {
     setBusy(method);
     setError(null);
     try {
@@ -89,7 +89,7 @@ export function useAction(refresh: () => void, botId?: string) {
 export function BotHome({ Info }: { Info: ComponentType<{ view: BotView; refresh(): void }> }) {
   const { botId, creating } = useBotSelection();
   const pathname = usePathname();
-  const view = useLive<BotView>("bot_get", forBot(creating ? undefined : botId), { pollMs: 30_000 });
+  const view = useLive("bot_get", forBot(creating ? undefined : botId), { pollMs: 30_000 });
   const landing = useBotLanding(isBareBotPath(pathname), view.data ?? undefined);
   if (view.loading && !view.data) return <PageColumn><p className="text-sm text-muted-foreground">Loading…</p></PageColumn>;
   if (view.error && !view.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{view.error}</p></PageColumn>;
@@ -137,7 +137,7 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
 }
 
 /** shape null: the emoji avatar. */
-export type Profile = { name: string; shape: string | null; color: string | null; role: string; emoji: string };
+export type Profile = { name: string; shape: Exclude<RpcInput<"bot_set">["shape"], undefined>; color: string | null; role: string; emoji: string };
 
 /** The first Bot's name until it picks its own; a further Bot's. */
 export const FIRST_BOT_NAME = "Chief of Staff";
@@ -150,8 +150,8 @@ export const NEXT_BOT_NAME = "New bot";
  */
 function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) {
   const look = first
-    ? { shape: DEFAULT_SHAPE as string, color: BOT_COLORS[0] as string, emoji: "🤖" }
-    : { shape: (BOT_SHAPES[3] ?? DEFAULT_SHAPE) as string, color: (BOT_COLORS[2] ?? BOT_COLORS[0]) as string, emoji: "🤖" };
+    ? { shape: DEFAULT_SHAPE, color: BOT_COLORS[0] as string, emoji: "🤖" }
+    : { shape: (BOT_SHAPES[3] ?? DEFAULT_SHAPE), color: (BOT_COLORS[2] ?? BOT_COLORS[0]) as string, emoji: "🤖" };
   const { run, busy, error } = useAction(onCreated);
   const openThread = useOpenThread();
   const make = async (goal: string) => {
@@ -176,7 +176,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
   const { run, busy, error } = useAction(refresh, bot.id);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const profile: Profile = { name: bot.name, shape: bot.shape ?? null, color: bot.color ?? null, role: bot.role ?? "", emoji: bot.avatar };
+  const profile: Profile = { name: bot.name, shape: isBotShape(bot.shape) ? bot.shape : null, color: bot.color ?? null, role: bot.role ?? "", emoji: bot.avatar };
   const saveProfile = (next: Profile) => {
     const input = {
       ...(next.name !== bot.name ? { name: next.name } : {}),
@@ -203,7 +203,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
       {sheet === "checkins" ? (
         <CheckinsDialog run={view.run} busy={!!busy} onClose={() => setSheet(null)}
           onPreset={(preset) => { setSheet(null); void run("bot_checkin_preset", { preset }); }}
-          onSave={(input) => { setSheet(null); void run("bot_set_run", input as object); }} />
+          onSave={(input) => { setSheet(null); void run("bot_set_run", input); }} />
       ) : null}
       {sheet === "stop" ? (
         <Dialog open onOpenChange={(open) => !open && setSheet(null)}>
@@ -305,7 +305,7 @@ function ScheduledList({ items }: { items: BotScheduledView[] }) {
 }
 
 /** Check-ins: a preset in one click (Morning brief, Evening wrap-up, Every 2 hours, Off), or a custom schedule. */
-function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: HeartbeatRun | null; busy: boolean; onClose(): void; onPreset(preset: Preset): void; onSave(input: unknown): void }) {
+function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: HeartbeatRun | null; busy: boolean; onClose(): void; onPreset(preset: Preset): void; onSave(input: RpcInput<"bot_set_run">): void }) {
   const form = useHeartbeatForm(run);
   const current = presetOf(run);
   const [custom, setCustom] = useState(current === null);
@@ -481,7 +481,7 @@ const UPLOAD_MAX = 4 * 1024 * 1024;
 
 /** Its image avatars: the drawn one, the last few images (made by it or uploaded), Upload, and Revert to the one before. */
 function AvatarImages({ botId, onChanged }: { botId: string; onChanged(): void }) {
-  const history = useLive<BotAvatarHistoryView>("bot_avatar_history", { botId }, { pollMs: 60_000 });
+  const history = useLive("bot_avatar_history", { botId }, { pollMs: 60_000 });
   const { run, busy, error } = useAction(() => { history.refresh(); onChanged(); }, botId);
   const [tooBig, setTooBig] = useState(false);
   const data = history.data;
@@ -518,8 +518,8 @@ function AvatarImages({ botId, onChanged }: { botId: string; onChanged(): void }
 
 /** The Bot's own skills: only its thread loads them. Share moves one into BB's user skills, for every agent. */
 function SkillsList({ botId, name }: { botId: string; name: string }) {
-  const skills = useLive<{ skills: BotSkillView[] }>("bot_skills", { botId }, { pollMs: 30_000 });
-  const learning = useLive<BotLearningView>("bot_learning", { botId }, { pollMs: 30_000 });
+  const skills = useLive("bot_skills", { botId }, { pollMs: 30_000 });
+  const learning = useLive("bot_learning", { botId }, { pollMs: 30_000 });
   const refresh = () => { skills.refresh(); learning.refresh(); };
   const { run, busy, error } = useAction(refresh, botId);
   const [showArchived, setShowArchived] = useState(false);
@@ -573,7 +573,7 @@ function SkillsList({ botId, name }: { botId: string; name: string }) {
 /** History includes deleted skills, so a mistaken deletion can also be reverted. */
 function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) {
   const [cursors, setCursors] = useState<number[]>([]);
-  const history = useLive<{ versions: { id: number; name: string; body: string | null; diff: string; warnings: string[]; at: number }[] }>("bot_skill_history", { botId, ...(cursors.length ? { before: cursors[cursors.length - 1] } : {}) }, { pollMs: 30_000 });
+  const history = useLive("bot_skill_history", { botId, ...(cursors.length ? { before: cursors[cursors.length - 1] } : {}) }, { pollMs: 30_000 });
   const { run, busy, error } = useAction(() => { history.refresh(); onRevert(); }, botId);
   return <details className="text-xs">
     <summary className="cursor-pointer">Skill history</summary>
@@ -595,7 +595,7 @@ function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) 
 const LEARN_INTERVALS = [5, 10, 20, 30, 50];
 
 /** Learn from work: the background review's switch, interval and model and the last result. */
-function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run(method: string, input?: object): Promise<unknown> }) {
+function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run<M extends Extract<Method, `bot_${string}`>>(method: M, input?: RpcInput<M>): Promise<unknown> }) {
   const intervals = LEARN_INTERVALS.includes(value.interval) ? LEARN_INTERVALS : [...LEARN_INTERVALS, value.interval].sort((a, b) => a - b);
   const status = value.reviewing ? "Reviewing now…" : value.lastReview ? `${value.lastReview.result} · ${relativeTime(value.lastReview.at)}` : "No review yet";
   return (
