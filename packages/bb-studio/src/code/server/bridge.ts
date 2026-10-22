@@ -24,6 +24,8 @@ export type BridgeCommand =
 /** A window's answer to a request. `code: "no-window"`: nothing on screen to do it in. */
 export type BridgeResult = { ok: boolean; detail: string; code?: "no-window" };
 
+const CLOSED: BridgeResult = { ok: false, detail: "The editor closed before answering the request; a partial edit may remain." };
+
 const MAX_BODY = 512 * 1024;
 /** Unix socket paths top out near 104 bytes on macOS. */
 const MAX_SOCKET_PATH = 100;
@@ -56,7 +58,7 @@ type Window = { stream: ServerResponse | null; state: EditorState | null; usedAt
  * mode alone doesn't tell the bridge extension apart from them. The secret
  * is handed over in a 0600 file beside the socket, never in the environment.
  */
-type Bridge = { server: Server; socket: string; token: string; tokenFile: string; windows: Map<string, Window>; heartbeat?: ReturnType<typeof setInterval> };
+type Bridge = { server: Server; socket: string; token: string; tokenFile: string; windows: Map<string, Window>; waiting: Map<string, { window: Window; finish(result: BridgeResult): void }>; heartbeat?: ReturnType<typeof setInterval> };
 
 /** Where a bridge's secret is kept: beside its socket. The extension finds it from the socket's path. */
 export const tokenFileFor = (socket: string) => socket.replace(/\.sock$/, "") + ".token";
@@ -76,7 +78,6 @@ export class Bridges {
   private readonly bridges = new Map<string, Bridge>();
   /** A command for an editor that isn't connected yet, delivered when it connects. */
   private readonly held = new Map<string, BridgeCommand>();
-  private readonly waiting = new Map<string, (result: BridgeResult) => void>();
 
   /** Starts a workspace's bridge and returns its socket path. */
   async open(id: string, dir: string): Promise<string> {
@@ -85,18 +86,25 @@ export class Bridges {
     await rm(socket, { force: true });
     const token = randomBytes(32).toString("hex");
     const tokenFile = tokenFileFor(socket);
-    await writeFile(tokenFile, `${token}\n`, { mode: 0o600 });
-    await chmod(tokenFile, 0o600);
-    const bridge: Bridge = { server: createServer((req, res) => this.handle(id, req, res)), socket, token, tokenFile, windows: new Map() };
-    // Keeps event streams open through idle proxies and notices dead ones.
-    bridge.heartbeat = setInterval(() => { for (const window of bridge.windows.values()) window.stream?.write(": ping\n\n"); }, 25_000);
-    bridge.heartbeat.unref?.();
-    await new Promise<void>((resolve, reject) => {
-      bridge.server.once("error", reject);
-      bridge.server.listen(socket, () => resolve());
-    });
-    await chmod(socket, 0o600);
-    this.bridges.set(id, bridge);
+    const bridge: Bridge = { server: createServer((req, res) => this.handle(id, req, res)), socket, token, tokenFile, windows: new Map(), waiting: new Map() };
+    try {
+      await writeFile(tokenFile, `${token}\n`, { mode: 0o600 });
+      await chmod(tokenFile, 0o600);
+      await new Promise<void>((resolve, reject) => {
+        bridge.server.once("error", reject);
+        bridge.server.listen(socket, () => resolve());
+      });
+      await chmod(socket, 0o600);
+      // Keeps event streams open through idle proxies and notices dead ones.
+      bridge.heartbeat = setInterval(() => { for (const window of bridge.windows.values()) window.stream?.write(": ping\n\n"); }, 25_000);
+      bridge.heartbeat.unref?.();
+      this.bridges.set(id, bridge);
+    } catch (error) {
+      await new Promise<void>((resolve) => bridge.server.close(() => resolve()));
+      await rm(socket, { force: true });
+      await rm(tokenFile, { force: true });
+      throw error;
+    }
     return socket;
   }
 
@@ -105,6 +113,7 @@ export class Bridges {
     if (!bridge) return;
     this.bridges.delete(id);
     clearInterval(bridge.heartbeat);
+    for (const pending of bridge.waiting.values()) pending.finish(CLOSED);
     for (const window of bridge.windows.values()) window.stream?.end();
     // Closing removes the socket file too.
     await new Promise<void>((resolve) => bridge.server.close(() => resolve()));
@@ -190,19 +199,20 @@ export class Bridges {
   request(id: string, command: BridgeCommand, timeoutMs: number): Promise<BridgeResult | null> {
     const window = this.current(id);
     if (!window?.stream) return Promise.resolve(null);
+    const bridge = this.bridges.get(id)!;
     const requestId = randomUUID();
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
-        this.waiting.delete(requestId);
+        bridge.waiting.delete(requestId);
         window.stale = true;
         resolve({ ok: false, detail: "The editor didn't answer in time." });
       }, timeoutMs);
-      this.waiting.set(requestId, (result) => {
+      bridge.waiting.set(requestId, { window, finish: (result) => {
         clearTimeout(timer);
-        this.waiting.delete(requestId);
+        bridge.waiting.delete(requestId);
         if (result.code === "no-window") window.stale = true;
         resolve(result);
-      });
+      } });
       window.stream!.write(`data: ${JSON.stringify({ ...command, requestId })}\n\n`);
     });
   }
@@ -228,7 +238,10 @@ export class Bridges {
       this.log(`workspace ${id}: editor window connected (${count()} open)`);
       this.onConnect(id);
       req.on("close", () => {
-        if (window.stream === res) bridge.windows.delete(windowId);
+        if (window.stream === res) {
+          bridge.windows.delete(windowId);
+          for (const pending of bridge.waiting.values()) if (pending.window === window) pending.finish(CLOSED);
+        }
         this.log(`workspace ${id}: editor window left after ${Math.round((Date.now() - opened) / 1000)}s (${count()} open)`);
       });
       const held = this.held.get(id);
@@ -266,7 +279,7 @@ export class Bridges {
       if (url.pathname === "/result") {
         const result = resultSchema.safeParse(parsed);
         if (!result.success) { res.writeHead(400).end(); return; }
-        this.waiting.get(result.data.requestId)?.({ ok: result.data.ok, detail: result.data.detail, ...(result.data.code ? { code: result.data.code } : {}) });
+        bridge.waiting.get(result.data.requestId)?.finish({ ok: result.data.ok, detail: result.data.detail, ...(result.data.code ? { code: result.data.code } : {}) });
         res.writeHead(204).end();
         return;
       }

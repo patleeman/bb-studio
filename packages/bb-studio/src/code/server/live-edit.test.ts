@@ -215,3 +215,38 @@ describe("BB's shortcuts from inside VS Code", () => {
     expect(BRIDGE_SOURCE).toContain("bbStudio.passKey");
   });
 });
+
+
+it("fails an in-flight edit immediately when its bridge closes", async () => {
+  const bridges = new Bridges();
+  const socket = await bridges.open("cws_close", dir);
+  const window = connect(socket, "a");
+  await window.ready;
+  const answer = bridges.request("cws_close", { type: "edit", path: "/x", edits: [] }, 500);
+  await bridges.close("cws_close");
+  window.close();
+  await expect(answer).resolves.toEqual({ ok: false, detail: "The editor closed before answering the request; a partial edit may remain." });
+});
+
+
+it("keeps requests owned by the workspace that sent them", async () => {
+  const bridges = new Bridges();
+  const socketA = await bridges.open("cws_owner_a", dir);
+  const socketB = await bridges.open("cws_owner_b", dir);
+  const a = connect(socketA, "a"), b = connect(socketB, "b");
+  await Promise.all([a.ready, b.ready]);
+  const answerA = bridges.request("cws_owner_a", { type: "edit", path: "/x", edits: [] }, 2000);
+  const answerB = bridges.request("cws_owner_b", { type: "edit", path: "/y", edits: [] }, 2000);
+  try {
+    await wait(50);
+    const requestId = (a.events[0] as { requestId: string }).requestId;
+    await post(socketB, "/result", { requestId, ok: true, detail: "Wrong workspace" });
+    await bridges.close("cws_owner_a");
+    await expect(answerA).resolves.toMatchObject({ ok: false, detail: expect.stringContaining("editor closed") });
+    await post(socketB, "/result", { requestId: (b.events[0] as { requestId: string }).requestId, ok: true, detail: "Typed" });
+    await expect(answerB).resolves.toEqual({ ok: true, detail: "Typed" });
+  } finally {
+    a.close(); b.close();
+    await bridges.closeAll();
+  }
+});
