@@ -767,4 +767,41 @@ export const MIGRATIONS = [
    ALTER TABLE bot_runners ADD COLUMN machine_suspended INTEGER NOT NULL DEFAULT 0;
    CREATE TABLE runner_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, runner_id TEXT NOT NULL, summary TEXT NOT NULL);
    CREATE INDEX runner_reports_runner ON runner_reports(runner_id, id);`,
+  // Mini apps (src/minis): apps and their versions, shared state, records,
+  // approved capabilities, secrets, the event log, takes and the network log.
+  `CREATE TABLE minis (
+       id TEXT PRIMARY KEY, name TEXT NOT NULL, project_id TEXT, icon TEXT, version_id TEXT, thread_id TEXT,
+       archived_at INTEGER, template INTEGER NOT NULL DEFAULT 0,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT NOT NULL
+     );
+   CREATE INDEX minis_updated ON minis (updated_at);
+   CREATE TABLE mini_versions (
+       id TEXT PRIMARY KEY, mini_id TEXT NOT NULL, files TEXT NOT NULL, manifest TEXT NOT NULL, modules TEXT NOT NULL,
+       html TEXT, note TEXT, by TEXT NOT NULL, created_at INTEGER NOT NULL
+     );
+   CREATE INDEX mini_versions_mini ON mini_versions (mini_id, created_at);
+   CREATE TABLE mini_state (
+       mini_id TEXT PRIMARY KEY, state TEXT NOT NULL, version INTEGER NOT NULL, updated_by TEXT NOT NULL, updated_at INTEGER NOT NULL
+     );
+   CREATE TABLE mini_records (
+       mini_id TEXT NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, rev INTEGER NOT NULL,
+       created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+       PRIMARY KEY (mini_id, collection, id)
+     );
+   CREATE INDEX mini_records_updated ON mini_records (mini_id, collection, updated_at);
+   CREATE TABLE mini_grants (mini_id TEXT NOT NULL, capability TEXT NOT NULL, granted_at INTEGER NOT NULL, PRIMARY KEY (mini_id, capability));
+   CREATE TABLE mini_secrets (
+       mini_id TEXT NOT NULL, name TEXT NOT NULL, header TEXT NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL,
+       PRIMARY KEY (mini_id, name)
+     );
+   CREATE TABLE mini_events (
+       seq INTEGER PRIMARY KEY AUTOINCREMENT, mini_id TEXT NOT NULL, type TEXT NOT NULL, name TEXT, data TEXT, by TEXT NOT NULL, at INTEGER NOT NULL
+     );
+   CREATE INDEX mini_events_mini ON mini_events (mini_id, seq);
+   CREATE TABLE mini_takes (id TEXT PRIMARY KEY, mini_id TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL);
+   CREATE TABLE mini_fetch_log (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, mini_id TEXT NOT NULL, at INTEGER NOT NULL, method TEXT NOT NULL, url TEXT NOT NULL,
+       status INTEGER, error TEXT, ms INTEGER NOT NULL, bytes INTEGER NOT NULL
+     );
+   CREATE INDEX mini_fetch_log_mini ON mini_fetch_log (mini_id, id);`,
 ];

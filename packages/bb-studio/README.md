@@ -770,6 +770,86 @@ time, error), `dashboard_script_approvals`, `dashboard_script_proposals`
 (who wrote each command) and `dashboard_versions`. A dashboard holds at most
 60 widgets.
 
+## Mini apps
+
+Mini apps are built into Studio: small interactive apps with their own data,
+which you and your agents build together. A mini app is React source and a
+manifest; it runs live in a reply (`::mini{id="mini_…"}`), in a page (an
+embed block, or `/mini` in the slash menu), and in its own tab, and every
+place shares the same data. Items are `minis:<id>` and open at
+`/plugins/studio/studio/minis/<id>`.
+
+Agents are told to make a mini app, rather than a playground or a one-off
+HTML file, whenever you want something to use or come back to: a tracker, a
+board, a calculator, a form, a poll, a chart to play with.
+
+### What a mini app is
+
+- **Source and manifest.** Files keyed by path: JSX, TSX, JS, TS, CSS, JSON,
+  HTML. `mini.json` names the entry, the shelf libraries, the record
+  collections, the access it asks for, and its size in a page or card. Studio
+  compiles the source when it's saved (JSX and imports, with Sucrase) and
+  refuses source that doesn't compile, so the last good version keeps running.
+  The last 50 versions are kept; restore one in Settings.
+- **Records.** Collections of JSON records, with per-record revisions so two
+  people editing at once don't overwrite each other, live updates in every
+  open copy, and filters and ordering on any field (fields listed under
+  `indexes` get a database index). Up to 64 KB a record and 50 MB an app.
+- **Shared state.** A small JSON value for UI state, as playgrounds and live
+  artifacts have.
+- **Actions and takes.** The app can expose actions an agent runs in the copy
+  you last touched, and send data to the thread's composer for you to send.
+
+### The shelf: libraries without a dependency mess
+
+Mini apps never install anything: no npm, no build step, no `node_modules`.
+An app imports only its own files and the shelf: libraries Studio ships at
+pinned versions, built into `shelf/` by `node scripts/build-shelf.mjs` and
+served from Studio. One copy serves every app, major versions sit side by
+side, and nothing loads from the internet.
+
+| Lib | Modules | Loaded |
+| --- | --- | --- |
+| `react@19` | `react`, `react-dom/client` | always |
+| `tailwind@4` | Tailwind in the browser, with BB's colors as theme tokens | always |
+| `kit@1` | `@studio/kit`: Studio's own components (Button, Input, Select, Dialog, DropdownMenu, …), Badge, Tabs, DataTable, Field, EmptyState, and hooks for records, state and actions | always |
+| `charts@1` | `@studio/kit/charts` (`<Chart>` in the Pages chart format, `<Stats>`), `recharts` | when listed |
+| `icons@1` | `lucide-react` | when listed |
+| `markdown@1` | `marked` | when listed |
+| `dates@4` | `date-fns` | when listed |
+
+Anything else goes into the app as its own file.
+
+### Security
+
+A mini app's frame runs in an opaque origin with a CSP that allows scripts
+only from Studio and blocks every connection. It reaches Studio only through
+its host component, which checks each message came from its own frame; the
+server checks collections, capabilities and rate limits again.
+
+- `playground.fetch` goes through Studio's server, only to hosts the manifest
+  lists as `fetch:<host>` and you approve, never to this machine or a private
+  network, with redirects checked hop by hop and cookies dropped. Every
+  request is in the app's network log.
+- A `secret:<name>` you store in the app's Settings is added as a request
+  header by the server. The app and agents never see the value.
+- `bb.threads.read`, `bb.studio.read` and `bb.open` let the app list your
+  thread titles, search Studio item titles, and open threads and items.
+- You approve access in the app (a banner, then a dialog). The dialog takes a
+  one-time nonce from the server and waits a moment before Approve works, so
+  an agent can't approve its own app through RPC or the CLI. Revoke in
+  Settings.
+
+Backups keep each app's current source, state and records; approvals and
+secrets aren't backed up, so a restored app asks again.
+
+### Agents
+
+`minis_create`, `minis_update`, `minis_read`, `minis_list`, `minis_data`
+and `minis_live`, the `minis` skill, and
+`bb studio minis list|show|data|state|watch|actions|do`. What an app returns
+to an agent is wrapped as data, never instructions.
+
 ## Recordings
 
 Talk is built into Studio: long-form, durable dictation and recording. It

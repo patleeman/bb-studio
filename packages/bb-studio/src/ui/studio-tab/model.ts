@@ -4,6 +4,7 @@ import { ARTIFACT_ICON, PLUGIN_ID as ARTIFACTS_PLUGIN, REALTIME_CHANNEL as ARTIF
 import { DASHBOARD_ICON, DASHBOARD_KIND, PLUGIN_ID as DASHBOARDS_PLUGIN, REALTIME_CHANNEL as DASHBOARDS_CHANNEL, isDashboardId } from "../../dashboards/shared";
 import { DESIGN_ICON, PLUGIN_ID as DESIGN_PLUGIN, REALTIME_CHANNEL as DESIGN_CHANNEL, isDesignId } from "../../design/shared";
 import { DRAW_ICON, PLUGIN_ID as DRAW_PLUGIN, REALTIME_CHANNEL as DRAW_CHANNEL, isDrawingId } from "../../draw/shared";
+import { MINI_ICON, PLUGIN_ID as MINIS_PLUGIN, REALTIME_CHANNEL as MINIS_CHANNEL, isMiniId } from "../../minis/shared";
 import { PLUGIN_ID as PAGES_PLUGIN, REALTIME_CHANNEL as PAGES_CHANNEL, isPageId } from "../../pages/constants";
 import { PLUGIN_ID as TALK_PLUGIN, RECORDING_CHANGED, TALK_ICON, isRecordingId } from "../../talk/shared/format";
 import { BUILTIN_PLUGIN_IDS } from "../../builtins";
@@ -11,7 +12,7 @@ import { BUILTIN_PLUGIN_IDS } from "../../builtins";
 /** The Studio tab's action id. */
 export const STUDIO_TAB = "studio";
 export const STUDIO_TAB_ICON = "studio/studio";
-export type TabKind = "page" | "drawing" | "design" | "dashboard" | "artifact" | "recording" | "dictation";
+export type TabKind = "page" | "drawing" | "design" | "dashboard" | "mini" | "artifact" | "recording" | "dictation";
 
 export interface TabKindInfo {
   kind: TabKind;
@@ -34,6 +35,7 @@ export const TAB_KINDS: readonly TabKindInfo[] = [
   { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Drawing", plural: "Drawings", icon: DRAW_ICON, isId: isDrawingId, gate: "drawing" },
   { kind: "design", pluginId: DESIGN_PLUGIN, channel: DESIGN_CHANNEL, label: "Design", plural: "Designs", icon: DESIGN_ICON, isId: isDesignId, gate: "design" },
   { kind: DASHBOARD_KIND as "dashboard", pluginId: DASHBOARDS_PLUGIN, channel: DASHBOARDS_CHANNEL, label: "Dashboard", plural: "Dashboards", icon: DASHBOARD_ICON, isId: isDashboardId, gate: "dashboard" },
+  { kind: "mini", pluginId: MINIS_PLUGIN, channel: MINIS_CHANNEL, label: "Mini app", plural: "Mini apps", icon: MINI_ICON, isId: isMiniId, gate: "mini" },
   { kind: "artifact", pluginId: ARTIFACTS_PLUGIN, channel: ARTIFACTS_CHANNEL, label: "Artifact", plural: "Artifacts", icon: ARTIFACT_ICON, isId: isArtifactId, gate: "artifact" },
   { kind: "recording", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Recording", plural: "Recordings", icon: TALK_ICON, isId: isRecordingId, gate: "recording" },
   { kind: "dictation", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Dictation", plural: "Dictations", icon: "Mic", isId: isRecordingId, gate: "recording", background: true },

@@ -1,27 +1,11 @@
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { cn } from "../../kit/ui/index";
-import { chartSpecSchema, parseJsonWith, resolveChart, SERIES_COLORS, statItemsSchema, type StatItem } from "../chart-spec";
+import { chartSpecSchema, parseJsonWith, SERIES_COLORS, statItemsSchema } from "../chart-spec";
+import { ChartView, EXAMPLE_CHART, StatsView } from "./chart-views";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
 import { calloutConfig, chartConfig, EMBED_KINDS, type EmbedKind, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
 import { pagePath } from "../constants";
@@ -145,73 +129,6 @@ const prettyJson = (text: string) => {
   }
 };
 
-const EXAMPLE_CHART = JSON.stringify({
-  type: "bar",
-  title: "Example",
-  data: [
-    { label: "Mon", Value: 4 },
-    { label: "Tue", Value: 7 },
-    { label: "Wed", Value: 5 },
-  ],
-});
-
-function ChartView({ spec }: { spec: string }) {
-  const parsed = parseJsonWith(chartSpecSchema, spec || EXAMPLE_CHART);
-  if (!parsed.ok) return <p className="text-sm text-red-500">{parsed.error}</p>;
-  const { spec: chart, x, series } = resolveChart(parsed.value);
-  const axis = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false } as const;
-  const tooltip = (
-    <Tooltip
-      contentStyle={{ background: "var(--popover, #111)", border: "1px solid var(--border, #333)", borderRadius: 8, fontSize: 12 }}
-      formatter={(value) => `${value}${chart.unit ?? ""}`}
-    />
-  );
-  const common = { data: chart.data, margin: { top: 8, right: 8, bottom: 0, left: -16 } };
-  let body: ReactNode;
-  if (chart.type === "pie") {
-    const key = series[0] ?? "value";
-    body = (
-      <PieChart>
-        <Pie data={chart.data} dataKey={key} nameKey={x} innerRadius="45%" outerRadius="80%" paddingAngle={2} isAnimationActive={false}>
-          {chart.data.map((_, index) => (
-            <Cell key={index} fill={SERIES_COLORS[index % SERIES_COLORS.length]} />
-          ))}
-        </Pie>
-        {tooltip}
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-      </PieChart>
-    );
-  } else {
-    const Chart = chart.type === "line" ? LineChart : chart.type === "area" ? AreaChart : BarChart;
-    body = (
-      <Chart {...common}>
-        <CartesianGrid vertical={false} strokeOpacity={0.12} />
-        <XAxis dataKey={x} {...axis} />
-        <YAxis {...axis} />
-        {tooltip}
-        {series.length > 1 ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null}
-        {series.map((key, index) => {
-          const color = SERIES_COLORS[index % SERIES_COLORS.length]!;
-          const stack = chart.stacked ? "stack" : undefined;
-          if (chart.type === "line") return <Line key={key} dataKey={key} stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />;
-          if (chart.type === "area")
-            return <Area key={key} dataKey={key} stroke={color} fill={color} fillOpacity={0.18} stackId={stack} isAnimationActive={false} />;
-          return <Bar key={key} dataKey={key} fill={color} radius={[3, 3, 0, 0]} stackId={stack} isAnimationActive={false} />;
-        })}
-      </Chart>
-    );
-  }
-  return (
-    <figure className="m-0 text-muted-foreground">
-      {chart.title ? <figcaption className="mb-2 text-sm font-medium text-foreground">{chart.title}</figcaption> : null}
-      <div className="h-60 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          {body as never}
-        </ResponsiveContainer>
-      </div>
-    </figure>
-  );
-}
 
 const ChartBlock = createReactBlockSpec(chartConfig, {
   render: ({ block, editor }) => (
@@ -236,32 +153,6 @@ const EXAMPLE_STATS = JSON.stringify([
   { label: "Metric", value: "42", delta: "+5%", trend: "up" },
   { label: "Another", value: "7", delta: "-1", trend: "down" },
 ]);
-
-function StatsView({ items }: { items: StatItem[] }) {
-  return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr))" }}>
-      {items.map((item, index) => (
-        <div key={index} className="min-w-0 rounded-md bg-background/60 px-3 py-2">
-          <div className="truncate text-xs text-muted-foreground">{item.label}</div>
-          <div className="mt-0.5 flex items-baseline gap-2">
-            <span className="truncate text-xl font-semibold tabular-nums text-foreground">{item.value}</span>
-            {item.delta ? (
-              <span
-                className={cn(
-                  "text-xs tabular-nums",
-                  item.trend === "up" ? "text-emerald-500" : item.trend === "down" ? "text-red-500" : "text-muted-foreground",
-                )}
-              >
-                {item.delta}
-              </span>
-            ) : null}
-          </div>
-          {item.caption ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{item.caption}</div> : null}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 const StatsBlock = createReactBlockSpec(statsConfig, {
   render: ({ block, editor }) => {
@@ -293,6 +184,7 @@ const EMBED_ICONS = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
+  mini: "AppWindow",
   item: "GridView",
 } as const satisfies Record<EmbedKind, string>;
 

@@ -49,7 +49,7 @@ export const htmlConfig = {
 /** The longest HTML source an ```html fence may hold; longer ones stay code. */
 export const MAX_HTML_CHARS = 200_000;
 
-export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "item"] as const;
+export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "mini", "item"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 
 /**
@@ -60,6 +60,7 @@ export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
+  mini: { pluginId: "minis", panel: "minis", label: "Mini app" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;
 

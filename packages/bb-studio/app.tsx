@@ -19,6 +19,8 @@ import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-re
 import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
 import { isDashboardId } from "./src/dashboards/shared";
+import { isMiniId } from "./src/minis/shared";
+import { MiniCard } from "./src/minis/ui/mini-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
@@ -94,6 +96,8 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
   // The grid (react-grid-layout) and the charts load when a dashboard first opens.
   dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
+  // The app's frame loads its own libraries (the shelf); this is the host around it.
+  minis: { isId: isMiniId, View: lazy(() => import("./src/minis/ui/route")) },
 };
 
 /** The thread's Studio tab; its kinds' editors load when an item opens. */
@@ -213,6 +217,8 @@ export default definePluginApp((app) => {
   // Artifacts (built in; docs/merging-add-ons.md): in the Studio tab, and its
   // save picker for a reply's files; and the `::artifact{id="art_…"}` card in replies.
   app.slots.messageDirective({ id: "artifact", component: whenOn(kinds, "artifact", ArtifactCard) });
+  // Mini apps (built in): `::mini{id="mini_…"}` in a reply is the app itself, live.
+  app.slots.messageDirective({ id: "mini", component: whenOn(kinds, "mini", MiniCard) });
   // Drawings (built in): in the Studio tab, the `::drawing{id="…"}`
   // card, and the composer's `+` → Drawing, which attaches one as a PNG.
   if (on("drawing")) {

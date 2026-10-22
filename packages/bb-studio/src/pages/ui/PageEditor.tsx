@@ -50,11 +50,13 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   drawing: "Embed an Excalidraw drawing",
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
+  mini: "Embed a mini app: an interactive app with its own data",
 };
-const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic" };
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", mini: "AppWindow" };
 /** Slash items that make a new item in another add-on and embed it. */
 const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
   { kind: "drawing", aliases: ["whiteboard", "excalidraw", "sketch", "diagram", "draw"] },
+  { kind: "mini", aliases: ["app", "widget", "interactive", "tracker", "form"] },
 ];
 
 export type SidePanel = "comments" | null;

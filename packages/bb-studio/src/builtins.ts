@@ -41,6 +41,7 @@ export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
   { pluginId: "talk", segment: "recordings", kind: "recording", legacyRoot: "/plugins/talk/recordings", pages: ["unsent"] },
   // Built into Studio from the start, so there's no old address.
   { pluginId: "dashboards", segment: "dashboards", kind: "dashboard" },
+  { pluginId: "minis", segment: "minis", kind: "mini" },
 ];
 
 export const BUILTIN_PLUGIN_IDS: ReadonlySet<string> = new Set(BUILTIN_ROUTES.map((route) => route.pluginId));

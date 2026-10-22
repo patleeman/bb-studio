@@ -15,6 +15,6 @@ export interface AddOn {
 }
 
 export const ADDONS: readonly AddOn[] = [
-  { id: "studio", displayName: "Studio", description: "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread’s worktree, and Decisions for Jev, fallback models and Smart Queue." },
+  { id: "studio", displayName: "Studio", description: "The home of BB Studio, with pages, recordings, drawings, designs, dashboards, mini apps and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread’s worktree, and Decisions for Jev, fallback models and Smart Queue." },
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
 ];

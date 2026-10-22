@@ -2,7 +2,7 @@
 // artifact its content, a recording its player and
 // transcript, and the rest a card. Each opens the
 // item in its own add-on.
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { studioItemProps } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { cn } from "../../kit/ui/index";
@@ -11,6 +11,9 @@ import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioE
 import { usePagesUi, type ArtifactView } from "./context";
 import { RecordingBody } from "./live-embeds";
 import { Whiteboard } from "./whiteboard";
+
+// A mini app brings its own frame host; it loads when a page first shows one.
+const MiniEmbed = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.MiniEmbed })));
 
 export function useStudioItems(enabled = true): StudioEmbedItem[] | null {
   const ui = usePagesUi();
@@ -48,6 +51,7 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
+  mini: "AppWindow",
   item: "GridView",
 };
 
@@ -124,6 +128,14 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   if (item.pluginId === STUDIO_EMBEDS.recording.pluginId) return <RecordingBody id={item.id} />;
   // A drawing is an inline whiteboard: its picture, and a pen to add to it.
   if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} onOpen={() => ui.openPath(item.href)} />;
+  // A mini app runs in place, sharing its data with every other place it shows.
+  if (item.pluginId === STUDIO_EMBEDS.mini.pluginId) {
+    return (
+      <div className="border-t border-border">
+        <Suspense fallback={<div className="h-24" />}><MiniEmbed miniId={item.id} threadId={null} chrome={false} /></Suspense>
+      </div>
+    );
+  }
   if (item.thumbnailUrl && !failed) {
     return (
       <button type="button" className="block w-full cursor-pointer border-t border-border bg-background" onClick={() => ui.openPath(item.href)}>

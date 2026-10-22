@@ -9,6 +9,7 @@ import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
+import { MINI_INSTRUCTIONS, MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
@@ -142,6 +143,19 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => designs.dispose());
   const dashboards = registerDashboards(bb, db, services, notifyBuiltin);
   bb.onDispose(() => dashboards.dispose());
+  // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
+  const minis = registerMinis(bb, db, services, notifyBuiltin, {
+    studioList: async ({ query, kind, limit }) => {
+      const { items } = await hub.overview();
+      const needle = query?.trim().toLowerCase() ?? "";
+      return items
+        .filter((item) => !item.archived && (!kind || item.kind === kind) && (!needle || item.title.toLowerCase().includes(needle)))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, limit)
+        .map((item) => ({ id: `${item.pluginId}:${item.id}`, kind: item.kind, title: item.title, href: item.href ?? null, updatedAt: item.updatedAt ?? null }));
+    },
+  });
+  bb.onDispose(() => minis.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
   // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread
@@ -225,6 +239,7 @@ export default async function plugin(bb: BbPluginApi) {
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
     { pluginId: "dashboards", name: "Dashboards", handlers: dashboards.provider },
+    { pluginId: "minis", name: "Mini apps", handlers: minis.provider },
   ], {
     builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
     route: (providers) => routeProviders(providers, kindSettings.current),
@@ -257,7 +272,7 @@ export default async function plugin(bb: BbPluginApi) {
   } as never)) as typeof bb.agents.registerTool;
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
-  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS };
+  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS, mini: MINI_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
@@ -286,7 +301,7 @@ export default async function plugin(bb: BbPluginApi) {
     const sideBot = sideBotId ? bots.stored(sideBotId) : null;
     if (sideBot && sideBot.kind !== "external") {
       const asBot = { ...sideBot, threadId: context.thread.id };
-      const instructions = [bots.instructions(asBot), SIDE_THREAD_INSTRUCTIONS, off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+      const instructions = [bots.instructions(asBot), SIDE_THREAD_INSTRUCTIONS, off.has("page") ? "" : PAGE_INSTRUCTIONS, off.has("mini") ? "" : MINI_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
       return withVoice({ tools: [...tools, ...SIDE_THREAD_TOOLS], skills: ["studio-code"], instructions });
     }
     const bot = sideBot ? { ...sideBot, threadId: context.thread.id } : bots.forThread(context.thread.id, context.pluginMetadata);
@@ -295,7 +310,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (bot && bot.state !== "active") return withVoice({ tools: [...BOT_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: bots.instructions(bot) });
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
-    const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
+    const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, off.has("mini") ? "" : MINI_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
     return withVoice({ tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions });
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
@@ -1705,6 +1720,7 @@ export default async function plugin(bb: BbPluginApi) {
       design: { name: "Studio Design", handlers: designs.backup },
       talk: { name: "Studio Talk", handlers: recordings.backup },
       dashboards: { name: "Studio Dashboards", handlers: dashboards.backup },
+      minis: { name: "Studio Mini apps", handlers: minis.backup },
     },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
@@ -1731,6 +1747,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
       { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
+      { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "speech", summary: "Text to speech: show the engine, list its models, speak text to a file, run local voices", usage: "bb studio speech <status|models|say|local> …" },
     ],
     async run(argv, ctx) {
@@ -1740,6 +1757,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
       if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
+      if (argv[0] === "minis") return minis.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "speech") return speech.cli(argv.slice(1), ctx);
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
@@ -1833,7 +1851,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|speech|decisions> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|minis|speech|decisions> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

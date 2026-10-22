@@ -8,7 +8,7 @@
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread\u2019s worktree, and Decisions for Jev, fallback models and Smart Queue.",
+      "description": "The home of BB Studio, with pages, recordings, drawings, designs, dashboards, mini apps and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread\u2019s worktree, and Decisions for Jev, fallback models and Smart Queue.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },

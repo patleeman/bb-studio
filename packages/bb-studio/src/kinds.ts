@@ -33,6 +33,7 @@ export const BUILTIN_KINDS: readonly BuiltinKind[] = [
   { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, artifacts and the save picker in the thread's Studio tab, and artifact cards." },
   { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, designs in the thread's Studio tab, and design cards." },
   { kind: "dashboard", pluginId: "dashboards", label: "Dashboards", covers: "Dashboards, their agent tools and the refreshing of their widgets' data." },
+  { kind: "mini", pluginId: "minis", label: "Mini apps", covers: "Mini apps, their agent tools, ::mini cards in replies and mini app blocks in pages." },
 ];
 
 const BY_KIND = new Map(BUILTIN_KINDS.map((each) => [each.kind, each]));

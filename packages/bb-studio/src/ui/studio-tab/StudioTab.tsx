@@ -15,6 +15,7 @@ import type { ProviderView, rpcContract } from "../../contract";
 import type { rpcContract as pagesContract } from "../../pages/contract";
 import { REALTIME_CHANNEL as ARTIFACTS_CHANNEL } from "../../artifacts/shared";
 import { REALTIME_CHANNEL as DASHBOARDS_CHANNEL } from "../../dashboards/shared";
+import { REALTIME_CHANNEL as MINIS_CHANNEL } from "../../minis/shared";
 import { REALTIME_CHANNEL as DESIGN_CHANNEL } from "../../design/shared";
 import { REALTIME_CHANNEL as DRAW_CHANNEL } from "../../draw/shared";
 import { REALTIME_CHANNEL as PAGES_CHANNEL } from "../../pages/constants";
@@ -26,6 +27,7 @@ const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => 
 const DrawingView = lazy(() => import("../../draw/ui/drawing-editor").then((module) => ({ default: module.DrawingEditor })));
 const DesignView = lazy(() => import("../../design/ui/design-tab").then((module) => ({ default: module.TabCanvas })));
 const DashboardView = lazy(() => import("../../dashboards/ui/dashboard-tab").then((module) => ({ default: module.TabDashboard })));
+const MiniView = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.TabMini })));
 const ArtifactView = lazy(() => import("../../artifacts/ui/artifact-viewer").then((module) => ({ default: module.ArtifactViewer })));
 const RecordingView = lazy(() => import("../../talk/ui/recordings-panel").then((module) => ({ default: module.RecordingDetail })));
 const SavePicker = lazy(() => import("../../artifacts/ui/save-picker").then((module) => ({ default: module.SavePicker })));
@@ -42,6 +44,7 @@ export function ItemView({ kind, id, threadId, onBack }: { kind: TabKind; id: st
         : kind === "drawing" ? <DrawingView key={id} drawingId={id} threadId={threadId} {...props} />
         : kind === "design" ? <DesignView key={id} designId={id} {...props} />
         : kind === "dashboard" ? <DashboardView key={id} dashboardId={id} {...props} />
+        : kind === "mini" ? <MiniView key={id} miniId={id} threadId={threadId} {...props} />
         : kind === "recording" || kind === "dictation" ? <RecordingView key={id} id={id} onBack={onBack} />
         : <ArtifactView key={id} artifactId={id} threadId={threadId} {...props} />}
     </Suspense>
@@ -98,6 +101,8 @@ function useKindChanges(onChange: () => void) {
   useRealtime(DRAW_CHANNEL, onChange);
   useRealtime(DESIGN_CHANNEL, onChange);
   useRealtime(DASHBOARDS_CHANNEL, onChange);
+  // Mini apps also stream state and records here; only item changes matter.
+  useRealtime(MINIS_CHANNEL, (payload) => { if ((payload as { type?: string } | null)?.type === "changed") onChange(); });
   useRealtime(ARTIFACTS_CHANNEL, onChange);
   useRealtime(RECORDING_CHANGED, onChange);
 }
