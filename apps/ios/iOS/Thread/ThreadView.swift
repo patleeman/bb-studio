@@ -213,7 +213,16 @@ struct ThreadView: View {
             .presentationDetents([.medium, .large])
         }
         .overlay(alignment: .top) {
-            if let error = model.error {
+            if let error = outbox.storageError {
+                VStack(spacing: 4) {
+                    Text(error).font(.caption)
+                    Button("Retry saving") {
+                        outbox.retryStorage()
+                        if outbox.storageError == nil, model.error == error { model.error = nil }
+                    }
+                }
+                .padding(8).background(.red.opacity(0.15), in: .rect(cornerRadius: 8)).padding(.top, 4)
+            } else if let error = model.error {
                 Text(error).font(.caption).padding(8).background(.red.opacity(0.15), in: .capsule).padding(.top, 4)
                     .onTapGesture { model.error = nil }
             }

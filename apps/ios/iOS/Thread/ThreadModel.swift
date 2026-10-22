@@ -563,8 +563,9 @@ final class ThreadModel: ObservableObject {
         } catch where BBClient.neverArrived(error) && attachments.isEmpty {
             // The outbox shows it from here.
             drop()
-            Outbox.shared.add(threadId: threadId, text: text, mentions: mentions, serverURL: client.baseURL)
-            return true
+            let queued = Outbox.shared.add(threadId: threadId, text: text, mentions: mentions, serverURL: client.baseURL)
+            if !queued { self.error = Outbox.shared.storageError }
+            return queued
         } catch {
             drop()
             self.error = BBClient.describe(error, server: client.baseURL)
