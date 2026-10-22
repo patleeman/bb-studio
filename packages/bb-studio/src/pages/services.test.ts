@@ -14,7 +14,11 @@ it("links pages and checklist handoffs directly, and reports activity failures w
   const db = host.bb.storage.database();
   for (const sql of MIGRATIONS) db.exec(sql);
   const services = new StudioServices(db);
-  const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services, async () => {});
+  const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services, async () => {}, {
+    items: async () => [], create: async () => { throw new Error("not in this test"); },
+    drawing: () => null, saveDrawing: () => { throw new Error("not in this test"); },
+    artifact: () => null, artifactText: () => ({ text: null, truncated: false }), recording: () => null,
+  });
   try {
     const notesId = await pages.notes.create({ projectId: null, title: "Meeting notes", markdown: "First version" });
     expect(await pages.notes.exists(notesId)).toBe(true);

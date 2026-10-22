@@ -54,6 +54,8 @@ export const DRAW_TOOLS = ["excalidraw_list_drawings", "excalidraw_get_drawing",
 
 export interface BuiltinDrawings {
   store: DrawingStore;
+  getDrawing(id: string): { id: string; name: string; createdAt: number; updatedAt: number; projectId: string | null; data: string } | null;
+  saveDrawing(input: { id: string; name?: string; data: string; expectedUpdatedAt?: number }): { ok: boolean; updatedAt: number };
   /** Studio's provider methods, which the hub calls in-process. */
   provider: StudioProviderHandlers;
   /** Its section of a Studio backup, still named `excalidraw`. */
@@ -150,6 +152,25 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     }));
   }
 
+  function getDrawing(id: string) {
+    const row = store.get(id);
+    if (!row) return null;
+    return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, projectId: row.project_id, data: row.data };
+  }
+
+  function saveDrawing({ id, name, data, expectedUpdatedAt }: Parameters<BuiltinDrawings["saveDrawing"]>[0]) {
+    return db.transaction(() => {
+      const row = mustGet(id);
+      if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt)
+        throw new Error("The drawing changed on the server. Save this draft as a copy to keep both versions.");
+      // Multi-writer merge: element-level union, higher `version` wins,
+      // tombstones preserved — so concurrent user edits and agent writes
+      // both survive instead of last-writer-wins clobbering.
+      const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
+      return { ok: true, updatedAt };
+    })();
+  }
+
   bb.rpc.register(rpcContract, {
     "drawings.getDrawingMeta"({ id }) {
       const row = store.get(id);
@@ -161,27 +182,12 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     "drawings.createDrawing"({ name, projectId }) {
       return { drawing: toMeta(create(name, "app", projectId ?? null)) };
     },
-    "drawings.getDrawing"({ id }) {
-      const row = store.get(id);
-      if (!row) return { drawing: null };
-      return { drawing: { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, projectId: row.project_id, data: row.data } };
-    },
+    "drawings.getDrawing": ({ id }) => ({ drawing: getDrawing(id) }),
     /** Cheap per-drawing revision check for the editor's polling fallback. */
     "drawings.getDrawingUpdatedAt"({ id }) {
       return { updatedAt: store.get(id)?.updated_at ?? 0 };
     },
-    "drawings.saveDrawing"({ id, name, data, expectedUpdatedAt }) {
-      return db.transaction(() => {
-        const row = mustGet(id);
-        if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt)
-          throw new Error("The drawing changed on the server. Save this draft as a copy to keep both versions.");
-        // Multi-writer merge: element-level union, higher `version` wins,
-        // tombstones preserved — so concurrent user edits and agent writes
-        // both survive instead of last-writer-wins clobbering.
-        const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
-        return { ok: true, updatedAt };
-      })();
-    },
+    "drawings.saveDrawing": saveDrawing,
     "drawings.recoverDrawingCopy"({ sourceDrawingId, draftId, draftToken, name, data, projectId }) {
       const scene = parseSceneData(data);
       if (!scene) throw new Error("This recovery draft is not a valid drawing scene.");
@@ -452,6 +458,8 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   return {
     store,
+    getDrawing,
+    saveDrawing,
     provider: drawingProvider({ store, changed: (id) => changed(id, store.get(id)?.updated_at ?? Date.now(), "studio") }),
     backup: createDrawBackup({ db, store, changed: (id, updatedAt) => changed(id, updatedAt, "studio") }),
     cli,

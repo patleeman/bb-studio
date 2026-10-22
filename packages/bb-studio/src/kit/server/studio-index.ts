@@ -29,7 +29,7 @@ export interface StudioIndexItem {
 type ProviderItem = z.infer<StudioSchemas["provider"]["studio_list"]["output"]>["items"][number];
 
 /** An add-on's item as the index lists it, labelled with its kind. */
-export function indexItem(pluginId: string, item: ProviderItem, info: z.infer<StudioSchemas["info"]>): StudioIndexItem {
+export function indexItem(pluginId: string, item: ProviderItem, info: Pick<z.infer<StudioSchemas["info"]>, "kinds">): StudioIndexItem {
   const kind = info.kinds.find((each) => each.id === item.kind);
   return {
     pluginId,

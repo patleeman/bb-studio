@@ -107,6 +107,8 @@ export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_re
 
 export interface BuiltinArtifacts {
   store: ArtifactStore;
+  getArtifact(id: string): ArtifactDto | null;
+  readText(id: string, versionId: string): { text: string | null; truncated: boolean };
   /** Studio's provider methods, which the hub calls in-process. */
   provider: StudioProviderHandlers;
   /** Its section of a Studio backup, still named `artifacts`. */
@@ -260,25 +262,28 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
     return `${what}: ${TYPE_LABELS[versionType(artifact.version)]}, ${formatBytes(artifact.version.size)}, id ${artifact.id}, link ${artifactHref(artifact.id)}.${restored}`;
   }
 
+  const getArtifact = (id: string) => { const artifact = store.get(id); return artifact ? toDto(artifact) : null; };
+  function readText(id: string, versionId: string) {
+    const version = store.version(id, versionId);
+    if (!version) throw new Error("Version not found.");
+    if (!isTextType(versionType(version))) return { text: null, truncated: false };
+    const bytes = store.bytes(version.sha256);
+    if (!bytes) return { text: null, truncated: false };
+    const truncated = bytes.byteLength > MAX_VIEW_TEXT;
+    return { text: utf8Prefix(bytes, MAX_VIEW_TEXT).toString("utf8"), truncated };
+  }
+
   bb.rpc.register(rpcContract, {
     "artifacts.get"({ id }) {
-      const artifact = store.get(id);
-      return { artifact: artifact ? toDto(artifact) : null, versions: artifact ? store.versions(id).map(toVersionDto) : [] };
+      const artifact = getArtifact(id);
+      return { artifact, versions: artifact ? store.versions(id).map(toVersionDto) : [] };
     },
     "artifacts.versionBytes"({ id, versionId }) {
       const version = store.version(id, versionId);
       const bytes = version ? store.bytes(version.sha256) : null;
       return { bytes: bytes?.toString("base64") ?? null, sha256: version?.sha256 ?? null };
     },
-    "artifacts.text"({ id, versionId }) {
-      const version = store.version(id, versionId);
-      if (!version) throw new Error("Version not found.");
-      if (!isTextType(versionType(version))) return { text: null, truncated: false };
-      const bytes = store.bytes(version.sha256);
-      if (!bytes) return { text: null, truncated: false };
-      const truncated = bytes.byteLength > MAX_VIEW_TEXT;
-      return { text: utf8Prefix(bytes, MAX_VIEW_TEXT).toString("utf8"), truncated };
-    },
+    "artifacts.text": ({ id, versionId }) => readText(id, versionId),
     "artifacts.update"({ id, title, description }) {
       store.update(id, { title, description }, "app");
       changed(id);
@@ -594,6 +599,8 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
 
   return {
     store,
+    getArtifact,
+    readText,
     provider: artifactProvider({ store, changed }),
     backup: artifactBackupHandlers(z, { db, store, changed }),
     cli: (argv, ctx) => cli.run(argv, ctx),

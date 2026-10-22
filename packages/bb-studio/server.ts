@@ -1,3 +1,4 @@
+import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerDecisions } from "./src/decisions/server";
 import { DECISIONS_SETTINGS } from "./src/decisions/settings";
@@ -176,7 +177,29 @@ export default async function plugin(bb: BbPluginApi) {
     linkThread: (thread) => services.linkThread(thread),
     replaceLinks: (ref, source, links) => services.replaceLinks(ref, source, links),
     recordActivity,
-  }, notifyBuiltin);
+  }, notifyBuiltin, {
+    items: async () => {
+      const { items, providers } = await hub.overview();
+      return items.filter((item) => item.pluginId !== "pages" && !item.archived)
+        .map((item) => indexItem(item.pluginId, item, providers.find((provider) => provider.pluginId === item.pluginId)!))
+        .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 500);
+    },
+    create: async (pluginId, kind, projectId) => {
+      const [{ item }, info] = await Promise.all([
+        hub.call(pluginId, "studio_create", { kind, projectId }),
+        hub.call(pluginId, "studio_describe", null),
+      ]);
+      return indexItem(pluginId, item, info);
+    },
+    drawing: drawings.getDrawing,
+    saveDrawing: drawings.saveDrawing,
+    artifact: artifacts.getArtifact,
+    artifactText: artifacts.readText,
+    recording: (id) => {
+      const recording = recordings.store.recording(id);
+      return recording ? { recording, segments: recordings.store.segments(id) } : null;
+    },
+  });
   bb.onDispose(() => pages.dispose());
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes, notifyBuiltin);
   bb.onDispose(() => recordings.dispose());

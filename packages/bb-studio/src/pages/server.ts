@@ -23,7 +23,7 @@ import { z } from "zod";
 import { actorColor } from "./actors";
 import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, MERMAID_PATH, PLUGIN_ID, PLUGIN_RPC_ACTOR, SYNC_PATH, UPLOAD_PATH } from "./constants";
 import { rpcContract } from "./contract";
-import { studioEmbeds } from "./embeds";
+import { studioEmbeds, type EmbedServices } from "./embeds";
 import { fetchPreview } from "./unfurl";
 import { createThread, listThreads, reply, setResolved } from "./comments";
 import { readBlocks, readMarkdown, textBlocks } from "./doc";
@@ -66,7 +66,7 @@ export interface PagesSettingsAccess {
 }
 
 /** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
-export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">, notify: StudioChanged): BuiltinPages {
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">, notify: StudioChanged, embedServices: EmbedServices): BuiltinPages {
   const store = new PageStore(db, () => settings.snapshotsPerPage());
   const service = new PagesService(bb, store);
   const checklists = new Checklists(bb, db, service, store, services);
@@ -202,7 +202,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
   };
 
   const studio = studioSchemas(z);
-  const embeds = studioEmbeds(bb.sdk, studio);
+  const embeds = studioEmbeds(embedServices);
 
   bb.rpc.register(rpcContract, {
     "pages.tree": ({ projectId }) => ({ pages: store.list({ projectId, includeArchived: true }).map(toView) }),

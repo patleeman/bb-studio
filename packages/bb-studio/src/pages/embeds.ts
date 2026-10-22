@@ -1,67 +1,33 @@
-// Items from the other Studio add-ons, for embeds and mentions, and what
-// their live embeds show and edit: an artifact's content, a
-// recording. A plugin's UI can only call its own RPCs, so Pages asks each
-// add-on on its behalf.
+// Live embeds use the built-in kinds directly. The composition root routes
+// the item picker and creation through the hub for external add-ons too.
 import { untitled } from "../kit/format";
-import type { StudioSchemas } from "../kit/contract";
-import { callProvider, indexItem, studioIndex, type StudioIndexItem } from "../kit/server/index";
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod";
+import type { StudioIndexItem } from "../kit/server/index";
+import type { BuiltinDrawings } from "../draw/server";
+import type { BuiltinArtifacts } from "../artifacts/server";
+import type { Recording, Segment } from "../talk/shared/contract";
 import { changesData, parseScene, renderWhiteboard, whiteboardChanges, type WhiteboardStroke, type WhiteboardView } from "./whiteboard";
-import { PLUGIN_ID, type RecordingCard } from "./contract";
+import type { RecordingCard } from "./contract";
+
+export interface EmbedServices {
+  items(): Promise<StudioIndexItem[]>;
+  create(pluginId: string, kind: string, projectId: string | null): Promise<StudioIndexItem>;
+  drawing: BuiltinDrawings["getDrawing"];
+  saveDrawing: BuiltinDrawings["saveDrawing"];
+  artifact: BuiltinArtifacts["getArtifact"];
+  artifactText: BuiltinArtifacts["readText"];
+  recording(id: string): { recording: Recording; segments: Segment[] } | null;
+}
 
 const MAX_TEXT = 20_000;
 
-const drawingSchema = z.object({ drawing: z.object({ id: z.string(), name: z.string(), updatedAt: z.number(), data: z.string() }).nullable() });
-
-const recordingSchema = z.object({
-  recording: z.object({
-    id: z.string(),
-    title: z.string(),
-    status: z.string(),
-    durationMs: z.number(),
-    createdAt: z.number(),
-    meetingNotes: z.object({ summary: z.string(), decisions: z.array(z.string()).optional() }).nullable().optional(),
-  }),
-  segments: z.array(z.object({ id: z.string(), offsetMs: z.number(), durationMs: z.number(), status: z.string(), text: z.string().nullable() })),
-});
-
-const artifactSchema = z.object({
-  artifact: z
-    .object({
-      id: z.string(),
-      version: z.object({
-        id: z.string(),
-        name: z.string(),
-        type: z.enum(["image", "html", "markdown", "code", "text", "pdf", "other"]),
-      }),
-    })
-    .nullable(),
-});
-
-type Sdk = BbPluginApi["sdk"];
-
-export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
-  const index = studioIndex(sdk, studio, { exclude: [PLUGIN_ID] });
-  const call = <T extends z.ZodType>(pluginId: string, method: string, input: unknown, outputSchema: T): Promise<z.infer<T>> =>
-    sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema }) as Promise<z.infer<T>>;
-
+export function studioEmbeds(services: EmbedServices) {
   return {
-    /** Every add-on's items. */
-    items: () => index.items(),
-    /** A new item from an add-on's Studio contract, as the index lists it. */
-    async create(pluginId: string, kind: string, projectId: string | null): Promise<StudioIndexItem> {
-      const [{ item }, info] = await Promise.all([
-        callProvider(sdk, pluginId, "studio_create", { kind, projectId }, studio.provider.studio_create.output),
-        callProvider(sdk, pluginId, "studio_describe", null, studio.info),
-      ]);
-      index.invalidate();
-      return indexItem(pluginId, item, info);
-    },
+    items: () => services.items(),
+    create: (pluginId: string, kind: string, projectId: string | null) => services.create(pluginId, kind, projectId),
 
     /** A recording as its embed shows it. Talk is built into Studio (its `recordings.*` methods). */
     async recording(id: string): Promise<RecordingCard | null> {
-      const result = await call("studio", "recordings.recording_get", { id }, recordingSchema).catch(() => null);
+      const result = services.recording(id);
       if (!result) return null;
       const { recording, segments } = result;
       let budget = MAX_TEXT;
@@ -72,7 +38,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
         durationMs: recording.durationMs,
         createdAt: recording.createdAt,
         summary: recording.meetingNotes?.summary || null,
-        decisions: recording.meetingNotes?.decisions ?? [],
+        decisions: [],
         segments: segments.flatMap((segment) => {
           const text = segment.status === "done" ? (segment.text ?? "").trim() : "";
           if (!text || budget <= 0) return [];
@@ -84,18 +50,17 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
     },
     /** A drawing as the inline whiteboard shows it. Drawings are built into Studio (its `drawings.*` methods). */
     async whiteboard(id: string): Promise<WhiteboardView | null> {
-      const { drawing } = await call("studio", "drawings.getDrawing", { id }, drawingSchema);
+      const drawing = services.drawing(id);
       if (!drawing) return null;
       return { id: drawing.id, name: drawing.name, updatedAt: drawing.updatedAt, ...renderWhiteboard(parseScene(drawing.data)) };
     },
     /** Adds pen strokes and erases elements; Draw merges them into what's there. */
     async saveWhiteboard(id: string, add: WhiteboardStroke[], erase: string[]): Promise<WhiteboardView> {
-      const { drawing } = await call("studio", "drawings.getDrawing", { id }, drawingSchema);
+      const drawing = services.drawing(id);
       if (!drawing) throw new Error("This drawing is gone.");
       const changes = whiteboardChanges(parseScene(drawing.data), add, erase);
       if (changes.length) {
-        await call("studio", "drawings.saveDrawing", { id, data: changesData(changes) }, z.object({ ok: z.boolean(), updatedAt: z.number() }));
-        index.invalidate();
+        services.saveDrawing({ id, data: changesData(changes) });
       }
       const view = await this.whiteboard(id);
       if (!view) throw new Error("This drawing is gone.");
@@ -103,21 +68,16 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
     },
     async artifactView(id: string) {
       // Artifacts are built into Studio (its `artifacts.*` methods).
-      const { artifact } = await sdk.plugins.callRpc({ pluginId: "studio", method: "artifacts.get", input: { id } as never, outputSchema: artifactSchema });
+      const artifact = services.artifact(id);
       if (!artifact) return null;
       const { version } = artifact;
       let text: string | null = null;
       if (version.type === "markdown" || version.type === "code" || version.type === "text") {
-        const result = await sdk.plugins.callRpc({
-          pluginId: "studio",
-          method: "artifacts.text",
-          input: { id, versionId: version.id } as never,
-          outputSchema: z.object({ text: z.string().nullable(), truncated: z.boolean() }),
-        });
+        const result = services.artifactText(id, version.id);
         text = result.text === null ? null : result.text.slice(0, MAX_TEXT) + (result.text.length > MAX_TEXT || result.truncated ? "\n…" : "");
       }
       const query = `artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(version.id)}`;
-      return { type: version.type, name: version.name, url: `/api/v1/plugins/studio/http/artifacts/content?${query}`, text };
+      return { type: version.type === "audio" || version.type === "video" ? "other" as const : version.type, name: version.name, url: `/api/v1/plugins/studio/http/artifacts/content?${query}`, text };
     },
   };
 }
