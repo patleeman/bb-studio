@@ -160,6 +160,7 @@ function runnerSchedule(schedule: Schedule): { cadence: "custom"; time: string; 
 }
 
 export class Automations {
+  private readonly watching = new Set<string>();
   constructor(private readonly deps: AutomationDeps) {}
 
   private call<T>(method: string, input: unknown, schema: z.ZodType<T>) {
@@ -599,20 +600,30 @@ export class Automations {
 
   /** Reads a watcher's new runs, oldest first, and wakes its target for each with output. */
   async watch(row: Row): Promise<number> {
-    const runs = (await Promise.all(this.ids(row).map((id) => this.bbRuns({ id, projectId: row.project_id }, 20)))).flat()
-      .filter((run) => run.finishedAt && run.finishedAt > row.seen_until)
-      .sort((a, b) => a.finishedAt! - b.finishedAt!);
-    let fired = 0;
-    for (const run of runs) {
-      const finding = watcherFinding(run);
-      if (finding) {
-        await this.fire(row, finding);
-        fired++;
-        this.save(row.id, { last_fired_at: run.finishedAt!, last_fire: finding.slice(0, 2000) });
+    if (this.watching.has(row.id)) return 0;
+    this.watching.add(row.id);
+    try {
+      // tick may have read this row before another watcher pass finished.
+      const current = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row | undefined;
+      if (!current || current.state !== "active") return 0;
+      row = current;
+      const runs = (await Promise.all(this.ids(row).map((id) => this.bbRuns({ id, projectId: row.project_id }, 20)))).flat()
+        .filter((run) => run.finishedAt && run.finishedAt > row.seen_until)
+        .sort((a, b) => a.finishedAt! - b.finishedAt!);
+      let fired = 0;
+      for (const run of runs) {
+        const finding = watcherFinding(run);
+        if (finding) {
+          await this.fire(row, finding);
+          fired++;
+          this.save(row.id, { last_fired_at: run.finishedAt!, last_fire: finding.slice(0, 2000) });
+        }
+        this.deps.db.prepare("UPDATE bot_automations SET seen_until = ? WHERE id = ?").run(run.finishedAt!, row.id);
       }
-      this.deps.db.prepare("UPDATE bot_automations SET seen_until = ? WHERE id = ?").run(run.finishedAt!, row.id);
+      return fired;
+    } finally {
+      this.watching.delete(row.id);
     }
-    return fired;
   }
 
   private async fire(row: Row, output: string): Promise<void> {

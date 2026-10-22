@@ -200,3 +200,24 @@ it("auto-resume: check-ins are on only while they and their Bot are active; resu
   expect((await x.auto.runs(made.id))[0]).toMatchObject({ status: "resumed", outcome: expect.stringContaining("1 of 3 today") });
   expect((await x.auto.list()).find((each) => each.id === made.id)?.lastOutcome).toContain("Resumed after BB");
 });
+
+it("single-flights overlapping watcher ticks and releases the watcher afterward", async () => {
+  const x = await setup();
+  await x.auto.create({ kind: "watcher", name: "Releases", schedule: { type: "interval", every: 15, unit: "minutes", days: [1] }, script: { body: "echo", interpreter: "bash" } });
+  const t = Date.now() + 1000;
+  x.runs.set("a1", [{ id: "r1", status: "succeeded", output: "v2", exitCode: 0, finishedAt: t }]);
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  let entered!: () => void;
+  const sending = new Promise<void>((resolve) => { entered = resolve; });
+  x.send.mockImplementationOnce(async () => { entered(); await blocked; return { ok: true }; });
+  const first = x.auto.tick();
+  await sending;
+  await x.auto.tick();
+  release();
+  await first;
+  expect(x.send).toHaveBeenCalledTimes(1);
+  x.runs.get("a1")!.push({ id: "r2", status: "succeeded", output: "v3", exitCode: 0, finishedAt: t + 1 });
+  await x.auto.tick();
+  expect(x.send).toHaveBeenCalledTimes(2);
+});
