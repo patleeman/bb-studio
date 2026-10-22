@@ -4,7 +4,7 @@
 // dashboard.
 import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
-import { BREAKPOINT_NAMES, EMPTY_LAYOUTS, LIMITS, layoutItemSchema, sourceSchema, WIDGET_TYPES, type DashboardDoc, type Layouts, type Source, type Widget, type WidgetType } from "../shared";
+import { BREAKPOINT_NAMES, EMPTY_LAYOUTS, jsonBytes, LIMITS, layoutItemSchema, sourceSchema, WIDGET_TYPES, type DashboardDoc, type Layouts, type Source, type Widget, type WidgetType } from "../shared";
 import { z } from "zod";
 
 /**
@@ -354,19 +354,27 @@ export class DashboardStore {
     return (this.db.prepare("SELECT * FROM dashboard_widget_types WHERE id = ?").get(id) as TypeRow | undefined) ?? null;
   }
 
-  saveType(input: { id?: string; name: string; description: string; html: string; defaultOptions: Record<string, unknown>; sampleData: unknown; by: Actor }): TypeRow {
+  saveType(input: { id?: string; name: string; description?: string; html: string; defaultOptions?: Record<string, unknown>; sampleData?: unknown; by: Actor }): TypeRow {
     const at = this.now();
     const existing = input.id ? this.type(input.id) : null;
     if (input.id && !existing) throw new Error(`No widget type ${input.id} in the library.`);
     if (!existing && (this.db.prepare("SELECT COUNT(*) AS n FROM dashboard_widget_types").get() as { n: number }).n >= LIMITS.libraryTypes) {
       throw new Error(`The library holds at most ${LIMITS.libraryTypes} widget types.`);
     }
+    const description = input.description ?? existing?.description ?? "";
+    const defaultOptions = input.defaultOptions ?? parseJson(existing?.default_options ?? null, {} as Record<string, unknown>);
+    const sampleData = input.sampleData === undefined
+      ? existing?.sample_data === null || !existing ? undefined : parseJson(existing.sample_data, null)
+      : input.sampleData;
+    if (jsonBytes(input.html) > LIMITS.htmlBytes) throw new Error(`html is over ${LIMITS.htmlBytes / 1024} KB.`);
+    if (jsonBytes(defaultOptions) > LIMITS.optionsBytes) throw new Error(`defaultOptions is over ${LIMITS.optionsBytes / 1024} KB.`);
+    if (sampleData !== undefined && jsonBytes(sampleData) > LIMITS.staticBytes) throw new Error(`sampleData is over ${LIMITS.staticBytes / 1024} KB.`);
     const id = existing?.id ?? newId("wt");
     this.db.prepare(`INSERT INTO dashboard_widget_types (id, name, description, html, default_options, sample_data, created_at, updated_at, updated_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, html = excluded.html,
         default_options = excluded.default_options, sample_data = excluded.sample_data, updated_at = excluded.updated_at, updated_by = excluded.updated_by`)
-      .run(id, input.name, input.description, input.html, JSON.stringify(input.defaultOptions), input.sampleData === undefined ? null : JSON.stringify(input.sampleData), existing?.created_at ?? at, at, input.by);
+      .run(id, input.name, description, input.html, JSON.stringify(defaultOptions), sampleData === undefined ? null : JSON.stringify(sampleData), existing?.created_at ?? at, at, input.by);
     return this.type(id)!;
   }
 

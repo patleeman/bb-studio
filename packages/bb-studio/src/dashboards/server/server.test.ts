@@ -84,6 +84,23 @@ describe("agent tools", () => {
     expect(read).toContain("Widgets JSON:");
   }));
 
+  it("validates widget library updates and preserves omitted fields", () => withHost(async (host) => {
+    const defined = text(await tool(host, "widget_define", {
+      name: "Gauge", html: "<div>v1</div>", description: "A gauge",
+      defaultOptions: { color: "blue" }, sampleData: { value: 1 },
+    }));
+    const id = /id (wt_[0-9a-f]+)\)/.exec(defined)![1]!;
+
+    const saved = await call(host, "dashboards.saveWidgetType", { id, name: "Updated gauge", html: "<div>v2</div>" });
+    expect(saved.type).toMatchObject({
+      name: "Updated gauge", description: "A gauge", html: "<div>v2</div>",
+      defaultOptions: { color: "blue" }, sampleData: { value: 1 },
+    });
+    await expect(call(host, "dashboards.saveWidgetType", {
+      id, name: "Updated gauge", html: "<div>v3</div>", defaultOptions: { value: "x".repeat(LIMITS.optionsBytes) },
+    })).rejects.toThrow(/defaultOptions.*over/);
+  }));
+
   it("edits atomically and rejects bad input with a reason", () => withHost(async (host) => {
     const { dashboard } = await call(host, "dashboards.create", { name: "X" });
     const bad = await tool(host, "dashboard_edit", { dashboardId: dashboard.id, ops: [{ op: "add", type: "note" }, { op: "remove", widgetId: "nope" }] }) as { isError?: boolean; content: { text: string }[] };

@@ -279,8 +279,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       return { types: store.types().map(typeView) };
     },
     "dashboards.saveWidgetType"({ id, name, description, html, defaultOptions }) {
-      if (jsonBytes(html) > LIMITS.htmlBytes) throw new Error(`HTML is over ${LIMITS.htmlBytes / 1024} KB.`);
-      const type = store.saveType({ id, name, description: description ?? "", html, defaultOptions: defaultOptions ?? {}, sampleData: undefined, by: "user" });
+      const type = store.saveType({ id, name, description, html, defaultOptions, by: "user" });
       for (const user of store.typeUsers(type.id)) changed(user);
       return { type: typeView(type) };
     },
@@ -388,11 +387,8 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
       sampleData: z.unknown().optional(),
     }),
     execute({ id, name, description, html, defaultOptions, sampleData }) {
-      if (jsonBytes(html) > LIMITS.htmlBytes) return fail(`html is over ${LIMITS.htmlBytes / 1024} KB.`);
-      if (jsonBytes(defaultOptions ?? {}) > LIMITS.optionsBytes) return fail(`defaultOptions is over ${LIMITS.optionsBytes / 1024} KB.`);
-      if (sampleData !== undefined && jsonBytes(sampleData) > LIMITS.staticBytes) return fail(`sampleData is over ${LIMITS.staticBytes / 1024} KB.`);
       try {
-        const type = store.saveType({ id, name, description: description ?? "", html, defaultOptions: defaultOptions ?? {}, sampleData, by: "agent" });
+        const type = store.saveType({ id, name, description, html, defaultOptions, sampleData, by: "agent" });
         for (const user of store.typeUsers(type.id)) changed(user);
         return `${id ? "Updated" : "Added"} widget type "${type.name}" (id ${type.id}) in the library. Use it with dashboard_edit: {"op":"add","type":"custom","customType":"${type.id}"}.`;
       } catch (error) {
