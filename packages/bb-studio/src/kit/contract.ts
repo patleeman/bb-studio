@@ -34,6 +34,7 @@ export const STUDIO_PLUGIN_ID = "studio";
 export const STUDIO_PANEL_PATH = "studio";
 /** The RPC an add-on calls on Studio when its items change. */
 export const STUDIO_CHANGED_METHOD = "studio_changed";
+export const STUDIO_CHANGED_MAX_IDS = 500;
 /** Studio's realtime channel; payload `{ pluginId, ids?, removed? }`. */
 export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 /** Studio's RPC that finds the item a path opens, or an item by id. */
@@ -299,7 +300,7 @@ export function studioSchemas(z: typeof Zod) {
     },
     /** Studio's own method add-ons call when their items change. */
     changed: {
-      input: z.object({ pluginId: z.string().min(1).max(100), ids: z.array(z.string().min(1).max(200)).max(500).optional(), removed: z.array(z.string().min(1).max(200)).max(500).optional() }),
+      input: z.object({ pluginId: z.string().min(1).max(100), ids: z.array(z.string().min(1).max(200)).max(STUDIO_CHANGED_MAX_IDS).optional(), removed: z.array(z.string().min(1).max(200)).max(STUDIO_CHANGED_MAX_IDS).optional() }),
       output: z.object({ ok: z.boolean() }),
     },
   };

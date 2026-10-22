@@ -1,7 +1,7 @@
 // Server helpers for Studio add-ons. Pure functions over the SDK objects the
 // caller passes in; no runtime imports, for the reason in contract.ts.
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import { STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
+import { STUDIO_CHANGED_MAX_IDS, STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
 
 
 export type StudioProviderHandlers = PluginRpcHandlers<StudioSchemas["provider"]>;
@@ -62,13 +62,25 @@ export function createStudioNotifier(options: {
         input: { pluginId: options.pluginId, ...(!reset && changedIds.length ? { ids: changedIds } : {}) },
         outputSchema: options.schemas.changed.output,
       }))
-      .catch(() => {});
+      .catch(() => {
+        if (disposed) return;
+        ids.clear();
+        full = true;
+      });
   };
   return {
     changed(id) {
       if (disposed) return;
-      if (id) ids.add(id);
-      else full = true;
+      if (!id) {
+        ids.clear();
+        full = true;
+      } else if (!full) {
+        ids.add(id);
+        if (ids.size > STUDIO_CHANGED_MAX_IDS) {
+          ids.clear();
+          full = true;
+        }
+      }
       if (timer) return;
       timer = setTimeout(send, options.delayMs ?? 250);
     },

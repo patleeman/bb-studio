@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseFlags, subcommand, takeFlag, takeOption, usage } from "./cli";
 import { studioSchemas } from "./contract";
 import { newId } from "./ids";
-import { createChangeBus, defineItemMention, discoverProviderSnapshot, fanOutProviders, mustGet, registerStudioProvider, serveBytes } from "./server";
+import { createChangeBus, createStudioNotifier, defineItemMention, discoverProviderSnapshot, fanOutProviders, mustGet, registerStudioProvider, serveBytes } from "./server";
 import { storeActions } from "./server/provider";
 
 afterEach(() => vi.useRealTimers());
@@ -43,6 +43,30 @@ describe("server helpers", () => {
     expect(callRpc).toHaveBeenCalledTimes(1);
     expect(callRpc.mock.calls[0]![0]).toMatchObject({ pluginId: "studio", method: "studio_changed", input: { pluginId: "pages" } });
     bus.dispose();
+  });
+
+  it("collapses change bursts above the RPC id limit into a full refresh", async () => {
+    vi.useFakeTimers();
+    const callRpc = vi.fn().mockResolvedValue(null);
+    const notifier = createStudioNotifier({ plugins: { callRpc }, pluginId: "pages", schemas: studioSchemas(z) });
+    for (let i = 0; i < 500; i++) notifier.changed(`pg_${i}`);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(callRpc.mock.calls[0]![0].input).toMatchObject({ pluginId: "pages", ids: expect.arrayContaining(["pg_0", "pg_499"]) });
+    expect((callRpc.mock.calls[0]![0].input as { ids: string[] }).ids).toHaveLength(500);
+
+    callRpc.mockClear();
+    for (let i = 0; i < 501; i++) notifier.changed(`pg_${i}`);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(callRpc.mock.calls[0]![0].input).toEqual({ pluginId: "pages" });
+
+    callRpc.mockClear();
+    callRpc.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(null);
+    notifier.changed("pg_failed");
+    await vi.advanceTimersByTimeAsync(250);
+    notifier.changed("pg_retry");
+    await vi.advanceTimersByTimeAsync(250);
+    expect(callRpc.mock.calls[1]![0].input).toEqual({ pluginId: "pages" });
+    notifier.dispose();
   });
 
   it("bounds mentions without changing ids or resolution", async () => {
