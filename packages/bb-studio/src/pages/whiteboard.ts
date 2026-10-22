@@ -208,7 +208,7 @@ export function whiteboardChanges(scene: Scene, add: WhiteboardStroke[], erase: 
     const ys = relative.map(([, py]) => py);
     index = nextIndex(index);
     out.push({
-      id: elementId(), type: "freedraw", x: x0, y: y0,
+      id: stroke.id ?? elementId(), type: "freedraw", x: x0, y: y0,
       width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys),
       angle: 0, strokeColor: stroke.color, backgroundColor: "transparent", fillStyle: "solid",
       strokeWidth: stroke.width, strokeStyle: "solid", roughness: 1, opacity: 100,

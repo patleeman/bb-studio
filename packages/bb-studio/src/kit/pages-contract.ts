@@ -15,6 +15,8 @@ const defineRpcContract: typeof sdkDefineRpcContract = (contract) => contract;
 export const WHITEBOARD_COLORS = ["#1e1e1e", "#e03131", "#1971c2", "#2f9e44", "#f08c00"] as const;
 
 export const whiteboardStrokeSchema = z.object({
+  /** Stable across retries, so an ambiguously saved stroke merges by element id. */
+  id: z.string().min(1).max(100).optional(),
   /** Scene coordinates, in drawing order. */
   points: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(1).max(5000),
   color: z.enum(WHITEBOARD_COLORS),

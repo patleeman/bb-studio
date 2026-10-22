@@ -24,13 +24,14 @@ describe("whiteboard", () => {
   });
 
   it("adds strokes on top as freedraw elements and erases with a bumped version", () => {
-    const changes = whiteboardChanges(scene, [{ points: [[10, 20], [15, 30], [5, 25]], color: "#e03131", width: 2 }], ["box", "gone", "missing"], 42);
+    const changes = whiteboardChanges(scene, [{ id: "pg_retry_1", points: [[10, 20], [15, 30], [5, 25]], color: "#e03131", width: 2 }], ["box", "gone", "missing"], 42);
     expect(changes).toHaveLength(2);
     const [erased, stroke] = changes;
     expect(erased).toMatchObject({ id: "box", isDeleted: true, version: 4, updated: 42 });
-    expect(stroke).toMatchObject({ type: "freedraw", x: 10, y: 20, width: 10, height: 10, strokeColor: "#e03131", index: "a3", version: 1, isDeleted: false });
+    expect(stroke).toMatchObject({ id: "pg_retry_1", type: "freedraw", x: 10, y: 20, width: 10, height: 10, strokeColor: "#e03131", index: "a3", version: 1, isDeleted: false });
     expect(stroke!.points).toEqual([[0, 0], [5, 10], [-5, 5]]);
     expect(JSON.parse(changesData(changes)).elements).toHaveLength(2);
+    expect(whiteboardChanges(scene, [{ id: "pg_retry_1", points: [[10, 20], [15, 30]], color: "#e03131", width: 2 }], [], 43)[0]!.id).toBe("pg_retry_1");
   });
 
   it("orders new elements after existing fractional indices", () => {

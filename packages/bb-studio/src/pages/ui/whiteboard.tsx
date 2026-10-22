@@ -32,6 +32,8 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
   const [pending, setPending] = useState<WhiteboardStroke[]>([]);
   const [erased, setErased] = useState<Set<string>>(new Set());
   const queue = useRef<{ add: WhiteboardStroke[]; erase: string[] }>({ add: [], erase: [] });
+  const failedBatch = useRef<{ add: WhiteboardStroke[]; erase: string[] } | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saving = useRef(false);
   const svg = useRef<SVGSVGElement | null>(null);
@@ -46,14 +48,14 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
   // Picks up edits made in Draw or by agents, unless a stroke is on its way.
   useEffect(() => {
     const poll = setInterval(() => {
-      if (document.visibilityState === "visible" && !saving.current && !queue.current.add.length && !queue.current.erase.length) load();
+      if (document.visibilityState === "visible" && !saving.current && !failedBatch.current && !queue.current.add.length && !queue.current.erase.length) load();
     }, POLL_MS);
     return () => clearInterval(poll);
   }, [load]);
 
   const flush = useCallback(async () => {
     timer.current = null;
-    if (saving.current) return;
+    if (saving.current || failedBatch.current) return;
     const batch = queue.current;
     if (!batch.add.length && !batch.erase.length) return;
     queue.current = { add: [], erase: [] };
@@ -66,13 +68,24 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
       setError(null);
     } catch (cause) {
       setError(errorMessage(cause));
-      setPending((current) => current.filter((stroke) => !batch.add.includes(stroke)));
-      setErased(new Set());
+      failedBatch.current = batch;
+      setSaveFailed(true);
     } finally {
       saving.current = false;
-      if (queue.current.add.length || queue.current.erase.length) void flush();
+      if (!failedBatch.current && (queue.current.add.length || queue.current.erase.length)) void flush();
     }
   }, [ui, id]);
+  const retry = useCallback(() => {
+    const failed = failedBatch.current;
+    if (!failed) return;
+    failedBatch.current = null;
+    setSaveFailed(false);
+    queue.current = {
+      add: [...failed.add, ...queue.current.add],
+      erase: [...failed.erase, ...queue.current.erase],
+    };
+    void flush();
+  }, [flush]);
   const schedule = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), SAVE_DELAY_MS);
@@ -125,7 +138,10 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
   };
   const onPointerUp = () => {
     if (!drawing) return;
-    const stroke: WhiteboardStroke = { points: drawing.slice(0, 5000), color: color as WhiteboardStroke["color"], width: 2 };
+    const stroke: WhiteboardStroke = {
+      id: `pg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
+      points: drawing.slice(0, 5000), color: color as WhiteboardStroke["color"], width: 2,
+    };
     setDrawing(null);
     setPending((current) => [...current, stroke]);
     queue.current.add.push(stroke);
@@ -214,6 +230,10 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
         ) : null}
       </svg>
       {error ? <p className="px-3 py-1 text-xs text-destructive">{error}</p> : null}
+      {saveFailed ? <div className="flex items-center gap-2 px-3 py-1 text-xs text-destructive">
+        <span>Changes weren’t saved.</span>
+        <button type="button" className="underline" onClick={retry}>Retry save</button>
+      </div> : null}
     </div>
   );
 }

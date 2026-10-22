@@ -17487,11 +17487,13 @@ public enum Studio {
   }
 
   public struct PagesWhiteboardSaveInputAddItem: Sendable, Hashable, Codable {
+    public var id: String?
     public var points: [[StudioJSONValue]]?
     public var color: PagesWhiteboardSaveInputAddItemColor?
     public var width: Double?
 
-    public init(points: [[StudioJSONValue]]? = nil, color: PagesWhiteboardSaveInputAddItemColor? = nil, width: Double? = nil) {
+    public init(id: String? = nil, points: [[StudioJSONValue]]? = nil, color: PagesWhiteboardSaveInputAddItemColor? = nil, width: Double? = nil) {
+      self.id = id
       self.points = points
       self.color = color
       self.width = width
