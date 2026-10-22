@@ -1,5 +1,6 @@
+import { designHost } from "../test/host";
 import Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { commentMessage } from "../server";
 import { withScreenScript } from "./screen-script";
 import { DesignStore, MIGRATIONS } from "./store";
@@ -79,4 +80,28 @@ describe("prototype steps", () => {
     store.addComment(row.id, { screenId: "1a", step: "address", selector: "h1", elementHtml: "", elementText: "", body: "x" });
     expect(store.view(row.id)!.comments[0]).toMatchObject({ screenId: "1a", step: "address" });
   });
+});
+
+
+it("returns a saved comment after failed delivery and retries the same comment once", async () => {
+  const { bb, harness } = designHost();
+  try {
+    const db = bb.storage.database();
+    const store = new DesignStore(db);
+    const row = store.create({ name: "Review me", by: "app" });
+    store.setThread(row.id, "thr_design");
+    store.writeScreen(row.id, { id: "1a", html: "<p>Hello</p>" }, "agent");
+    const send = vi.fn(async () => { throw new Error("offline"); });
+    harness.sdk.stub("threads.send", send);
+    const result = await harness.behavior.callRpc("designs.addComment", { designId: row.id, screenId: "1a", selector: "p", elementHtml: "<p>Hello</p>", elementText: "Hello", body: "Change this", send: true }) as { id: string; sent: boolean };
+    expect(result).toEqual({ id: expect.any(String), sent: false });
+    expect(store.view(row.id)!.comments).toEqual([expect.objectContaining({ id: result.id, sent: false })]);
+    expect(harness.realtimeSignals.length).toBeGreaterThan(0);
+    harness.sdk.stub("threads.send", async () => ({ delivery: "sent" }) as never);
+    await Promise.all([1, 2].map(() => harness.behavior.callRpc("designs.sendComment", { id: result.id })));
+    await harness.behavior.callRpc("designs.sendComment", { id: result.id });
+    expect(harness.inspection.sdk.callsTo("threads.send")).toHaveLength(2);
+    expect(store.view(row.id)!.comments).toHaveLength(1);
+    expect(store.comment(result.id)!.sent_at).not.toBeNull();
+  } finally { await harness.lifecycle.dispose(); }
 });

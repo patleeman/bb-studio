@@ -208,9 +208,17 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   });
 
   /** Posts a comment to the design's conversation; it waits for a running turn instead of cutting in. */
-  async function sendToThread(row: DesignRow, comment: CommentRow) {
-    await bb.sdk.threads.send({ threadId: row.thread_id!, input: [{ type: "text", text: commentMessage(row, comment), mentions: [] }], mode: "queue-if-active" });
-    store.markSent(comment.id);
+  const sendingComments = new Map<string, Promise<void>>();
+  function sendToThread(row: DesignRow, comment: CommentRow): Promise<void> {
+    if (store.comment(comment.id)?.sent_at !== null) return Promise.resolve();
+    const pending = sendingComments.get(comment.id);
+    if (pending) return pending;
+    const task = (async () => {
+      await bb.sdk.threads.send({ threadId: row.thread_id!, input: [{ type: "text", text: commentMessage(row, comment), mentions: [] }], mode: "queue-if-active" });
+      store.markSent(comment.id);
+    })().finally(() => sendingComments.delete(comment.id));
+    sendingComments.set(comment.id, task);
+    return task;
   }
 
   bb.rpc.register(rpcContract, {
@@ -237,8 +245,15 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       if (send && !row.thread_id) throw new Error("This design has no conversation yet. Start one with Chat, then send the comment.");
       const comment = store.addComment(designId, { screenId, step, selector, elementHtml, elementText, body });
       reviews.userChanged(designId);
-      if (send) await sendToThread(row, comment);
       changed(designId, store.bump(designId, "editor"), "editor");
+      if (send) {
+        try { await sendToThread(row, comment); }
+        catch (error) {
+          bb.log.warn(`Comment ${comment.id} was saved but couldn't be sent: ${String(error)}`);
+          return { id: comment.id, sent: false };
+        }
+        changed(designId, store.bump(designId, "editor"), "editor");
+      }
       return { id: comment.id, sent: send };
     },
     "designs.editText"({ designId, screenId, before, after }) {
