@@ -1,7 +1,6 @@
 import { rpcContract } from "./contract";
-import { registerCodeImport } from "./server/migration";
 import { codeProvider, registerCodeMentions } from "./server/provider";
-// bb-studio-code — server entry.
+// Studio Code — server entry.
 //
 // VS Code is the editor: each thread gets one workspace, its own worktree,
 // shown in the thread's VS Code tab. Opening it starts code-server for it
@@ -92,15 +91,10 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     },
     theme: () => theme,
     beforeOpen: async (signal) => {
-      await migration.requireReady();
       signal.throwIfAborted();
       await installBridge(join(root, "extensions"));
     },
     env: async (id, dir) => ({ STUDIO_CODE_BRIDGE: await bridges.open(id, dir) }),
-  });
-  const migration = registerCodeImport(bb, db, root, async () => {
-    theme = await bb.storage.kv.get<BbTheme>("code:theme") ?? theme;
-    themeKey = JSON.stringify(theme);
   });
   bb.onDispose(() => servers.dispose());
   bb.onDispose(() => bridges.closeAll());
@@ -124,7 +118,6 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
   };
   /** The thread's worktree workspace, made the first time. */
   const forThread = async (threadId: string) => {
-    await migration.requireReady();
     const existing = store.forThread(threadId);
     const folder = await threadFolder(threadId).catch((cause) => {
       // Without a current worktree to compare, keep the workspace the thread has.
@@ -188,7 +181,6 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
       return { shown: bridges.send(id, { type: "show", path: file, startLine, endLine: Math.max(endLine ?? startLine, startLine) }) };
     },
     "code.syncTheme": async (next) => {
-      await migration.requireReady();
       const key = JSON.stringify(next);
       if (key === themeKey) return { changed: false };
       bb.log.info(`theme changed (${next.mode}, background ${next.colors.background}); open editors reload`);

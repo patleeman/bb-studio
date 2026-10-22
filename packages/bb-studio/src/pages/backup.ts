@@ -1,5 +1,5 @@
-// Pages' part of `bb studio backup` / `bb studio restore` (the contract is in
-// @bb-studio/kit/backup). Section layout, version 1:
+// Pages' part of `bb studio backup` / `bb studio restore` (shared helpers are
+// in Studio's internal kit). Section layout, version 1:
 //
 //   items/<page id>.json                    the page row (see itemSchema)
 //   files/<page id>/state.bin               the page's Yjs state; comments live in it

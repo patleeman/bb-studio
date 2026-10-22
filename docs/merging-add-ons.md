@@ -8,14 +8,13 @@ and last Pages (`packages/bb-studio/src/pages`, with Explore in
 `packages/bb-studio/src/explore`). This is the checklist, with what each
 taught.
 
-**Content-kind status: complete.** Every kind is built in, and the five upgrade bridges
-(`pages`, `talk`, `excalidraw`, `artifacts`, `design`), Studio's import RPCs
-and the iOS fallbacks to the old plugin ids were deleted after their release
-cycle. The last commit with the bridges is
-`350e69857c0f79a173abfd60ff3d11b1b2a14f66`; see
-[upgrade-unified-studio.md](upgrade-unified-studio.md). The bridge steps
-below (4, and the bridge parts of 3 and 5) are a record of how it was done;
-the packages they name are gone. The old-address mapping and item ids stay.
+**Content-kind status: complete.** Every kind is built in. The five content
+bridges were removed after their release cycle, followed by the Decisions and
+Code bridges after their migrations were complete. Their import RPCs and iOS
+fallbacks are gone. See [upgrade-unified-studio.md](upgrade-unified-studio.md)
+for the content moves. The bridge steps below (4, and the bridge parts of 3
+and 5) are historical; those packages are gone. Old-address mappings and item
+ids remain for data compatibility.
 
 ## Rules
 
@@ -31,8 +30,9 @@ the packages they name are gone. The old-address mapping and item ids stay.
 - **Keep names users and agents already know.** Agent tools, skill name,
   mention provider id, message directive id, thread panel action and composer
   entries keep their names. The CLI can't: BB allows one CLI command per
-  plugin (`cli command is already registered`), so `bb <old> …` becomes
-  `bb studio <segment> …`. The bridge keeps `bb <old> migrate`.
+  plugin (`cli command is already registered`), so current commands use
+  `bb studio <segment> …`. A bridge's migration command existed only while
+  that bridge was supported.
 - **Old addresses keep working.** Map `/plugins/<old>/<panel>/<id>` to the
   Studio address everywhere a path comes in.
 
@@ -50,9 +50,9 @@ the packages they name are gone. The old-address mapping and item ids stay.
   returns `StudioProviderHandlers` (see `artifactProvider`). Set
   `panel: null` in `studio_describe`. Point `href`s at the Studio address.
 - Prefix the kind's RPC methods: `<segment>.<method>` (`artifacts.get`).
-  Put the contract in the kit (`packages/bb-studio-kit/src/<segment>-contract.ts`),
-  because the bridge is a separate package and can't import Studio. Add it
-  to `src/public-contract.ts` so iOS gets generated names.
+  Keep the contract in Studio's `src/kit` sources and add it to
+  `src/public-contract.ts` so iOS gets generated names. A separately installed
+  bridge needed its own copy only during its upgrade window.
 - HTTP routes move under `/<segment>/…`, so content URLs become
   `/api/v1/plugins/studio/http/<segment>/…`.
 - Icons: copy the SVGs into `packages/bb-studio/icons/` and add them to
@@ -157,9 +157,10 @@ and `packages/bb-studio-artifacts`.
   `/thumbnail`) is answered through a bridge RPC on Studio
   (`drawings.thumbnail`); a forwarded call that waits on the user (Draw's
   `pickDrawing`, up to five minutes) needs a longer timeout.
-- Studio `setup.ts`: add a `RETIRED` entry with
-  `blocker: bridgeBlocker("<noun>", <BRIDGE_VERSION>)`, which checks the
-  version (older: update it), that it's enabled, and `migrationStatus`.
+- Studio `setup.ts`: add a `RETIRED` entry whose blocker checks the bridge
+  version, enabled state and `migrationStatus` while copying is in progress.
+  Once migration is complete, remove that bridge check and explain that its
+  copied data stays in Studio.
   Remove the id from `ADDONS` in `setup-addons.ts`. Its test skips retired
   ids when comparing with `marketplace.json`.
 - Marketplace: keep the bridge listed in `marketplace.json` and
@@ -192,14 +193,14 @@ and `packages/bb-studio-artifacts`.
 - Docs: Studio README section for the kind, bridge README with the upgrade
   commands, root README table and install list, `docs/studio.md`,
   `docs/backup.md`.
-- Kit changed: `sh scripts/refresh-locks.sh` with every package that has a
-  `package-lock.json`, then `pnpm install --lockfile-only`.
+- When package dependencies change, update lockfiles only for packages that
+  still use them. The temporary bridge kit and tarball are gone.
 
 ### 6. Verify
 
 ```sh
 pnpm -r typecheck && pnpm -r test
-pnpm check:compat && pnpm check:contracts && pnpm check:native-payloads && pnpm check:kit
+pnpm check:compat && pnpm check:contracts && pnpm check:native-payloads
 node scripts/check-marketplace.mjs && node scripts/check-docs.mjs && node scripts/check-icons.mjs
 git diff --check
 ```
@@ -341,10 +342,11 @@ commit, run `bb <old> migrate`, and check the items in Studio
 - Done: the bridge packages (`bb-studio-pages`, `-talk`, `-draw`,
   `-artifacts`, `-design`), their marketplace entries, Setup's `RETIRED`
   entries for them, the import RPCs and the iOS fallbacks are deleted.
-- The kit stays a packed tarball (`packages/bb-studio-kit.tgz`): Code and Decisions install alone from Git and can't import its
-  sources. It could shrink to what those two use. Reactions had no items, so
-  it moved without a bridge: Studio defines its settings and copies the
-  old plugin's once on start (`src/reactions/server.ts`), and Setup lists
+- The Decisions and Code upgrade bridges are now retired too. Their packages,
+  marketplace entries, import RPCs and tarball dependencies are removed. The
+  slim kit tarball existed only for those bridges. Reactions had no items, so
+  it moved without a bridge: Studio defines its settings and copies the old
+  plugin's once on start (`src/reactions/server.ts`), and Setup lists
   `emoji-react` as retired.
 
 Done: the kit's `AddOnCollection`, `AddOnPanel` and `handOver` are gone (Code
@@ -353,17 +355,13 @@ keeps a list of known add-ons, since every kind that had one is built in.
 
 ## Decisions merge (21 October 2026)
 
-Decisions is a service, with no item routes or database tables. Its server and settings sections now live in `src/decisions`, with `decisions.*` RPCs and `bb studio decisions`. The 0.5.0 `smart-decisions` bridge forwards all former RPCs and CLI commands. Ordinary settings use `getSettings`; five secrets travel only from the verified bridge server into Studio’s secret settings. Import acknowledgment gates Smart Queue and Setup removal. Existing destination settings and KV values win. The bridge has no hook; Studio cleans classifier threads belonging to either ID and still pauses for standalone `smart-queue`. Staged upgrade verification needs the lead’s pushed merge commit.
+Decisions is a service, with no item routes or database tables. Its server and settings live in `src/decisions`, with `decisions.*` RPCs and commands under `bb studio decisions`. The retired bridge copied ordinary settings, five secrets, fallback configuration and recent decisions while preserving destination values. Those import RPCs and bridge gates are removed now that migration is complete. Smart Queue uses Studio's local settings and still pauses for the standalone `smart-queue` plugin; recovery cleans stale classifier threads owned by either plugin id.
 
 ## Code merge (21 October 2026)
 
-VS Code now lives in `src/code`, with `code.*` RPCs and unchanged agent tool and
-skill names. The 0.2.0 `studio-code` bridge quiesces the old process tree, then
-copies editor files before rows and final acknowledgment. Studio gates starts
-until completion. Both sides enforce the process fence. Recovery paths, SQLite
-state and derived workspace-storage/backup IDs follow the new root. The bridge
-retains a small legacy thread-tab renderer because SDK 0.6.37 cannot alias the
-plugin-scoped `studio-code/code` identity; new tabs and file opens belong to
-Studio. Old workspace URLs and item IDs resolve after bridge removal. See
-[the upgrade guide](upgrade-studio-code.md) for removal limits and the staged
-checks the lead must run; no staged BB was run during implementation.
+VS Code lives in `src/code`, with `code.*` RPCs and unchanged agent tool and
+skill names. The retired bridge quiesced the old process tree and copied editor
+files and rows. Those import RPCs and start gates are removed after the
+migration. Studio retains the process fence for its own server restarts.
+Workspace ids keep the `studio-code` item namespace and old URLs still resolve.
+See [the compatibility note](upgrade-studio-code.md).

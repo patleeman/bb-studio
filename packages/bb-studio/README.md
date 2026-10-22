@@ -16,8 +16,8 @@ Studio's own code-server runtime and `code.*` RPCs. The removed thread-header
 VS Code button stays absent.
 
 [Editor usage](src/code/README.md) covers sharing, live edits and reviews.
-[Upgrade instructions](../../docs/upgrade-studio-code.md) cover existing data,
-unsaved recovery state and the temporary `studio-code` bridge.
+[Workspace compatibility](../../docs/upgrade-studio-code.md) explains why old
+workspace ids and links still work after the migration.
 
 ## Workspace
 
@@ -2292,11 +2292,10 @@ bb plugin build .
 
 Studio owns its contracts, helpers and UI under `src/kit`. Its runtime dependencies
 are declared directly in this package. Tailwind scans the internal sources.
-`gen-contracts.mjs` reads the same internal contract; generated Swift stays unchanged.
-The temporary `@bb-studio/kit` tarball contains only the Decisions and Code bridge
-contracts and handover helpers. `pack-kit.sh --check` checks those copies against
-Studio and validates the bridge locks. Mobile remains a separate plugin with no
-runtime kit dependency; its silent-output helper is already local.
+`gen-contracts.mjs` generates Swift contracts from Studio and Mobile's current RPCs.
+The temporary `@bb-studio/kit` tarball was used only by the Decisions and Code
+upgrade bridges and has been removed with them. Mobile remains a separate
+plugin with its own local silent-output helper.
 
 ## Templates and export
 
@@ -2326,4 +2325,7 @@ See the [Decisions guide](../../docs/decisions.md) for provider setup and the pl
 
 Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
-Existing installs update the `smart-decisions` bridge before Studio, then run `bb smart-decisions migrate`. The bridge copies settings, five secret keys and fallback/recent-decision KV without overwriting Studio choices. Setup permits removal after acknowledgment, but keep it for old CLI scripts. Settings and keys are server configuration and are not included in item backups.
+The Decisions migration is complete. If Setup still lists an old Decisions
+bridge install, it is safe to remove: Studio already has the settings, keys,
+fallback model and recent decisions. Settings and keys are server configuration
+and are not included in item backups.

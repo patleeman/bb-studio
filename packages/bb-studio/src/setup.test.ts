@@ -17,10 +17,6 @@ function fakeSdk(plugins: SetupPluginEntry[], opts: { marketplaces?: string[]; i
       list: async () => ({ plugins }),
       enable: vi.fn(async ({ pluginId }: { pluginId: string }) => { calls.push(`enable ${pluginId}`); }),
       remove: vi.fn(async ({ pluginId }: { pluginId: string }) => { calls.push(`remove ${pluginId}`); }),
-      callRpc: vi.fn(async ({ pluginId, method }: { pluginId: string; method: string }) => {
-        calls.push(`rpc ${pluginId} ${method}`);
-        return { item: null };
-      }),
       catalog: {
         installPlan: vi.fn(async ({ entryId }: { entryId: string }) => ({ kind: "marketplace", compatible: true, incompatibleReason: null, resolvedSource: { kind: "git", url: "https://github.com/patleeman/bb-studio.git", subdir: `packages/${entryId}` } })),
         install: vi.fn(async ({ entryId, marketplace, confirmedSource }: { entryId: string; marketplace?: string; confirmedSource?: unknown }) => {
@@ -187,38 +183,22 @@ describe("SetupService install", () => {
   });
 });
 
-describe("Decisions bridge retirement", () => {
-  it("requires a current, enabled bridge and acknowledged migration", async () => {
-    for (const [extra, status, expected] of [
-      [{ version: "0.4.0" }, true, "Update Decisions first"],
-      [{ version: "0.5.0", enabled: false }, true, "Enable Decisions"],
-      [{ version: "0.5.0" }, false, "bb smart-decisions migrate"],
-      [{ version: "0.5.0" }, true, null],
-    ] as const) {
-      const fake = fakeSdk([plugin("smart-decisions", extra)]);
-      fake.raw.plugins.callRpc.mockResolvedValue({ complete: status } as never);
-      const summary = await buildSetup(fake.sdk, health());
-      const retired = summary.retired.find((entry) => entry.id === "smart-decisions")!;
-      if (expected === null) expect(retired.blocker).toBeNull();
-      else expect(retired.blocker).toContain(expected);
+describe("retired upgrade bridges", () => {
+  it("explains that copied data is safe and removes leftovers without calling the bridge", async () => {
+    const fake = fakeSdk([
+      plugin("smart-decisions", { version: "0.5.0" }),
+      plugin("studio-code", { version: "0.2.0" }),
+    ]);
+    const summary = await buildSetup(fake.sdk, health());
+    expect(summary.retired.map(({ id }) => id)).toEqual(["studio-code", "smart-decisions"]);
+    for (const entry of summary.retired) {
+      expect(entry.blocker).toBeNull();
+      expect(entry.before[0]?.text).toContain("No migration step is needed");
+      expect(entry.removeCommand).toBe(`bb plugin remove ${entry.id}`);
     }
-  });
-});
-
-
-describe("Code bridge retirement", () => {
-  it("requires a current, enabled bridge and acknowledged file and row copy", async () => {
-    for (const [extra, complete, expected] of [
-      [{ version: "0.1.0" }, true, "Update Studio Code first"],
-      [{ version: "0.2.0", enabled: false }, true, "Enable Studio Code"],
-      [{ version: "0.2.0" }, false, "bb studio-code migrate"],
-      [{ version: "0.2.0" }, true, null],
-    ] as const) {
-      const fake = fakeSdk([plugin("studio-code", extra)]);
-      fake.raw.plugins.callRpc.mockResolvedValue({ complete } as never);
-      const entry = (await buildSetup(fake.sdk, health())).retired.find((entry) => entry.id === "studio-code")!;
-      if (expected === null) expect(entry.blocker).toBeNull();
-      else expect(entry.blocker).toContain(expected);
-    }
+    const setup = new SetupService({ sdk: fake.sdk, health: async () => health() });
+    await setup.remove("studio-code");
+    await setup.remove("smart-decisions");
+    expect(fake.calls).toEqual(["remove studio-code", "remove smart-decisions"]);
   });
 });

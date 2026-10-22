@@ -3,7 +3,6 @@
 // go. Studio's Setup page and `bb studio setup` both show this. Installs,
 // enables and removes use BB's plugin SDK; every action also has the CLI
 // command that does the same, for when the SDK call fails.
-import { z } from "zod";
 import type { HealthSummary, Problem } from "./health-contract";
 import { ADDONS, MARKETPLACE_NAME, MARKETPLACE_SOURCE } from "./setup-addons";
 import type { AddOnEntry, AddOnStatus, RetiredEntry, SetupActionResult, SetupSummary } from "./setup-contract";
@@ -28,7 +27,6 @@ export interface SetupSdk {
     list(): Promise<{ plugins: readonly SetupPluginEntry[] }>;
     enable(args: { pluginId: string }): Promise<unknown>;
     remove(args: { pluginId: string }): Promise<unknown>;
-    callRpc<T>(args: { pluginId: string; method: string; input?: unknown; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T>;
     catalog: {
       installPlan(args: { entryId: string; marketplace?: string }): Promise<InstallPlan>;
       install(args: { entryId: string; marketplace?: string; confirmedSource?: never }): Promise<unknown>;
@@ -71,10 +69,7 @@ export interface SetupOptions {
   settingsCopied?(pluginId: string): Promise<boolean>;
 }
 
-interface RetiredContext extends SetupOptions {
-  sdk: SetupSdk;
-  plugins: ReadonlyMap<string, SetupPluginEntry>;
-}
+type RetiredContext = SetupOptions;
 
 interface RetiredPlugin {
   id: string;
@@ -87,40 +82,22 @@ interface RetiredPlugin {
   blocker(plugin: SetupPluginEntry, ctx: RetiredContext): Promise<string | null>;
 }
 
-/** Require the bridge's acknowledged copy before allowing removal. */
-export const bridgeBlocker = (noun: string, version: string): RetiredPlugin["blocker"] => async (plugin, ctx) => {
-  const parts = (value: string) => value.split(".").map(Number);
-  const current = parts(plugin.version), required = parts(version);
-  const firstDifference = required.findIndex((value, index) => value !== current[index]);
-  if (current.length !== 3 || current.some((value) => !Number.isFinite(value)) || (firstDifference >= 0 && current[firstDifference]! < required[firstDifference]!)) return `Update ${noun} first: bb plugin update ${plugin.id}. Then update Studio.`;
-  if (!plugin.enabled) return `Enable ${noun} so it can copy its settings: bb plugin enable ${plugin.id}.`;
-  const result = await ctx.sdk.plugins.callRpc({ pluginId: plugin.id, method: "migrationStatus", input: null, outputSchema: z.object({ complete: z.boolean() }), signal: AbortSignal.timeout(10_000) });
-  return result.complete ? null : `Run bb ${plugin.id} migrate, then check again.`;
-};
-
 export const RETIRED: readonly RetiredPlugin[] = [
   {
     id: "studio-code", name: "Studio Code upgrade bridge",
-    why: "VS Code, its tools and the studio-code skill are built into Studio.",
-    kept: "Workspaces, review comments, theme, extensions and editor recovery files copied into Studio with their ids; existing Studio files and rows are kept.",
-    deleted: "Its installed bridge files and the compatibility renderer for old saved thread tabs. Studio keeps its own editor data copy.",
-    before: [
-      { text: "Update Code first; its bridge stops all old code-servers before copying.", command: "bb plugin update studio-code" },
-      { text: "Update Studio and finish the copy.", command: "bb plugin update studio && bb studio-code migrate" },
-      { text: "If Studio updated first, reload it after updating the bridge to register the six code tools.", command: "bb plugin reload studio" },
-    ],
-    blocker: bridgeBlocker("Studio Code", "0.2.0"),
+    why: "VS Code, its tools and the studio-code skill are built into Studio. Its upgrade is complete.",
+    kept: "Workspaces, review comments, theme, extensions and editor recovery files are in Studio with their original ids and links.",
+    deleted: "The old bridge's installed files and settings. Studio keeps the migrated editor data.",
+    before: [{ text: "No migration step is needed; the copied workspaces and their links are already in Studio.", command: null }],
+    blocker: async () => null,
   },
   {
     id: "smart-decisions", name: "Studio Decisions upgrade bridge",
-    why: "Decisions and Smart Queue are built into Studio now.",
-    kept: "The fallback model, recent decisions, ordinary settings and five secret API keys copied into Studio; existing Studio choices are kept.",
-    deleted: REMOVED,
-    before: [
-      { text: "Update Decisions first.", command: "bb plugin update smart-decisions" },
-      { text: "Update Studio, then finish the copy.", command: "bb plugin update studio && bb smart-decisions migrate" },
-    ],
-    blocker: bridgeBlocker("Decisions", "0.5.0"),
+    why: "Decisions and Smart Queue are built into Studio now. Their upgrade is complete.",
+    kept: "The fallback model, recent decisions, settings and secret API keys are in Studio; existing Studio choices were kept.",
+    deleted: "The old bridge's settings, secrets and installed files. Studio keeps the migrated Decisions data.",
+    before: [{ text: "No migration step is needed; Studio already owns Decisions and its settings.", command: null }],
+    blocker: async () => null,
   },
   {
     id: "studio-tables",
@@ -190,7 +167,7 @@ export async function buildSetup(sdk: SetupSdk, health: HealthSummary, options: 
     const plugin = byId.get(def.id)!;
     return {
       id: def.id, name: plugin.name ?? def.name, enabled: plugin.enabled, why: def.why, kept: def.kept, deleted: def.deleted, before: def.before,
-      blocker: await def.blocker(plugin, { ...options, sdk, plugins: byId }).catch((error) => `Couldn't check: ${message(error)}`),
+      blocker: await def.blocker(plugin, options).catch((error) => `Couldn't check: ${message(error)}`),
       removeCommand: removeCommand(def.id),
     };
   }));

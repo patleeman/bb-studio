@@ -24,7 +24,7 @@ export function codeProcesses(rows: ProcessRow[], root: string): number[] {
 }
 export const systemProcesses = async () => processRows((await promisify(execFile)("ps", ["-axo", "pid=,ppid=,command="], { maxBuffer: 16 * 1024 * 1024 })).stdout);
 
-/** Fail closed: no copy or new server until every old process has exited. */
+/** Fail closed: do not start a replacement until every previous process has exited. */
 export async function quiesceCode(root: string, driver = {
   list: systemProcesses,
   stop: (pid: number) => { try { process.kill(pid, "SIGTERM"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; } },

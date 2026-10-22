@@ -1,8 +1,10 @@
-import { test, vi } from "vitest";
+import { afterEach, test, vi } from "vitest";
 import assert from "node:assert/strict";
 import { registerDecisions } from "../server";
 const plugin = (bb: any) => registerDecisions(bb, { get: async () => Object.fromEntries(Object.entries(await bb.settings.define().get()).map(([key, value]) => [`decisions_${key}`, value])), experimental_set: async () => {} });
 import { rpcContract } from "../../kit/decisions-legacy-contract";
+
+afterEach(() => vi.restoreAllMocks());
 
 function setup() {
   const handlers: Record<string, (input: any) => Promise<any>> = {};
@@ -121,23 +123,73 @@ test("a Smart Queue decision cancelled by a hand send does not count as a Jev fa
   assert.deepEqual(checks.map((check: { id: string }) => check.id), ["jev-route"]);
 });
 
-test("Studio registers one hook, suppresses it while standalone Smart Queue is enabled, and waits for the old bridge", async () => {
-  for (const installed of [
-    [{ id: "smart-queue", enabled: true }],
-    [{ id: "smart-decisions", enabled: true, version: "0.4.0" }],
-    [{ id: "smart-decisions", enabled: true, version: "0.5.0" }],
-  ]) {
-    const { bb, hooks } = setup();
-    bb.settings.define = () => ({ get: async () => ({ enabled: true, jevProvider: "custom" }) });
-    bb.sdk.plugins.list = async () => ({ plugins: installed }) as never;
-    await plugin(bb as never);
-    assert.deepEqual(Object.keys(hooks), ["message.dispatch"]);
-    assert.deepEqual(await hooks["message.dispatch"]!({
-      attempt: "start-turn", initiator: "user", senderThreadId: null,
-      experimental_submission: null, queuedMessages: [],
-      thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
-    }), { action: "proceed" });
+test("Smart Queue decides once for migrated data and a fresh install without a bridge gate", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ answers: {
+    action: { type: "choice", choice: "steer", confidence: 1, probabilities: { steer: 1, followup: 0 } },
+  } }), { headers: { "content-type": "application/json" } }));
+  globalThis.fetch = fetchMock as typeof fetch;
+  try {
+    for (const scenario of [
+      { name: "migrated data with a leftover bridge", installed: [{ id: "smart-decisions", enabled: true, version: "0.5.0" }], migrated: true },
+      { name: "fresh install without the old plugin", installed: [], migrated: false },
+    ]) {
+      const { bb, hooks, stored } = setup();
+      const events: Record<string, (payload: any) => unknown> = {};
+      bb.settings.define = () => ({ get: async () => ({
+        enabled: true, jevProvider: "custom", customJevEndpoint: "https://gw.example.com/v1/systemone", customJevModel: "jev",
+      }) });
+      bb.sdk.plugins.list = async () => ({ plugins: scenario.installed }) as never;
+      (bb.events as any).on = (name: string, handler: (payload: any) => unknown) => { events[name] = handler; };
+      if (scenario.migrated) stored.set("decisions:imported", true);
+      Object.assign(bb.sdk, {
+        threads: {
+          get: async () => ({ id: "thr_1", status: "active", visibility: "visible", originPluginId: null, title: "Work", environmentId: null }),
+          promptHistory: async () => [],
+          output: async () => ({ output: null }),
+        },
+      });
+      await plugin(bb as never);
+      assert.deepEqual(Object.keys(hooks), ["message.dispatch"], scenario.name);
+      const initial = await hooks["message.dispatch"]!({
+        attempt: "join-turn", initiator: "user", senderThreadId: null,
+        experimental_submission: null, queuedMessages: [],
+        thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
+      });
+      assert.equal(initial.action, "wait", scenario.name);
+      if (initial.action === "wait") {
+        assert.match(initial.reason, /Smart Queue is deciding/, scenario.name);
+        assert.equal(typeof initial.sendAt, "number", scenario.name);
+      }
+      const entry = {
+        id: "q_1", threadId: "thr_1", createdAt: 1, initiator: "user", senderThreadId: null, originPluginId: null,
+        payload: { kind: "inline" }, editable: true, waitingOn: { kind: "plugin", pluginId: "studio", reason: "" },
+        content: [{ type: "text", text: "Use SQLite for this task", mentions: [] }],
+      };
+      const requestsBefore = fetchMock.mock.calls.length;
+      events["message.queued"]!({ entry });
+      for (let attempt = 0; attempt < 20 && !stored.has("decisions:recent-decisions"); attempt++)
+        await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(fetchMock.mock.calls.length, requestsBefore + 1, `${scenario.name}: one Jev request`);
+      const recent = stored.get("decisions:recent-decisions");
+      assert.ok(Array.isArray(recent), scenario.name);
+      assert.equal(recent.length, 1, scenario.name);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
   }
+});
+
+test("the standalone Smart Queue plugin still suppresses Studio's queue", async () => {
+  const { bb, hooks } = setup();
+  bb.settings.define = () => ({ get: async () => ({ enabled: true, jevProvider: "custom" }) });
+  bb.sdk.plugins.list = async () => ({ plugins: [{ id: "smart-queue", enabled: true }] }) as never;
+  await plugin(bb as never);
+  assert.deepEqual(await hooks["message.dispatch"]!({
+    attempt: "join-turn", initiator: "user", senderThreadId: null,
+    experimental_submission: null, queuedMessages: [],
+    thread: { id: "thr_1", status: "active", visibility: "visible", originPluginId: null },
+  }), { action: "proceed" });
 });
 
 test("recovery cleans hidden classifier sessions owned by both IDs and preserves visible work", async () => {

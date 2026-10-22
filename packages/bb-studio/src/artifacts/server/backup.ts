@@ -1,5 +1,5 @@
 // Studio Artifacts' section of a BB Studio backup (the contract is in
-// @bb-studio/kit/backup). Layout, version 1:
+// Studio's shared backup helpers in src/kit. Layout, version 1:
 //
 //   items/<artifact id>.json            the artifact row and its versions' metadata
 //   files/<artifact id>/<version id>    each version's bytes, as saved

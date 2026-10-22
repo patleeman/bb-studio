@@ -13,7 +13,6 @@ if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
 const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/public-contract.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
-  ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
 ];
 
 const swiftKeywords = new Set("associatedtype class deinit enum extension fileprivate func import init inout internal let open operator private protocol public rethrows static struct subscript typealias var break case catch continue default defer do else fallthrough for guard if in repeat return switch throw try while as Any false is nil self Self super throws true where await async actor some".split(" "));

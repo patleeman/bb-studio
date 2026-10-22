@@ -1,6 +1,5 @@
 import { rpcContract, decisionMethods } from "./contract";
 import { decisionsDefaults } from "./settings";
-import { registerDecisionsImport } from "./migration";
 import { setTimeout as sleep } from "node:timers/promises";
 import { errorMessage } from "../kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -45,6 +44,23 @@ const jevFailureWindowMs = 30 * 60_000;
 
 export async function registerDecisions(bb: BbPluginApi, settings: { get(): Promise<Record<string, unknown>>; experimental_set(values: Record<string, unknown>): Promise<unknown> }) {
   const config = async (): Promise<ClassifierSettings & { enabled: boolean }> => ({ ...decisionsDefaults, ...Object.fromEntries(Object.entries(await settings.get()).filter(([key]) => key.startsWith("decisions_")).map(([key, value]) => [key.slice(10), value])) }) as ClassifierSettings & { enabled: boolean };
+  // Settings descriptors intentionally omit defaults. Store them once on the
+  // first request without inspecting or waiting for a retired bridge.
+  let defaultsReady: Promise<void> | null = null;
+  const settingsReady = () => {
+    if (defaultsReady) return defaultsReady;
+    defaultsReady = (async () => {
+      const current = await settings.get();
+      const missing = Object.fromEntries(Object.entries(decisionsDefaults)
+        .filter(([key]) => current[`decisions_${key}`] === undefined)
+        .map(([key, value]) => [`decisions_${key}`, value]));
+      if (Object.keys(missing).length) await settings.experimental_set(missing);
+    })().catch((error) => {
+      defaultsReady = null;
+      throw error;
+    });
+    return defaultsReady;
+  };
   const sessions = new Set<string>();
   const lifetime = new AbortController();
   bb.onDispose(async () => {
@@ -177,12 +193,12 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
   bb.rpc.register(decisionMethods, {
     "decisions.systemOne.ask": ({ caller, state, questions }) =>
       answer(caller, "Jev", async () => {
-        if (!(await migration.ready())) throw new UnavailableError("Decisions migration is pending.");
+        await settingsReady();
         return tracked(askSystemOne(await config(), { state, questions }, AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000)])));
       }),
     "decisions.model.ask": ({ caller, requestId, hostId, prompt, providerId, modelSelection }) =>
       answer(caller, "Fallback model", async () => {
-        if (!(await migration.ready())) throw new UnavailableError("Decisions migration is pending.");
+        await settingsReady();
         return runModel(
           bb,
           modelSelection ? { mode: "model", ...modelSelection } : await fallback(),
@@ -200,7 +216,6 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
   });
   registerHealth(bb, healthSchemas(z), health);
   bb.rpc.register({ "decisions.studio_health": { input: z.object({}).strict(), output: healthSchemas(z).contract.studio_health.output } }, { "decisions.studio_health": async () => ({ checks: await health() }) });
-  const migration = registerDecisionsImport(bb, settings);
 
   async function situation(threadId: string, message: string, thread: ThreadInfo): Promise<Situation> {
     const [history, output] = await Promise.all([
@@ -241,7 +256,10 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     }
     return standaloneQueue.on;
   }
-  const queueEnabled = async () => (await migration.ready()) && (await config()).enabled && !(await standaloneQueueOn());
+  const queueEnabled = async () => {
+    await settingsReady();
+    return (await config()).enabled && !(await standaloneQueueOn());
+  };
 
   // One read-modify-write at a time, so concurrent decisions don't drop each other.
   let recording: Promise<unknown> = Promise.resolve();
@@ -379,10 +397,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     async start(signal) {
       // Remove model sessions a previous load left behind. List every page
       // first: deleting while paging by offset would skip threads.
-      while (!(await migration.ready())) {
-        if (signal.aborted) return;
-        await sleep(1000, undefined, { signal }).catch(() => {});
-      }
+      if (signal.aborted) return;
       const stale: string[] = [];
       for (const owner of ["studio", "smart-decisions"]) {
         for (let offset = 0, page = 0; page < 100; offset += 100, page++) {
@@ -412,7 +427,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     "  bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
   ].join("\n");
   const cli = async (argv: string[]) => {
-      if (!(await migration.ready())) return { exitCode: 1, stderr: "Update the Decisions bridge and finish its migration first: bb smart-decisions migrate." };
+      await settingsReady();
       const json = argv.includes("--json");
       const args = argv.filter((arg) => arg !== "--json");
       const [command, ...rest] = args;

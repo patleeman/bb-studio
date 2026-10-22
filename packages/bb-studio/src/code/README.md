@@ -79,4 +79,4 @@ Tested on macOS (arm64) and Linux (arm64, in Docker). There is no Windows suppor
 - **Stop ends everything.** code-server runs in its own process group. Idle shutdown, or BB exiting, ends the whole group, including extension hosts and terminals.
 
 
-See [the upgrade guide](../../../../docs/upgrade-studio-code.md) for bridge and recovery details.
+See [the workspace compatibility note](../../../../docs/upgrade-studio-code.md) for old workspace links and ids.

@@ -1,7 +1,8 @@
 # Studio references
 
-Use the helpers exported by `@bb-studio/kit/contract` when turning a mention or
-link into `{ pluginId, id }`. These helpers run in both server and app bundles.
+Use the helpers in `packages/bb-studio/src/kit/contract.ts` when turning a
+mention or link into `{ pluginId, id }`. These helpers run in both server and
+app bundles.
 
 - `parseStudioItemReference("item:custom:part:50%2F")` returns the opaque ID
   `part:50%2F`. Explicit item references do not contain mention namespaces.

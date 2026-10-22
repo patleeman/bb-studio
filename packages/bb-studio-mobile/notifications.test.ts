@@ -17,7 +17,7 @@ describe("quiet completions", () => {
   });
 });
 
-describe("agrees with the kit's isSilentOutput", () => {
+describe("agrees with Studio's isSilentOutput helper", () => {
   it.each(["", " ", "[PASS]", "`[PASS]`", "```\n[PASS]\n```", "**[pass]**", "PASS", "Tests: [PASS]", "[PASS] done", "Report"])("%j", (body) => {
     expect(isQuietCompletion({ body, data: { kind: "turn-finished" } })).toBe(isSilentOutput(body));
   });

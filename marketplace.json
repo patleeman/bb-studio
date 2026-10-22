@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs, dashboards, artifacts and Decisions built in, plus Code and Mobile beside it. Includes the Decisions upgrade bridge.",
+  "description": "BB Studio: one Studio plugin with pages, recordings, drawings, designs, dashboards, artifacts, Code and Decisions built in, plus Mobile for iOS notifications.",
   "plugins": [
     {
       "id": "studio",
@@ -55,56 +55,6 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-mobile",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "studio-code",
-      "displayName": "Studio Code upgrade bridge",
-      "description": "Upgrade bridge: copies Studio Code workspaces, reviews and editor recovery files into Studio, then forwards old RPCs. Remove after Setup confirms the copy.",
-      "icon": {
-        "url": "./packages/bb-studio-code/assets/icon.svg"
-      },
-      "tags": [
-        "productivity",
-        "developer-tools",
-        "editor",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-code",
-          "ref": "stable"
-        }
-      }
-    },
-    {
-      "id": "smart-decisions",
-      "displayName": "Studio Decisions upgrade bridge",
-      "description": "Upgrade bridge: copies Decisions settings and keys into Studio, and forwards old RPCs and bb smart-decisions commands.",
-      "icon": {
-        "url": "./packages/bb-studio-decisions/assets/icon.svg"
-      },
-      "tags": [
-        "bb-studio",
-        "studio",
-        "upgrade",
-        "decisions"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-decisions",
           "ref": "stable"
         }
       }

@@ -1,7 +1,7 @@
 import type { ExpoMessage } from "./apns.js";
 
-// Mirrors isSilentOutput in @bb-studio/kit/silent (this plugin installs without
-// the kit); notifications.test.ts checks they agree. See docs/silent-output.md.
+// Mobile has its own copy of Studio's silent-output rule; notifications.test.ts
+// checks they agree. See docs/silent-output.md.
 const SILENT = /^[\s`*_~]*(?:\[pass\][\s`*_~]*)?$/iu;
 
 /** A finished turn whose text is empty or exactly [PASS] has nothing to say: no push. */

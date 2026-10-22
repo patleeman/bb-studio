@@ -188,4 +188,4 @@ Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }
 `unavailable` means nothing is configured to answer.
 
 
-Studio settings use `decisions_<old-key>`, including all five secret key settings. Existing installations upgrade the `smart-decisions` bridge first, then Studio; run `bb smart-decisions migrate`. The old CLI continues through the bridge while installed.
+Studio settings use `decisions_<old-key>`, including all five secret key settings. The migration from the standalone Decisions plugin is complete; if Setup lists an old bridge install, remove it there. Current commands start with `bb studio decisions`, for example `bb studio decisions status`.

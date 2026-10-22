@@ -187,4 +187,7 @@ upload path. These parts haven't been checked on a running BB yet:
 
 Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
-Existing installs update the `smart-decisions` bridge before Studio, then run `bb smart-decisions migrate`. The bridge copies settings, five secret keys and fallback/recent-decision KV without overwriting Studio choices. Setup permits removal after acknowledgment, but keep it for old CLI scripts. Settings and keys are server configuration and are not included in item backups.
+The Decisions migration is complete. Studio stores its settings, keys,
+fallback model and recent decisions; these are server configuration and are
+not included in item backups. Remove any leftover upgrade bridge from Studio
+Setup after confirming the current values in Studio settings.

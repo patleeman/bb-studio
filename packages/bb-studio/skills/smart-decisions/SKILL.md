@@ -84,4 +84,4 @@ and any configuration problems.
 - To stop Smart Queue, run
   `bb plugin config studio set decisions_enabled false`.
 
-Settings live under Studio with a `decisions_` prefix. Use Studio settings to enter API keys securely; never ask for or print their contents. The upgrade bridge preserves `bb smart-decisions` for existing scripts.
+Settings live under Studio with a `decisions_` prefix. Use Studio settings to enter API keys securely; never ask for or print their contents. Use `bb studio decisions` for the current CLI, such as `bb studio decisions status`.

@@ -253,7 +253,7 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   }
 
   // Talk's meeting notes and Studio Decisions fall back to this model.
-  await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
+  await bb("studio", "decisions", "fallback", "codex", "gpt-6-luna", "low");
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const workspaceThread = !capturePlugin || capturePlugin === "studio" || capturePlugin === "artifacts"
     ? await seedWorkspaceThread(project, machine, orbitDir) : null;

@@ -1,4 +1,4 @@
-// Talk's section of a BB Studio backup (see @bb-studio/kit/backup).
+// Talk's section of a BB Studio backup (see Studio's internal backup helpers).
 //
 // Layout, inside Talk's section folder:
 //   items/<recordingId>.json        one recording: its row, segments and transcripts

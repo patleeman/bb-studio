@@ -80,16 +80,4 @@ export default ({ projectId, pluginRpc, sleep, bbCli }) => [
       return cleanup;
     },
   },
-  {
-    id: "studio-code-bridge", packageDir: "bb-studio-code",
-    setup: async (client) => {
-      await bbCli(["studio-code", "migrate"]);
-      const status = await pluginRpc("studio-code", "migrationStatus", null);
-      if (!status.complete) throw new Error("Code migration must be acknowledged before capture");
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Retired plugins");
-      await client.waitForText("VS Code, its tools and the studio-code skill are built into Studio.");
-      await client.waitForText("bb plugin remove studio-code");
-    },
-  },
 ];

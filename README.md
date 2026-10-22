@@ -4,20 +4,18 @@
 keeping what your agents make. Studio is one plugin with pages, recordings,
 drawings, designs and artifacts built in: every item lives in one collection
 that you can search, tag, and hand to an agent. Emoji reactions on replies
-are built in too. Code, Decisions and Mobile are separate plugins
-beside it.
+are built in too. VS Code and Decisions are part of Studio; Mobile is a
+separate add-on for the iOS app.
 
 ![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
 | [Studio](packages/bb-studio/) | `studio` | The hub, with everything you make built in: pages (collaborative documents with checklists you hand to agents, inline whiteboards and Explore's Next row), recordings and dictation (audio saved as you speak, then transcribed), drawings (Excalidraw scenes), designs (UI prototypes and slide decks with a reviewer) and artifacts (the files agents make). One collection with search, tags, project filters, templates, item chats, quotes and emoji reactions on replies, plus project leads with a Heartbeat, a Setup page, plugin health and backup and restore. |
-| [Studio Code upgrade bridge](packages/bb-studio-code/) | `studio-code` | Copies editor data into Studio and forwards old RPCs; keep until Setup confirms migration. |
-| [Decisions upgrade bridge](packages/bb-studio-decisions/) | `smart-decisions` | Copies settings and secret keys into Studio. Keeps old RPCs and CLI commands working. Decisions and Smart Queue are built into Studio. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Install Studio first; the other plugins are built to run beside it. Studio
-VS Code is built into Studio. Workspace links and IDs keep resolving; see [the upgrade guide](docs/upgrade-studio-code.md).
+Install Studio first. Install Mobile only if you use the iOS app. Existing
+VS Code workspace ids and links keep resolving; see [the compatibility note](docs/upgrade-studio-code.md).
 
 ## iOS app
 
@@ -38,12 +36,10 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
 1. Add its marketplace: `bb marketplace add git:github.com/patleeman/bb-studio@main`.
    If `bb marketplace list` already shows `bb-studio`, run
    `bb marketplace refresh bb-studio` instead.
-2. Ask me whether to install all of these plugins or only some. List them with
-   a one-line description each:
-   - studio: the Studio collection and project leads, with pages, dictation and recordings, drawings, designs and artifacts built in; required, since the others run beside it
-   - smart-decisions: upgrade bridge for existing Decisions installs; new installs use Studio
-   - studio-code: temporary upgrade bridge for existing installs; new installs get VS Code through Studio
-   - mobile: push notifications for the BB Studio iOS app; only if I use it
+2. Ask whether to install Studio and, if I use the iOS app, Studio Mobile.
+   Studio includes the collection and project leads, pages, dictation and
+   recordings, drawings, designs, artifacts, VS Code, Decisions and Smart Queue.
+   Mobile adds push notifications and muted-thread controls.
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report
    anything that failed with its error.
@@ -86,12 +82,12 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Consolidation upgrades
 
-Chat, Pages, Artifacts, Draw, Design and Talk now ship in Studio, and Studio
-Sidebar (`thread-list-plus`) and Studio Tables (`studio-tables`) are retired.
-New installs need at most 6 plugins. The separate Pages, Talk, Draw, Artifacts
-and Design add-ons and their upgrade bridges are gone; to move items from one
-of them, see [Upgrading from the separate add-ons](docs/upgrade-unified-studio.md).
-Old links to their items still open in Studio.
+Chat, Pages, Artifacts, Draw, Design, Talk, Decisions and VS Code now ship in
+Studio. Studio Sidebar (`thread-list-plus`) and Studio Tables (`studio-tables`)
+are retired. A fresh install needs Studio; add Mobile only for the iOS app.
+The old content add-ons and upgrade bridges are gone. See [Upgrading from the
+separate add-ons](docs/upgrade-unified-studio.md) for the original item moves.
+Old links to those items and Code workspaces still open in Studio.
 
 To see where an existing install stands, open **Studio → Setup**. It lists
 the add-ons you're missing, flags installed retired plugins, says what
@@ -101,15 +97,9 @@ removing each keeps and deletes, and removes one only after you confirm. See
 
 ## Development
 
-This is a pnpm workspace. [`@bb-studio/kit`](packages/bb-studio-kit/) holds the
-shared contract, UI and helpers. BB installs a Git plugin by running npm in its
-package directory alone, so each plugin depends on the packed kit,
-`file:../bb-studio-kit.tgz`, which npm copies into the plugin's `node_modules`
-where the kit's own imports resolve. The workspace overrides that with a link to
-the live kit sources. After changing the kit or a plugin's dependencies, run
-`scripts/refresh-locks.sh` for every plugin: it repacks the kit and refreshes
-the npm locks, which pin the tarball's hash. `pnpm check:kit` fails while the
-tarball is stale.
+This is a pnpm workspace. Each plugin declares its own runtime dependencies;
+the release dry run checks that Studio and Mobile install and build from their
+package directories without workspace-only dependencies.
 The Studio plugins use `sonner` 1.x because the BB host shims its installed
 `sonner@1.7.4` instance.
 
@@ -122,7 +112,6 @@ pnpm check:compat        # every plugin installs on the current stable BB
 node scripts/release.mjs --dry-run  # check a commit for release; without --dry-run it moves stable
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
-scripts/refresh-locks.sh bb-studio-code   # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
 node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
 ```

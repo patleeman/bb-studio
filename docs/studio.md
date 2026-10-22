@@ -69,7 +69,7 @@ kinds: [{ id: "notion-page", label: "Notion page", plural: "Notion pages", icon:
 
 ## Shared item services
 
-The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
+The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `packages/bb-studio/src/kit/server`; `RelatedPanel` in Studio's internal kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
 
 `replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The thread panel's Studio tab uses both: it lists the thread's items first, and links each item it creates to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
 
@@ -83,7 +83,7 @@ Templates and bulk export are described in the [Studio README](../packages/bb-st
 
 ## Collection and installation
 
-`CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. VS Code workspace links now open Studio tabs; thread editors are available through the + tab menu. [Code upgrade details](upgrade-studio-code.md) include the process handover and recovery state.
+`CollectionPage` in Studio's `src/kit` renders the shared list, grid, filters, selection and action menus. VS Code workspace links open Studio tabs; thread editors are available through the + tab menu. [Code workspace compatibility](upgrade-studio-code.md) covers old ids and addresses.
 
 Studio owns contracts, helpers, UI primitives and their tests in
 `packages/bb-studio/src/kit`. All Studio imports are local. BB's default
@@ -91,13 +91,10 @@ Tailwind scan covers these package-local sources, so Studio no longer needs a
 shared package's `bb.pluginTailwindContent`. Runtime UI dependencies are declared
 directly by Studio. Swift generation reads Studio's internal contract.
 
-`packages/bb-studio-kit` is now a temporary, slim compatibility library for the
-Decisions and Code bridges. Its eight source files must match Studio's internal
-copies byte for byte; `scripts/pack-kit.sh` enforces that before packing and in
-`--check` mode. Only the bridges depend on `file:../bb-studio-kit.tgz`.
-`scripts/refresh-locks.sh` repacks it and refreshes their npm integrity hashes.
-Mobile stays independent, with its existing local silent-output helper; its test
-compares that helper with Studio's internal implementation.
+The temporary compatibility kit and tarball existed only for the Decisions and
+Code bridges and were removed with them. Mobile stays independent, with its
+local silent-output helper; its test compares that helper with Studio's
+implementation.
 
 ## Setup
 
@@ -161,4 +158,7 @@ workspace's, so Back doesn't return to it. A sub-view, such as a page's chat
 
 Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
-Existing installs update the `smart-decisions` bridge before Studio, then run `bb smart-decisions migrate`. The bridge copies settings, five secret keys and fallback/recent-decision KV without overwriting Studio choices. Setup permits removal after acknowledgment, but keep it for old CLI scripts. Settings and keys are server configuration and are not included in item backups.
+The Decisions migration is complete. If Setup still lists an old Decisions
+bridge install, it is safe to remove: Studio already has the settings, keys,
+fallback model and recent decisions. Settings and keys are server configuration
+and are not included in item backups.

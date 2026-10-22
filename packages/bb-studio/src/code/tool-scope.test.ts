@@ -9,7 +9,6 @@ import { CommentStore } from "./server/comments";
 
 const bridge = vi.hoisted(() => ({ connected: true, send: vi.fn(() => true), request: vi.fn(async () => ({ ok: true, detail: "Edited" })) }));
 vi.mock("./server/runtime", () => ({ CodeServers: class { dispose() {} } }));
-vi.mock("./server/migration", () => ({ registerCodeImport: () => ({ requireReady: async () => {} }) }));
 vi.mock("./server/bridge", async (original) => ({ ...(await original<typeof import("./server/bridge")>()), Bridges: class {
   connected() { return bridge.connected; }
   state() { return { focused: true, activeFile: null, openFiles: [], unsavedFiles: [] }; }

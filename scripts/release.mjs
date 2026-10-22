@@ -48,23 +48,14 @@ const results = [];
 let failed = false;
 try {
   git("worktree", "add", "--quiet", "--detach", tree, sha);
-  // Reuse this checkout's installed dependencies; the release commit's own
-  // locks must match them, which the kit check and tests below rely on.
-  // Each entry is linked one by one so @bb-studio/kit can point at the release
-  // commit's kit, not this checkout's, which may hold uncommitted edits.
+  // Reuse this checkout's installed dependencies; package-local clean installs
+  // below still verify that each plugin declares everything it needs.
   const link = (relative) => {
     const from = join(repo, relative, "node_modules");
     const to = join(tree, relative, "node_modules");
     if (!existsSync(from) || !existsSync(join(tree, relative)) || existsSync(to)) return;
     mkdirSync(to);
-    for (const entry of readdirSync(from)) {
-      if (entry === "@bb-studio") {
-        mkdirSync(join(to, entry));
-        for (const scoped of readdirSync(join(from, entry))) {
-          symlinkSync(scoped === "kit" ? join(tree, "packages", "bb-studio-kit") : join(from, entry, scoped), join(to, entry, scoped), "dir");
-        }
-      } else symlinkSync(join(from, entry), join(to, entry));
-    }
+    for (const entry of readdirSync(from)) symlinkSync(join(from, entry), join(to, entry));
   };
   link(".");
   const packages = readdirSync(join(tree, "packages"), { withFileTypes: true }).filter((entry) => entry.isDirectory() && existsSync(join(tree, "packages", entry.name, "package.json"))).map((entry) => entry.name);
@@ -86,7 +77,6 @@ try {
     step(check, process.execPath, [join("scripts", `${check}.mjs`)]);
   }
   step("contracts", join(tree, "node_modules", ".bin", "tsx"), [join("scripts", "gen-contracts.mjs"), "--check"]);
-  step("kit tarball", "sh", [join("scripts", "pack-kit.sh"), "--check"]);
   if (!flag("--skip-tests")) {
     for (const name of packages) {
       const dir = join(tree, "packages", name);
@@ -108,16 +98,15 @@ try {
     }
   }
   // Build each plugin the way BB installs it from Git: its package directory
-  // alone beside the packed kit, `npm install --omit=dev` as BB runs it, then
-  // `bb plugin build`. The workspace's shared node_modules can hide a missing
-  // dependency or a frontend import that only resolves there.
+  // alone, `npm install --omit=dev` as BB runs it, then `bb plugin build`.
+  // The workspace's shared node_modules can hide a missing dependency or a
+  // frontend import that only resolves there.
   const plugins = JSON.parse(execFileSync("git", ["show", `${sha}:.bb/plugins.json`], { cwd: repo, encoding: "utf8" })).plugins;
   const builds = join(work, "builds");
   for (const { name, source } of plugins) {
     const dir = join(builds, "packages", source.replace(/^\.\/packages\//, ""));
     mkdirSync(join(builds, "packages"), { recursive: true });
     cpSync(join(tree, source), dir, { recursive: true, filter: (path) => !/\/(node_modules|dist)(\/|$)/.test(path.slice(join(tree, source).length)) });
-    if (!existsSync(join(builds, "packages", "bb-studio-kit.tgz"))) cpSync(join(tree, "packages", "bb-studio-kit.tgz"), join(builds, "packages", "bb-studio-kit.tgz"));
     // Same command BB runs (apps/server/src/services/plugins/git-plugin-dependencies.ts).
     if (step(`${name} clean install`, "npm", ["install", "--prefix", dir, "--ignore-scripts", "--omit=dev", "--omit=optional", "--no-audit", "--no-fund"], dir)) step(`${name} build`, "bb", ["plugin", "build", "."], dir);
   }

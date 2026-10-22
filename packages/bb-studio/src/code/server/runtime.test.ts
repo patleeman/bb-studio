@@ -38,8 +38,8 @@ it("quiesces only this runtime's servers and descendants", async () => {
   expect(stopped.sort()).toEqual([101, 102, 106]);
 });
 
-// No real process or server is launched: this tests the ownership fence itself.
-describe("the migration start fence", () => {
+// No real process or server is launched: this tests the startup ownership fence.
+describe("the Studio server start fence", () => {
   it("does not install or spawn when the old server cannot be quiesced", async () => {
     const { CodeServers } = await import("./runtime");
     let installed = false, spawned = false;
@@ -54,19 +54,19 @@ describe("the migration start fence", () => {
     expect(installed).toBe(false); expect(spawned).toBe(false);
     runtime.dispose();
   });
-  it("does not install or spawn before the migration is acknowledged", async () => {
+  it("does not spawn when editor extension setup fails", async () => {
     const { CodeServers } = await import("./runtime");
     const order: string[] = [];
     const runtime = new CodeServers({
       root: "/fixture/studio/code", log: { info() {}, warn() {} }, onChange() {},
       quiesce: async () => { order.push("quiesce"); },
-      beforeOpen: async () => { order.push("migration"); throw new Error("copy incomplete"); },
+      beforeOpen: async () => { order.push("setup"); throw new Error("extension setup failed"); },
       install: async () => { order.push("install"); return "/fixture/bin"; },
       spawn: () => { order.push("spawn"); throw new Error("must not launch"); },
     });
     const result = await runtime.open({ id: "cws_1", title: "Repo", projectId: null, threadId: null, folders: ["/project"], trusted: true, share: true, archived: false, createdAt: 1, updatedAt: 2 });
-    expect(result).toMatchObject({ state: "failed", error: "copy incomplete" });
-    expect(order).toEqual(["quiesce", "migration"]);
+    expect(result).toMatchObject({ state: "failed", error: "extension setup failed" });
+    expect(order).toEqual(["quiesce", "setup"]);
     runtime.dispose();
   });
 });

@@ -1,4 +1,4 @@
-// bb-studio-code — frontend entry. VS Code is the editor: one per thread.
+// Studio Code — frontend entry. VS Code is the editor: one per thread.
 //
 // Surfaces:
 //   - threadPanelAction "VS Code": the workbench tab beside a conversation,

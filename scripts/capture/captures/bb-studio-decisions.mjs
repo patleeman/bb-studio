@@ -61,16 +61,5 @@ export default ({ bbCli }) => [
       }
       return cleanup;
     },
-  },
-  {
-    id: "decisions-bridge",
-    packageDir: "bb-studio-decisions",
-    setup: async (client) => {
-      await bbCli(["smart-decisions", "migrate"]);
-      await client.navigate("/plugins/studio/studio/setup");
-      await client.waitForText("Retired plugins");
-      await client.waitForText("Decisions and Smart Queue are built into Studio now.");
-      await client.waitForText("bb plugin remove smart-decisions");
-    },
   }
 ];
