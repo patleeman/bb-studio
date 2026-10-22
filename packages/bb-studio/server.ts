@@ -112,6 +112,12 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const services = new StudioServices(db);
+  const recordActivity = (event: Parameters<StudioServices["recordActivity"]>[0]) => {
+    const id = services.recordActivity(event);
+    changes.append(null);
+    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+    return id;
+  };
   // Create tools nudge agents to tag what they make (src/create-tag-hint.ts).
   const tagNames = new TagStore(db);
   const registerTool = bb.agents.registerTool.bind(bb.agents);
@@ -159,6 +165,12 @@ export default async function plugin(bb: BbPluginApi) {
     .catch((error) => bb.log.warn(`Couldn't copy Studio Reactions settings: ${errorText(error)}`));
   const pages = registerPages(bb, db, {
     snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? PAGES_SETTINGS.snapshotsPerPage.default),
+  }, {
+    created: (ref, threadId) => services.created(ref, threadId),
+    linkThread: (thread) => services.linkThread(thread),
+    replaceLinks: (ref, source, links) => services.replaceLinks(ref, source, links),
+    recordActivity,
+
   });
   bb.onDispose(() => pages.dispose());
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
@@ -1008,10 +1020,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     activity: ({ ref, since, limit }) => ({ events: services.activity(ref ?? null, since ?? 0, limit ?? 50) }),
     recordActivity: (event) => {
-      const id = services.recordActivity(event);
-      changes.append(null);
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
-      return { id };
+      return { id: recordActivity(event) };
     },
     comments: async ({ ref }) => ({ comments: (await providerComments.list(ref)) ?? services.comments(ref) }),
     commentCreate: async (input) => {

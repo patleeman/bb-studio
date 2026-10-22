@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Pages, built into Studio: collaborative documents you write with your
 // agents, with live editing (Yjs over the `/pages/sync` WebSocket), comments,
 // version history and ordinary agent chats.
@@ -6,7 +7,7 @@
 // their namespace; its agent tools (`pages_*`), skill, `page` mention
 // provider, `::page` directive, thread panel and header actions keep their
 // names; and its RPC methods are Studio's `pages.*` (docs/merging-add-ons.md).
-import { createStudioNotifier, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
+import { createStudioNotifier, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { BbPluginApi, PluginCliRegistration } from "@get-bb/plugin-sdk";
@@ -62,10 +63,10 @@ export interface PagesSettingsAccess {
 }
 
 /** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
-export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess): BuiltinPages {
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">): BuiltinPages {
   const store = new PageStore(db, () => settings.snapshotsPerPage());
   const service = new PagesService(bb, store);
-  const checklists = new Checklists(bb, db, service, store);
+  const checklists = new Checklists(bb, db, service, store, services);
 
   // Live sync -----------------------------------------------------------------
 
@@ -284,7 +285,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
       store.addChat(id, thread.id);
       service.publish({ type: "chats", pageId: id, threadId: thread.id });
       const at = Date.now();
-      void services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id }, role: "chat", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Best effort. */ });
+      services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id }, role: "chat", state: "working", createdAt: at, updatedAt: at, metadata: {} });
       return { threadId: thread.id, botName: null };
     },
     "pages.chats": async ({ pageId }) => {
@@ -353,27 +354,44 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
   const provider = pageProvider(service);
   // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
   const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
-  const services = studioServices(bb.sdk);
   for (const page of store.list({ includeArchived: true })) {
-    for (const chat of store.chats(page.id, 1000)) void services.linkThread({
+    for (const chat of store.chats(page.id, 1000)) services.linkThread({
       threadId: chat.thread_id, ref: { pluginId: PLUGIN_ID, id: page.id }, role: "chat", state: "idle",
       createdAt: chat.created_at, updatedAt: chat.created_at, metadata: {},
-    }).catch(() => { /* Best effort. */ });
+    });
   }
+  // Derived links can be rebuilt. Keep failed writes pending until storage recovers.
+  const pendingLinks = new Set<string>();
+  let linksRetry: ReturnType<typeof setTimeout> | undefined;
   const syncLinks = (id: string) => {
-    const ref = { pluginId: PLUGIN_ID, id };
-    const markdown = store.meta(id) ? readMarkdown(service.hub.open(id).doc) : "";
-    void services.replaceLinks(ref, PLUGIN_ID, outgoingStudioLinks(id, markdown)).catch(() => { /* Best effort. */ });
+    try {
+      const ref = { pluginId: PLUGIN_ID, id };
+      const markdown = store.meta(id) ? readMarkdown(service.hub.open(id).doc) : "";
+      services.replaceLinks(ref, PLUGIN_ID, outgoingStudioLinks(id, markdown));
+      pendingLinks.delete(id);
+    } catch (error) {
+      bb.log.warn(`Page ${id} links could not be updated: ${errorText(error)}`);
+      pendingLinks.add(id);
+      if (!linksRetry) {
+        linksRetry = setTimeout(() => {
+          linksRetry = undefined;
+          for (const pageId of pendingLinks) syncLinks(pageId);
+        }, 5_000);
+        linksRetry.unref?.();
+      }
+    }
   };
   service.onPublish = (event) => {
     if (event.type === "page") {
       studioNotifier.changed(event.pageId); syncLinks(event.pageId);
       const meta = store.meta(event.pageId);
-      if (meta) void services.recordActivity({
+      if (meta) try { services.recordActivity({
         ref: { pluginId: PLUGIN_ID, id: event.pageId },
         actor: meta.updated_by.startsWith("bot:") ? { kind: "bot", id: meta.updated_by.slice(4) } : meta.updated_by.startsWith("agent:") ? { kind: "agent", id: meta.updated_by.slice(6) } : { kind: "user" },
         verb: "updated", at: meta.updated_at, summary: meta.title || "Untitled page",
-      }).catch(() => { /* Best effort. */ });
+      }); } catch (error) {
+        bb.log.warn(`Page ${event.pageId} activity could not be recorded: ${errorText(error)}`);
+      }
     }
     else if (event.type === "deleted") for (const id of event.pageIds) { studioNotifier.changed(id); syncLinks(id); }
     else studioNotifier.changed();
@@ -385,11 +403,11 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
 
   // Agents --------------------------------------------------------------------
 
-  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Best effort. */ });
+  const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
   /** A page an agent changed belongs to its thread too, so the thread's tab lists it. */
   const edited = (id: string, threadId: string) => {
     const at = Date.now();
-    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Best effort. */ });
+    services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} });
   };
   // Studio configures them once, with its other kinds' tools (PAGE_TOOLS).
   registerTools(bb, service, created, edited);
@@ -429,7 +447,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     tags: new TagStore(db),
     linkThread: (pageId, threadId, state) => {
       const at = Date.now();
-      void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id: pageId }, role: "notes", state: state === "open" ? "working" : "idle", createdAt: at, updatedAt: at, metadata: { note: state } }).catch(() => { /* Best effort. */ });
+      services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id: pageId }, role: "notes", state: state === "open" ? "working" : "idle", createdAt: at, updatedAt: at, metadata: { note: state } });
     },
     publish: (pageId, threadId) => service.publish({ type: "note", pageId, threadId }),
   });
@@ -471,6 +489,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     },
     dispose() {
       studioNotifier.dispose();
+      if (linksRetry) clearTimeout(linksRetry);
       service.onPublish = null;
       service.hub.flushAll();
       service.dispose();

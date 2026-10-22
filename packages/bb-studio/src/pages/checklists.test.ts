@@ -31,7 +31,7 @@ function setup(rpc: (method: string, input: unknown) => unknown) {
   };
   const service = new PagesService(bb as never, store);
   services.push(service);
-  return { db, store, service, calls, bb, checklists: new Checklists(bb as never, db, service, store) };
+  return { db, store, service, calls, bb, checklists: new Checklists(bb as never, db, service, store, { linkThread: (thread) => { calls.push(["linkItemThread", { thread }]); } }) };
 }
 
 describe("checklists", () => {

@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Page checklists as work items. A checklist item can be handed to an agent:
 // Pages starts a thread with the item as its prompt, puts a mention of the
 // thread at the end of the item, and keeps the mention's label on the
@@ -7,7 +8,7 @@ import type Database from "better-sqlite3";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { errorMessage, untitled } from "../kit/format";
 import { pageCheckboxes } from "../kit/page-checkbox";
-import { primaryHostId, studioServices } from "../kit/server/index";
+import { primaryHostId } from "../kit/server/index";
 import { PLUGIN_ID } from "./constants";
 import { readMarkdown, tagChecklistThread } from "./doc";
 import type { PagesService } from "./service";
@@ -74,16 +75,13 @@ export function checklistPrompt(page: { id: string; title: string }, item: strin
 }
 
 export class Checklists {
-  private readonly services;
-
   constructor(
     private readonly bb: BbPluginApi,
     private readonly db: Database.Database,
     private readonly service: PagesService,
     private readonly store: PageStore,
-  ) {
-    this.services = studioServices(bb.sdk);
-  }
+    private readonly services: Pick<StudioServices, "linkThread">,
+  ) {}
 
   private row(threadId: string): ChecklistHandoffRow | null {
     return (this.db.prepare("SELECT * FROM checklist_handoffs WHERE thread_id = ?").get(threadId) as ChecklistHandoffRow | undefined) ?? null;
@@ -141,8 +139,7 @@ export class Checklists {
     this.db.prepare("INSERT OR IGNORE INTO checklist_handoffs (thread_id, page_id, block_id, title, state, note, created_at, updated_at) VALUES (?, ?, ?, ?, 'starting', NULL, ?, ?)")
       .run(thread.id, meta.id, checkbox.blockId, title, now, now);
     this.tag(this.row(thread.id)!);
-    void this.services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id: meta.id }, role: "checklist", state: "starting", createdAt: now, updatedAt: now, metadata: { blockId: checkbox.blockId } })
-      .catch(() => { /* Studio is optional. */ });
+    this.services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id: meta.id }, role: "checklist", state: "starting", createdAt: now, updatedAt: now, metadata: { blockId: checkbox.blockId } });
     return { threadId: thread.id };
   }
 
