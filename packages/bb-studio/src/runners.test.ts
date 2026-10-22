@@ -100,7 +100,7 @@ it("creates a runner: an unparented thread, its first run, and a schedule that w
   expect(spawned).not.toHaveProperty("lifecycleOwnerThreadId");
   expect(spawned).toMatchObject({ title: "Inbox · Runner", pluginMetadata: { runner: runner.id, bot: "bot_main" } });
   expect(x.automations).toHaveLength(1);
-  expect(x.automations[0]).toMatchObject({ enabled: true, trigger: { cron: "*/15 * * * *" }, execution: { targetThreadId: runner.threadId, prompt: runnerPrompt({ name: "Inbox", job: "Check the inbox for replies from Dana." }) } });
+  expect(x.automations[0]).toMatchObject({ enabled: true, trigger: { triggerType: "schedule", cron: "*/15 * * * *" }, execution: { targetThreadId: runner.threadId, prompt: runnerPrompt({ name: "Inbox", job: "Check the inbox for replies from Dana." }) } });
   expect(runner).toMatchObject({ name: "Inbox", state: "active", adopted: false, nextRunAt: 99, schedule: { cadence: "every15minutes" } });
   expect(x.runners.forThread(runner.threadId)).toMatchObject({ id: runner.id });
   await expect(x.runners.create({ name: "inbox", job: "x", schedule })).rejects.toThrow(/already/);
@@ -111,7 +111,7 @@ it("updates, pauses, resumes, runs now and deletes", async () => {
   const { id, threadId } = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
   const updated = await x.runners.update({ id, name: "Mail", job: "Check mail twice.", schedule: { cadence: "custom", time: "09:00", cron: "0 8 * * 1-5" } });
   expect(updated).toMatchObject({ name: "Mail", job: "Check mail twice.", schedule: { cadence: "custom", cron: "0 8 * * 1-5" } });
-  expect(x.automations[0]).toMatchObject({ trigger: { cron: "0 8 * * 1-5" }, execution: { prompt: expect.stringContaining("Check mail twice.") } });
+  expect(x.automations[0]).toMatchObject({ trigger: { triggerType: "schedule", cron: "0 8 * * 1-5" }, execution: { prompt: expect.stringContaining("Check mail twice.") } });
   expect(x.threads.get(threadId!)?.title).toBe("Mail · Runner");
   expect(await x.runners.setState("Mail", "paused")).toMatchObject({ state: "paused", nextRunAt: null });
   expect(x.automations[0]!.enabled).toBe(false);
@@ -175,8 +175,8 @@ it("offers a thread the Bot started with an automation for adoption, and adopts 
   const x = await setup();
   x.add({ id: "thr_staff", title: "Staff · Runner", parentThreadId: "bot1" });
   x.started.push({ id: "thr_staff", title: "Staff · Runner", projectId: "proj_personal", parentThreadId: "bot1" });
-  x.automations.push({ id: "auto_staff", projectId: "proj_personal", name: "Staff · Heartbeat", enabled: true, trigger: { cron: "15 7,12,17,22 * * *" }, execution: { mode: "agent", targetThreadId: "thr_staff", prompt: "Staff heartbeat. Reply [PASS]." }, nextRunAt: 5, lastRunAt: 4 });
-  x.automations.push({ id: "auto_other", projectId: "proj_personal", name: "Someone else's", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "thr_user" } });
+  x.automations.push({ id: "auto_staff", projectId: "proj_personal", name: "Staff · Heartbeat", enabled: true, trigger: { triggerType: "schedule", cron: "15 7,12,17,22 * * *" }, execution: { mode: "agent", targetThreadId: "thr_staff", prompt: "Staff heartbeat. Reply [PASS]." }, nextRunAt: 5, lastRunAt: 4 });
+  x.automations.push({ id: "auto_other", projectId: "proj_personal", name: "Someone else's", enabled: true, trigger: { triggerType: "schedule", cron: "0 9 * * *" }, execution: { targetThreadId: "thr_user" } });
   const adoptable = await x.runners.adoptable();
   expect(adoptable).toEqual([expect.objectContaining({ threadId: "thr_staff", automationId: "auto_staff", cron: "15 7,12,17,22 * * *" })]);
   // Listing changes nothing.
@@ -185,7 +185,7 @@ it("offers a thread the Bot started with an automation for adoption, and adopts 
 
   const runner = await x.runners.adopt({ threadId: "thr_staff", automationId: "auto_staff" });
   expect(runner).toMatchObject({ name: "Staff", adopted: true, state: "active", schedule: { cadence: "custom", cron: "15 7,12,17,22 * * *" }, nextRunAt: 5, lastRunAt: 4 });
-  expect(x.automations[0]).toMatchObject({ id: "auto_staff", trigger: { cron: "15 7,12,17,22 * * *" }, execution: { targetThreadId: "thr_staff", prompt: `Staff heartbeat. Reply [PASS].${ADOPT_NOTE}` } });
+  expect(x.automations[0]).toMatchObject({ id: "auto_staff", trigger: { triggerType: "schedule", cron: "15 7,12,17,22 * * *" }, execution: { targetThreadId: "thr_staff", prompt: `Staff heartbeat. Reply [PASS].${ADOPT_NOTE}` } });
   expect(x.threads.get("thr_staff")?.parentThreadId).toBeNull();
   expect(await x.runners.adoptable()).toEqual([]);
 
@@ -199,7 +199,7 @@ it("shows a runner paused when BB turned its automation off, and Resume turns it
   const x = await setup();
   x.add({ id: "thr_lead", title: "Project Lead", parentThreadId: "bot1" });
   x.started.push({ id: "thr_lead", title: "Project Lead", projectId: "proj_personal", parentThreadId: "bot1" });
-  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { cron: "0 */2 * * *", timezone: "America/New_York" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." }, nextRunAt: 7 });
+  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { triggerType: "schedule", cron: "0 */2 * * *", timezone: "America/New_York" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." }, nextRunAt: 7 });
   const runner = await x.runners.adopt({ threadId: "thr_lead", automationId: "auto_lead" });
   expect(runner).toMatchObject({ state: "active", nextRunAt: 7 });
   // A run failed and BB disabled the automation: no next run, so not "active" with a bare cron.
@@ -227,7 +227,7 @@ it("hides an adopted thread while it's a runner and shows it again when it's let
   const x = await setup();
   x.add({ id: "thr_lead", title: "Project lead", parentThreadId: "bot1", visibility: "visible" });
   x.started.push({ id: "thr_lead", title: "Project lead", projectId: "proj_personal", parentThreadId: "bot1" });
-  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." } });
+  x.automations.push({ id: "auto_lead", projectId: "proj_personal", name: "Lead heartbeat", enabled: true, trigger: { triggerType: "schedule", cron: "0 9 * * *" }, execution: { mode: "agent", targetThreadId: "thr_lead", prompt: "Check the project." } });
   const runner = await x.runners.adopt({ threadId: "thr_lead", automationId: "auto_lead" });
   expect(x.update).toHaveBeenCalledWith({ threadId: "thr_lead", visibility: "hidden", parentThreadId: null });
   expect(x.threads.get("thr_lead")).toMatchObject({ visibility: "hidden", parentThreadId: null });
@@ -291,4 +291,22 @@ it("auto-resume: a runner's automation is on only while the runner and its Bot a
   expect(x.runners.threads().get(runner.threadId!)).toEqual({ urgent: true });
   expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "bot1", input: expect.arrayContaining([expect.objectContaining({ text: tellLine("Inbox", "urgent", "Inbox is off") })]) }));
   expect(x.calls.some((call) => call.pluginId === "mobile" && call.method === "notify")).toBe(true);
+});
+
+it("offers only recurring cron adoption and preserves the adopted timezone on edits", async () => {
+  const x = await setup();
+  x.add({ id: "thr_once", title: "Once" });
+  x.add({ id: "thr_cron", title: "Cron" });
+  x.started.push({ id: "thr_once", title: "Once", projectId: "proj_personal" }, { id: "thr_cron", title: "Cron", projectId: "proj_personal" });
+  x.automations.push(
+    { id: "once", projectId: "proj_personal", name: "Reminder", enabled: true, trigger: { triggerType: "once" }, execution: { mode: "agent", targetThreadId: "thr_once", prompt: "Remind me" } },
+    { id: "cron", projectId: "proj_personal", name: "Daily", enabled: true, trigger: { triggerType: "schedule", cron: "0 8 * * *", timezone: "Asia/Tokyo" }, execution: { mode: "agent", targetThreadId: "thr_cron", prompt: "Check" } },
+  );
+  expect((await x.runners.adoptable()).map((a) => a.automationId)).toEqual(["cron"]);
+  await expect(x.runners.adopt({ threadId: "thr_once", automationId: "once" })).rejects.toThrow(/recurring cron/);
+  expect(x.automations[0]).toMatchObject({ enabled: true, trigger: { triggerType: "once" } });
+  const adopted = await x.runners.adopt({ threadId: "thr_cron", automationId: "cron" });
+  expect(adopted.schedule).toMatchObject({ timezone: "Asia/Tokyo" });
+  await x.runners.update({ id: adopted.id, schedule: { cadence: "custom", time: "09:00", cron: "0 10 * * *" } });
+  expect(x.automations[1]).toMatchObject({ trigger: { triggerType: "schedule", cron: "0 10 * * *", timezone: "Asia/Tokyo" } });
 });

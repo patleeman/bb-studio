@@ -103,7 +103,7 @@ export function runOutcome(kind: AutomationKind, run: BbRun): string {
 export interface AutomationBot { id: string; name: string; threadId: string | null; state: string; primary: boolean; kind: string }
 export interface AutomationRunner {
   id: string; name: string; job: string; threadId: string | null; state: "active" | "paused";
-  schedule: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string }; nextRunAt: number | null; lastRunAt: number | null;
+  schedule: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string; timezone?: string }; nextRunAt: number | null; lastRunAt: number | null;
   lastReport: string | null; lastLevel: string | null; lastReportAt: number | null;
 }
 export interface AutomationDeps {
@@ -322,7 +322,7 @@ export class Automations {
       });
     }
     for (const runner of runners) {
-      const schedule = fromHeartbeat(runner.schedule);
+      const schedule = fromHeartbeat(runner.schedule, runner.schedule.timezone);
       views.push({
         id: runner.id, kind: "runner", name: runner.name, original: false, instruction: runner.job, schedule, scheduleText: describeSchedule(schedule),
         state: runner.state, nextRunAt: runner.nextRunAt, lastRunAt: runner.lastRunAt,

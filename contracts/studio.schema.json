@@ -10645,6 +10645,9 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 100
+                    },
+                    "timezone": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -10885,6 +10888,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [
@@ -11078,6 +11084,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [
@@ -11228,6 +11237,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [
@@ -11378,6 +11390,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [
@@ -11528,6 +11543,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [
@@ -11768,6 +11786,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 100
+              },
+              "timezone": {
+                "type": "string"
               }
             },
             "required": [

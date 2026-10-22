@@ -316,7 +316,7 @@ const runner = z.object({
   state: z.enum(["active", "paused"]),
   /** Adopted from a thread and automation the Bot had; deleting only lets it go. */
   adopted: z.boolean(),
-  schedule: heartbeatRunSchema.omit({ enabled: true }),
+  schedule: heartbeatRunSchema.omit({ enabled: true }).extend({ timezone: z.string().optional() }),
   nextRunAt: z.number().nullable(),
   lastRunAt: z.number().nullable(),
   lastLevel: runnerLevel.nullable(),

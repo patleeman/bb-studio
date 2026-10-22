@@ -41,7 +41,7 @@ export type RunnerLevel = "log" | "tell" | "urgent";
 export type RunnerSchedule = Omit<HeartbeatRun, "enabled">;
 type RunnerRow = {
   id: string; bot_id: string; name: string; job: string; thread_id: string | null; project_id: string; state: "active" | "paused";
-  cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
+  cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; timezone: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
   /** 1 once Studio made the thread hidden. */
   hidden: number;
@@ -50,7 +50,7 @@ type RunnerRow = {
 
 const automationRow = z.object({
   id: z.string(), name: z.string(), enabled: z.boolean(),
-  trigger: z.object({ cron: z.string().optional() }).passthrough(),
+  trigger: z.object({ triggerType: z.string().optional(), cron: z.string().optional(), timezone: z.string().optional() }).passthrough(),
   execution: z.object({ targetThreadId: z.string().nullish(), prompt: z.string().nullish() }).passthrough(),
   nextRunAt: z.number().nullish(), lastRunAt: z.number().nullish(), createdByThreadId: z.string().nullish(),
 }).passthrough();
@@ -189,7 +189,7 @@ export class Runners {
     const state = row.state === "active" && automation?.enabled === false ? "paused" : row.state;
     return {
       id: row.id, name: row.name, job: row.job, threadId: row.thread_id, state, adopted: !!row.adopted,
-      schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) },
+      schedule: { cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}), ...(row.timezone ? { timezone: row.timezone } : {}) },
       nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
       lastRunAt: Math.max(automation?.lastRunAt ?? 0, row.last_run_at ?? 0) || null,
       lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at, urgent: !!row.urgent,
@@ -272,7 +272,7 @@ export class Runners {
   private async provision(row: RunnerRow): Promise<void> {
     if (!row.thread_id) throw new Error("This runner has no thread.");
     const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId: row.thread_id }), this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null)]);
-    const trigger = { triggerType: "schedule", cron: heartbeatCron({ enabled: true, cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) }), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    const trigger = { triggerType: "schedule", cron: heartbeatCron({ enabled: true, cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) }), timezone: row.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone };
     const projectId = row.automation_project_id ?? thread.projectId;
     if (row.adopted && row.automation_id) {
       await this.call("automations_update", { projectId, automationId: row.automation_id, trigger }, z.unknown());
@@ -450,6 +450,7 @@ export class Runners {
     const automations = await this.automations([PERSONAL_PROJECT_ID, ...started.flatMap((thread) => thread.projectId ? [thread.projectId] : [])]);
     const seen = new Set<string>();
     return automations.flatMap((automation) => {
+      if (automation.trigger.triggerType !== "schedule" || !automation.trigger.cron?.trim() || automation.execution.mode !== "agent") return [];
       const target = automation.execution.targetThreadId;
       if (!target || chain.has(target) || runners.has(target) || seen.has(target)) return [];
       if (!mine.has(target) && !(automation.createdByThreadId && chain.has(automation.createdByThreadId))) return [];
@@ -469,18 +470,19 @@ export class Runners {
     const bot = this.bot(botId);
     if (this.threadIds().has(input.threadId)) throw new Error("That thread is already a runner.");
     const candidate = (await this.adoptable(bot.id)).find((each) => each.threadId === input.threadId && each.automationId === input.automationId);
-    if (!candidate) throw new Error("That thread isn't one your Bot started with an automation waking it.");
+    if (!candidate) throw new Error("Only a recurring cron agent automation on a thread your Bot started can be adopted.");
     const automation = (await this.automations([candidate.projectId])).find((each) => each.id === candidate.automationId)!;
     const name = (input.name?.trim() || candidate.title.replace(/\s*·\s*Runner$/i, "")).slice(0, 60);
     const prompt = automation.execution.prompt ?? "";
     const job = (input.job?.trim() || prompt.split("\n")[0]?.trim() || "Follow your automation's prompt.").slice(0, 2000);
-    const cron = automation.trigger.cron ?? "0 9 * * *";
+    const cron = automation.trigger.cron!;
     const now = Date.now();
     const id = `run_${Math.random().toString(36).slice(2, 12)}`;
     if (!prompt.includes(ADOPT_NOTE)) await this.call("automations_update", { projectId: candidate.projectId, automationId: automation.id, execution: { ...automation.execution, prompt: `${prompt}${ADOPT_NOTE}` } }, z.unknown());
     this.deps.db.prepare(`INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, cron, automation_id, automation_project_id, adopted, last_run_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'custom', '09:00', ?, ?, ?, 1, ?, ?, ?)`)
       .run(id, bot.id, name, job, input.threadId, candidate.projectId, automation.enabled ? "active" : "paused", cron, automation.id, candidate.projectId, automation.lastRunAt ?? null, now, now);
+    this.changedRow(id, { timezone: automation.trigger.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone });
     const thread = await this.deps.sdk.threads.get({ threadId: input.threadId }).catch(() => null);
     await this.hide({ id, bot_id: bot.id, thread_id: input.threadId }, thread?.parentThreadId ? { parentThreadId: null } : {});
     this.deps.changed();

@@ -754,4 +754,5 @@ export const MIGRATIONS = [
    );
    CREATE UNIQUE INDEX page_notes_one_open_thread ON page_notes (thread_id) WHERE state = 'open';`,
   `ALTER TABLE bot_automations ADD COLUMN seen_ids TEXT NOT NULL DEFAULT '[]';`,
+  `ALTER TABLE bot_runners ADD COLUMN timezone TEXT;`,
 ];

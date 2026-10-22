@@ -8600,11 +8600,13 @@ public enum Studio {
     public var cadence: BotRunnersOutputRunnersItemScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnersOutputRunnersItemScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnersOutputRunnersItemScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -8849,11 +8851,13 @@ public enum Studio {
     public var cadence: BotRunnerCreateOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerCreateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerCreateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -9070,11 +9074,13 @@ public enum Studio {
     public var cadence: BotRunnerUpdateOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerUpdateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerUpdateOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -9225,11 +9231,13 @@ public enum Studio {
     public var cadence: BotRunnerPauseOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerPauseOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerPauseOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -9380,11 +9388,13 @@ public enum Studio {
     public var cadence: BotRunnerResumeOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerResumeOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerResumeOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -9535,11 +9545,13 @@ public enum Studio {
     public var cadence: BotRunnerRunNowOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerRunNowOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerRunNowOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
@@ -9734,11 +9746,13 @@ public enum Studio {
     public var cadence: BotRunnerAdoptOutputScheduleCadence?
     public var time: String?
     public var cron: String?
+    public var timezone: String?
 
-    public init(cadence: BotRunnerAdoptOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil) {
+    public init(cadence: BotRunnerAdoptOutputScheduleCadence? = nil, time: String? = nil, cron: String? = nil, timezone: String? = nil) {
       self.cadence = cadence
       self.time = time
       self.cron = cron
+      self.timezone = timezone
     }
   }
 
