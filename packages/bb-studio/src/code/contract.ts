@@ -9,7 +9,6 @@ export const rpcContract = {
   "code.listDir": legacy.listDir,
   "code.readFile": legacy.readFile,
   "code.reveal": legacy.reveal,
-  "code.threadChip": legacy.threadChip,
   "code.viewedFrom": legacy.viewedFrom,
   "code.editorState": legacy.editorState,
   "code.syncTheme": legacy.syncTheme,

@@ -20,6 +20,7 @@ export class ThreadWatcher {
     onActivity(threadId: string, activity: Activity): void;
     /** Problems reading a thread, and when following stops. */
     log?(message: string): void;
+    interested?(threadId: string): Promise<boolean>;
     pollMs?: number;
   }) {}
 
@@ -51,6 +52,7 @@ export class ThreadWatcher {
     let quiet = 0;
     while (!loop.stop) {
       await new Promise((resolve) => setTimeout(resolve, pollMs));
+      if (loop.stop || (this.options.interested && !await this.options.interested(threadId))) return;
       const page = await this.options.events({ threadId, afterSeq: after, order: "asc", limit: String(PAGE) }).catch((error) => { log(`thread ${threadId}: couldn't read events: ${String(error)}`); return { events: [] as Event[] }; });
       for (const event of page.events) {
         after = String(event.seq);

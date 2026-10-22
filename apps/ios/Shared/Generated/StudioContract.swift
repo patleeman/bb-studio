@@ -12,7 +12,6 @@ public enum Studio {
     public static let code_listDir = "code.listDir"
     public static let code_readFile = "code.readFile"
     public static let code_reveal = "code.reveal"
-    public static let code_threadChip = "code.threadChip"
     public static let code_viewedFrom = "code.viewedFrom"
     public static let code_editorState = "code.editorState"
     public static let code_syncTheme = "code.syncTheme"
@@ -287,8 +286,6 @@ public enum Studio {
   public typealias CodeReadFile = CodeReadFileOutput
 
   public typealias CodeReveal = CodeRevealOutput
-
-  public typealias CodeThreadChip = CodeThreadChipOutput
 
   public typealias CodeViewedFrom = CodeViewedFromOutput
 
@@ -1270,34 +1267,6 @@ public enum Studio {
 
     public init(shown: Bool? = nil) {
       self.shown = shown
-    }
-  }
-
-  public struct CodeThreadChipInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-
-    public init(threadId: String? = nil) {
-      self.threadId = threadId
-    }
-  }
-
-  public struct CodeThreadChipOutputChip: Sendable, Hashable, Codable {
-    public var workspaceId: String?
-    public var title: String?
-    public var working: Bool?
-
-    public init(workspaceId: String? = nil, title: String? = nil, working: Bool? = nil) {
-      self.workspaceId = workspaceId
-      self.title = title
-      self.working = working
-    }
-  }
-
-  public struct CodeThreadChipOutput: Sendable, Hashable, Codable {
-    public var chip: CodeThreadChipOutputChip?
-
-    public init(chip: CodeThreadChipOutputChip? = nil) {
-      self.chip = chip
     }
   }
 

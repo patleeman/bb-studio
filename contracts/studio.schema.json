@@ -676,62 +676,6 @@
         "additionalProperties": false
       }
     },
-    "code.threadChip": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "chip": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "workspaceId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "working": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "workspaceId",
-                  "title",
-                  "working"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "chip"
-        ],
-        "additionalProperties": false
-      }
-    },
     "code.viewedFrom": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

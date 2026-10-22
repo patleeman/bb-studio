@@ -19,7 +19,7 @@ import { CommentStore, commentCallSchema, describeThread, reviewMessage } from "
 import { installBridge } from "./server/bridge-extension";
 import { editOnDisk, editOutcome, editSchema } from "./server/edits";
 import { contained, listDir, readText } from "./server/files";
-import { chipFor, relatedWorkspaces } from "./server/chip";
+import { relatedWorkspaces } from "./server/chip";
 import { sensitiveFolder } from "./server/folders";
 import { applyThemeEverywhere } from "./server/settings";
 import type { BbTheme } from "./theme";
@@ -179,9 +179,6 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     "code.readFile": async ({ id, path }) => readText(safeFolders(must(id)), path),
     "code.viewedFrom": ({ id, threadId }) => { must(id); store.setReviewThread(id, threadId); return { ok: true as const }; },
     "code.editorState": ({ id }) => ({ state: bridges.connected(id) ? bridges.state(id) : null }),
-    "code.threadChip": async ({ threadId }) => ({
-      chip: chipFor({ threadId, threadPath: await threadPath(threadId), workspaces: store.list(), touched: touchedFiles.get(threadId) ?? null }),
-    }),
     "code.reveal": async ({ id, path, startLine, endLine }) => {
       const workspace = must(id);
       const file = isAbsolute(path) ? resolve(path) : resolve(workspace.folders[0] ?? "/", path);
@@ -351,24 +348,8 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
   };
   /** The workspaces each thread's activity reached this turn, to tell them when it's done. */
   const touched = new Map<string, Set<string>>();
-  /** Threads that have edited files in their folder or a workspace's: they get the header chip. */
-  const touchedFiles = new Map<string, { working: boolean }>();
-  forget = (threadId) => { titles.delete(threadId); touchedFiles.delete(threadId); touched.delete(threadId); };
-  const chipChanged = (threadId: string) => { try { bb.realtime.publish(CHANNEL, { type: "thread", threadId }); } catch { /* No views. */ } };
+  forget = (threadId) => { titles.delete(threadId); touched.delete(threadId); };
   const deliver = async (threadId: string, activity: Activity) => {
-    if (activity.kind === "turn" && activity.state === "done" && touchedFiles.get(threadId)?.working) {
-      touchedFiles.set(threadId, { working: false });
-      chipChanged(threadId);
-    }
-    if (activity.kind === "edit") {
-      const path = await threadPath(threadId);
-      const ours = (path !== null && inside(path, activity.path)) || store.list().some((workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, activity.path)));
-      if (ours && !touchedFiles.get(threadId)?.working) {
-        touchedFiles.set(threadId, { working: true });
-        cap(touchedFiles);
-        chipChanged(threadId);
-      }
-    }
     if (!bridges.anyConnected()) return;
     const by = await titleOf(threadId);
     bb.log.debug(`activity ${threadId}: ${activity.kind} ${"path" in activity ? activity.path : activity.state}`);
@@ -396,7 +377,13 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
       }
     }
   };
+  const hasEditor = async (threadId: string) => {
+    if (!bridges.anyConnected()) return false;
+    const path = await threadPath(threadId);
+    return relatedWorkspaces(store.list(), threadId, path).some((workspace) => bridges.connected(workspace.id));
+  };
   const watcher = new ThreadWatcher({
+    interested: hasEditor,
     events: async ({ threadId, afterSeq, order, limit }) => ({
       events: (await bb.sdk.threads.events.list({ threadId, limit, ...(afterSeq ? { afterSeq } : {}), ...(order ? { order } : {}) })) as unknown as { seq: number; type: string; data?: unknown }[],
     }),
@@ -418,13 +405,13 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
       watcher.watch(threadId);
     }, () => undefined);
   };
-  // A thread is followed while it works, and only when an editor is open to show it.
-  // Every working thread is followed (a cheap local poll while it works): its
-  // edits light the header chip even before any editor is open.
+  // Follow activity only while a related editor is connected.
   bb.events.on("thread.active", ({ thread }) => {
-    if (watcher.watching(thread.id)) return;
-    bb.log.info(`following thread ${thread.id} while it works`);
-    watcher.watch(thread.id);
+    void hasEditor(thread.id).then((interested) => {
+      if (!interested || watcher.watching(thread.id)) return;
+      bb.log.info(`following thread ${thread.id} while it works`);
+      watcher.watch(thread.id);
+    });
   });
 
   // ---- Review comments (src/server/comments.ts) ------------------------------

@@ -50,3 +50,17 @@ describe("BB's page limit", () => {
     watcher.dispose();
   });
 });
+
+it("stops polling when its editor disconnects", async () => {
+  let reads = 0;
+  const watcher = new ThreadWatcher({
+    events: async () => { reads++; return { events: [] }; },
+    interested: async () => false,
+    threadPath: async () => null, status: async () => "active", onActivity() {}, pollMs: 5,
+  });
+  watcher.watch("thr_1");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  expect(reads).toBe(1);
+  expect(watcher.watching("thr_1")).toBe(false);
+  watcher.dispose();
+});
