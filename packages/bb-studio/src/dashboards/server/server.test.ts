@@ -1,3 +1,4 @@
+import { scriptHash } from "./sources";
 import { describe, expect, it } from "vitest";
 import { dashboardHost, memoryStore } from "../test/host";
 import { applyOps } from "../ops";
@@ -281,3 +282,76 @@ describe("url widgets", () => {
     expect(view.data[0]!.fetchedAt).toBeGreaterThan(0);
   }, { fetch: (async () => new Response(JSON.stringify({ users: 42 }), { headers: { "content-type": "application/json" } })) as typeof fetch }));
 });
+
+
+describe("document application", () => {
+  it("clears data only for changed sources and records script proposals on every write", () => {
+    const { store } = memoryStore();
+    const row = store.create({ name: "Ops", by: "user" });
+    const doc = applyOps(store.doc(row.id), [{ op: "add", type: "stat", source: { kind: "push" } }], { newId: () => "w1", hasType: () => false }).doc;
+    store.write(row.id, doc, "user", "add");
+    store.setValue(row.id, "w1", 42);
+    doc.widgets[0]!.title = "Renamed";
+    store.write(row.id, doc, "user", "rename");
+    expect(store.dataFor(row.id, "w1")?.value).toBe("42");
+    doc.widgets[0]!.source = { kind: "script", command: "echo 7" };
+    store.write(row.id, doc, "user", "restore");
+    expect(store.dataFor(row.id, "w1")).toBeNull();
+    expect(store.proposal(row.id, "w1", scriptHash(doc.widgets[0]!.source))).toMatchObject({ actor: "user", thread_id: null });
+  });
+
+  it("restores through source cleanup, records the restorer, and refreshes after commit", () => withHost(async (host) => {
+    const { store } = host.dashboards;
+    const row = store.create({ name: "Ops", by: "user" });
+    const doc = applyOps(store.doc(row.id), [{ op: "add", type: "stat", source: { kind: "url", url: "https://example.com/a" } }, { op: "add", type: "stat", source: { kind: "script", command: "echo 7" } }], { newId: (() => { let i = 0; return () => `w${++i}`; })(), hasType: () => false }).doc;
+    store.write(row.id, doc, "agent", "add");
+    store.saveVersion(store.get(row.id)!, "agent", "A");
+    const versionId = store.versions(row.id)[0]!.id;
+    doc.widgets[0]!.source = { kind: "url", url: "https://example.com/b" };
+    doc.widgets[1]!.source = { kind: "script", command: "echo 8" };
+    store.write(row.id, doc, "agent", "B");
+    store.setValue(row.id, "w1", "B");
+    const { dashboard } = await call(host, "dashboards.restoreVersion", { id: row.id, versionId });
+    expect(dashboard.data[0].value).toBeNull();
+    expect(store.proposal(row.id, "w2", scriptHash({ command: "echo 7" }))).toMatchObject({ actor: "user", thread_id: null });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(store.dataFor(row.id, "w1")?.value).toBe('"A"');
+  }, { fetch: (async () => new Response('"A"', { headers: { "content-type": "application/json" } })) as typeof fetch }));
+});
+
+it("coalesces source edits and restore behind a running fetch, including a return to the original source", async () => {
+  let release!: (value: Response) => void;
+  const blocked = new Promise<Response>((resolve) => { release = resolve; });
+  const fetched: string[] = [];
+  await withHost(async (host) => {
+    const { store } = host.dashboards;
+    const row = store.create({ name: "Ops", by: "user" });
+    const doc = applyOps(store.doc(row.id), [{ op: "add", type: "stat", source: { kind: "url", url: "https://example.com/a" } }], { newId: () => "w1", hasType: () => false }).doc;
+    store.write(row.id, doc, "user", "A");
+    store.saveVersion(store.get(row.id)!, "user", "A");
+    const versionId = store.versions(row.id)[0]!.id;
+    await call(host, "dashboards.view", { id: row.id, clientId: "c1" });
+    await call(host, "dashboards.edit", { id: row.id, ops: [{ op: "update", widgetId: "w1", source: { kind: "url", url: "https://example.com/b" } }] });
+    await call(host, "dashboards.restoreVersion", { id: row.id, versionId });
+    expect(fetched).toEqual(["https://example.com/a"]);
+    release(new Response('"obsolete A"', { headers: { "content-type": "application/json" } }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(fetched).toEqual(["https://example.com/a", "https://example.com/a"]);
+    expect(store.dataFor(row.id, "w1")?.value).toBe('"fresh A"');
+  }, { fetch: (async (url: string) => {
+    fetched.push(url);
+    return fetched.length === 1 ? blocked : new Response('"fresh A"', { headers: { "content-type": "application/json" } });
+  }) as typeof fetch });
+});
+
+it("distinguishes an unavailable proposer thread from a deleted thread when opening approval", () => withHost(async (host) => {
+  const { dashboard } = await call(host, "dashboards.create", { name: "Ops" });
+  const { dashboard: edited } = await call(host, "dashboards.edit", { id: dashboard.id, ops: [{ op: "add", type: "stat", source: { kind: "script", command: "echo 7" } }] });
+  const widget = edited.widgets[0];
+  host.dashboards.store.propose(dashboard.id, widget.id, widget.script.sha256, "agent", "thr_proposer");
+  await call(host, "dashboards.view", { id: dashboard.id, clientId: "c1" });
+  host.harness.sdk.stub("threads.get", async () => { throw new Error("offline"); });
+  await expect(openDialog(host, dashboard.id, widget.id)).rejects.toThrow("offline");
+  host.harness.sdk.stub("threads.get", async () => { throw { code: "NOT_FOUND" }; });
+  expect((await openDialog(host, dashboard.id, widget.id)).proposedBy).toMatchObject({ actor: "agent", threadId: "thr_proposer", threadTitle: null });
+}));

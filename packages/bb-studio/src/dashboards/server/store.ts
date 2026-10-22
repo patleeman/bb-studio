@@ -2,6 +2,7 @@
 // a layout per breakpoint, the custom widget library, each widget's last
 // data, script approvals pinned by hash, and the last 20 versions of each
 // dashboard.
+import { scriptHash } from "./sources";
 import { newId } from "../../kit/ids";
 import type Database from "better-sqlite3";
 import { BREAKPOINT_NAMES, EMPTY_LAYOUTS, jsonBytes, LIMITS, layoutItemSchema, sourceSchema, WIDGET_TYPES, type DashboardDoc, type Layouts, type Source, type Widget, type WidgetType } from "../shared";
@@ -142,6 +143,7 @@ export class DashboardStore {
   constructor(
     private readonly db: Database.Database,
     private readonly now: () => number = Date.now,
+    private readonly sourcesChanged?: (id: string, widgetIds: string[]) => void,
   ) {}
 
   get(id: string): DashboardRow | null {
@@ -164,7 +166,7 @@ export class DashboardStore {
     this.db.transaction(() => {
       this.db.prepare("INSERT INTO dashboards (id, name, project_id, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?)")
         .run(id, input.name, input.projectId ?? null, at, at, input.by);
-      this.replaceDoc(id, input.doc ?? { widgets: [], layouts: EMPTY_LAYOUTS }, at);
+      this.replaceDoc(id, input.doc ?? { widgets: [], layouts: EMPTY_LAYOUTS }, at, input.by);
     })();
     return this.get(id)!;
   }
@@ -190,15 +192,21 @@ export class DashboardStore {
   }
 
   /** Writes widgets and layouts as given (no version). */
-  private replaceDoc(id: string, doc: DashboardDoc, at: number): void {
+  private replaceDoc(id: string, doc: DashboardDoc, at: number, by: Actor, threadId: string | null = null): void {
     const previous = new Map((this.db.prepare("SELECT * FROM dashboard_widgets WHERE dashboard_id = ?").all(id) as WidgetRow[]).map((row) => [row.id, row]));
     this.db.prepare("DELETE FROM dashboard_widgets WHERE dashboard_id = ?").run(id);
     const insert = this.db.prepare(`INSERT INTO dashboard_widgets (dashboard_id, id, position, type, title, options, source, custom_type, html, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const changedSources: string[] = [];
     doc.widgets.forEach((widget, position) => {
       const before = previous.get(widget.id);
       const options = JSON.stringify(widget.options);
       const source = JSON.stringify(widget.source);
+      if (!before || before.source !== source) {
+        changedSources.push(widget.id);
+        this.clearData(id, widget.id);
+        if (widget.source.kind === "script") this.propose(id, widget.id, scriptHash(widget.source), by, threadId);
+      }
       const same = before && before.options === options && before.source === source && before.title === widget.title && before.type === widget.type && before.custom_type === widget.customType && before.html === widget.html;
       insert.run(id, widget.id, position, widget.type, widget.title, options, source, widget.customType, widget.html, before?.created_at ?? at, same ? before.updated_at : at);
     });
@@ -209,7 +217,10 @@ export class DashboardStore {
     for (const gone of [...previous.keys()].filter((widgetId) => !keep.has(widgetId))) {
       this.db.prepare("DELETE FROM dashboard_data WHERE dashboard_id = ? AND widget_id = ?").run(id, gone);
       this.db.prepare("DELETE FROM dashboard_script_approvals WHERE dashboard_id = ? AND widget_id = ?").run(id, gone);
+      this.db.prepare("DELETE FROM dashboard_script_proposals WHERE dashboard_id = ? AND widget_id = ?").run(id, gone);
+      changedSources.push(gone);
     }
+    if (changedSources.length) this.sourcesChanged?.(id, changedSources);
   }
 
   /**
@@ -217,14 +228,14 @@ export class DashboardStore {
    * last version is a minute old or by someone else, so a run of drags or
    * an agent's burst of edits is one step back. Returns the new revision.
    */
-  write(id: string, doc: DashboardDoc, by: Actor, label: string): number {
+  write(id: string, doc: DashboardDoc, by: Actor, label: string, threadId: string | null = null): number {
     return this.db.transaction(() => {
       const row = this.get(id);
       if (!row) throw new Error("Dashboard not found.");
       const at = this.nextRevision(row);
       const last = this.db.prepare("SELECT created_at, actor FROM dashboard_versions WHERE dashboard_id = ? ORDER BY id DESC LIMIT 1").get(id) as { created_at: number; actor: string } | undefined;
       if (!last || last.actor !== by || at - last.created_at >= VERSION_GAP_MS) this.saveVersion(row, by, label);
-      this.replaceDoc(id, doc, at);
+      this.replaceDoc(id, doc, at, by, threadId);
       this.db.prepare("UPDATE dashboards SET updated_at = ?, updated_by = ? WHERE id = ?").run(at, by, id);
       return at;
     }).immediate();

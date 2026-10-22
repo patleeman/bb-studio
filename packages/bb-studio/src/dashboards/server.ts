@@ -11,6 +11,7 @@ import type { StudioServices } from "../services";
 //
 // A new kind, not a merged add-on: items are `dashboards:<id>` and open at
 // /plugins/studio/studio/dashboards/<id>.
+import { readAvailable } from "../kit/server/read-available";
 import { studioSchemas } from "../kit/contract";
 import { errorMessage } from "../kit/format";
 import { createChangeBus, defineItemMention, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
@@ -70,7 +71,7 @@ const widgetTypeLines = () => WIDGET_TYPES.map((type) => `- ${type}: ${WIDGETS[t
 /** Registers dashboards' RPC, agent tools, mention provider and refresh loop on Studio. Studio has run the migrations. */
 export function registerDashboards(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, notify: StudioChanged, options: { now?: () => number; fetch?: typeof fetch; tickMs?: number | null } = {}): BuiltinDashboards {
   const now = options.now ?? Date.now;
-  const store = new DashboardStore(db, now);
+  const store = new DashboardStore(db, now, (id, widgetIds) => refresher.invalidate(id, widgetIds));
   const studio = studioSchemas(z);
   const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt: number) => ({ type: DASHBOARD_UPDATE_TYPE, dashboardId: id, updatedAt }), delayMs: 1000 });
   const changed = (id: string) => changeBus.changed(id, store.get(id)?.updated_at ?? now());
@@ -105,12 +106,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, servi
       if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt) throw new Error("The dashboard changed since you loaded it. Reload and try again.");
       const result = applyOps(store.doc(id), ops, ctx);
       const label = ops.length === 1 ? `${ops[0]!.op[0]!.toUpperCase()}${ops[0]!.op.slice(1)} widget` : `${ops.length} edits`;
-      store.write(id, result.doc, by, by === "agent" ? `Agent: ${label}` : label);
-      for (const widgetId of result.sourceChanged) store.clearData(id, widgetId);
-      for (const widgetId of new Set([...result.sourceChanged, ...result.added])) {
-        const widget = result.doc.widgets.find((each) => each.id === widgetId);
-        if (widget?.source.kind === "script") store.propose(id, widgetId, scriptHash(widget.source), by, threadId ?? null);
-      }
+      store.write(id, result.doc, by, by === "agent" ? `Agent: ${label}` : label, threadId ?? null);
       return result;
     }).immediate();
   }
@@ -201,9 +197,9 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, servi
       const proposal = store.proposal(id, widgetId, sha256);
       let title: string | null = null;
       if (proposal?.thread_id) {
-        try {
-          title = ((await bb.sdk.threads.get({ threadId: proposal.thread_id })) as { title?: string | null }).title?.trim() || null;
-        } catch { /* a deleted thread: the dialog says "an agent" */ }
+        const thread = await readAvailable(() => bb.sdk.threads.get({ threadId: proposal.thread_id! }));
+        if (thread.status === "unavailable") throw thread.error;
+        if (thread.status === "ok") title = thread.value.title?.trim() || null;
       }
       // Read the revision after the await, so a nonce never outlives an edit it didn't see.
       const issued = nonces.issue({ dashboardId: id, widgetId, sha256, revision: mustGet(id).updated_at });
@@ -273,7 +269,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, servi
         store.saveVersion(mustGet(id), "user", "Before restoring a version");
         store.write(id, checked, "user", "Restored a version");
       }).immediate();
-      changed(id);
+      afterEdit(id, { sourceChanged: doc.widgets.map((widget) => widget.id), added: [] });
       return { dashboard: buildView(store, mustGet(id)) };
     },
     "dashboards.widgetTypes"() {
@@ -467,7 +463,7 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, servi
   return {
     store,
     provider: dashboardProvider({ store, changed, removed: changed }),
-    backup: createDashboardBackup({ db, store, changed }),
+    backup: createDashboardBackup({ db, store, changed: (id) => { changed(id); void refresher.tick(id).catch(() => {}); } }),
     cli,
     setEnabled: (next) => { enabled = next; },
     dispose: () => {
