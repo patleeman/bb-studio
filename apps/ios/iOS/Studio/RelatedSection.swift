@@ -7,8 +7,7 @@ struct RelatedSection: View {
     @State private var links: Studio.LinksOutput?
     @State private var threads: Studio.ItemThreadsOutput?
     @State private var comments: Studio.CommentsOutput?
-    @State private var replyingTo: String?
-    @State private var reply = ""
+    @StateObject private var reply = RelatedReply()
     @State private var error: String?
 
     var body: some View {
@@ -34,7 +33,7 @@ struct RelatedSection: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(comment.body ?? "").textSelection(.enabled)
                     HStack {
-                        Button("Reply") { replyingTo = comment.id }
+                        Button("Reply") { reply.parentId = comment.id }
                         if comment.parentId == nil, let id = comment.id {
                             Button(comment.resolvedAt == nil ? "Resolve" : "Reopen") {
                                 Task { await resolve(id, resolved: comment.resolvedAt == nil) }
@@ -44,6 +43,16 @@ struct RelatedSection: View {
                     .font(.caption)
                 }
             }
+            if reply.parentId != nil {
+                TextField("Reply", text: $reply.text, axis: .vertical)
+                HStack {
+                    Button("Cancel", role: .cancel) { reply.text = ""; reply.parentId = nil }
+                        .disabled(reply.posting)
+                    Button(reply.posting ? "Sending…" : "Send") { Task { await sendReply() } }
+                        .disabled(reply.posting || reply.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            if let error = reply.error { Text(error).font(.footnote).foregroundStyle(.red) }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             if links == nil, threads == nil, comments == nil, error == nil { ProgressView() }
             if links != nil, threads != nil, comments != nil,
@@ -51,11 +60,6 @@ struct RelatedSection: View {
                threads?.threads?.isEmpty != false, comments?.comments?.isEmpty != false {
                 Text("No related items yet").foregroundStyle(.secondary)
             }
-        }
-        .alert("Reply", isPresented: Binding(get: { replyingTo != nil }, set: { if !$0 { replyingTo = nil } })) {
-            TextField("Reply", text: $reply, axis: .vertical)
-            Button("Cancel", role: .cancel) { reply = "" }
-            Button("Send") { Task { await sendReply() } }
         }
         .task(id: itemId) { await load() }
     }
@@ -88,15 +92,8 @@ struct RelatedSection: View {
     }
 
     private func sendReply() async {
-        guard let parentId = replyingTo else { return }
-        let body = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-        reply = ""
-        replyingTo = nil
-        guard !body.isEmpty else { return }
-        do {
-            try await app.client.replyToStudioComment(pluginId: pluginId, id: itemId, parentId: parentId, body: body)
-            await load()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        await reply.send(pluginId: pluginId, itemId: itemId, client: app.client)
+        if reply.error == nil { await load() }
     }
 
     private func resolve(_ id: String, resolved: Bool) async {
@@ -117,5 +114,30 @@ struct RelatedView: View {
                 .navigationTitle("Related")
                 .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+@MainActor
+final class RelatedReply: ObservableObject {
+    @Published var parentId: String?
+    @Published var text = ""
+    @Published private(set) var posting = false
+    @Published private(set) var error: String?
+
+    func send(pluginId: String, itemId: String, client: BBClient) async {
+        guard !posting, let parentId else { return }
+        let submitted = text
+        let body = submitted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { return }
+        posting = true
+        error = nil
+        defer { posting = false }
+        do {
+            try await client.replyToStudioComment(pluginId: pluginId, id: itemId, parentId: parentId, body: body)
+            if text == submitted, self.parentId == parentId {
+                text = ""
+                self.parentId = nil
+            }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 }
