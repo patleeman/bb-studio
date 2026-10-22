@@ -48,19 +48,18 @@ const threadTitle = (thread: Pick<Thread, "title" | "titleFallback">) => thread.
 const missing = (error: unknown) => rpcErrorStatus(error) === 404;
 
 export class ProjectLeads {
-  private readonly pending = new Map<string, Promise<unknown>>();
+  private pending: Promise<unknown> = Promise.resolve();
   readonly runs: ProjectRuns;
 
   constructor(private readonly deps: ProjectLeadDeps) {
     this.runs = new ProjectRuns(deps.db, deps.sdk, deps.changed, deps.personalPrompt, deps.botPrompt);
   }
 
-  // Reads, lead, run and handoff for one project share a queue: a stale read
-  // must not clear a lead another request just made. A failure frees the queue.
-  private serial<T>(key: string, run: () => Promise<T>): Promise<T> {
-    const next = (this.pending.get(key) ?? Promise.resolve()).catch(() => {}).then(run);
-    this.pending.set(key, next);
-    void next.finally(() => { if (this.pending.get(key) === next) this.pending.delete(key); }).catch(() => {});
+  // Lead transfers touch two projects. Reads and mutations share one queue so
+  // transfers cannot deadlock or race a stale read clearing a new lead.
+  private serial<T>(run: () => Promise<T>): Promise<T> {
+    const next = this.pending.catch(() => {}).then(run);
+    this.pending = next;
     return next;
   }
 
@@ -93,7 +92,7 @@ export class ProjectLeads {
   }
 
   get(projectId: string): Promise<ProjectLeadView> {
-    return this.serial(projectId, () => this.read(projectId));
+    return this.serial(() => this.read(projectId));
   }
 
   /** Every project with a lead or heartbeat settings, as stored. */
@@ -113,7 +112,7 @@ export class ProjectLeads {
    * lead and heartbeat, whose schedule carries over if this project has none.
    */
   setLead(projectId: string, threadId: string | null): Promise<ProjectLeadView> {
-    return this.serial(projectId, async () => {
+    return this.serial(async () => {
       let run = this.runs.get(projectId);
       if (threadId) {
         if (this.storedLead(projectId) === threadId) return this.read(projectId);
@@ -125,11 +124,11 @@ export class ProjectLeads {
         if (!run && ledRun) run = { ...ledRun };
         // Move the heartbeat first: if it can't target the new thread, the old lead stays.
         if (run?.enabled) await this.runs.set(projectId, threadId, run);
-        if (led) await this.serial(led, async () => {
+        if (led) {
           const ledNow = this.runs.get(led);
           if (ledNow?.enabled) await this.runs.set(led, null, { ...ledNow, enabled: false });
           if (this.storedLead(led) === threadId) this.saveLead(led, null);
-        });
+        }
         this.saveLead(projectId, threadId);
       } else {
         if (run?.enabled) await this.runs.set(projectId, null, { ...run, enabled: false });
@@ -141,7 +140,7 @@ export class ProjectLeads {
   }
 
   setRun(projectId: string, input: { enabled: boolean; cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): Promise<ProjectLeadView> {
-    return this.serial(projectId, async () => {
+    return this.serial(async () => {
       const current = await this.read(projectId);
       if (input.enabled && !current.leadThreadId) throw new Error(projectId === PERSONAL_PROJECT_ID ? "Make your Bot before turning on its heartbeat." : "Pick the project's lead before turning on its heartbeat.");
       await this.runs.set(projectId, current.leadThreadId, { enabled: input.enabled, cadence: input.cadence, time: input.time ?? current.run?.time ?? "09:00", cron: input.cron ?? current.run?.cron });
@@ -205,7 +204,7 @@ export class ProjectLeads {
   handoff(threadId: string, request: NewThreadRequestInput): Promise<{ threadId: string }> {
     const db = this.deps.db;
     const ledProject = (db.prepare("SELECT project_id FROM project_leads WHERE lead_thread_id = ? UNION SELECT project_id FROM project_thread_handoffs WHERE old_thread_id = ? AND lead = 1 AND project_id IS NOT NULL").get(threadId, threadId) as { project_id: string } | undefined)?.project_id ?? null;
-    return this.serial(ledProject ?? `thread:${threadId}`, async () => {
+    return this.serial(async () => {
       const previous = db.prepare("SELECT new_thread_id, archived FROM project_thread_handoffs WHERE old_thread_id = ?").get(threadId) as { new_thread_id: string; archived: number } | undefined;
       const old = await this.deps.sdk.threads.get({ threadId });
       // Leadership moves only while this thread, or its successor on a retry, is still the lead.

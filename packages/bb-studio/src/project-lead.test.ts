@@ -210,3 +210,13 @@ it("retries the move at the next startup when BB can't say where a lead is", asy
   await x.leads.finishMoves();
   expect(x.leads.list()).toEqual([{ projectId: "q", leadThreadId: gardener.id, run: null }]);
 });
+
+it("completes simultaneous lead transfers and later reads", async () => {
+  const x = await setup();
+  const a = await x.spawn({ projectId: "a" }), b = await x.spawn({ projectId: "b" });
+  await x.leads.setLead("a", a.id);
+  await x.leads.setLead("b", b.id);
+  await Promise.all([x.leads.setLead("a", b.id), x.leads.setLead("b", a.id)]);
+  expect(await x.leads.get("a")).toMatchObject({ leadThreadId: b.id });
+  expect(await x.leads.get("b")).toMatchObject({ leadThreadId: a.id });
+}, 1000);
