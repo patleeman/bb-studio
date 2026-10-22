@@ -98,6 +98,8 @@ it("backs up every add-on and Studio's data, then restores it on another BB with
   tags.apply([{ pluginId: "notes", id: "n1" }], [tag.id], []);
   services.addComment({ ref: { pluginId: "notes", id: "n1" }, parentId: null, anchor: null, actor: { kind: "user" }, body: "Check this" });
   services.addVersion({ pluginId: "notes", id: "n1" }, Buffer.from("v1"), "First", { kind: "user" });
+  services.linkThread({ threadId: "thr_saved", ref: { pluginId: "notes", id: "n1" }, role: "created", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
+  services.replaceLinks({ pluginId: "notes", id: "n1" }, "notes", [{ from: { pluginId: "notes", id: "n1" }, to: { pluginId: "notes", id: "n2" }, kind: "related", source: "notes" }]);
   const sourceNotes = new Map([
     ["n1", { id: "n1", title: "Plan", projectId: "p_old", updatedAt: 10 }],
     ["n2", { id: "n2", title: "Elsewhere", projectId: "p_gone", updatedAt: 10 }],
@@ -128,13 +130,16 @@ it("backs up every add-on and Studio's data, then restores it on another BB with
   // A new computer: different project ids, an empty Studio.
   const targetDir = await temp();
   const targetDb = studioDb();
+  for (const table of ["item_links", "item_threads", "item_comments", "item_blobs", "item_versions"]) {
+    targetDb.exec(`ALTER TABLE ${table} ADD COLUMN future TEXT NOT NULL DEFAULT ''`);
+  }
   const targetNotes = new Map<string, { id: string; title: string; projectId: string | null; updatedAt: number }>();
   let changed = 0;
   const target = new BackupService({
     dataDir: targetDir,
     sdk: bb({ dataDir: targetDir, projects: [{ id: "p_new", name: "App", sources: [{ path: "/code/app", isDefault: true }] }], addOns: { notes: notesAddOn(targetNotes) }, installed: ["notes"] }),
     bbVersion: async () => null,
-    studioData: studioDataBackup(targetDb, { threadExists: async () => false, changed: () => changed++ }),
+    studioData: studioDataBackup(targetDb, { threadExists: async (id) => id === "thr_saved", changed: () => changed++ }),
   });
 
   const plan = await target.restore(file, { dryRun: true });

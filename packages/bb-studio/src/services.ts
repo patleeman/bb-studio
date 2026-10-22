@@ -22,7 +22,7 @@ export class StudioServices {
     }
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM item_links WHERE from_plugin = ? AND from_id = ? AND source = ?").run(ref.pluginId, ref.id, source);
-      const insert = this.db.prepare("INSERT OR IGNORE INTO item_links VALUES (?, ?, ?, ?, ?, ?)");
+      const insert = this.db.prepare("INSERT OR IGNORE INTO item_links (from_plugin, from_id, to_plugin, to_id, kind, source) VALUES (?, ?, ?, ?, ?, ?)");
       for (const link of links) insert.run(ref.pluginId, ref.id, link.to.pluginId, link.to.id, link.kind, source);
     })();
   }
@@ -37,7 +37,7 @@ export class StudioServices {
   }
 
   linkThread(thread: ItemThread): void {
-    this.db.prepare(`INSERT INTO item_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    this.db.prepare(`INSERT INTO item_threads (thread_id, plugin_id, item_id, role, state, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(thread_id, plugin_id, item_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`)
       .run(thread.threadId, thread.ref.pluginId, thread.ref.id, thread.role, thread.state, thread.createdAt, thread.updatedAt, JSON.stringify(thread.metadata));
   }
@@ -89,7 +89,7 @@ export class StudioServices {
       const parent = this.db.prepare("SELECT plugin_id, item_id FROM item_comments WHERE id = ?").get(comment.parentId) as { plugin_id: string; item_id: string } | undefined;
       if (!parent || parent.plugin_id !== input.ref.pluginId || parent.item_id !== input.ref.id) throw new Error("Comment thread not found.");
     }
-    this.db.prepare("INSERT INTO item_comments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    this.db.prepare("INSERT INTO item_comments (id, plugin_id, item_id, parent_id, anchor, actor, body, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(comment.id, input.ref.pluginId, input.ref.id, input.parentId, input.anchor, JSON.stringify(input.actor), input.body, comment.createdAt, null);
     return comment;
   }
@@ -117,8 +117,8 @@ export class StudioServices {
     if (latest?.sha256 === sha256) return { id: latest.id, ref, sha256, label: latest.label, actor: readActor(latest.actor), createdAt: latest.created_at };
     const version: ItemVersion = { id: newId("version"), ref, sha256, label, actor, createdAt: Date.now() };
     this.db.transaction(() => {
-      this.db.prepare("INSERT OR IGNORE INTO item_blobs VALUES (?, ?)").run(sha256, Buffer.from(bytes));
-      this.db.prepare("INSERT INTO item_versions VALUES (?, ?, ?, ?, ?, ?, ?)")
+      this.db.prepare("INSERT OR IGNORE INTO item_blobs (sha256, bytes) VALUES (?, ?)").run(sha256, Buffer.from(bytes));
+      this.db.prepare("INSERT INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
         .run(version.id, ref.pluginId, ref.id, sha256, label, JSON.stringify(actor), version.createdAt);
     })();
     return version;

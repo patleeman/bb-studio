@@ -45,6 +45,21 @@ describe("Studio services", () => {
     expect(() => services.replaceLinks(task, "pages", [link])).toThrow(/source/);
   });
 
+  it("keeps live item inserts independent of table column order", () => {
+    const { db, services } = setup();
+    for (const table of ["item_links", "item_threads", "item_comments", "item_blobs", "item_versions"]) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN future TEXT NOT NULL DEFAULT ''`);
+    }
+    services.replaceLinks(page, "pages", [{ from: page, to: task, kind: "mention", source: "pages" }]);
+    services.linkThread({ threadId: "thr_1", ref: page, role: "created", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
+    services.addComment({ ref: page, parentId: null, anchor: null, actor, body: "Comment" });
+    services.addVersion(page, Buffer.from("version"), "Snapshot", actor);
+    expect(services.links(page).outgoing).toHaveLength(1);
+    expect(services.threads(page)).toHaveLength(1);
+    expect(services.comments(page)).toHaveLength(1);
+    expect(services.versions(page)).toHaveLength(1);
+  });
+
   it("tracks threads and filters activity by item and cursor", () => {
     const { services } = setup();
     services.linkThread({ threadId: "thr_1", ref: page, role: "work", state: "working", createdAt: 1, updatedAt: 1, metadata: { source: "page" } });

@@ -248,15 +248,15 @@ function apply(
     counted(skill.run(row.bot_id, row.name, row.description, row.body, row.created_at, row.updated_at).changes, { id: `${row.bot_id}:${row.name}`, title: row.name });
   }
 
-  const link = db.prepare("INSERT OR IGNORE INTO item_links VALUES (?, ?, ?, ?, ?, ?)");
+  const link = db.prepare("INSERT OR IGNORE INTO item_links (from_plugin, from_id, to_plugin, to_id, kind, source) VALUES (?, ?, ?, ?, ?, ?)");
   for (const row of data.links) counted(link.run(row.from_plugin, row.from_id, row.to_plugin, row.to_id, row.kind, row.source).changes);
-  const chat = db.prepare("INSERT OR IGNORE INTO item_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+  const chat = db.prepare("INSERT OR IGNORE INTO item_threads (thread_id, plugin_id, item_id, role, state, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.threads) if (threads.has(row.thread_id)) counted(chat.run(row.thread_id, row.plugin_id, row.item_id, row.role, row.state, row.created_at, row.updated_at, row.metadata).changes);
   // A comment is keyed by its id; one edited here keeps its local text.
-  const comment = db.prepare("INSERT OR IGNORE INTO item_comments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  const comment = db.prepare("INSERT OR IGNORE INTO item_comments (id, plugin_id, item_id, parent_id, anchor, actor, body, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.comments) counted(comment.run(row.id, row.plugin_id, row.item_id, row.parent_id, row.anchor, row.actor, row.body, row.created_at, row.resolved_at).changes);
-  const blob = db.prepare("INSERT OR IGNORE INTO item_blobs VALUES (?, ?)");
-  const version = db.prepare("INSERT OR IGNORE INTO item_versions VALUES (?, ?, ?, ?, ?, ?, ?)");
+  const blob = db.prepare("INSERT OR IGNORE INTO item_blobs (sha256, bytes) VALUES (?, ?)");
+  const version = db.prepare("INSERT OR IGNORE INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.versions) {
     const bytes = blobs.get(row.sha256);
     if (bytes) blob.run(row.sha256, bytes);
