@@ -91,6 +91,32 @@ describe("refresh gating", () => {
     expect(t.ran).toHaveLength(2);
   });
 
+  it.each(["revoked", "edited", "deleted", "disabled"])("skips a queued script that is %s before its worker starts", async (change) => {
+    const t = setup([{ kind: "url", url: "https://example.com/slow" }, { kind: "script", command: "echo 7" }]);
+    const widget = t.widgets[1]!;
+    t.store.approve(t.row.id, widget.id, scriptHash(widget.source), "echo 7", null);
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    let enabled = true;
+    const ran: string[] = [];
+    const refresher = new Refresher({
+      store: t.store, concurrency: 1, now: () => 10_000_000_000, enabled: () => enabled,
+      fetchUrl: async () => { await blocked; return 1; },
+      runScript: async (source) => { ran.push(source.command!); return 7; }, changed: () => {},
+    });
+    const refresh = refresher.tick();
+    if (change === "revoked") t.store.revoke(t.row.id, widget.id);
+    if (change === "disabled") enabled = false;
+    if (change === "edited" || change === "deleted") {
+      const op = change === "deleted" ? { op: "remove" as const, widgetId: widget.id } : { op: "update" as const, widgetId: widget.id, source: { kind: "script" as const, command: "echo 8" } };
+      t.store.write(t.row.id, applyOps(t.store.doc(t.row.id), [op], { newId: () => "x", hasType: () => false }).doc, "user", "edit");
+    }
+    release();
+    await refresh;
+    expect(ran).toEqual([]);
+    expect(t.store.dataFor(t.row.id, widget.id)).toBeNull();
+  });
+
   it("keeps the last good value when a refresh fails, and records the error", async () => {
     const t = setup([{ kind: "url", url: "https://example.com/a.json" }]);
     await t.refresher.tick();

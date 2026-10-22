@@ -130,6 +130,10 @@ export class Refresher {
 
   private async refreshOne(dashboardId: string, widget: Widget): Promise<void> {
     const { store } = this.deps;
+    if (this.deps.enabled && !this.deps.enabled()) return;
+    const current = store.doc(dashboardId).widgets.find((each) => each.id === widget.id);
+    if (!current || JSON.stringify(current.source) !== JSON.stringify(widget.source)) return;
+    if (current.source.kind === "script" && !isApproved(store, dashboardId, current)) return;
     const key = `${dashboardId}:${widget.id}`;
     this.running.add(key);
     // The attempt counts before it runs, so a failure isn't retried at once.
