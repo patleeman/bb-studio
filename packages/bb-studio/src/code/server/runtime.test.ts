@@ -110,3 +110,26 @@ it("waits for the stopped watchdog to exit before spawning its replacement", asy
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it.each(["sweep", "beforeOpen"])("cancels disposal during %s and refuses later opens", async (phase) => {
+  const { CodeServers } = await import("./runtime");
+  let release!: () => void, entered!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const ready = new Promise<void>((resolve) => { entered = resolve; });
+  let installs = 0;
+  const block = async () => { entered(); await gate; };
+  const runtime = new CodeServers({
+    root: "/fixture/code", log: { info() {}, warn() {} }, onChange() {},
+    quiesce: phase === "sweep" ? block : async () => {},
+    beforeOpen: phase === "beforeOpen" ? block : undefined,
+    install: async () => { installs++; throw new Error("must not install"); },
+  });
+  const workspace = { id: "cws_1", title: "Repo", projectId: null, threadId: null, folders: ["/project"], trusted: true, share: true, archived: false, createdAt: 1, updatedAt: 2 };
+  const opening = runtime.open(workspace);
+  await ready;
+  runtime.dispose();
+  release();
+  expect(await opening).toMatchObject({ state: "stopped" });
+  expect(await runtime.open(workspace)).toMatchObject({ state: "stopped" });
+  expect(installs).toBe(0);
+});

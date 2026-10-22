@@ -102,6 +102,7 @@ type Entry = { status: ServerStatus; child: ChildProcess | null; file: string | 
 type Spawn = (command: string, args: string[], options: Parameters<typeof spawnProcess>[2]) => ChildProcess;
 
 export class CodeServers {
+  private disposed = false;
   private readonly entries = new Map<string, Entry>();
   private readonly starting = new Map<string, Promise<ServerStatus>>();
   private installing: Promise<string> | null = null;
@@ -138,6 +139,7 @@ export class CodeServers {
 
   /** Starts the workspace's server, or returns the running one. */
   open(workspace: Workspace): Promise<ServerStatus> {
+    if (this.disposed) return Promise.resolve(STOPPED);
     const running = this.entries.get(workspace.id);
     if (running?.status.state === "running") return Promise.resolve(running.status);
     const pending = this.starting.get(workspace.id);
@@ -166,6 +168,7 @@ export class CodeServers {
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const id of [...this.entries.keys()]) this.stop(id);
   }
 
@@ -193,7 +196,7 @@ export class CodeServers {
     if (!workspace.folders.length) throw new Error("Add a folder to open this workspace.");
     const generation = this.generations.get(id) ?? 0;
     /** Throws once Stop, archive or delete has cancelled this start. */
-    const check = () => { if ((this.generations.get(id) ?? 0) !== generation) throw new Cancelled(); };
+    const check = () => { if (this.disposed || (this.generations.get(id) ?? 0) !== generation) throw new Cancelled(); };
     let child: ChildProcess | null = null;
     try {
       await this.draining.get(id);
