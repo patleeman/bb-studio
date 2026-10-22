@@ -1,3 +1,4 @@
+import { untitled } from "../../kit/format";
 // Pasting a lone link on an empty line turns it into an embed: a page,
 // thread, drawing, artifact, recording for a BB
 // link, a bookmark for anything else on the web.
@@ -56,4 +57,12 @@ export function referenceMention(
   if (page) return { kind: "page", target: page[1]! };
   const item = itemAtPath(items, href);
   return item ? { kind: "item", target: `${item.pluginId}:${item.id}` } : null;
+}
+
+/** Paste immediately, before the cursor or editor can change during discovery. */
+export function referenceContent(reference: { href: string; title?: string | null }) {
+  const label = untitled(reference.title ?? "");
+  const ref = parseStudioItemHref(reference.href);
+  const mention = referenceMention(reference.href, []) ?? (ref ? { kind: "item", target: `${ref.pluginId}:${ref.id}` } : null);
+  return [mention ? { type: "mention", props: { ...mention, label } } : { type: "link", href: reference.href, content: label }, " "];
 }

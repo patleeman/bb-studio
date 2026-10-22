@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkEmbed, referenceMention } from "./links";
+import { linkEmbed, referenceMention, referenceContent } from "./links";
 
 const ORIGIN = "http://127.0.0.1:38886";
 
@@ -38,4 +38,13 @@ it("turns a pasted reference into a page or item mention", () => {
   expect(referenceMention("/plugins/pages/pages/pg_0123456789ab", items)).toEqual({ kind: "page", target: "pg_0123456789ab" });
   expect(referenceMention("/plugins/notes/notes/nt_1", items)).toEqual({ kind: "item", target: "notes:nt_1" });
   expect(referenceMention("/plugins/feed/feed/p_1", items)).toBeNull();
+});
+
+it("builds reference paste content synchronously without item discovery", () => {
+  expect(referenceContent({ href: "/plugins/studio/studio/pages/pg_0123456789abcdef", title: "Plan" })).toEqual([
+    { type: "mention", props: { kind: "item", target: "pages:pg_0123456789abcdef", label: "Plan" } }, " ",
+  ]);
+  expect(referenceContent({ href: "/plugins/custom/items/id", title: "Other" })).toEqual([
+    { type: "link", href: "/plugins/custom/items/id", content: "Other" }, " ",
+  ]);
 });

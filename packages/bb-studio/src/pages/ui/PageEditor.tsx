@@ -23,7 +23,7 @@ import { Icon } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
-import { linkEmbed, referenceMention } from "./links";
+import { linkEmbed, referenceContent } from "./links";
 import { handOffChecklist, PageSideMenu, placeEmbed } from "./block-menu";
 import { pageSchema } from "./blocks";
 import { createHighlighter } from "./code";
@@ -199,14 +199,7 @@ export function PageEditor({
         // A copied item reference becomes a mention pill, or a link when it isn't a Studio item Pages knows.
         const reference = itemReferenceFrom(event.clipboardData);
         if (reference) {
-          const label = untitled(reference.title ?? "");
-          void uiRef.current.studioItems().catch(() => []).then((items) => {
-            const mention = referenceMention(reference.href, items);
-            editor.insertInlineContent([
-              mention ? ({ type: "mention", props: { ...mention, label } } as never) : { type: "link", href: reference.href, content: label },
-              " ",
-            ]);
-          });
+          editor.insertInlineContent(referenceContent(reference) as never);
           return true;
         }
         const embed = linkEmbed(event.clipboardData?.getData("text/plain") ?? "", window.location.origin);

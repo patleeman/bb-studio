@@ -1,3 +1,4 @@
+import { requestGeneration } from "../../kit/ui/request-generation";
 // The Studio tab in a thread's workbench: one panel action for every kind
 // that opens beside the conversation. It opens on the thread's collection
 // (this thread's items, then recent ones; search and a kind filter), and an
@@ -124,6 +125,8 @@ function Collection({
   const [linked, setLinked] = useState<Set<string>>(new Set());
   const [thread, setThread] = useState<{ projectId: string | null; status: string } | null>(null);
   const [query, setQuery] = useState("");
+  const [requests] = useState(requestGeneration);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [menu, setMenu] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -141,25 +144,26 @@ function Collection({
   }, [sdk, threadId]);
 
   useEffect(() => {
-    let live = true;
+    const current = requests.begin();
+    setLoadError(null);
     Promise.all([
       rpc.call("overview", null),
-      rpc.call("threadItems", { threadId }).then(({ threads }) => threads.map((each) => `${each.ref.pluginId}:${each.ref.id}`), () => []),
+      rpc.call("threadItems", { threadId }).then(({ threads }) => threads.map((each) => `${each.ref.pluginId}:${each.ref.id}`)),
       // A Pages chat's page belongs to its thread too.
-      pages.call("pages.chatPage", { threadId }).then((result) => (result.page ? [`pages:${result.page.id}`] : []), () => []),
+      pages.call("pages.chatPage", { threadId }).then((result) => (result.page ? [`pages:${result.page.id}`] : [])),
     ]).then(
       ([overview, links, chatPage]) => {
-        if (!live) return;
+        if (!current()) return;
         setProviders(overview.providers);
         setItems(overview.items);
         setLinked(new Set([...links, ...chatPage]));
       },
-      (cause: unknown) => live && toast.error(errorMessage(cause)),
+      (cause: unknown) => { if (current()) setLoadError(errorMessage(cause)); },
     );
     return () => {
-      live = false;
+      requests.invalidate();
     };
-  }, [rpc, pages, threadId, refreshKey]);
+  }, [rpc, pages, threadId, refreshKey, requests]);
 
   const projectId = thread?.projectId ?? null;
   const kinds = useMemo(() => collectionKinds(enabled, providers), [enabled, providers]);
@@ -172,15 +176,25 @@ function Collection({
     else if (opening) openAppPath(opening.href);
   };
 
+  const linkCreated = async (association: Parameters<typeof rpc.call<"linkItemThread">>[1]) => {
+    try {
+      await rpc.call("linkItemThread", association);
+      setRefreshKey((key) => key + 1);
+    } catch (cause) {
+      toast.error(`Item created, but couldn't link it to this thread: ${errorMessage(cause)}`, {
+        duration: Infinity,
+        action: { label: "Retry link", onClick: () => { void linkCreated(association); } },
+      });
+    }
+  };
+
   const create = async (info: TabKindInfo) => {
     setMenu(false);
     setCreating(true);
     try {
       const { item } = await rpc.call("create", { pluginId: info.pluginId, kind: info.kind, projectId });
       const now = Date.now();
-      await rpc
-        .call("linkItemThread", { thread: { threadId, ref: { pluginId: info.pluginId, id: item.id }, role: "created", state: thread?.status ?? "idle", createdAt: now, updatedAt: now, metadata: {} } })
-        .catch(() => {});
+      await linkCreated({ thread: { threadId, ref: { pluginId: info.pluginId, id: item.id }, role: "created", state: thread?.status ?? "idle", createdAt: now, updatedAt: now, metadata: {} } });
       onOpen(info.kind, item.id);
     } catch (cause) {
       toast.error(`Couldn't create a ${info.label.toLowerCase()}: ${errorMessage(cause)}`);
@@ -240,7 +254,8 @@ function Collection({
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        {items === null ? (
+        {loadError ? <p role="alert" className="px-2 py-3 text-sm text-destructive">Couldn't load thread items: {loadError} <button type="button" onClick={() => setRefreshKey((key) => key + 1)}>Retry loading items</button></p> : null}
+        {items === null && !loadError ? (
           <p className="px-2 py-3 text-sm text-muted-foreground">Loading…</p>
         ) : sections.length === 0 ? (
           <p className="px-2 py-3 text-sm text-muted-foreground">{query ? "Nothing matches." : `No ${noun} yet.${creatable.length ? " New makes one for this thread." : ""}`}</p>

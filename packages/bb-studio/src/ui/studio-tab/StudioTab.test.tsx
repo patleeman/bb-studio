@@ -3,6 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const notices = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("sonner", () => ({ toast: notices }));
+
 const state = vi.hoisted(() => ({ off: new Set<string>(), opened: [] as string[] }));
 const rpcCall = vi.hoisted(() =>
   vi.fn(async (method: string, _input?: unknown): Promise<unknown> => {
@@ -139,4 +142,47 @@ describe("Studio tab", () => {
     await render(<StudioTab threadId="thr_1" params={{ kind: "design", id: "dsn_0123456789abcdef" }} />);
     expect(shown()).toBe("TabCanvas:dsn_0123456789abcdef");
   });
+});
+
+it("shows thread-link read failures and retries loading instead of showing an empty thread", async () => {
+  rpcCall.mockRejectedValueOnce(new Error("overview unavailable"));
+  await render(<StudioTab threadId="thr_1" params={{}} />);
+  expect(container.textContent).toContain("overview unavailable");
+  expect(container.textContent).not.toContain("Loading…");
+  await act(async () => button("Retry loading items").click());
+  expect(container.textContent).toContain("Plan");
+  const original = rpcCall.getMockImplementation()!;
+  rpcCall.mockImplementationOnce(original).mockRejectedValueOnce(new Error("links unavailable"));
+  await render(<StudioTab threadId="thr_2" params={{}} />);
+  expect(container.textContent).toContain("links unavailable");
+  await act(async () => button("Retry loading items").click());
+  expect(container.textContent).toContain("Plan");
+});
+
+it("opens a created item and retries only its failed association", async () => {
+  const original = rpcCall.getMockImplementation()!;
+  let links = 0;
+  rpcCall.mockClear();
+  rpcCall.mockImplementation(async (method, input) => {
+    if (method === "overview") {
+      const result = await original(method, input) as { providers: unknown[] };
+      return { ...result, providers: [...result.providers, { pluginId: "pages", name: "Pages", state: "ready", kinds: [{ id: "page", create: { mode: "rpc" } }] }] };
+    }
+    if (method === "create") return { item: { id: "pg_created" } };
+    if (method === "linkItemThread" && ++links === 1) throw new Error("link unavailable");
+    return original(method, input);
+  });
+  try {
+    await render(<StudioTab threadId="thr_1" params={{}} />);
+    await act(async () => (container.querySelector("button[aria-haspopup=menu]") as HTMLButtonElement).click());
+    await act(async () => button("Page").click());
+    expect(shown()).toBe("PageTab:pg_created");
+    const [message, options] = notices.error.mock.calls.at(-1)!;
+    expect(message).toContain("couldn't link");
+    expect(options.duration).toBe(Infinity);
+    await act(async () => options.action.onClick());
+    expect(rpcCall.mock.calls.filter(([method]) => method === "create")).toHaveLength(1);
+    expect(rpcCall.mock.calls.filter(([method]) => method === "linkItemThread")).toHaveLength(2);
+    expect(rpcCall.mock.calls.filter(([method]) => method === "linkItemThread")[1]?.[1]).toMatchObject({ thread: { ref: { id: "pg_created" }, threadId: "thr_1" } });
+  } finally { rpcCall.mockImplementation(original); }
 });
