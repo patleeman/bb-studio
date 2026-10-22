@@ -83,6 +83,9 @@ export class Speaker {
           await ended;
         }
       }
+    } catch (error) {
+      if (run === this.run) this.stop();
+      throw error;
     } finally {
       if (run === this.run) {
         this.current = this.next = null;

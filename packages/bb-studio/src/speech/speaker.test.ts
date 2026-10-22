@@ -105,4 +105,20 @@ describe("Speaker", () => {
     clips[0]!.dispatchEvent(new Event("error"));
     await expect(done).rejects.toThrow(/couldn't play/);
   });
+
+  it("stops the current clip when the next URL fails", async () => {
+    const { speaker, clips, states } = setup();
+    let rejectNext: (error: Error) => void = () => {};
+    const next = new Promise<string>((_, reject) => { rejectNext = reject; });
+    const done = speaker.play(["/audio/current", next]);
+    await tick();
+    expect(states.at(-1)).toBe("speaking");
+    expect(clips[0]!.paused).toBe(false);
+
+    rejectNext(new Error("Next audio unavailable"));
+    await expect(done).rejects.toThrow(/Next audio unavailable/);
+    expect(clips[0]!.paused).toBe(true);
+    expect(clips[0]!.src).toBe("");
+    expect(states.at(-1)).toBe("idle");
+  });
 });
