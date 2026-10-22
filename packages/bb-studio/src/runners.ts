@@ -104,9 +104,9 @@ export class Runners {
     return bot ? this.deps.db.prepare("SELECT * FROM bot_runners WHERE bot_id = ? ORDER BY created_at, id").all(bot.id) as RunnerRow[] : [];
   }
 
-  /** A runner by id, thread or name; a name is looked up among `botId`'s runners when given. */
+  /** A runner by id, thread or name; scoped to `botId` when given. */
   private row(id: string, botId?: string): RunnerRow {
-    const row = (this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ? OR thread_id = ?").get(id, id)
+    const row = ((botId ? this.deps.db.prepare("SELECT * FROM bot_runners WHERE (id = ? OR thread_id = ?) AND bot_id = ?").get(id, id, botId) : this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ? OR thread_id = ?").get(id, id))
       ?? (botId ? this.rows(botId).find((each) => each.name.toLowerCase() === id.toLowerCase()) : this.deps.db.prepare("SELECT * FROM bot_runners WHERE lower(name) = lower(?)").get(id))) as RunnerRow | undefined;
     if (!row) throw new Error(`No runner "${id}". Yours: ${this.rows(botId).map((each) => each.name).join(", ") || "none"}.`);
     return row;

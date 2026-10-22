@@ -73,6 +73,25 @@ it("keeps each Bot's runners apart: listing, names, reports and pausing", async 
   expect(x.runners.threads().has(theirs.threadId!)).toBe(false);
 });
 
+it("rejects another Bot's runner id and thread at every scoped entry point", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check releases.", schedule }, "bot_two");
+  await x.runners.report(runner.threadId!, { level: "urgent", summary: "Needs you" });
+  const before = await x.runners.list("bot_two");
+  const calls = x.calls.length;
+  for (const id of [runner.id, runner.threadId!]) {
+    await expect(x.runners.update({ id, name: "Changed" }, "bot_main")).rejects.toThrow(/No runner/);
+    await expect(x.runners.setState(id, "paused", "bot_main")).rejects.toThrow(/No runner/);
+    await expect(x.runners.setState(id, "active", "bot_main")).rejects.toThrow(/No runner/);
+    await expect(x.runners.runNow(id, "bot_main")).rejects.toThrow(/No runner/);
+    expect(() => x.runners.seen(id, "bot_main")).toThrow(/No runner/);
+    await expect(x.runners.delete(id, "bot_main")).rejects.toThrow(/No runner/);
+  }
+  expect(x.calls).toHaveLength(calls);
+  expect(await x.runners.list("bot_two")).toEqual(before);
+  expect(x.archive).not.toHaveBeenCalled();
+});
+
 it("creates a runner: an unparented thread, its first run, and a schedule that wakes its own thread", async () => {
   const x = await setup();
   const runner = await x.runners.create({ name: "Inbox", job: "Check the inbox for replies from Dana.", schedule });
