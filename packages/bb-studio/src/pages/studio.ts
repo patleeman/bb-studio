@@ -156,19 +156,9 @@ export function pageProvider(service: PagesService): StudioProviderHandlers {
       throw new Error(`Unsupported page format: ${format}`);
     },
     studio_move: ({ ids, projectId }) => {
-      const touched = new Set<string | null>([projectId]);
-      const result = eachId(ids, (id) => {
-        const meta = requireMeta(id);
-        touched.add(meta.project_id);
-        // A page leaves a parent that stays behind in the old project.
-        const parent = meta.parent_id ? store.meta(meta.parent_id) : null;
-        const detach = parent && !ids.includes(parent.id) && parent.project_id !== projectId;
-        store.update(id, { project_id: projectId, ...(detach ? { parent_id: null } : {}) }, HUMAN_USER_ID);
-        for (const child of store.descendants(id)) store.update(child, { project_id: projectId }, HUMAN_USER_ID);
-      });
-      return result.finally(() => {
-        for (const project of touched) service.publish({ type: "tree", projectId: project });
-      });
+      // Move ancestors first so selecting a subtree preserves its parents.
+      const ordered = [...ids].sort((a, b) => store.descendants(b).length - store.descendants(a).length);
+      return eachId(ordered, (id) => { service.updatePage(id, { project_id: projectId }, HUMAN_USER_ID); });
     },
     studio_archive: ({ ids, archived }) =>
       eachId(ids, (id) => {

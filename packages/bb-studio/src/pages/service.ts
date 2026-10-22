@@ -116,7 +116,30 @@ export class PagesService {
     this.store.saveContent(meta.id, Y.encodeStateAsUpdate(doc), readMarkdown(doc), null);
     doc.destroy();
     this.publish({ type: "tree", projectId: meta.project_id });
+    this.publish({ type: "page", pageId: meta.id });
     return this.store.meta(meta.id)!;
+  }
+
+  /** Reparent and move a whole subtree together, regardless of the caller. */
+  updatePage(id: string, patch: Parameters<PageStore["update"]>[1], actor: string, expectedTitle?: string): PageMeta {
+    const before = this.requirePage(id);
+    const page = this.store.transaction(() => {
+      const descendants = this.store.descendants(id);
+      let projectId = patch.project_id === undefined ? before.project_id : patch.project_id;
+      let parentId = patch.parent_id === undefined ? before.parent_id : patch.parent_id;
+      if (patch.parent_id) {
+        if (parentId === id || descendants.includes(parentId!)) throw new Error("A page can't be nested inside itself.");
+        projectId = this.requirePage(parentId!).project_id;
+      } else if (parentId && this.requirePage(parentId).project_id !== projectId) parentId = null;
+      const updated = this.store.update(id, { ...patch, parent_id: parentId, project_id: projectId }, actor, expectedTitle)!;
+      if (projectId !== before.project_id) {
+        for (const child of descendants) this.store.update(child, { project_id: projectId }, actor);
+      }
+      return updated;
+    });
+    this.publish({ type: "tree", projectId: before.project_id });
+    if (page.project_id !== before.project_id) this.publish({ type: "tree", projectId: page.project_id });
+    return page;
   }
 
   deletePage(id: string): string[] {

@@ -139,6 +139,10 @@ const SNAPSHOTS_PER_PAGE = 50;
 export class PageStore {
   constructor(private readonly db: Database.Database, private readonly snapshotLimit: () => number = () => SNAPSHOTS_PER_PAGE) {}
 
+  transaction<T>(work: () => T): T {
+    return this.db.transaction(work)();
+  }
+
   setTemplate(id: string, template: boolean): void {
     this.db.prepare("UPDATE pages SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
   }

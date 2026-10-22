@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runBackup, runRestore } from "../kit/server/index";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { expect, it, vi } from "vitest";
 import { pageCheckboxes } from "../kit/page-checkbox";
@@ -26,6 +30,23 @@ it("links pages and checklist handoffs directly, and reports activity failures w
     await pages.notes.replace(notesId, "New notes with token-notes");
     expect(await pages.notes.markdown(notesId)).toContain("New notes with token-notes");
     await expect(pages.notes.replace("pg_missing", "x")).rejects.toThrow("Page not found");
+    const linkedId = pages.createPage({ projectId: null, title: "Created link", markdown: "@[Other](item:artifacts:art_other)" });
+    expect(services.links({ pluginId: "pages", id: linkedId }).outgoing).toMatchObject([{ to: { id: "art_other" } }]);
+    const dir = mkdtempSync(join(tmpdir(), "pages-links-"));
+    try {
+      await runBackup(join(dir, "section"), pages.backup);
+      await pages.provider.studio_delete({ ids: [linkedId] });
+      expect(services.links({ pluginId: "pages", id: linkedId }).outgoing).toEqual([]);
+      await runRestore(join(dir, "section"), pages.backup, { dryRun: false, version: 1, projects: {} });
+      expect(services.links({ pluginId: "pages", id: linkedId }).outgoing).toMatchObject([{ to: { id: "art_other" } }]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+    const parent = pages.createPage({ projectId: "proj_a", title: "Parent", markdown: "" });
+    const childResult = await host.harness.behavior.callRpc("pages.create", { projectId: "proj_a", parentId: parent, title: "Child" }) as { page: { id: string } };
+    const child = childResult.page.id;
+    await host.harness.behavior.callRpc("pages.update", { id: child, projectId: "proj_b" });
+    expect(pages.store.meta(child)).toMatchObject({ project_id: "proj_b", parent_id: null });
+    await pages.provider.studio_move({ ids: [child], projectId: "proj_a" });
+    expect(pages.store.meta(child)?.project_id).toBe("proj_a");
     const id = pages.createPage({ projectId: "proj_1", title: "Plan", markdown: "- [ ] Ship it" });
     await host.harness.behavior.callAgentTool("pages_edit", { page: id, ops: [{ op: "append", markdown: "@[Other](item:artifacts:art_other)" }] }, { threadId: "thr_editor" });
     expect(services.threadsForThread("thr_editor")).toMatchObject([{ ref: { pluginId: "pages", id }, role: "edited" }]);

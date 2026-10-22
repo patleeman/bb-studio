@@ -208,30 +208,10 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     "pages.tree": ({ projectId }) => ({ pages: store.list({ projectId, includeArchived: true }).map(toView) }),
     "pages.create": (input) => ({ page: toView(service.createPage({ ...input, actor: HUMAN_USER_ID })) }),
     "pages.update": ({ id, title, expectedTitle, icon, parentId, projectId, position, archived }) => {
-      const meta = requireMeta(id);
-      let nextProject = projectId === undefined ? meta.project_id : projectId;
-      if (parentId) {
-        if (parentId === id || store.descendants(id).includes(parentId)) throw new Error("A page can't be nested inside itself.");
-        nextProject = requireMeta(parentId).project_id;
-      }
-      const page = store.update(
-        id,
-        {
-          title,
-          icon,
-          parent_id: parentId,
-          project_id: nextProject,
-          position,
-          archived_at: archived === undefined ? undefined : archived ? Date.now() : null,
-        },
-        HUMAN_USER_ID,
-        expectedTitle,
-      )!;
-      if (nextProject !== meta.project_id) {
-        for (const child of store.descendants(id)) store.update(child, { project_id: nextProject }, HUMAN_USER_ID);
-      }
-      service.publish({ type: "tree", projectId: meta.project_id });
-      if (nextProject !== meta.project_id) service.publish({ type: "tree", projectId: nextProject });
+      const page = service.updatePage(id, {
+        title, icon, parent_id: parentId, project_id: projectId, position,
+        archived_at: archived === undefined ? undefined : archived ? Date.now() : null,
+      }, HUMAN_USER_ID, expectedTitle);
       return { page: toView(page) };
     },
     "pages.remove": ({ id }) => {

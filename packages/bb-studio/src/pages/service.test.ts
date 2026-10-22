@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { HUMAN_USER_ID, PLUGIN_RPC_ACTOR } from "./constants";
 import { rpcContract } from "./contract";
@@ -108,4 +108,42 @@ describe("editClientDocument", () => {
     expect(() => service.editClientDocument(page.id, expected, "")).toThrow("has comments");
     expect(readMarkdown(doc)).toBe("Keep.\n\nDiscussed.\n");
   });
+});
+
+
+describe("page moves", () => {
+  it("detaches a parent left in another project and moves descendants", () => {
+    const { service, store } = setup();
+    const parent = service.createPage({ projectId: "a", parentId: null, title: "Parent", actor: HUMAN_USER_ID });
+    const child = service.createPage({ projectId: "a", parentId: parent.id, title: "Child", actor: HUMAN_USER_ID });
+    const leaf = service.createPage({ projectId: "a", parentId: child.id, title: "Leaf", actor: HUMAN_USER_ID });
+    service.updatePage(child.id, { project_id: "b" }, HUMAN_USER_ID);
+    expect(store.meta(child.id)).toMatchObject({ parent_id: null, project_id: "b" });
+    expect(store.meta(leaf.id)).toMatchObject({ parent_id: child.id, project_id: "b" });
+    service.updatePage(child.id, { parent_id: parent.id }, HUMAN_USER_ID);
+    expect(store.meta(leaf.id)?.project_id).toBe("a");
+    expect(() => service.updatePage(parent.id, { parent_id: leaf.id }, HUMAN_USER_ID)).toThrow("nested inside itself");
+  });
+
+  it("rolls back the entire move if updating a descendant fails", () => {
+    const { service, store, events } = setup();
+    const parent = service.createPage({ projectId: "a", parentId: null, title: "Parent", actor: HUMAN_USER_ID });
+    const child = service.createPage({ projectId: "a", parentId: parent.id, title: "Child", actor: HUMAN_USER_ID });
+    const update = store.update.bind(store);
+    vi.spyOn(store, "update").mockImplementation((id, ...args) => {
+      if (id === child.id) throw new Error("storage unavailable");
+      return update(id, ...args);
+    });
+    events.length = 0;
+    expect(() => service.updatePage(parent.id, { project_id: "b" }, HUMAN_USER_ID)).toThrow("storage unavailable");
+    expect(store.meta(parent.id)?.project_id).toBe("a");
+    expect(store.meta(child.id)?.project_id).toBe("a");
+    expect(events).toEqual([]);
+  });
+});
+
+it("publishes content for pages created with links", () => {
+  const { service, events } = setup();
+  const page = service.createPage({ projectId: null, parentId: null, title: "Link", markdown: "@[Other](item:artifacts:art_other)", actor: HUMAN_USER_ID });
+  expect(events).toContainEqual({ type: "page", pageId: page.id });
 });
