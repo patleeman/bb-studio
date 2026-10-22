@@ -199,7 +199,12 @@ export class Runners {
   async list(botId?: string): Promise<RunnerView[]> {
     const rows = this.rows(botId);
     const automations = await this.automations(rows.flatMap((row) => row.automation_project_id ? [row.automation_project_id] : []));
-    return rows.map((row) => this.view(row, automations.find((each) => each.id === row.automation_id)));
+    return Promise.all(rows.map(async (row) => {
+      const runner = this.view(row, automations.find((each) => each.id === row.automation_id));
+      if (!runner.threadId) return runner;
+      const thread = await this.deps.sdk.threads.get({ threadId: runner.threadId }).catch(() => null);
+      return { ...runner, providerId: thread?.providerId ?? null };
+    }));
   }
 
   private bot(botId?: string): RunnerBot & { threadId: string } {

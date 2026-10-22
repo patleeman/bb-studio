@@ -271,6 +271,8 @@ const botThread = z.object({
   id: z.string(),
   title: z.string(),
   status: z.string(),
+  /** Agent provider that owns this thread; used to draw its catalog icon. */
+  providerId: z.string().nullable().optional(),
   projectId: z.string().nullable(),
   updatedAt: z.number(),
   relation: z.enum(["self", "started"]),
@@ -313,6 +315,8 @@ const runner = z.object({
   name: z.string(),
   job: z.string(),
   threadId: z.string().nullable(),
+  /** Agent provider that owns the runner thread; used to draw its catalog icon. */
+  providerId: z.string().nullable().optional(),
   state: z.enum(["active", "paused"]),
   /** Adopted from a thread and automation the Bot had; deleting only lets it go. */
   adopted: z.boolean(),

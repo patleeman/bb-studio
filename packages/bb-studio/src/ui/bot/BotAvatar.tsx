@@ -51,8 +51,15 @@ export const BOT_STYLES = `
 .bb-bot-shimmer { -webkit-text-fill-color: transparent; opacity: .75; }
 @keyframes bb-bot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .bot-pulse { animation: bb-bot-pulse 1.6s ease-in-out infinite; }
+@keyframes bb-provider-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 24%, transparent); }
+  50% { box-shadow: 0 0 0 2px color-mix(in oklab, var(--provider-ring-color) 36%, transparent), 0 0 5px color-mix(in oklab, var(--provider-ring-color) 30%, transparent); }
+}
+.bb-provider-ring { border-color: var(--provider-ring-color); box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 20%, transparent); }
+.bb-provider-ring[data-provider-status="running"] { animation: bb-provider-ring-pulse 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .bb-bot-eyes, .bb-bot-pupils, .bb-bot-in, .bb-bot-dot, .bb-bot-shimmer, .bot-pulse { animation: none !important; }
+  .bb-provider-ring[data-provider-status="running"] { animation: none !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 36%, transparent); }
   .bb-bot-shimmer { -webkit-text-fill-color: currentColor; }
 }
 `;
@@ -62,8 +69,16 @@ export function botProvider(bot: { kind?: string | null; providerId?: string | n
   return bot.kind === "external" && bot.providerId ? { id: bot.providerId, logoUrl: `/api/v1/system/providers/${encodeURIComponent(bot.providerId)}/logo` } : null;
 }
 
+/** Fields BB's shared provider icon renderer reads from its catalog. */
+export type ProviderIconRecord = {
+  id: string;
+  logoUrl?: string | null;
+  icon?: { glyph: string } | null;
+  strings?: { iconTint?: { light: string; dark: string } | null } | null;
+};
+
 /** A provider's logo, as BB's own pickers draw it. */
-export function ProviderLogo({ provider, className }: { provider: { id: string; logoUrl?: string | null }; className?: string }) {
+export function ProviderLogo({ provider, className }: { provider: ProviderIconRecord; className?: string }) {
   // Read off the module, so a BB without the component draws a plain glyph.
   const ProviderIcon = (BbApp as Partial<typeof BbApp>).experimental_ProviderIcon;
   return ProviderIcon ? <ProviderIcon providerKind="agent" provider={provider} fallback="Bot" className={className} aria-hidden /> : <span className={className} aria-hidden>●</span>;

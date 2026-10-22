@@ -7957,6 +7957,12 @@
                 "status": {
                   "type": "string"
                 },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "projectId": {
                   "type": [
                     "string",
@@ -8575,6 +8581,12 @@
                 "status": {
                   "type": "string"
                 },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "projectId": {
                   "type": [
                     "string",
@@ -8628,6 +8640,12 @@
                 },
                 "status": {
                   "type": "string"
+                },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "projectId": {
                   "type": [
@@ -8683,6 +8701,12 @@
                 },
                 "status": {
                   "type": "string"
+                },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "projectId": {
                   "type": [
@@ -8782,6 +8806,12 @@
                 },
                 "status": {
                   "type": "string"
+                },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "projectId": {
                   "type": [
@@ -10948,6 +10978,12 @@
                     "null"
                   ]
                 },
+                "providerId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "state": {
                   "type": "string",
                   "enum": [
@@ -11182,6 +11218,12 @@
               "null"
             ]
           },
+          "providerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -11369,6 +11411,12 @@
               "null"
             ]
           },
+          "providerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -11508,6 +11556,12 @@
             "type": "string"
           },
           "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
             "type": [
               "string",
               "null"
@@ -11657,6 +11711,12 @@
               "null"
             ]
           },
+          "providerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -11796,6 +11856,12 @@
             "type": "string"
           },
           "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
             "type": [
               "string",
               "null"
@@ -12030,6 +12096,12 @@
             "type": "string"
           },
           "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerId": {
             "type": [
               "string",
               "null"

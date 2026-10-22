@@ -102,6 +102,16 @@ Kind menus above it.
 Tags and Status are available under **More filters**. The rows show
 a paused Talk recording, a drawing and three Orbit pages.
 
+### Bot sidebar provider status
+
+These staged captures show Codex and Claude Code logos in Bot thread and runner
+rows. Running work has a pulsing green ring, waiting rows use amber, failed
+threads use red, and idle threads use a neutral ring.
+
+![Bot sidebar provider logos and status rings in light mode](assets/bot-sidebar-providers.png)
+
+![Bot sidebar provider logos and status rings in dark mode](assets/bot-sidebar-providers-dark.png)
+
 ![Live BB screenshot of Studio with active filters](assets/filters.png)
 
 Selected filters appear below search, each with a remove button and an explicit

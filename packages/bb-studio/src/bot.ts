@@ -40,7 +40,7 @@ import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow
 type Sdk = BbPluginApi["sdk"];
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 /** What Activity reads from a thread, listed or fetched. */
-type ActivityThread = Pick<ListedThread, "id" | "title" | "titleFallback" | "status" | "projectId" | "updatedAt" | "archivedAt"> & Partial<Pick<ListedThread, "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">> & { hasPendingInteraction?: boolean; queuedWork?: ListedThread["queuedWork"] };
+type ActivityThread = Pick<ListedThread, "id" | "title" | "titleFallback" | "status" | "projectId" | "updatedAt" | "archivedAt"> & Partial<Pick<ListedThread, "providerId" | "sourceThreadId" | "parentThreadId" | "lifecycleOwnerThreadId">> & { hasPendingInteraction?: boolean; queuedWork?: ListedThread["queuedWork"] };
 export type BotState = "active" | "paused" | "stopped";
 export const BOT_ID = "bot_main";
 export const DEFAULT_BOT_NAME = "Bot";
@@ -244,6 +244,7 @@ export function classifyActivity(threads: readonly ActivityThread[], botThreadId
     id: thread.id,
     title: thread.title || thread.titleFallback || "Untitled thread",
     status: thread.status,
+    providerId: thread.providerId ?? null,
     projectId: thread.projectId ?? null,
     updatedAt: thread.updatedAt ?? 0,
     relation: thread.id === botThreadId ? "self" : "started",
@@ -1156,14 +1157,14 @@ export class Bots {
     const { needsYou, inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id) && !hidden.has(thread.id)), bot.threadId);
     const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
     for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
-      if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
+      if (thread && !thread.archivedAt) needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, providerId: thread.providerId ?? null, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null });
     }
     // An automation or thread past its auto-resume cap: one entry, opening the Bot's chat, where its line is.
     const alerts = this.deps.automationAlerts?.(bot.id) ?? [];
     if (alerts.length && !needsYou.some((thread) => thread.id === bot.threadId)) {
       needsYou.unshift({
         id: bot.threadId, title: alerts.length === 1 ? alerts[0]!.message : `${alerts.length} automations or threads stopped after failing: ${alerts.map((each) => each.name).join(", ")}`,
-        status: "idle", projectId: threads.find((thread) => thread.id === bot.threadId)?.projectId ?? PERSONAL_PROJECT_ID, updatedAt: Math.max(...alerts.map((each) => each.at)), relation: "self", needsYou: true, parentId: null,
+        status: "idle", providerId: threads.find((thread) => thread.id === bot.threadId)?.providerId ?? null, projectId: threads.find((thread) => thread.id === bot.threadId)?.projectId ?? PERSONAL_PROJECT_ID, updatedAt: Math.max(...alerts.map((each) => each.at)), relation: "self", needsYou: true, parentId: null,
       });
     }
     const HEARTBEAT_NAME = heartbeatName(bot.primary === false ? `${BOT_RUN_PREFIX}${bot.id}` : PERSONAL_PROJECT_ID);

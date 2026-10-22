@@ -14,7 +14,7 @@
 // Threads comes back to the user (ThreadsSection.tsx).
 import { Icon } from "../../kit/ui/index";
 import { openAppPath, usePathname } from "../../kit/app/index";
-import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, experimental_useProviders as useProviders, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import type { BotActivityView, BotScheduledView, BotSideThreadListView, BotThrea
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
+import { ProviderStatusMark, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
@@ -48,24 +49,6 @@ function useLayout(): [Layout, (patch: Partial<Layout>) => void] {
   });
   return [layout, update];
 }
-
-const WORKING = new Set(["active", "starting", "stopping"]);
-type Tone = "needs" | "running" | "waiting" | "failed" | "idle";
-function toneOf(thread: BotThreadView): Tone {
-  if (thread.needsYou) return "needs";
-  if (WORKING.has(thread.status)) return "running";
-  if (thread.status === "pending") return "waiting";
-  if (/error|fail/.test(thread.status)) return "failed";
-  return "idle";
-}
-const TONE_DOT: Record<Tone, string> = {
-  needs: "bg-warning",
-  running: "bg-success bot-pulse",
-  waiting: "border border-muted-foreground/60",
-  failed: "bg-destructive",
-  idle: "bg-muted-foreground/35",
-};
-const TONE_LABEL: Record<Tone, string> = { needs: "Needs you", running: "Running", waiting: "Waiting to start", failed: "Failed", idle: "Done" };
 
 const relative = new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "narrow" });
 function age(at: number, now = Date.now()): string {
@@ -120,6 +103,8 @@ type BotSummary = NonNullable<BotView["bot"]>;
 
 /** `threadId`: the Bot thread open in the main pane, if any (not on the Bot page). */
 function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void; activeThreadId: string | null; threadId: string | null }) {
+  const providerState = useProviders();
+  const providers = providerState.providers;
   // The removed Threads tab kept its opened threads in localStorage; drop them once.
   useEffect(() => forgetThreadStrips(), []);
   const route = useBotSelection();
@@ -150,7 +135,7 @@ function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(): void
         </button>
       ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id
-        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} />
+        ? <BotEntry key={bot.id} view={view.data!} onNavigate={onNavigate} active={activeThreadId} onThread={!!threadId} providers={providers} />
         : <BotRow key={bot.id} bot={bot} onNavigate={onNavigate} />)
         : none ? null : <p className="px-2 text-xs text-muted-foreground">{list.loading || view.loading ? "Loading…" : list.error ?? view.error}</p>}
     </nav>
@@ -224,7 +209,7 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
 }
 
 /** One bot: its row, and (it's the selected bot) its threads under it. */
-function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNavigate(): void; active: string | null; onThread: boolean }) {
+function BotEntry({ view, onNavigate, active, onThread, providers }: { view: BotView; onNavigate(): void; active: string | null; onThread: boolean; providers: readonly ProviderCatalogEntry[] }) {
   const bot = view.bot!;
   const activity = useLive<BotActivityView>("bot_activity", { botId: bot.id }, { pollMs: 15_000 });
   const chain = useLive<{ threadIds: string[]; threads?: { id: string; title: string }[] }>("bot_chain", { botId: bot.id }, { pollMs: 120_000 });
@@ -251,7 +236,7 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
   const sideThreads = useLive<{ threads: BotSideThreadListView[] }>("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
-  const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} />;
+  const tree = (nodes: TreeNode[]) => <ThreadTree nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
   const drop = useThreadDrop(bot);
 
   return (
@@ -277,13 +262,13 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
         {groups.needsYou.length ? (
           <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={groups.needsYou.length}>
-            {groups.needsYou.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} />)}
+            {groups.needsYou.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)}
           </Group>
         ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
         {runners.data?.runners.length ? (
           <Group id="runners" title="Runners" closed={layout.closed} onToggle={toggle}>
-            {runners.data.runners.map((runner) => <RunnerSidebarRow key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} />)}
+            {runners.data.runners.map((runner) => <RunnerSidebarRow key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />)}
           </Group>
         ) : null}
         {groups.recurring.length ? (
@@ -293,7 +278,7 @@ function BotEntry({ view, onNavigate, active, onThread }: { view: BotView; onNav
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
         {bot.kind !== "external" ? <button type="button" className="self-start px-2 text-xs text-muted-foreground hover:text-foreground" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Hide archived" : "Show archived"}</button> : null}
-        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} />) : null}
+        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />) : null}
         {sideThreads.data?.threads.length ? (
           <Group id="threads" title="Side threads" closed={layout.closed} onToggle={toggle}>
             {sideThreads.data.threads.map((thread) => <SideThreadRow key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
@@ -333,26 +318,26 @@ function Group({ id, title, closed, onToggle, badge, children }: { id: string; t
   );
 }
 
-function ThreadTree({ nodes, depth, active, onOpen }: { nodes: TreeNode[]; depth: number; active: string | null; onOpen(threadId: string): void }) {
+function ThreadTree({ nodes, depth, active, onOpen, providers }: { nodes: TreeNode[]; depth: number; active: string | null; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
   return (
     <ul className={depth ? "relative ml-[15px] border-l border-border/70 pl-1" : "flex flex-col"}>
       {nodes.map((node) => (
         <li key={node.thread.id}>
-          <Row thread={node.thread} depth={depth} active={active === node.thread.id} onOpen={onOpen} />
-          {node.children.length ? <ThreadTree nodes={node.children} depth={depth + 1} active={active} onOpen={onOpen} /> : null}
+          <Row thread={node.thread} depth={depth} active={active === node.thread.id} onOpen={onOpen} providers={providers} />
+          {node.children.length ? <ThreadTree nodes={node.children} depth={depth + 1} active={active} onOpen={onOpen} providers={providers} /> : null}
         </li>
       ))}
     </ul>
   );
 }
 
-function Row({ thread, active, onOpen }: { thread: BotThreadView; depth: number; active: boolean; onOpen(threadId: string): void }) {
-  const tone = toneOf(thread);
+function Row({ thread, active, onOpen, providers }: { thread: BotThreadView; depth: number; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
+  const tone = threadStatusTone(thread.status, thread.needsYou);
   return (
     <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
       draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
-      <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`} role="img" aria-label={TONE_LABEL[tone]} />
+      <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{thread.title}</span>
       <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>
     </button>
@@ -378,7 +363,7 @@ function SideThreadRow({ thread, active, onOpen }: { thread: BotSideThreadListVi
         onKeyDown={(event) => { if (!renaming && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onOpen(thread.threadId); } }}
         className="group/side-thread flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
         {thread.working
-          ? <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT.running}`} role="img" aria-label={TONE_LABEL.running} />
+          ? <span className="size-1.5 shrink-0 rounded-full bg-success bot-pulse" role="img" aria-label="Running" />
           : <Icon name="MessageSquare" className="size-3.5 shrink-0 text-muted-foreground" />}
         {renaming
           ? <RenameInput thread={{ id: thread.threadId, title: thread.title, displayTitle: thread.title }} onDone={() => setRenaming(false)} />

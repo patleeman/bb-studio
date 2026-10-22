@@ -6845,16 +6845,18 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var providerId: String?
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotMaintenanceThreadsOutputThreadsItemRelation?
     public var needsYou: Bool?
     public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.providerId = providerId
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
@@ -7219,16 +7221,18 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var providerId: String?
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputNeedsYouItemRelation?
     public var needsYou: Bool?
     public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.providerId = providerId
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
@@ -7265,16 +7269,18 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var providerId: String?
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputInProgressItemRelation?
     public var needsYou: Bool?
     public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.providerId = providerId
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
@@ -7311,16 +7317,18 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var providerId: String?
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputWaitingItemRelation?
     public var needsYou: Bool?
     public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.providerId = providerId
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
@@ -7399,16 +7407,18 @@ public enum Studio {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var providerId: String?
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputCompletedItemRelation?
     public var needsYou: Bool?
     public var parentId: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.providerId = providerId
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
@@ -8884,6 +8894,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnersOutputRunnersItemState?
     public var adopted: Bool?
     public var schedule: BotRunnersOutputRunnersItemSchedule?
@@ -8894,11 +8905,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -9131,6 +9143,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerCreateOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerCreateOutputSchedule?
@@ -9141,11 +9154,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -9350,6 +9364,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerUpdateOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerUpdateOutputSchedule?
@@ -9360,11 +9375,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -9503,6 +9519,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerPauseOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerPauseOutputSchedule?
@@ -9513,11 +9530,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -9656,6 +9674,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerResumeOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerResumeOutputSchedule?
@@ -9666,11 +9685,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -9809,6 +9829,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerRunNowOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerRunNowOutputSchedule?
@@ -9819,11 +9840,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule
@@ -10006,6 +10028,7 @@ public enum Studio {
     public var name: String?
     public var job: String?
     public var threadId: String?
+    public var providerId: String?
     public var state: BotRunnerAdoptOutputState?
     public var adopted: Bool?
     public var schedule: BotRunnerAdoptOutputSchedule?
@@ -10016,11 +10039,12 @@ public enum Studio {
     public var lastReportAt: Double?
     public var urgent: Bool?
 
-    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
+    public init(id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil) {
       self.id = id
       self.name = name
       self.job = job
       self.threadId = threadId
+      self.providerId = providerId
       self.state = state
       self.adopted = adopted
       self.schedule = schedule

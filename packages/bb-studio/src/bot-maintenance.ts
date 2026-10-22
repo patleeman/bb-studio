@@ -82,7 +82,7 @@ export class BotMaintenance {
       threads.push(...batch.filter((t) => owned.has(t.id) && (t.archivedAt || Date.now() - t.updatedAt >= 7 * DAY) && !t.hasPendingInteraction && t.status === "idle"));
       if (batch.length < 200) break;
     }
-    return threads.map((t) => ({ id: t.id, title: t.title || t.titleFallback || "Untitled thread", status: t.status, projectId: t.projectId, updatedAt: t.updatedAt, relation: "started" as const, needsYou: t.hasPendingInteraction, parentId: null }));
+    return threads.map((t) => ({ id: t.id, title: t.title || t.titleFallback || "Untitled thread", status: t.status, providerId: t.providerId ?? null, projectId: t.projectId, updatedAt: t.updatedAt, relation: "started" as const, needsYou: t.hasPendingInteraction, parentId: null }));
   }
   async tick(now = Date.now(), heartbeatBotId?: string): Promise<void> {
     for (const bot of this.deps.bots()) {
