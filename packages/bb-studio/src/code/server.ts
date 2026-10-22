@@ -236,6 +236,10 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     bb.events.on(event, ({ thread }) => { threadPaths.delete(thread.id); forget(thread.id); });
 
   const inside = (folder: string, path: string) => path === folder || path.startsWith(`${folder.replace(/\/+$/, "")}/`);
+  // User RPCs are trusted; agent tools use their caller's thread scope.
+  const usable = (workspace: Workspace, threadId: string, path: string | null) =>
+    !workspace.archived && (workspace.threadId === threadId || workspace.share ||
+      (path !== null && workspace.folders.some((folder) => inside(folder, path))));
   /**
    * Workspaces with a VS Code open whose editor this thread may see: the one
    * made for it, or one whose folders hold its folder, with sharing on
@@ -257,12 +261,16 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     name: "code_editor_state",
     description: "What the user has open in VS Code (Studio Code) right now: the file, the lines on screen, their selection, errors, and files with unsaved changes.",
     parameters: z.object({}),
-    execute: async (_input, ctx) => contextFor(ctx.threadId, ctx.projectId ?? null, await threadPath(ctx.threadId)) ?? "The user has no VS Code open for this thread right now.",
+    execute: async (_input, ctx) => {
+      const path = await threadPath(ctx.threadId);
+      const workspaces = store.list().filter((workspace) => usable(workspace, ctx.threadId, path) && bridges.connected(workspace.id) && bridges.state(workspace.id) !== null);
+      return editorContext(workspaces.map((workspace) => ({ title: workspace.title, folders: workspace.folders, state: bridges.state(workspace.id)! }))) ?? "The user has no VS Code open for this thread right now.";
+    },
   });
 
   /**
-   * The workspace and file a tool means: an open editor of this thread's
-   * first, then any open editor, then the thread's own worktree. The path is
+   * Prefer the thread's own workspace, then an allowed open editor or
+   * stored workspace, creating its own worktree workspace if needed. The path is
    * checked through symlinks, but used as the workspace knows it: VS Code
    * treats /tmp/x and /private/tmp/x as two different files.
    */
@@ -271,10 +279,10 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     const absolute = isAbsolute(path) ? resolve(path) : base ? resolve(base, path) : null;
     if (!absolute) throw new Error("Give a full path: this thread has no working folder to start from.");
     const holds = (workspace: Workspace) => !workspace.archived && workspace.folders.some((folder) => inside(folder, absolute));
-    const mine = editorsFor(ctx.threadId, ctx.projectId ?? null, base);
-    let workspace = mine.find(holds) ?? store.list().find((each) => holds(each) && bridges.connected(each.id));
+    const allowed = store.list().filter((workspace) => usable(workspace, ctx.threadId, base));
+    let workspace = allowed.find((each) => each.threadId === ctx.threadId && holds(each)) ?? allowed.find((each) => holds(each) && bridges.connected(each.id));
     if (!workspace && base && inside(base, absolute)) workspace = await forThread(ctx.threadId);
-    if (!workspace) workspace = store.list().find(holds);
+    if (!workspace) workspace = allowed.find(holds);
     if (!workspace) return null;
     const real = await contained(workspace.folders, absolute);
     if (!(await stat(real)).isFile()) throw new Error(`${absolute} is a folder; name a file.`);
@@ -482,8 +490,12 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
     name: "code_comments",
     description: "The user's open code review comments sent to you from VS Code (Studio Code): each thread's id, file and lines, and what was said.",
     parameters: z.object({}),
-    execute: (_input, ctx) => {
-      const open = comments.openFor(ctx.threadId);
+    execute: async (_input, ctx) => {
+      const path = await threadPath(ctx.threadId);
+      const open = comments.openFor(ctx.threadId).filter((thread) => {
+        const workspace = store.get(thread.workspaceId);
+        return workspace && usable(workspace, ctx.threadId, path);
+      });
       return open.map((thread) => describeThread(thread, showIn(thread.workspaceId))).join("\n\n") || "No open review comments.";
     },
   });
@@ -495,10 +507,13 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
       body: z.string().trim().min(1).max(20_000).optional(),
       resolve: z.boolean().optional(),
     }),
-    execute: ({ id, body, resolve: done }, ctx) => {
+    execute: async ({ id, body, resolve: done }, ctx) => {
       const thread = comments.thread(id);
       if (!thread || (thread.sentTo !== ctx.threadId && !comments.openFor(ctx.threadId).some((each) => each.id === id)))
         throw new Error("No review comment thread with that id was sent to you. code_comments lists yours.");
+      const workspace = store.get(thread.workspaceId);
+      if (!workspace || !usable(workspace, ctx.threadId, await threadPath(ctx.threadId)))
+        throw new Error("That workspace is outside this thread's scope and sharing is off.");
       if (!body && done === undefined) throw new Error("Give a body, resolve, or both.");
       if (body) comments.reply(id, "agent", body, ctx.threadId);
       if (done !== undefined) comments.resolve(id, done);
