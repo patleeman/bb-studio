@@ -12,12 +12,14 @@ export const SETUP_SUBPATH = "setup";
 const SEEN_KEY = "studio:health-seen";
 
 let footer: { open(): void; close(): void } | null = null;
+let seenInMemory: Set<string> | null = null;
 /** app.tsx hands over the footer item's controller once it registers it. */
 export function setHealthFooter(controller: { open(): void; close(): void }) {
   footer = controller;
 }
 
 function readSeen(): Set<string> {
+  if (seenInMemory) return new Set(seenInMemory);
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]");
     return new Set(Array.isArray(stored) ? stored.filter((key): key is string => typeof key === "string") : []);
@@ -41,7 +43,8 @@ export function HealthWatch() {
     const seen = readSeen();
     const fresh = lasting.some((key) => !seen.has(key));
     // Forget problems that went away, so one that comes back shows again.
-    localStorage.setItem(SEEN_KEY, JSON.stringify(lasting));
+    seenInMemory = new Set(lasting);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(lasting)); } catch { /* private mode */ }
     if (fresh) {
       opened.current = true;
       footer?.open();
