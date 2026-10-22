@@ -16,7 +16,10 @@ afterEach(() => {
 // Oct 13 2026, 2:05 PM in UTC.
 const AT = Date.UTC(2026, 9, 13, 14, 5);
 
-function setup(db = new Database(":memory:"), migrate = true) {
+function setup(db = new Database(":memory:"), migrate = true, threadOverrides?: {
+  get?(threadId: string): Promise<{ title?: string | null; projectId?: string | null }>;
+  send?(threadId: string, input: { text: string; agentOnly?: boolean }[]): Promise<void>;
+}) {
   if (migrate) for (const sql of MIGRATIONS) db.exec(sql);
   const store = new PageStore(db);
   const events: unknown[] = [];
@@ -31,8 +34,8 @@ function setup(db = new Database(":memory:"), migrate = true) {
     service,
     tags,
     threads: {
-      get: async (threadId) => (threadId === "thr_gone" ? Promise.reject(new Error("Thread not found")) : { title: "Weekly sync", projectId: "proj_a" }),
-      send: async (threadId, input) => { sent.push({ threadId, input }); },
+      get: (threadId) => threadOverrides?.get?.(threadId) ?? (threadId === "thr_gone" ? Promise.reject(new Error("Thread not found")) : Promise.resolve({ title: "Weekly sync", projectId: "proj_a" })),
+      send: async (threadId, input) => { sent.push({ threadId, input }); await threadOverrides?.send?.(threadId, input); },
     },
     linkThread: (pageId, threadId, state) => links.push([pageId, threadId, state]),
     publish: (pageId, threadId) => published.push([pageId, threadId]),
@@ -71,6 +74,20 @@ describe("draftToMarkdown", () => {
 });
 
 describe("Notes", () => {
+  it("serializes concurrent creation and appends every draft to the winning note", async () => {
+    const { notes, service, store } = setup();
+    const [first, second] = await Promise.all([
+      notes.create({ threadId: "thr_race", text: "First draft", timeZone: "UTC" }),
+      notes.create({ threadId: "thr_race", text: "Second draft", timeZone: "UTC" }),
+    ]);
+
+    expect(first.appended).toBe(false);
+    expect(second.appended).toBe(true);
+    expect(second.note.pageId).toBe(first.note.pageId);
+    expect(readMarkdown(service.hub.open(first.note.pageId).doc)).toBe("First draft\n\nSecond draft\n");
+    expect(store.list()).toHaveLength(1);
+  });
+
   it("makes a page from the draft, titled, tagged Notes and linked to the thread", async () => {
     const { notes, store, service, tags, links, published } = setup();
     const { note, appended } = await notes.create({ threadId: "thr_1", text: "Ana: ship Friday\n- check CI", timeZone: "UTC" });
@@ -137,6 +154,25 @@ describe("Notes", () => {
     expect(tags.assignments().get(`pages:${note.pageId}`)).toHaveLength(1);
     expect(links.at(-1)).toEqual([note.pageId, "thr_1", "sent"]);
     await expect(notes.send(note.pageId)).rejects.toThrow("already sent");
+  });
+
+  it("shares an in-flight send and refuses keep or discard until it settles", async () => {
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const { notes, sent } = setup(new Database(":memory:"), true, { send: async () => blocked });
+    const { note } = await notes.create({ threadId: "thr_1", text: "Send once", timeZone: "UTC" });
+    const first = notes.send(note.pageId);
+    const second = notes.send(note.pageId);
+    await Promise.resolve();
+
+    expect(sent).toHaveLength(1);
+    expect(() => notes.keep(note.pageId, "Saved")).toThrow("being sent");
+    expect(() => notes.discard(note.pageId)).toThrow("being sent");
+    release();
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+    expect(sent).toHaveLength(1);
+    expect(a.note.state).toBe("sent");
   });
 
   it("sends a long note as a link and a request to summarize", async () => {
@@ -210,5 +246,23 @@ describe("Notes", () => {
 
     expect(db.prepare("SELECT page_id FROM page_notes").all()).toEqual([]);
     expect(db.prepare("SELECT page_id FROM checklist_handoffs").all()).toEqual([]);
+  });
+
+  it("keeps the newest open note when applying the unique-thread migration", () => {
+    const db = new Database(":memory:");
+    for (const sql of MIGRATIONS.slice(0, -1)) db.exec(sql);
+    const insert = db.prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at) VALUES (?, 'thr_dupe', 'open', ?)");
+    insert.run("pg_old", 1);
+    insert.run("pg_a", 3);
+    insert.run("pg_z", 3);
+
+    db.exec(MIGRATIONS.at(-1)!);
+
+    expect(db.prepare("SELECT page_id, state FROM page_notes WHERE thread_id = 'thr_dupe' ORDER BY page_id").all()).toEqual([
+      { page_id: "pg_a", state: "kept" },
+      { page_id: "pg_old", state: "kept" },
+      { page_id: "pg_z", state: "open" },
+    ]);
+    expect(() => insert.run("pg_extra", 4)).toThrow(/UNIQUE constraint failed/);
   });
 });

@@ -456,4 +456,14 @@ export const MIGRATIONS = [
    CREATE TRIGGER bot_maintenance_runs_no_delete BEFORE DELETE ON bot_maintenance_runs BEGIN SELECT RAISE(ABORT, 'append-only'); END;`,
   ...CODE_MIGRATIONS,
   `ALTER TABLE bot_learning ADD COLUMN in_tool_turn INTEGER NOT NULL DEFAULT 0;`,
+  // There can be only one open note per thread. Keep the newest one when older databases contain duplicates.
+  `UPDATE page_notes
+     SET state = 'kept', resolved_at = COALESCE(resolved_at, created_at)
+   WHERE state = 'open' AND EXISTS (
+     SELECT 1 FROM page_notes AS newer
+     WHERE newer.thread_id = page_notes.thread_id AND newer.state = 'open'
+       AND (newer.created_at > page_notes.created_at
+         OR (newer.created_at = page_notes.created_at AND newer.page_id > page_notes.page_id))
+   );
+   CREATE UNIQUE INDEX page_notes_one_open_thread ON page_notes (thread_id) WHERE state = 'open';`,
 ];

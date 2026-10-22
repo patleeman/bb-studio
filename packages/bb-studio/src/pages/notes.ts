@@ -119,6 +119,9 @@ export interface NotesDeps {
 }
 
 export class Notes {
+  private readonly creating = new Map<string, Promise<{ note: NoteView; appended: boolean }>>();
+  private readonly sending = new Map<string, Promise<{ note: NoteView; sent: NoteSendMode }>>();
+
   constructor(private readonly deps: NotesDeps) {}
 
   private get store() {
@@ -178,20 +181,25 @@ export class Notes {
   }
 
   /** Makes the thread's note from `text`, or adds `text` to the end of the open one. */
-  async create(input: { threadId: string; text: string; timeZone?: string }): Promise<{ note: NoteView; appended: boolean }> {
+  create(input: { threadId: string; text: string; timeZone?: string }): Promise<{ note: NoteView; appended: boolean }> {
+    const pending = this.creating.get(input.threadId);
+    const operation = pending
+      ? pending.catch(() => {}).then(() => this.createOnce(input))
+      : Promise.resolve().then(() => this.createOnce(input));
+    this.creating.set(input.threadId, operation);
+    void operation.finally(() => {
+      if (this.creating.get(input.threadId) === operation) this.creating.delete(input.threadId);
+    }).catch(() => {});
+    return operation;
+  }
+
+  private async createOnce(input: { threadId: string; text: string; timeZone?: string }): Promise<{ note: NoteView; appended: boolean }> {
     const markdown = draftToMarkdown(input.text);
     const open = this.forThread(input.threadId);
-    if (open) {
-      if (markdown.trim()) {
-        const actor = { key: HUMAN_USER_ID, name: "You", color: actorColor(HUMAN_USER_ID) };
-        this.deps.service.edit(open.pageId, [{ op: "append", markdown }], actor);
-        this.deps.service.hub.flush(this.deps.service.hub.open(open.pageId));
-      }
-      const row = this.row(open.pageId)!;
-      this.changed(row);
-      return { note: this.view(row)!, appended: true };
-    }
+    if (open) return this.append(open, markdown);
     const thread = await this.deps.threads.get(input.threadId);
+    const afterLookup = this.forThread(input.threadId);
+    if (afterLookup) return this.append(afterLookup, markdown);
     const at = this.now();
     const page = this.deps.service.createPage({
       projectId: thread.projectId ?? null,
@@ -202,9 +210,16 @@ export class Notes {
       actor: HUMAN_USER_ID,
     });
     const row: NoteRow = { page_id: page.id, thread_id: input.threadId, state: "open", created_at: at, resolved_at: null };
-    this.deps.db
-      .prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at, resolved_at) VALUES (?, ?, ?, ?, ?)")
-      .run(row.page_id, row.thread_id, row.state, row.created_at, row.resolved_at);
+    try {
+      this.deps.db
+        .prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at, resolved_at) VALUES (?, ?, ?, ?, ?)")
+        .run(row.page_id, row.thread_id, row.state, row.created_at, row.resolved_at);
+    } catch (error) {
+      const winner = this.forThread(input.threadId);
+      this.deps.service.deletePage(page.id);
+      if (winner) return this.append(winner, markdown);
+      throw error;
+    }
     try {
       this.deps.tags.apply([{ pluginId: PLUGIN_ID, id: page.id }], [this.deps.tags.ensure(NOTES_TAG).id], []);
     } catch {
@@ -215,6 +230,17 @@ export class Notes {
     return { note: this.view(row)!, appended: false };
   }
 
+  private append(open: NoteView, markdown: string): { note: NoteView; appended: boolean } {
+    if (markdown.trim()) {
+      const actor = { key: HUMAN_USER_ID, name: "You", color: actorColor(HUMAN_USER_ID) };
+      this.deps.service.edit(open.pageId, [{ op: "append", markdown }], actor);
+      this.deps.service.hub.flush(this.deps.service.hub.open(open.pageId));
+    }
+    const row = this.row(open.pageId)!;
+    this.changed(row);
+    return { note: this.view(row)!, appended: true };
+  }
+
   private requireOpen(pageId: string): NoteRow {
     const row = this.row(pageId);
     if (!row || !this.store.meta(pageId)) throw new Error("This note no longer exists.");
@@ -223,7 +249,8 @@ export class Notes {
   }
 
   private resolve(row: NoteRow, state: Exclude<NoteState, "open">): NoteView {
-    this.deps.db.prepare("UPDATE page_notes SET state = ?, resolved_at = ? WHERE page_id = ?").run(state, this.now(), row.page_id);
+    const result = this.deps.db.prepare("UPDATE page_notes SET state = ?, resolved_at = ? WHERE page_id = ? AND state = 'open'").run(state, this.now(), row.page_id);
+    if (!result.changes) throw new Error("This note was already completed.");
     const next = this.row(row.page_id)!;
     this.deps.linkThread?.(row.page_id, row.thread_id, state);
     this.changed(next);
@@ -231,8 +258,24 @@ export class Notes {
   }
 
   /** Sends the note to its thread; `auto` sends the Markdown up to SEND_INLINE_LIMIT characters, else a link and a request to summarize. */
-  async send(pageId: string, mode: "auto" | NoteSendMode = "auto"): Promise<{ note: NoteView; sent: NoteSendMode }> {
-    const row = this.requireOpen(pageId);
+  send(pageId: string, mode: "auto" | NoteSendMode = "auto"): Promise<{ note: NoteView; sent: NoteSendMode }> {
+    const pending = this.sending.get(pageId);
+    if (pending) return pending;
+    let row: NoteRow;
+    try {
+      row = this.requireOpen(pageId);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const operation = Promise.resolve().then(() => this.sendOnce(row, pageId, mode));
+    this.sending.set(pageId, operation);
+    void operation.finally(() => {
+      if (this.sending.get(pageId) === operation) this.sending.delete(pageId);
+    }).catch(() => {});
+    return operation;
+  }
+
+  private async sendOnce(row: NoteRow, pageId: string, mode: "auto" | NoteSendMode): Promise<{ note: NoteView; sent: NoteSendMode }> {
     const meta = this.store.meta(pageId)!;
     const markdown = this.markdown(pageId).trim();
     if (!markdown) throw new Error("The note is empty. Write something first, or discard it.");
@@ -260,6 +303,7 @@ export class Notes {
 
   /** Keeps the note as an ordinary page titled `title`; it stays in Notes. */
   keep(pageId: string, title: string): NoteView {
+    if (this.sending.has(pageId)) throw new Error("This note is being sent; wait for it to finish.");
     const row = this.requireOpen(pageId);
     const meta = this.store.update(pageId, { title: title.trim() }, HUMAN_USER_ID);
     this.deps.service.publish({ type: "tree", projectId: meta?.project_id ?? null });
@@ -268,6 +312,7 @@ export class Notes {
 
   /** Deletes an open note's page. */
   discard(pageId: string): boolean {
+    if (this.sending.has(pageId)) throw new Error("This note is being sent; wait for it to finish.");
     const row = this.requireOpen(pageId);
     const ids = this.deps.service.deletePage(pageId);
     this.deps.db.prepare("DELETE FROM page_notes WHERE page_id = ?").run(pageId);
