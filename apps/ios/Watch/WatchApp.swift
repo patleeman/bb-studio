@@ -80,6 +80,7 @@ struct WatchThreadView: View {
     @State private var interactions: [PendingInteraction] = []
     @State private var reply = ""
     @State private var status: String?
+    @State private var stopping = false
     /// Why the thread couldn't load, when nothing has loaded.
     @State private var loadError: String?
     /// BB says the thread doesn't exist: deleted since the list or notification.
@@ -128,8 +129,9 @@ struct WatchThreadView: View {
                     ProgressView().frame(width: 20)
                     Text("Working…").font(.footnote)
                     Spacer()
-                    Button { Task { try? await client.stop(threadId) } } label: { Image(systemName: "stop.fill") }
+                    Button { Task { await stop() } } label: { Image(systemName: "stop.fill") }
                         .buttonStyle(.plain)
+                        .disabled(stopping)
                 }
             }
             Section {
@@ -156,6 +158,19 @@ struct WatchThreadView: View {
                 guard !Task.isCancelled else { return }
                 await load()
             }
+        }
+    }
+
+    private func stop() async {
+        guard !stopping else { return }
+        stopping = true
+        defer { stopping = false }
+        do {
+            try await client.stop(threadId)
+        } catch {
+            let message = BBClient.describe(error, server: client.baseURL)
+            await load()
+            status = message
         }
     }
 

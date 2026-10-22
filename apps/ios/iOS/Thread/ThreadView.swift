@@ -1018,6 +1018,7 @@ struct ThreadView: View {
                             .background(Color.primary.opacity(0.85), in: .circle)
                             .frame(width: 36, height: 36)
                     }
+                    .disabled(model.stopping)
                     .accessibilityLabel("Stop \(botChrome.bot.name)")
                 } else {
                 Button(action: send) {

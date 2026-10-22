@@ -30,6 +30,7 @@ final class ThreadModel: ObservableObject {
     @Published var loadingAll = false
     @Published var error: String?
     @Published var sending = false
+    @Published private(set) var stopping = false
     @Published var interactions: [PendingInteraction] = []
     @Published var shelf = Shelf()
     @Published var queued: [QueuedMessage] = []
@@ -649,7 +650,16 @@ final class ThreadModel: ObservableObject {
     }
 
     func stop() async {
-        try? await client?.stop(threadId)
+        guard !stopping, let client else { return }
+        stopping = true
+        defer { stopping = false }
+        do {
+            try await client.stop(threadId)
+        } catch {
+            let message = BBClient.describe(error, server: client.baseURL)
+            await refreshLatest()
+            self.error = message
+        }
     }
 
     /// The newest assistant reply, for voice chat and the watch.
