@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { element, memoryStore, scene } from "../test/db";
 import { drawingProvider, drawingText, toStudioItem } from "./provider";
+import type { DrawingRow } from "./store";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -119,6 +120,15 @@ describe("the Draw Studio provider", () => {
     const row = store.create({ name: "", projectId: null, by: "app" });
     store.write(row.id, scene([element("embeddable"), element("text", { text: "  " })]), "editor");
     expect(toStudioItem(store.get(row.id)!)).toMatchObject({ thumbnailUrl: null, facts: [{ id: "elements", value: "2", sort: 2 }] });
+  });
+
+  it("does not share drawing summaries across stores", () => {
+    const row = (text: string) => ({
+      id: "dr_shared", name: "Sketch", data: scene([element("text", { text })]), project_id: null,
+      created_at: 1, updated_at: 1, updated_by: "app", archived_at: null, template: 0,
+    }) as DrawingRow;
+    expect(toStudioItem(row("first"))).toMatchObject({ preview: "first" });
+    expect(toStudioItem(row("second"))).toMatchObject({ preview: "second" });
   });
 
   it("creates, moves, archives and deletes", async () => {

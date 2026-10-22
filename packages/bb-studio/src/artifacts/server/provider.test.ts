@@ -2,7 +2,8 @@ import { studioSchemas } from "../../kit/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { bytes, memoryStore } from "../test/db";
-import { artifactProvider, htmlText } from "./provider";
+import { artifactProvider, artifactText, htmlText } from "./provider";
+import type { ArtifactStore, ArtifactWithVersion } from "./store";
 
 function setup() {
   const { store } = memoryStore();
@@ -15,6 +16,25 @@ function setup() {
 }
 
 describe("the Artifacts Studio provider", () => {
+  it("keeps text caches within a store and bounds null entries", () => {
+    const version = { id: "shared", artifact_id: "art_shared", number: 1, name: "note.txt", mime: "text/plain", size: 4, sha256: "hash", created_at: 1 };
+    const artifact = (id: string) => ({
+      id: "art_shared", title: "", description: "", project_id: null, source_thread_id: null, source_path: null,
+      created_at: 1, updated_at: 1, updated_by: null, archived_at: null, versions: 1,
+      version: { ...version, id },
+    }) as ArtifactWithVersion;
+    const firstStore = { bytes: () => Buffer.from("one") } as unknown as ArtifactStore;
+    const secondStore = { bytes: () => Buffer.from("two") } as unknown as ArtifactStore;
+    expect(artifactText(firstStore, artifact("shared"))).toBe("one");
+    expect(artifactText(secondStore, artifact("shared"))).toBe("two");
+
+    let reads = 0;
+    const emptyStore = { bytes: () => { reads++; return null; } } as unknown as ArtifactStore;
+    for (let i = 0; i < 10_001; i++) artifactText(emptyStore, artifact(`empty-${i}`));
+    artifactText(emptyStore, artifact("empty-0"));
+    expect(reads).toBe(10_002);
+  });
+
   it("renames an artifact", async () => {
     const { store, call, changed, save } = setup();
     const source = save("notes.txt", "hello", { title: "Notes" });

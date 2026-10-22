@@ -32,29 +32,41 @@ export const TEXT_SCAN_BYTES = 1024 * 1024;
 
 /** How much text the cache keeps, in characters; the least recently read goes first. */
 const TEXT_CACHE_CHARS = 32 * 1024 * 1024;
+const TEXT_CACHE_ENTRIES = 10_000;
 
-const texts = new Map<string, string | null>();
-let cachedChars = 0;
+type TextCache = { entries: Map<string, string | null>; chars: number };
+const texts = new WeakMap<ArtifactStore, TextCache>();
+
+/** Drop a store's cached versions when its artifacts are deleted. */
+export function clearArtifactTextCache(store: ArtifactStore): void {
+  texts.delete(store);
+}
 
 /** A version's text, for text types under the scan limit. Cached by version. */
 export function artifactText(store: ArtifactStore, artifact: ArtifactWithVersion): string | null {
+  let cache = texts.get(store);
+  if (!cache) {
+    cache = { entries: new Map(), chars: 0 };
+    texts.set(store, cache);
+  }
   const { version } = artifact;
-  if (texts.has(version.id)) {
-    const text = texts.get(version.id)!;
-    texts.delete(version.id);
-    texts.set(version.id, text);
+  if (cache.entries.has(version.id)) {
+    const text = cache.entries.get(version.id)!;
+    cache.entries.delete(version.id);
+    cache.entries.set(version.id, text);
     return text;
   }
   let text: string | null = null;
   if (isTextType(versionType(version)) && version.size <= TEXT_SCAN_BYTES) {
     text = store.bytes(version.sha256)?.toString("utf8") ?? null;
   }
-  texts.set(version.id, text);
-  cachedChars += text?.length ?? 0;
-  for (const [id, old] of texts) {
-    if (cachedChars <= TEXT_CACHE_CHARS || id === version.id) break;
-    texts.delete(id);
-    cachedChars -= old?.length ?? 0;
+  cache.entries.set(version.id, text);
+  cache.chars += text?.length ?? 0;
+  while (cache.entries.size > TEXT_CACHE_ENTRIES || cache.chars > TEXT_CACHE_CHARS) {
+    const oldest = cache.entries.entries().next().value as [string, string | null] | undefined;
+    if (!oldest) break;
+    cache.entries.delete(oldest[0]);
+    cache.chars -= oldest[1]?.length ?? 0;
   }
   return text;
 }
@@ -187,6 +199,7 @@ export function artifactProvider(deps: { store: ArtifactStore; changed(id: strin
     studio_delete: each((id) => {
       mustGet(id);
       store.delete(id);
+      clearArtifactTextCache(store);
       deps.changed(id);
     }),
     studio_search: storeSearch<ArtifactWithVersion>({

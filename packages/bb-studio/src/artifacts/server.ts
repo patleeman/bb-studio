@@ -26,7 +26,7 @@ import { LiveStore } from "./live/store";
 import { importedFile } from "./server/import-file";
 import { mentionContext } from "./server/mention";
 import { pageMarkdown } from "./server/page";
-import { TEXT_SCAN_BYTES, artifactProvider, artifactText } from "./server/provider";
+import { TEXT_SCAN_BYTES, artifactProvider, artifactText, clearArtifactTextCache } from "./server/provider";
 import {
   ArtifactStore,
   displayTitle,
@@ -284,7 +284,10 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
       return { ok: true };
     },
     "artifacts.delete"({ id }) {
-      if (store.delete(id)) changed(id);
+      if (store.delete(id)) {
+        clearArtifactTextCache(store);
+        changed(id);
+      }
       return { ok: true };
     },
     "artifacts.move"({ id, projectId }) {
@@ -578,6 +581,7 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
           const id = flags.positional[0];
           if (!id) return { exitCode: 1, stderr: "usage: bb studio artifacts delete <id>\n" };
           if (!store.delete(id)) return { exitCode: 1, stderr: `Artifact ${id} not found\n` };
+          clearArtifactTextCache(store);
           changed(id);
           return { exitCode: 0, stdout: `deleted ${id}\n` };
         }

@@ -76,12 +76,17 @@ export function drawingText(data: string): string[] {
 }
 
 type Summary = { count: number; preview: string | null; thumbnail: boolean };
-const summaries = new Map<string, { at: number; summary: Summary }>();
+type SummaryCache = Map<string, { at: number; summary: Summary }>;
+const SUMMARY_CACHE_ENTRIES = 10_000;
 
 /** Element count and text preview, cached per revision: scenes can be large. */
-function summarize(row: DrawingRow): Summary {
+function summarize(row: DrawingRow, summaries: SummaryCache): Summary {
   const cached = summaries.get(row.id);
-  if (cached?.at === row.updated_at) return cached.summary;
+  if (cached?.at === row.updated_at) {
+    summaries.delete(row.id);
+    summaries.set(row.id, cached);
+    return cached.summary;
+  }
   const scene = parseSceneData(row.data);
   const count = getNonDeletedElements(scene).length;
   const text = drawingText(row.data).join(" · ").replace(/\s+/g, " ");
@@ -91,12 +96,14 @@ function summarize(row: DrawingRow): Summary {
     // Some elements (embeds, empty text) draw nothing; the route would 404.
     thumbnail: count > 0 && sceneThumbnail(scene) !== null,
   };
+  summaries.delete(row.id);
   summaries.set(row.id, { at: row.updated_at, summary });
+  if (summaries.size > SUMMARY_CACHE_ENTRIES) summaries.delete(summaries.keys().next().value!);
   return summary;
 }
 
-export function toStudioItem(row: DrawingRow): StudioItem {
-  const { count, preview, thumbnail } = summarize(row);
+function makeStudioItem(row: DrawingRow, summaries: SummaryCache): StudioItem {
+  const { count, preview, thumbnail } = summarize(row, summaries);
   return {
     id: row.id,
     kind: DRAWING_KIND.id,
@@ -117,11 +124,17 @@ export function toStudioItem(row: DrawingRow): StudioItem {
   };
 }
 
+export function toStudioItem(row: DrawingRow): StudioItem {
+  return makeStudioItem(row, new Map());
+}
+
 /** Studio lists at most this many; past it, Studio keeps tags of items it didn't see. */
 const LIST_LIMIT = 10_000;
 
 export function drawingProvider(deps: { store: DrawingStore; changed(id: string): void }): StudioProviderHandlers {
   const { store } = deps;
+  const summaries: SummaryCache = new Map();
+  const item = (row: DrawingRow) => makeStudioItem(row, summaries);
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Drawing not found.");
   const duplicate = (id: string, projectId: string | null, variables?: Record<string, string>) => {
     const source = mustGet(id);
@@ -129,23 +142,23 @@ export function drawingProvider(deps: { store: DrawingStore; changed(id: string)
     const row = store.create({ name: variables ? fillTemplate(source.name, variables) : copyTitle(source.name), projectId, by: "app" });
     store.write(row.id, data, "app");
     deps.changed(row.id);
-    return toStudioItem(store.get(row.id)!);
+    return item(store.get(row.id)!);
   };
 
   return {
     // No panel of its own: the kind's collection is Studio's library filtered to it.
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: null, kinds: [DRAWING_KIND] }),
-    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(row)] : []; }) }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [item(row)] : []; }) }),
     studio_read: ({ id }) => ({ content: store.get(id) ? drawingText(store.get(id)!.data).join("\n") : null }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
-      return { items: rows.map(toStudioItem), truncated: rows.length === LIST_LIMIT };
+      return { items: rows.map(item), truncated: rows.length === LIST_LIMIT };
     },
     studio_create: ({ kind, projectId }) => {
       if (kind !== DRAWING_KIND.id) throw new Error(`Unknown kind "${kind}".`);
       const row = store.create({ name: "", projectId, by: "app" });
       deps.changed(row.id);
-      return { item: toStudioItem(row) };
+      return { item: item(row) };
     },
     studio_rename: ({ id, title }) =>
       eachId([id], () => {
@@ -154,7 +167,7 @@ export function drawingProvider(deps: { store: DrawingStore; changed(id: string)
         deps.changed(id);
       }),
     studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
-    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id)) }; },
+    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: item(mustGet(id)) }; },
     studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Drawing is not a template."); return { item: duplicate(id, projectId, variables) }; },
     studio_export: async ({ id, format }) => {
       const row = mustGet(id);
