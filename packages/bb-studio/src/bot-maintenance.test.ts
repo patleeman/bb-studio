@@ -143,6 +143,17 @@ it("treats commits ahead of a local or other branch's base as unconfirmed, not u
   s.workspace.mergeBase.mergeBaseBranch = "main"; expect(workspaceBlock(s as never)).toBeNull();
   s.workspace.mergeBase.mergeBaseBranch = "origin/other"; expect(workspaceBlock(s as never)).toBeNull();
 });
+it("keeps a parent while a child thread is still open, since archiving cascades", async () => {
+  const x = await setup(); await x.enable();
+  x.rows.push({ ...thread("kid"), parentThreadId: "child", environmentId: "env" }); x.owned.add("kid");
+  const s = clean(); s.workspace.workingTree.files.push({ path: "README.md", status: "M" }); x.status.mockResolvedValue(s);
+  const r = await x.maintenance.run("bot", { now });
+  expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall.map((n) => n.threadId)).toEqual(["kid"]);
+  x.status.mockResolvedValue(clean()); await x.maintenance.run("bot", { now: now + 1 });
+  expect(x.archive.mock.calls.map(([input]) => (input as { threadId: string }).threadId)).toEqual(["kid"]);
+  x.rows.splice(1, 1); await x.maintenance.run("bot", { now: now + 2 });
+  expect(x.archive.mock.calls.map(([input]) => (input as { threadId: string }).threadId)).toEqual(["kid", "child"]);
+});
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
   await x.maintenance.run("bot", { now }); expect(x.status).toHaveBeenCalledWith({ environmentId: "env", mergeBaseBranch: "origin/bb/child" }); expect(x.archive).toHaveBeenCalledOnce();

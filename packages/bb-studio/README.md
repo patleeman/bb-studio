@@ -1264,7 +1264,9 @@ real work: uncommitted changes to tracked files, or commits ahead of the
 branch's own remote-tracking ref. Those threads go to **Needs your call**.
 Untracked scratch files, non-git workspaces and statuses that can't be
 confirmed don't block. SDK 0.6.37 has no upstream push count, so commits
-counted against any other base are treated as unconfirmed.
+counted against any other base are treated as unconfirmed. BB archives a
+thread's children with it, so a thread with open child threads waits for a
+later run.
 The same SDK cannot identify loaded idle runtimes, so runtime cleanup skips
 them. Archives can be undone with BB's Unarchive. Settings and run history
 are append-only. Each run has one Activity entry; only **Needs your call**

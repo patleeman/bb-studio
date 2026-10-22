@@ -127,6 +127,7 @@ export class BotMaintenance {
         if (batch.length < 200) break;
       }
       let archived = 0, workers = 0;
+      const archiving = new Set<string>();
       for (const id of owned) {
         const thread = listed.get(id);
         if (!thread || thread.archivedAt || running.has(id)) continue;
@@ -157,6 +158,9 @@ export class BotMaintenance {
           if (reason) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason }); continue; }
         }
         if (!this.deps.owned(botId).has(id) || this.deps.bots().find((b) => b.id === botId)?.state !== "active") continue;
+        // BB archives a thread's children with it: wait until none are left open.
+        if ([...listed.values()].some((t) => t.parentThreadId === id && !t.archivedAt && !archiving.has(t.id))) continue;
+        archiving.add(id);
         await act(`Archive ${worker ? "worker" : "thread"}: ${thread.title || id}`, () => this.deps.sdk.threads.archive({ threadId: id }));
         if (worker) workers++; else archived++;
       }
