@@ -39,7 +39,7 @@ function setup(options: { sideChat?: boolean } = {}) {
   const events = vi.fn(async ({ threadId }: { threadId: string }) => firstEvents.has(threadId) ? [{ seq: 1, data: { input: [{ type: "text", text: firstEvents.get(threadId), visibility: "agent-only" }] } }] : []);
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: { fork: fork as never, timeline: timeline as never, get: get as never, update: update as never, list: list as never, events: { list: events as never } as never },
-    plugins: { callRpc: callRpc as never } as never,
+    plugins: { callRpc: callRpc as never, list: async () => ({ plugins: options.sideChat === false ? [] : [{ id: "side-chat", enabled: true }] }) as never } as never,
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
@@ -146,4 +146,17 @@ it("titles a side thread with the reply's plain start", () => {
   expect(snippet("## Plan\n\nShip **Friday**.\n\n::bot-thread{}")).toBe("Plan Ship Friday.");
   expect(snippet("::next{reply=\"x\"}")).toBe("Thread");
   expect(snippet("a".repeat(80))).toHaveLength(60);
+});
+
+
+it("surfaces operational side-chat failures and discovers a created fork before retrying", async () => {
+  const { side, callRpc, fork, userSideChat } = setup();
+  callRpc.mockImplementationOnce(async () => {
+    userSideChat("Older reply");
+    throw new Error("response timed out");
+  });
+  await expect(side.open("bot1", "r1")).rejects.toThrow("response timed out");
+  expect(fork).not.toHaveBeenCalled();
+  expect(await side.open("bot1", "r1")).toEqual({ threadId: "fork1", created: false });
+  expect(callRpc).toHaveBeenCalledTimes(1);
 });

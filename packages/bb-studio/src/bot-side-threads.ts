@@ -261,6 +261,8 @@ export class SideThreads {
   }
 
   private async start(sourceThreadId: string, messageId: string): Promise<{ threadId: string; created: boolean }> {
+    // A previous create may have succeeded before its response was lost.
+    await this.discover(sourceThreadId);
     const latest = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? AND message_id = ? ORDER BY created_at DESC, rowid DESC").all(sourceThreadId, messageId) as SideRow[];
     const open = (await this.live(latest))[0];
     if (open) return { threadId: open.row.thread_id, created: false };
@@ -275,8 +277,10 @@ export class SideThreads {
         input: { sourceThreadId, sourceSeqEnd: reply.sourceSeqEnd, anchorText: reply.text ?? "" } as never,
         outputSchema: z.object({ threadId: z.string() }),
       }));
-    } catch {
-      // Side-chat is off: the same fork, made here.
+    } catch (error) {
+      const { plugins } = await this.deps.sdk.plugins.list();
+      if (plugins.some((plugin) => plugin.id === SIDE_CHAT_PLUGIN && plugin.enabled)) throw error;
+      // Confirmed absent or disabled: make the same fork here.
       const fork = await this.deps.sdk.threads.fork({
         sourceThreadId, sourceSeqEnd: reply.sourceSeqEnd, lifecycleOwnerThreadId: sourceThreadId, visibility: "hidden",
         agentContextSeed: [{ type: "text", text: `${SIDE_THREAD_INSTRUCTIONS}\n\n${SIDE_CHAT_SEED_PREFIX}${reply.text ?? ""}`, mentions: [], visibility: "agent-only" }],
