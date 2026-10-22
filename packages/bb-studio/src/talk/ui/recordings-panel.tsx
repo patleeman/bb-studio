@@ -51,6 +51,7 @@ import { RecordingPlayer, type PlaybackState } from "./playback";
 import { UnsentNotice } from "./unsent-notice";
 import { useRecordingProvider } from "./provider";
 import { openCollection } from "../../ui/StudioPanel";
+import { unsentAudioState } from "./unsent-state";
 
 function useChangedSignal(onChange: (id: string) => void): void {
   useRealtime(RECORDING_CHANGED, (payload) => {
@@ -63,7 +64,9 @@ function useChangedSignal(onChange: (id: string) => void): void {
 
 /** Audio the server refused, kept on this device. */
 export function UnsentAudio() {
-  const setAside = useTalkState().setAside ?? [];
+  const { setAside: recovered, uploadError } = useTalkState();
+  const setAside = recovered ?? [];
+  const status = unsentAudioState(recovered, uploadError);
   const open = useOpenMain();
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
@@ -83,9 +86,17 @@ export function UnsentAudio() {
           The server refused these pieces of audio, so Talk kept them on this device instead of losing them. Retry
           after updating Talk, download them, or discard them.
         </p>
-        {setAside.length === 0 ? (
+        {status === "error" ? (
+          <div role="alert" className="mt-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+            <p>Talk couldn’t check or upload local audio: {uploadError}</p>
+            <button type="button" className={`${OUTLINE_BUTTON} mt-3`} disabled={busy} onClick={() => act(() => talk.kickUpload())}>Retry check</button>
+          </div>
+        ) : null}
+        {status === "checking" ? (
+          <p className="mt-8 text-sm text-muted-foreground">Checking for unsent audio…</p>
+        ) : status === "uploaded" ? (
           <p className="mt-8 text-sm text-muted-foreground">Nothing here: every piece of audio was uploaded.</p>
-        ) : (
+        ) : status === "items" ? (
           <>
             <div className="mt-6 flex flex-wrap gap-2">
               <button type="button" className={OUTLINE_BUTTON} disabled={busy} onClick={() => act(() => talk.retrySetAside(setAside))}>
@@ -156,7 +167,7 @@ export function UnsentAudio() {
               ))}
             </ul>
           </>
-        )}
+        ) : null}
       </PageColumn>
     </div>
   );

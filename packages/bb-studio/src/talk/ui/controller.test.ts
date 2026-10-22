@@ -125,6 +125,20 @@ it("reports a memory-only tail lost on reload and blocks completion until acknow
   expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!)).toMatchObject({ insert: false, localSaveFailed: false });
 });
 
+it.each([
+  ["outbox read", "IndexedDB unavailable"],
+  ["orphan sealing", "Could not seal audio"],
+] as const)("surfaces %s failures without claiming audio is uploaded", async (operation, failure) => {
+  if (operation === "outbox read") vi.mocked(Outbox.prototype.all).mockRejectedValue(new Error(failure));
+  else vi.mocked(Outbox.prototype.sealOrphans).mockRejectedValue(new Error(failure));
+  const controller = new TalkController();
+  controller.attach({ call: vi.fn(async () => ({})) } as never);
+
+  await vi.waitFor(() => expect(controller.getState().uploadError).toBe(failure));
+  if (operation === "outbox read") expect(controller.getState().setAside).toBeNull();
+  else expect(controller.getState().setAside).toEqual([]);
+});
+
 it("retains recovery metadata when the network is online but the recording RPC fails", async () => {
   const saved = { recordingId: "rec_offline", kind: "dictation", phase: "paused", threadId: "thr_origin", insert: false, localSaveFailed: true };
   localStorage.setItem("bb-plugin-talk:active", JSON.stringify(saved));

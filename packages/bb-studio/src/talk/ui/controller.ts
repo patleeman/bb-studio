@@ -1514,10 +1514,15 @@ export class TalkController {
 
   // ── Set-aside audio (the recovery view) ────────────────────────────────
   private async refreshSetAside(): Promise<void> {
-    const setAside = setAsideOf(await this.outbox.all().catch(() => []));
-    const signature = (list: readonly SetAsideSegment[]) => list.map((s) => `${keyString(s)} ${s.reason}`).join("\n");
-    const current = this.state.setAside;
-    if (!current || signature(setAside) !== signature(current)) this.set({ setAside });
+    try {
+      const setAside = setAsideOf(await this.outbox.all());
+      const signature = (list: readonly SetAsideSegment[]) => list.map((s) => `${keyString(s)} ${s.reason}`).join("\n");
+      const current = this.state.setAside;
+      if (!current || signature(setAside) !== signature(current)) this.set({ setAside });
+    } catch (error) {
+      this.set({ uploadError: message(error) });
+      this.scheduleUpload();
+    }
   }
 
   /** Sends set-aside segments again, e.g. after a Talk update. */
@@ -1559,8 +1564,8 @@ export class TalkController {
     if (!rpc) return;
     // A segment a closed window left open never uploads until it's sealed;
     // seal it here too, not only at startup, so it can't hang the count.
-    await this.sealOrphans().catch(() => {});
-    const all = (await this.outbox.all().catch(() => [])).filter((s) => !s.rejected && !this.unsaved.has(keyString(s)));
+    await this.sealOrphans();
+    const all = (await this.outbox.all()).filter((s) => !s.rejected && !this.unsaved.has(keyString(s)));
     // Open segments still being recorded (here or in another window) aren't
     // waiting to upload yet; check back once they could count as orphans.
     const open = all.filter((s) => !isUploadable(s) && !this.live.has(keyString(s)));
