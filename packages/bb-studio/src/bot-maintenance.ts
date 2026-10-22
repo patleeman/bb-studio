@@ -21,16 +21,22 @@ export function finished(thread: Pick<Thread, "status" | "hasPendingInteraction"
   return thread.status === "idle" && !thread.hasPendingInteraction && !targeted && thread.queuedWork === "none" && Object.values(thread.activity).every((count) => count === 0) && !interactions.some((i) => i.status === "pending" || i.status === "resolving");
 }
 export function archiveAge(worker: boolean, captured: boolean, ownerReplied: boolean): number { return (worker ? ownerReplied ? 1 : 3 : captured ? 3 : 7) * DAY; }
-export function safeWorkspace(status: Awaited<ReturnType<Sdk["environments"]["status"]>>): boolean {
-  // 0.6.37 has no upstream/push count. A local merge base cannot prove
-  // commits were pushed: accept only zero ahead of a remote tracking branch
-  // for this exact branch. `baseRef` is the merge-base commit SHA, so use the
-  // requested `mergeBaseBranch` ref to prove it is remote-tracking.
-  if (status.outcome !== "available") return false;
+/**
+ * Why a workspace must not be archived, or null. Only real work blocks:
+ * uncommitted changes to tracked files, or commits ahead of this branch's
+ * own remote-tracking ref. Untracked scratch files, non-git workspaces and
+ * statuses that can't be confirmed don't block.
+ */
+export function workspaceBlock(status: Awaited<ReturnType<Sdk["environments"]["status"]>> | null): string | null {
+  if (status?.outcome !== "available") return null;
   const { checkout, mergeBase, workingTree } = status.workspace;
-  if (checkout.kind !== "branch" || !mergeBase?.mergeBaseBranch) return false;
-  const remote = /^(?:refs\/remotes\/)?[^/]+\/(.+)$/.exec(mergeBase.mergeBaseBranch)?.[1];
-  return remote === checkout.branchName && !mergeBase.mergeBaseBranch.startsWith("refs/heads/") && workingTree.state === "clean" && !workingTree.hasUncommittedChanges && mergeBase.aheadCount === 0 && !mergeBase.hasCommittedUnmergedChanges;
+  const tracked = workingTree.files.filter((f) => f.status !== "??" && f.status !== "?");
+  if (tracked.length) return `Uncommitted changes to ${count(tracked.length, "tracked file")}.`;
+  // 0.6.37 has no upstream/push count: only a remote-tracking ref for this
+  // exact branch proves which commits are unpushed. `baseRef` is a SHA.
+  const remote = mergeBase && !mergeBase.mergeBaseBranch.startsWith("refs/heads/") ? /^(?:refs\/remotes\/)?[^/]+\/(.+)$/.exec(mergeBase.mergeBaseBranch)?.[1] : undefined;
+  if (checkout.kind === "branch" && remote === checkout.branchName && mergeBase!.aheadCount > 0 && mergeBase!.files.length) return `${count(mergeBase!.aheadCount, "unpushed commit")}.`;
+  return null;
 }
 export function memoryNeedsTidy(text: string, budget: number, updatedAt: number, now: number): boolean {
   const dates = [...text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => Date.parse(m[1]!)).filter(Number.isFinite);
@@ -144,11 +150,10 @@ export class BotMaintenance {
         if (fresh.archivedAt || fresh.environmentId !== thread.environmentId || fresh.queuedMessageCount > 0 || fresh.updatedAt !== thread.updatedAt || fresh.status !== "idle" || fresh.activeBackgroundAgentCount > 0 || (await this.deps.sdk.threads.interactions.list({ threadId: id })).some((i) => i.status === "pending" || i.status === "resolving")) continue;
         const live = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: null, outputSchema: overview });
         if (live.automations.some((a) => a.automation.enabled && a.automation.execution.targetThreadId === id)) continue;
-        if (thread.environmentId || thread.environmentPath) {
-          const status = thread.environmentId && thread.environmentBranchName
-            ? await this.deps.sdk.environments.status({ environmentId: thread.environmentId, mergeBaseBranch: `origin/${thread.environmentBranchName}` }).catch(() => null)
-            : null;
-          if (!status || !safeWorkspace(status)) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason: "Workspace is dirty, has unpushed commits, or clean/pushed status could not be confirmed." }); continue; }
+        if (thread.environmentId) {
+          const status = await this.deps.sdk.environments.status({ environmentId: thread.environmentId, ...thread.environmentBranchName ? { mergeBaseBranch: `origin/${thread.environmentBranchName}` } : {} }).catch(() => null);
+          const reason = workspaceBlock(status);
+          if (reason) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason }); continue; }
         }
         if (!this.deps.owned(botId).has(id) || this.deps.bots().find((b) => b.id === botId)?.state !== "active") continue;
         await act(`Archive ${worker ? "worker" : "thread"}: ${thread.title || id}`, () => this.deps.sdk.threads.archive({ threadId: id }));

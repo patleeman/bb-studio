@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, safeWorkspace } from "./bot-maintenance";
+import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, workspaceBlock } from "./bot-maintenance";
 import { MIGRATIONS } from "./migrations";
 const DAY = 86_400_000;
 const now = 200 * DAY;
@@ -9,7 +9,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 function thread(id = "child", days = 8) {
   return { ...makeThreadResponse({ id, status: "idle", updatedAt: now - days * DAY, parentThreadId: "main", environmentId: null }), environmentBranchName: "bb/child", hasPendingInteraction: false, queuedWork: "none", activity: { activeBackgroundAgentCount: 0, activeBackgroundCommandCount: 0, activeGoalCount: 0, activePlanModeCount: 0, activeWorkflowCount: 0 }, environmentPath: null };
 }
-const clean = () => ({ outcome: "available", workspace: { checkout: { kind: "branch", branchName: "bb/child" }, workingTree: { state: "clean", hasUncommittedChanges: false }, mergeBase: { mergeBaseBranch: "origin/bb/child", baseRef: "4f2a0930f358881edf6a22ce40d56212f8432f40", aheadCount: 0, hasCommittedUnmergedChanges: false } } });
+const clean = () => ({ outcome: "available", workspace: { checkout: { kind: "branch", branchName: "bb/child" }, workingTree: { state: "clean", hasUncommittedChanges: false, files: [] as { path: string; status: string }[] }, mergeBase: { mergeBaseBranch: "origin/bb/child", baseRef: "4f2a0930f358881edf6a22ce40d56212f8432f40", aheadCount: 0, hasCommittedUnmergedChanges: false, files: [] as { path: string; status: string }[] } } });
 async function setup() {
   const rows = [thread()];
   const targets: Record<string, unknown>[] = [];
@@ -50,10 +50,13 @@ it("uses captured results and owner replies for retention", () => {
   expect(archiveAge(false, true, false)).toBe(3 * DAY); expect(archiveAge(false, false, false)).toBe(7 * DAY);
   expect(archiveAge(true, false, true)).toBe(DAY); expect(archiveAge(true, false, false)).toBe(3 * DAY);
 });
-it("requires confirmed clean workspace and no ahead commits", () => {
-  expect(safeWorkspace(clean() as never)).toBe(true);
-  for (const mutate of [(s: ReturnType<typeof clean>) => { s.workspace.workingTree.state = "dirty_uncommitted"; }, (s: ReturnType<typeof clean>) => { s.workspace.workingTree.hasUncommittedChanges = true; }, (s: ReturnType<typeof clean>) => { s.workspace.mergeBase.aheadCount = 1; }, (s: ReturnType<typeof clean>) => { s.workspace.checkout.kind = "detached"; }]) { const s = clean(); mutate(s); expect(safeWorkspace(s as never)).toBe(false); }
-  expect(safeWorkspace({ outcome: "not_applicable" } as never)).toBe(false); expect(safeWorkspace({ outcome: "unavailable" } as never)).toBe(false);
+it("blocks only tracked uncommitted changes and unpushed commits", () => {
+  expect(workspaceBlock(clean() as never)).toBeNull();
+  const dirty = clean(); dirty.workspace.workingTree.files.push({ path: "src/a.ts", status: "M" }); expect(workspaceBlock(dirty as never)).toBe("Uncommitted changes to 1 tracked file.");
+  const ahead = clean(); ahead.workspace.mergeBase.aheadCount = 2; ahead.workspace.mergeBase.files.push({ path: "src/a.ts", status: "M" }); expect(workspaceBlock(ahead as never)).toBe("2 unpushed commits.");
+  const scratch = clean(); scratch.workspace.workingTree.state = "untracked"; scratch.workspace.workingTree.hasUncommittedChanges = true; scratch.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); expect(workspaceBlock(scratch as never)).toBeNull();
+  const detached = clean(); detached.workspace.checkout.kind = "detached"; detached.workspace.mergeBase.aheadCount = 1; detached.workspace.mergeBase.files.push({ path: "a", status: "M" }); expect(workspaceBlock(detached as never)).toBeNull();
+  for (const s of [null, { outcome: "not_applicable" }, { outcome: "unavailable" }]) expect(workspaceBlock(s as never)).toBeNull();
 });
 it("checks Memory word budget and old entries", () => {
   expect(memoryNeedsTidy("one two three", 2, now, now)).toBe(true);
@@ -87,12 +90,18 @@ it("protects BB automation targets, pending interactions and open plans", async 
   x.interactions.push({ status: "pending" }); await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); x.interactions.length = 0;
   x.events.push({ data: { plan: [{ status: "in_progress" }] } }); await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
 });
-it.each(["dirty", "error", "not_applicable", "ahead"])("sends %s workspace to Needs your call", async (mode) => {
+it.each(["dirty", "ahead"])("sends a %s workspace to Needs your call", async (mode) => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  const s = clean(); if (mode === "dirty") s.workspace.workingTree.files.push({ path: "src/a.ts", status: "M" }); else { s.workspace.mergeBase.aheadCount = 1; s.workspace.mergeBase.files.push({ path: "src/a.ts", status: "M" }); }
+  x.status.mockResolvedValue(s);
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall).toHaveLength(1); expect(x.alert).toHaveBeenCalledOnce();
+});
+it.each(["error", "not_applicable", "scratch"])("archives a %s workspace that holds no real work", async (mode) => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
   if (mode === "error") x.status.mockRejectedValue(new Error("offline"));
   else if (mode === "not_applicable") x.status.mockResolvedValue({ outcome: "not_applicable" } as never);
-  else { const s = clean(); if (mode === "dirty") s.workspace.workingTree.hasUncommittedChanges = true; else s.workspace.mergeBase.aheadCount = 1; x.status.mockResolvedValue(s); }
-  const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall).toHaveLength(1); expect(x.alert).toHaveBeenCalledOnce();
+  else { const s = clean(); s.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); x.status.mockResolvedValue(s); }
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce(); expect(r?.needsCall).toHaveLength(0);
 });
 it("archives captured threads at 3 days, otherwise waits 7", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.updatedAt = now - 4 * DAY;
@@ -127,9 +136,11 @@ it("runs at 4 AM local and deduplicates heartbeat runs that day", async () => {
   await x.maintenance.tick(at + 1000, "bot"); await x.maintenance.tick(at + 2000); expect(x.maintenance.view("bot").runs).toHaveLength(count);
   await x.maintenance.tick(at + DAY); expect(x.maintenance.view("bot").runs).toHaveLength(count + 1);
 });
-it("blocks a local merge base because it cannot prove the branch was pushed", () => {
-  const s = clean(); s.workspace.mergeBase.mergeBaseBranch = "main"; expect(safeWorkspace(s as never)).toBe(false);
-  s.workspace.mergeBase.mergeBaseBranch = "origin/other"; expect(safeWorkspace(s as never)).toBe(false);
+it("treats commits ahead of a local or other branch's base as unconfirmed, not unpushed", () => {
+  const s = clean(); s.workspace.mergeBase.aheadCount = 1; s.workspace.mergeBase.files.push({ path: "a", status: "M" });
+  expect(workspaceBlock(s as never)).not.toBeNull();
+  s.workspace.mergeBase.mergeBaseBranch = "main"; expect(workspaceBlock(s as never)).toBeNull();
+  s.workspace.mergeBase.mergeBaseBranch = "origin/other"; expect(workspaceBlock(s as never)).toBeNull();
 });
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";

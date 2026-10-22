@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { botFixtures, BOT_PATH } from "./bb-studio-bot.mjs";
 import {
@@ -57,7 +57,10 @@ export default function maintenanceCaptures(context) {
     exec("git", ["-C", cleanPath, "remote", "add", "origin", origin]);
     exec("git", ["-C", cleanPath, "fetch", "--quiet", "origin", "main"]);
     exec("git", ["-C", cleanPath, "branch", "--set-upstream-to=origin/main"]);
-    writeFileSync(join(dirtyPath, "MAINTENANCE-FIXTURE.txt"), "Uncommitted staged maintenance fixture.\n");
+    // Only tracked changes block an archive; untracked scratch files don't.
+    const trackedFile = exec("git", ["-C", dirtyPath, "ls-files"]).split("\n")[0];
+    if (!trackedFile) throw new Error("The dirty workspace fixture has no tracked file to change");
+    appendFileSync(join(dirtyPath, trackedFile), "\nUncommitted staged maintenance fixture.\n");
     if (exec("git", ["-C", cleanPath, "status", "--porcelain"])) throw new Error("The clean workspace fixture is already dirty");
     if (exec("git", ["-C", cleanPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]) !== "origin/main") throw new Error("The clean workspace fixture does not track origin/main");
     if (!exec("git", ["-C", dirtyPath, "status", "--porcelain"])) throw new Error("The dirty workspace fixture has no uncommitted file");

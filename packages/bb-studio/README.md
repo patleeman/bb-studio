@@ -1249,11 +1249,12 @@ are suggestions; duplicates and retired targets are paused. Pinned skills
 are exempt from the existing 30/90-day skill retirement rules.
 
 Pending interactions, open plans, queued work and live automation or runner
-targets protect threads. Workspace archives require a successful
-`environments.status` check: clean, no uncommitted changes and no ahead
-commits. SDK 0.6.37 has no upstream push count, so a local merge base cannot
-prove a branch was pushed. Unless the returned base is the branch's remote
-tracking ref with zero ahead commits, it goes to **Needs your call**.
+targets protect threads. A workspace blocks an archive only when it holds
+real work: uncommitted changes to tracked files, or commits ahead of the
+branch's own remote-tracking ref. Those threads go to **Needs your call**.
+Untracked scratch files, non-git workspaces and statuses that can't be
+confirmed don't block. SDK 0.6.37 has no upstream push count, so commits
+counted against any other base are treated as unconfirmed.
 The same SDK cannot identify loaded idle runtimes, so runtime cleanup skips
 them. Archives can be undone with BB's Unarchive. Settings and run history
 are append-only. Each run has one Activity entry; only **Needs your call**
