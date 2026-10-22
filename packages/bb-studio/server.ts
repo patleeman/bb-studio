@@ -111,19 +111,20 @@ export default async function plugin(bb: BbPluginApi) {
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  const services = new StudioServices(db);
   // Create tools nudge agents to tag what they make (src/create-tag-hint.ts).
   const tagNames = new TagStore(db);
   const registerTool = bb.agents.registerTool.bind(bb.agents);
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) =>
     registerTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)))) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
-  const artifacts = registerArtifacts(bb, db);
+  const artifacts = registerArtifacts(bb, db, services);
   bb.onDispose(() => artifacts.dispose());
-  const drawings = registerDraw(bb, db);
+  const drawings = registerDraw(bb, db, services);
   bb.onDispose(() => drawings.dispose());
-  const designs = registerDesign(bb, db);
+  const designs = registerDesign(bb, db, services);
   bb.onDispose(() => designs.dispose());
-  const dashboards = registerDashboards(bb, db);
+  const dashboards = registerDashboards(bb, db, services);
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
@@ -284,7 +285,6 @@ export default async function plugin(bb: BbPluginApi) {
       snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
     };
   };
-  const services = new StudioServices(db);
   const providerHistory = new ProviderHistory(bb.sdk, {
     artifacts: {
       versions: (id) => artifacts.store.versions(id).map((version) => ({ id: version.id, name: version.name, createdAt: version.created_at })),

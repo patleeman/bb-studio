@@ -33,6 +33,12 @@ export class StudioServices {
     };
   }
 
+  /** Links an item an agent made to the thread that made it. */
+  created(ref: Ref, threadId: string): void {
+    const at = Date.now();
+    this.linkThread({ threadId, ref, role: "created", state: "working", createdAt: at, updatedAt: at, metadata: {} });
+  }
+
   linkThread(thread: ItemThread): void {
     this.db.prepare(`INSERT INTO item_threads (thread_id, plugin_id, item_id, role, state, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(thread_id, plugin_id, item_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`)

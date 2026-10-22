@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Artifacts, built into Studio: keep the files agents make.
 //
 // Saving is explicit: an agent calls `artifacts_save` (or
@@ -13,7 +14,7 @@ import { basename } from "node:path";
 import { parseFlags } from "../kit/cli";
 import { studioSchemas } from "../kit/contract";
 import { errorMessage } from "../kit/format";
-import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBytes, studioServices, threadRoots as rootsOf, type BackupHandlers, type ResolvedSource, type StudioProviderHandlers } from "../kit/server/index";
+import { createChangeBus, defineItemMention, displayPath, resolveSource, serveBytes, threadRoots as rootsOf, type BackupHandlers, type ResolvedSource, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -115,7 +116,7 @@ export interface BuiltinArtifacts {
 }
 
 /** Registers artifacts' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerArtifacts(bb: BbPluginApi, db: Database.Database): BuiltinArtifacts {
+export function registerArtifacts(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">): BuiltinArtifacts {
   const store = new ArtifactStore(db);
   const liveStore = new LiveStore(db);
   const liveServer = registerLive(bb, liveStore, store);
@@ -123,10 +124,9 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database): Built
   const studio = studioSchemas(z);
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
 
-  const services = studioServices(bb.sdk);
   /** A new artifact saved from a thread is linked to the thread. */
   function created(result: SaveResult, threadId: string | null) {
-    if (result.outcome === "created" && threadId) void services.created({ pluginId: PLUGIN_ID, id: result.artifact.id }, threadId).catch(() => {});
+    if (result.outcome === "created" && threadId) services.created({ pluginId: PLUGIN_ID, id: result.artifact.id }, threadId);
   }
 
   /** Tells open viewers, collections and Studio that an artifact changed. */

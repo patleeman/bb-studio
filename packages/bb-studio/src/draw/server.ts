@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Drawings, built into Studio: sketch Excalidraw drawings with your agents.
 //
 // Drawings live in Studio's SQLite database as serialized Excalidraw scenes
@@ -12,7 +13,7 @@
 // thread tab and composer entry keep their names (docs/merging-add-ons.md).
 import { studioSchemas } from "../kit/contract";
 import { errorMessage } from "../kit/format";
-import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, studioServices, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
+import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -62,9 +63,8 @@ export interface BuiltinDrawings {
 }
 
 /** Registers drawings' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerDraw(bb: BbPluginApi, db: Database.Database): BuiltinDrawings {
+export function registerDraw(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">): BuiltinDrawings {
   const store = new DrawingStore(db);
-  const services = studioServices(bb.sdk);
 
   // In a thread, the file is on the thread's host, inside its workspace or
   // thread storage; from a terminal with no thread, it's a local file.
@@ -80,11 +80,11 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database): BuiltinDra
     return Buffer.from((await readThreadFile(bb, source)).bytes).toString("utf8");
   }
   /** A drawing an agent made is linked to its thread. */
-  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => {});
+  const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
   /** A drawing an agent changed belongs to its thread too, so the thread's tab lists it. */
   const edited = (id: string, threadId: string) => {
     const at = Date.now();
-    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => {});
+    services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} });
   };
   /** The reply card that opens the drawing in the user's workbench. */
   const card = (id: string) => `Put this line on its own in your reply so the user can open the drawing beside the chat:\n::drawing{id="${id}"}`;

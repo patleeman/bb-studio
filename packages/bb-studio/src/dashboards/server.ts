@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Dashboards, built into Studio: live tiles, charts, tables and feeds on a
 // responsive grid, edited by the user and their agents.
 //
@@ -11,7 +12,7 @@
 // /plugins/studio/studio/dashboards/<id>.
 import { studioSchemas } from "../kit/contract";
 import { errorMessage } from "../kit/format";
-import { createChangeBus, defineItemMention, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
+import { createChangeBus, defineItemMention, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
@@ -66,10 +67,9 @@ export interface BuiltinDashboards {
 const widgetTypeLines = () => WIDGET_TYPES.map((type) => `- ${type}: ${WIDGETS[type].description} Data: ${WIDGETS[type].data}. Options: ${WIDGETS[type].options}.`).join("\n");
 
 /** Registers dashboards' RPC, agent tools, mention provider and refresh loop on Studio. Studio has run the migrations. */
-export function registerDashboards(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; fetch?: typeof fetch; tickMs?: number | null } = {}): BuiltinDashboards {
+export function registerDashboards(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, options: { now?: () => number; fetch?: typeof fetch; tickMs?: number | null } = {}): BuiltinDashboards {
   const now = options.now ?? Date.now;
   const store = new DashboardStore(db, now);
-  const services = studioServices(bb.sdk);
   const studio = studioSchemas(z);
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt: number) => ({ type: DASHBOARD_UPDATE_TYPE, dashboardId: id, updatedAt }), delayMs: 1000 });
   const changed = (id: string) => changeBus.changed(id, store.get(id)?.updated_at ?? now());
@@ -293,10 +293,10 @@ export function registerDashboards(bb: BbPluginApi, db: Database.Database, optio
   // ---------------------------------------------------------------------
   // Agent tools.
 
-  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => {});
+  const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
   const edited = (id: string, threadId: string) => {
     const at = now();
-    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => {});
+    services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} });
   };
   const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
   const link = (row: DashboardRow) => `[${displayName(row).replace(/[[\]]/g, "")}](${dashboardHref(row.id)})`;

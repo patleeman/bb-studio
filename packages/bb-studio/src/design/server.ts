@@ -1,3 +1,4 @@
+import type { StudioServices } from "../services";
 // Designs, built into Studio: UI prototypes and slide decks made with agents.
 //
 // A design is a set of rounds; each round holds a few options; each option is
@@ -10,7 +11,7 @@
 // directive, question form and thread tab keep their names
 // (docs/merging-add-ons.md).
 import { studioSchemas } from "../kit/contract";
-import { createChangeBus, defineItemMention, serveBytes, studioServices, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
+import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
@@ -116,16 +117,15 @@ export function screenResponse(screen: Pick<ScreenRow, "id" | "html">, download:
 }
 
 /** Registers designs' RPC, HTTP routes, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerDesign(bb: BbPluginApi, db: Database.Database): BuiltinDesigns {
+export function registerDesign(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">): BuiltinDesigns {
   const store = new DesignStore(db);
-  const services = studioServices(bb.sdk);
   const studio = studioSchemas(z);
 
   // Agents write a screen at a time; Studio only needs to hear about it now and then.
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
   const changed = (id: string, updatedAt: number, by: Writer | "studio") => changeBus.changed(id, updatedAt, by);
   /** Tells Studio an agent made a design, so it is linked to the thread. */
-  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => {});
+  const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
 
   // ---------------------------------------------------------------------
   // Reviews (src/server/review.ts, src/server/review-queue.ts). The latest per

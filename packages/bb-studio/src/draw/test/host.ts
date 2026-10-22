@@ -1,3 +1,5 @@
+import { MIGRATIONS } from "../../migrations";
+import { StudioServices } from "../../services";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { registerDraw } from "../server";
 import { DRAWING_TABLES } from "../server/store";
@@ -8,8 +10,9 @@ export function drawHost() {
     plugins: { callRpc: async () => { throw new Error("not in this test"); } },
   } });
   const db = host.bb.storage.database();
+  db.exec(MIGRATIONS[0]!);
   db.exec(DRAWING_TABLES);
-  const drawings = registerDraw(host.bb, db);
+  const drawings = registerDraw(host.bb, db, new StudioServices(db));
   host.bb.onDispose(() => drawings.dispose());
   return { ...host, drawings };
 }

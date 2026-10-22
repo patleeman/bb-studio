@@ -1,3 +1,5 @@
+import { MIGRATIONS } from "../../migrations";
+import { StudioServices } from "../../services";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { registerDesign } from "../server";
 import { DESIGN_MIGRATIONS } from "../server/store";
@@ -8,8 +10,9 @@ export function designHost() {
     plugins: { callRpc: async () => { throw new Error("not in this test"); } },
   } });
   const db = host.bb.storage.database();
+  db.exec(MIGRATIONS[0]!);
   for (const statement of DESIGN_MIGRATIONS) db.exec(statement);
-  const designs = registerDesign(host.bb, db);
+  const designs = registerDesign(host.bb, db, new StudioServices(db));
   host.bb.onDispose(() => designs.dispose());
   return { ...host, designs };
 }
