@@ -45,7 +45,7 @@ type Row = {
   script: string | null; interpreter: string | null; timeout_ms: number | null; env_json: string | null; working_dir: string | null;
   target: string; schedule_json: string; provider_id: string | null; model: string | null; reasoning: string | null;
   state: "active" | "paused" | "done" | "ended"; project_id: string; bb_ids: string; target_thread_id: string | null;
-  seen_until: number; last_fired_at: number | null; last_fire: string | null; created_at: number; updated_at: number;
+  seen_ids: string; seen_until: number; last_fired_at: number | null; last_fire: string | null; created_at: number; updated_at: number;
 };
 
 const bbAutomation = z.object({
@@ -607,9 +607,24 @@ export class Automations {
       const current = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row | undefined;
       if (!current || current.state !== "active") return 0;
       row = current;
-      const runs = (await Promise.all(this.ids(row).map((id) => this.bbRuns({ id, projectId: row.project_id }, 20)))).flat()
-        .filter((run) => run.finishedAt && run.finishedAt > row.seen_until)
-        .sort((a, b) => a.finishedAt! - b.finishedAt!);
+      const seen = new Set<string>(JSON.parse(row.seen_ids));
+      const runs: BbRun[] = [];
+      for (const id of this.ids(row)) {
+        let cursor: string | undefined;
+        const cursors = new Set<string>();
+        do {
+          const page = await this.call("automations_runs", { projectId: row.project_id, automationId: id, limit: 20, ...(cursor ? { cursor } : {}) },
+            z.object({ runs: z.array(bbRun), nextCursor: z.string().nullish() }));
+          runs.push(...page.runs.filter((run) => run.finishedAt && (run.finishedAt > row.seen_until || (run.finishedAt === row.seen_until && !seen.has(run.id)))));
+          // Finish the entire boundary timestamp, including a boundary split across pages.
+          if (page.runs.some((run) => run.finishedAt && run.finishedAt < row.seen_until)) break;
+          cursor = page.nextCursor ?? undefined;
+          if (cursor && cursors.has(cursor)) throw new Error("Watcher history returned a repeated cursor.");
+          if (cursor) cursors.add(cursor);
+        } while (cursor);
+      }
+      runs.sort((a, b) => a.finishedAt! - b.finishedAt! || a.id.localeCompare(b.id));
+      let boundary = row.seen_until;
       let fired = 0;
       for (const run of runs) {
         const finding = watcherFinding(run);
@@ -618,7 +633,9 @@ export class Automations {
           fired++;
           this.save(row.id, { last_fired_at: run.finishedAt!, last_fire: finding.slice(0, 2000) });
         }
-        this.deps.db.prepare("UPDATE bot_automations SET seen_until = ? WHERE id = ?").run(run.finishedAt!, row.id);
+        if (run.finishedAt! > boundary) { seen.clear(); boundary = run.finishedAt!; }
+        seen.add(run.id);
+        this.deps.db.prepare("UPDATE bot_automations SET seen_until = ?, seen_ids = ? WHERE id = ?").run(boundary, JSON.stringify([...seen]), row.id);
       }
       return fired;
     } finally {

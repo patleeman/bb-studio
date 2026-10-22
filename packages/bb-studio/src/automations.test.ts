@@ -21,7 +21,11 @@ async function setup() {
     if (method === "automations_update") { if (!row) throw Object.assign(new Error("Not found"), { status: 404 }); Object.assign(row, input); return row; }
     if (method === "automations_resume" || method === "automations_pause") { if (row) row.enabled = method === "automations_resume"; return row; }
     if (method === "automations_delete") { if (row) automations.splice(automations.indexOf(row), 1); return { ok: true }; }
-    if (method === "automations_runs") return { runs: runs.get(String(input.automationId)) ?? [] };
+    if (method === "automations_runs") {
+      const all = runs.get(String(input.automationId)) ?? [];
+      const start = Number(input.cursor ?? 0), limit = Number(input.limit);
+      return { runs: all.slice(start, start + limit), nextCursor: start + limit < all.length ? String(start + limit) : null };
+    }
     return { ok: true };
   });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
@@ -220,4 +224,18 @@ it("single-flights overlapping watcher ticks and releases the watcher afterward"
   x.runs.get("a1")!.push({ id: "r2", status: "succeeded", output: "v3", exitCode: 0, finishedAt: t + 1 });
   await x.auto.tick();
   expect(x.send).toHaveBeenCalledTimes(2);
+});
+
+it("catches up every watcher page and later-visible runs at the cursor timestamp", async () => {
+  const x = await setup();
+  await x.auto.create({ kind: "watcher", name: "Releases", schedule: { type: "cron", cron: "* * * * *" }, script: { body: "echo", interpreter: "bash" } });
+  const t = Date.now() + 1000;
+  x.runs.set("a1", Array.from({ length: 45 }, (_, i) => ({ id: `r${i}`, status: "succeeded", output: `${i}`, finishedAt: t + 45 - i })));
+  await x.auto.tick();
+  expect(x.send).toHaveBeenCalledTimes(45);
+  x.runs.get("a1")!.unshift({ id: "late", status: "succeeded", output: "late", finishedAt: t + 45 });
+  await x.auto.tick();
+  expect(x.send).toHaveBeenCalledTimes(46);
+  await x.auto.tick();
+  expect(x.send).toHaveBeenCalledTimes(46);
 });
