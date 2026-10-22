@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 // Talk, built into Studio: long-form, durable dictation and recording.
 //
 // The browser captures audio in short segments and uploads each one over RPC
@@ -72,7 +73,7 @@ export interface BuiltinRecordings {
 }
 
 /** Registers recordings' RPC, HTTP routes, background work, agent tools and mention provider on Studio. Studio has run the migrations. */
-export async function registerTalk(bb: BbPluginApi, db: Database.Database, settings: TalkSettingsHandle, pages: PagesClient): Promise<BuiltinRecordings> {
+export async function registerTalk(bb: BbPluginApi, db: Database.Database, settings: TalkSettingsHandle, pages: PagesClient, notify: StudioChanged): Promise<BuiltinRecordings> {
   let config = await settings.get();
   settings.onChange((next) => {
     config = next;
@@ -86,7 +87,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   const lifetime = new AbortController();
   const studio = studioSchemas(z);
   // Transcription touches a recording every few seconds; Studio only needs to hear about it now and then.
-  const changeBus = createChangeBus({ bb, channel: RECORDING_CHANGED, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ id }), delayMs: 1500 });
+  const changeBus = createChangeBus({ bb, notify, channel: RECORDING_CHANGED, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ id }), delayMs: 1500 });
 
   const changed = (id: string) => changeBus.changed(id);
   const models = talkModels(bb);

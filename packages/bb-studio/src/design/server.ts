@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Designs, built into Studio: UI prototypes and slide decks made with agents.
 //
@@ -117,12 +118,12 @@ export function screenResponse(screen: Pick<ScreenRow, "id" | "html">, download:
 }
 
 /** Registers designs' RPC, HTTP routes, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerDesign(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">): BuiltinDesigns {
+export function registerDesign(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">, notify: StudioChanged): BuiltinDesigns {
   const store = new DesignStore(db);
   const studio = studioSchemas(z);
 
   // Agents write a screen at a time; Studio only needs to hear about it now and then.
-  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
+  const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DESIGN_UPDATE_TYPE, designId: id, updatedAt, by }), delayMs: 1000 });
   const changed = (id: string, updatedAt: number, by: Writer | "studio") => changeBus.changed(id, updatedAt, by);
   /** Tells Studio an agent made a design, so it is linked to the thread. */
   const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);

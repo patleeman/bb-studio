@@ -12,7 +12,7 @@ export async function talkHost() {
   const talk = await registerTalk(host.bb, db, host.bb.settings.define(TALK_SETTINGS), {
     exists: async () => false, create: async () => { throw new Error("not in this test"); },
     markdown: async () => "", replace: async () => {}, search: async () => [],
-  });
+  }, async () => {});
   host.bb.onDispose(() => talk.dispose());
   const call = (method: string, input: unknown): Promise<any> => host.harness.behavior.callRpc(method, input);
   return { ...host, db, talk, call };

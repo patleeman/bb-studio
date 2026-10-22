@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Artifacts, built into Studio: keep the files agents make.
 //
@@ -116,13 +117,13 @@ export interface BuiltinArtifacts {
 }
 
 /** Registers artifacts' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerArtifacts(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">): BuiltinArtifacts {
+export function registerArtifacts(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">, notify: StudioChanged): BuiltinArtifacts {
   const store = new ArtifactStore(db);
   const liveStore = new LiveStore(db);
   const liveServer = registerLive(bb, liveStore, store);
 
   const studio = studioSchemas(z);
-  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
+  const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
 
   /** A new artifact saved from a thread is linked to the thread. */
   function created(result: SaveResult, threadId: string | null) {

@@ -23,7 +23,7 @@ export function dashboardHost(options: { now?: () => number; fetch?: typeof fetc
   db.exec(MIGRATIONS[0]!);
   db.exec(DASHBOARD_TABLES);
   db.exec(DASHBOARD_PROPOSALS_TABLE);
-  const dashboards = registerDashboards(host.bb, db, new StudioServices(db), { ...options, tickMs: null });
+  const dashboards = registerDashboards(host.bb, db, new StudioServices(db), async () => {}, { ...options, tickMs: null });
   host.bb.onDispose(() => dashboards.dispose());
   return { ...host, dashboards };
 }

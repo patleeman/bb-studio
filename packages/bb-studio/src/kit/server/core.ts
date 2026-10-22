@@ -32,13 +32,17 @@ interface CallRpc {
   callRpc(args: { pluginId: string; method: string; input?: unknown; outputSchema: unknown }): Promise<unknown>;
 }
 
+export type StudioChanged = (pluginId: string, ids?: string[]) => Promise<unknown>;
+
 /**
  * Tells Studio this add-on's items changed, so an open Studio collection
- * refetches them. Bursts collapse into one call. Best effort: when Studio
- * isn't installed or running, the call fails quietly.
+ * refetches them. Bursts collapse into one call. Built-ins retry failed
+ * notifications; external add-ons retain a full refresh for their next change.
  */
 export function createStudioNotifier(options: {
   plugins: CallRpc;
+  /** Built-ins notify Studio directly; external add-ons use the RPC bridge. */
+  notify?: StudioChanged;
   pluginId: string;
   schemas: StudioSchemas;
   delayMs?: number;
@@ -54,9 +58,11 @@ export function createStudioNotifier(options: {
     ids.clear();
     const reset = full;
     full = false;
-    // Studio may be absent; a host that throws instead of rejecting is the same.
+    // Handle synchronous failures and rejected promises the same way.
     Promise.resolve()
-      .then(() => options.plugins.callRpc({
+      .then(() => options.notify
+        ? options.notify(options.pluginId, !reset && changedIds.length ? changedIds : undefined)
+        : options.plugins.callRpc({
         pluginId: STUDIO_PLUGIN_ID,
         method: STUDIO_CHANGED_METHOD,
         input: { pluginId: options.pluginId, ...(!reset && changedIds.length ? { ids: changedIds } : {}) },
@@ -66,6 +72,7 @@ export function createStudioNotifier(options: {
         if (disposed) return;
         ids.clear();
         full = true;
+        if (options.notify && !timer) timer = setTimeout(send, 1000);
       });
   };
   return {

@@ -12,7 +12,7 @@ export function designHost() {
   const db = host.bb.storage.database();
   db.exec(MIGRATIONS[0]!);
   for (const statement of DESIGN_MIGRATIONS) db.exec(statement);
-  const designs = registerDesign(host.bb, db, new StudioServices(db));
+  const designs = registerDesign(host.bb, db, new StudioServices(db), async () => {});
   host.bb.onDispose(() => designs.dispose());
   return { ...host, designs };
 }

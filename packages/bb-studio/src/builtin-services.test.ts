@@ -20,7 +20,7 @@ describe("built-in item thread links", () => {
       const db = host.bb.storage.database();
       for (const sql of MIGRATIONS) db.exec(sql);
       const services = new StudioServices(db);
-      const builtin = register(host.bb, db, services);
+      const builtin = register(host.bb, db, services, async () => {});
       try {
         await host.harness.behavior.callAgentTool(tool, input, { threadId: "thr_maker" });
         expect(services.threadsForThread("thr_maker")).toMatchObject([{ ref: { pluginId: kind }, role: "created" }]);

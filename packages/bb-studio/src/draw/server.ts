@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Drawings, built into Studio: sketch Excalidraw drawings with your agents.
 //
@@ -63,7 +64,7 @@ export interface BuiltinDrawings {
 }
 
 /** Registers drawings' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerDraw(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">): BuiltinDrawings {
+export function registerDraw(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, notify: StudioChanged): BuiltinDrawings {
   const store = new DrawingStore(db);
 
   // In a thread, the file is on the thread's host, inside its workspace or
@@ -91,7 +92,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   const studio = studioSchemas(z);
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
-  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by }), delayMs: 1500 });
+  const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by }), delayMs: 1500 });
 
   /** Tells open editors, galleries, and Studio that a drawing changed. Drawings keep no versions. */
   function changed(id: string, updatedAt: number, by: Writer | "studio") {

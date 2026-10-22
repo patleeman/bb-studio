@@ -109,6 +109,14 @@ const HEALTH_INTERVAL_MS = 3 * 60_000;
 export default async function plugin(bb: BbPluginApi) {
   await registerChat(bb);
   const changes = new ChangeLog();
+  // Built-ins can publish while registration awaits settings. Flush once the hub is ready.
+  let servicesReady!: () => void;
+  const ready = new Promise<void>((resolve) => { servicesReady = resolve; });
+  const notifyBuiltin = async (pluginId: string, ids?: string[]) => {
+    await ready;
+    try { await studioChanged({ pluginId, ids }); }
+    catch (error) { bb.log.warn(`Studio changes for ${pluginId} could not be recorded; retrying: ${errorText(error)}`); throw error; }
+  };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const services = new StudioServices(db);
@@ -124,13 +132,13 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) =>
     registerTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)))) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
-  const artifacts = registerArtifacts(bb, db, services);
+  const artifacts = registerArtifacts(bb, db, services, notifyBuiltin);
   bb.onDispose(() => artifacts.dispose());
-  const drawings = registerDraw(bb, db, services);
+  const drawings = registerDraw(bb, db, services, notifyBuiltin);
   bb.onDispose(() => drawings.dispose());
-  const designs = registerDesign(bb, db, services);
+  const designs = registerDesign(bb, db, services, notifyBuiltin);
   bb.onDispose(() => designs.dispose());
-  const dashboards = registerDashboards(bb, db, services);
+  const dashboards = registerDashboards(bb, db, services, notifyBuiltin);
   bb.onDispose(() => dashboards.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
@@ -168,10 +176,9 @@ export default async function plugin(bb: BbPluginApi) {
     linkThread: (thread) => services.linkThread(thread),
     replaceLinks: (ref, source, links) => services.replaceLinks(ref, source, links),
     recordActivity,
-
-  });
+  }, notifyBuiltin);
   bb.onDispose(() => pages.dispose());
-  const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes);
+  const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes, notifyBuiltin);
   bb.onDispose(() => recordings.dispose());
 
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
@@ -290,6 +297,13 @@ export default async function plugin(bb: BbPluginApi) {
   const workspace = new WorkspacePresence();
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
   bb.onDispose(() => searchIndex.dispose());
+  async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }) {
+    await searchIndex.changed(pluginId, ids, removed);
+    await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
+    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
+    return { ok: true };
+  }
+  servicesReady();
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
     const indexed = searchIndex.search(query, { limit: 100 });
@@ -930,12 +944,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     recentThreads: async () => ({ threads: await recentThreads() }),
-    studio_changed: async ({ pluginId, ids, removed }) => {
-      await searchIndex.changed(pluginId, ids, removed).catch(() => {});
-      await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
-      return { ok: true };
-    },
+    studio_changed: studioChanged,
     changes: ({ since }) => changes.since(since),
     items: async ({ pluginId, ids }) => {
       return { items: await listed(await hub.get(pluginId, ids)) };

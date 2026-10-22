@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 import type { PagesClient } from "../talk/server/notes";
 import type { StudioServices } from "../services";
 // Pages, built into Studio: collaborative documents you write with your
@@ -65,7 +66,7 @@ export interface PagesSettingsAccess {
 }
 
 /** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
-export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">): BuiltinPages {
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">, notify: StudioChanged): BuiltinPages {
   const store = new PageStore(db, () => settings.snapshotsPerPage());
   const service = new PagesService(bb, store);
   const checklists = new Checklists(bb, db, service, store, services);
@@ -355,7 +356,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
 
   const provider = pageProvider(service);
   // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
+  const studioNotifier = createStudioNotifier({ notify, plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
   for (const page of store.list({ includeArchived: true })) {
     for (const chat of store.chats(page.id, 1000)) services.linkThread({
       threadId: chat.thread_id, ref: { pluginId: PLUGIN_ID, id: page.id }, role: "chat", state: "idle",

@@ -1,11 +1,12 @@
 import type { StudioSchemas } from "../contract";
-import { createStudioNotifier } from "./core";
+import { createStudioNotifier, type StudioChanged } from "./core";
 
 type Realtime = { publish(channel: string, data: unknown): void };
 
 /** Publish a local event and notify the Studio collection. Both are best effort. */
 export function createChangeBus<T extends unknown[]>(options: {
   bb: { realtime: Realtime; sdk: { plugins: Parameters<typeof createStudioNotifier>[0]["plugins"] } };
+  notify?: StudioChanged;
   channel: string;
   pluginId: string;
   schemas: StudioSchemas;
@@ -14,6 +15,7 @@ export function createChangeBus<T extends unknown[]>(options: {
 }): { changed(id: string, ...details: T): void; dispose(): void } {
   const notifier = createStudioNotifier({
     plugins: options.bb.sdk.plugins,
+    notify: options.notify,
     pluginId: options.pluginId,
     schemas: options.schemas,
     delayMs: options.delayMs,

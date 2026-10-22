@@ -12,7 +12,7 @@ export function artifactsHost() {
   db.exec(MIGRATIONS[0]!);
   db.exec(ARTIFACT_TABLES);
   db.exec(ARTIFACT_LIVE_TABLES);
-  const artifacts = registerArtifacts(host.bb, db, new StudioServices(db));
+  const artifacts = registerArtifacts(host.bb, db, new StudioServices(db), async () => {});
   host.bb.onDispose(() => artifacts.dispose());
   return { ...host, artifacts };
 }

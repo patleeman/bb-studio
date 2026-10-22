@@ -14,7 +14,7 @@ it("links pages and checklist handoffs directly, and reports activity failures w
   const db = host.bb.storage.database();
   for (const sql of MIGRATIONS) db.exec(sql);
   const services = new StudioServices(db);
-  const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services);
+  const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services, async () => {});
   try {
     const notesId = await pages.notes.create({ projectId: null, title: "Meeting notes", markdown: "First version" });
     expect(await pages.notes.exists(notesId)).toBe(true);
@@ -42,6 +42,6 @@ it("links pages and checklist handoffs directly, and reports activity failures w
     expect(services.links({ pluginId: "pages", id }).outgoing.some((link) => link.to.id === "rec_other")).toBe(false);
     await vi.advanceTimersByTimeAsync(5000);
     expect(services.links({ pluginId: "pages", id }).outgoing.some((link) => link.to.id === "rec_other")).toBe(true);
-    expect(callRpc.mock.calls.every(([args]) => args.method === "studio_changed")).toBe(true);
+    expect(callRpc).not.toHaveBeenCalled();
   } finally { pages.dispose(); await host.harness.lifecycle.dispose(); vi.useRealTimers(); }
 });

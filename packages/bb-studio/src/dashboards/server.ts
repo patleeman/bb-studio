@@ -1,3 +1,4 @@
+import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Dashboards, built into Studio: live tiles, charts, tables and feeds on a
 // responsive grid, edited by the user and their agents.
@@ -67,11 +68,11 @@ export interface BuiltinDashboards {
 const widgetTypeLines = () => WIDGET_TYPES.map((type) => `- ${type}: ${WIDGETS[type].description} Data: ${WIDGETS[type].data}. Options: ${WIDGETS[type].options}.`).join("\n");
 
 /** Registers dashboards' RPC, agent tools, mention provider and refresh loop on Studio. Studio has run the migrations. */
-export function registerDashboards(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, options: { now?: () => number; fetch?: typeof fetch; tickMs?: number | null } = {}): BuiltinDashboards {
+export function registerDashboards(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, notify: StudioChanged, options: { now?: () => number; fetch?: typeof fetch; tickMs?: number | null } = {}): BuiltinDashboards {
   const now = options.now ?? Date.now;
   const store = new DashboardStore(db, now);
   const studio = studioSchemas(z);
-  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt: number) => ({ type: DASHBOARD_UPDATE_TYPE, dashboardId: id, updatedAt }), delayMs: 1000 });
+  const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt: number) => ({ type: DASHBOARD_UPDATE_TYPE, dashboardId: id, updatedAt }), delayMs: 1000 });
   const changed = (id: string) => changeBus.changed(id, store.get(id)?.updated_at ?? now());
   const dataChanged = (dashboardId: string, widgetIds: string[]) => {
     try { bb.realtime.publish(REALTIME_CHANNEL, { type: DATA_UPDATE_TYPE, dashboardId, widgetIds }); } catch { /* clients refetch on open */ }

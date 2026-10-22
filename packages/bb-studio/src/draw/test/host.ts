@@ -12,7 +12,7 @@ export function drawHost() {
   const db = host.bb.storage.database();
   db.exec(MIGRATIONS[0]!);
   db.exec(DRAWING_TABLES);
-  const drawings = registerDraw(host.bb, db, new StudioServices(db));
+  const drawings = registerDraw(host.bb, db, new StudioServices(db), async () => {});
   host.bb.onDispose(() => drawings.dispose());
   return { ...host, drawings };
 }
