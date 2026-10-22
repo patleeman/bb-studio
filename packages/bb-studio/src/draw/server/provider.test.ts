@@ -1,8 +1,14 @@
 import { studioSchemas } from "../../kit/contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { element, memoryStore, scene } from "../test/db";
 import { drawingProvider, drawingText, toStudioItem } from "./provider";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: vi.fn(actual.readFile), readdir: vi.fn(actual.readdir) };
+});
+import { readdir } from "node:fs/promises";
 
 function setup() {
   const { store } = memoryStore();
@@ -30,6 +36,19 @@ describe("the Draw Studio provider", () => {
     expect(store.get(row.id)!.name).toBe("Floor plan");
     expect(changed).toEqual([row.id]);
     expect((await call("studio_rename", { id: "dr_missing", title: "X" })).failed).toEqual([{ id: "dr_missing", error: "Drawing not found." }]);
+  });
+  it("rejects font loading failures and retries them", async () => {
+    const { store, call } = setup();
+    const row = store.create({ name: "Sketch", by: "app" });
+    store.write(row.id, scene([element("text", { text: "Retry" })]), "editor");
+    vi.mocked(readdir).mockRejectedValueOnce(new Error("missing font directory"));
+    const beforeRetry = vi.mocked(readdir).mock.calls.length;
+    await expect(call("studio_export", { id: row.id, format: "png" })).rejects.toThrow(/export fonts.*missing font directory/i);
+    const afterFailure = vi.mocked(readdir).mock.calls.length;
+    expect(afterFailure).toBeGreaterThan(beforeRetry);
+    const png = await call("studio_export", { id: row.id, format: "png" });
+    expect(Buffer.from(png.files[0].data, "base64").subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(vi.mocked(readdir).mock.calls.length).toBeGreaterThan(afterFailure);
   });
   it("exports SVG and PNG from a stored scene", async () => {
     const { store, call } = setup();

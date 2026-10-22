@@ -28,15 +28,25 @@ const loadResvg = () =>
 const EXPORT_FONT_DIRS = ["Liberation", "Cascadia", "Virgil", "Excalifont"];
 const EXPORT_FONT_OPTIONS = { loadSystemFonts: false, defaultFontFamily: "Liberation Sans", sansSerifFamily: "Liberation Sans", monospaceFamily: "Cascadia Code", cursiveFamily: "Excalifont" };
 let exportFonts: Promise<Uint8Array[]> | undefined;
-const loadExportFonts = () =>
-  (exportFonts ??= (async () => {
-    // Resolves to <package>/dist/prod/index.js; the fonts sit beside it.
-    const root = join(dirname(createRequire(import.meta.url).resolve("@excalidraw/excalidraw")), "fonts");
-    const files = (await Promise.all(EXPORT_FONT_DIRS.map(async (dir) =>
-      (await readdir(join(root, dir))).filter((name) => name.endsWith(".woff2")).map((name) => join(root, dir, name)))))
-      .flat();
+const loadExportFonts = () => {
+  if (exportFonts) return exportFonts;
+  // Resolves to <package>/dist/prod/index.js; the fonts sit beside it.
+  const root = join(dirname(createRequire(import.meta.url).resolve("@excalidraw/excalidraw")), "fonts");
+  exportFonts = (async () => {
+    const files = (await Promise.all(EXPORT_FONT_DIRS.map(async (dir) => {
+      const directory = join(root, dir);
+      const fonts = (await readdir(directory)).filter((name) => name.endsWith(".woff2"));
+      if (!fonts.length) throw new Error(`No .woff2 export fonts found in ${directory}`);
+      return fonts.map((name) => join(directory, name));
+    }))).flat();
     return Promise.all(files.map(async (file) => new Uint8Array(await readFile(file))));
-  })().catch(() => []));
+  })().catch((error: unknown) => {
+    exportFonts = undefined;
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not load Excalidraw export fonts under ${root}: ${reason}`, { cause: error });
+  });
+  return exportFonts;
+};
 
 export const DRAWING_KIND: StudioKind = {
   id: "drawing",
