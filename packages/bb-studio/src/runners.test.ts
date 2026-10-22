@@ -16,7 +16,7 @@ async function setup() {
   const add = (fields: Partial<Thread> & { id: string }) => { const thread = makeThreadResponse({ projectId: "proj_personal", providerId: "codex", ...fields }); threads.set(thread.id, thread); return thread; };
   add({ id: "bot1", title: "Bot" });
   // Like BB: a spawn needs at least one input entry.
-  const spawn = vi.fn(async (args: { projectId: string; title?: string; input?: unknown[] }) => { if (!args.input?.length) throw new Error("HTTP 400: input must contain at least one entry"); return add({ id: `thr_r${++count}`, projectId: args.projectId, title: args.title ?? null }); });
+  const spawn = vi.fn(async (args: { projectId: string; title?: string; input?: unknown[] }) => { if (!args.input?.length) throw new Error("HTTP 400: input must contain at least one entry"); const id = `thr_r${++count}`; return add({ id, projectId: args.projectId, title: args.title ?? null, environmentId: `env_${id}` }); });
   const get = vi.fn(async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; });
   const send = vi.fn(async () => ({ ok: true, delivery: "sent" }));
   const update = vi.fn(async (args: { threadId: string; parentThreadId?: string | null; title?: string }) => { const thread = threads.get(args.threadId)!; threads.set(args.threadId, { ...thread, ...args } as Thread); return {}; });
@@ -25,6 +25,9 @@ async function setup() {
   const calls: { pluginId: string; method: string; input: Record<string, unknown> }[] = [];
   const callRpc = vi.fn(async ({ pluginId, method, input }: { pluginId: string; method: string; input: Record<string, unknown> }) => {
     calls.push({ pluginId, method, input });
+    // Like the Automations plugin: an execution environment is reuse, host or project-default.
+    const environment = (input.execution as { environment?: { type?: string } } | undefined)?.environment;
+    if (environment && !["reuse", "host", "project-default"].includes(environment.type ?? "")) throw new Error("HTTP 400: rpc input validation failed");
     const row = automations.find((a) => a.id === input.automationId);
     if (method === "automations_list") return automations.filter((a) => a.projectId === input.projectId);
     if (method === "automations_create") { const made = { id: `a${automations.length + 1}`, projectId: input.projectId, name: input.name, enabled: false, trigger: input.trigger, execution: input.execution, nextRunAt: 99 }; automations.push(made); return made; }
@@ -483,7 +486,7 @@ it("migrates the same row and automation with the last 3 reports, then archives;
   expect(moved).toMatchObject({ id: runner.id, machine: "host_red4", name: runner.name, job: runner.job, schedule: runner.schedule, lastReport: "three" });
   expect(moved.threadId).not.toBe(runner.threadId);
   expect(x.runners.automation(runner.id)?.id).toBe(automationId);
-  expect(x.automations[0]).toMatchObject({ execution: { targetThreadId: moved.threadId } });
+  expect(x.automations[0]).toMatchObject({ execution: { targetThreadId: moved.threadId, environment: { type: "reuse", environmentId: `env_${moved.threadId}` } } });
   const text = (x.spawn.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
   expect(text).toContain("one\ntwo\nthree");
   expect(text).not.toContain("discard");
@@ -492,6 +495,7 @@ it("migrates the same row and automation with the last 3 reports, then archives;
   expect(x.db.prepare("SELECT bot_id FROM bot_hidden_threads WHERE thread_id = ?").get(moved.threadId)).toEqual({ bot_id: "bot_main" });
   const back = await x.runners.migrate({ id: runner.id, machine: null });
   expect(back.machine).toBeNull();
+  expect(x.automations[0]).toMatchObject({ execution: { targetThreadId: back.threadId, environment: { type: "project-default" } } });
   expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ environment: { type: "project-default" } }));
 });
 

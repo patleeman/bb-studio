@@ -99,6 +99,16 @@ export interface RunnerDeps {
   botThreads?(): ReadonlySet<string>;
 }
 
+/**
+ * An automation's environment for a runner run. Automations accept only
+ * reuse, host or project-default (not a provider environment), and every run
+ * targets the runner's own thread, so a runner on another machine reuses that
+ * thread's environment. Server runners keep project-default, as before.
+ */
+export function automationEnvironment(machine: string | null, environmentId: string | null | undefined) {
+  return machine && environmentId ? { type: "reuse" as const, environmentId } : { type: "project-default" as const };
+}
+
 export class Runners {
   private readonly moving = new Set<string>();
   constructor(private readonly deps: RunnerDeps) {}
@@ -229,7 +239,7 @@ export class Runners {
         pluginMetadata: { runner: row.id, bot: row.bot_id },
       });
       newThreadId = next.id;
-      await this.call("automations_update", { projectId, automationId: row.automation_id, execution: { ...original.execution, environment, targetThreadId: next.id } }, z.unknown());
+      await this.call("automations_update", { projectId, automationId: row.automation_id, execution: { ...original.execution, environment: automationEnvironment(check.machine, next.environmentId), targetThreadId: next.id } }, z.unknown());
       retargeted = true;
       this.deps.db.transaction(() => {
         this.changedRow(row.id, { thread_id: next.id, project_id: next.projectId ?? PERSONAL_PROJECT_ID, machine: check.machine, machine_name: check.machineName, machine_offline: 0, machine_suspended: 0, hidden: 1 });
@@ -461,7 +471,7 @@ export class Runners {
       if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the runner's thread first.");
       const execution = {
         mode: "agent", providerId: thread.providerId, model: defaults.model, reasoningLevel: defaults.reasoningLevel ?? "medium",
-        permissionMode: defaults.permissionMode ?? "accept-edits", environment: await runnerEnvironment(this.deps.sdk, row.machine ?? null), targetThreadId: row.thread_id, prompt: runnerPrompt(row),
+        permissionMode: defaults.permissionMode ?? "accept-edits", environment: automationEnvironment(row.machine ?? null, thread.environmentId), targetThreadId: row.thread_id, prompt: runnerPrompt(row),
       };
       let automationId = row.automation_id;
       if (automationId) {
