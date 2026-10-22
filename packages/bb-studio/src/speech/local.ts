@@ -208,6 +208,7 @@ export class LocalVoice implements LocalSpeechServer {
   readonly paths: LocalPaths;
   private readonly lines: string[] = [];
   private installing: Promise<void> | null = null;
+  private serving: Promise<number> | null = null;
   private phase: "stopped" | "starting" | "ready" | "failed" = "stopped";
   private failure: string | null = null;
   private url: string | null = null;
@@ -354,12 +355,12 @@ export class LocalVoice implements LocalSpeechServer {
     this.failure = null;
     this.lines.length = 0;
     this.installing = (async () => {
-      const wasRunning = this.phase !== "stopped";
+      const serving = this.serving;
       this.held = true;
       this.wake();
       // The old server runs from the venv being replaced; let it stop first.
-      if (wasRunning) await this.until(() => this.phase === "stopped", 15_000);
       try {
+        if (serving) await this.waitForStop(serving, 15_000);
         await mkdir(this.paths.root, { recursive: true });
         await rm(this.paths.marker, { force: true });
         for (const step of installCommands(uv, this.paths)) {
@@ -392,16 +393,15 @@ export class LocalVoice implements LocalSpeechServer {
     return this.installing;
   }
 
-  private until(check: () => boolean, timeoutMs: number): Promise<void> {
-    return new Promise((resolve) => {
-      const started = Date.now();
-      const timer = setInterval(() => {
-        if (check() || Date.now() - started > timeoutMs) {
-          clearInterval(timer);
-          resolve();
-        }
-      }, 100);
-    });
+  private async waitForStop(serving: Promise<number>, timeoutMs: number): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([serving, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Timed out waiting for the local voice server to exit.")), timeoutMs);
+      })]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private spawn(command: Command, onLine: (line: string) => void): LocalProcess {
@@ -427,7 +427,10 @@ export class LocalVoice implements LocalSpeechServer {
         await this.sleep(3000, stop);
         continue;
       }
-      const ranFor = await this.serve(signal);
+      this.serving = this.serve(signal);
+      let ranFor: number;
+      try { ranFor = await this.serving; }
+      finally { this.serving = null; }
       if (signal.aborted || this.phase !== "failed") continue;
       this.attempt = ranFor > 60_000 ? 1 : this.attempt + 1;
       const delay = restartDelay(this.attempt);
@@ -450,6 +453,10 @@ export class LocalVoice implements LocalSpeechServer {
     this.loadedModel = null;
     this.log(`$ mlx_audio.server --port ${port}`);
     await mkdir(this.paths.logs, { recursive: true }).catch(() => {});
+    if (signal.aborted || !this.wanted() || this.installing) {
+      this.phase = "stopped";
+      return 0;
+    }
     const child = this.spawn(command, (line) => this.log(line));
     if (child.pid) await writeFile(this.paths.pid, String(child.pid)).catch(() => {});
     const ended: { exit: { code: number | null; signal: string | null } | null } = { exit: null };
@@ -486,9 +493,8 @@ export class LocalVoice implements LocalSpeechServer {
     } else if (!up && !signal.aborted && this.wanted()) {
       this.phase = "failed";
       this.failure = "The local voice server didn't answer within two minutes.";
-    } else {
-      this.phase = "stopped";
     }
+    const stopping = this.phase !== "failed";
     if (!exit) {
       child.kill("SIGTERM");
       const killer = setTimeout(() => child.kill("SIGKILL"), 5000);
@@ -497,6 +503,7 @@ export class LocalVoice implements LocalSpeechServer {
       this.log("Stopped.");
     }
     await rm(this.paths.pid, { force: true }).catch(() => {});
+    if (stopping) this.phase = "stopped";
     if (this.phase === "failed") {
       this.deps.log?.(this.failure!);
       this.settle(new Error(`${this.failure}\n${this.lines.slice(-STATUS_LINES).join("\n")}`));

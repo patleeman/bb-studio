@@ -19,7 +19,7 @@ const until = async (check: () => boolean, ms = 3000) => {
 };
 
 /** Processes that exit when killed or when the test says, and a server that answers once spawned. */
-function fakeHost(options: { installExit?: number } = {}) {
+function fakeHost(options: { installExit?: number; delayExit?: boolean } = {}) {
   const spawned: { command: Command; exit(code: number | null, signal?: string | null): void; killed: string[] }[] = [];
   const requests: { url: string; method: string }[] = [];
   let serverUp = false;
@@ -35,7 +35,7 @@ function fakeHost(options: { installExit?: number } = {}) {
       onLine(`ran ${command.args[0]}`);
       queueMicrotask(() => entry.exit(options.installExit ?? 0));
     }
-    return { pid: undefined, exited, kill: (signal = "SIGTERM") => { entry.killed.push(signal); entry.exit(null, signal); } };
+    return { pid: undefined, exited, kill: (signal = "SIGTERM") => { entry.killed.push(signal); if (!options.delayExit || !command.command.endsWith("mlx_audio.server")) entry.exit(null, signal); } };
   };
   const fetchImpl = (async (url: string, init?: RequestInit) => {
     requests.push({ url, method: init?.method ?? "GET" });
@@ -54,7 +54,7 @@ describe("local voices", () => {
     for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
   });
 
-  async function voice(options: { selected?: () => boolean; installExit?: number; installed?: boolean; uv?: boolean } = {}) {
+  async function voice(options: { selected?: () => boolean; installExit?: number; installed?: boolean; uv?: boolean; delayExit?: boolean } = {}) {
     const root = await mkdtemp(join(tmpdir(), "studio-local-voice-"));
     roots.push(root);
     const host = fakeHost(options);
@@ -86,6 +86,21 @@ describe("local voices", () => {
     const running = local.run(abort.signal);
     return { local, host, abort, running, paths };
   }
+
+  it("waits for the old process exit before reinstalling", async () => {
+    const { local, host, abort, running } = await voice({ installed: true, delayExit: true });
+    await until(() => local.status().state === "ready");
+    const installing = local.install();
+    await until(() => host.spawned[0]!.killed.length > 0);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(host.spawned).toHaveLength(1);
+    host.spawned[0]!.exit(null, "SIGTERM");
+    await installing;
+    expect(host.spawned.some(({ command }) => command.args[0] === "venv")).toBe(true);
+    abort.abort();
+    for (const child of host.spawned) child.exit(0);
+    await running;
+  });
 
   it("runs only on Apple silicon Macs", () => {
     expect(localSupport("darwin", "arm64")).toBeNull();

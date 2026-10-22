@@ -299,6 +299,34 @@ export class TalkController {
   cleanupEnabled = readFlag(CLEANUP_KEY, true);
   private delivering = false;
 
+  private disposed = false;
+  private readonly subscriptions = new AbortController();
+  private uploadFinished: Promise<void> = Promise.resolve();
+
+  constructor(private readonly predecessor: Promise<void> = Promise.resolve()) {}
+
+  /** Release this bundle's listeners and work before its replacement starts. */
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.subscriptions.abort();
+    const clearTimers = () => {
+      if (this.uploadRetry !== null) clearTimeout(this.uploadRetry);
+      if (this.pendingTimer !== null) clearInterval(this.pendingTimer);
+      if (this.refreshTimer !== null) clearInterval(this.refreshTimer);
+      this.uploadRetry = this.pendingTimer = this.refreshTimer = null;
+    };
+    clearTimers();
+    try {
+      await this.stop(false);
+      await this.uploadFinished;
+    } finally {
+      clearTimers();
+      this.listeners.clear();
+      this.unlock();
+    }
+  }
+
   // ── Store plumbing for React ─────────────────────────────────────────────
   getState = (): TalkState => this.state;
 
@@ -330,23 +358,25 @@ export class TalkController {
 
   // ── Wiring ───────────────────────────────────────────────────────────────
   attach(rpc: PluginRpcClient<TalkRpcContract>): void {
+    if (this.disposed) return;
     this.rpc = rpc;
     if (this.initialized) return;
     this.initialized = true;
-    window.addEventListener("online", () => void this.kickUpload());
-    document.addEventListener("visibilitychange", () => void this.onVisible());
+    const options = { signal: this.subscriptions.signal };
+    window.addEventListener("online", () => void this.kickUpload(), options);
+    document.addEventListener("visibilitychange", () => void this.onVisible(), options);
     window.addEventListener("pagehide", () => {
       const recorder = this.capture?.current?.recorder;
       if (recorder?.state === "recording") recorder.requestData();
-    });
+    }, options);
     window.addEventListener("beforeunload", (event) => {
       if (!this.unsaved.size) return;
       event.preventDefault();
       event.returnValue = "";
-    });
+    }, options);
     window.addEventListener("storage", (event) => {
       if (event.key === PENDING_STORAGE_KEY) this.onPendingChanged();
-    });
+    }, options);
     this.onPendingChanged();
     void this.init();
   }
@@ -500,12 +530,16 @@ export class TalkController {
   }
 
   private async init(): Promise<void> {
+    await this.predecessor;
+    if (this.disposed) return;
     try {
       await this.sealOrphans();
     } catch (error) {
       toast.error(`Talk cannot use local storage: ${message(error)}`);
     }
+    if (this.disposed) return;
     await this.refreshSetAside();
+    if (this.disposed) return;
     void this.kickUpload();
     const saved = this.readPersisted();
     if (!saved) return;
@@ -1134,6 +1168,7 @@ export class TalkController {
   }
 
   private pollWhileTranscribing(): void {
+    if (this.disposed) return;
     if (this.refreshTimer !== null) return;
     this.refreshTimer = window.setInterval(() => void this.refresh(), 3000);
     void this.refresh();
@@ -1302,6 +1337,7 @@ export class TalkController {
 
   // ── Dictations waiting for their thread ─────────────────────────────────
   private onPendingChanged(): void {
+    if (this.disposed) return;
     const waiting = Object.keys(readPending()).length > 0;
     if (waiting && this.pendingTimer === null) {
       this.pendingTimer = window.setInterval(() => this.flushPending(), PENDING_POLL_MS);
@@ -1493,22 +1529,26 @@ export class TalkController {
   }
 
   async kickUpload(): Promise<void> {
+    if (this.disposed) return;
     if (this.uploading) {
       this.uploadAgain = true;
       return;
     }
     this.uploading = true;
+    let finished!: () => void;
+    this.uploadFinished = new Promise<void>((resolve) => { finished = resolve; });
     try {
       do {
         this.uploadAgain = false;
         await this.drain();
-      } while (this.uploadAgain);
+      } while (this.uploadAgain && !this.disposed);
     } catch (error) {
       this.set({ uploadError: message(error) });
       this.scheduleUpload();
     } finally {
       this.uploading = false;
-      await this.refreshSetAside();
+      try { if (!this.disposed) await this.refreshSetAside(); }
+      finally { finished(); }
     }
   }
 
@@ -1571,6 +1611,7 @@ export class TalkController {
     const open = all.filter((s) => !isUploadable(s) && !this.live.has(keyString(s)));
     let segments = all.filter(isUploadable);
     for (const segment of [...segments]) {
+      if (this.disposed) return;
       this.set({ pendingUploads: segments.length });
       try {
         await rpc.call("recordings.segment_put", {
@@ -1617,6 +1658,7 @@ export class TalkController {
   }
 
   private scheduleUpload(): void {
+    if (this.disposed) return;
     if (this.uploadRetry !== null) return;
     const delay = this.uploadBackoffMs;
     this.uploadBackoffMs = Math.min(60_000, this.uploadBackoffMs * 2);
@@ -1707,16 +1749,16 @@ export class TalkController {
   }
 }
 
-export const talk = new TalkController();
-
 // A reload of Studio's bundle (e.g. a plugin update) loads this module again
 // in the same window. The old controller would keep the microphone and the
 // capture lock with no pill left to stop it, so finish its capture here. It
 // keeps the transcript as a recording rather than typing it in unseen.
 const CURRENT = Symbol.for("bb-studio.talk.controller");
 const previous = (window as unknown as Record<symbol, TalkController | undefined>)[CURRENT];
+export const talk = new TalkController(previous?.dispose().catch((error) => {
+  toast.error(`Talk couldn't finish its previous capture: ${message(error)}`);
+}));
 (window as unknown as Record<symbol, TalkController>)[CURRENT] = talk;
-if (previous && previous !== talk) void previous.stop(false).catch(() => {});
 
 export function useTalkState(): TalkState {
   return useSyncExternalStore(talk.subscribe, talk.getState);

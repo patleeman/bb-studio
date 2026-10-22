@@ -453,3 +453,23 @@ it("gives voice mode the mic back when the dictation can't start", async () => {
   expect(told).toEqual([true, false]);
   unregister();
 });
+
+
+it("disposes listeners and upload retries before a replacement attaches", async () => {
+  const old = new TalkController();
+  const call = vi.fn(async () => { throw new Error("offline"); });
+  old.attach({ call } as never);
+  await vi.advanceTimersByTimeAsync(0);
+  const kick = vi.spyOn(old, "kickUpload");
+  const disposal = old.dispose();
+  const replacement = new TalkController(disposal);
+  replacement.attach({ call } as never);
+  await disposal;
+  kick.mockClear();
+  window.dispatchEvent(new Event("online"));
+  document.dispatchEvent(new Event("visibilitychange"));
+  window.dispatchEvent(new StorageEvent("storage", { key: "bb-talk.pending-inserts" }));
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(kick).not.toHaveBeenCalled();
+  await replacement.dispose();
+});
