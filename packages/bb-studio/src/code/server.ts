@@ -91,8 +91,9 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
       if (state === "stopped" || state === "failed") void bridges.close(id);
     },
     theme: () => theme,
-    beforeOpen: async () => {
+    beforeOpen: async (signal) => {
       await migration.requireReady();
+      signal.throwIfAborted();
       await installBridge(join(root, "extensions"));
     },
     env: async (id, dir) => ({ STUDIO_CODE_BRIDGE: await bridges.open(id, dir) }),

@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { IDLE_TIMEOUT_SECONDS, type ServerStatus, type Workspace } from "../shared";
 import type { BbTheme } from "../theme";
@@ -20,6 +21,7 @@ import { applyLayout, applyTheme } from "./settings";
 
 export const CODE_SERVER_VERSION = "4.140.0";
 const READY_TIMEOUT_MS = 60_000;
+const INSTALL_TIMEOUT_MS = 300_000;
 const RECONNECTION_GRACE_SECONDS = 30;
 const STOPPED: ServerStatus = { state: "stopped", url: null, password: null, error: null };
 const pending = (state: "installing" | "starting"): ServerStatus => ({ state, url: null, password: null, error: null });
@@ -34,9 +36,9 @@ export const RELEASE_SHA256: Record<string, string> = {
 /** Written into an install once its archive matched, so a partial or older install is replaced. */
 const INSTALL_MARKER = ".studio-code-sha256";
 
-export async function verifySha256(file: string, expected: string): Promise<void> {
+export async function verifySha256(file: string, expected: string, signal?: AbortSignal): Promise<void> {
   const hash = createHash("sha256");
-  await pipeline(createReadStream(file), hash);
+  await pipeline(createReadStream(file), hash, { signal });
   const actual = hash.digest("hex");
   if (actual !== expected) throw new Error(`The code-server download failed its checksum (got ${actual}), so it wasn't installed.`);
 }
@@ -80,6 +82,16 @@ export function listeningPort(text: string): number | null {
 /** Thrown inside a start that Stop, archive or delete cancelled. */
 class Cancelled extends Error {}
 
+/** Release one start's waiter without cancelling work shared by other starts. */
+function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+    if (signal.aborted) abort();
+  });
+}
+
 /** The release folder name for this machine, or null where code-server has no build. */
 export function releaseAsset(platform: string, arch: string): string | null {
   const os = platform === "darwin" ? "macos" : platform === "linux" ? "linux" : null;
@@ -105,7 +117,8 @@ export class CodeServers {
   private disposed = false;
   private readonly entries = new Map<string, Entry>();
   private readonly starting = new Map<string, Promise<ServerStatus>>();
-  private installing: Promise<string> | null = null;
+  private readonly controllers = new Map<string, AbortController>();
+  private installing: { promise: Promise<string>; controller: AbortController; users: Set<AbortSignal> } | null = null;
   private readonly draining = new Map<string, Promise<void>>();
   /** Each Stop bumps a workspace's generation; a start of an older one gives up. */
   private readonly generations = new Map<string, number>();
@@ -115,7 +128,7 @@ export class CodeServers {
   constructor(private readonly options: {
     /** The plugin's own data folder. */
     root: string;
-    beforeOpen?(): Promise<void>;
+    beforeOpen?(signal: AbortSignal): Promise<void>;
     /** Tests can fence their simulated processes without inspecting the host. */
     quiesce?(): Promise<void>;
     log: { info(message: string): void; warn(message: string): void };
@@ -126,7 +139,7 @@ export class CodeServers {
     /** Extra environment for a workspace's server (the bridge's socket). */
     env?(id: string, dir: string): Promise<Record<string, string>>;
     /** Tests: the installed binary, and the process launcher. */
-    install?(): Promise<string>;
+    install?(signal: AbortSignal): Promise<string>;
     spawn?: Spawn;
   }) {
     this.swept = this.options.quiesce?.() ?? quiesceCode(this.options.root);
@@ -144,7 +157,12 @@ export class CodeServers {
     if (running?.status.state === "running") return Promise.resolve(running.status);
     const pending = this.starting.get(workspace.id);
     if (pending) return pending;
-    const start = this.start(workspace).finally(() => this.starting.delete(workspace.id));
+    const controller = new AbortController();
+    this.controllers.set(workspace.id, controller);
+    const start = this.start(workspace, controller.signal).finally(() => {
+      if (this.starting.get(workspace.id) === start) this.starting.delete(workspace.id);
+      if (this.controllers.get(workspace.id) === controller) this.controllers.delete(workspace.id);
+    });
     this.starting.set(workspace.id, start);
     return start;
   }
@@ -156,6 +174,9 @@ export class CodeServers {
   }
 
   stop(id: string): ServerStatus {
+    this.controllers.get(id)?.abort(new Cancelled());
+    this.controllers.delete(id);
+    this.starting.delete(id);
     // A start still downloading or booting sees this and gives up.
     this.generations.set(id, (this.generations.get(id) ?? 0) + 1);
     const entry = this.entries.get(id);
@@ -169,7 +190,8 @@ export class CodeServers {
 
   dispose(): void {
     this.disposed = true;
-    for (const id of [...this.entries.keys()]) this.stop(id);
+    this.installing?.controller.abort(new Cancelled());
+    for (const id of new Set([...this.entries.keys(), ...this.controllers.keys()])) this.stop(id);
   }
 
   /** Stop is synchronous for callers, but its replacement waits for actual exit. */
@@ -191,7 +213,7 @@ export class CodeServers {
     this.options.onChange(id);
   }
 
-  private async start(workspace: Workspace): Promise<ServerStatus> {
+  private async start(workspace: Workspace, signal: AbortSignal): Promise<ServerStatus> {
     const { id } = workspace;
     if (!workspace.folders.length) throw new Error("Add a folder to open this workspace.");
     const generation = this.generations.get(id) ?? 0;
@@ -199,13 +221,13 @@ export class CodeServers {
     const check = () => { if (this.disposed || (this.generations.get(id) ?? 0) !== generation) throw new Cancelled(); };
     let child: ChildProcess | null = null;
     try {
-      await this.draining.get(id);
+      await abortable(this.draining.get(id) ?? Promise.resolve(), signal);
       check();
-      await this.swept;
+      await abortable(this.swept, signal);
       check();
-      await this.options.beforeOpen?.();
+      if (this.options.beforeOpen) await abortable(this.options.beforeOpen(signal), signal);
       check();
-      const bin = await this.binary(id, check);
+      const bin = await this.binary(id, check, signal);
       check();
       this.set(id, { status: pending("starting"), child: null, file: null, stopping: false });
       const dir = join(this.options.root, "workspaces", id);
@@ -225,6 +247,7 @@ export class CodeServers {
       // reason, even SIGKILL, the pipe closes and it stops code-server.
       const watchdog = join(this.options.root, "watchdog.cjs");
       await writeFile(watchdog, WATCHDOG);
+      check();
       const extra = (await this.options.env?.(id, dir)) ?? {};
       check();
       const launch = this.options.spawn ?? (spawnProcess as Spawn);
@@ -256,7 +279,8 @@ export class CodeServers {
         else if (!entry.stopping) this.options.log.info(`workspace ${id}: stopped after ${IDLE_TIMEOUT_SECONDS}s idle`);
         this.set(id, { status: error ? { state: "failed", url: null, password: null, error } : STOPPED, child: null, file: null, stopping: false });
       });
-      const port = await waitUntilReady(started, () => listeningPort(output.join("")), check);
+      const port = await waitUntilReady(started, () => listeningPort(output.join("")), check, signal);
+      check();
       const origin = `http://127.0.0.1:${port}`;
       const status: ServerStatus = { state: "running", url: `${origin}/?workspace=${encodeURIComponent(file)}`, password, error: null };
       this.set(id, { ...entry, status });
@@ -265,7 +289,7 @@ export class CodeServers {
     } catch (cause) {
       if (child) this.drain(id, child);
       // Stop already said "stopped"; a cancelled start leaves it that way.
-      if (cause instanceof Cancelled) return this.status(id);
+      if (signal.aborted || cause instanceof Cancelled) return this.status(id);
       // code-server's own exit message says more than "stopped while starting".
       const current = this.entries.get(id)?.status;
       const error = current?.state === "failed" && current.error ? current.error : cause instanceof Error ? cause.message : String(cause);
@@ -276,8 +300,8 @@ export class CodeServers {
   }
 
   /** The code-server binary, downloading and checking the release the first time. */
-  private async binary(id: string, check: () => void): Promise<string> {
-    if (this.options.install) return this.options.install();
+  private async binary(id: string, check: () => void, signal: AbortSignal): Promise<string> {
+    if (this.options.install) return abortable(this.options.install(signal), signal);
     const asset = releaseAsset(process.platform, process.arch);
     if (!asset) throw new Error(`code-server has no build for ${process.platform}-${process.arch}.`);
     const expected = RELEASE_SHA256[asset];
@@ -285,35 +309,57 @@ export class CodeServers {
     const dir = join(this.options.root, "code-server", asset);
     const bin = join(dir, "bin", "code-server");
     const marker = (await readFile(join(dir, INSTALL_MARKER), "utf8").catch(() => "")).trim();
+    check();
     if (existsSync(bin) && marker === expected) {
       await hideLetterpress(dir);
       return bin;
     }
     check();
     this.set(id, { status: pending("installing"), child: null, file: null, stopping: false });
-    this.installing ??= this.download(asset, dir, expected).finally(() => { this.installing = null; });
-    await this.installing;
+    // An aborted install must finish its staging cleanup before a replacement.
+    if (this.installing?.controller.signal.aborted) await abortable(this.installing.promise.catch(() => ""), signal);
+    check();
+    if (!this.installing) {
+      const controller = new AbortController();
+      const job = {
+        controller, users: new Set<AbortSignal>(),
+        promise: this.download(asset, dir, expected, AbortSignal.any([controller.signal, AbortSignal.timeout(INSTALL_TIMEOUT_MS)]))
+          .finally(() => { if (this.installing === job) this.installing = null; }),
+      };
+      this.installing = job;
+    }
+    const job = this.installing;
+    job.users.add(signal);
+    try { await abortable(job.promise, signal); } finally {
+      job.users.delete(signal);
+      if (!job.users.size) job.controller.abort(new Cancelled());
+    }
+    check();
     await hideLetterpress(dir);
     return bin;
   }
 
-  private async download(asset: string, dir: string, expected: string): Promise<string> {
+  private async download(asset: string, dir: string, expected: string, signal: AbortSignal): Promise<string> {
     const url = `https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/${asset}.tar.gz`;
     const parent = join(this.options.root, "code-server");
     await mkdir(parent, { recursive: true });
+    signal.throwIfAborted();
     // Downloads a crash interrupted, and an install from before checksums.
     for (const name of await readdir(parent)) if (name.startsWith(".download-")) await rm(join(parent, name), { recursive: true, force: true });
+    signal.throwIfAborted();
     await rm(dir, { recursive: true, force: true });
     const staging = await mkdtemp(join(parent, ".download-"));
     try {
+      signal.throwIfAborted();
       this.options.log.info(`downloading ${url}`);
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok || !response.body) throw new Error(`Couldn't download code-server (HTTP ${response.status}).`);
       const archive = join(staging, "code-server.tar.gz");
-      await pipeline(Readable.fromWeb(response.body as WebReadableStream<Uint8Array>), createWriteStream(archive));
-      await verifySha256(archive, expected);
-      await promisify(execFile)("tar", ["-xzf", archive, "-C", staging]);
-      await writeFile(join(staging, asset, INSTALL_MARKER), `${expected}\n`);
+      await pipeline(Readable.fromWeb(response.body as WebReadableStream<Uint8Array>), createWriteStream(archive), { signal });
+      await verifySha256(archive, expected, signal);
+      await promisify(execFile)("tar", ["-xzf", archive, "-C", staging], { signal });
+      await writeFile(join(staging, asset, INSTALL_MARKER), `${expected}\n`, { signal });
+      signal.throwIfAborted();
       await rename(join(staging, asset), dir);
       return dir;
     } finally {
@@ -389,7 +435,7 @@ function tail(lines: string[]): string {
 }
 
 /** Waits for code-server to log its port and answer health checks; returns the port. */
-async function waitUntilReady(child: ChildProcess, port: () => number | null, check: () => void): Promise<number> {
+async function waitUntilReady(child: ChildProcess, port: () => number | null, check: () => void, signal: AbortSignal): Promise<number> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     check();
@@ -397,12 +443,17 @@ async function waitUntilReady(child: ChildProcess, port: () => number | null, ch
     const bound = port();
     if (bound) {
       try {
-        if ((await fetch(`http://127.0.0.1:${bound}/healthz`)).ok) return bound;
+        const response = await fetch(`http://127.0.0.1:${bound}/healthz`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(Math.max(1, Math.min(2000, deadline - Date.now())))]),
+        });
+        check();
+        if (response.ok && Date.now() < deadline) return bound;
       } catch {
         // Not answering yet.
       }
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    check();
+    await sleep(Math.max(0, Math.min(250, deadline - Date.now())), undefined, { signal });
   }
   throw new Error("code-server didn't start within a minute.");
 }
