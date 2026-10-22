@@ -300,7 +300,11 @@ async function edit(command) {
     if (!userTyped) {
       const doc = editor.document;
       mine = { offset: 0, length: doc.getText().length, text: original };
-      await editor.edit((builder) => builder.replace(new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), original), { undoStopBefore: true, undoStopAfter: true });
+      let restored = false;
+      try {
+        restored = await editor.edit((builder) => builder.replace(new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), original), { undoStopBefore: true, undoStopAfter: true });
+      } catch { /* Report the partial edit below. */ }
+      if (!restored) throw new Error((error && error.message || String(error)) + " Rollback failed; a partial edit remains in " + name + "; inspect the file before retrying.");
       throw new Error((error && error.message || String(error)) + " The edit stopped partway and was rolled back; " + name + " is as it was.");
     }
     throw new Error((error && error.message || String(error)) + " The edit stopped partway while the user was typing in " + name + ", so the partial edit was left in place; ⌘Z undoes it.");

@@ -6,7 +6,7 @@ import { BRIDGE_SOURCE } from "./bridge-extension";
 
 type Change = { rangeOffset: number; rangeLength: number; text: string };
 
-function fakeVscode(initial: string, options: { failOnEdit?: number; onEdit?: (count: number, doc: { text: string }) => void } = {}) {
+function fakeVscode(initial: string, options: { failOnEdit?: number | number[]; onEdit?: (count: number, doc: { text: string }) => void } = {}) {
   const listeners: ((event: { document: Doc; contentChanges: Change[] }) => void)[] = [];
   const undoStops: boolean[] = [];
   let edits = 0;
@@ -34,7 +34,7 @@ function fakeVscode(initial: string, options: { failOnEdit?: number; onEdit?: (c
     async edit(callback: (builder: unknown) => void, opts: { undoStopBefore: boolean }) {
       edits += 1;
       undoStops.push(opts.undoStopBefore);
-      if (options.failOnEdit === edits) return false;
+      if ([options.failOnEdit].flat().includes(edits)) return false;
       const changes: Change[] = [];
       callback({
         insert: (at: Position, text: string) => changes.push({ rangeOffset: at.offset, rangeLength: 0, text }),
@@ -95,6 +95,13 @@ describe("live edit in the user's editor", () => {
     const { vscode, doc } = fakeVscode("const a = 1;\n", { failOnEdit: 4 });
     await expect(load(vscode).edit(command)).rejects.toThrow(/rolled back/i);
     expect(doc.text).toBe("const a = 1;\n");
+    expect(doc.saved).toBe(0);
+  });
+
+  it("reports a partial edit when rollback is rejected too", async () => {
+    const { vscode, doc } = fakeVscode("const a = 1;\n", { failOnEdit: [4, 5] });
+    await expect(load(vscode).edit(command)).rejects.toThrow(/rollback failed.*partial edit/i);
+    expect(doc.text).not.toBe("const a = 1;\n");
     expect(doc.saved).toBe(0);
   });
 
