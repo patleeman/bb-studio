@@ -179,3 +179,19 @@ it("fails closed and records a run when the automation overview is unavailable",
   x.harness.sdk.stub("plugins.callRpc", async () => { throw new Error("overview unavailable"); });
   const run = await x.maintenance.run("bot", { now }); expect(run?.summary).toContain("stopped: overview unavailable"); expect(x.archive).not.toHaveBeenCalled();
 });
+
+it("keeps same-prompt local check-ins at different times", async () => {
+  const x = await setup(); await x.enable(); x.rows.push(thread("main"));
+  x.local("morning", "checkin"); x.local("evening", "checkin");
+  x.db.prepare("UPDATE bot_automations SET schedule_json = ? WHERE id = ?").run(JSON.stringify({ type: "cron", cron: "0 9 * * *" }), "morning");
+  x.db.prepare("UPDATE bot_automations SET schedule_json = ? WHERE id = ?").run(JSON.stringify({ type: "cron", cron: "0 18 * * *" }), "evening");
+  await x.maintenance.run("bot", { now });
+  expect(x.pause).not.toHaveBeenCalled();
+});
+it("pauses only external schedules with the same project, trigger and execution", async () => {
+  const x = await setup(); await x.enable();
+  const add = (id: string, project: string, cron: string, model = "model") => x.targets.push({ project: { id: project }, automation: { id, enabled: true, createdByThreadId: "main", execution: { prompt: "report", mode: "agent", model }, trigger: { cron, timezone: "UTC" } } });
+  add("morning", "p", "0 9 * * *"); add("evening", "p", "0 18 * * *"); add("other-project", "q", "0 9 * * *"); add("other-model", "p", "0 9 * * *", "different"); add("duplicate", "p", "0 9 * * *");
+  await x.maintenance.run("bot", { now });
+  expect(x.rpcCalls.filter((c) => c.method === "automations_pause").map((c) => c.input)).toEqual([{ projectId: "p", automationId: "duplicate" }]);
+});

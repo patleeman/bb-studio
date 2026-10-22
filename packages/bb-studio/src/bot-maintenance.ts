@@ -56,7 +56,8 @@ export interface MaintenanceDeps {
   adoptable(botId: string): Promise<{ threadId: string; title: string; automationId: string; cron: string | null }[]>;
   alert(botId: string, line: string): Promise<void>;
 }
-type LocalAutomation = { id: string; name: string; kind: string; state: string; instruction: string; target: string; target_thread_id: string | null; updated_at: number; last_fired_at: number | null; schedule_json: string; bb_ids: string; project_id: string };
+const signatureOf = (value: unknown): string => JSON.stringify(value, (_key, part) => part && typeof part === "object" && !Array.isArray(part) ? Object.fromEntries(Object.keys(part).sort().map((key) => [key, part[key]])) : part);
+type LocalAutomation = { model: string | null; provider_id: string | null; reasoning: string | null; id: string; name: string; kind: string; state: string; instruction: string; target: string; target_thread_id: string | null; updated_at: number; last_fired_at: number | null; schedule_json: string; bb_ids: string; project_id: string };
 export class BotMaintenance {
   private running = new Set<string>();
   constructor(private readonly deps: MaintenanceDeps) {}
@@ -178,9 +179,9 @@ export class BotMaintenance {
           const targetId = row.target === "main" ? bot.threadId : (this.deps.db.prepare("SELECT thread_id FROM bot_runners WHERE id = ?").get(row.target) as { thread_id: string | null } | undefined)?.thread_id;
           const target = targetId ? await this.deps.sdk.threads.get({ threadId: targetId }).catch((error) => { if ((error as { status?: number }).status === 404 || /not found/i.test(String(error))) return null; throw error; }) : null;
           const retired = !target || !!target.archivedAt;
-          const signature = JSON.stringify([targetId, row.instruction.trim(), row.kind === "watcher" ? row.id : ""]);
+          const signature = signatureOf([row.project_id, targetId, row.kind, JSON.parse(row.schedule_json), row.instruction.trim(), row.provider_id, row.model, row.reasoning, row.kind === "watcher" ? row.id : ""]);
           const duplicate = seen.has(signature); seen.add(signature);
-          if (retired || duplicate) { await act(`Pause ${retired ? "retired target" : "duplicate"}: ${row.name}`, () => this.deps.automationPause(row.id, botId)); result.suggestions.push({ text: `${row.name}: ${retired ? "target retired or missing" : "duplicate instruction and target"}` }); continue; }
+          if (retired || duplicate) { await act(`Pause ${retired ? "retired target" : "duplicate"}: ${row.name}`, () => this.deps.automationPause(row.id, botId)); result.suggestions.push({ text: `${row.name}: ${retired ? "target retired or missing" : "duplicate schedule, instruction and target"}` }); continue; }
           const ids = JSON.parse(row.bb_ids) as string[];
           const runs = (await Promise.all(ids.map((automationId) => this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_runs", input: { projectId: row.project_id, automationId, limit: 10 }, outputSchema: z.object({ runs: z.array(z.object({ status: z.string(), output: z.string().nullish(), finishedAt: z.number().nullish() }).passthrough()) }).passthrough() })))).flatMap((p) => p.runs).sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0)).slice(0, 10);
           if (runs.length === 10 && runs.every((r) => r.status === "succeeded" && (!r.output?.trim() || r.output.trim() === "[PASS]"))) result.suggestions.push({ text: `Review ${row.name}: no useful output in its last 10 runs` });
@@ -198,11 +199,11 @@ export class BotMaintenance {
           const targetId = a.execution.targetThreadId;
           const target = targetId ? await this.deps.sdk.threads.get({ threadId: targetId }).catch((error) => { if ((error as { status?: number }).status === 404 || /not found/i.test(String(error))) return null; throw error; }) : undefined;
           const retired = targetId ? !target || !!target.archivedAt : false;
-          const signature = JSON.stringify([targetId ?? "new-thread", a.execution.prompt?.trim()]);
+          const signature = signatureOf([entry.project.id, a.trigger, { ...a.execution, prompt: a.execution.prompt?.trim() }]);
           const duplicate = !!a.execution.prompt && seen.has(signature); seen.add(signature);
           if (retired || duplicate) {
             await act(`Pause ${retired ? "retired target" : "duplicate"}: ${name}`, () => this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_pause", input: { projectId: entry.project.id, automationId: a.id }, outputSchema: z.unknown() }));
-            result.suggestions.push({ text: `${name}: ${retired ? "target retired or missing" : "duplicate instruction and target"}` });
+            result.suggestions.push({ text: `${name}: ${retired ? "target retired or missing" : "duplicate schedule, instruction and target"}` });
             continue;
           }
           const page = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_runs", input: { projectId: entry.project.id, automationId: a.id, limit: 10 }, outputSchema: z.object({ runs: z.array(z.object({ status: z.string(), output: z.string().nullish() }).passthrough()) }).passthrough() });
