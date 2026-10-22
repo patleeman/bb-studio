@@ -32,7 +32,7 @@ test("descriptor rejects partial or mixed staging routes and removes inherited C
   assert.throws(() => readStagedInstance({ BB_CAPTURE_INSTANCE: descriptor, BB_DATA_DIR: "/private/work" }), /disagrees/);
   assert.deepEqual(readStagedInstance({ BB_CAPTURE_INSTANCE: descriptor }), instance);
   assert.deepEqual(captureEnv(instance, { PATH: "path", BB_CLI: "/private/bb", BB_HOST_ID: "real", BB_THREAD_ID: "real", BB_HOST_DAEMON_PORT: "1" }), {
-    PATH: "path", BB_CLI: instance.cli, BB_SERVER_URL: instance.serverUrl, BB_DATA_DIR: instance.dataDir, BB_HOST_DAEMON_PORT: "49502",
+    PATH: "path", BB_SERVER_URL: instance.serverUrl, BB_DATA_DIR: instance.dataDir, BB_HOST_DAEMON_PORT: "49502",
   });
   write(descriptor, JSON.stringify({ ...instance, cli: "/some/other/bb" }));
   assert.throws(() => readStagedInstance({ BB_CAPTURE_INSTANCE: descriptor }), /Invalid staged/);

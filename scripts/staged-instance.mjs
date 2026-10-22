@@ -23,12 +23,13 @@ export function readStagedInstance(env = process.env) {
   return instance;
 }
 
+// No BB_CLI: the bb launcher re-execs to BB_CLI with the same environment, so
+// pointing it at the staged launcher itself spawns copies until fork fails.
 export function captureEnv(instance, env = process.env) {
   return {
     ...Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("BB_"))),
     BB_DATA_DIR: instance.dataDir,
     BB_SERVER_URL: instance.serverUrl,
     BB_HOST_DAEMON_PORT: String(instance.port + 1),
-    BB_CLI: instance.cli,
   };
 }
