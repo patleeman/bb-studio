@@ -127,6 +127,10 @@ export function apnsPayload(message: ExpoMessage): string {
   const body = message.body ?? "";
   const full = renderPayload(message, body);
   if (Buffer.byteLength(full) <= APNS_MAX_PAYLOAD_BYTES) return full;
+  const minimum = renderPayload(message, "…");
+  if (Buffer.byteLength(minimum) > APNS_MAX_PAYLOAD_BYTES) {
+    throw new Error("PayloadTooLarge: APNs title or data exceeds the 4096-byte payload budget");
+  }
   // Shorten the body by whole code points so multi-byte text is never split.
   const chars = Array.from(body);
   let low = 0;
@@ -220,10 +224,15 @@ export async function deliverApns(
   if (!isHexToken(deviceToken)) {
     return { status: "error", message: "Malformed APNs token", details: { error: "DeviceNotRegistered" } };
   }
+  let payload: string;
+  try { payload = apnsPayload(message); }
+  catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "PayloadTooLarge", details: { error: "PayloadTooLarge" } };
+  }
   const result = await sendApns(
     {
       deviceToken,
-      payload: apnsPayload(message),
+      payload,
       pushType: "alert",
       priority: 10,
       ...(typeof message.collapseId === "string" && message.collapseId !== "" ? { collapseId: message.collapseId } : {}),
@@ -244,6 +253,7 @@ export async function deliverApns(
 /** One HTTP/2 connection per APNs host, reopened after errors or GOAWAY. */
 export class Http2ApnsSender {
   private sessions = new Map<ApnsEnvironment, ClientHttp2Session>();
+  private owned = new Set<ClientHttp2Session>();
 
   send: ApnsSend = (environment, deviceToken, payload, headers) =>
     new Promise((resolve) => {
@@ -292,15 +302,23 @@ export class Http2ApnsSender {
       if (this.sessions.get(environment) === session) this.sessions.delete(environment);
     };
     session.on("error", forget);
-    session.on("goaway", forget);
-    session.on("close", forget);
+    session.on("goaway", () => {
+      forget();
+      session.close(); // Drains existing streams; disposal still owns it.
+    });
+    session.on("close", () => {
+      forget();
+      this.owned.delete(session);
+    });
+    this.owned.add(session);
     this.sessions.set(environment, session);
     return session;
   }
 
   close(): void {
-    for (const session of this.sessions.values()) session.close();
+    for (const session of this.owned) session.close();
     this.sessions.clear();
+    this.owned.clear();
   }
 }
 

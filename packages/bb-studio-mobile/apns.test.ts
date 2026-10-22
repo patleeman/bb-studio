@@ -58,6 +58,16 @@ describe("ProviderToken", () => {
 });
 
 describe("apnsPayload", () => {
+  it.each([{ title: "x".repeat(5000) }, { data: { extra: "x".repeat(5000) } }])("rejects fixed fields that cannot fit: %j", async (fields) => {
+    const send = recordingSend({});
+    const message = { to: `apns:${token}`, body: "long".repeat(2000), ...fields };
+    expect(() => apnsPayload(message)).toThrow("PayloadTooLarge");
+    expect(await deliverApns(message, config, new ProviderToken(config), send.send)).toMatchObject({
+      status: "error", details: { error: "PayloadTooLarge" },
+    });
+    expect(send.calls).toEqual([]);
+  });
+
   it("puts the alert in aps and keeps BB's data at the top level", () => {
     const payload = JSON.parse(
       apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", kind: "turn-finished" } }),

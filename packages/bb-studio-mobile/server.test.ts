@@ -30,6 +30,17 @@ async function setup() {
 }
 
 describe("push relay", () => {
+  it("does not refresh muted device timestamps past their TTL", async () => {
+    const host = await setup();
+    try {
+      const to = "apns:" + "ab".repeat(32);
+      await host.bb.storage.kv.set("devices", { [to]: Date.now() - DEVICE_TTL_MS - 1 });
+      await host.harness.behavior.callRpc("mute_set", { threadId: "thr_muted", muted: true });
+      expect(await host.push([{ to, body: "Done", data: { threadId: "thr_muted" } }])).toEqual({ data: [{ status: "ok" }] });
+      expect(await host.bb.storage.kv.get("devices")).toEqual({});
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
   it("persists one server identity across reloads", async () => {
     const host = await setup();
     try {
@@ -205,6 +216,7 @@ describe("clearing notifications", () => {
       await vi.advanceTimersByTimeAsync(60_000);
       expect(await host.bb.storage.kv.get("notified-threads")).toEqual({ thr_a: expect.any(Number) });
       expect(session).not.toHaveBeenCalled();
+      expect(host.harness.logEntries.some((entry) => entry.level === "warn" && entry.message.includes("thr_a") && entry.message.includes("temporary lookup failure"))).toBe(true);
     } finally { await host.harness.lifecycle.dispose(); }
   });
 

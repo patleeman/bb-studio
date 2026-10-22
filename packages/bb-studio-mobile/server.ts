@@ -223,7 +223,6 @@ export default async function plugin(bb: BbPluginApi) {
       }
       (message.to.startsWith(APNS_TOKEN_PREFIX) ? apnsIndexes : expoIndexes).push(index);
     });
-    const deliveryIndexes = [...apnsIndexes, ...expoIndexes];
 
     // Muted threads are dropped for the app only; other subscribers still get them.
     const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
@@ -258,7 +257,8 @@ export default async function plugin(bb: BbPluginApi) {
       });
     }
 
-    // Quiet completions must not refresh device tokens as if they were delivered.
+    // Only attempted deliveries refresh devices; quiet and muted messages do not.
+    const deliveryIndexes = [...apnsIndexes, ...expoIndexes];
     await rememberDevices(deliveryIndexes.map((index) => messages[index]!), deliveryIndexes.map((index) => tickets[index]!));
     await rememberNotified(apnsIndexes.flatMap((index) => {
       const threadId = messages[index]!.data?.threadId;
@@ -311,6 +311,7 @@ export default async function plugin(bb: BbPluginApi) {
     return withNotified(async (notified) => noteNotified(notified, threadIds, Date.now()));
   }
 
+  const readWarnings = new Map<string, number>();
   async function readState(threadId: string): Promise<ThreadReadState | null | undefined> {
     try {
       // Only a missing thread establishes deletion. A failed interactions
@@ -321,8 +322,14 @@ export default async function plugin(bb: BbPluginApi) {
       });
       if (!thread) return null;
       const interactions = await bb.sdk.threads.interactions.list({ threadId });
+      readWarnings.delete(threadId);
       return { ...thread, hasPendingInteraction: interactions.some((interaction) => interaction.status === "pending") };
-    } catch {
+    } catch (error) {
+      const now = Date.now();
+      if (!readWarnings.has(threadId) || now - readWarnings.get(threadId)! >= 5 * CLEAR_INTERVAL_MS) {
+        bb.log.warn(`notification read-state lookup failed for ${threadId}: ${error instanceof Error ? error.message : String(error)}`);
+        readWarnings.set(threadId, now);
+      }
       return undefined;
     }
   }
@@ -330,6 +337,7 @@ export default async function plugin(bb: BbPluginApi) {
   function clearReadNotifications(): Promise<void> {
     return withNotified(async (notified) => {
       const threadIds = Object.keys(notified);
+      for (const id of readWarnings.keys()) if (!(id in notified)) readWarnings.delete(id);
       if (threadIds.length === 0) return notified;
       const apns = await apnsConfig();
       if ("missing" in apns) return notified;
