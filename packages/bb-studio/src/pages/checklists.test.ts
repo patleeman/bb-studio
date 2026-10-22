@@ -87,8 +87,12 @@ describe("checklists", () => {
 
     await expect(checklists.handOff({ pageId: page.id, blockId: item!.blockId })).resolves.toEqual({ threadId: "thr_new" });
     expect(bb.sdk.threads.spawn).toHaveBeenCalledTimes(2);
-    expect(bb.sdk.threads.spawn.mock.calls[0]![0]).toMatchObject({ environment: { workspace: { type: "managed-worktree" } } });
-    expect(bb.sdk.threads.spawn.mock.calls[1]![0]).toMatchObject({ environment: { workspace: { type: "unmanaged" } } });
+    expect(bb.sdk.threads.spawn).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      environment: expect.objectContaining({ workspace: expect.objectContaining({ type: "managed-worktree", baseBranch: { kind: "default" } }) }),
+    }));
+    expect(bb.sdk.threads.spawn).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      environment: expect.objectContaining({ workspace: expect.objectContaining({ type: "unmanaged", path: null }) }),
+    }));
   });
 
   it("preserves other worktree spawn failures", async () => {
