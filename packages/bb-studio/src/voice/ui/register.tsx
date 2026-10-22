@@ -22,6 +22,7 @@ import type { voiceContract } from "../contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "../shared";
 import { useVoiceSnapshot, voicePlayer } from "./state";
 import { HINT_TEXT, INITIAL_INPUT, SpeechGate, footer, reduce, takeHint, wantsCapture, type VoiceEffect, type VoiceEvent, type VoiceInput } from "./voice-input";
+import { canRestoreFailedDictation } from "./dictation-recovery";
 
 const NEW_VOICE_CHAT_EVENT = "studio:new-voice-chat";
 const TOGGLE_VOICE_EVENT = "studio:toggle-voice";
@@ -325,8 +326,13 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
       rpcRef.current.call("voice.turnNote", { threadId }).then((result) => result.note, () => null)
         .then((note) => sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [] }, ...(note ? [{ type: "text", text: note, mentions: [], visibility: "agent-only" }] : [])] } as never))
         .catch((error: unknown) => {
-          current.replace({ text, mentions: [] });
-          toast.error("Couldn't send what you said", { description: errorMessage(error) });
+          const latest = composerRef.current;
+          const restored = canRestoreFailedDictation(latest.draft, latest.attachmentCount);
+          if (restored) latest.replace({ text, mentions: [] });
+          toast.error("Couldn't send what you said", {
+            description: errorMessage(error),
+            ...(!restored ? { action: { label: "Add to draft", onClick: () => composerRef.current.replace((draft) => ({ text: joinText(draft.text, text), mentions: draft.mentions })) } } : {}),
+          });
         });
     });
   }, [on, threadId, sdk]);
