@@ -45,7 +45,7 @@ async function setup() {
   add({ id: "bot2", title: "Scout" });
   const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
   const runners = new Runners({ db, sdk: bb.sdk, changed: () => {}, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
-  return { runners, threads, add, spawn, send, update, archive, automations, calls, bot, started };
+  return { runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -309,4 +309,27 @@ it("offers only recurring cron adoption and preserves the adopted timezone on ed
   expect(adopted.schedule).toMatchObject({ timezone: "Asia/Tokyo" });
   await x.runners.update({ id: adopted.id, schedule: { cadence: "custom", time: "09:00", cron: "0 10 * * *" } });
   expect(x.automations[1]).toMatchObject({ trigger: { triggerType: "schedule", cron: "0 10 * * *", timezone: "Asia/Tokyo" } });
+});
+
+
+it("retains runner cleanup after a failed archive and retries it", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check", schedule });
+  x.archive.mockRejectedValueOnce(new Error("offline"));
+  await expect(x.runners.delete(runner.id)).rejects.toThrow("offline");
+  expect(x.db.prepare("SELECT id FROM bot_runners WHERE id = ?").get(runner.id)).toBeTruthy();
+  await x.runners.retryCleanup();
+  expect(x.db.prepare("SELECT id FROM bot_runners WHERE id = ?").get(runner.id)).toBeUndefined();
+  expect(x.threads.get(runner.threadId!)?.archivedAt).toBe(5);
+});
+
+it("retains failed creation rollback until the remote thread can be archived", async () => {
+  const x = await setup();
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_create") throw new Error("offline"); return original(args); });
+  x.archive.mockRejectedValueOnce(new Error("offline"));
+  await expect(x.runners.create({ name: "Inbox", job: "Check", schedule })).rejects.toThrow("offline");
+  expect(x.db.prepare("SELECT id FROM bot_runners").all()).toHaveLength(1);
+  await x.runners.retryCleanup();
+  expect(x.db.prepare("SELECT id FROM bot_runners").all()).toHaveLength(0);
 });

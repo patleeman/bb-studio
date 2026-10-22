@@ -44,7 +44,7 @@ type RunnerRow = {
   cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; timezone: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
   /** 1 once Studio made the thread hidden. */
-  hidden: number;
+  hidden: number; cleanup_pending: number;
   created_at: number; updated_at: number;
 };
 
@@ -174,9 +174,9 @@ export class Runners {
     return this.deps.sdk.plugins.callRpc({ pluginId: "automations", method, input: input as never, outputSchema: schema });
   }
 
-  private async automations(projectIds: Iterable<string>): Promise<(AutomationRow & { projectId: string })[]> {
+  private async automations(projectIds: Iterable<string>, strict = false): Promise<(AutomationRow & { projectId: string })[]> {
     const lists = await Promise.all([...new Set(projectIds)].map(async (projectId) => {
-      const raw = await this.call("automations_list", { projectId }, z.unknown()).catch(() => []);
+      const raw = await this.call("automations_list", { projectId }, z.unknown()).catch((error) => { if (strict) throw error; return []; });
       return (Array.isArray(raw) ? raw : []).flatMap((entry) => { const parsed = automationRow.safeParse(entry); return parsed.success ? [{ ...parsed.data, projectId }] : []; });
     }));
     return lists.flat();
@@ -253,10 +253,8 @@ export class Runners {
       this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(thread.id, bot.id, now);
       await this.provision(this.row(id));
     } catch (error) {
-      const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
-      if (row?.automation_id) await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch(() => {});
-      if (row?.thread_id) await this.deps.sdk.threads.archive({ threadId: row.thread_id }).catch(() => {});
-      this.deps.db.prepare("DELETE FROM bot_runners WHERE id = ?").run(id);
+      this.changedRow(id, { cleanup_pending: 1, state: "paused" });
+      await this.delete(id).catch((cleanupError) => console.warn(`[studio] runner ${id} cleanup pending`, cleanupError));
       throw error;
     }
     this.deps.changed();
@@ -265,7 +263,9 @@ export class Runners {
 
   private async one(id: string): Promise<RunnerView> {
     const row = this.row(id);
-    return (await this.list(row.bot_id)).find((each) => each.id === row.id) ?? this.view(row);
+    const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((a) => a.id === row.automation_id);
+    const thread = row.thread_id ? await this.deps.sdk.threads.get({ threadId: row.thread_id }).catch(() => null) : null;
+    return { ...this.view(row, automation), providerId: thread?.providerId ?? null };
   }
 
   /** Makes or updates the runner's automation to match its row (adopted runners keep their prompt). */
@@ -367,20 +367,29 @@ export class Runners {
    */
   async delete(id: string, botId?: string): Promise<{ deleted: true; kept: boolean }> {
     const row = this.row(id, botId);
-    if (row.thread_id && row.hidden) await this.deps.sdk.threads.update({ threadId: row.thread_id, visibility: "visible" } as never).catch(() => {});
+    this.changedRow(row.id, { cleanup_pending: 1 });
+    if (row.thread_id && row.hidden) await this.deps.sdk.threads.update({ threadId: row.thread_id, visibility: "visible" } as never).catch((error) => { if (!missing(error)) throw error; });
     if (row.adopted) {
       if (row.automation_id) {
-        const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((each) => each.id === row.automation_id);
+        const automation = (await this.automations([row.automation_project_id ?? row.project_id], true)).find((each) => each.id === row.automation_id);
         const prompt = automation?.execution.prompt;
-        if (prompt?.includes(ADOPT_NOTE)) await this.call("automations_update", { projectId: row.automation_project_id, automationId: row.automation_id, execution: { ...automation!.execution, prompt: prompt.replace(ADOPT_NOTE, "") } }, z.unknown()).catch(() => {});
+        if (prompt?.includes(ADOPT_NOTE)) await this.call("automations_update", { projectId: row.automation_project_id, automationId: row.automation_id, execution: { ...automation!.execution, prompt: prompt.replace(ADOPT_NOTE, "") } }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
       }
     } else {
       if (row.automation_id) await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
-      if (row.thread_id) await this.deps.sdk.threads.archive({ threadId: row.thread_id }).catch(() => {});
+      if (row.thread_id) await this.deps.sdk.threads.archive({ threadId: row.thread_id }).catch((error) => { if (!missing(error)) throw error; });
     }
     this.deps.db.prepare("DELETE FROM bot_runners WHERE id = ?").run(row.id);
     this.deps.changed();
     return { deleted: true, kept: !!row.adopted };
+  }
+
+  /** Retry unfinished rollback/release work on startup and each lifecycle tick. */
+  async retryCleanup(): Promise<void> {
+    const rows = this.deps.db.prepare("SELECT id FROM bot_runners WHERE cleanup_pending = 1").all() as { id: string }[];
+    for (const row of rows) {
+      await this.delete(row.id).catch((error) => console.warn(`[studio] runner ${row.id} cleanup pending`, error));
+    }
   }
 
   /** The user saw an urgent report: it leaves Needs you. */
@@ -421,7 +430,7 @@ export class Runners {
     const rows = this.deps.db.prepare("SELECT * FROM bot_runners WHERE automation_id IS NOT NULL").all() as RunnerRow[];
     return rows.map((row) => ({
       automationId: row.automation_id!, projectId: row.automation_project_id ?? row.project_id, botId: row.bot_id, ownerId: row.id, name: row.name,
-      on: row.state === "active" && this.deps.bot(row.bot_id)?.state === "active",
+      on: !row.cleanup_pending && row.state === "active" && this.deps.bot(row.bot_id)?.state === "active",
     }));
   }
 
