@@ -239,7 +239,7 @@ export class SearchIndex {
     }, pluginId);
   }
 
-  search(raw: string, options: { kinds?: string[]; projectId?: string | null; limit?: number } = {}): SearchHit[] {
+  search(raw: string, options: { kinds?: string[]; projectId?: string | null; limit?: number; keys?: readonly string[] } = {}): SearchHit[] {
     const words = tokens(raw);
     if (!words.length) return [];
     const match = words.map((word) => `"${word}"*`).join(" AND ");
@@ -247,6 +247,12 @@ export class SearchIndex {
     const args: unknown[] = [match];
     if (options.kinds?.length) { clauses.push(`kind IN (${options.kinds.map(() => "?").join(",")})`); args.push(...options.kinds); }
     if (options.projectId !== undefined) { clauses.push("project_id IS ?"); args.push(options.projectId); }
+    if (options.keys) {
+      if (!options.keys.length) return [];
+      // A single JSON parameter avoids SQLite's bind-variable limit for large collections.
+      clauses.push("plugin_id || ':' || item_id IN (SELECT value FROM json_each(?))");
+      args.push(JSON.stringify(options.keys));
+    }
     args.push(Math.min(options.limit ?? 40, 100));
     const rows = this.db.prepare(`SELECT plugin_id,item_id,kind,project_id,href,updated_at,title,body,bm25(studio_search_fts,0,0,0,0,0,0,8,1) AS rank FROM studio_search_fts WHERE ${clauses.join(" AND ")} ORDER BY rank, updated_at DESC LIMIT ?`).all(...args) as Row[];
     return rows.map((row) => ({

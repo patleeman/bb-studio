@@ -305,3 +305,15 @@ it.each(["provider", "full"])("repairs unexpected %s reconciliation failures aut
   warning.mockRestore();
   db.close();
 });
+
+it("intersects eligible collection items before limiting content matches", async () => {
+  const { db, state, index } = fixture();
+  try {
+    state.items = Array.from({ length: 150 }, (_, i) => item(`unrelated-${i}`, "Other", 1000 + i));
+    state.items.push({ ...item("scoped", "Scoped", 1), projectId: "two" });
+    await index.ensure();
+    // Eligibility includes project, kind, tags and every other collection filter.
+    expect(index.search("searchable", { keys: ["pages:scoped"], limit: 100 }).map(hit => hit.ref.id)).toEqual(["scoped"]);
+    expect(index.search("searchable", { keys: [], limit: 100 })).toEqual([]);
+  } finally { index.dispose(); db.close(); }
+});

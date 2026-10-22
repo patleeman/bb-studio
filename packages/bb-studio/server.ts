@@ -327,9 +327,9 @@ export default async function plugin(bb: BbPluginApi) {
     return { ok: true };
   }
   servicesReady();
-  const contentSearch = async (query: string) => {
+  const contentSearch = async (query: string, keys?: string[]) => {
     await searchIndex.ensure();
-    const indexed = searchIndex.search(query, { limit: 100 });
+    const indexed = searchIndex.search(query, { limit: 100, keys });
     return {
       keys: [...new Set(indexed.map((hit) => `${hit.ref.pluginId}:${hit.ref.id}`))],
       snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
@@ -1119,13 +1119,12 @@ export default async function plugin(bb: BbPluginApi) {
     const inScope = (item: HubItem) => everything || item.projectId === null || item.projectId === options.projectId;
     const labels = new Map(data.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
     const text = compiled.text.toLowerCase();
-    const content = compiled.text ? await contentSearch(compiled.text) : null;
+    const eligible = data.items.filter((item) => inScope(item) && compiled.test(item));
+    const content = compiled.text ? await contentSearch(compiled.text, eligible.map((item) => `${item.pluginId}:${item.id}`)) : null;
     const contentKeys = new Set(content?.keys);
-    const picked: ListedItem[] = data.items
+    const picked: ListedItem[] = eligible
       .filter(
         (item) =>
-          inScope(item) &&
-          compiled.test(item) &&
           (!text || untitled(item.title).toLowerCase().includes(text) || contentKeys.has(`${item.pluginId}:${item.id}`)),
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)

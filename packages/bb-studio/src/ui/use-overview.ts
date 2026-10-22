@@ -83,4 +83,3 @@ export function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) 
   });
   return { data, error, refetch, setData };
 }
-
