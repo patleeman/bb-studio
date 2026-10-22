@@ -345,7 +345,7 @@ function ThreadVoiceControls({ composer, threadId }: { composer: PluginComposerA
     const state = inputRef.current;
     const talking = state.sub === "ptt" ? state.pressedAt !== null || capturingRef.current : gate.current.heard;
     if (talking || !spoken.urls.length) return;
-    voicePlayer.play(threadId, spoken.urls, spoken.pieces).catch((error: unknown) => toast.error("Couldn't play the reply", { description: errorMessage(error) }));
+    voicePlayer.play(threadId, spoken.urls, spoken.pieces, spoken.eventId).catch((error: unknown) => toast.error("Couldn't play the reply", { description: errorMessage(error) }));
   });
 
   const press = (at: number) => { voicePlayer.setHint(null); dispatch({ type: "press", at }); };

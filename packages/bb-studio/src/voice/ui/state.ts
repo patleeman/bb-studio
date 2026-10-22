@@ -65,6 +65,7 @@ const composers = new Map<string, (text: string) => void>();
 const micHolders = new Map<string, (dictating: boolean) => void>();
 /** The reply last started, so a second composer on the same thread (or a repeated event) doesn't start it again. */
 let lastPlayed = "";
+const playedEvents = new Set<string>();
 
 // A reload of Studio's bundle loads this module again in the same window. Only
 // the newest copy plays, and it silences the one before, so two replies never
@@ -74,12 +75,18 @@ const current = () => (window as unknown as Record<symbol, unknown>)[CURRENT];
 
 export const voicePlayer = {
   /** Play a thread's reply, cutting off whatever was speaking; each piece lights up as it plays. */
-  play(threadId: string, urls: readonly string[], pieces: readonly string[] = []): Promise<void> {
-    const key = urls.join("|");
-    if (current() !== voicePlayer || key === lastPlayed) return Promise.resolve();
-    lastPlayed = key;
+  play(threadId: string, urls: readonly string[], pieces: readonly string[] = [], eventId?: string): Promise<void> {
+    const key = eventId ? `${threadId}:${eventId}` : null;
+    if (current() !== voicePlayer || (key && playedEvents.has(key))) return Promise.resolve();
+    if (key) {
+      playedEvents.add(key);
+      if (playedEvents.size > 1000) playedEvents.delete(playedEvents.values().next().value!);
+    }
     set({ threadId });
-    return speaker.play(urls, (index) => { if (pieces[index]) highlightPiece(pieces[index]!); });
+    return speaker.play(urls, (index) => { if (pieces[index]) highlightPiece(pieces[index]!); }).catch((error) => {
+      if (key) playedEvents.delete(key);
+      throw error;
+    });
   },
   /** Read text aloud on request (a message's Read aloud), even if it was spoken before; again stops it. */
   readAloud(threadId: string, text: string, prepare: (piece: string) => Promise<string>): Promise<void> {

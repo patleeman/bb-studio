@@ -1,5 +1,6 @@
 // Voice mode, built into Studio: its RPCs, the voice tools, and speaking a
 // voice thread's replies. See sessions.ts.
+import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { speechChunks } from "../speech/chunks";
@@ -65,7 +66,7 @@ export async function registerVoice(bb: BbPluginApi, deps: {
       if (!sessions.isOn(thread.id) || !lastAssistantText?.trim()) return;
       const text = speakable(lastAssistantText);
       const pieces = speechChunks(text);
-      const spoken: VoiceSpoken = { threadId: thread.id, text, urls: [], pieces };
+      const spoken: VoiceSpoken = { eventId: randomUUID(), threadId: thread.id, text, urls: [], pieces };
       try {
         spoken.urls = pieces.map((piece) => `${SPEECH_HTTP_ROOT}?key=${deps.speech.warm(piece)}`);
       } catch (error) {

@@ -4,6 +4,8 @@
 export const VOICE_REALTIME_CHANNEL = "studio-voice";
 
 export interface VoiceSpoken {
+  /** Identifies this reply delivery, independently of its cached audio. */
+  eventId: string;
   threadId: string;
   text: string;
   /** Audio URLs for the reply's pieces, in order; the server is already making them. */

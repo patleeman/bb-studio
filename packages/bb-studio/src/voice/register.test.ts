@@ -30,7 +30,7 @@ describe("registerVoice", () => {
     handlers["thread.idle"]!({ thread: { id: "thr_voice" }, lastAssistantText: "**Done.** Two tests fail." } as never);
     await settle();
     expect(warmed).toEqual(["Done. Two tests fail."]);
-    expect(published).toEqual([{ channel: VOICE_REALTIME_CHANNEL, data: { threadId: "thr_voice", text: "Done. Two tests fail.", pieces: ["Done. Two tests fail."], urls: [`/api/v1/plugins/studio/http/speech/audio?key=${"a".repeat(40)}`] } }]);
+    expect(published).toEqual([{ channel: VOICE_REALTIME_CHANNEL, data: { eventId: expect.any(String), threadId: "thr_voice", text: "Done. Two tests fail.", pieces: ["Done. Two tests fail."], urls: [`/api/v1/plugins/studio/http/speech/audio?key=${"a".repeat(40)}`] } }]);
   });
 
   it("says why a reply can't be spoken, and stays quiet for other threads", async () => {
