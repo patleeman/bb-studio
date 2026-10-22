@@ -203,3 +203,29 @@ describe("rememberedDevices", () => {
     expect(devices).toEqual({ "apns:abcd": now - 5000, "apns:ef01": now });
   });
 });
+
+it("returns individual results over a local HTTP/2 transport", async () => {
+  const { createServer, connect, constants } = await import("node:http2");
+  const { Http2ApnsSender } = await import("./apns.js");
+  const { vi } = await import("vitest");
+  const server = createServer();
+  server.on("stream", (stream, headers) => {
+    stream.on("error", () => {});
+    if (String(headers[":path"]).endsWith("bad")) stream.close(constants.NGHTTP2_INTERNAL_ERROR);
+    else { stream.respond({ ":status": 200 }); stream.end(); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as { port: number };
+  const session = connect(`http://127.0.0.1:${address.port}`);
+  const sender = new Http2ApnsSender();
+  const spy = vi.spyOn(sender as any, "session").mockReturnValue(session);
+  try {
+    const results = await Promise.all([sender.send("production", "bad", "{}", {}), sender.send("production", "good", "{}", {})]);
+    expect(results[0]).toMatchObject({ status: 0, reason: expect.any(String) });
+    expect(results[1]).toMatchObject({ status: 200 });
+  } finally {
+    spy.mockRestore();
+    session.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

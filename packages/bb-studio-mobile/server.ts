@@ -276,9 +276,18 @@ export default async function plugin(bb: BbPluginApi) {
     return tickets;
   }
 
+  let devicesQueue: Promise<void> = Promise.resolve();
+  function updateDevices(update: (devices: Record<string, number>) => Record<string, number>): Promise<void> {
+    const task = devicesQueue.then(async () => {
+      const devices = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
+      await bb.storage.kv.set(DEVICES_KEY, update(devices));
+    });
+    devicesQueue = task.catch(() => {});
+    return task;
+  }
+
   async function rememberDevices(messages: ExpoMessage[], tickets: ExpoTicket[]) {
-    const devices = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
-    await bb.storage.kv.set(DEVICES_KEY, rememberedDevices(devices, messages, tickets, Date.now()));
+    await updateDevices((devices) => rememberedDevices(devices, messages, tickets, Date.now()));
   }
 
   // --- Clearing read notifications -------------------------------------------
@@ -326,7 +335,8 @@ export default async function plugin(bb: BbPluginApi) {
       if ("missing" in apns) return notified;
       const states = Object.fromEntries(await Promise.all(threadIds.map(async (id) => [id, await readState(id)] as const)));
       const { clear, keep } = partition(notified, states, Date.now());
-      let devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+      const observed = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
+      let devices = Object.keys(observed)
         .filter((to) => to.startsWith(APNS_TOKEN_PREFIX))
         .map((to) => to.slice(APNS_TOKEN_PREFIX.length));
       const gone = new Set<string>();
@@ -351,9 +361,13 @@ export default async function plugin(bb: BbPluginApi) {
         if (!delivered) for (const id of batch) keep[id] = notified[id]!;
       }
       if (gone.size > 0) {
-        const current = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
-        for (const deviceToken of gone) delete current[`${APNS_TOKEN_PREFIX}${deviceToken}`];
-        await bb.storage.kv.set(DEVICES_KEY, current);
+        await updateDevices((current) => {
+          for (const deviceToken of gone) {
+            const key = `${APNS_TOKEN_PREFIX}${deviceToken}`;
+            if (current[key] === observed[key]) delete current[key];
+          }
+          return current;
+        });
       }
       return keep;
     });

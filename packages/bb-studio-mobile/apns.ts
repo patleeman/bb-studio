@@ -191,7 +191,11 @@ export async function sendApns(
     config.environment === "auto" ? ["production", "development"] : [config.environment];
   let result: ApnsResult = { status: 0, reason: "NotSent" };
   for (const environment of environments) {
-    result = await send(environment, push.deviceToken, push.payload, headers);
+    try {
+      result = await send(environment, push.deviceToken, push.payload, headers);
+    } catch (error) {
+      result = { status: 0, reason: error instanceof Error ? error.message : String(error) };
+    }
     if (!(result.status === 400 && result.reason === "BadDeviceToken")) break;
   }
   return result;
@@ -243,43 +247,41 @@ export class Http2ApnsSender {
 
   send: ApnsSend = (environment, deviceToken, payload, headers) =>
     new Promise((resolve) => {
-      let session: ClientHttp2Session;
+      let close: (() => void) | undefined;
       try {
-        session = this.session(environment);
+        const request = this.session(environment).request({
+          ":method": "POST",
+          ":path": `/3/device/${deviceToken}`,
+          "content-type": "application/json",
+          ...headers,
+        });
+        close = () => request.close();
+        request.setTimeout(15_000, () => request.close());
+        let status = 0;
+        let id: string | undefined;
+        let body = "";
+        request.on("response", (responseHeaders) => {
+          status = Number(responseHeaders[":status"] ?? 0);
+          const apnsId = responseHeaders["apns-id"];
+          id = typeof apnsId === "string" ? apnsId : undefined;
+        });
+        request.setEncoding("utf8");
+        request.on("data", (chunk: string) => { body += chunk; });
+        request.on("error", (error) => resolve({ status: 0, reason: error.message }));
+        request.on("close", () => {
+          let reason: string | undefined;
+          try {
+            reason = body ? (JSON.parse(body) as { reason?: string }).reason : undefined;
+          } catch {
+            reason = undefined;
+          }
+          resolve({ status, reason: status === 0 ? (reason ?? "Timeout") : reason, id });
+        });
+        request.end(payload);
       } catch (error) {
-        resolve({ status: 0, reason: error instanceof Error ? error.message : "ConnectFailed" });
-        return;
+        resolve({ status: 0, reason: error instanceof Error ? error.message : String(error) });
+        try { close?.(); } catch { /* The transport may already be closed. */ }
       }
-      const request = session.request({
-        ":method": "POST",
-        ":path": `/3/device/${deviceToken}`,
-        "content-type": "application/json",
-        ...headers,
-      });
-      request.setTimeout(15_000, () => request.close());
-      let status = 0;
-      let id: string | undefined;
-      let body = "";
-      request.on("response", (responseHeaders) => {
-        status = Number(responseHeaders[":status"] ?? 0);
-        const apnsId = responseHeaders["apns-id"];
-        id = typeof apnsId === "string" ? apnsId : undefined;
-      });
-      request.setEncoding("utf8");
-      request.on("data", (chunk: string) => {
-        body += chunk;
-      });
-      request.on("error", (error) => resolve({ status: 0, reason: error.message }));
-      request.on("close", () => {
-        let reason: string | undefined;
-        try {
-          reason = body ? (JSON.parse(body) as { reason?: string }).reason : undefined;
-        } catch {
-          reason = undefined;
-        }
-        resolve({ status, reason: status === 0 ? (reason ?? "Timeout") : reason, id });
-      });
-      request.end(payload);
     });
 
   private session(environment: ApnsEnvironment): ClientHttp2Session {

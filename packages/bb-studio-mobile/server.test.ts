@@ -267,3 +267,99 @@ describe("clearing notifications", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 });
+
+it("serializes overlapping device registrations without losing either device", async () => {
+  const requests = recordingSession();
+  const host = await configuredHost();
+  const push = (to: string) => host.harness.behavior.fetchHttp("POST", "/push", { body: JSON.stringify([{ to, body: "Useful reply" }]), headers: { "content-type": "application/json" } });
+  const firstToken = `apns:${"a".repeat(64)}`;
+  const secondToken = `apns:${"b".repeat(64)}`;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const get = host.bb.storage.kv.get.bind(host.bb.storage.kv);
+  let paused = false;
+  vi.spyOn(host.bb.storage.kv, "get").mockImplementation(async (key) => {
+    const value = await get(key);
+    if (key === "devices" && !paused) { paused = true; await gate; }
+    return value as never;
+  });
+  try {
+    const first = push(firstToken);
+    await vi.waitFor(() => expect(paused).toBe(true));
+    const second = push(secondToken);
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    release();
+    await Promise.all([first, second]);
+    expect(await get("devices")).toEqual({ [firstToken]: expect.any(Number), [secondToken]: expect.any(Number) });
+  } finally { release(); await host.harness.lifecycle.dispose(); }
+});
+
+it.each(["request", "end"])("records a mixed APNs batch when %s throws synchronously", async (failure) => {
+  const good = "a".repeat(64);
+  vi.spyOn(Http2ApnsSender.prototype as any, "session").mockReturnValue({
+    request: (headers: Record<string, string>) => {
+      const bad = !headers[":path"]!.endsWith(good);
+      if (bad && failure === "request") throw new Error("transport broke");
+      const request = new EventEmitter() as any;
+      request.setTimeout = () => {};
+      request.setEncoding = () => {};
+      request.close = () => request.emit("close");
+      request.end = () => {
+        if (bad) throw new Error("transport broke");
+        request.emit("response", { ":status": 200 });
+        request.emit("close");
+      };
+      return request;
+    },
+  });
+  const host = await configuredHost();
+  try {
+    const response = await host.harness.behavior.fetchHttp("POST", "/push", { body: JSON.stringify([
+      { to: `apns:${"b".repeat(64)}`, body: "Bad", data: { threadId: "thr_bad" } },
+      { to: `apns:${good}`, body: "Good", data: { threadId: "thr_good" } },
+    ]), headers: { "content-type": "application/json" } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: [{ status: "error", message: expect.stringContaining("transport broke") }, { status: "ok" }] });
+    expect(await host.bb.storage.kv.get("notified-threads")).toEqual({ thr_good: expect.any(Number) });
+    expect(await host.bb.storage.kv.get("last-delivery")).toMatchObject({ apns: 2, errors: [expect.any(String)] });
+  } finally { await host.harness.lifecycle.dispose(); }
+});
+
+it("keeps a refreshed registration when an older clear rejects the same token", async () => {
+  vi.useFakeTimers();
+  const device = "a".repeat(64);
+  let rejectClear: (() => void) | undefined;
+  vi.spyOn(Http2ApnsSender.prototype as any, "session").mockReturnValue({
+    request: () => {
+      const request = new EventEmitter() as any;
+      request.setTimeout = () => {};
+      request.setEncoding = () => {};
+      request.end = (body: string) => {
+        if (JSON.parse(body).aps["content-available"] === 1) {
+          rejectClear = () => {
+            request.emit("response", { ":status": 410 });
+            request.emit("data", JSON.stringify({ reason: "Unregistered" }));
+            request.emit("close");
+          };
+        } else {
+          request.emit("response", { ":status": 200 });
+          request.emit("close");
+        }
+      };
+      return request;
+    },
+  });
+  const host = await configuredHost();
+  host.harness.sdk.stub("threads.get", async () => makeThreadResponse({ id: "thr_a", lastReadAt: 2000, latestAttentionAt: 1000 }));
+  try {
+    await host.bb.storage.kv.set("devices", { [`apns:${device}`]: Date.now() - 1000 });
+    await host.bb.storage.kv.set("notified-threads", { thr_a: Date.now() });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(rejectClear).toBeDefined();
+    const response = await host.harness.behavior.fetchHttp("POST", "/push", { body: JSON.stringify([{ to: `apns:${device}`, body: "Refreshed" }]), headers: { "content-type": "application/json" } });
+    expect(response.status).toBe(200);
+    rejectClear!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await host.bb.storage.kv.get("devices")).toEqual({ [`apns:${device}`]: Date.now() });
+  } finally { await host.harness.lifecycle.dispose(); }
+});
