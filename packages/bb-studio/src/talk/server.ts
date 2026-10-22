@@ -35,6 +35,7 @@ import { cleanTranscript } from "./server/cleanup";
 import { talkModels } from "./server/models";
 import { NotesMaker, PAGES_MISSING, generateNotes, notesPagePath, pagesClient } from "./server/notes";
 import { talkBackupHandlers } from "./server/backup";
+import { abortableWait } from "./server/abortable-wait";
 
 export { TALK_SETTINGS } from "./shared/contract";
 
@@ -197,10 +198,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     async start(signal) {
       while (!signal.aborted) {
         await expireDictationAudio().catch((error) => bb.log.warn(`Talk could not expire dictation audio: ${String(error)}`));
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, 6 * 60 * 60_000);
-          signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
-        });
+        await abortableWait(6 * 60 * 60_000, signal);
       }
     },
   });
@@ -209,10 +207,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     async start(signal) {
       while (!signal.aborted) {
         for (const id of store.interruptStale(STALE_AFTER_MS)) changed(id);
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, 30_000);
-          signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
-        });
+        await abortableWait(30_000, signal);
       }
     },
   });
