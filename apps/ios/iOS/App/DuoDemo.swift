@@ -52,6 +52,18 @@ enum DuoDemo {
             default: return false
             }
             return true
+        case "replies-end":
+            func revealEnd(_ view: UIView) -> Bool {
+                if let scroll = view as? UIScrollView, scroll.bounds.height < 100,
+                   scroll.bounds.width > 100, scroll.contentSize.width > scroll.bounds.width,
+                   scroll.convert(scroll.bounds, to: window).minX > window.bounds.width / 2 {
+                    scroll.setContentOffset(CGPoint(x: scroll.contentSize.width - scroll.bounds.width, y: scroll.contentOffset.y), animated: false)
+                    return true
+                }
+                return view.subviews.contains(where: revealEnd)
+            }
+            _ = revealEnd(window)
+            return true
         case "layout":
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)

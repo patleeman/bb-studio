@@ -4,7 +4,7 @@ import XCTest
 final class DuoQuickRepliesUITests: XCTestCase {
     func testRepliesClipAtComposerAndKeepSystemSafeAreas() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-qaNotesDemo", "draft", "-qaVoice", "idle", "-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark",
             "-openURL", "bbstudio://bot"]
         app.launch()
@@ -12,6 +12,9 @@ final class DuoQuickRepliesUITests: XCTestCase {
         XCTAssertTrue(replies.waitForExistence(timeout: 30))
         let composer = app.otherElements["threadComposer"].firstMatch
         XCTAssertTrue(composer.exists)
+        XCTAssertTrue(app.buttons["composerExpandToPage"].exists)
+        XCTAssertTrue(app.buttons["Voice mode"].exists)
+        waitForValue("More replies to the right", on: replies)
         command("layout")
         let value = try XCTUnwrap(app.windows.firstMatch.value as? String)
         print("DUO LAYOUT \(value)")
@@ -31,6 +34,27 @@ final class DuoQuickRepliesUITests: XCTestCase {
         })
         XCTAssertTrue(scroll.clips, "Quick replies must clip horizontally at the composer edge")
         command("capture?v6-bot-duo")
+        command("portrait")
+        waitForValue("No more replies to the right", on: replies)
+        command("landscape")
+        waitForValue("More replies to the right", on: replies)
+        command("replies-end")
+        waitForValue("No more replies to the right", on: replies)
+    }
+
+    func testOfflineFixtureHidesUnavailableComposerCapabilities() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launch()
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["composerExpandToPage"].exists)
+        XCTAssertFalse(app.buttons["Voice mode"].exists)
+    }
+
+    private func waitForValue(_ value: String, on element: XCUIElement) {
+        expectation(for: NSPredicate(format: "value == %@", value), evaluatedWith: element)
+        waitForExpectations(timeout: 10)
     }
 
     private func command(_ path: String) {

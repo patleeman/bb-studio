@@ -440,6 +440,7 @@ struct BotQuickReplies: View {
     let tint: Color
     let pick: (String) -> Void
     @State private var taps = 0
+    @State private var hasTrailingOverflow = false
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -465,7 +466,21 @@ struct BotQuickReplies: View {
         // Keep overflow inside the same safe-area width as the composer.
         // Horizontal scrolling exposes additional replies without drawing
         // them into the system's status-bar column.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentSize.width - geometry.contentOffset.x - geometry.containerSize.width > 1
+        } action: { _, overflowing in
+            hasTrailingOverflow = overflowing
+        }
+        .mask {
+            HStack(spacing: 0) {
+                Rectangle()
+                LinearGradient(colors: [.black, hasTrailingOverflow ? .clear : .black],
+                    startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 24)
+            }
+        }
         .accessibilityIdentifier("botQuickReplies")
+        .accessibilityValue(hasTrailingOverflow ? "More replies to the right" : "No more replies to the right")
         .sensoryFeedback(.impact(weight: .light), trigger: taps)
     }
 
