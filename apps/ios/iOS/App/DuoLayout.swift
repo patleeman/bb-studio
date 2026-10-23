@@ -154,11 +154,11 @@ struct DuoSearch: ViewModifier {
 }
 
 /// Shared by the regular sidebar's list and search header. The phone uses the
-/// entire left page up to the crease gutter; iPad keeps its normal end inset.
+/// entire left page, with matching margins inside the crease gutter.
 @MainActor
 enum SidebarContentInsets {
     static let leading: CGFloat = 16
-    static var trailing: CGFloat { UIDevice.current.userInterfaceIdiom == .phone ? 0 : 16 }
+    static let trailing = leading
 }
 
 struct SidebarListMargins: ViewModifier {

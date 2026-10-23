@@ -1,3 +1,5 @@
+> Latest sidebar filters and matching margins: [Duo v5](V5.md).
+
 > Latest search and sidebar alignment: [Duo v4](V4.md).
 
 > Current implementation and dark phone/iPad comparisons: [Duo v3](V3.md).

@@ -526,9 +526,19 @@ struct StudioView: View {
     /// moves between them, as a pager. Search is one list.
     @ViewBuilder
     private var studioPages: some View {
-        // A sidebar is one filtered list. The phone's page controller adds
-        // another trailing safe-area inset when nested inside the left page.
-        if query.isEmpty && !selectsDetail {
+        if selectsDetail {
+            // Keep filters above the folder/item list, as in the phone pager,
+            // without nesting its page controller inside the sidebar.
+            studioList(kind: app.studioKind, chips: false)
+                .safeAreaBar(edge: .top) {
+                    if showsFilter {
+                        kindFilter
+                            .contentMargins(.leading, SidebarContentInsets.leading, for: .scrollContent)
+                            .contentMargins(.trailing, SidebarContentInsets.trailing, for: .scrollContent)
+                            .padding(.vertical, 6)
+                    }
+                }
+        } else if query.isEmpty {
             TabView(selection: Binding(get: { app.studioKind ?? "" }, set: { app.studioKind = $0.isEmpty ? nil : $0 })) {
                 ForEach(kindPages, id: \.self) { kind in
                     studioList(kind: kind.isEmpty ? nil : kind, chips: false)
@@ -600,6 +610,7 @@ struct StudioView: View {
                                 Label(parent.displayTitle, systemImage: "folder")
                             }
                             .modifier(SidebarRowContent(enabled: true))
+                            .accessibilityIdentifier("studio-folder")
                             .listRowBackground(SidebarSelectionBackground(selected: folder == parent.itemId))
                         }
                     }
@@ -681,11 +692,13 @@ struct StudioView: View {
                 HStack(spacing: 8) {
                     chip("All", nil, selected: app.studioKind == nil) { withAnimation { app.studioKind = nil } }
                         .id("")
+                        .accessibilityIdentifier("studio-kind-all")
                     ForEach(store.kinds) { kind in
                         chip(kind.plural, kind.symbol, selected: app.studioKind == kind.id) {
                             withAnimation { app.studioKind = app.studioKind == kind.id ? nil : kind.id }
                         }
                         .id(kind.id)
+                        .accessibilityIdentifier("studio-kind-" + kind.id)
                     }
                     ForEach(usedTags) { tag in
                         chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {

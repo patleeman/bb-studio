@@ -11,21 +11,27 @@ final class DuoSidebarSearchUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 30))
         try assertCard(app, device: device)
-        capture("v4-bot-" + device)
+        capture("v5-bot-" + device)
         command("tab?studio")
         XCTAssertTrue(app.buttons.matching(identifier: "studioItem").firstMatch.waitForExistence(timeout: 20))
         try assertSearch(app, device: device)
-        app.buttons.matching(identifier: "studioItem").firstMatch.tap()
+        XCTAssertTrue(app.buttons["studio-kind-all"].exists)
+        XCTAssertTrue(app.buttons["studio-kind-page"].exists)
+        XCTAssertTrue(app.buttons["studio-kind-mini"].exists)
+        XCTAssertTrue(app.staticTexts["Folders"].exists)
+        XCTAssertTrue(app.buttons.matching(identifier: "studio-folder").firstMatch.exists)
+        XCTAssertFalse(app.buttons["Dictate"].exists)
+        app.buttons.matching(identifier: "studioItem").matching(NSPredicate(format: "label CONTAINS %@", "Review checklist")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Search and list cards share")).firstMatch.waitForExistence(timeout: 15))
-        capture("v4-search-studio-" + device)
-        capture("v4-studio-" + device)
+        capture("v5-search-studio-" + device)
+        capture("v5-studio-" + device)
         command("tab?threads")
         let thread = app.buttons["inbox-thread-thr_botdemo01"]
         XCTAssertTrue(thread.waitForExistence(timeout: 20))
         thread.tap()
         try assertSearch(app, device: device)
-        capture("v4-search-threads-" + device)
-        capture("v4-threads-" + device)
+        capture("v5-search-threads-" + device)
+        capture("v5-threads-" + device)
         command("tab?settings")
         XCTAssertTrue(app.buttons["Server"].waitForExistence(timeout: 10))
         try assertCard(app, device: device)
@@ -103,9 +109,9 @@ final class DuoSidebarSearchUITests: XCTestCase {
     private func assertCard(_ app: XCUIApplication, device: String) throws {
         let card = try firstCard(app)
         let crease = app.windows.firstMatch.frame.width / 2
-        let trailingInset: CGFloat = device == "duo" ? 0 : 16
-        XCTAssertEqual(card.frame.maxX, crease - 16 - trailingInset, accuracy: 1,
-            "Duo cards reach the crease gutter; iPad retains its existing 16pt list inset")
+        let sidebarTrailing = crease - 16
+        XCTAssertEqual(card.frame.minX - 64, sidebarTrailing - card.frame.maxX, accuracy: 1,
+            "Cards have matching margins inside the sidebar, clear of the crease gutter")
     }
     private func assertSearch(_ app: XCUIApplication, device: String) throws {
         let field = app.otherElements["sidebarSearchField"].firstMatch
