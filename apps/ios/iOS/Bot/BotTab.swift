@@ -9,6 +9,7 @@ struct BotTab: View {
     /// Back to the Bots list.
     var back: (() -> Void)? = nil
     @EnvironmentObject private var model: AppModel
+    @Environment(\.duoLayout) private var duoLayout
     @Environment(\.scenePhase) private var scenePhase
     @State private var path: [Route] = []
     @State private var lead = BotLead.loading
@@ -50,7 +51,8 @@ struct BotTab: View {
         NavigationStack(path: $path) {
             content
                 .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-                .toolbar { if let bot { toolbar(bot) } }
+                .toolbar { if let bot, !duoLayout.twoPages { toolbar(bot) } }
+                .environment(\.duoBotActions, bot.map { AnyView(wideActions($0)) })
                 .sheet(item: $sheet, onDismiss: { attempt += 1 }) { sheet in
                     switch sheet {
                     case .activity:
@@ -166,7 +168,7 @@ struct BotTab: View {
 
     @ToolbarContentBuilder
     private func toolbar(_ bot: BotInfo) -> some ToolbarContent {
-        if let back {
+        if let back, !duoLayout.twoPages {
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: back) { Image(systemName: "chevron.backward") }
                     .accessibilityLabel("Bots")
@@ -189,6 +191,25 @@ struct BotTab: View {
         }
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { menu(bot) }
+    }
+
+    private func wideActions(_ bot: BotInfo) -> some View {
+        HStack(spacing: 16) {
+            if bot.lead.threadId != nil {
+                Button { model.startVoiceChat() } label: { Image(systemName: "phone.fill") }
+                    .accessibilityLabel("New voice chat")
+                    .accessibilityHint("Starts a voice chat that can hand work to \(bot.name)")
+            }
+            Button { sheet = .activity } label: {
+                Image(systemName: needsYou > 0 ? "bell.badge.fill" : "bell")
+                    .symbolRenderingMode(needsYou > 0 ? .multicolor : .monochrome)
+                    .symbolEffect(.wiggle, value: needsYou)
+            }
+            .badge(needsYou)
+            .accessibilityLabel(needsYou > 0 ? "Activity, \(needsYou) need\(needsYou == 1 ? "s" : "") you" : "Activity")
+            menu(bot)
+        }
+        .frame(minHeight: 44)
     }
 
     private func menu(_ bot: BotInfo) -> some View {

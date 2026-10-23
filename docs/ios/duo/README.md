@@ -11,13 +11,15 @@ from `origin/main` (`d970f030`).
 A 64-point tab rail and thread list occupy the left page. The 32-point gutter
 centers on the window midpoint, including asymmetric leading safe areas. Thread
 selection uses the existing `AppModel.path`, with the selected row highlighted.
-Other tabs use a single pane on the right page. The thread's back button is
+Bot, Studio and Settings fill the width after the rail as a single pane.
+Only Threads reserves the left page for its list. The thread's back button is
 hidden only when that list is beside it; narrow layouts retain the back button.
 Portrait uses the phone layout without new fixed chrome at its midpoint.
 
 The navigation stack and its root keep their identity across resizing. The
 existing thread view continues to own its model, draft and ScrollPosition.
-`TranscriptResizeAnchor` observes the top visible message and its pixel offset.
+`TranscriptResizeAnchor` observes the top visible message and its window offset,
+so changing between native and unfolded headers does not move its anchor.
 Only a container-width change starts a restore: after the new lazy layout starts
 to settle, it materializes that message and corrects its offset through the
 existing ScrollPosition. A thread at its newest message uses the existing bottom
@@ -26,11 +28,49 @@ restoration. Height-only changes, including the keyboard, do not request a
 restore. Normal scrolling, keyboard avoidance and the existing bottom-anchor
 rules are unchanged.
 
-## Captures
+## iPhone root regression captures
 
-These screenshots show the built app in exact-size **iPad UIWindow captures**;
-the status bar and safe areas belong to the iPad runtime. They are not real Duo
-hinge transitions.
+The October 23 follow-up reproduces the root of `b868efe0` on an owned iPhone
+Duo simulator with a **phone idiom**, resizing the existing window to 951 × 669
+points. The original root exposed two navigation rails, duplicated titles and
+actions, a Bot back button and a blank left page on other tabs. The new phone
+regression checks their absence, the trailing status safe area, full-width
+content and a populated thread list. Narrow and portrait windows retain the
+native phone navigation.
+
+The inbox model and load task now belong to the stable InboxTab, shared by its
+narrow root and split list. A cold unfolded test starts on Bot and loads Threads
+from the real staged sidebar endpoint without first opening the narrow inbox.
+The warm staged baseline did populate; the real device's empty-list failure was
+not independently reproduced as a server/decoder defect.
+
+These PNGs are unmodified UIKit renders of the built phone window, at 3× scale
+(2853 × 2007 pixels), with safe local fixture data. The staged Orbit threads,
+sidebar and Studio page come from the real isolated server. Bot uses the local
+Juniper fixture. No agent ran.
+
+| Surface | Screenshot |
+| --- | --- |
+| Bot | [Bot](fix-bot.png) |
+| Threads, selected thread | [Threads](fix-threads.png) |
+| Threads, keyboard avoidance active | [Keyboard-up root](fix-threads-keyboard.png) |
+| Studio | [Studio](fix-studio.png) |
+| Settings | [Settings](fix-settings.png) |
+
+**Keyboard capture limitation:** changing UIWindow bounds preserves the phone
+idiom and app hierarchy but cannot resize the simulator's remote keyboard
+service. It remains on the outer 466 × 678 display. The keyboard-up root render
+shows the right-page composer avoiding that keyboard, but cannot draw the
+cross-process keyboard itself. [The actual screen capture](fix-threads-keyboard-native.png)
+shows the real system keyboard and clips the right half of the forced window.
+Neither image is a verified full-width Duo keyboard screenshot. Geometry is
+recorded in [capture metadata](fix-capture-geometry.json). The simulator's
+supported screenConfig command rejected the inner display geometry.
+
+## Earlier layout captures
+
+These older images use exact-size iPad windows and do not cover phone root
+navigation. They remain useful for transcript and mini-card behavior.
 
 | Layout | Window size (pt) | Screenshot |
 | --- | --- | --- |
@@ -42,25 +82,21 @@ hinge transitions.
 | Tall mini card after an internal drag, outer | 466 × 678 | [Mini in outer](mini-scroll-outer.png) |
 | Tall mini card after an internal drag, split | 951 × 669 | [Mini in split](mini-scroll-landscape.png) |
 
-The local 80-message fixture needs no server or agent. The mini fixtures use real
-WebKit cards and an isolated staged BB at a pushed `d970f030`, started with
-`scripts/staged-bb.mjs --plugin mobile`. No staged agent ran. The task-counter,
-long-list and note apps use the server's real records, shared state and realtime.
-
 ## Verification
 
 - `xcodegen generate`: passed with Xcode 27.1 selected through `DEVELOPER_DIR`.
-- Full `BBStudioTests` on an owned iPhone 18 Pro: 332 tests, 1 skipped, 0 failures.
-  New unit tests cover width-only restore requests, inset conversion, bottom
+- Full `BBStudioTests` on the owned iPhone Duo: 332 tests, 1 skipped, 0 failures.
+  Existing unit tests cover width-only restore requests, inset conversion, bottom
   pinning and cancellation. Keyboard-height changes and reading updates do not
   request restoration.
+- All 3 `DuoPhoneRootUITests` cover the phone root, cold split loading, one rail/title/action pair, full-width tabs, no Bot back button, status-safe actions and native outer/portrait chrome.
 - All 3 `DuoLayoutUITests` passed on an owned iPad Pro 13-inch. The reading test
   compares process identity, selected thread, exact draft and a visible message
   within the original 90-point tolerance at each size. The bottom test keeps the
   newest message visible with no Jump to latest button. The keyboard test checks
   its full width, the right composer above it and the list's usable selected row.
-- Both `MiniCardUITests` passed: the existing interaction/realtime test on the
-  iPhone, and the new scroll-ownership test on the iPad. In both exact Duo layouts,
+- Both `MiniCardUITests` passed: the interaction/realtime test on the
+  iPhone Duo (explicitly starting at the newest card after its heights load), and the new scroll-ownership test on the iPad. In both exact Duo layouts,
   dragging over a short app scrolls the transcript; dragging over a tall app
   moves its rows internally while its card header stays within 4 points.
 - Studio package-local `tsc --noEmit`: passed.
@@ -85,6 +121,21 @@ xcodebuild test -scheme BBStudio -destination id=<iphone-uuid> \
 xcodebuild test -scheme BBStudio -destination id=<ipad-uuid> \
   -only-testing:BBStudioUITests/DuoLayoutUITests CODE_SIGNING_ALLOWED=NO
 ```
+
+For phone-root tests, start an isolated staged BB and seed its sidebar with the
+Orbit demo threads and a page titled `Duo launch checklist`. The test uses real
+sidebar/page RPCs and a local Bot transcript; `-qaDuoPhone` bypasses the fake
+sidebar. Run on the owned **iPhone Duo** simulator (phone idiom):
+
+```sh
+TEST_RUNNER_BBGO_QA_SERVER=http://127.0.0.1:<staged-port> \
+xcodebuild test -scheme BBStudio -destination id=<duo-iphone-uuid> \
+  -only-testing:BBStudioUITests/DuoPhoneRootUITests CODE_SIGNING_ALLOWED=NO
+```
+
+The Debug-only `qa-duo/capture?name` URL writes the full UIKit window PNG and
+geometry JSON to the app's Documents directory. Export them before deleting the
+owned simulator. The keyboard's actual screen image is a test attachment.
 
 For mini tests, start a separate staged BB with `scripts/staged-bb.mjs` and seed
 the counter, long list and note as described in [the iOS test guide](../../../apps/ios/README.md).

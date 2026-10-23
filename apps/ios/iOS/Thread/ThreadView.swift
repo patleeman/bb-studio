@@ -387,86 +387,99 @@ struct ThreadView: View {
         .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, working: model.thread?.isRunning == true))
         .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(sizeClass == .compact && hidesTabBar ? .hidden : .automatic, for: .tabBar)
-        .toolbar {
-            if botChrome == nil { ToolbarItemGroup(placement: .topBarTrailing) {
-                if model.thread?.isRunning == true {
-                    Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
-                        .accessibilityLabel("Stop")
-                }
-                // On iPad there's room for Find beside the menu.
-                if sizeClass == .regular {
-                    Button { finding = true } label: { Image(systemName: "magnifyingglass") }
-                        .accessibilityLabel("Find")
-                }
-                // One menu rather than a row of buttons, so the title has room.
-                Menu {
-                    Button { app.startVoiceChat(projectId: model.thread?.projectId) } label: {
-                        Label("New Voice Chat", systemImage: Symbols.voiceChat)
-                    }
-                    Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
-                    Button {
-                        newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
-                        renaming = true
-                    } label: { Label("Rename", systemImage: "pencil") }
-                    Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
-                    if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
-                        Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
-                        Button { app.push(.terminals(scope: terminals, title: "Terminals")) } label: {
-                            Label("Terminals", systemImage: "apple.terminal")
-                        }
-                    }
-                    Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
-                    if canSaveFiles {
-                        Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
-                            Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
-                        }
-                    }
-                    BotMenu(
-                        model: bot, threadId: model.threadId,
-                        isChild: model.thread?.parentThreadId != nil,
-                        editHeartbeat: { editingBotHeartbeat = true }
-                    ) { model.error = $0 }
-                    if let sourcePage {
-                        Button { app.push(.page(id: sourcePage.id)) } label: {
-                            Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
-                        }
-                    }
-                    Section {
-                        Button {
-                            Task { if let id = await model.fork() { app.path.append(.thread(id: id)) } }
-                        } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
-                        Button { showingContext = true } label: {
-                            Label("Context usage", systemImage: "chart.bar")
-                        }
-                        Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
-                        Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
-                    }
-                    let isMuted = muted.ids.contains(model.threadId)
-                    Button {
-                        Task {
-                            do {
-                                try await muted.set(model.threadId, muted: !isMuted)
-                            } catch {
-                                model.error = BBClient.describe(error, server: client.baseURL)
-                            }
-                        }
-                    } label: {
-                        Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
-                    }
-                    Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
-                    if let thread = model.thread {
-                        ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
-                            Label("Share link", systemImage: "square.and.arrow.up")
-                        }
-                    }
-                    Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .accessibilityLabel("More")
-            } }
+        .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
+        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if duoLayout.twoPages && botChrome == nil {
+                DuoHeader {
+                    Text(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+                        .font(.headline).lineLimit(1).accessibilityIdentifier("duoThreadTitle")
+                } actions: { threadActions }
+            }
         }
+        .toolbar {
+            if botChrome == nil && !duoLayout.twoPages {
+                ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
+            }
+        }
+    }
+
+    @ViewBuilder private var threadActions: some View {
+        if model.thread?.isRunning == true {
+            Button { Task { await model.stop() } } label: { Image(systemName: "stop.circle") }
+                .accessibilityLabel("Stop")
+        }
+        // On iPad there's room for Find beside the menu.
+        if sizeClass == .regular {
+            Button { finding = true } label: { Image(systemName: "magnifyingglass") }
+                .accessibilityLabel("Find")
+        }
+        // One menu rather than a row of buttons, so the title has room.
+        Menu {
+            Button { app.startVoiceChat(projectId: model.thread?.projectId) } label: {
+                Label("New Voice Chat", systemImage: Symbols.voiceChat)
+            }
+            Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+            Button {
+                newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+                renaming = true
+            } label: { Label("Rename", systemImage: "pencil") }
+            Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
+            if let terminals = TerminalScope.forThread(model.threadId, environmentId: model.thread?.environmentId) {
+                Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
+                Button { app.push(.terminals(scope: terminals, title: "Terminals")) } label: {
+                    Label("Terminals", systemImage: "apple.terminal")
+                }
+            }
+            Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+            if canSaveFiles {
+                Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
+                    Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+                }
+            }
+            BotMenu(
+                model: bot, threadId: model.threadId,
+                isChild: model.thread?.parentThreadId != nil,
+                editHeartbeat: { editingBotHeartbeat = true }
+            ) { model.error = $0 }
+            if let sourcePage {
+                Button { app.push(.page(id: sourcePage.id)) } label: {
+                    Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
+                }
+            }
+            Section {
+                Button {
+                    Task { if let id = await model.fork() { app.path.append(.thread(id: id)) } }
+                } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+                Button { showingContext = true } label: {
+                    Label("Context usage", systemImage: "chart.bar")
+                }
+                Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+                Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
+            }
+            let isMuted = muted.ids.contains(model.threadId)
+            Button {
+                Task {
+                    do {
+                        try await muted.set(model.threadId, muted: !isMuted)
+                    } catch {
+                        model.error = BBClient.describe(error, server: client.baseURL)
+                    }
+                }
+            } label: {
+                Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
+            }
+            Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
+            if let thread = model.thread {
+                ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
+                    Label("Share link", systemImage: "square.and.arrow.up")
+                }
+            }
+            Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("More")
     }
 
     /// The Bot's status line, for its header.
@@ -528,7 +541,8 @@ struct ThreadView: View {
                     }
                     .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
                         TranscriptResizeAnchor.Row(width: proxy.bounds(of: .scrollView)?.width ?? 0,
-                                                   frame: proxy.frame(in: .named("threadTranscript")))
+                                                   // Headers move the transcript origin during the same width change.
+                                                   frame: proxy.frame(in: .global))
                     } action: { row in
                         resizeAnchor.measure(item.id, row: row)
                     }

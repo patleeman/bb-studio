@@ -327,6 +327,7 @@ struct StudioKind: Identifiable, Hashable {
 struct StudioView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
+    @Environment(\.duoLayout) private var duoLayout
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
     @ObservedObject private var store = StudioStore.shared
@@ -376,10 +377,37 @@ struct StudioView: View {
         .environment(\.editMode, $editMode)
         .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
         .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
-        .searchable(text: $query, prompt: "Search Studio")
+        .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
+        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if duoLayout.twoPages {
+                VStack(spacing: 0) {
+                    DuoHeader {
+                        Text(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio").font(.title2.bold())
+                    } actions: {
+                        if selecting {
+                            let all = Set(visible.map(\.id))
+                            Button(all.isSubset(of: selection) && !all.isEmpty ? "Deselect All" : "Select All") {
+                                selection = all.isSubset(of: selection) ? [] : all
+                            }
+                            Button("Done") { endSelecting() }
+                        } else {
+                            if !store.creatable.isEmpty { newMenu }
+                            projectMenu
+                            if store.viaStudio, !visible.isEmpty {
+                                Button("Select") { withAnimation { editMode = .active } }
+                            }
+                        }
+                    }
+                    TextField("Search Studio", text: $query)
+                        .textFieldStyle(.roundedBorder).padding(.horizontal, 16).padding(.bottom, 12)
+                }.background(.bar)
+            }
+        }
         // Keep Select reachable, so search results can be acted on together.
         .searchPresentationToolbarBehavior(.avoidHidingContent)
         .toolbar {
+            if !duoLayout.twoPages {
             if selecting {
                 ToolbarItem(placement: .topBarLeading) {
                     let all = Set(visible.map(\.id))
@@ -400,6 +428,7 @@ struct StudioView: View {
                         Button("Select") { withAnimation { editMode = .active } }
                     }
                 }
+            }
             }
         }
         .task(id: query) { await search() }

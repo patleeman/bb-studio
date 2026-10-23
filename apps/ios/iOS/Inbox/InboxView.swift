@@ -74,7 +74,7 @@ final class InboxModel: ObservableObject {
     func load(_ client: BBClient, refreshPreferences: Bool = true) async {
         guard client.baseURL == serverURL else { return }
         #if DEBUG
-        if BotDemo.variant == "duo", let demo = BotDemo.current {
+        if BotDemo.variant == "duo", !DuoDemo.phone, let demo = BotDemo.current {
             threads = [demo.thread]
             projectNames = [demo.thread.projectId: "Orbit"]
             loaded = true
@@ -261,7 +261,8 @@ final class InboxModel: ObservableObject {
 struct InboxView: View {
     var selectsDetail = false
     @EnvironmentObject private var app: AppModel
-    @StateObject private var model = InboxModel()
+    @ObservedObject var model: InboxModel
+    @Environment(\.duoLayout) private var layout
     @State private var query = ""
     @State private var renaming: ThreadEntry?
     @State private var deleting: ThreadEntry?
@@ -275,8 +276,26 @@ struct InboxView: View {
         .overlay {
             if !model.loaded { ProgressView() }
         }
-        .navigationTitle("Threads")
-        .searchable(text: $query, prompt: "Search threads and messages")
+        .navigationTitle(layout.twoPages ? "" : "Threads")
+        .toolbar(layout.twoPages ? .hidden : .automatic, for: .navigationBar)
+        .modifier(DuoSearch(query: $query, unfolded: layout.twoPages, prompt: "Search threads and messages"))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if layout.twoPages && selectsDetail {
+                VStack(spacing: 0) {
+                    DuoHeader {
+                        Text("Threads").font(.title2.bold()).accessibilityIdentifier("duoInboxTitle")
+                    } actions: {
+                        Button { app.startDictation() } label: { Image(systemName: "mic").frame(width: 44, height: 44) }
+                            .accessibilityLabel("Dictate")
+                        Button { app.newThread() } label: { Image(systemName: "square.and.pencil").frame(width: 44, height: 44) }
+                            .accessibilityLabel("New Thread")
+                    }
+                    TextField("Search threads and messages", text: $query)
+                        .textFieldStyle(.roundedBorder).padding(.horizontal, 16).padding(.bottom, 12)
+                }
+                .background(.bar)
+            }
+        }
         .task(id: query) { await model.search(app.client, query) }
         .sensoryFeedback(.impact(weight: .light), trigger: model.actions)
         .alert("Rename thread", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -304,11 +323,11 @@ struct InboxView: View {
         }
         .refreshable { await model.load(app.client) }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            if !layout.twoPages { ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { app.startDictation() } label: { Image(systemName: "mic") }
                 Button { app.newThread() } label: { Image(systemName: "square.and.pencil") }
                 .accessibilityLabel("New Thread")
-            }
+            } }
         }
         .sheet(
             isPresented: Binding(get: { app.newThreadDraft != nil }, set: { if !$0 { app.newThreadDraft = nil } })
@@ -318,11 +337,6 @@ struct InboxView: View {
         .task(id: app.serverURL) {
             if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }
             await MutedThreads.shared.refresh()
-        }
-        .task(id: app.serverURL) {
-            model.restore()
-            model.attach(app)
-            await model.load(app.client)
         }
     }
 
@@ -350,13 +364,19 @@ struct InboxView: View {
         let filtered = query.isEmpty
             ? group.threads : group.threads.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
         if !filtered.isEmpty {
-            collapsible(group.id, group.title) {
-                ForEach(filtered) { thread in
-                    threadLink(thread, showsProject: group.showsProject, depth: 0)
-                    ForEach(query.isEmpty ? shownChildren(of: thread) : []) { child in
-                        threadLink(child, showsProject: false, depth: 1)
-                    }
-                }
+            if layout.twoPages && selectsDetail && group.title == "Threads" {
+                Section { rows(filtered, group: group) }
+            } else {
+                collapsible(group.id, group.title) { rows(filtered, group: group) }
+            }
+        }
+    }
+
+    private func rows(_ threads: [ThreadEntry], group: InboxModel.Group) -> some View {
+        ForEach(threads) { thread in
+            threadLink(thread, showsProject: group.showsProject, depth: 0)
+            ForEach(query.isEmpty ? shownChildren(of: thread) : []) { child in
+                threadLink(child, showsProject: false, depth: 1)
             }
         }
     }
@@ -400,6 +420,7 @@ struct InboxView: View {
             ThreadRow(thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil)
                 .padding(.leading, CGFloat(depth) * 18)
         }
+        .accessibilityIdentifier("inbox-thread-" + thread.id)
         .swipeActions(edge: .leading) { leadingActions(thread) }
         .swipeActions(edge: .trailing) { trailingActions(thread) }
         .contextMenu { menu(thread) }

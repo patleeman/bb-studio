@@ -14,7 +14,6 @@ struct RootView: View {
                 .clipped()
                 .accessibilityHidden(!layout.twoPages)
             tabs
-                .padding(.leading, layout.twoPages && model.tab != .inbox ? layout.listWidth + DuoLayout.gutter : 0)
         }
         .environment(\.duoLayout, layout)
         .background(WindowGeometry { size, leading in
@@ -23,29 +22,44 @@ struct RootView: View {
         })
     }
 
+    private var tabVisibility: Visibility { DuoLayout(size: windowSize).twoPages ? .hidden : .automatic }
+
     private var tabs: some View {
         TabView(selection: $model.tab) {
             BotsTab()
+                .toolbar(tabVisibility, for: .tabBar)
                 .tabItem { Label("Bot", systemImage: "face.smiling") }
                 .tag(Tab.bot)
 
             InboxTab()
+                .toolbar(tabVisibility, for: .tabBar)
                 .tabItem { Label("Threads", systemImage: "bubble.left.and.bubble.right") }
             .tag(Tab.inbox)
 
             NavigationStack(path: $model.studioPath) {
                 StudioView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
+            .toolbar(tabVisibility, for: .tabBar)
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
-            NavigationStack { SettingsView() }
+            NavigationStack {
+                SettingsView()
+                    .toolbar(tabVisibility, for: .tabBar)
+                    .toolbar(DuoLayout(size: windowSize).twoPages ? .hidden : .automatic, for: .navigationBar)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        if DuoLayout(size: windowSize).twoPages {
+                            DuoHeader { Text("Settings").font(.title2.bold()) } actions: { EmptyView() }
+                        }
+                    }
+            }
+                .toolbar(tabVisibility, for: .tabBar)
                 .tabItem { Label("Settings", systemImage: "gear") }
                 .tag(Tab.settings)
         }
-        .tabViewStyle(.sidebarAdaptable)
+        .tabViewStyle(.tabBarOnly)
         // Use our rail on a two-page window. Portrait keeps the phone tabs.
-        .environment(\.horizontalSizeClass, .compact)
+        .environment(\.horizontalSizeClass, DuoLayout(size: windowSize).twoPages ? .regular : .compact)
         .toolbar(DuoLayout(size: windowSize).twoPages ? .hidden : .automatic, for: .tabBar)
         .overlay(alignment: .bottom) {
             if let notice = model.notice {
@@ -90,12 +104,13 @@ struct RootView: View {
 struct InboxTab: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.duoLayout) private var layout
+    @StateObject private var inbox = InboxModel()
 
     var body: some View {
         HStack(spacing: 0) {
             ZStack {
                 if layout.twoPages {
-                    NavigationStack { InboxView(selectsDetail: true) }
+                    NavigationStack { InboxView(selectsDetail: true, model: inbox) }
                 }
             }
             .frame(width: layout.listWidth)
@@ -107,7 +122,7 @@ struct InboxTab: View {
                 .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
                 .accessibilityHidden(true)
             NavigationStack(path: $model.path) {
-                InboxView()
+                InboxView(model: inbox)
                 .opacity(layout.twoPages ? 0 : 1)
                 .accessibilityHidden(layout.twoPages)
                 .overlay {
@@ -118,6 +133,13 @@ struct InboxTab: View {
                 .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
             .frame(maxWidth: .infinity)
+        }
+        // One live store and load task for both presentations. On the phone,
+        // an inactive navigation root must not own the sidebar's data load.
+        .task(id: model.serverURL) {
+            inbox.restore()
+            inbox.attach(model)
+            await inbox.load(model.client)
         }
     }
 }

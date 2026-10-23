@@ -26,6 +26,10 @@ final class MiniCardUITests: XCTestCase {
 
         let add = app.webViews.buttons["Add task"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 30), "the last card runs its app")
+        // Card heights arrive asynchronously. Establish the test's newest-copy
+        // starting point before testing a downward transcript drag.
+        let latest = app.buttons["Jump to latest"]
+        if latest.exists { latest.tap() }
         screenshot("top")
 
         // Shared state, records and the phone's refusal, as full screen.

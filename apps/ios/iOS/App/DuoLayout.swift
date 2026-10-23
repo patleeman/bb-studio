@@ -98,3 +98,44 @@ struct WindowGeometry: UIViewRepresentable {
         }
     }
 }
+
+/// Expanded phone windows use an in-page header, rather than iOS's compact
+/// floating navigation controls. Narrow windows keep their native bars.
+struct DuoHeader<Title: View, Actions: View>: View {
+    @ViewBuilder var title: Title
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        HStack(spacing: 12) {
+            title
+            Spacer(minLength: 8)
+            actions
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 58)
+        .background(.bar)
+    }
+}
+
+private struct DuoBotActionsKey: EnvironmentKey {
+    static let defaultValue: AnyView? = nil
+}
+
+extension EnvironmentValues {
+    var duoBotActions: AnyView? {
+        get { self[DuoBotActionsKey.self] }
+        set { self[DuoBotActionsKey.self] = newValue }
+    }
+}
+
+struct DuoSearch: ViewModifier {
+    @Binding var query: String
+    let unfolded: Bool
+    let prompt: String
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if unfolded { content }
+        else { content.searchable(text: $query, prompt: Text(prompt)) }
+    }
+}

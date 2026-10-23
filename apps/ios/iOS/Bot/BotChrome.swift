@@ -30,35 +30,19 @@ struct BotChromeToolbar: ViewModifier {
     let chrome: BotChrome?
     let status: String
     let working: Bool
+    @Environment(\.duoLayout) private var layout
+    @Environment(\.duoBotActions) private var actions
 
     func body(content: Content) -> some View {
         if let chrome {
             content.toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        BotAvatar(chrome.bot.look, size: 26, working: working)
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(chrome.bot.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                            HStack(spacing: 4) {
-                                Text(status)
-                                    .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
-                                    .contentTransition(.opacity)
-                                if !working, let cache = chrome.cache {
-                                    // Minutes left, counted down between loads.
-                                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                                        if let line = cache.line(now: context.date) {
-                                            Text("· \(line)").foregroundStyle(.tertiary)
-                                        }
-                                    }
-                                }
-                            }
-                            .font(.caption2)
-                            .lineLimit(1)
-                        }
-                    }
-                    .animation(.smooth, value: status)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(chrome.bot.name), \(status)")
+                if !layout.twoPages {
+                    ToolbarItem(placement: .principal) { title(chrome) }
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if layout.twoPages {
+                    DuoHeader { title(chrome) } actions: { if let actions { actions } }
                 }
             }
             // A frosted bar, so earlier messages blur under the Bot's name
@@ -68,6 +52,32 @@ struct BotChromeToolbar: ViewModifier {
         } else {
             content
         }
+    }
+    private func title(_ chrome: BotChrome) -> some View {
+        HStack(spacing: 8) {
+            BotAvatar(chrome.bot.look, size: 26, working: working)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(chrome.bot.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(status)
+                        .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
+                        .contentTransition(.opacity)
+                    if !working, let cache = chrome.cache {
+                        // Minutes left, counted down between loads.
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            if let line = cache.line(now: context.date) {
+                                Text("· \(line)").foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+                .font(.caption2)
+                .lineLimit(1)
+            }
+        }
+        .animation(.smooth, value: status)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(chrome.bot.name), \(status)")
     }
 }
 

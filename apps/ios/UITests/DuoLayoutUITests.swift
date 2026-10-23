@@ -35,7 +35,11 @@ final class DuoLayoutUITests: XCTestCase {
             resize(app, name, size)
             XCTAssertEqual(app.windows.firstMatch.identifier, session, "Resize must not relaunch the process")
             XCTAssertEqual(composer.value as? String, "Keep this Duo draft")
-            XCTAssertTrue(app.navigationBars["Juniper"].exists, "Same selected thread")
+            if name == "landscape" {
+                XCTAssertEqual(app.staticTexts["duoThreadTitle"].label, "Juniper", "Same selected thread")
+            } else {
+                XCTAssertTrue(app.navigationBars["Juniper"].exists, "Same selected thread")
+            }
             XCTAssertEqual(app.navigationBars["Juniper"].buttons["Threads"].exists, name != "landscape")
             let retained = app.staticTexts[label].firstMatch
             XCTAssertTrue(retained.exists, "Visible message survives the resize")
@@ -82,7 +86,7 @@ final class DuoLayoutUITests: XCTestCase {
         XCTAssertGreaterThan(composer.frame.minX, window.frame.width / 2 + 15)
         XCTAssertLessThanOrEqual(composer.frame.maxY, keyboard.frame.minY + 1)
         XCTAssertEqual(keyboard.frame.width, window.frame.width, accuracy: 2)
-        let selection = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Juniper")).firstMatch
+        let selection = app.buttons["inbox-thread-thr_botdemo01"]
         XCTAssertTrue(selection.isHittable, "The thread list stays usable with the keyboard shown")
         XCTAssertLessThan(selection.frame.maxX, window.frame.width / 2 - 15)
         screenshot(app, "built-ipad-keyboard")

@@ -200,7 +200,9 @@ enum BotDemo {
                     ], interactions: [])
                 }
             }
-            return Fixture(bot: nil, activity: nil, thread: thread(running: false, needs: false), rows: transcript, interactions: [])
+            let phoneBot = DuoDemo.phone ? BotInfo(name: "Juniper", avatar: "🌿", state: .active,
+                lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
+            return Fixture(bot: phoneBot, activity: nil, thread: thread(running: false, needs: false), rows: transcript, interactions: [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
