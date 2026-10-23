@@ -7,6 +7,15 @@ import UIKit
 enum DuoDemo {
     nonisolated static var phone: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoPhone") }
 
+    private static var configured: Set<ObjectIdentifier> = []
+
+    static func configure(_ window: UIWindow) {
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-qaDark") { window.overrideUserInterfaceStyle = .dark }
+        guard args.contains("-qaDuoColdWide"), configured.insert(ObjectIdentifier(window)).inserted else { return }
+        window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
+    }
+
     static func handle(_ url: URL) -> Bool {
         guard BotDemo.variant == "duo", url.host() == "qa-duo",
               let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
@@ -25,10 +34,18 @@ enum DuoDemo {
             default: return false
             }
             return true
+        case "inspect":
+            NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
+            return true
+        case "mid", "bottom":
+            window.endEditing(true)
+            NotificationCenter.default.post(name: Notification.Name("duo-qa-scroll"), object: url.lastPathComponent)
+            return true
         case "capture":
             let name = url.query() ?? "phone-root"
             let metadata: [String: Any] = ["idiom": window.traitCollection.userInterfaceIdiom == .phone ? "phone" : "other",
                 "width": window.bounds.width, "height": window.bounds.height,
+                "appearance": window.traitCollection.userInterfaceStyle == .dark ? "dark" : "light",
                 "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right,
                 "screenWidth": window.screen.bounds.width, "screenHeight": window.screen.bounds.height,
                 "windows": window.windowScene?.windows.map { ["class": String(describing: type(of: $0)),

@@ -50,9 +50,12 @@ final class DuoPhoneRootUITests: XCTestCase {
                 XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message' ")).firstMatch.waitForExistence(timeout: 15))
                 XCTAssertFalse(app.buttons["Bots"].exists, "No Bot back button on the unfolded phone")
             }
-            let content = tab == "settings" ? app.textFields.firstMatch : tab == "studio" ? app.staticTexts["Duo launch checklist"] : app.textViews.firstMatch
+            let content = tab == "settings" ? app.textFields.firstMatch : tab == "studio" ? app.buttons.matching(identifier: "studioItem").firstMatch : app.textViews.firstMatch
             XCTAssertTrue(content.waitForExistence(timeout: 10))
-            if content.exists { XCTAssertLessThan(content.frame.minX, 300, "\(tab) fills the space after the rail") }
+            if content.exists {
+                if tab == "studio" { XCTAssertLessThan(content.frame.minX, 475, "Studio list is in the sidebar") }
+                else { XCTAssertGreaterThan(content.frame.minX, 475, "\(tab) detail is beside its sidebar") }
+            }
             assertStatusAreaClear()
             capture(name)
             XCTAssertEqual(app.tabBars.count, 0)

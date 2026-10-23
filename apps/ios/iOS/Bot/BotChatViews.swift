@@ -29,31 +29,43 @@ struct BotChatTimeline: View {
     var threadRows: Set<String> = []
     /// The rows are the cached ones, for timing.
     var cached = false
+    var measure: (String, TranscriptResizeAnchor.Row) -> Void = { _, _ in }
+    var unmeasure: (String) -> Void = { _ in }
 
     var body: some View {
         let entries = BotChatEntry.memo.entries(rows, started: started, compactions: compactions)
         let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in
-            switch entry {
-            case .day(let date, _):
-                BotDaySeparator(date: date)
-            case .message(let row, let first, let last):
-                BotMessageRow(
-                    bot: bot, row: row, first: first, last: last, projectId: projectId,
-                    react: react, quote: quote, select: select,
-                    edit: row.id == editableId ? edit : nil,
-                    sideThread: sideThreads[row.id],
-                    replyInThread: !row.isUser && threadRows.contains(row.id) ? { replyInThread(row.id) } : nil)
-                .modifier(ChatPerfRow(row: row, cached: cached))
-            case .work(let rows):
-                BotWorkRow(rows: rows)
-            case .autoCompacted(let compaction, _):
-                BotAutoCompactedMarker(compaction: compaction)
-            case .child(let event, _):
-                BotChildCard(event: event, live: event.threadId.flatMap { live[$0] }) {
-                    if let id = event.threadId { openThread(id) }
+            Group {
+                switch entry {
+                case .day(let date, _):
+                    BotDaySeparator(date: date)
+                case .message(let row, let first, let last):
+                    BotMessageRow(
+                        bot: bot, row: row, first: first, last: last, projectId: projectId,
+                        react: react, quote: quote, select: select,
+                        edit: row.id == editableId ? edit : nil,
+                        sideThread: sideThreads[row.id],
+                        replyInThread: !row.isUser && threadRows.contains(row.id) ? { replyInThread(row.id) } : nil)
+                    .modifier(ChatPerfRow(row: row, cached: cached))
+                case .work(let rows):
+                    BotWorkRow(rows: rows)
+                case .autoCompacted(let compaction, _):
+                    BotAutoCompactedMarker(compaction: compaction)
+                case .child(let event, _):
+                    BotChildCard(event: event, live: event.threadId.flatMap { live[$0] }) {
+                        if let id = event.threadId { openThread(id) }
+                    }
                 }
             }
+            .id(entry.id)
+            .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
+                let isMessage: Bool
+                if case .message = entry { isMessage = true } else { isMessage = false }
+                return .init(width: proxy.bounds(of: .scrollView)?.width ?? 0,
+                    frame: proxy.frame(in: .global), isMessage: isMessage)
+            } action: { row in measure(entry.id, row) }
+            .onDisappear { unmeasure(entry.id) }
         }
     }
 }

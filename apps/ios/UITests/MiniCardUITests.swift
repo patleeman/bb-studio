@@ -17,6 +17,7 @@ final class MiniCardUITests: XCTestCase {
     private let app = XCUIApplication()
 
     func testMiniCardsRunInline() async throws {
+        XCUIDevice.shared.orientation = .portrait
         guard let thread = ProcessInfo.processInfo.environment["BBGO_QA_MINI_THREAD"], !thread.isEmpty else {
             throw XCTSkip("Set TEST_RUNNER_BBGO_QA_MINI_THREAD to a staged thread with mini app cards")
         }
@@ -45,6 +46,10 @@ final class MiniCardUITests: XCTestCase {
         screenshot("used")
 
         // A drag that starts on the app scrolls the thread, since the app fits its card.
+        // Content and measured card heights have changed during the actions
+        // above. Establish the newest-copy starting point after those changes.
+        if app.buttons["Jump to latest"].exists { app.buttons["Jump to latest"].tap() }
+        Thread.sleep(forTimeInterval: 3)
         let before = add.frame.minY
         drag(from: add.frame.midY + 40, by: 300)
         XCTAssertGreaterThan(add.frame.minY, before + 150, "the thread scrolled over the card")
@@ -86,24 +91,51 @@ final class MiniCardUITests: XCTestCase {
         screenshot("realtime")
     }
 
-    /// Same production WKWebView cards and staged server, in exact Duo windows.
+    /// Production cards on native outer and iPad landscape scenes. The latter
+    /// uses the same split decision as Duo, with reliable physical touch bounds.
     func testScrollOwnershipInOuterAndLandscape() throws {
         let env = ProcessInfo.processInfo.environment
         guard let thread = env["BBGO_QA_MINI_THREAD"], env["BBGO_QA_MINI_IDS"] != nil else {
             throw XCTSkip("Set the staged Duo mini fixture IDs and server")
         }
-        for (name, size) in [("outer", CGSize(width: 466, height: 678)), ("landscape", CGSize(width: 951, height: 669))] {
+        let sizes = [("outer", CGSize(width: 466, height: 678)), ("landscape", CGSize(width: 951, height: 669))]
+        // A forced window may exceed the simulator's physical touch surface.
+        // Run each size on a simulator whose screen can receive its gestures.
+        guard let requested = env["BBGO_QA_MINI_LAYOUT"], ["outer", "landscape"].contains(requested) else {
+            throw XCTSkip("Set TEST_RUNNER_BBGO_QA_MINI_LAYOUT to the native simulator size: outer or landscape")
+        }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        for (name, _) in sizes where requested == name {
+            XCUIDevice.shared.orientation = name == "landscape" ? .landscapeLeft : .portrait
             launch(thread)
             XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20))
-            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/\(name)")!)
             let window = app.windows.firstMatch
-            expectation(for: NSPredicate { _, _ in abs(window.frame.width - size.width) < 1 }, evaluatedWith: nil)
+            expectation(for: NSPredicate { _, _ in
+                name == "landscape" ? window.frame.width >= 900 && window.frame.width > window.frame.height
+                    : window.frame.width < 900 && window.frame.height > window.frame.width
+            }, evaluatedWith: nil)
             waitForExpectations(timeout: 10)
+            let size = window.frame.size
             let short = app.webViews.buttons["Add task"].firstMatch
             XCTAssertTrue(short.waitForExistence(timeout: 30))
-            let before = short.frame.minY
-            cardDrag(x: short.frame.midX, y: short.frame.midY + 25, distance: 150)
-            XCTAssertGreaterThan(short.frame.minY, before + 80, "\(name): a short app passes the drag to the transcript")
+            // Materialize the reply's early cards once. Their initial 240pt
+            // estimates otherwise change as the first drag brings them near,
+            // masking that drag with a simultaneous content-size correction.
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/mid")!)
+            let early = app.webViews.staticTexts["Row 1"].firstMatch
+            XCTAssertTrue(early.waitForExistence(timeout: 20))
+            Thread.sleep(forTimeInterval: 3)
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/bottom")!)
+            Thread.sleep(forTimeInterval: 1)
+            // WebKit can retain a stale accessibility frame after a large
+            // programmatic jump. Measure the native card header, and start
+            // the drag inside its preview, rather than following that frame.
+            let shortHeader = try XCTUnwrap(app.staticTexts.matching(identifier: "Task counter").allElementsBoundByIndex.first {
+                $0.isHittable && $0.frame.minY > 100 && $0.frame.maxY < size.height - 250
+            })
+            let before = shortHeader.frame.minY
+            cardDrag(x: shortHeader.frame.midX, y: shortHeader.frame.maxY + 60, distance: 270)
+            XCTAssertGreaterThan(shortHeader.frame.minY, before + 80, "\(name): a short app passes the drag to the transcript")
             let detailLeft: CGFloat = name == "landscape" ? size.width / 2 + 16 : 0
             var header: XCUIElement?
             for _ in 0..<14 {
@@ -111,13 +143,13 @@ final class MiniCardUITests: XCTestCase {
                     $0.isHittable && $0.frame.minY > 130 && $0.frame.minY < 300
                 }
                 if header != nil { break }
-                cardDrag(x: detailLeft + 5, y: 170, distance: 120)
+                cardDrag(x: detailLeft + 5, y: 170, distance: 240)
             }
             let title = try XCTUnwrap(header, "\(name): tall card is positioned inside the transcript")
             let row = app.webViews.staticTexts["Row 1"].firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 10))
             let (rowY, titleY) = (row.frame.minY, title.frame.minY)
-            cardDrag(x: title.frame.midX, y: title.frame.maxY + 110, distance: -100)
+            cardDrag(x: title.frame.midX, y: title.frame.maxY + 110, distance: -150)
             XCTAssertEqual(title.frame.minY, titleY, accuracy: 4, "\(name): the transcript stays still over a tall app")
             XCTAssertTrue(!row.exists || row.frame.minY < rowY - 60, "\(name): the app scrolls internally past its maximum height")
             let image = window.screenshot()
@@ -140,7 +172,7 @@ final class MiniCardUITests: XCTestCase {
     private func cardDrag(x: CGFloat, y: CGFloat, distance: CGFloat) {
         let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
         let from = origin.withOffset(CGVector(dx: x, dy: y))
-        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: distance)),
+        from.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: x, dy: y + distance)),
                    withVelocity: 300, thenHoldForDuration: 0.3)
     }
 

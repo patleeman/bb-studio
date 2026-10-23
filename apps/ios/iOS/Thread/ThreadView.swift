@@ -503,7 +503,7 @@ struct ThreadView: View {
                         running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
                         edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
-                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache)
+                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache, measure: { resizeAnchor.measure($0, row: $1) }, unmeasure: { resizeAnchor.forget($0) })
                 }
                 let items = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
                 let unread = unreadItem(in: items)
@@ -540,12 +540,14 @@ struct ThreadView: View {
                         }
                     }
                     .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
-                        TranscriptResizeAnchor.Row(width: proxy.bounds(of: .scrollView)?.width ?? 0,
-                                                   // Headers move the transcript origin during the same width change.
-                                                   frame: proxy.frame(in: .global))
+                        let isMessage: Bool
+                        if case .message = item { isMessage = true } else { isMessage = false }
+                        return TranscriptResizeAnchor.Row(width: proxy.bounds(of: .scrollView)?.width ?? 0,
+                            frame: proxy.frame(in: .global), isMessage: isMessage)
                     } action: { row in
                         resizeAnchor.measure(item.id, row: row)
                     }
+                    .onDisappear { resizeAnchor.forget(item.id) }
                 }
                 ForEach(outbox.messages(for: model.threadId)) { message in
                     PendingBubble(message: message)
@@ -579,11 +581,30 @@ struct ThreadView: View {
             .frame(maxWidth: Self.readableWidth)
             .frame(maxWidth: .infinity)
         }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-inspect"))) { _ in
+            guard BotDemo.variant == "duo", app.tab == .bot, botChrome != nil else { return }
+            let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
+            window?.accessibilityValue = "\(ObjectIdentifier(model))|loads=\(model.qaLoadCount)|keeper=\(ObjectIdentifier(resizeAnchor))#\(resizeAnchor.debugState)"
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
+            guard BotDemo.variant == "duo" else { return }
+            resizeRestore?.cancel()
+            resizeAnchor.cancel()
+            if event.object as? String == "mid" {
+                let entries = BotChatEntry.memo.entries(model.chainRows, started: botChrome?.started ?? [], compactions: [])
+                if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { position.scrollTo(id: entry.id, anchor: .top) }
+            } else { scrollToBottom(animated: false) }
+        }
+        #endif
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { resizeAnchor.frame = $0 }
+        .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { resizeAnchor.visible($0) }
         .coordinateSpace(name: "threadTranscript")
         .scrollPosition($position)
         .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
             TranscriptResizeAnchor.Viewport(size: geometry.containerSize, offset: geometry.contentOffset.y,
-                inset: geometry.contentInsets.top, bottomGap: geometry.contentSize.height - geometry.unobscuredBottom)
+                inset: geometry.contentInsets.top, bottomGap: geometry.contentSize.height - geometry.unobscuredBottom,
+                contentHeight: geometry.contentSize.height, bottomInset: geometry.contentInsets.bottom)
         } action: { _, viewport in
             if let anchor = resizeAnchor.update(viewport) { restoreAfterWidthChange(anchor) }
         }
@@ -597,22 +618,20 @@ struct ThreadView: View {
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
-        // Following a streaming reply scrolls to the bottom the lazy stack
-        // estimates; when rows above measure shorter than estimated, or the
-        // bottom shrinks (the working indicator goes, steps fold into a group),
-        // the timeline is left past its end, showing nothing. Bring it back
-        // once nothing is scrolling, so a bounce at the bottom isn't fought.
+        // Repair a viewport wholly beyond the lazy content, once idle. Leave
+        // ordinary partial bottom bounces and fitting short content to UIKit;
+        // re-aiming those can create a scroll/layout feedback loop.
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             // Content shorter than the screen sits at the top: nothing is past its end.
-            let end = max(geometry.contentSize.height, geometry.visibleRect.minY + geometry.contentInsets.top + geometry.containerSize.height)
-            return geometry.unobscuredBottom - end
+            TranscriptResizeAnchor.excessBottom(contentHeight: geometry.contentSize.height,
+                viewportHeight: geometry.containerSize.height, visibleBottom: geometry.unobscuredBottom)
         } action: { _, distance in
             pastEnd = distance
             if scrollPhase == .idle { settlePastEnd() }
         }
         .onScrollPhaseChange { _, phase in
             scrollPhase = phase
-            if phase == .interacting {
+            if phase == .tracking || phase == .interacting {
                 resizeRestore?.cancel()
                 resizeAnchor.cancel()
             }
@@ -678,15 +697,40 @@ struct ThreadView: View {
             guard !Task.isCancelled else { return }
             switch anchor {
             case .bottom:
-                scrollToBottom(animated: false)
+                // A single lazy-stack jump can precede a cascade of new row
+                // heights. Keep the marker pinned while that layout settles.
+                for _ in 0..<24 {
+                    guard !Task.isCancelled else { return }
+                    scrollToBottom(animated: false)
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
             case .message(let id, let offset):
                 position.scrollTo(id: id, anchor: .top)
-                for _ in 0..<3 {
+                var restored = false
+                for _ in 0..<12 {
                     try? await Task.sleep(for: .milliseconds(100))
                     guard !Task.isCancelled else { return }
-                    if let y = resizeAnchor.correction(for: id, offset: offset) {
+                    if let alignment = resizeAnchor.alignment(for: id, offset: offset) {
+                        // Keep an id anchor after the restore. A raw point loses
+                        // its message as estimated heights above it settle.
+                        position.scrollTo(id: id, anchor: UnitPoint(x: 0, y: alignment))
+                        restored = true
+                    } else if let y = resizeAnchor.correction(for: id, offset: offset) {
                         position.scrollTo(y: y)
-                    }
+                        restored = true
+                    } else { restored = false }
+                }
+                // Unmeasured/stale lazy geometry cannot provide a safe point.
+                // Materializing the bottom marker is the deterministic fallback.
+                if !restored { scrollToBottom(animated: false) }
+            }
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            if let viewport = resizeAnchor.viewport {
+                let point = viewport.offset + viewport.inset
+                let maximum = max(0, viewport.contentHeight - viewport.size.height)
+                if !point.isFinite || point < -Self.pastEndSlack || point > maximum + Self.pastEndSlack || !resizeAnchor.hasVisibleRows {
+                    scrollToBottom(animated: false)
                 }
             }
         }
@@ -744,7 +788,8 @@ struct ThreadView: View {
     private static let bottomId = "timeline-bottom"
 
     private func settlePastEnd() {
-        if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
+        guard !resizeAnchor.restoring else { return }
+        if pastEnd > 0.5 { scrollToBottom(animated: false) }
     }
 
     /// Animates only a short way, from near the bottom, and then toward the

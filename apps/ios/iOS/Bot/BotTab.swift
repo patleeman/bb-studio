@@ -48,36 +48,45 @@ struct BotTab: View {
     private var needsYou: Int { activity?.needsYou.count ?? 0 }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            content
-                .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-                .toolbar { if let bot, !duoLayout.twoPages { toolbar(bot) } }
-                .environment(\.duoBotActions, bot.map { AnyView(wideActions($0)) })
-                .sheet(item: $sheet, onDismiss: { attempt += 1 }) { sheet in
-                    switch sheet {
-                    case .activity:
-                        BotThreadsSheet(bot: bot, botId: botId, activity: activity) { id in
-                            self.sheet = nil
-                            path.append(.thread(id: id))
-                        } refresh: { await loadActivity() }
-                    case .profile:
-                        BotProfileSheet(bot: bot, botId: botId) { next in
-                            if let next { lead = .bot(next) }
+        RegularPages {
+            if duoLayout.twoPages {
+                BotThreadsSheet(bot: bot, botId: botId, activity: activity, open: { id in
+                    if id == bot?.lead.threadId { path = [] }
+                    else { path = [.thread(id: id)] }
+                }, refresh: { await loadActivity() }, embedded: true)
+            }
+        } detail: {
+            NavigationStack(path: $path) {
+                content
+                    .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                    .toolbar { if let bot, !duoLayout.twoPages { toolbar(bot) } }
+                    .environment(\.duoBotActions, bot.map { AnyView(wideActions($0)) })
+                    .sheet(item: $sheet, onDismiss: { attempt += 1 }) { sheet in
+                        switch sheet {
+                        case .activity:
+                            BotThreadsSheet(bot: bot, botId: botId, activity: activity) { id in
+                                self.sheet = nil
+                                path.append(.thread(id: id))
+                            } refresh: { await loadActivity() }
+                        case .profile:
+                            BotProfileSheet(bot: bot, botId: botId) { next in
+                                if let next { lead = .bot(next) }
+                            }
+                        case .checkIns:
+                            BotAutomationsSheet(botId: botId, botName: bot?.name ?? BotInfo.defaultName, active: bot?.state == .active)
+                        case .skills:
+                            BotSkillsSheet(name: bot?.name ?? BotInfo.defaultName, botId: botId)
                         }
-                    case .checkIns:
-                        BotAutomationsSheet(botId: botId, botName: bot?.name ?? BotInfo.defaultName, active: bot?.state == .active)
-                    case .skills:
-                        BotSkillsSheet(name: bot?.name ?? BotInfo.defaultName, botId: botId)
                     }
-                }
-                .confirmationDialog("Stop \(bot?.name ?? BotInfo.defaultName)?", isPresented: $confirmingStop, titleVisibility: .visible) {
-                    Button("Stop", role: .destructive) { change(.stop) }
-                } message: {
-                    Text("It pauses, its check-ins and automations turn off, and the running threads it started stop. Its chat and data are kept.")
-                }
-                .alert("Couldn't change the Bot", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-                    Button("OK", role: .cancel) { error = nil }
-                } message: { Text(error ?? "") }
+                    .confirmationDialog("Stop \(bot?.name ?? BotInfo.defaultName)?", isPresented: $confirmingStop, titleVisibility: .visible) {
+                        Button("Stop", role: .destructive) { change(.stop) }
+                    } message: {
+                        Text("It pauses, its check-ins and automations turn off, and the running threads it started stop. Its chat and data are kept.")
+                    }
+                    .alert("Couldn't change the Bot", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                        Button("OK", role: .cancel) { error = nil }
+                    } message: { Text(error ?? "") }
+            }
         }
         .task(id: LoadKey(visible: model.tab == .bot, server: model.serverURL, botId: botId, attempt: attempt)) {
             guard model.tab == .bot else { return }

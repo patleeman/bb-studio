@@ -137,6 +137,7 @@ extension PageModel {
 
 /// One page, rendered natively from its Markdown. The text is read-only; comments aren't.
 struct PageView: View {
+    @Environment(\.duoLayout) private var duoLayout
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var store = PagesStore.shared
     @StateObject private var model: PageModel
@@ -192,62 +193,22 @@ struct PageView: View {
             }
         }
         .toolbar {
-            if !gone || hasLocalDraft {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingEditor = true } label: { Image(systemName: "square.and.pencil") }
-                        .accessibilityLabel("Edit page")
-                }
+            if !duoLayout.twoPages {
+                if !gone || hasLocalDraft { ToolbarItem(placement: .topBarTrailing) { editButton } }
+                if model.comments != nil, !gone { ToolbarItem(placement: .topBarTrailing) { commentsButton } }
+                ToolbarItem(placement: .topBarTrailing) { moreMenu }
             }
-            if model.comments != nil, !gone {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingComments = true } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "text.bubble")
-                            if model.openComments > 0 { Text("\(model.openComments)").font(.subheadline.monospacedDigit()) }
-                        }
-                    }
-                    .accessibilityLabel("Comments")
-                    .accessibilityValue(model.openComments > 0 ? "\(model.openComments) open" : "")
+        }
+        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if duoLayout.twoPages {
+                DuoHeader {
+                    Text(meta?.displayTitle ?? "Page").font(.headline).lineLimit(1)
+                } actions: {
+                    if !gone || hasLocalDraft { editButton }
+                    if model.comments != nil, !gone { commentsButton }
+                    moreMenu
                 }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    if !chats.isEmpty {
-                        Menu {
-                            ForEach(chats, id: \.threadId) { chat in
-                                Button { app.push(.thread(id: chat.threadId)) } label: {
-                                    Text(Date(timeIntervalSince1970: chat.createdAt / 1000), format: .dateTime.month().day().hour().minute())
-                                }
-                            }
-                        } label: {
-                            Label("Chats (\(chats.count))", systemImage: Symbols.thread)
-                        }
-                    }
-                    Section {
-                        Button { showingActivity = true } label: { Label("Activity", systemImage: "clock") }
-                        Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
-                        Button {
-                            newTitle = meta?.title ?? ""
-                            renaming = true
-                        } label: { Label("Rename", systemImage: "pencil") }
-                        Button { showingHistory = true } label: { Label("Version History", systemImage: "clock.arrow.circlepath") }
-                        Button { confirmingArchive = true } label: { Label("Archive", systemImage: "archivebox") }
-                    }
-                    Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
-                    Button {
-                        UIPasteboard.general.string = model.markdown
-                        copied.toggle()
-                    } label: {
-                        Label("Copy Markdown", systemImage: "doc.on.doc")
-                    }
-                    .disabled(model.markdown == nil)
-                    ShareLink(item: app.client.webURL(forPage: model.pageId).absoluteURL) {
-                        Label("Share link", systemImage: "square.and.arrow.up")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
-                .accessibilityLabel("More")
             }
         }
         .sensoryFeedback(.success, trigger: copied)
@@ -301,6 +262,62 @@ struct PageView: View {
                 showingEditor = true
             }
         }
+    }
+
+    private var editButton: some View {
+        Button { showingEditor = true } label: { Image(systemName: "square.and.pencil") }
+            .accessibilityLabel("Edit page")
+    }
+
+    private var commentsButton: some View {
+        Button { showingComments = true } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "text.bubble")
+                if model.openComments > 0 { Text("\(model.openComments)").font(.subheadline.monospacedDigit()) }
+            }
+        }
+        .accessibilityLabel("Comments")
+        .accessibilityValue(model.openComments > 0 ? "\(model.openComments) open" : "")
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            if !chats.isEmpty {
+                Menu {
+                    ForEach(chats, id: \.threadId) { chat in
+                        Button { app.push(.thread(id: chat.threadId)) } label: {
+                            Text(Date(timeIntervalSince1970: chat.createdAt / 1000), format: .dateTime.month().day().hour().minute())
+                        }
+                    }
+                } label: {
+                    Label("Chats (\(chats.count))", systemImage: Symbols.thread)
+                }
+            }
+            Section {
+                Button { showingActivity = true } label: { Label("Activity", systemImage: "clock") }
+                Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
+                Button {
+                    newTitle = meta?.title ?? ""
+                    renaming = true
+                } label: { Label("Rename", systemImage: "pencil") }
+                Button { showingHistory = true } label: { Label("Version History", systemImage: "clock.arrow.circlepath") }
+                Button { confirmingArchive = true } label: { Label("Archive", systemImage: "archivebox") }
+            }
+            Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
+            Button {
+                UIPasteboard.general.string = model.markdown
+                copied.toggle()
+            } label: {
+                Label("Copy Markdown", systemImage: "doc.on.doc")
+            }
+            .disabled(model.markdown == nil)
+            ShareLink(item: app.client.webURL(forPage: model.pageId).absoluteURL) {
+                Label("Share link", systemImage: "square.and.arrow.up")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("More")
     }
 
     private func loadChats() async {

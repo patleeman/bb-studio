@@ -46,23 +46,12 @@ struct RootView: View {
                 .tabItem { Label("Threads", systemImage: "bubble.left.and.bubble.right") }
             .tag(Tab.inbox)
 
-            NavigationStack(path: $model.studioPath) {
-                StudioView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            }
+            StudioTab()
             .toolbar(tabVisibility, for: .tabBar)
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
-            NavigationStack {
-                SettingsView()
-                    .toolbar(tabVisibility, for: .tabBar)
-                    .toolbar(DuoLayout(size: windowSize).twoPages ? .hidden : .automatic, for: .navigationBar)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        if DuoLayout(size: windowSize).twoPages {
-                            DuoHeader { Text("Settings").font(.title2.bold()) } actions: { EmptyView() }
-                        }
-                    }
-            }
+            SettingsTab()
                 .toolbar(tabVisibility, for: .tabBar)
                 .tabItem { Label("Settings", systemImage: "gear") }
                 .tag(Tab.settings)

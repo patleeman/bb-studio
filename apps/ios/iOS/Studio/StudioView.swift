@@ -325,6 +325,7 @@ struct StudioKind: Identifiable, Hashable {
 }
 
 struct StudioView: View {
+    var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
     @Environment(\.duoLayout) private var duoLayout
@@ -334,6 +335,7 @@ struct StudioView: View {
     @AppStorage(ServerScope.key("studioProject")) private var project = ""
     @State private var query = ""
     /// Content matches, keyed like items, with the matching text.
+    @State private var folder: String?
     @State private var contentMatches: [String: String] = [:]
     @State private var externalMatches: [Studio.SearchAllOutputItem] = []
     @State private var recordingKind: String?
@@ -381,7 +383,7 @@ struct StudioView: View {
         .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
         .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if duoLayout.twoPages {
+            if duoLayout.twoPages && selectsDetail {
                 VStack(spacing: 0) {
                     DuoHeader {
                         Text(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio").font(.title2.bold())
@@ -573,7 +575,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, store.hasTalk || store.hasPages {
+            if query.isEmpty, !selecting, !selectsDetail, store.hasTalk || store.hasPages {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -582,6 +584,22 @@ struct StudioView: View {
                 Section { kindFilter }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+            }
+            if selectsDetail, query.isEmpty {
+                let folders = store.items.filter { parent in
+                    !parent.archived && store.items.contains { $0.pluginId == parent.pluginId && $0.parentId == parent.itemId }
+                }
+                if !folders.isEmpty {
+                    Section("Folders") {
+                        Button { folder = nil } label: { Label("All items", systemImage: "tray") }
+                        ForEach(folders) { parent in
+                            Button { folder = parent.itemId } label: {
+                                Label(parent.displayTitle, systemImage: "folder")
+                            }
+                            .listRowBackground(folder == parent.itemId ? Color.accentColor.opacity(0.15) : .clear)
+                        }
+                    }
+                }
             }
             ForEach(sections(visible), id: \.title) { section in
                 Section {
@@ -755,8 +773,17 @@ struct StudioView: View {
             highlight: query.trimmingCharacters(in: .whitespaces))
         Group {
             if !selecting, let route = route(item) {
-                NavigationLink(value: route) { content }
+                if selectsDetail {
+                    Button { app.studioPath = [route] } label: {
+                        content.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(app.studioPath.first == route ? Color.accentColor.opacity(0.15) : .clear)
                     .accessibilityIdentifier("studioItem")
+                } else {
+                    NavigationLink(value: route) { content }
+                        .accessibilityIdentifier("studioItem")
+                }
             } else {
                 content
             }
@@ -855,6 +882,7 @@ struct StudioView: View {
 
     private func visible(kind: String?) -> [StudioItem] {
         store.items.filter { item in
+            if selectsDetail, let folder, item.itemId != folder && item.parentId != folder { return false }
             if item.archived != showArchived { return false }
             if let kind, item.kind != kind { return false }
             if kind == nil, query.isEmpty, store.info(item)?.background == true { return false }

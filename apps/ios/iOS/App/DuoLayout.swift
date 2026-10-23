@@ -85,6 +85,9 @@ struct WindowGeometry: UIViewRepresentable {
         }
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            #if DEBUG
+            if let window { DuoDemo.configure(window) }
+            #endif
             report()
         }
         private func report() {
@@ -94,6 +97,11 @@ struct WindowGeometry: UIViewRepresentable {
             guard size != lastSize || leading != lastLeading else { return }
             lastSize = size
             lastLeading = leading
+            // SwiftUI's environment alone does not change UIKit navigation
+            // chrome on a phone. Give its hosting hierarchy the same regular
+            // trait used by the shared iPad layout, without changing idiom.
+            window.rootViewController?.traitOverrides.horizontalSizeClass =
+                DuoLayout(size: size).twoPages ? .regular : .unspecified
             DispatchQueue.main.async { [weak self] in self?.changed(size, leading) }
         }
     }
@@ -107,9 +115,9 @@ struct DuoHeader<Title: View, Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            title
+            title.fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 8)
-            actions
+            HStack(spacing: 12) { actions }.fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)

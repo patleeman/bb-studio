@@ -276,7 +276,14 @@ final class ThreadModel: ObservableObject {
         TimelineCache.save(threadId, thread: thread, rows: rows, serverURL: serverURL)
     }
 
+    #if DEBUG
+    private(set) var qaLoadCount = 0
+    #endif
+
     func load() async {
+        #if DEBUG
+        qaLoadCount += 1
+        #endif
         #if DEBUG
         if BotDemo.served == nil, let demo = BotDemo.current, threadId == BotDemo.threadId {
             thread = demo.thread

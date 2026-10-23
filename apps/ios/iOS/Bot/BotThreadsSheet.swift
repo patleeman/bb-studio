@@ -11,6 +11,7 @@ struct BotThreadsSheet: View {
     let activity: BotActivity?
     var open: (String) -> Void
     var refresh: () async -> Void
+    var embedded = false
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     /// Its runners (`bot_runners`); external bots have none.
@@ -29,6 +30,15 @@ struct BotThreadsSheet: View {
             let groups = BotThreadGroups(activity)
             let earlier = chain.earlier(current: bot?.lead.threadId)
             List {
+                if embedded, let id = bot?.lead.threadId {
+                    Section {
+                        Button { open(id) } label: {
+                            Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                                .frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 if !groups.needsYou.isEmpty {
                     group("needs", "Needs you", badge: groups.needsYou.count) {
                         ForEach(groups.needsYou) { threadRow($0, depth: 0) }
@@ -72,9 +82,13 @@ struct BotThreadsSheet: View {
             .task { await loadChain() }
             // Runners follow the Activity, which BB's thread changes refresh.
             .task(id: activity) { await loadRunners() }
-            .navigationTitle("Activity")
+            .navigationTitle(embedded ? name : "Activity")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { if !embedded { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } } }
+            .toolbar(embedded ? .hidden : .automatic, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if embedded { DuoHeader { Text(name).font(.title2.bold()) } actions: { EmptyView() } }
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

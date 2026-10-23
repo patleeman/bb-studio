@@ -202,7 +202,7 @@ enum BotDemo {
             }
             let phoneBot = DuoDemo.phone ? BotInfo(name: "Juniper", avatar: "🌿", state: .active,
                 lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
-            return Fixture(bot: phoneBot, activity: nil, thread: thread(running: false, needs: false), rows: transcript, interactions: [])
+            return Fixture(bot: phoneBot, activity: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? activity(needs: true) : nil, thread: thread(running: false, needs: false), rows: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? longRows : transcript, interactions: [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
@@ -254,7 +254,7 @@ enum BotDemo {
     }
 
     /// The served chat's rows, made once.
-    static let longRows: [TimelineRow] = rows("chat", long: served?.messages ?? 300)
+    static let longRows: [TimelineRow] = rows("chat", long: served?.messages ?? (ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? 600 : 300))
 
     private static func rows(_ variant: String, long: Int? = nil) -> [TimelineRow] {
         let yesterday = now - 86_400_000 - 3_600_000
@@ -308,7 +308,9 @@ enum BotDemo {
             let at = start + Double(index) * 3_600_000
             out.append(message("u\(index)", "user", asks[index % asks.count], at))
             if index % 3 == 0 { out.append(work("w\(index)", "bb_threads_list", at + 5_000, "completed", "")) }
-            out.append(message("a\(index)", "assistant", replies[index % replies.count], at + 30_000))
+            let history = ProcessInfo.processInfo.arguments.contains("-qaDuoLong")
+            let detail = history && index % 11 == 0 ? String(repeating: "\n\n### Investigation\nThe release has several dependencies. We checked the logs, compared the build outputs, and kept the original documents for review.\n\n- Verify the mobile layout\n- Review the change with the lead\n- Keep the launch notes ready", count: 8) : ""
+            out.append(message("a\(index)", "assistant", (history ? "History turn \(index).\n\n" : "") + replies[index % replies.count] + detail, at + 30_000))
         }
         return out
     }
