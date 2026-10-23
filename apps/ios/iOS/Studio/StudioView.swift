@@ -374,6 +374,7 @@ struct StudioView: View {
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
         }
+        .containerBackground(Color(uiColor: duoLayout.twoPages ? .systemGroupedBackground : .systemBackground), for: .navigation)
         .environment(\.editMode, $editMode)
         .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
         .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)

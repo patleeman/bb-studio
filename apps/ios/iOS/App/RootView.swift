@@ -12,8 +12,18 @@ struct RootView: View {
             DuoTabRail(selection: $model.tab)
                 .frame(width: layout.railWidth)
                 .clipped()
+                .background {
+                    if layout.twoPages {
+                        Rectangle().fill(.bar).ignoresSafeArea(.container, edges: .bottom)
+                    }
+                }
                 .accessibilityHidden(!layout.twoPages)
             tabs
+        }
+        .background {
+            if layout.twoPages {
+                Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+            }
         }
         .environment(\.duoLayout, layout)
         .background(WindowGeometry { size, leading in
@@ -115,11 +125,21 @@ struct InboxTab: View {
             }
             .frame(width: layout.listWidth)
             .clipped()
+            .background {
+                if layout.twoPages {
+                    Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                }
+            }
             .accessibilityHidden(!layout.twoPages)
             Rectangle()
                 .fill(Color(uiColor: .systemGroupedBackground))
                 .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
                 .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
+                .background {
+                    if layout.twoPages {
+                        Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                    }
+                }
                 .accessibilityHidden(true)
             NavigationStack(path: $model.path) {
                 InboxView(model: inbox)

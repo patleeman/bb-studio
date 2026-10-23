@@ -399,6 +399,13 @@ struct InboxView: View {
     /// The connection banner, then Automations as a plain row under no header, like the sidebar's nav.
     @ViewBuilder
     private var homeTop: some View {
+        #if DEBUG
+        // Phone-root QA keeps the real staged sidebar and adds the existing
+        // 80-message fixture as a normal selectable thread destination.
+        if DuoDemo.phone, !layout.twoPages || selectsDetail, let demo = BotDemo.current {
+            Section { threadLink(demo.thread, showsProject: false, depth: 0) }
+        }
+        #endif
         if let error = model.error {
             Section {
                 ConnectionBanner(message: error) { await model.load(app.client) }
@@ -429,7 +436,11 @@ struct InboxView: View {
     @ViewBuilder
     private func inboxDestination<Content: View>(_ route: Route, @ViewBuilder label: () -> Content) -> some View {
         if selectsDetail {
-            Button { app.open(route) } label: { label() }
+            Button { app.open(route) } label: {
+                label()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+            }
                 .buttonStyle(.plain)
                 .listRowBackground(app.path.first == route ? Color.accentColor.opacity(0.15) : Color.clear)
                 .accessibilityAddTraits(app.path.first == route ? .isSelected : [])

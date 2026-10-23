@@ -27,8 +27,13 @@ final class DuoPhoneRootUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(identifier: "Dictate").count, 1)
         let thread = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Draft the ORBIT-42 release notes")).firstMatch
         XCTAssertTrue(thread.waitForExistence(timeout: 15), "The split list fetches its real staged sidebar")
-        if thread.exists { thread.tap() }
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
+        conversation.tap()
         XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
+        let newest = app.staticTexts["Duo message 80. Review the launch checklist and keep the release notes ready."]
+        XCTAssertTrue(newest.waitForExistence(timeout: 15), "The selected thread renders its transcript in the right page")
+        XCTAssertGreaterThan(newest.frame.minX, 951 / 2 + 15)
         assertStatusAreaClear()
         capture("fix-threads")
         command("focus")
@@ -60,13 +65,24 @@ final class DuoPhoneRootUITests: XCTestCase {
     func testColdUnfoldedInboxLoadsWithoutNarrowInbox() throws {
         let server = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_SERVER"])
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", server.replacingOccurrences(of: "127.0.0.1", with: "localhost"),
-                               "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://bot"]
+                               "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://settings"]
         app.launch()
-        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 20))
         command("landscape")
         command("tab?threads")
         let thread = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Draft the ORBIT-42 release notes")).firstMatch
         XCTAssertTrue(thread.waitForExistence(timeout: 20), "An unprimed split list loads from the real sidebar endpoint")
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 10))
+        conversation.tap()
+        let newest = app.staticTexts["Duo message 80. Review the launch checklist and keep the release notes ready."]
+        XCTAssertTrue(newest.waitForExistence(timeout: 15), "Cold split-list selection loads the 80-message transcript")
+        // The forced window extends beyond the simulator's physical outer
+        // screen. Check visible window bounds; right-page taps are clipped by
+        // that physical screen even when the full UIKit render is correct.
+        XCTAssertGreaterThan(newest.frame.minY, 58)
+        XCTAssertLessThan(newest.frame.maxY, 669)
+        XCTAssertGreaterThan(newest.frame.minX, 951 / 2 + 15)
         XCTAssertEqual(app.navigationBars.matching(identifier: "Threads").count + app.staticTexts.matching(identifier: "duoInboxTitle").count, 1)
     }
 

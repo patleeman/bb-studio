@@ -39,15 +39,32 @@ content and a populated thread list. Narrow and portrait windows retain the
 native phone navigation.
 
 The inbox model and load task now belong to the stable InboxTab, shared by its
-narrow root and split list. A cold unfolded test starts on Bot and loads Threads
+narrow root and split list. A cold unfolded test starts on Settings and loads Threads
 from the real staged sidebar endpoint without first opening the narrow inbox.
 The warm staged baseline did populate; the real device's empty-list failure was
 not independently reproduced as a server/decoder defect.
 
 These PNGs are unmodified UIKit renders of the built phone window, at 3× scale
-(2853 × 2007 pixels), with safe local fixture data. The staged Orbit threads,
-sidebar and Studio page come from the real isolated server. Bot uses the local
-Juniper fixture. No agent ran.
+(2853 × 2007 pixels), with safe local fixture data. The staged Orbit sidebar and Studio page come from the real isolated server.
+Bot and the selected split conversation use the local 80-message Juniper
+fixture, exposed as a normal selectable list row only by the Debug phone QA
+flag. The cold test starts on Settings, opens the unfolded list, selects that
+row and checks that message 80 renders on the right page. No agent ran.
+
+The earlier release-notes capture selected a genuinely empty scheduled thread.
+The staged script deliberately schedules its first prompt weeks ahead; the
+verified timeline response has `maxSeq: 0`, `rows: []` and no history segments.
+Its queued-message response contains one future scheduled prompt. There was no
+missing transcript to render for that thread. The refreshed captures show actual
+messages instead.
+
+The stronger cold-selection test also found a separate split-row hit-target bug:
+plain buttons did not accept taps in blank space beyond a short title. A center
+tap on Juniper left “No thread selected”. The full label now fills the row width
+and supplies a rectangular hit shape. The cold test failed before that change.
+
+The unfolded rail and grouped list backgrounds now paint
+through the bottom safe area; controls keep their existing safe-area layout.
 
 | Surface | Screenshot |
 | --- | --- |
