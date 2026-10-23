@@ -36,12 +36,32 @@ final class DuoLayoutUITests: XCTestCase {
             XCTAssertEqual(app.windows.firstMatch.identifier, session, "Resize must not relaunch the process")
             XCTAssertEqual(composer.value as? String, "Keep this Duo draft")
             XCTAssertTrue(app.navigationBars["Juniper"].exists, "Same selected thread")
+            XCTAssertEqual(app.navigationBars["Juniper"].buttons["Threads"].exists, name != "landscape")
             let retained = app.staticTexts[label].firstMatch
             XCTAssertTrue(retained.exists, "Visible message survives the resize")
             if retained.exists {
                 XCTAssertEqual(retained.frame.minY, before, accuracy: 90, "Scroll position stays near the same message")
             }
             screenshot(app, "built-\(name)")
+        }
+    }
+
+    func testNewestMessageStaysPinnedThroughThreeWindowSizes() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+                               "-qaBotDemo", "duo", "-openURL", "bbstudio://thread/thr_botdemo01"]
+        app.launch()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20))
+        for (name, size) in [("outer", CGSize(width: 466, height: 678)),
+                             ("landscape", CGSize(width: 951, height: 669)),
+                             ("portrait", CGSize(width: 669, height: 951)),
+                             ("outer", CGSize(width: 466, height: 678))] {
+            resize(app, name, size)
+            let last = app.staticTexts["Duo message 80. Review the launch checklist and keep the release notes ready."]
+            let pinned = NSPredicate { _, _ in last.isHittable && !app.buttons["Jump to latest"].exists }
+            expectation(for: pinned, evaluatedWith: nil)
+            waitForExpectations(timeout: 5)
+            screenshot(app, "pinned-\(name)")
         }
     }
 

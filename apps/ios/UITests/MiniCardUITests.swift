@@ -12,17 +12,17 @@ import XCTest
 /// card, and that the first copy, above, shows the last one's changes. Then it writes `/tmp/qa-mini-cards-ready` and waits
 /// for a record named "Server task", which the person running it inserts
 /// through Studio's RPC, to arrive by realtime.
+@MainActor
 final class MiniCardUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    func testMiniCardsRunInline() throws {
+    func testMiniCardsRunInline() async throws {
         guard let thread = ProcessInfo.processInfo.environment["BBGO_QA_MINI_THREAD"], !thread.isEmpty else {
             throw XCTSkip("Set TEST_RUNNER_BBGO_QA_MINI_THREAD to a staged thread with mini app cards")
         }
         continueAfterFailure = false
         try? FileManager.default.removeItem(atPath: "/tmp/qa-mini-cards-ready")
-        app.launchArguments += ["-skipPushPrompt", "YES", "-openURL", "bbstudio://thread/\(thread)"]
-        app.launch()
+        launch(thread)
 
         let add = app.webViews.buttons["Add task"].firstMatch
         XCTAssertTrue(add.waitForExistence(timeout: 30), "the last card runs its app")
@@ -68,8 +68,76 @@ final class MiniCardUITests: XCTestCase {
         screenshot("first")
 
         FileManager.default.createFile(atPath: "/tmp/qa-mini-cards-ready", contents: Data())
+        if let ids = ProcessInfo.processInfo.environment["BBGO_QA_MINI_IDS"],
+           let server = ProcessInfo.processInfo.environment["BBGO_QA_SERVER"], let id = ids.split(separator: ",").first {
+            var request = URLRequest(url: URL(string: server + "/api/v1/plugins/studio/rpc/minis.db.insert")!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["id": String(id), "clientId": "duo-ui-test",
+                "collection": "tasks", "data": ["title": "Server task"]])
+            let (_, response) = try await URLSession.shared.data(for: request)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        }
         XCTAssertTrue(app.webViews.staticTexts["Server task"].waitForExistence(timeout: 60), "a record from elsewhere arrived by realtime")
         screenshot("realtime")
+    }
+
+    /// Same production WKWebView cards and staged server, in exact Duo windows.
+    func testScrollOwnershipInOuterAndLandscape() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let thread = env["BBGO_QA_MINI_THREAD"], env["BBGO_QA_MINI_IDS"] != nil else {
+            throw XCTSkip("Set the staged Duo mini fixture IDs and server")
+        }
+        for (name, size) in [("outer", CGSize(width: 466, height: 678)), ("landscape", CGSize(width: 951, height: 669))] {
+            launch(thread)
+            XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20))
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/\(name)")!)
+            let window = app.windows.firstMatch
+            expectation(for: NSPredicate { _, _ in abs(window.frame.width - size.width) < 1 }, evaluatedWith: nil)
+            waitForExpectations(timeout: 10)
+            let short = app.webViews.buttons["Add task"].firstMatch
+            XCTAssertTrue(short.waitForExistence(timeout: 30))
+            let before = short.frame.minY
+            cardDrag(x: short.frame.midX, y: short.frame.midY + 25, distance: 150)
+            XCTAssertGreaterThan(short.frame.minY, before + 80, "\(name): a short app passes the drag to the transcript")
+            let detailLeft: CGFloat = name == "landscape" ? size.width / 2 + 16 : 0
+            var header: XCUIElement?
+            for _ in 0..<14 {
+                header = app.staticTexts.matching(identifier: "Long list").allElementsBoundByIndex.first {
+                    $0.isHittable && $0.frame.minY > 130 && $0.frame.minY < 300
+                }
+                if header != nil { break }
+                cardDrag(x: detailLeft + 5, y: 170, distance: 120)
+            }
+            let title = try XCTUnwrap(header, "\(name): tall card is positioned inside the transcript")
+            let row = app.webViews.staticTexts["Row 1"].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            let (rowY, titleY) = (row.frame.minY, title.frame.minY)
+            cardDrag(x: title.frame.midX, y: title.frame.maxY + 110, distance: -100)
+            XCTAssertEqual(title.frame.minY, titleY, accuracy: 4, "\(name): the transcript stays still over a tall app")
+            XCTAssertTrue(!row.exists || row.frame.minY < rowY - 60, "\(name): the app scrolls internally past its maximum height")
+            let image = window.screenshot()
+            let attachment = XCTAttachment(screenshot: image)
+            attachment.name = "mini-scroll-\(name)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            app.terminate()
+        }
+    }
+
+    private func launch(_ thread: String) {
+        app.launchArguments = ["-skipPushPrompt", "YES", "-openURL", "bbstudio://thread/\(thread)"]
+        let env = ProcessInfo.processInfo.environment
+        if let server = env["BBGO_QA_SERVER"] { app.launchArguments += ["-serverURL", server] }
+        if let ids = env["BBGO_QA_MINI_IDS"] { app.launchArguments += ["-qaBotDemo", "duo", "-qaDuoMinis", ids] }
+        app.launch()
+    }
+
+    private func cardDrag(x: CGFloat, y: CGFloat, distance: CGFloat) {
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let from = origin.withOffset(CGVector(dx: x, dy: y))
+        from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: distance)),
+                   withVelocity: 300, thenHoldForDuration: 0.3)
     }
 
     /// Drags vertically from `y`, over the cards, or `beside` them in the thread's margin.

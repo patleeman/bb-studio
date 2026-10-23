@@ -50,6 +50,9 @@ struct ThreadView: View {
     @State private var selectedExcerpt = ""
     @State private var reactionSettings = ReactionSettings.defaults
     @State private var position = ScrollPosition()
+    @State private var resizeAnchor = TranscriptResizeAnchor()
+    @State private var resizeRestore: Task<Void, Never>?
+    @Environment(\.duoLayout) private var duoLayout
     @State private var pickingSendTime = false
     @State private var showingFiles = false
     @State private var showingHistory = false
@@ -105,6 +108,7 @@ struct ThreadView: View {
 
     var body: some View {
         screen
+        .navigationBarBackButtonHidden(duoLayout.twoPages && app.tab == .inbox && hidesTabBar)
         .sheet(isPresented: $showingWeb) {
             if let thread = model.thread {
                 NavigationStack {
@@ -283,6 +287,8 @@ struct ThreadView: View {
             if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
         }
         .onDisappear {
+            resizeRestore?.cancel()
+            resizeAnchor.cancel()
             model.detach()
             notes.detach()
         }
@@ -520,6 +526,12 @@ struct ThreadView: View {
                             }
                         }
                     }
+                    .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
+                        TranscriptResizeAnchor.Row(width: proxy.bounds(of: .scrollView)?.width ?? 0,
+                                                   frame: proxy.frame(in: .named("threadTranscript")))
+                    } action: { row in
+                        resizeAnchor.measure(item.id, row: row)
+                    }
                 }
                 ForEach(outbox.messages(for: model.threadId)) { message in
                     PendingBubble(message: message)
@@ -553,7 +565,14 @@ struct ThreadView: View {
             .frame(maxWidth: Self.readableWidth)
             .frame(maxWidth: .infinity)
         }
+        .coordinateSpace(name: "threadTranscript")
         .scrollPosition($position)
+        .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
+            TranscriptResizeAnchor.Viewport(size: geometry.containerSize, offset: geometry.contentOffset.y,
+                inset: geometry.contentInsets.top, bottomGap: geometry.contentSize.height - geometry.unobscuredBottom)
+        } action: { _, viewport in
+            if let anchor = resizeAnchor.update(viewport) { restoreAfterWidthChange(anchor) }
+        }
         // The Bot's header floats on glass: earlier messages blur away under it
         // rather than being cut off at a hard edge.
         .scrollEdgeEffectStyle(botChrome != nil ? .soft : nil, for: .top)
@@ -579,6 +598,10 @@ struct ThreadView: View {
         }
         .onScrollPhaseChange { _, phase in
             scrollPhase = phase
+            if phase == .interacting {
+                resizeRestore?.cancel()
+                resizeAnchor.cancel()
+            }
             if phase == .idle { settlePastEnd() }
         }
         // The first page lands at the bottom through `defaultScrollAnchor`;
@@ -626,6 +649,32 @@ struct ThreadView: View {
         .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
         .onChange(of: outbox.messages.count) { old, new in
             if new > old { scrollToBottom() }
+        }
+    }
+
+    /// The only new scroll requests: after a container-width change. First
+    /// materialize the saved row in the lazy stack, then restore its pixel
+    /// offset as the new widths settle. An interaction cancels this work.
+    private func restoreAfterWidthChange(_ anchor: TranscriptResizeAnchor.Anchor) {
+        resizeRestore?.cancel()
+        let token = resizeAnchor.generation
+        resizeRestore = Task { @MainActor in
+            defer { resizeAnchor.finish(token) }
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            switch anchor {
+            case .bottom:
+                scrollToBottom(animated: false)
+            case .message(let id, let offset):
+                position.scrollTo(id: id, anchor: .top)
+                for _ in 0..<3 {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    guard !Task.isCancelled else { return }
+                    if let y = resizeAnchor.correction(for: id, offset: offset) {
+                        position.scrollTo(y: y)
+                    }
+                }
+            }
         }
     }
 

@@ -166,7 +166,7 @@ enum BotDemo {
     }
 
     fileprivate static func row(id: String, role: String, text: String, at: Double) -> TimelineRow {
-        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: "\\n")
         return decode(#"{"id":"\#(id)","kind":"conversation","role":"\#(role)","text":"\#(escaped)","createdAt":\#(at)}"#)
     }
 
@@ -186,6 +186,19 @@ enum BotDemo {
             let transcript = (1...80).map { index in
                 row(id: "duo-\(index)", role: index.isMultiple(of: 2) ? "assistant" : "user",
                     text: "Duo message \(index). Review the launch checklist and keep the release notes ready.", at: Double(index) * 60_000)
+            }
+            let args = ProcessInfo.processInfo.arguments
+            if let at = args.firstIndex(of: "-qaDuoMinis"), args.indices.contains(at + 1) {
+                let ids = args[at + 1].split(separator: ",")
+                if ids.count == 3 {
+                    let cards = [ids[0], ids[1], ids[2], ids[0]].map { "::mini{id=\"\($0)\"}" }.joined(separator: "\n\n")
+                    let footer = (1...8).map { "Mini card scrolling check \($0)." }.joined(separator: "\n")
+                    return Fixture(bot: nil, activity: nil, thread: thread(running: false, needs: false), rows: [
+                        row(id: "duo-mini-prompt", role: "user", text: "Show the task counter, long list and note.", at: 1),
+                        row(id: "duo-mini-reply", role: "assistant", text: cards, at: 2),
+                        row(id: "duo-mini-footer", role: "assistant", text: footer, at: 3),
+                    ], interactions: [])
+                }
             }
             return Fixture(bot: nil, activity: nil, thread: thread(running: false, needs: false), rows: transcript, interactions: [])
         }

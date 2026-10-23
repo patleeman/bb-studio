@@ -371,6 +371,21 @@ that the first copy shows the shared count and new record. It then writes
 "Server task" in the first app, which you insert through `minis.db.insert` on
 the staged server, to arrive by realtime (`/tmp/qa-mini-cards-*.png`).
 
+For deterministic Duo testing without an agent-produced reply, additionally set
+`TEST_RUNNER_BBGO_QA_SERVER` to the isolated staged server and
+`TEST_RUNNER_BBGO_QA_MINI_IDS` to three comma-separated mini IDs: the task counter,
+long list, and note, in that order. Set `TEST_RUNNER_BBGO_QA_MINI_THREAD=thr_botdemo01`.
+The Debug-only `-qaDuoMinis` fixture renders those real apps in local reply rows;
+records, shared state, frames and realtime still use the staged server. In this
+mode the full card test inserts its own external “Server task” record through
+RPC. `testScrollOwnershipInOuterAndLandscape` uses the same fixtures in exact
+466 × 678 and 951 × 669 windows on an owned 13-inch iPad simulator.
+
+`DuoLayoutUITests` uses local messages to check the same-process outer → landscape
+→ portrait → outer transition, draft retention, the visible message within 90
+points, bottom pinning, split-only back-button hiding, and keyboard layout. See
+[the built Duo captures and test notes](../../docs/ios/duo/README.md).
+
 `StudioPagingUITests` swipes Studio between its kinds and drags an item row
 partway open (`/tmp/qa-studio-paging-*.png`).
 
