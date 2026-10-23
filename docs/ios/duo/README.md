@@ -1,3 +1,5 @@
+> Latest search and sidebar alignment: [Duo v4](V4.md).
+
 > Current implementation and dark phone/iPad comparisons: [Duo v3](V3.md).
 > The captures and full-width tab behavior below document the earlier v2 build.
 

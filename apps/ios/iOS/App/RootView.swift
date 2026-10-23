@@ -5,9 +5,10 @@ struct RootView: View {
 
     @State private var windowSize = CGSize.zero
     @State private var windowLeadingInset: CGFloat = 0
+    @State private var windowTrailingInset: CGFloat = 0
 
     var body: some View {
-        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset)
+        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset)
         HStack(spacing: 0) {
             DuoTabRail(selection: $model.tab)
                 .frame(width: layout.railWidth)
@@ -26,9 +27,10 @@ struct RootView: View {
             }
         }
         .environment(\.duoLayout, layout)
-        .background(WindowGeometry { size, leading in
+        .background(WindowGeometry { size, leading, trailing in
             windowSize = size
             windowLeadingInset = leading
+            windowTrailingInset = trailing
         })
     }
 
@@ -112,6 +114,7 @@ struct InboxTab: View {
                     NavigationStack { InboxView(selectsDetail: true, model: inbox) }
                 }
             }
+            .ignoresSafeArea(.container, edges: .trailing)
             .frame(width: layout.listWidth)
             .clipped()
             .background {

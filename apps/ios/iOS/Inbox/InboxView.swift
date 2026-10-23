@@ -273,6 +273,7 @@ struct InboxView: View {
     var body: some View {
         home
         .listStyle(.sidebar)
+        .modifier(SidebarListMargins(enabled: layout.twoPages && selectsDetail))
         .overlay {
             if !model.loaded { ProgressView() }
         }
@@ -290,10 +291,10 @@ struct InboxView: View {
                         Button { app.newThread() } label: { Image(systemName: "square.and.pencil").frame(width: 44, height: 44) }
                             .accessibilityLabel("New Thread")
                     }
-                    TextField("Search threads and messages", text: $query)
-                        .textFieldStyle(.roundedBorder).padding(.horizontal, 16).padding(.bottom, 12)
+                    SidebarSearchField(prompt: "Search threads and messages", text: $query)
                 }
                 .background(.bar)
+                .ignoresSafeArea(.container, edges: .trailing)
             }
         }
         .task(id: query) { await model.search(app.client, query) }
@@ -442,7 +443,8 @@ struct InboxView: View {
                     .contentShape(.rect)
             }
                 .buttonStyle(.plain)
-                .listRowBackground(app.path.first == route ? Color.accentColor.opacity(0.15) : Color.clear)
+                .modifier(SidebarRowContent(enabled: layout.twoPages))
+                .listRowBackground(SidebarSelectionBackground(selected: app.path.first == route))
                 .accessibilityAddTraits(app.path.first == route ? .isSelected : [])
         } else {
             NavigationLink(value: route, label: label)

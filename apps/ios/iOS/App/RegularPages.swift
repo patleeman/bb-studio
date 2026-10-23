@@ -10,6 +10,7 @@ struct RegularPages<Sidebar: View, Detail: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
+                .ignoresSafeArea(.container, edges: .trailing)
                 .frame(width: layout.listWidth)
                 .clipped()
                 .accessibilityHidden(!layout.twoPages)
@@ -64,12 +65,15 @@ struct SettingsTab: View {
                         Text(title).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .listRowBackground(section == title ? Color.accentColor.opacity(0.15) : .clear)
+                    .modifier(SidebarRowContent(enabled: true))
+                    .listRowBackground(SidebarSelectionBackground(selected: section == title))
                     .accessibilityAddTraits(section == title ? .isSelected : [])
                 }
                 .listStyle(.sidebar)
+                .modifier(SidebarListMargins(enabled: true))
                 .safeAreaInset(edge: .top, spacing: 0) {
                     DuoHeader { Text("Settings").font(.title2.bold()) } actions: { EmptyView() }
+                        .ignoresSafeArea(.container, edges: .trailing)
                 }
             }
         } detail: {

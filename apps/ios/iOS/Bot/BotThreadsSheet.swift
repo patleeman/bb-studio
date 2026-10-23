@@ -37,6 +37,7 @@ struct BotThreadsSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                         }
                         .buttonStyle(.plain)
+                        .modifier(SidebarRowContent(enabled: embedded))
                     }
                 }
                 if !groups.needsYou.isEmpty {
@@ -77,6 +78,7 @@ struct BotThreadsSheet: View {
                 }
             }
             .listStyle(.sidebar)
+            .modifier(SidebarListMargins(enabled: embedded))
             .overlay { if activity == nil { ProgressView() } }
             .refreshable { await refresh(); await loadRunners(); await loadChain() }
             .task { await loadChain() }
@@ -87,7 +89,10 @@ struct BotThreadsSheet: View {
             .toolbar { if !embedded { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } } }
             .toolbar(embedded ? .hidden : .automatic, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
-                if embedded { DuoHeader { Text(name).font(.title2.bold()) } actions: { EmptyView() } }
+                if embedded {
+                    DuoHeader { Text(name).font(.title2.bold()) } actions: { EmptyView() }
+                        .ignoresSafeArea(.container, edges: .trailing)
+                }
             }
         }
         .presentationDetents([.medium, .large])
@@ -110,6 +115,7 @@ struct BotThreadsSheet: View {
                         .background(.orange, in: .capsule)
                 }
             }
+            .modifier(SidebarRowContent(enabled: embedded))
         }
     }
 
@@ -144,6 +150,7 @@ struct BotThreadsSheet: View {
             }
             .padding(.leading, CGFloat(max(depth - 1, 0)) * 16)
         }
+        .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(thread.title), \(tone.label), \(age)")
@@ -171,6 +178,7 @@ struct BotThreadsSheet: View {
                 if runnerBusy == runner.id { ProgressView() }
             }
         }
+        .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .disabled(runner.threadId == nil)
         .swipeActions(edge: .trailing) {
@@ -206,6 +214,7 @@ struct BotThreadsSheet: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .modifier(SidebarRowContent(enabled: embedded))
         .accessibilityElement(children: .combine)
     }
 
@@ -217,6 +226,7 @@ struct BotThreadsSheet: View {
                 Spacer(minLength: 0)
             }
         }
+        .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .accessibilityHint("Opens an earlier conversation")
     }

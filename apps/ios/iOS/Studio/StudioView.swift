@@ -402,9 +402,9 @@ struct StudioView: View {
                             }
                         }
                     }
-                    TextField("Search Studio", text: $query)
-                        .textFieldStyle(.roundedBorder).padding(.horizontal, 16).padding(.bottom, 12)
+                    SidebarSearchField(prompt: "Search Studio", text: $query)
                 }.background(.bar)
+                .ignoresSafeArea(.container, edges: .trailing)
             }
         }
         // Keep Select reachable, so search results can be acted on together.
@@ -526,7 +526,9 @@ struct StudioView: View {
     /// moves between them, as a pager. Search is one list.
     @ViewBuilder
     private var studioPages: some View {
-        if query.isEmpty {
+        // A sidebar is one filtered list. The phone's page controller adds
+        // another trailing safe-area inset when nested inside the left page.
+        if query.isEmpty && !selectsDetail {
             TabView(selection: Binding(get: { app.studioKind ?? "" }, set: { app.studioKind = $0.isEmpty ? nil : $0 })) {
                 ForEach(kindPages, id: \.self) { kind in
                     studioList(kind: kind.isEmpty ? nil : kind, chips: false)
@@ -592,11 +594,13 @@ struct StudioView: View {
                 if !folders.isEmpty {
                     Section("Folders") {
                         Button { folder = nil } label: { Label("All items", systemImage: "tray") }
+                            .modifier(SidebarRowContent(enabled: true))
                         ForEach(folders) { parent in
                             Button { folder = parent.itemId } label: {
                                 Label(parent.displayTitle, systemImage: "folder")
                             }
-                            .listRowBackground(folder == parent.itemId ? Color.accentColor.opacity(0.15) : .clear)
+                            .modifier(SidebarRowContent(enabled: true))
+                            .listRowBackground(SidebarSelectionBackground(selected: folder == parent.itemId))
                         }
                     }
                 }
@@ -611,6 +615,7 @@ struct StudioView: View {
                 }
             }
         }
+        .modifier(SidebarListMargins(enabled: duoLayout.twoPages && selectsDetail))
         .listSectionSpacing(.compact)
         .overlay {
             if !store.loaded {
@@ -778,7 +783,7 @@ struct StudioView: View {
                         content.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .listRowBackground(app.studioPath.first == route ? Color.accentColor.opacity(0.15) : .clear)
+                    .listRowBackground(SidebarSelectionBackground(selected: app.studioPath.first == route))
                     .accessibilityIdentifier("studioItem")
                 } else {
                     NavigationLink(value: route) { content }
@@ -801,6 +806,7 @@ struct StudioView: View {
             }
         }
         .contextMenu { menu(item) }
+        .modifier(SidebarRowContent(enabled: duoLayout.twoPages && selectsDetail))
     }
 
     @ViewBuilder
