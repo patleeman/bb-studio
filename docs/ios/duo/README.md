@@ -1,3 +1,5 @@
+> Latest quick-reply clipping and system inset audit: [Duo v6](V6.md).
+
 > Latest sidebar filters and matching margins: [Duo v5](V5.md).
 
 > Latest search and sidebar alignment: [Duo v4](V4.md).

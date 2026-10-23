@@ -462,7 +462,10 @@ struct BotQuickReplies: View {
             .padding(.horizontal, 2)
             .padding(.vertical, 2)
         }
-        .scrollClipDisabled()
+        // Keep overflow inside the same safe-area width as the composer.
+        // Horizontal scrolling exposes additional replies without drawing
+        // them into the system's status-bar column.
+        .accessibilityIdentifier("botQuickReplies")
         .sensoryFeedback(.impact(weight: .light), trigger: taps)
     }
 

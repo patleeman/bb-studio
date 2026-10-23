@@ -16,6 +16,24 @@ enum DuoDemo {
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
     }
 
+    private static func layoutGeometry(_ window: UIWindow) -> [String: Any] {
+        func scrolls(_ view: UIView) -> [[String: Any]] {
+            var result = view.subviews.flatMap(scrolls)
+            if let scroll = view as? UIScrollView, !scroll.isHidden {
+                let rect = scroll.convert(scroll.bounds, to: window)
+                result.append(["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height,
+                    "contentWidth": scroll.contentSize.width, "contentHeight": scroll.contentSize.height,
+                    "adjustedRight": scroll.adjustedContentInset.right,
+                    "adjustedBottom": scroll.adjustedContentInset.bottom,
+                    "clips": scroll.clipsToBounds])
+            }
+            return result
+        }
+        return ["width": window.bounds.width, "height": window.bounds.height,
+                "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
+                "scrolls": scrolls(window)]
+    }
+
     static func handle(_ url: URL) -> Bool {
         guard BotDemo.variant == "duo", url.host() == "qa-duo",
               let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
@@ -34,6 +52,11 @@ enum DuoDemo {
             default: return false
             }
             return true
+        case "layout":
+            if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
+                window.accessibilityValue = String(data: data, encoding: .utf8)
+            }
+            return true
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
             return true
@@ -43,13 +66,14 @@ enum DuoDemo {
             return true
         case "capture":
             let name = url.query() ?? "phone-root"
-            let metadata: [String: Any] = ["idiom": window.traitCollection.userInterfaceIdiom == .phone ? "phone" : "other",
+            var metadata: [String: Any] = ["idiom": window.traitCollection.userInterfaceIdiom == .phone ? "phone" : "other",
                 "width": window.bounds.width, "height": window.bounds.height,
                 "appearance": window.traitCollection.userInterfaceStyle == .dark ? "dark" : "light",
                 "safeTop": window.safeAreaInsets.top, "safeRight": window.safeAreaInsets.right,
                 "screenWidth": window.screen.bounds.width, "screenHeight": window.screen.bounds.height,
                 "windows": window.windowScene?.windows.map { ["class": String(describing: type(of: $0)),
                     "width": $0.bounds.width, "height": $0.bounds.height, "hidden": $0.isHidden] as [String: Any] } ?? []]
+            metadata.merge(layoutGeometry(window)) { _, measured in measured }
             try? JSONSerialization.data(withJSONObject: metadata, options: .sortedKeys)
                 .write(to: URL.documentsDirectory.appending(path: name + ".json"))
             let format = UIGraphicsImageRendererFormat()

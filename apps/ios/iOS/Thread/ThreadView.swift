@@ -1175,6 +1175,8 @@ struct ThreadView: View {
                 }
             }
             .modifier(BotComposerGlass(active: botChrome != nil))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("threadComposer")
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
         .padding(.horizontal, botChrome != nil ? 12 : 16)
