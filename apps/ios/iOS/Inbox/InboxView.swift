@@ -73,6 +73,14 @@ final class InboxModel: ObservableObject {
 
     func load(_ client: BBClient, refreshPreferences: Bool = true) async {
         guard client.baseURL == serverURL else { return }
+        #if DEBUG
+        if BotDemo.variant == "duo", let demo = BotDemo.current {
+            threads = [demo.thread]
+            projectNames = [demo.thread.projectId: "Orbit"]
+            loaded = true
+            return
+        }
+        #endif
         do {
             async let sidebar = client.sidebar()
             // Every assignment re-renders the inbox, so only on change.
@@ -251,6 +259,7 @@ final class InboxModel: ObservableObject {
 }
 
 struct InboxView: View {
+    var selectsDetail = false
     @EnvironmentObject private var app: AppModel
     @StateObject private var model = InboxModel()
     @State private var query = ""
@@ -377,7 +386,7 @@ struct InboxView: View {
         }
         if query.isEmpty, runningPlugins.split(separator: ",").contains("automations") {
             Section {
-                NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
+                inboxDestination(.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
             }
         }
     }
@@ -387,7 +396,7 @@ struct InboxView: View {
     }
 
     private func threadLink(_ thread: ThreadEntry, showsProject: Bool, depth: Int) -> some View {
-        NavigationLink(value: Route.thread(id: thread.id)) {
+        inboxDestination(.thread(id: thread.id)) {
             ThreadRow(thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil)
                 .padding(.leading, CGFloat(depth) * 18)
         }
@@ -397,11 +406,23 @@ struct InboxView: View {
     }
 
     @ViewBuilder
+    private func inboxDestination<Content: View>(_ route: Route, @ViewBuilder label: () -> Content) -> some View {
+        if selectsDetail {
+            Button { app.open(route) } label: { label() }
+                .buttonStyle(.plain)
+                .listRowBackground(app.path.first == route ? Color.accentColor.opacity(0.15) : Color.clear)
+                .accessibilityAddTraits(app.path.first == route ? .isSelected : [])
+        } else {
+            NavigationLink(value: route, label: label)
+        }
+    }
+
+    @ViewBuilder
     private func searchSection(_ title: String, _ hits: [ThreadSearchResults.Hit]) -> some View {
         if !hits.isEmpty {
             Section(title) {
                 ForEach(hits) { hit in
-                    NavigationLink(value: Route.thread(id: hit.thread.id)) {
+                    inboxDestination(.thread(id: hit.thread.id)) {
                         VStack(alignment: .leading, spacing: 4) {
                             ThreadRow(
                                 thread: hit.thread, project: model.projectNames[hit.thread.projectId])

@@ -3,7 +3,27 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
 
+    @State private var windowSize = CGSize.zero
+    @State private var windowLeadingInset: CGFloat = 0
+
     var body: some View {
+        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset)
+        HStack(spacing: 0) {
+            DuoTabRail(selection: $model.tab)
+                .frame(width: layout.railWidth)
+                .clipped()
+                .accessibilityHidden(!layout.twoPages)
+            tabs
+                .padding(.leading, layout.twoPages && model.tab != .inbox ? layout.listWidth + DuoLayout.gutter : 0)
+        }
+        .environment(\.duoLayout, layout)
+        .background(WindowGeometry { size, leading in
+            windowSize = size
+            windowLeadingInset = leading
+        })
+    }
+
+    private var tabs: some View {
         TabView(selection: $model.tab) {
             BotsTab()
                 .tabItem { Label("Bot", systemImage: "face.smiling") }
@@ -24,6 +44,9 @@ struct RootView: View {
                 .tag(Tab.settings)
         }
         .tabViewStyle(.sidebarAdaptable)
+        // Use our rail on a two-page window. Portrait keeps the phone tabs.
+        .environment(\.horizontalSizeClass, .compact)
+        .toolbar(DuoLayout(size: windowSize).twoPages ? .hidden : .automatic, for: .tabBar)
         .overlay(alignment: .bottom) {
             if let notice = model.notice {
                 Text(notice)
@@ -62,25 +85,39 @@ struct RootView: View {
     }
 }
 
-/// A stack on iPhone; on iPad, the inbox beside the open thread.
+/// The destination stack never moves to a different structural branch on resize.
+/// ThreadView owns its live model, draft and ScrollPosition throughout the change.
 struct InboxTab: View {
     @EnvironmentObject private var model: AppModel
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.duoLayout) private var layout
 
     var body: some View {
-        if sizeClass == .regular {
-            NavigationSplitView {
-                InboxView().navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
-            } detail: {
-                NavigationStack(path: $model.path) {
-                    ContentUnavailableView("No thread selected", systemImage: Symbols.thread)
-                        .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+        HStack(spacing: 0) {
+            ZStack {
+                if layout.twoPages {
+                    NavigationStack { InboxView(selectsDetail: true) }
                 }
             }
-        } else {
+            .frame(width: layout.listWidth)
+            .clipped()
+            .accessibilityHidden(!layout.twoPages)
+            Rectangle()
+                .fill(Color(uiColor: .systemGroupedBackground))
+                .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
+                .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
+                .accessibilityHidden(true)
             NavigationStack(path: $model.path) {
-                InboxView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                InboxView()
+                .opacity(layout.twoPages ? 0 : 1)
+                .accessibilityHidden(layout.twoPages)
+                .overlay {
+                    if layout.twoPages {
+                        ContentUnavailableView("No thread selected", systemImage: Symbols.thread)
+                    }
+                }
+                .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 }

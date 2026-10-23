@@ -14,7 +14,12 @@ struct BBStudioApp: App {
             RootView()
                 .id(model.serverURL)
                 .environmentObject(model)
-                .onOpenURL { model.handle($0) }
+                .onOpenURL { url in
+                    #if DEBUG
+                    if DuoDemo.handle(url) { return }
+                    #endif
+                    model.handle(url)
+                }
                 .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
@@ -27,6 +32,11 @@ struct BBStudioApp: App {
                     }
                 }
                 .task {
+                    #if DEBUG
+                    if BotDemo.variant == "duo" {
+                        Drafts.save(BotDemo.threadId, text: "", mentions: [], serverURL: model.serverURL)
+                    }
+                    #endif
                     TalkOutbox.shared.kick()
                     // `-openURL bbstudio://…` drives headless simulator runs.
                     if let url = UserDefaults.standard.string(forKey: "openURL").flatMap(URL.init(string:)) {

@@ -1,0 +1,100 @@
+import SwiftUI
+import UIKit
+
+/// Window geometry, independent of device model, size class and keyboard height.
+struct DuoLayout: Equatable {
+    static let gutter: CGFloat = 32
+    let twoPages: Bool
+    let railWidth: CGFloat
+    let listWidth: CGFloat
+
+    init(size: CGSize, leadingInset: CGFloat = 0) {
+        twoPages = size.width >= 900 && size.width > size.height
+        railWidth = twoPages ? 64 : 0
+        // Half the gutter on either side of the window midpoint, even with
+        // asymmetric safe areas. No control occupies the crease.
+        listWidth = twoPages ? max(0, size.width / 2 - leadingInset - 64 - Self.gutter / 2) : 0
+    }
+}
+
+private struct DuoLayoutKey: EnvironmentKey {
+    static let defaultValue = DuoLayout(size: .zero)
+}
+
+extension EnvironmentValues {
+    var duoLayout: DuoLayout {
+        get { self[DuoLayoutKey.self] }
+        set { self[DuoLayoutKey.self] = newValue }
+    }
+}
+
+struct DuoTabRail: View {
+    @Binding var selection: Tab
+
+    var body: some View {
+        VStack(spacing: 12) {
+            tab(.bot, "Bot", "face.smiling")
+            tab(.inbox, "Threads", "bubble.left.and.bubble.right")
+            tab(.studio, "Studio", "square.stack")
+            Spacer()
+            tab(.settings, "Settings", "gear")
+        }
+        .padding(.vertical, 12)
+        .frame(width: 64)
+        .background(.bar)
+    }
+
+    private func tab(_ value: Tab, _ title: String, _ icon: String) -> some View {
+        Button { selection = value } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon).font(.title3)
+                Text(title).font(.caption2)
+            }
+            .frame(width: 60, height: 52)
+            .background(selection == value ? Color.accentColor.opacity(0.15) : .clear, in: .rect(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selection == value ? .isSelected : [])
+    }
+}
+
+/// Observes the window rather than the keyboard-reduced SwiftUI proposal. It
+/// does not alter safe areas, keyboard avoidance or the transcript hierarchy.
+struct WindowGeometry: UIViewRepresentable {
+    var changed: (CGSize, CGFloat) -> Void
+
+    func makeUIView(context: Context) -> Probe { Probe(changed: changed) }
+    func updateUIView(_ view: Probe, context: Context) { view.changed = changed }
+
+    final class Probe: UIView {
+        var changed: (CGSize, CGFloat) -> Void
+        private var lastSize = CGSize.zero
+        private var lastLeading: CGFloat = -1
+
+        init(changed: @escaping (CGSize, CGFloat) -> Void) {
+            self.changed = changed
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            report()
+        }
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            report()
+        }
+        private func report() {
+            guard let window else { return }
+            let size = window.bounds.size
+            let leading = window.safeAreaInsets.left
+            guard size != lastSize || leading != lastLeading else { return }
+            lastSize = size
+            lastLeading = leading
+            DispatchQueue.main.async { [weak self] in self?.changed(size, leading) }
+        }
+    }
+}

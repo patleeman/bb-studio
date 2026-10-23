@@ -182,6 +182,13 @@ enum BotDemo {
 
     static var current: Fixture? {
         guard let variant else { return nil }
+        if variant == "duo" {
+            let transcript = (1...80).map { index in
+                row(id: "duo-\(index)", role: index.isMultiple(of: 2) ? "assistant" : "user",
+                    text: "Duo message \(index). Review the launch checklist and keep the release notes ready.", at: Double(index) * 60_000)
+            }
+            return Fixture(bot: nil, activity: nil, thread: thread(running: false, needs: false), rows: transcript, interactions: [])
+        }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
             name: "Juniper", avatar: "🌿", state: .active,
