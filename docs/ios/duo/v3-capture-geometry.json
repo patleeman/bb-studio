@@ -1,0 +1,218 @@
+{
+  "v3-bot-bottom-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-bot-bottom-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-bot-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-bot-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-bot-mid-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-bot-mid-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-settings-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-settings-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-studio-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-studio-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-threads-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v3-threads-ipad": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "other",
+    "safeRight": 0,
+    "safeTop": 32,
+    "screenHeight": 1376,
+    "screenWidth": 1032,
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  }
+}

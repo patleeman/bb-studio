@@ -1,3 +1,6 @@
+> Current implementation and dark phone/iPad comparisons: [Duo v3](V3.md).
+> The captures and full-width tab behavior below document the earlier v2 build.
+
 # Duo unfolded layout
 
 23 October 2026. The built app uses two pages when the window is at least
