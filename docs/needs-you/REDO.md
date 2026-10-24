@@ -215,13 +215,13 @@ watchOS path.
 2. **README screenshots** `bot.png` and `bot-runners.png` still show Needs
    you. They need a capture run from a pushed commit
    (`scripts/capture/captures/bb-studio-bot.mjs` is updated for it).
-3. **Widgets with Studio but no Bot**: `bot_attention` answers "nothing", so
-   the widgets show 0, not BB's pending-question count. The fallback is only
-   for a Studio without `bot_attention`. Should "no Bot" also fall back?
-4. **iOS chat header truncates** the reason on a phone ("Asked you a
-   questi…") beside the call and bell buttons.
-5. `Widgets/StatusWidget.swift` is now also built into the app target, for
+3. Fixed (round 4): with Studio but no Bot, `bot_attention` says
+   `hasBot: false` and the widgets and watch fall back to BB's count of
+   threads waiting on him. The iOS chat header shows a short form when the
+   reason doesn't fit ("1 question", "2 things", "Approval"); VoiceOver
+   still reads the full reason.
+4. `Widgets/StatusWidget.swift` is now also built into the app target, for
    the in-app widget render.
-6. Reloading or reinstalling Studio cancels a pending `design_ask` question
+5. Reloading or reinstalling Studio cancels a pending `design_ask` question
    (seen while staging). That's BB's plugin-interaction behaviour, not this
    change.
