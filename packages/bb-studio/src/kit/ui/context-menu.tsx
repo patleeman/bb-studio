@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as Primitive from "@radix-ui/react-context-menu";
 import { cn } from "./utils";
+import { MENU_MUTED } from "./menu-muted";
 import { LIST_HOVER_TRANSITION } from "./motion";
 
 export const ContextMenu = Primitive.Root;
@@ -23,7 +24,7 @@ export function ContextMenuSubContent({
   ...props
 }: React.ComponentPropsWithoutRef<typeof Primitive.SubContent>) {
   return <Primitive.Portal><Primitive.SubContent
-    className={cn("z-[70] min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md", className)}
+    className={cn(`z-[70] min-w-32 rounded-md border bg-popover p-1 text-popover-foreground shadow-md ${MENU_MUTED}`, className)}
     {...props} /></Primitive.Portal>;
 }
 
@@ -42,7 +43,7 @@ export function ContextMenuContent({
     <Primitive.Portal>
       <Primitive.Content
         className={cn(
-          "z-[70] min-w-28 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          `z-[70] min-w-28 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md ${MENU_MUTED}`,
           className,
         )}
         {...props}
