@@ -122,9 +122,10 @@ final class BotTests: XCTestCase {
     }
 
     func testActivityDecodes() async throws {
-        let client = client(a, ["bot_activity": (200, #"{"ok":true,"result":{"needsYou":[{"id":"t1","title":"Approve","status":"active","projectId":"p","updatedAt":1,"relation":"started","needsYou":true}],"inProgress":[],"scheduled":[{"id":"a1","kind":"heartbeat","name":"Check-in (heartbeat)","cron":"0 9 * * *","enabled":true,"nextRunAt":null}],"completed":[],"latest":null}}"#)])
+        let client = client(a, ["bot_activity": (200, #"{"ok":true,"result":{"attention":{"reason":"Asked you a question","count":1,"since":5},"inProgress":[{"id":"t1","title":"Approve","status":"active","projectId":"p","updatedAt":1,"relation":"started","waitingFor":"Waiting for approval"}],"scheduled":[{"id":"a1","kind":"heartbeat","name":"Check-in (heartbeat)","cron":"0 9 * * *","enabled":true,"nextRunAt":null}],"completed":[],"latest":null}}"#)])
         let activity = try await client.botActivity()
-        XCTAssertEqual(activity.needsYou.map(\.id), ["t1"])
+        XCTAssertEqual(activity.attention, BotActivity.Attention(reason: "Asked you a question", count: 1, since: 5))
+        XCTAssertEqual(activity.inProgress.map(\.waitingFor), ["Waiting for approval"])
         XCTAssertEqual(activity.scheduled.first?.kind, "heartbeat")
     }
 
@@ -170,7 +171,8 @@ final class BotTests: XCTestCase {
         let other = (200, #"{"ok":true,"result":{"bot":{"id":"bot_2","name":"Scout","avatar":"🔭","state":"active","threadId":"thr_2","primary":false},"run":null}}"#)
         let client = client(a, [
             "bot_get": other, "bot_pause": other, "bot_set": other, "bot_checkin_preset": other, "bot_set_run": other,
-            "bot_activity": (200, #"{"ok":true,"result":{"needsYou":[],"inProgress":[],"scheduled":[],"completed":[]}}"#),
+            "bot_activity": (200, #"{"ok":true,"result":{"attention":null,"inProgress":[],"scheduled":[],"completed":[]}}"#),
+            "bot_attention": (200, #"{"ok":true,"result":{"attention":{"reason":"2 things for you","count":2,"since":1}}}"#),
             "bot_chain": (200, #"{"ok":true,"result":{"threadIds":["thr_2"]}}"#),
             "bot_memory": (200, #"{"ok":true,"result":{"pageId":"pg_1"}}"#),
             "bot_skills": (200, #"{"ok":true,"result":{"skills":[]}}"#),
@@ -185,6 +187,9 @@ final class BotTests: XCTestCase {
         _ = try await client.setBotCheckinPreset(.morning, botId: "bot_2")
         _ = try await client.setBotHeartbeat(enabled: false, cadence: "daily", time: nil, cron: nil, botId: "bot_2")
         _ = try await client.botActivity(botId: "bot_2")
+        let attention = try await client.botAttention(botId: "bot_2")
+        XCTAssertEqual(attention?.reason, "2 things for you")
+        XCTAssertEqual(attention?.count, 2)
         _ = try await client.botChain(botId: "bot_2")
         _ = try await client.botMemoryPageId(botId: "bot_2")
         _ = try await client.botSkills(botId: "bot_2")
@@ -193,7 +198,7 @@ final class BotTests: XCTestCase {
         try await client.runRunnerNow("r1", botId: "bot_2")
         XCTAssertEqual(runners.first?.paused, true)
         XCTAssertEqual(runners.first?.scheduleLabel, "Weekdays at 09:00")
-        XCTAssertEqual(calls.all.count, 13)
+        XCTAssertEqual(calls.all.count, 14)
         for (method, body) in calls.all {
             XCTAssertTrue(body.contains(#""botId":"bot_2""#), "\(method) without botId: \(body)")
         }

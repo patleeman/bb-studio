@@ -324,7 +324,6 @@ extension BotStartedThread {
                 out[item.id] = BotStartedThread(id: item.id, title: item.title, createdAt: thread.createdAt, status: status(item))
             }
         }
-        add(activity.needsYou) { _ in .needsYou }
         add(activity.waiting ?? []) { _ in .waiting }
         add(activity.inProgress) { _ in .running }
         add(activity.completed) { $0.status == "error" ? .failed : .finished }

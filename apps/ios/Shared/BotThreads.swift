@@ -2,8 +2,10 @@ import Foundation
 
 // The threads under a Bot, grouped as on the desktop Bots sidebar
 // (packages/bb-studio/src/ui/bot/BotSidebar.tsx, workspace.ts sidebarGroups):
-// Needs you, Running, Runners, Recurring, Recent and Earlier conversations,
-// a thread nested under the thread that started it. Pure, so it's tested.
+// Running, Runners, Recurring, Recent and Earlier conversations, a thread
+// nested under the thread that started it. Pure, so it's tested. Nothing
+// here needs you: the Bot handles its threads, and only the Bot itself asks
+// for you (`BotActivity.attention`).
 
 /// The Bot's handoff chain with titles (`bot_chain`). Chain threads are
 /// hidden in BB, so their titles come from here.
@@ -43,64 +45,6 @@ extension BBClient {
         for thread in output.threads ?? [] { titles[thread.id] = thread.title }
         return BotChainThreads(threadIds: output.threadIds, titles: titles)
     }
-
-    /// Opening a runner with an urgent report marks it seen (`bot_runner_seen`).
-    public func markRunnerSeen(_ id: String, botId: String? = nil) async throws {
-        let _: JSONValue = try await rpc("studio", Studio.Method.bot_runner_seen, Self.scoped(botId, ["id": .string(id)]))
-    }
-
-    /// Mark handled: the item leaves Needs you until its signal changes (`bot_needs_you_dismiss`).
-    public func dismissNeedsYou(_ threadId: String, botId: String? = nil) async throws {
-        let _: JSONValue = try await rpc("studio", Studio.Method.bot_needs_you_dismiss, Self.scoped(botId, ["threadId": .string(threadId)]))
-    }
-
-    /// Undo for Mark handled: the item is back in Needs you (`bot_needs_you_restore`).
-    public func restoreNeedsYou(_ threadId: String, botId: String? = nil) async throws {
-        let _: JSONValue = try await rpc("studio", Studio.Method.bot_needs_you_restore, Self.scoped(botId, ["threadId": .string(threadId)]))
-    }
-}
-
-/// Needs you items marked handled on this device: hidden at once, before the
-/// server's Activity drops them, and the last one kept for Undo. Pure, so it's tested.
-public struct BotHandledItems: Equatable, Sendable {
-    /// Hidden from Needs you until the server's Activity stops listing them.
-    public private(set) var hidden: Set<String> = []
-    /// The last one marked handled, while its Undo is offered.
-    public private(set) var last: String?
-
-    public init() {}
-
-    /// Mark handled: hide it and offer Undo.
-    public mutating func mark(_ id: String) {
-        hidden.insert(id)
-        last = id
-    }
-
-    /// The server refused: show it again, with no Undo.
-    public mutating func failed(_ id: String) {
-        hidden.remove(id)
-        if last == id { last = nil }
-    }
-
-    /// Undo: the item to restore, shown again once the server lists it.
-    public mutating func undo() -> String? {
-        guard let id = last else { return nil }
-        hidden.remove(id)
-        last = nil
-        return id
-    }
-
-    /// The Undo offer ran out.
-    public mutating func expire(_ id: String) {
-        if last == id { last = nil }
-    }
-
-    /// Forget what the server no longer lists in Needs you; keep hiding the rest.
-    public mutating func settle(_ activity: BotActivity?) {
-        guard let activity else { return }
-        let listed = Set(activity.needsYou.map(\.id))
-        hidden.formIntersection(listed)
-    }
 }
 
 /// The Bot's threads in the desktop sidebar's groups.
@@ -116,8 +60,6 @@ public struct BotThreadGroups: Equatable, Sendable {
         public var id: String { thread.id }
     }
 
-    /// Flat: each one is a thing to do.
-    public var needsYou: [BotActivity.Thread] = []
     /// Started threads that are running, or have a running thread below them.
     public var running: [Node] = []
     /// Started threads queued to start, with none running in their tree.
@@ -127,13 +69,12 @@ public struct BotThreadGroups: Equatable, Sendable {
     /// The rest of the threads it started, newest first.
     public var recent: [Node] = []
 
-    public var isEmpty: Bool { needsYou.isEmpty && running.isEmpty && waiting.isEmpty && recent.isEmpty }
+    public var isEmpty: Bool { running.isEmpty && waiting.isEmpty && recent.isEmpty }
 
     /// Desktop `sidebarGroups`: Running, Waiting to start and Recent are trees, a thread under
-    /// the thread that started it at any depth, placed by its root. A
-    /// childless thread that needs the user is only under Needs you.
-    /// `hiding` leaves out Needs you items marked handled that the server still lists.
-    public init(_ activity: BotActivity?, hiding: Set<String> = []) {
+    /// the thread that started it at any depth, placed by its root. A thread
+    /// held by a question (`waitingFor`) is in progress, so it's under Running.
+    public init(_ activity: BotActivity?) {
         guard let activity else { return }
         func started(_ list: [BotActivity.Thread]) -> [BotActivity.Thread] { list.filter { $0.relation == "started" } }
         let pending = activity.waiting ?? []
@@ -141,7 +82,7 @@ public struct BotThreadGroups: Equatable, Sendable {
         let queued = Set(pending.map(\.id))
         var all: [String: BotActivity.Thread] = [:]
         var order: [String] = []
-        for thread in started(activity.needsYou + activity.inProgress + pending + activity.completed) where all[thread.id] == nil {
+        for thread in started(activity.inProgress + pending + activity.completed) where all[thread.id] == nil {
             all[thread.id] = thread
             order.append(thread.id)
         }
@@ -171,9 +112,6 @@ public struct BotThreadGroups: Equatable, Sendable {
             var seen = Set<String>()
             return build(root, &seen)
         }
-        // A thread waiting on the user is already under Needs you; it stays in a tree only to hold its children.
-        .filter { !$0.thread.needsYou || !$0.children.isEmpty }
-        needsYou = started(activity.needsYou).filter { !hiding.contains($0.id) }
         running = trees.filter(hasRunning)
         waiting = trees.filter { !hasRunning($0) && hasQueued($0) }
         recurring = activity.scheduled.filter { $0.kind == "automation" }
@@ -188,10 +126,11 @@ public struct BotThreadGroups: Equatable, Sendable {
 
 /// A thread's status dot, as on desktop.
 public enum BotThreadTone: String, Sendable {
-    case needs, running, waiting, failed, idle
+    /// `held`: in progress but held by a pending question the Bot owns.
+    case held, running, waiting, failed, idle
 
     public init(_ thread: BotActivity.Thread) {
-        if thread.needsYou { self = .needs }
+        if thread.waitingFor != nil { self = .held }
         else if ["active", "starting", "stopping", "running"].contains(thread.status) { self = .running }
         else if thread.status == "pending" { self = .waiting }
         else if thread.status.contains("error") || thread.status.contains("fail") { self = .failed }
@@ -200,7 +139,7 @@ public enum BotThreadTone: String, Sendable {
 
     public var label: String {
         switch self {
-        case .needs: "Needs you"
+        case .held: "Waiting"
         case .running: "Running"
         case .waiting: "Waiting to start"
         case .failed: "Failed"
@@ -214,7 +153,7 @@ public enum BotThreadTone: String, Sendable {
 public enum BotRowState: Equatable, Sendable {
     /// Working now; ticks from `since` when BB knows it.
     case running(since: Double?)
-    /// Needs the user: a still amber ring.
+    /// Held by a pending question or approval: a still amber ring.
     case waiting
     /// Queued to start: dimmed, with a muted hairline ring.
     case queued
@@ -228,7 +167,7 @@ public enum BotRowState: Equatable, Sendable {
     public init(_ tone: BotThreadTone, since: Double? = nil) {
         switch tone {
         case .running: self = .running(since: since)
-        case .needs: self = .waiting
+        case .held: self = .waiting
         case .waiting: self = .queued
         case .failed: self = .failed
         case .idle: self = .idle
@@ -309,9 +248,9 @@ extension BotRunner {
         return reported ? "reported" : "quiet"
     }
 
-    /// Its row's state: needs you beats running, then paused, a failed last run, or between runs.
+    /// Its row's state: running, then paused, a failed last run, or between runs.
+    /// An urgent report is just "reported"; the Bot passes it on.
     public var rowState: BotRowState {
-        if urgent == true { return .waiting }
         if isRunning { return .running(since: runningSince) }
         if paused { return .paused }
         return lastOutcome == "failed" ? .failed : .idle
@@ -330,7 +269,6 @@ extension BotRunner {
 
     /// "Next run 5:15 PM, last run quiet", for VoiceOver.
     public func spokenStatus(now: Date = Date()) -> String {
-        if urgent == true { return "Needs you" }
         if isRunning { return runningSince.map { BotRowTime.spokenElapsed(since: $0, now: now) } ?? "Running" }
         if paused { return "Paused" }
         return [nextRunAt.map { "Next run \(BotRowTime.at($0, now: now))" }, lastOutcome.map { "last run \($0)" }]

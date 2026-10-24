@@ -172,7 +172,7 @@ struct BotsTab: View {
                         summary.running = entry?.isRunning ?? false
                         summary.updatedAt = entry?.updatedAt
                     }
-                    summary.needsYou = (try? await client.botActivity(botId: botId))?.needsYou.count ?? 0
+                    summary.attention = try? await client.botAttention(botId: botId)
                     return (bot.key, summary)
                 }
             }
@@ -188,7 +188,8 @@ struct BotsTab: View {
 /// What the Bots list shows under a bot's name.
 struct BotSummary: Hashable {
     var preview: String?
-    var needsYou = 0
+    /// The bot's one "needs you" (`bot_attention`): why, and how many things.
+    var attention: BotActivity.Attention?
     var running = false
     var updatedAt: Double?
 
@@ -238,27 +239,37 @@ private struct BotRow: View {
                     }
                 }
                 HStack(spacing: 4) {
-                    Circle().fill(dot).frame(width: 7, height: 7)
-                    Text(bot.external ? "\(bot.status(running: summary?.running == true)) · External" : bot.status(running: summary?.running == true))
+                    Circle().fill(attention == nil ? dot : .orange).frame(width: 7, height: 7)
+                    Text(statusLine).lineLimit(1)
                 }
                 .font(.caption.weight(.medium))
-                .foregroundStyle(summary?.running == true ? AnyShapeStyle(BotPalette.color(bot.color)) : AnyShapeStyle(.secondary))
+                .foregroundStyle(attention != nil ? AnyShapeStyle(.orange)
+                    : summary?.running == true ? AnyShapeStyle(BotPalette.color(bot.color)) : AnyShapeStyle(.secondary))
                 HStack(alignment: .top) {
                     Text(summary?.preview ?? (bot.lead.threadId == nil ? "No chat yet" : " "))
                         .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                     Spacer(minLength: 4)
-                    if let count = summary?.needsYou, count > 0 {
+                    if let count = attention?.count, count > 0 {
                         Text("\(count)")
                             .font(.caption.weight(.bold)).foregroundStyle(.white)
                             .padding(.horizontal, 7).padding(.vertical, 2)
                             .background(.orange, in: .capsule)
-                            .accessibilityLabel("\(count) need\(count == 1 ? "s" : "") you")
+                            .accessibilityLabel(count == 1 ? "1 thing for you" : "\(count) things for you")
                     }
                 }
             }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    private var attention: BotActivity.Attention? { summary?.attention }
+
+    /// Why it needs you ("Asked you a question"), or "Working…", "Paused", "Active".
+    private var statusLine: String {
+        if let attention { return attention.reason }
+        let status = bot.status(running: summary?.running == true)
+        return bot.external ? "\(status) · External" : status
     }
 
     private var dot: Color {

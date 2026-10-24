@@ -115,8 +115,9 @@ final class BotChatTests: XCTestCase {
 
     func testStartedThreadsComeFromMetadataWithLiveStatus() throws {
         let activity = try JSONDecoder().decode(BotActivity.self, from: Data("""
-        {"needsYou":[{"id":"t_ask","title":"Ask","status":"active","relation":"started","needsYou":true,"updatedAt":1}],
-         "inProgress":[{"id":"t_run","title":"Run","status":"active","relation":"started","needsYou":false,"updatedAt":1},
+        {"attention":null,
+         "inProgress":[{"id":"t_ask","title":"Ask","status":"active","relation":"started","updatedAt":1,"waitingFor":"Waiting for an answer"},
+                       {"id":"t_run","title":"Run","status":"active","relation":"started","needsYou":false,"updatedAt":1},
                        {"id":"thr_self","title":"Bot","status":"active","relation":"self","needsYou":false,"updatedAt":1}],
          "scheduled":[],
          "completed":[{"id":"t_done","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":1},
@@ -131,7 +132,8 @@ final class BotChatTests: XCTestCase {
         ].map { ($0.id, $0) })
         let started = BotStartedThread.list(activity: activity, threads: threads, chain: ["thr_old", "thr_self"])
         XCTAssertEqual(started.map(\.id), ["t_done", "t_bad", "t_run", "t_ask"])
-        XCTAssertEqual(started.map(\.status), [.finished, .failed, .running, .needsYou])
+        // A thread held by a question is the Bot's to answer: it's running.
+        XCTAssertEqual(started.map(\.status), [.finished, .failed, .running, .running])
     }
 
     func testStartedCardsGoWhereTheyWereMadeAndSystemMessagesBecomeCards() throws {

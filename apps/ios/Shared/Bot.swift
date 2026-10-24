@@ -232,6 +232,13 @@ extension BBClient {
         try await rpc("studio", Studio.Method.bot_activity, Self.scoped(botId))
     }
 
+    /// Just the Bot's "needs you" (`bot_attention`), for a list row.
+    public func botAttention(botId: String? = nil) async throws -> BotActivity.Attention? {
+        struct Output: Decodable { var attention: BotActivity.Attention? }
+        let output: Output = try await rpc("studio", Studio.Method.bot_attention, Self.scoped(botId))
+        return output.attention
+    }
+
     /// A Bot chat's prompt cache (`bot_cache_state`); nil on a Studio without it.
     public func botCacheState(threadId: String) async throws -> BotCacheState? {
         do {
@@ -473,7 +480,6 @@ public struct BotRunner: Decodable, Hashable, Sendable, Identifiable {
     public var lastRunAt: Double?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     /// Its thread is working now. Older Studios leave these out.
     public var running: Bool?
     /// When the current run started (ms), while running; nil when BB couldn't tell.
@@ -534,7 +540,6 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var status: String
         /// "self" for the Bot's own thread, "started" for one it started.
         public var relation: String
-        public var needsYou: Bool
         public var updatedAt: Double
         /// The listed thread that started this one; nil when the Bot did (or older Studios).
         public var parentId: String?
@@ -542,9 +547,24 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var runningSince: Double?
         /// The agent provider it runs on, for its logo.
         public var providerId: String?
-        /// Why it needs you, one short line ("Asked you a question", "Waiting for
-        /// approval", "Urgent report: …", "Failed"); only on Needs you items, and older Studios leave it out.
-        public var reason: String?
+        /// "Waiting for an answer" or "Waiting for approval" while a pending
+        /// question holds it; the Bot answers those, so it stays under Running.
+        public var waitingFor: String?
+    }
+    /// The Bot's one "needs you": its own chat asked something, wants an
+    /// approval, or has replies you haven't read. Cleared by reading or answering it.
+    public struct Attention: Decodable, Hashable, Sendable {
+        /// "Asked you a question", "Waiting for approval", "2 things for you".
+        public var reason: String
+        public var count: Int
+        /// Milliseconds.
+        public var since: Double?
+
+        public init(reason: String, count: Int, since: Double? = nil) {
+            self.reason = reason
+            self.count = count
+            self.since = since
+        }
     }
     public struct Scheduled: Decodable, Hashable, Sendable, Identifiable {
         public var id: String
@@ -554,7 +574,8 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var enabled: Bool
         public var nextRunAt: Double?
     }
-    public var needsYou: [Thread]
+    /// Nil when the Bot needs nothing from you (and from older Studios).
+    public var attention: Attention?
     /// Queued behind other work; older Studios leave it out.
     public var waiting: [Thread]?
     public var inProgress: [Thread]

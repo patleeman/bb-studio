@@ -11,23 +11,25 @@ final class BotThreadsTests: XCTestCase {
 
     func testGroupsMatchDesktopSidebar() throws {
         let activity = try activity("""
-        {"needsYou":[{"id":"ask","title":"Approve push","status":"active","relation":"started","needsYou":true,"updatedAt":50,"parentId":null},
-                     {"id":"self","title":"Chat","status":"active","relation":"self","needsYou":true,"updatedAt":60}],
-         "waiting":[{"id":"queued","title":"Queued","status":"pending","relation":"started","needsYou":false,"updatedAt":40}],
-         "inProgress":[{"id":"worker","title":"Worker","status":"active","relation":"started","needsYou":false,"updatedAt":30,"parentId":"lead"}],
+        {"attention":{"reason":"Asked you a question","count":1,"since":60},
+         "waiting":[{"id":"queued","title":"Queued","status":"pending","relation":"started","updatedAt":40}],
+         "inProgress":[{"id":"worker","title":"Worker","status":"active","relation":"started","updatedAt":30,"parentId":"lead"},
+                       {"id":"ask","title":"Approve push","status":"active","relation":"started","updatedAt":50,"waitingFor":"Waiting for approval"},
+                       {"id":"self","title":"Chat","status":"active","relation":"self","updatedAt":60}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":null},
                       {"id":"au","kind":"automation","name":"Friday wrap-up","enabled":true,"nextRunAt":1}],
-         "completed":[{"id":"lead","title":"Lead","status":"idle","relation":"started","needsYou":false,"updatedAt":20},
-                      {"id":"old","title":"Old","status":"error","relation":"started","needsYou":false,"updatedAt":10},
-                      {"id":"kid","title":"Kid","status":"idle","relation":"started","needsYou":false,"updatedAt":5,"parentId":"old"}],
+         "completed":[{"id":"lead","title":"Lead","status":"idle","relation":"started","updatedAt":20},
+                      {"id":"old","title":"Old","status":"error","relation":"started","updatedAt":10},
+                      {"id":"kid","title":"Kid","status":"idle","relation":"started","updatedAt":5,"parentId":"old"}],
          "latest":null}
         """)
         let groups = BotThreadGroups(activity)
-        // Needs you is flat and only the threads it started; a childless one isn't repeated below.
-        XCTAssertEqual(groups.needsYou.map(\.id), ["ask"])
+        // The only "needs you" is the Bot's own; no thread is listed as needing you.
+        XCTAssertEqual(activity.attention, BotActivity.Attention(reason: "Asked you a question", count: 1, since: 60))
+        // A thread held by a question stays under Running; the Bot answers it.
         // A worker nests under the lead that started it, and pulls it into Running.
         // Running holds only running work; a queued thread waits to start.
-        XCTAssertEqual(BotThreadGroups.rows(groups.running).map { "\($0.id):\($0.depth)" }, ["lead:0", "worker:1"])
+        XCTAssertEqual(BotThreadGroups.rows(groups.running).map { "\($0.id):\($0.depth)" }, ["ask:0", "lead:0", "worker:1"])
         XCTAssertEqual(BotThreadGroups.rows(groups.waiting).map { "\($0.id):\($0.depth)" }, ["queued:0"])
         XCTAssertEqual(BotThreadGroups.rows(groups.recent).map { "\($0.id):\($0.depth)" }, ["old:0", "kid:1"])
         // Recurring leaves out the check-in.
@@ -38,12 +40,11 @@ final class BotThreadsTests: XCTestCase {
 
     func testQueuedThreadsWaitToStartUnlessTheirTreeRuns() throws {
         let activity = try activity("""
-        {"needsYou":[],
-         "waiting":[{"id":"q1","title":"Queued under a runner","status":"pending","relation":"started","needsYou":false,"updatedAt":40,"parentId":"run"},
-                    {"id":"q2","title":"Queued under an idle one","status":"pending","relation":"started","needsYou":false,"updatedAt":35,"parentId":"done"}],
-         "inProgress":[{"id":"run","title":"Running","status":"active","relation":"started","needsYou":false,"updatedAt":30}],
+        {"waiting":[{"id":"q1","title":"Queued under a runner","status":"pending","relation":"started","updatedAt":40,"parentId":"run"},
+                    {"id":"q2","title":"Queued under an idle one","status":"pending","relation":"started","updatedAt":35,"parentId":"done"}],
+         "inProgress":[{"id":"run","title":"Running","status":"active","relation":"started","updatedAt":30}],
          "scheduled":[],
-         "completed":[{"id":"done","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":20}],
+         "completed":[{"id":"done","title":"Done","status":"idle","relation":"started","updatedAt":20}],
          "latest":null}
         """)
         let groups = BotThreadGroups(activity)
@@ -53,92 +54,41 @@ final class BotThreadsTests: XCTestCase {
         XCTAssertEqual(BotRowState(BotThreadTone(activity.waiting![1])), .queued)
     }
 
-    func testNeedsYouParentStaysInTreeToHoldChildren() throws {
+    func testHeldThreadIsRunningAndWaitsInItsRow() throws {
         let activity = try activity("""
-        {"needsYou":[{"id":"p","title":"Parent","status":"active","relation":"started","needsYou":true,"updatedAt":5}],
-         "inProgress":[],"scheduled":[],
-         "completed":[{"id":"c","title":"Child","status":"idle","relation":"started","needsYou":false,"updatedAt":4,"parentId":"p"}]}
+        {"inProgress":[{"id":"p","title":"Approve deploy to prod","status":"active","relation":"started","updatedAt":5,"waitingFor":"Waiting for approval"}],
+         "scheduled":[],
+         "completed":[{"id":"c","title":"Child","status":"idle","relation":"started","updatedAt":4,"parentId":"p"}]}
         """)
+        XCTAssertNil(activity.attention)
         let groups = BotThreadGroups(activity)
-        XCTAssertEqual(groups.needsYou.map(\.id), ["p"])
-        XCTAssertEqual(BotThreadGroups.rows(groups.recent).map(\.id), ["p", "c"])
-    }
-
-    // MARK: Needs you reasons and Mark handled
-
-    private let needsYouJSON = """
-    {"needsYou":[{"id":"run","title":"Security · Runner","status":"idle","relation":"started","needsYou":true,"updatedAt":30,"reason":"Urgent report: SSH on red4 accepts passwords again"},
-                 {"id":"ask","title":"Approve deploy to prod","status":"active","relation":"started","needsYou":true,"updatedAt":20,"reason":"Waiting for approval"},
-                 {"id":"old","title":"Older Studio","status":"active","relation":"started","needsYou":true,"updatedAt":10}],
-     "inProgress":[],"scheduled":[],"completed":[]}
-    """
-
-    func testNeedsYouReasonDecodesAndStaysInTheGroup() throws {
-        let activity = try activity(needsYouJSON)
-        XCTAssertEqual(activity.needsYou.map(\.reason), ["Urgent report: SSH on red4 accepts passwords again", "Waiting for approval", nil])
-        let groups = BotThreadGroups(activity)
-        XCTAssertEqual(groups.needsYou.map(\.id), ["run", "ask", "old"])
-        XCTAssertEqual(groups.needsYou.first?.reason, "Urgent report: SSH on red4 accepts passwords again")
-    }
-
-    func testHandledItemsHideUntilTheServerDropsThem() throws {
-        let before = try activity(needsYouJSON)
-        var handled = BotHandledItems()
-        handled.mark("run")
-        XCTAssertEqual(handled.last, "run")
-        // Hidden at once, while the server still lists it.
-        XCTAssertEqual(BotThreadGroups(before, hiding: handled.hidden).needsYou.map(\.id), ["ask", "old"])
-        handled.settle(before)
-        XCTAssertEqual(handled.hidden, ["run"])
-        // Once the Activity drops it, nothing is left to hide, and Undo is still offered.
-        let after = try activity(needsYouJSON.replacingOccurrences(of: #""id":"run""#, with: #""id":"gone""#))
-        handled.settle(after)
-        XCTAssertEqual(handled.hidden, [])
-        XCTAssertEqual(handled.last, "run")
-        handled.settle(nil)
-        XCTAssertEqual(handled.last, "run")
-    }
-
-    func testHandledUndoFailureAndExpiry() {
-        var handled = BotHandledItems()
-        handled.mark("a")
-        handled.mark("b")
-        // Undo restores the last one marked; a second Undo has nothing to do.
-        XCTAssertEqual(handled.undo(), "b")
-        XCTAssertEqual(handled.hidden, ["a"])
-        XCTAssertNil(handled.last)
-        XCTAssertNil(handled.undo())
-        // A refused dismiss shows the row again with no Undo.
-        handled.mark("c")
-        handled.failed("c")
-        XCTAssertEqual(handled.hidden, ["a"])
-        XCTAssertNil(handled.last)
-        // The offer runs out, but only for the item it was made for.
-        handled.mark("d")
-        handled.expire("a")
-        XCTAssertEqual(handled.last, "d")
-        handled.expire("d")
-        XCTAssertNil(handled.last)
-        XCTAssertEqual(handled.hidden, ["a", "d"])
+        XCTAssertEqual(BotThreadGroups.rows(groups.running).map(\.id), ["p", "c"])
+        XCTAssertTrue(groups.recent.isEmpty)
+        let held = activity.inProgress[0]
+        XCTAssertEqual(held.waitingFor, "Waiting for approval")
+        XCTAssertEqual(BotThreadTone(held), .held)
+        XCTAssertEqual(BotRowState(BotThreadTone(held)), .waiting)
     }
 
     func testParentCycleDoesNotLoop() throws {
         let activity = try activity("""
-        {"needsYou":[],"inProgress":[],"scheduled":[],
-         "completed":[{"id":"a","title":"A","status":"idle","relation":"started","needsYou":false,"updatedAt":2,"parentId":"b"},
-                      {"id":"b","title":"B","status":"idle","relation":"started","needsYou":false,"updatedAt":1,"parentId":"a"},
-                      {"id":"s","title":"Self","status":"idle","relation":"started","needsYou":false,"updatedAt":3,"parentId":"s"}]}
+        {"inProgress":[],"scheduled":[],
+         "completed":[{"id":"a","title":"A","status":"idle","relation":"started","updatedAt":2,"parentId":"b"},
+                      {"id":"b","title":"B","status":"idle","relation":"started","updatedAt":1,"parentId":"a"},
+                      {"id":"s","title":"Self","status":"idle","relation":"started","updatedAt":3,"parentId":"s"}]}
         """)
         // Neither a nor b is a root; s points at itself, so it is one.
         XCTAssertEqual(BotThreadGroups.rows(BotThreadGroups(activity).recent).map(\.id), ["s"])
     }
 
     func testTones() throws {
-        func tone(_ status: String, needs: Bool = false) throws -> BotThreadTone {
-            let thread = try JSONDecoder().decode(BotActivity.Thread.self, from: Data(#"{"id":"t","title":"T","status":"\#(status)","relation":"started","needsYou":\#(needs),"updatedAt":1}"#.utf8))
+        func tone(_ status: String, waitingFor: String? = nil) throws -> BotThreadTone {
+            let held = waitingFor.map { #","waitingFor":"\#($0)""# } ?? ""
+            let thread = try JSONDecoder().decode(BotActivity.Thread.self, from: Data(#"{"id":"t","title":"T","status":"\#(status)","relation":"started","updatedAt":1\#(held)}"#.utf8))
             return BotThreadTone(thread)
         }
-        XCTAssertEqual(try tone("active", needs: true), .needs)
+        XCTAssertEqual(try tone("active", waitingFor: "Waiting for an answer"), .held)
+        XCTAssertEqual(try tone("active"), .running)
         XCTAssertEqual(try tone("starting"), .running)
         XCTAssertEqual(try tone("pending"), .waiting)
         XCTAssertEqual(try tone("error"), .failed)
@@ -240,7 +190,12 @@ final class BotRowStateTests: XCTestCase {
     }
 
     func testRowStatePrecedence() throws {
-        XCTAssertEqual(try runner(#""state":"active","running":true,"runningSince":5,"urgent":true"#).rowState, .waiting)
+        // An urgent report doesn't make a runner need you: it's "reported", and the Bot passes it on.
+        let urgent = try runner(#""state":"active","lastRunAt":100,"lastLevel":"urgent","lastReportAt":100,"urgent":true"#)
+        XCTAssertEqual(urgent.rowState, .idle)
+        XCTAssertEqual(urgent.lastOutcome, "reported")
+        XCTAssertFalse(urgent.spokenStatus().contains("Needs you"))
+        XCTAssertEqual(try runner(#""state":"active","running":true,"runningSince":5,"lastLevel":"urgent""#).rowState, .running(since: 5))
         XCTAssertEqual(try runner(#""state":"active","running":true,"runningSince":5"#).rowState, .running(since: 5))
         XCTAssertEqual(try runner(#""state":"paused","running":true"#).rowState, .paused)
         XCTAssertEqual(try runner(#""state":"active","lastRunAt":1,"lastRunStatus":"failed""#).rowState, .failed)
@@ -291,7 +246,7 @@ final class BotRowStateTests: XCTestCase {
     }
 
     func testThreadToneMapsToRowState() {
-        XCTAssertEqual(BotRowState(.needs), .waiting)
+        XCTAssertEqual(BotRowState(.held), .waiting)
         XCTAssertEqual(BotRowState(.waiting), .queued)
         XCTAssertEqual(BotRowState(.running, since: 3), .running(since: 3))
         XCTAssertEqual(BotRowState(.failed), .failed)

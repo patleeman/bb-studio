@@ -424,6 +424,12 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
+      "method": "bot_attention",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
       "method": "bot_cache_state",
       "coverage": "generated method"
     },
@@ -485,24 +491,6 @@
       "file": "apps/ios/Shared/BotThreads.swift",
       "plugin": "studio",
       "method": "bot_chain",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BotThreads.swift",
-      "plugin": "studio",
-      "method": "bot_runner_seen",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BotThreads.swift",
-      "plugin": "studio",
-      "method": "bot_needs_you_dismiss",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BotThreads.swift",
-      "plugin": "studio",
-      "method": "bot_needs_you_restore",
       "coverage": "generated method"
     },
     {

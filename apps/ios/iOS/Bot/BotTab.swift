@@ -45,7 +45,8 @@ struct BotTab: View {
     }
 
     private var bot: BotInfo? { if case .bot(let bot) = lead { bot } else { nil } }
-    private var needsYou: Int { activity?.needsYou.count ?? 0 }
+    /// The Bot's one "needs you": its own chat asked something or has replies you haven't read.
+    private var needsYou: Int { activity?.attention?.count ?? 0 }
 
     var body: some View {
         RegularPages {
@@ -66,7 +67,8 @@ struct BotTab: View {
                         case .activity:
                             BotThreadsSheet(bot: bot, botId: botId, activity: activity) { id in
                                 self.sheet = nil
-                                path.append(.thread(id: id))
+                                // The Bot's own chat is this tab's root.
+                                if id == bot?.lead.threadId { path = [] } else { path.append(.thread(id: id)) }
                             } refresh: { await loadActivity() }
                         case .profile:
                             BotProfileSheet(bot: bot, botId: botId) { next in
@@ -196,7 +198,7 @@ struct BotTab: View {
                     .symbolEffect(.wiggle, value: needsYou)
             }
             .badge(needsYou)
-            .accessibilityLabel(needsYou > 0 ? "Activity, \(needsYou) need\(needsYou == 1 ? "s" : "") you" : "Activity")
+            .accessibilityLabel(activity?.attention.map { "Activity, \($0.reason)" } ?? "Activity")
         }
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { menu(bot) }
@@ -215,7 +217,7 @@ struct BotTab: View {
                     .symbolEffect(.wiggle, value: needsYou)
             }
             .badge(needsYou)
-            .accessibilityLabel(needsYou > 0 ? "Activity, \(needsYou) need\(needsYou == 1 ? "s" : "") you" : "Activity")
+            .accessibilityLabel(activity?.attention.map { "Activity, \($0.reason)" } ?? "Activity")
             menu(bot)
         }
         .frame(minHeight: 44)
@@ -345,7 +347,7 @@ struct BotTab: View {
         guard let next = try? await client.botActivity(botId: botId) else { return }
         // An unchanged Activity redraws nothing.
         if next != activity { activity = next }
-        let ids = Set((next.needsYou + (next.waiting ?? []) + next.inProgress + next.completed).filter { $0.relation == "started" }.map(\.id))
+        let ids = Set(((next.waiting ?? []) + next.inProgress + next.completed).filter { $0.relation == "started" }.map(\.id))
         let missing = ids.subtracting(startedThreads.keys)
         guard !missing.isEmpty else { return }
         let fetched = await withTaskGroup(of: ThreadEntry?.self) { group in

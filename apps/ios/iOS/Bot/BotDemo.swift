@@ -4,8 +4,8 @@ import Foundation
 /// Debug builds: `-qaBotDemo chat|working|needs|onboarding|list` fills the Bot tab
 /// with a deterministic local Bot, chat and Activity, for screenshots without
 /// a server. `-qaBotSheet activity|profile` opens a sheet over it.
-/// `-qaNeedsYou` puts three items with reasons under Needs you, and Mark
-/// handled and Undo work on them locally.
+/// `-qaBotAttention`: the Bot asked you a question, a thread under Running
+/// waits for approval, and a runner reported something urgent.
 enum BotDemo {
     static let threadId = "thr_botdemo01"
 
@@ -231,19 +231,20 @@ enum BotDemo {
 
     static var summaries: [String: BotSummary] {
         [
-            "bot_juniper": BotSummary(preview: "Just one thing: the Lisbon offsite budget needs your sign-off by 3pm.", needsYou: 1, running: false, updatedAt: now - 600_000),
-            "bot_scout": BotSummary(preview: "Two competitors shipped pricing changes this week. Summary is on your Pages.", needsYou: 0, running: true, updatedAt: now - 120_000),
-            "bot_ledger": BotSummary(preview: "October invoices are reconciled. Three receipts are still missing.", needsYou: 0, running: false, updatedAt: now - 86_400_000 * 2),
+            "bot_juniper": BotSummary(preview: "Just one thing: the Lisbon offsite budget needs your sign-off by 3pm.", attention: .init(reason: "Asked you a question", count: 1), running: false, updatedAt: now - 600_000),
+            "bot_scout": BotSummary(preview: "Two competitors shipped pricing changes this week. Summary is on your Pages.", running: true, updatedAt: now - 120_000),
+            "bot_ledger": BotSummary(preview: "October invoices are reconciled. Three receipts are still missing.", running: false, updatedAt: now - 86_400_000 * 2),
         ]
     }
 
-    /// One runner in each row state: running, needs you, quiet, reported, failed and paused.
+    /// One runner in each row state: running, quiet, reported (one of them urgent), failed and paused.
     static var runners: [BotRunner] {
         let today = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
         let laterToday = max(now + 600_000, today + 23 * 3_600_000)
         return decode(#"""
         [{"id":"run_inbox","providerId":"codex","threadId":"thr_runinbox","name":"Inbox sweep","state":"active","running":true,"runningSince":\#(now - 42_000),"schedule":{"cadence":"every2hours"},"nextRunAt":\#(now + 7_200_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"log","lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 7_200_000)},
-         {"id":"run_prs","providerId":"claude-code","threadId":"thr_runprs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
+         {"id":"run_prs","providerId":"claude-code","threadId":"thr_runprs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000)},
+         {"id":"run_security","providerId":"claude-code","threadId":"thr_runsecurity","name":"Security","state":"active","schedule":{"cadence":"daily","time":"07:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 240_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"SSH on red4 accepts passwords again.","lastReportAt":\#(now - 240_000)},
          {"id":"run_deploy","providerId":"pi","threadId":"thr_rundeploy","name":"Deploy check","state":"active","schedule":{"cadence":"hourly"},"nextRunAt":\#(laterToday),"lastRunAt":\#(now - 3_000_000),"lastRunStatus":"succeeded","lastLevel":"log"},
          {"id":"run_rivals","providerId":"acp-opencode","threadId":"thr_runrivals","name":"Competitor pricing watch","state":"active","schedule":{"cadence":"daily","time":"07:30"},"nextRunAt":\#(now + 2 * 86_400_000),"lastRunAt":\#(now - 36_000_000),"lastRunStatus":"succeeded","lastLevel":"tell","lastReport":"Acme cut its Pro price by 20%.","lastReportAt":\#(now - 36_000_000)},
          {"id":"run_metrics","providerId":"claude-code","threadId":"thr_runmetrics","name":"Weekly metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
@@ -327,38 +328,26 @@ enum BotDemo {
         decode(#"[{"id":"int_demo1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"approval","subject":{"kind":"command","command":"git push origin release/1.4","cwd":"~/code/app"},"reason":"Push the release workflow fix","availableDecisions":["allow_once","deny"]}}]"#)
     }
 
-    /// Needs you items marked handled in this launch (`-qaNeedsYou`).
-    @MainActor static func setHandled(_ id: String, _ handled: Bool) {
-        if handled { handledIds.insert(id) } else { handledIds.remove(id) }
-    }
-    nonisolated(unsafe) private static var handledIds: Set<String> = []
-
-    /// `-qaNeedsYou`: an urgent runner, an approval and a question, each with its reason.
-    private static func needsYouItems(_ t: Double) -> String {
-        let items = [
-            ("thr_runsecurity", "claude-code", "Security · Runner", "Urgent report: SSH on red4 accepts passwords again", t - 240_000),
-            ("thr_deployprod", "codex", "Approve deploy to prod", "Waiting for approval", t - 1_500_000),
-            ("thr_venue0001", "claude-code", "Pick a venue for Friday", "Asked you a question", t - 7_800_000),
-        ].filter { !handledIds.contains($0.0) }
-        return "[" + items.map { id, provider, title, reason, at in
-            #"{"id":"\#(id)","providerId":"\#(provider)","title":"\#(title)","status":"idle","relation":"started","needsYou":true,"updatedAt":\#(at),"reason":"\#(reason)"}"#
-        }.joined(separator: ",") + "]"
-    }
+    private static var qaAttention: Bool { ProcessInfo.processInfo.arguments.contains("-qaBotAttention") }
 
     private static func activity(needs: Bool) -> BotActivity {
         let t = now
-        let needsYou = ProcessInfo.processInfo.arguments.contains("-qaNeedsYou") ? needsYouItems(t)
-            : needs ? #"[{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"
+        let qa = qaAttention
+        // The Bot asks; a thread it started waits on an approval the Bot owns.
+        let attention = qa ? #"{"reason":"Asked you a question","count":1,"since":\#(t - 300000)}"#
+            : needs ? #"{"reason":"Waiting for approval","count":1,"since":\#(t)}"# : "null"
+        let held = qa ? #"{"id":"thr_deployprod","providerId":"codex","title":"Approve deploy to prod","status":"active","relation":"started","updatedAt":\#(t - 30000),"waitingFor":"Waiting for approval"},"#
+            : needs ? #"{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"active","relation":"started","updatedAt":\#(t),"waitingFor":"Waiting for approval"},"# : ""
         return decode(#"""
-        {"needsYou":\#(needsYou),
-         "waiting":[{"id":"thr_waiting01","providerId":"codex","title":"Summarize inbox","status":"pending","relation":"started","needsYou":false,"updatedAt":\#(t - 120000)}],
-         "inProgress":[{"id":"thr_research1","providerId":"claude-code","title":"Lisbon offsite options","status":"active","relation":"started","needsYou":false,"updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
+        {"attention":\#(attention),
+         "waiting":[{"id":"thr_waiting01","providerId":"codex","title":"Summarize inbox","status":"pending","relation":"started","updatedAt":\#(t - 120000)}],
+         "inProgress":[\#(held){"id":"thr_research1","providerId":"claude-code","title":"Lisbon offsite options","status":"active","relation":"started","updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":\#(t + 50400000)},
                       {"id":"auto1","kind":"automation","name":"Friday wrap-up","enabled":true,"nextRunAt":\#(t + 259200000)},
                       {"id":"auto2","kind":"automation","name":"Monthly invoices","enabled":false,"nextRunAt":null}],
-         "completed":[\#(needs ? "" : #"{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"idle","relation":"started","needsYou":false,"updatedAt":\#(t - 3600000)},"#)
-                      {"id":"thr_deck0001","providerId":"acp-opencode","title":"Polish the design review deck","status":"idle","relation":"started","needsYou":false,"updatedAt":\#(t - 7200000)},
-                      {"id":"thr_hotel001","providerId":"pi","title":"Book the Lisbon hotel","status":"error","relation":"started","needsYou":false,"updatedAt":\#(t - 5400000)}]}
+         "completed":[\#(needs ? "" : #"{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"idle","relation":"started","updatedAt":\#(t - 3600000)},"#)
+                      {"id":"thr_deck0001","providerId":"acp-opencode","title":"Polish the design review deck","status":"idle","relation":"started","updatedAt":\#(t - 7200000)},
+                      {"id":"thr_hotel001","providerId":"pi","title":"Book the Lisbon hotel","status":"error","relation":"started","updatedAt":\#(t - 5400000)}]}
         """#)
     }
 }
