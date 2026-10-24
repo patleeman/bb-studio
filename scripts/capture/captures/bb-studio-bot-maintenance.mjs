@@ -192,7 +192,9 @@ export default function maintenanceCaptures(context) {
         const section = document.querySelector('[data-testid="bot-maintenance"]');
         if (!section) throw new Error("Maintenance section is missing");
         section.scrollIntoView({ block: "start" });
-        section.querySelector("details").open = true;
+        const rules = section.querySelector('button[aria-controls="bot-maintenance-rules"]');
+        if (!rules) throw new Error("Maintenance has no Rules toggle");
+        if (rules.getAttribute("aria-expanded") !== "true") rules.click();
         const checkbox = section.querySelector('input[type="checkbox"]');
         if (!checkbox.checked) checkbox.click();
         return true;
@@ -233,9 +235,9 @@ export default function maintenanceCaptures(context) {
         await client.waitForText("Proposed actions", 30000);
         await client.evaluate(`(() => {
           const section = document.querySelector('[data-testid="bot-maintenance"]');
-          const proposed = [...section.querySelectorAll("summary")].find((summary) => summary.textContent.includes("Proposed actions"));
-          if (!proposed) throw new Error("The dry-run actions are missing");
-          proposed.parentElement.open = true;
+          const proposed = section.querySelector('button[aria-controls="bot-maintenance-actions"]');
+          if (!proposed?.textContent.includes("Proposed actions")) throw new Error("The dry-run actions are missing");
+          if (proposed.getAttribute("aria-expanded") !== "true") proposed.click();
           const needsCall = [...section.querySelectorAll("h4")].find((heading) => heading.textContent.includes("Needs your call"));
           if (!needsCall) throw new Error("Needs your call is missing from the dry-run summary");
           section.scrollIntoView({ block: "start" });
