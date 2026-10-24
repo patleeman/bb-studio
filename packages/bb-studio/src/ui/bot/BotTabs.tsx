@@ -95,7 +95,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
         {bot.state === "active"
           ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
           : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
-        {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
+        {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" className="fill-current" />Stop…</DropdownMenuItem> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -116,7 +116,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
         {bot.state === "active"
           ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
           : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
-        {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
+        {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" className="fill-current" />Stop…</button> : null}
       </div>
       {error ? <p role="alert" className="px-4 pb-2 text-xs text-destructive">{error}</p> : null}
       {!bot.threadId ? <p className="px-4 pb-2 text-xs text-muted-foreground">{bot.name} has no chat.{bot.primary === false ? "" : " Make a thread your Bot from its ⋯ menu."}</p> : null}
