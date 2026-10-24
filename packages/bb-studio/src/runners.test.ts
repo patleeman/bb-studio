@@ -231,6 +231,14 @@ it("Needs you: an urgent report clears once its thread is read after it, the use
   expect(await x.runners.needsYou(threadId!, null)).toBe("Urgent report: Card declined twice.");
 });
 
+it("Needs you: an urgent flag from before Studio kept its time uses the last urgent report's", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  x.db.prepare("UPDATE bot_runners SET urgent = 1, last_level = 'urgent', last_report = 'Card declined.', last_report_at = 1000 WHERE id = ?").run(runner.id);
+  expect(await x.runners.needsYou(runner.threadId!, { lastReadAt: 999 })).toBe("Urgent report: Card declined.");
+  expect(await x.runners.needsYou(runner.threadId!, { lastReadAt: 1000 })).toBeNull();
+});
+
 it("Needs you: Studio's own urgent report (past the auto-resume cap) reads as failed", async () => {
   const x = await setup();
   const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });

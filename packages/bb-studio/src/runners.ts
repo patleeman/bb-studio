@@ -649,13 +649,16 @@ export class Runners {
   async needsYou(threadId: string, thread: { lastReadAt?: number | null } | null): Promise<string | null> {
     const row = this.forThread(threadId);
     if (!row?.urgent) return null;
-    if (row.urgent_at == null) return urgentReason(row.urgent_kind, row.last_report);
-    const events = thread?.lastReadAt != null && thread.lastReadAt >= row.urgent_at ? [] : await this.events(threadId, ["client/turn/requested", "turn/completed"], 100);
-    if (urgentSettled({ at: row.urgent_at, turn: row.urgent_turn }, thread, events)) {
+    // Flagged before Studio kept the report's time: its last urgent report's.
+    const at = row.urgent_at ?? (row.last_level === "urgent" ? row.last_report_at : null);
+    const reason = urgentReason(row.urgent_kind, row.urgent_report ?? row.last_report);
+    if (at == null) return reason;
+    const events = thread?.lastReadAt != null && thread.lastReadAt >= at ? [] : await this.events(threadId, ["client/turn/requested", "turn/completed"], 100);
+    if (urgentSettled({ at, turn: row.urgent_turn }, thread, events)) {
       this.changedRow(row.id, { urgent: 0 });
       return null;
     }
-    return urgentReason(row.urgent_kind, row.urgent_report);
+    return reason;
   }
 
   /**
