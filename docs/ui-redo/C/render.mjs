@@ -210,11 +210,23 @@ const sidebarClip = async (client) => {
   return rect;
 };
 
+/** The Threads section's sort menu, whose labels are muted text, at 2x. */
+const menuView = async (client) => {
+  await fixtures.seededBot();
+  await client.navigate(BOT_PATH);
+  await client.waitForSelector(SIDEBAR, 30000);
+  await dismissProblems(client);
+  await client.clickAriaButtonWithPointer("Sort and group threads");
+  await client.waitForSelector('[role="menu"]', 10000);
+  await sleep(600);
+};
+const menuClip = async (client) => client.evaluate(`(() => { const r = document.querySelector('[role="menu"]').getBoundingClientRect(); return { x: r.x - 12, y: r.y - 12, width: r.width + 24, height: r.height + 24 }; })()`);
+
 const PREFLIGHT = { machine: "host_mini", machineName: "Mac mini", providerName: "Codex", signInHint: null, install: false, blocked: null, warnings: [] };
 const VIEWS = {
   // The README captures, as they are.
   // The whole window: the sidebar, and the chat's header (cache time, Bot info).
-  sidebar: { setup: readme.get("studio-bot"), width: 1440, height: 1200 },
+  sidebar: { setup: async (client) => { await runningView(client); await client.evaluate(`document.querySelector('${SIDEBAR}').closest('[data-sidebar="content"], nav')?.parentElement?.scrollTo?.(0, 0)`); }, width: 1440, height: 1200 },
   info: { setup: readme.get("studio-bot-info"), width: 1440, height: 560 },
   "profile-changes": { setup: readme.get("studio-bot-profile-changes"), width: 1440, height: 560 },
   "profile-edit": { setup: readme.get("studio-bot-profile-edit"), width: 1440, height: 650 },
@@ -225,6 +237,8 @@ const VIEWS = {
   // Running now vs scheduled, at 2x: the Bots list, and the same under reduced motion.
   running: { setup: runningView, width: 1440, height: 1200, scale: 2, clip: sidebarClip, gif: true },
   "running-reduced-motion": { setup: runningView, width: 1440, height: 1200, scale: 2, clip: sidebarClip, motion: "reduce" },
+  // Muted text in a Studio menu (the kit's menus).
+  menu: { setup: menuView, width: 1440, height: 900, scale: 2, clip: menuClip },
   // The pre-flight's own messages (src/runner-machines.ts).
   "move-ready": { setup: moveDialog({ ...PREFLIGHT, warnings: ["Path does not exist on Mac mini: ~/Projects/orbit/status.md", "Mac-only tool may be unavailable on Mac mini: osascript"] }), width: 1440, height: 800 },
   "move-confirm": { setup: moveConfirm({ ...PREFLIGHT, warnings: ["Path does not exist on Mac mini: ~/Projects/orbit/status.md", "Mac-only tool may be unavailable on Mac mini: osascript"] }), width: 1440, height: 800 },
