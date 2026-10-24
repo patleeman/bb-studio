@@ -66,10 +66,43 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         shot("bot-skills")
     }
 
-    private func launch(_ arguments: String...) {
+    /// The Bot's Running, Runners and Recurring rows on the phone. Set
+    /// `TEST_RUNNER_BBGO_STATES_MOTION=reduced` for the Reduce Motion look and
+    /// `TEST_RUNNER_BBGO_STATES_HOLD=<s>` to keep it on screen for a recording.
+    func testBotRowsPhone() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
+        launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity"] + motion)
+        XCTAssertTrue(text(containing: "Lisbon offsite options").waitForExistence(timeout: 20))
+        app.swipeUp()
+        let runner = text(containing: "Metrics digest")
+        XCTAssertTrue(runner.waitForExistence(timeout: 10))
+        if !runner.isHittable { app.swipeUp() }
+        shot("bot-rows-phone" + suffix)
+        hold()
+    }
+
+    /// The same rows in the unfolded Duo's sidebar, a 951×669 window on the iPad simulator.
+    func testBotRowsDuo() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
+        launch(["-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-openURL", "bbstudio://bot"] + motion)
+        XCTAssertTrue(text(containing: "Lisbon offsite options").waitForExistence(timeout: 30))
+        sleep(2)
+        shot("bot-rows-duo" + suffix)
+        hold()
+    }
+
+    private var motion: [String] { ProcessInfo.processInfo.environment["BBGO_STATES_MOTION"] == "reduced" ? ["-qaReduceMotion"] : [] }
+    private var suffix: String { motion.isEmpty ? "" : "-reduced-motion" }
+    private func hold() {
+        if let seconds = ProcessInfo.processInfo.environment["BBGO_STATES_HOLD"].flatMap(UInt32.init) { sleep(seconds) }
+    }
+
+    private func launch(_ arguments: [String]) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9"] + arguments
         app.launch()
     }
+
+    private func launch(_ arguments: String...) { launch(arguments) }
 
     private func text(containing value: String) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch

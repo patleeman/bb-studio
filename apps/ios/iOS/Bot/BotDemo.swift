@@ -235,11 +235,17 @@ enum BotDemo {
         ]
     }
 
+    /// One runner in each row state: running, needs you, quiet, reported, failed and paused.
     static var runners: [BotRunner] {
-        decode(#"""
-        [{"id":"run_inbox","name":"Inbox sweep","state":"active","schedule":{"cadence":"every2hours"},"lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 1_800_000)},
-         {"id":"run_prs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
-         {"id":"run_news","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3)}]
+        let today = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
+        let laterToday = max(now + 600_000, today + 23 * 3_600_000)
+        return decode(#"""
+        [{"id":"run_inbox","name":"Inbox sweep","state":"active","running":true,"runningSince":\#(now - 42_000),"schedule":{"cadence":"every2hours"},"nextRunAt":\#(now + 7_200_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"log","lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 7_200_000)},
+         {"id":"run_prs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
+         {"id":"run_deploy","name":"Deploy check","state":"active","schedule":{"cadence":"hourly"},"nextRunAt":\#(laterToday),"lastRunAt":\#(now - 3_000_000),"lastRunStatus":"succeeded","lastLevel":"log"},
+         {"id":"run_rivals","name":"Competitor watch","state":"active","schedule":{"cadence":"daily","time":"07:30"},"nextRunAt":\#(now + 2 * 86_400_000),"lastRunAt":\#(now - 36_000_000),"lastRunStatus":"succeeded","lastLevel":"tell","lastReport":"Acme cut its Pro price by 20%.","lastReportAt":\#(now - 36_000_000)},
+         {"id":"run_metrics","name":"Metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
+         {"id":"run_news","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3),"lastRunAt":\#(now - 86_400_000 * 3)}]
         """#)
     }
 
@@ -324,11 +330,13 @@ enum BotDemo {
         return decode(#"""
         {"needsYou":\#(needs ? #"[{"id":"thr_reviewprs1","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"),
          "waiting":[{"id":"thr_waiting01","title":"Summarize inbox","status":"pending","relation":"started","needsYou":false,"updatedAt":\#(t - 120000)}],
-         "inProgress":[{"id":"thr_research1","title":"Lisbon offsite options","status":"running","relation":"started","needsYou":false,"updatedAt":\#(t - 60000)}],
+         "inProgress":[{"id":"thr_research1","title":"Lisbon offsite options","status":"active","relation":"started","needsYou":false,"updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":\#(t + 50400000)},
-                      {"id":"auto1","kind":"automation","name":"Friday wrap-up","enabled":true,"nextRunAt":\#(t + 259200000)}],
+                      {"id":"auto1","kind":"automation","name":"Friday wrap-up","enabled":true,"nextRunAt":\#(t + 259200000)},
+                      {"id":"auto2","kind":"automation","name":"Monthly invoices","enabled":false,"nextRunAt":null}],
          "completed":[\#(needs ? "" : #"{"id":"thr_reviewprs1","title":"Review open PRs","status":"idle","relation":"started","needsYou":false,"updatedAt":\#(t - 3600000)},"#)
-                      {"id":"thr_deck0001","title":"Polish the design review deck","status":"idle","relation":"started","needsYou":false,"updatedAt":\#(t - 7200000)}]}
+                      {"id":"thr_deck0001","title":"Polish the design review deck","status":"idle","relation":"started","needsYou":false,"updatedAt":\#(t - 7200000)},
+                      {"id":"thr_hotel001","title":"Book the Lisbon hotel","status":"error","relation":"started","needsYou":false,"updatedAt":\#(t - 5400000)}]}
         """#)
     }
 }
