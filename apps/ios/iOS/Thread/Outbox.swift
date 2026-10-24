@@ -5,7 +5,18 @@ import Combine
 /// retain their stable client ID and require review, including after a restart.
 @MainActor
 final class Outbox: ObservableObject {
-    static let shared = Outbox()
+    static let shared: Outbox = {
+        #if DEBUG
+        // `-qaOutboxUnreadable`: the file holds something it can't read, for screenshots of the save error.
+        if ProcessInfo.processInfo.arguments.contains("-qaOutboxUnreadable") {
+            let file = FileManager.default.temporaryDirectory.appending(path: "qa-outbox/messages.json")
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? Data("not json".utf8).write(to: file)
+            return Outbox(store: Store(file: file, legacy: file))
+        }
+        #endif
+        return Outbox()
+    }()
 
     struct Message: Codable, Identifiable, Hashable {
         /// The client ID survives migration, restarts and every retry.

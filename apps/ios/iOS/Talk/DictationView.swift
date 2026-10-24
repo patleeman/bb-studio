@@ -103,6 +103,13 @@ struct DictationView: View {
         }
         .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery || recorder.starting)
         .task {
+            #if DEBUG
+            if StateDemo.variant == "dictation" {
+                recorder.showDemoTranscript(StateDemo.transcript)
+                text = StateDemo.transcript
+                return
+            }
+            #endif
             if autoStart { await recorder.start(kind: kind, threadId: threadId) }
         }
         .onChange(of: recorder.phase, initial: true) { _, phase in

@@ -21,6 +21,9 @@ struct BBStudioApp: App {
                     model.handle(url)
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
+                #if DEBUG
+                .modifier(StateDemoSheets())
+                #endif
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
                         let id = Spotlight.currentIdentifier(identifier) {

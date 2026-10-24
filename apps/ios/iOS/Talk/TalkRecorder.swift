@@ -48,6 +48,14 @@ final class TalkRecorder: ObservableObject {
         outbox.kick()
     }
 
+    #if DEBUG
+    /// `StateDemo`: a finished dictation, to review without recording.
+    func showDemoTranscript(_ text: String) {
+        transcript = text
+        phase = .done
+    }
+    #endif
+
     /// A recorder dropped mid-capture (its view went away) releases the
     /// microphone and the audio session; what it captured stays in the journal.
     deinit {
