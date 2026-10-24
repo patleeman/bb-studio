@@ -100,7 +100,7 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         shot("bot-rows-duo" + suffix)
         let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
         origin.withOffset(CGVector(dx: 250, dy: 600)).press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 250, dy: 240)))
-        XCTAssertTrue(text(containing: "Metrics digest").waitForExistence(timeout: 10))
+        XCTAssertTrue(text(containing: "metrics digest").waitForExistence(timeout: 10))
         sleep(1)
         shot("bot-rows-duo-runners" + suffix)
         hold()
