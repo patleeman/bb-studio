@@ -807,4 +807,6 @@ export const MIGRATIONS = [
   // The Bot triages runner reports (docs/needs-you/REDO.md): a runner no
   // longer waits on the user, so no urgent flag is left standing.
   `UPDATE bot_runners SET urgent = 0;`,
+  // Threads Studio nudged their Bot about while they wait on an answer (src/bot-nudge.ts).
+  `CREATE TABLE bot_nudges (thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, at INTEGER NOT NULL);`,
 ];

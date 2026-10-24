@@ -9,9 +9,9 @@ export type ProviderCatalogEntry = ReturnType<typeof BbApp.experimental_useProvi
 
 const WORKING_THREAD_STATUSES = new Set(["active", "starting", "stopping"]);
 
-/** A thread's state; one held by a question or approval (its Bot's to handle) is waiting. */
+/** A thread's state; one held by a question or approval (its Bot's to handle) shows the amber "waiting for you" state. */
 export function threadStatusTone(status: string, waitingForAnswer = false): ProviderStatusTone {
-  if (waitingForAnswer) return "waiting";
+  if (waitingForAnswer) return "needs";
   if (WORKING_THREAD_STATUSES.has(status)) return "running";
   if (status === "pending") return "waiting";
   if (/error|fail/i.test(status)) return "failed";

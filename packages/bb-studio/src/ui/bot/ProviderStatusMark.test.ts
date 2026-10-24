@@ -13,7 +13,7 @@ describe("provider status rings", () => {
     ["failed", false, "failed"],
   ] as const)("maps thread status %s (waiting on an answer: %s) to the %s ring", (status, waiting, ring) => {
     expect(providerRingState(threadStatusTone(status, waiting))).toBe(ring);
-    if (waiting) expect(threadStatusTone(status, waiting)).toBe("waiting");
+    if (waiting) expect(threadStatusTone(status, waiting)).toBe("needs");
   });
 
   it("shows a runner as running only mid-run; between runs it's idle", () => {

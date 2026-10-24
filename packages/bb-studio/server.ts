@@ -61,6 +61,7 @@ import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
+import { BotNudges, type NudgeOwner } from "./src/bot-nudge";
 
 /** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
 const STOPPED_NOTE = "Studio notice: something you own stopped after failing. You decide what the user sees: if you can fix it (resume it, retry it), do. If the user must act, tell them in one or two short lines what stopped and what to do. If it needs nothing from them, reply exactly [PASS].";
@@ -629,6 +630,25 @@ export default async function plugin(bb: BbPluginApi) {
       ?? bots.list().find((each) => ownedThreads.owned(each.id).has(threadId));
     return bot ? { botId: bot.id, name: bot.name, threadId: bot.threadId ?? null, active: bot.state === "active" } : null;
   };
+  // A thread a Bot owns starts waiting on an answer: one note to the Bot (src/bot-nudge.ts).
+  // Owned: the Bot's chain, a runner, a thread it owns, or one started (up to a few levels) by any of those.
+  const nudgeOwner = async (thread: { id: string }): Promise<NudgeOwner | null> => {
+    const known = (id: string) => { const owner = threadOwner(id); return owner?.threadId ? { botId: owner.botId, botThreadId: owner.threadId, active: owner.active } : null; };
+    const direct = known(thread.id);
+    if (direct) return { ...direct, self: bots.list().some((bot) => bots.chain(bot.id).includes(thread.id)) };
+    let ids = [thread.id];
+    for (let depth = 0; depth < 4 && ids.length; depth++) {
+      const parents = (await Promise.all(ids.map((id) => bb.sdk.threads.get({ threadId: id }).catch(() => null))))
+        .flatMap((each) => each ? [each.parentThreadId, each.sourceThreadId, each.lifecycleOwnerThreadId].filter((id): id is string => !!id) : []);
+      for (const id of parents) { const owner = known(id); if (owner) return { ...owner, self: false }; }
+      ids = [...new Set(parents)];
+    }
+    return null;
+  };
+  const nudges = new BotNudges({ db, sdk: bb.sdk, owner: nudgeOwner, log: (message) => bb.log.warn(message) });
+  bb.events.on("interaction.pending", ({ thread, interaction }) => void nudges.pending(thread, interaction as never).catch((error) => bb.log.warn(`Bot nudge: ${errorText(error)}`)));
+  bb.events.on("thread.active", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
+  bb.events.on("thread.idle", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
   const threadResume = new ThreadResume({
     db, sdk: bb.sdk, owner: threadOwner, log: (message) => bb.log.warn(message),
     enabled: () => settingValues.autoResumeThreads !== false,

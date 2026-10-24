@@ -283,7 +283,7 @@ function ThreadList({ threads, onOpen, running }: { threads: BotThreadView[]; on
       {threads.map((thread) => (
         <li key={thread.id}>
           <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-state-hover" onClick={() => onOpen(thread.id)}>
-            {running ? <ProviderStatusMark providerId={thread.providerId} tone={thread.waitingFor ? "waiting" : "running"} providers={running} label={thread.waitingFor ?? runningLabel(thread.runningSince)} /> : null}
+            {running ? <ProviderStatusMark providerId={thread.providerId} tone={thread.waitingFor ? "needs" : "running"} providers={running} label={thread.waitingFor ?? runningLabel(thread.runningSince)} /> : null}
             <span className="min-w-0 flex-1 truncate">{thread.relation === "self" ? "Its chat" : thread.title}</span>
             {thread.waitingFor
               ? <span className="shrink-0 text-xs text-muted-foreground">{thread.waitingFor.replace(/^Waiting for /, "waiting for ")}</span>
