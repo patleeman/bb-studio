@@ -511,7 +511,10 @@ export default async function plugin(bb: BbPluginApi) {
     hiddenThreads: () => learning.reviewThreads(),
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
-    runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
+    runners: {
+      threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id),
+      needsYou: (threadId, thread) => runners.needsYou(threadId, thread), seen: (id, botId) => runners.seen(id, botId), unseen: (id, botId) => runners.unseen(id, botId),
+    },
     automationAlerts: (botId) => [...autoResume.alerts(botId).filter((alert) => alert.owner !== "runner"), ...threadResume.alerts(botId)],
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -979,6 +982,8 @@ export default async function plugin(bb: BbPluginApi) {
     bot_runner_run_now: ({ botId, id }) => runners.runNow(id, botId),
     bot_runner_delete: ({ botId, id }) => runners.delete(id, botId),
     bot_runner_seen: ({ botId, id }) => { runners.seen(id, botId); return { ok: true as const }; },
+    bot_needs_you_dismiss: async ({ botId, threadId }) => { await bots.markHandled(threadId, botId); return { ok: true as const }; },
+    bot_needs_you_restore: ({ botId, threadId }) => { bots.restoreHandled(threadId, botId); return { ok: true as const }; },
     bot_runner_adopt: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.adopt(input, botId); },
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),

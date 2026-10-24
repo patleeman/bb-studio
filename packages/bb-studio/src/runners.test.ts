@@ -42,10 +42,15 @@ async function setup() {
   const pathsExist = vi.fn(async ({ paths }: { paths: string[] }) => ({ existence: Object.fromEntries(paths.map(path => [path, !path.startsWith("/Users")])) }));
   const installProviderCli = vi.fn(async () => []);
   const timeline = vi.fn(async () => ({ rows: [] as unknown[] }));
+  // Each thread's events, oldest first, as threads.events.list returns them (newest first with order desc).
+  const events = new Map<string, { seq: number; type: string; createdAt?: number; data?: unknown }[]>();
+  let seq = 0;
+  const event = (threadId: string, type: string, data: unknown = {}) => { const list = events.get(threadId) ?? []; list.push({ seq: ++seq, type, createdAt: Date.now(), data }); events.set(threadId, list); };
+  const listEvents = vi.fn(async ({ threadId, types, limit }: { threadId: string; types?: string[]; limit?: string }) => (events.get(threadId) ?? []).filter((each) => !types || types.includes(each.type)).reverse().slice(0, Number(limit ?? 100)));
   const environmentProviders = [{ id: "personal-workspace", acceptsEmptyInputs: true, availability: { status: "available" }, machineAvailability: {} }];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
-      timeline: timeline as never, spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
+      timeline: timeline as never, events: { list: listEvents as never } as never, spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
       defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
     hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw new Error("Unknown host"); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
@@ -63,7 +68,7 @@ async function setup() {
   const second = { id: "bot_two", name: "Scout", threadId: "bot2" as string | null, state: "active" };
   const changed = vi.fn(() => bb.realtime.publish("studio-changed", { pluginId: "studio" }));
   const runners = new Runners({ db, sdk: bb.sdk, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
-  return { timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
+  return { event, timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
 const schedule = { cadence: "every15minutes" as const, time: "09:00" };
@@ -172,17 +177,65 @@ it("routes reports by level: log stays, tell posts one line, urgent also pushes 
   expect(told.input[1]!.visibility).toBe("agent-only");
   expect(x.calls.some((call) => call.pluginId === "mobile")).toBe(false);
 
+  x.event(threadId!, "client/turn/requested", { initiator: "automation", input: [{ type: "text", text: "Run of the runner \"Inbox\"." }] });
   await x.runners.report(threadId!, { level: "urgent", summary: "The payment failed." });
   expect(x.send).toHaveBeenCalledTimes(2);
   expect(x.calls.find((call) => call.pluginId === "mobile")).toMatchObject({ method: "notify", input: { kind: "turn-finished", threadId: "bot1", body: "The payment failed.", coalesceKey: `runner:${id}` } });
   expect(x.runners.threads().get(threadId!)).toEqual({ urgent: true });
-  // A later log or tell doesn't clear an unacknowledged urgent; only the user seeing it does.
+  // The same run reporting again doesn't clear it.
   await x.runners.report(threadId!, { level: "log", summary: "Nothing new." });
-  await x.runners.report(threadId!, { level: "tell", summary: "Still waiting." });
   expect(x.runners.threads().get(threadId!)).toEqual({ urgent: true });
+  // A later run's log or tell does: that urgent report is over.
+  x.event(threadId!, "turn/completed", { status: "completed" });
+  x.event(threadId!, "client/turn/requested", { initiator: "automation", input: [{ type: "text", text: "Run of the runner \"Inbox\"." }] });
+  await x.runners.report(threadId!, { level: "tell", summary: "Paid now." });
+  expect(x.runners.threads().get(threadId!)).toEqual({ urgent: false });
+  // Mark handled, and its Undo.
+  await x.runners.report(threadId!, { level: "urgent", summary: "The payment failed again." });
   x.runners.seen(id);
   expect(x.runners.threads().get(threadId!)).toEqual({ urgent: false });
+  x.runners.unseen(threadId!);
+  expect(x.runners.threads().get(threadId!)).toEqual({ urgent: true });
   await expect(x.runners.report("bot1", { level: "log", summary: "x" })).rejects.toThrow(/runner/);
+});
+
+it("Needs you: an urgent report clears once its thread is read after it, the user replies, or a later run ends [PASS]", async () => {
+  const x = await setup();
+  const { threadId } = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  const run = () => x.event(threadId!, "client/turn/requested", { initiator: "automation", input: [{ type: "text", text: "Run of the runner \"Inbox\". Your job: Check mail." }] });
+  const urgent = async (summary: string) => { run(); await x.runners.report(threadId!, { level: "urgent", summary }); x.event(threadId!, "turn/completed", { status: "completed" }); };
+
+  await urgent("The payment for the lease failed and the landlord wants it by Friday.");
+  const at = Date.now();
+  // Its own run finishing, or a read before the report, leave it.
+  expect(await x.runners.needsYou(threadId!, { lastReadAt: at - 60_000 })).toBe("Urgent report: The payment for the lease failed and the…");
+  // (a) Read after the report.
+  expect(await x.runners.needsYou(threadId!, { lastReadAt: at + 1 })).toBeNull();
+  expect(x.runners.threads().get(threadId!)).toEqual({ urgent: false });
+
+  // (b) The user replies in the runner's thread.
+  await urgent("Card declined.");
+  x.event(threadId!, "client/turn/requested", { initiator: "user", input: [{ type: "text", text: "Paid it, thanks." }] });
+  expect(await x.runners.needsYou(threadId!, null)).toBeNull();
+
+  // A run prompt sent as the user isn't a reply; a later run that ends [PASS] is.
+  await urgent("Card declined.");
+  x.event(threadId!, "client/turn/requested", { initiator: "user", input: [{ type: "text", text: "Run of the runner \"Inbox\". Your job: Check mail." }] });
+  expect(await x.runners.needsYou(threadId!, null)).toBe("Urgent report: Card declined.");
+  x.event(threadId!, "turn/completed", { status: "completed" });
+  expect(await x.runners.needsYou(threadId!, null)).toBeNull();
+
+  // A later run that reports urgent again keeps it, with the new report.
+  await urgent("Card declined.");
+  await urgent("Card declined twice.");
+  expect(await x.runners.needsYou(threadId!, null)).toBe("Urgent report: Card declined twice.");
+});
+
+it("Needs you: Studio's own urgent report (past the auto-resume cap) reads as failed", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  await x.runners.alert(runner.id, "Inbox stopped after failing 3 times.");
+  expect(await x.runners.needsYou(runner.threadId!, null)).toBe("Failed: Inbox stopped after failing 3 times.");
 });
 
 it("a run with nothing to report produces nothing: the instructions say so, and no call means no message", async () => {

@@ -38,6 +38,7 @@ import type { HeartbeatRun, RunnerAdoptableView, RunnerView } from "./contract";
 import { automationName } from "./automation-names";
 import { heartbeatRunSchema } from "./contract";
 import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
+import { urgentReason, urgentSettled, type UrgentKind } from "./needs-you";
 import { turnStartedAt } from "./turn-started";
 
 type Sdk = BbPluginApi["sdk"];
@@ -50,6 +51,8 @@ type RunnerRow = {
   id: string; bot_id: string; name: string; job: string; thread_id: string | null; project_id: string; state: "active" | "paused";
   cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; timezone: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
+  /** The urgent report that put it in Needs you: when, what, why, and the sequence of the turn request that made it (docs/needs-you/REDO.md). */
+  urgent_at: number | null; urgent_report: string | null; urgent_kind: UrgentKind | null; urgent_turn: number | null;
   /** 1 once Studio made the thread hidden. */
   hidden: number; cleanup_pending: number; machine: string | null; machine_name: string | null; machine_offline: number; machine_suspended: number;
   created_at: number; updated_at: number;
@@ -610,17 +613,56 @@ export class Runners {
     }
   }
 
-  /** The user saw an urgent report: it leaves Needs you. */
+  /** The user saw an urgent report, or marked it handled: it leaves Needs you. */
   seen(id: string, botId?: string): void {
     const row = this.row(id, botId);
     if (row.urgent) this.changedRow(row.id, { urgent: 0 });
   }
 
+  /** Undo of seen (Mark handled's Undo): the last urgent report is back in Needs you. */
+  unseen(id: string, botId?: string): void {
+    const row = this.row(id, botId);
+    if (!row.urgent && row.urgent_at != null) this.changedRow(row.id, { urgent: 1 });
+  }
+
+  /** The sequence of the thread's latest turn request: which run an urgent report came from. */
+  private async lastTurn(threadId: string): Promise<number | null> {
+    const events = await this.events(threadId, ["client/turn/requested"], 1);
+    return events[0]?.seq ?? null;
+  }
+
+  /** A runner thread's latest events of `types`, newest first; none when BB can't say. */
+  private async events(threadId: string, types: string[], limit: number): Promise<{ seq?: number; type: string; createdAt?: number; data?: unknown }[]> {
+    try {
+      return await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: String(limit), types: types as never }) as { seq?: number; type: string }[];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * A runner thread in Needs you: its reason line, or null once the user read
+   * the thread after the report, replied there, or a later run finished
+   * (src/needs-you.ts); then the flag clears. `thread` is the thread as BB
+   * lists it (for lastReadAt).
+   */
+  async needsYou(threadId: string, thread: { lastReadAt?: number | null } | null): Promise<string | null> {
+    const row = this.forThread(threadId);
+    if (!row?.urgent) return null;
+    if (row.urgent_at == null) return urgentReason(row.urgent_kind, row.last_report);
+    const events = thread?.lastReadAt != null && thread.lastReadAt >= row.urgent_at ? [] : await this.events(threadId, ["client/turn/requested", "turn/completed"], 100);
+    if (urgentSettled({ at: row.urgent_at, turn: row.urgent_turn }, thread, events)) {
+      this.changedRow(row.id, { urgent: 0 });
+      return null;
+    }
+    return urgentReason(row.urgent_kind, row.urgent_report);
+  }
+
   /**
    * runner_report from a runner's thread. log stays here; tell posts one line
    * into the Bot's thread; urgent also goes to Needs you and the phone.
-   * An urgent flag stays until the user acknowledges it (acknowledge, when
-   * they open the runner); a later log or tell doesn't clear it.
+   * An urgent flag stays until the user reads or answers it, marks it
+   * handled, or a later run reports log or tell (or ends [PASS]; needsYou).
    */
   async report(threadId: string, input: { level: RunnerLevel; summary: string }): Promise<string> {
     const row = this.forThread(threadId);
@@ -629,7 +671,14 @@ export class Runners {
     const now = Date.now();
     this.deps.db.prepare("INSERT INTO runner_reports(runner_id, summary) VALUES (?, ?)").run(row.id, summary);
     this.deps.db.prepare("DELETE FROM runner_reports WHERE runner_id = ? AND id NOT IN (SELECT id FROM runner_reports WHERE runner_id = ? ORDER BY id DESC LIMIT 3)").run(row.id, row.id);
-    this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now, ...(input.level === "urgent" ? { urgent: 1 } : {}) });
+    const turn = input.level === "urgent" || row.urgent ? await this.lastTurn(threadId) : null;
+    // A log or tell from a later run than the urgent one: that one's over.
+    // (The same run reporting again doesn't count.)
+    const later = input.level !== "urgent" && !!row.urgent && (turn == null || row.urgent_turn == null || turn > row.urgent_turn);
+    this.changedRow(row.id, {
+      last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now,
+      ...(input.level === "urgent" ? { urgent: 1, urgent_at: now, urgent_report: summary, urgent_kind: "report" as const, urgent_turn: turn } : later ? { urgent: 0 } : {}),
+    });
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
@@ -663,7 +712,9 @@ export class Runners {
   async alert(id: string, summary: string): Promise<void> {
     const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
     if (!row) return;
-    this.changedRow(row.id, { last_level: "urgent", last_report: summary, last_report_at: Date.now(), urgent: 1 });
+    const now = Date.now();
+    const turn = row.thread_id ? await this.lastTurn(row.thread_id) : null;
+    this.changedRow(row.id, { last_level: "urgent", last_report: summary, last_report_at: now, urgent: 1, urgent_at: now, urgent_report: summary, urgent_kind: "failed", urgent_turn: turn });
     const bot = this.deps.bot(row.bot_id);
     if (bot?.threadId) await this.tell(row, "urgent", summary, bot as RunnerBot & { threadId: string });
   }

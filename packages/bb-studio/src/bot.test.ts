@@ -657,6 +657,65 @@ it("puts a Bot automation past its auto-resume cap in Needs you, opening the Bot
   expect((await x.bots.activity()).needsYou).toEqual([]);
 });
 
+it("Needs you says why: a question, an approval; Mark handled hides it until a new one comes, and Undo brings it back", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "ask", parentThreadId: "bot1", status: "idle", hasPendingInteraction: true } as never);
+  x.add({ id: "deploy", parentThreadId: "bot1", status: "idle", hasPendingInteraction: true } as never);
+  x.pending.set("ask", [{ id: "q1", status: "pending", payload: { kind: "user_question" } } as never]);
+  x.pending.set("deploy", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
+  const reasons = async () => Object.fromEntries((await x.bots.activity()).needsYou.map((t) => [t.id, t.reason]));
+  expect(await reasons()).toEqual({ ask: "Asked you a question", deploy: "Waiting for approval" });
+
+  await x.bots.markHandled("ask");
+  expect(await reasons()).toEqual({ deploy: "Waiting for approval" });
+  x.bots.restoreHandled("ask");
+  expect(await reasons()).toEqual({ ask: "Asked you a question", deploy: "Waiting for approval" });
+  // Handled stays handled until what it waits on changes: a new question is back.
+  await x.bots.markHandled("ask");
+  expect(Object.keys(await reasons())).toEqual(["deploy"]);
+  x.pending.set("ask", [{ id: "q1", status: "pending", payload: { kind: "user_question" } }, { id: "q2", status: "pending", payload: { kind: "user_question" } }] as never);
+  expect(Object.keys(await reasons()).sort()).toEqual(["ask", "deploy"]);
+  // Answered: it leaves on its own, even before BB's list catches up.
+  x.pending.set("deploy", [{ id: "p1", status: "resolved", payload: { kind: "approval" } } as never]);
+  expect(Object.keys(await reasons())).toEqual(["ask"]);
+});
+
+it("Needs you: a failure alert in the Bot's chat leaves once the chat is read after it, or is marked handled until the next one", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle", lastReadAt: 1 });
+  await x.bots.setThread("bot1");
+  let alerts = [{ name: "Brief", message: "Brief is off.", at: 100 }];
+  (x.bots as unknown as { deps: { automationAlerts(): unknown } }).deps.automationAlerts = () => alerts;
+  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", reason: "Failed" })]);
+  await x.bots.markHandled("bot1");
+  expect((await x.bots.activity()).needsYou).toEqual([]);
+  alerts = [...alerts, { name: "Digest", message: "Digest is off.", at: 200 }];
+  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", reason: "2 failed" })]);
+  // Read after the latest alert: seen.
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, lastReadAt: 200 });
+  expect((await x.bots.activity()).needsYou).toEqual([]);
+});
+
+it("Needs you: an urgent runner shows its report; read or answered it's gone; Mark handled and Undo go through the runner", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "run_t", visibility: "hidden", title: "Security · Runner", status: "idle" });
+  let reason: string | null = "Urgent report: Port 22 is open";
+  const runners = { threads: () => new Map([["run_t", { urgent: true }]]), pauseAll: async () => [], restore: async () => true, needsYou: vi.fn(async () => reason), seen: vi.fn(), unseen: vi.fn() };
+  (x.bots as unknown as { deps: { runners: unknown } }).deps.runners = runners;
+  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "run_t", reason: "Urgent report: Port 22 is open" })]);
+  expect(runners.needsYou).toHaveBeenCalledWith("run_t", expect.objectContaining({ id: "run_t" }));
+  reason = null;
+  expect((await x.bots.activity()).needsYou).toEqual([]);
+  await x.bots.markHandled("run_t");
+  expect(runners.seen).toHaveBeenCalledWith("run_t", expect.any(String));
+  x.bots.restoreHandled("run_t");
+  expect(runners.unseen).toHaveBeenCalledWith("run_t", expect.any(String));
+});
+
 it("applies skill saves immediately, preserves diffs and warnings, and reverts without losing history", async () => {
   const x = await setup();
   x.add({ id: "bot1" });

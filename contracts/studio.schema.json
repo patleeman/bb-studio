@@ -7938,6 +7938,12 @@
                     "number",
                     "null"
                   ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -8557,6 +8563,12 @@
                     "number",
                     "null"
                   ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -8621,6 +8633,12 @@
                 "runningSince": {
                   "type": [
                     "number",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
                     "null"
                   ]
                 }
@@ -8688,6 +8706,12 @@
                 "runningSince": {
                   "type": [
                     "number",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
                     "null"
                   ]
                 }
@@ -8799,6 +8823,12 @@
                 "runningSince": {
                   "type": [
                     "number",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
                     "null"
                   ]
                 }
@@ -12252,6 +12282,76 @@
         },
         "required": [
           "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_needs_you_dismiss": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_needs_you_restore": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
         ]
       },
       "output": {

@@ -114,6 +114,8 @@ public enum Studio {
     public static let bot_runner_run_now = "bot_runner_run_now"
     public static let bot_runner_delete = "bot_runner_delete"
     public static let bot_runner_seen = "bot_runner_seen"
+    public static let bot_needs_you_dismiss = "bot_needs_you_dismiss"
+    public static let bot_needs_you_restore = "bot_needs_you_restore"
     public static let bot_runner_adopt = "bot_runner_adopt"
     public static let bot_automations = "bot_automations"
     public static let bot_automation_create = "bot_automation_create"
@@ -559,6 +561,10 @@ public enum Studio {
   public typealias BotRunnerDelete = BotRunnerDeleteOutput
 
   public typealias BotRunnerSeen = BotRunnerSeenOutput
+
+  public typealias BotNeedsYouDismiss = BotNeedsYouDismissOutput
+
+  public typealias BotNeedsYouRestore = BotNeedsYouRestoreOutput
 
   public typealias BotRunnerAdopt = BotRunnerAdoptOutput
 
@@ -6928,8 +6934,9 @@ public enum Studio {
     public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
+    public var reason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -6940,6 +6947,7 @@ public enum Studio {
       self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
+      self.reason = reason
     }
   }
 
@@ -7300,8 +7308,9 @@ public enum Studio {
     public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
+    public var reason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7312,6 +7321,7 @@ public enum Studio {
       self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
+      self.reason = reason
     }
   }
 
@@ -7350,8 +7360,9 @@ public enum Studio {
     public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
+    public var reason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7362,6 +7373,7 @@ public enum Studio {
       self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
+      self.reason = reason
     }
   }
 
@@ -7400,8 +7412,9 @@ public enum Studio {
     public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
+    public var reason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7412,6 +7425,7 @@ public enum Studio {
       self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
+      self.reason = reason
     }
   }
 
@@ -7492,8 +7506,9 @@ public enum Studio {
     public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
+    public var reason: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7504,6 +7519,7 @@ public enum Studio {
       self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
+      self.reason = reason
     }
   }
 
@@ -10094,6 +10110,42 @@ public enum Studio {
   }
 
   public struct BotRunnerSeenOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotNeedsYouDismissInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var threadId: String?
+
+    public init(botId: String? = nil, threadId: String? = nil) {
+      self.botId = botId
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotNeedsYouDismissOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BotNeedsYouRestoreInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var threadId: String?
+
+    public init(botId: String? = nil, threadId: String? = nil) {
+      self.botId = botId
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotNeedsYouRestoreOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

@@ -272,6 +272,8 @@ const botThread = z.object({
   parentId: z.string().nullable().default(null),
   /** Running threads: when the current turn started, for the elapsed time. */
   runningSince: z.number().nullable().optional(),
+  /** Needs you: why, in one short line ("Asked you a question", "Urgent report: …", "Failed"). */
+  reason: z.string().nullable().optional(),
 });
 export type BotThreadView = z.infer<typeof botThread>;
 const botScheduled = z.object({
@@ -578,6 +580,10 @@ export const rpcContract = defineRpcContract({
   bot_runner_delete: { input: z.object({ botId, id: runnerId }), output: z.object({ deleted: z.literal(true), kept: z.boolean() }) },
   /** The user opened a runner: its urgent report leaves Needs you. */
   bot_runner_seen: { input: z.object({ botId, id: runnerId }), output: z.object({ ok: z.literal(true) }) },
+  /** Mark handled: the thread leaves Needs you (a runner's urgent report is seen; anything else until what it waits on changes). */
+  bot_needs_you_dismiss: { input: z.object({ botId, threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
+  /** Mark handled's Undo. */
+  bot_needs_you_restore: { input: z.object({ botId, threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
   /** Adopt as runner: registers the thread, keeps its automation, switches it to runner_report. The user's choice only. */
   bot_runner_adopt: { input: z.object({ botId, threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
   /** A Bot's automations: check-ins (its original one first), reminders, watchers and runners. */

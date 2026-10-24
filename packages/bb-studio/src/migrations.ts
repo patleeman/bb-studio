@@ -804,4 +804,15 @@ export const MIGRATIONS = [
        status INTEGER, error TEXT, ms INTEGER NOT NULL, bytes INTEGER NOT NULL
      );
    CREATE INDEX mini_fetch_log_mini ON mini_fetch_log (mini_id, id);`,
+  // Needs you (docs/needs-you/REDO.md): what an urgent runner report was and
+  // when, so reading or answering its thread clears it; and the items the
+  // user marked handled, each until its signal changes.
+  `ALTER TABLE bot_runners ADD COLUMN urgent_at INTEGER;
+   ALTER TABLE bot_runners ADD COLUMN urgent_report TEXT;
+   ALTER TABLE bot_runners ADD COLUMN urgent_kind TEXT;
+   ALTER TABLE bot_runners ADD COLUMN urgent_turn INTEGER;
+   CREATE TABLE bot_needs_you_handled (
+       bot_id TEXT NOT NULL, thread_id TEXT NOT NULL, signal TEXT NOT NULL, at INTEGER NOT NULL,
+       PRIMARY KEY (bot_id, thread_id)
+     );`,
 ];
