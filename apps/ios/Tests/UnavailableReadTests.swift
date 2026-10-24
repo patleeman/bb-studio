@@ -44,19 +44,44 @@ final class UnavailableReadTests: XCTestCase {
         XCTAssertNil(result)
     }
 
-    func testFailedDefaultsNeverStartAChat() async throws {
+    func testFailedDefaultsStartTheChatWithStandardSettings() async throws {
         let client = BBClient(baseURL: URL(string: "https://unavailable-defaults.invalid")!)
+        let sent = Box()
+        client.transport = { _, path, body in
+            if path.hasSuffix("default-execution-options") { return (503, Data(#"{"error":"offline"}"#.utf8)) }
+            sent.body = body
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_standard"}}"#.utf8))
+        }
+        let started = try await client.startStudioChat(pluginId: "studio", itemId: "a", projectId: "p", text: "Discuss")
+        XCTAssertEqual(started, .init(threadId: "thr_standard", usedStandardSettings: true))
+        let request = try JSONDecoder().decode(JSONValue.self, from: XCTUnwrap(sent.body))["request"]
+        XCTAssertEqual(request?["providerId"], .string("claude-code"))
+        XCTAssertEqual(request?["projectId"], .string("p"))
+    }
+
+    func testReadDefaultsStartTheChatWithoutANotice() async throws {
+        let client = BBClient(baseURL: URL(string: "https://defaults.invalid")!)
+        client.transport = { _, path, _ in
+            if path.hasSuffix("default-execution-options") { return (200, Data(#"{"providerId":"codex","model":"gpt-5"}"#.utf8)) }
+            return (200, Data(#"{"ok":true,"result":{"threadId":"thr_defaults"}}"#.utf8))
+        }
+        let started = try await client.startStudioChat(pluginId: "studio", itemId: "a", projectId: "p", text: "Discuss")
+        XCTAssertEqual(started, .init(threadId: "thr_defaults", usedStandardSettings: false))
+    }
+
+    func testCancelledDefaultsReadStartsNothing() async throws {
+        let client = BBClient(baseURL: URL(string: "https://cancelled-defaults.invalid")!)
         client.transport = { _, path, _ in
             guard path.hasSuffix("default-execution-options") else {
-                XCTFail("A failed default read must not start work: \(path)")
+                XCTFail("A cancelled start must not start work: \(path)")
                 return (200, Data(#"{"ok":true,"result":{"threadId":"thr_wrong"}}"#.utf8))
             }
-            return (503, Data(#"{"error":"offline"}"#.utf8))
+            throw CancellationError()
         }
         do {
             _ = try await client.startStudioChat(pluginId: "studio", itemId: "a", projectId: "p", text: "Discuss")
-            XCTFail("Defaults unavailable must throw")
-        } catch { XCTAssertEqual((error as? BBError)?.status, 503) }
+            XCTFail("Cancellation must stop the start")
+        } catch { XCTAssertTrue(error is CancellationError) }
     }
 
     func testBot503WithContradictoryNullDoesNotClearIdentity() async throws {
@@ -73,3 +98,5 @@ final class UnavailableReadTests: XCTestCase {
         XCTAssertEqual(client.cachedBotThreadId, "thr_cached")
     }
 }
+
+private final class Box: @unchecked Sendable { var body: Data? }

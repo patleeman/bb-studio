@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// Debug builds: `-qaStateDemo dictation|related` opens that sheet with local
+/// Debug builds: `-qaStateDemo dictation|related|studio-chat` opens that sheet with local
 /// data, for screenshots of its states without a server. The app's client
 /// answers from fixtures here; sends and replies fail as if BB were
 /// unreachable. `-qaBotSheet skills` with `-qaBotDemo` gets its skills here too.
@@ -19,13 +19,15 @@ enum StateDemo {
     /// Answers the app's requests from fixtures, once per launch.
     @MainActor static func install(_ model: AppModel) {
         guard variant != nil || BotDemo.sheet == "skills" else { return }
-        model.client.transport = { method, path, _ in
+        BBClient.demoTransport = { method, path, _ in
             let rpc = "/api/v1/plugins/studio/rpc/"
             guard method == "POST", path.hasPrefix(rpc) else { throw URLError(.cannotConnectToHost) }
             switch String(path.dropFirst(rpc.count)) {
             case Studio.Method.links: return ok(links)
             case Studio.Method.itemThreads: return ok(#"{"threads":[{"threadId":"thr_launchrev1","role":"source","state":"Launch review"}]}"#)
             case Studio.Method.comments: return ok(comments)
+            // The project's defaults fail (not RPC, so unreachable); the chat starts anyway.
+            case Studio.Method.chat_start: return ok(#"{"threadId":"\#(BotDemo.threadId)"}"#)
             case Studio.Method.bot_skills: return ok(skills)
             case Studio.Method.bot_learning: return ok(learning)
             default: throw URLError(.cannotConnectToHost)
@@ -71,17 +73,22 @@ enum StateDemo {
 /// Opens the Related sheet for `-qaStateDemo related`.
 struct StateDemoSheets: ViewModifier {
     @State private var related = false
+    @State private var chat = false
 
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $related) {
                 RelatedView(pluginId: "pages", itemId: "pg_launch01").environmentObject(AppModel.shared)
             }
+            .studioChat(isPresented: $chat, pluginId: "pages", itemId: "pg_launch01", title: "Launch plan", projectId: "proj_statedemo")
             .task {
                 // Before anything it opens loads.
                 StateDemo.install(AppModel.shared)
                 related = StateDemo.variant == "related"
+                chat = StateDemo.variant == "studio-chat"
             }
+            // Outermost, so the sheets above it get the app too.
+            .environmentObject(AppModel.shared)
     }
 }
 #endif

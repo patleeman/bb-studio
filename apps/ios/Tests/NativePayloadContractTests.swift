@@ -79,6 +79,7 @@ final class NativePayloadContractTests: XCTestCase {
     func testChatStartEnvelope() async throws {
         let chatClient = try client("chat-start")
         let thread = try await chatClient.startStudioChat(pluginId: "pages", itemId: "pg_contract", projectId: "proj_contract", text: "Discuss")
-        XCTAssertEqual(thread, "thr_chat")
+        XCTAssertEqual(thread.threadId, "thr_chat")
+        XCTAssertFalse(thread.usedStandardSettings)
     }
 }

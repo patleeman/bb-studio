@@ -103,11 +103,17 @@ private struct StudioChatSheet: View {
         starting = true
         defer { starting = false }
         do {
-            let threadId = try await client.startStudioChat(
+            let started = try await client.startStudioChat(
                 pluginId: pluginId, itemId: itemId, projectId: project, text: text.trimmingCharacters(in: .whitespacesAndNewlines))
-            open(threadId)
+            open(started.threadId)
+            if started.usedStandardSettings { app.flash(StudioChatNotice.standardSettings) }
         } catch {
             self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
+}
+
+/// What the item chat says when it couldn't read the project's defaults.
+enum StudioChatNotice {
+    static let standardSettings = "Couldn't read this project's default settings. The chat uses the standard ones."
 }

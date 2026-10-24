@@ -80,6 +80,10 @@ public final class BBClient: @unchecked Sendable {
     public var baseURL: URL
     /// Replaces the network for every request. The watch sets this to relay through the phone.
     public var transport: Transport?
+    #if DEBUG
+    /// Debug fixtures (`StateDemo`): answers for every client without its own `transport`.
+    nonisolated(unsafe) public static var demoTransport: Transport?
+    #endif
     fileprivate let session: URLSession
     fileprivate let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -97,6 +101,9 @@ public final class BBClient: @unchecked Sendable {
     /// One raw request. Also the unit the Watch relay forwards through the phone.
     public func raw(method: String, path: String, body: Data?) async throws -> (Int, Data) {
         if let transport { return try await transport(method, path, body) }
+        #if DEBUG
+        if let demo = Self.demoTransport { return try await demo(method, path, body) }
+        #endif
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw BBError(status: 0, message: "Bad path \(path)")
         }

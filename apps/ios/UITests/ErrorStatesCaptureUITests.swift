@@ -106,6 +106,19 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         hold()
     }
 
+    /// Chat About This when the project's defaults can't be read: it starts
+    /// anyway and says so in the app's brief notice.
+    func testStudioChatStandardSettings() {
+        launch("-qaBotDemo", "chat", "-qaStateDemo", "studio-chat")
+        let field = app.descendants(matching: .any)["studioChatField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 20))
+        field.typeText("What changed since Monday?")
+        shot("studio-chat-ask")
+        app.buttons["Start"].tap()
+        XCTAssertTrue(text(containing: "standard ones").waitForExistence(timeout: 10))
+        shot("studio-chat-standard-settings")
+    }
+
     /// A plain thread's composer on the phone: at the latest message, scrolled
     /// up with Jump to latest, with the keyboard up, and with a shelf card.
     func testThreadComposerPhone() throws {

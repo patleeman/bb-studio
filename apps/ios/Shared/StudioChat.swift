@@ -4,14 +4,29 @@ import Foundation
 /// carries a pill for the item, which the plugin turns into a pointer to it
 /// and the tools that read it. Pages go through Pages, so they stay in the page's chats.
 extension BBClient {
-    /// Starts a thread about the item with the project's default agent.
-    public func startStudioChat(pluginId: String, itemId: String, projectId: String, text: String) async throws -> String {
+    /// A started item chat, and whether it had to use the standard settings.
+    public struct StudioChatStart: Sendable, Equatable {
+        public var threadId: String
+        /// The project's defaults couldn't be read, so the chat uses the standard settings.
+        public var usedStandardSettings: Bool
+    }
+
+    /// Starts a thread about the item with the project's default agent. When the
+    /// defaults can't be read, it starts with the standard settings and says so.
+    public func startStudioChat(pluginId: String, itemId: String, projectId: String, text: String) async throws -> StudioChatStart {
         struct Result: Decodable { var threadId: String }
-        let choice = try await projectDefaults(projectId) ?? ExecutionChoice()
+        var standard = false
+        let choice: ExecutionChoice
+        do {
+            choice = try await projectDefaults(projectId) ?? ExecutionChoice()
+        } catch where !Self.isCancellation(error) {
+            choice = ExecutionChoice()
+            standard = true
+        }
         let request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
         let input: JSONValue = ["item": ["pluginId": .string(pluginId), "id": .string(itemId)], "request": request]
         let result: Result = try await rpc("studio", Studio.Method.chat_start, input)
-        return result.threadId
+        return StudioChatStart(threadId: result.threadId, usedStandardSettings: standard)
     }
 
     /// The execution options shared by item chats and page work.
