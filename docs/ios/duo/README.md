@@ -1,3 +1,5 @@
+> Latest edge-to-edge surfaces and safe controls: [Duo v7](V7.md).
+
 > Latest quick-reply clipping and system inset audit: [Duo v6](V6.md).
 
 > Latest sidebar filters and matching margins: [Duo v5](V5.md).

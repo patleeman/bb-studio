@@ -160,6 +160,7 @@ struct DrawingView: View {
                 ProgressView()
             }
         }
+        .modifier(RegularScrollingSurface())
         .background(Color(white: 0.98).ignoresSafeArea())
         .environment(\.colorScheme, .light)
         .navigationTitle(name)

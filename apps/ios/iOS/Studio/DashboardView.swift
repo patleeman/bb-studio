@@ -40,6 +40,7 @@ struct DashboardView: View {
                 ProgressView()
             }
         }
+        .modifier(RegularScrollingSurface())
         .navigationTitle(dashboard?.displayName ?? "Dashboard")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

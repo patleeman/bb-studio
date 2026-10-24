@@ -29,6 +29,7 @@ struct MiniAppView: View {
                 ProgressView()
             }
         }
+        .modifier(RegularScrollingSurface())
         .navigationTitle(session?.mini?.displayName ?? "Mini app")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

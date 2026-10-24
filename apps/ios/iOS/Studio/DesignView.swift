@@ -33,6 +33,7 @@ struct DesignView: View {
                 ProgressView()
             }
         }
+        .modifier(RegularScrollingSurface())
         .navigationTitle(design?.displayName ?? "Design")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

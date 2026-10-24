@@ -4,12 +4,14 @@ import UIKit
 /// Window geometry, independent of device model, size class and keyboard height.
 struct DuoLayout: Equatable {
     static let gutter: CGFloat = 32
+    let windowSize: CGSize
     let twoPages: Bool
     let railWidth: CGFloat
     let listWidth: CGFloat
     let sidebarWindowInset: CGFloat
 
     init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0) {
+        windowSize = size
         twoPages = size.width >= 900 && size.width > size.height
         railWidth = twoPages ? 64 : 0
         sidebarWindowInset = twoPages ? trailingInset : 0
@@ -43,7 +45,6 @@ struct DuoTabRail: View {
         }
         .padding(.vertical, 12)
         .frame(width: 64)
-        .background(.bar)
     }
 
     private func tab(_ value: Tab, _ title: String, _ icon: String) -> some View {
@@ -127,7 +128,9 @@ struct DuoHeader<Title: View, Actions: View>: View {
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)
         .frame(minHeight: 58)
-        .background(.bar)
+        .background {
+            RegularSurfaceBackground(name: "header", style: AnyShapeStyle(.bar), bottom: false, rightPage: true)
+        }
     }
 }
 
@@ -227,5 +230,52 @@ struct SidebarRowContent: ViewModifier {
         if enabled && UIDevice.current.userInterfaceIdiom == .phone {
             content.listRowInsets(.trailing, 20 - layout.sidebarWindowInset)
         } else { content }
+    }
+}
+
+/// Scroll views may draw and lay out content under the system status column.
+/// Their surrounding safe-area insets still position fixed chrome and preserve
+/// the native bottom content inset for the home indicator and composer.
+struct RegularScrollingSurface: ViewModifier {
+    @Environment(\.duoLayout) private var layout
+    func body(content: Content) -> some View {
+        content.ignoresSafeArea(.container, edges: layout.twoPages ? .trailing : [])
+    }
+}
+
+/// Paint the complete page independently of the safe bounds used by controls.
+struct RegularSurfaceBackground: View {
+    @Environment(\.duoLayout) private var layout
+    let name: String
+    var style = AnyShapeStyle(Color(uiColor: .systemBackground))
+    var bottom = true
+    var rightPage = false
+    var fullWidth = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let origin = geometry.frame(in: .global).origin
+            let extendsRight = fullWidth || (rightPage && origin.x >= layout.windowSize.width / 2)
+            Rectangle().fill(style)
+                .frame(width: extendsRight ? max(0, layout.windowSize.width - origin.x) : geometry.size.width,
+                       height: bottom ? max(0, layout.windowSize.height - origin.y) : geometry.size.height,
+                       alignment: .topLeading)
+                .allowsHitTesting(false)
+                .modifier(RegularSurfaceProbe(name: name))
+        }
+        .ignoresSafeArea(.container, edges: bottom ? .bottom : [])
+    }
+}
+
+private struct RegularSurfaceProbe: ViewModifier {
+    let name: String
+    func body(content: Content) -> some View {
+        #if DEBUG
+        content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { rect in
+            DuoDemo.surfaces[name + "-" + String(Int(rect.minX.rounded()))] = rect
+        }
+        #else
+        content
+        #endif
     }
 }

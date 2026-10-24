@@ -73,6 +73,7 @@ struct ArtifactView: View {
             }
         }
         .animation(.snappy, value: notice)
+        .modifier(RegularScrollingSurface())
         .navigationTitle(artifact?.displayTitle ?? "Artifact")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }

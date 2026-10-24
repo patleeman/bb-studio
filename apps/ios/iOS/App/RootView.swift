@@ -15,7 +15,7 @@ struct RootView: View {
                 .clipped()
                 .background {
                     if layout.twoPages {
-                        Rectangle().fill(.bar).ignoresSafeArea(.container, edges: .bottom)
+                        RegularSurfaceBackground(name: "rail", style: AnyShapeStyle(.bar))
                     }
                 }
                 .accessibilityHidden(!layout.twoPages)
@@ -23,7 +23,7 @@ struct RootView: View {
         }
         .background {
             if layout.twoPages {
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                RegularSurfaceBackground(name: "root", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), fullWidth: true)
             }
         }
         .environment(\.duoLayout, layout)
@@ -119,7 +119,7 @@ struct InboxTab: View {
             .clipped()
             .background {
                 if layout.twoPages {
-                    Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                    RegularSurfaceBackground(name: "sidebar", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                 }
             }
             .accessibilityHidden(!layout.twoPages)
@@ -129,7 +129,7 @@ struct InboxTab: View {
                 .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
                 .background {
                     if layout.twoPages {
-                        Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                        RegularSurfaceBackground(name: "gutter", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                     }
                 }
                 .accessibilityHidden(true)
@@ -145,6 +145,9 @@ struct InboxTab: View {
                 .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
             .frame(maxWidth: .infinity)
+            .background {
+                if layout.twoPages { RegularSurfaceBackground(name: "detail", rightPage: true) }
+            }
         }
         // One live store and load task for both presentations. On the phone,
         // an inactive navigation root must not own the sidebar's data load.

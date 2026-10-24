@@ -72,6 +72,7 @@ struct RecordingDetailView: View {
             .padding()
         }
         .overlay { if !loaded { ProgressView() } }
+        .modifier(RegularScrollingSurface())
         .safeAreaInset(edge: .bottom) {
             if player.durationMs > 0 { RecordingPlayerBar(player: player) }
         }

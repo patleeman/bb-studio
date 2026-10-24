@@ -1,0 +1,585 @@
+{
+  "v7-bot-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "railBottom": [
+      16,
+      19,
+      19
+    ],
+    "railCenter": [
+      17,
+      19,
+      19
+    ],
+    "safeBottom": 34,
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "scrolls": [
+      {
+        "adjustedBottom": 34,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 859.8333333333333,
+        "contentWidth": 395.66666666666663,
+        "height": 669,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 115.66666666666666,
+        "contentWidth": 518.3333333333333,
+        "height": 115.66666666666674,
+        "width": 339.33333333333337,
+        "x": 553.6666666666666,
+        "y": -2039
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 121,
+        "contentWidth": 189,
+        "height": 121,
+        "width": 339.33333333333337,
+        "x": 553.6666666666666,
+        "y": -65.33333333334303
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 121,
+        "contentWidth": 189,
+        "height": 121,
+        "width": 339.33333333333337,
+        "x": 553.6666666666666,
+        "y": -48387.333333333336
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 121,
+        "contentWidth": 189,
+        "height": 121,
+        "width": 339.33333333333337,
+        "x": 553.6666666666666,
+        "y": -49924.66666666667
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 115.66666666666666,
+        "contentWidth": 518.3333333333333,
+        "height": 115.66666666666424,
+        "width": 339.33333333333337,
+        "x": 553.6666666666666,
+        "y": -48740.00000000001
+      },
+      {
+        "adjustedBottom": 218,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 93310,
+        "contentWidth": 459.3333333333333,
+        "height": 669,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 52,
+        "contentWidth": 412,
+        "height": 52,
+        "width": 351.33333333333337,
+        "x": 503.66666666666663,
+        "y": 467
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 0,
+        "contentWidth": 0,
+        "height": 0,
+        "width": 351.33333333333337,
+        "x": 503.66666666666663,
+        "y": 527
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": false,
+        "contentHeight": 38,
+        "contentWidth": 351.3333333333333,
+        "height": 38,
+        "width": 351.33333333333337,
+        "x": 503.66666666666663,
+        "y": 539
+      }
+    ],
+    "surfaces": {
+      "detail-428": {
+        "height": 669,
+        "width": 351.5,
+        "x": 427.5,
+        "y": 0
+      },
+      "detail-492": {
+        "height": 669,
+        "width": 459.5,
+        "x": 491.5,
+        "y": 0
+      },
+      "header--71": {
+        "height": 58,
+        "width": 142.33333333333331,
+        "x": -71.16666666666666,
+        "y": -29
+      },
+      "header-0": {
+        "height": 58,
+        "width": 779.0000000000003,
+        "x": -1.1368683772161603e-13,
+        "y": 0
+      },
+      "header-478": {
+        "height": 58,
+        "width": 472.66666666666674,
+        "x": 478.33333333333326,
+        "y": 0
+      },
+      "header-492": {
+        "height": 58,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      "header-64": {
+        "height": 58,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      "rail-0": {
+        "height": 669,
+        "width": 64,
+        "x": 0,
+        "y": 0
+      },
+      "root-0": {
+        "height": 669,
+        "width": 951,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-0": {
+        "height": 669,
+        "width": 395.5,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-64": {
+        "height": 669,
+        "width": 395.5,
+        "x": 64,
+        "y": 0
+      }
+    },
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v7-studio-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "railBottom": [
+      16,
+      19,
+      19
+    ],
+    "railCenter": [
+      17,
+      19,
+      19
+    ],
+    "safeBottom": 34,
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "scrolls": [
+      {
+        "adjustedBottom": 34,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 507.66666666666663,
+        "contentWidth": 395.66666666666663,
+        "height": 669,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 100,
+        "clips": false,
+        "contentHeight": 36,
+        "contentWidth": 256,
+        "height": 36,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 120
+      },
+      {
+        "adjustedBottom": 81.33333333333337,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 1397.3333333333333,
+        "contentWidth": 459.3333333333333,
+        "height": 669,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 22,
+        "contentWidth": 287.3333333333333,
+        "height": 22,
+        "width": 287.33333333333337,
+        "x": 515.6666666666666,
+        "y": 599
+      }
+    ],
+    "surfaces": {
+      "detail-428": {
+        "height": 669,
+        "width": 375.5,
+        "x": 427.5,
+        "y": 0
+      },
+      "detail-492": {
+        "height": 669,
+        "width": 459.5,
+        "x": 491.5,
+        "y": 0
+      },
+      "gutter-396": {
+        "height": 669,
+        "width": 32,
+        "x": 395.5,
+        "y": 0
+      },
+      "gutter-460": {
+        "height": 669,
+        "width": 32,
+        "x": 459.5,
+        "y": 0
+      },
+      "header--124": {
+        "height": 58,
+        "width": 248.66666666666666,
+        "x": -124.33333333333333,
+        "y": -57
+      },
+      "header--230": {
+        "height": 58,
+        "width": 459.3333333333333,
+        "x": -229.66666666666666,
+        "y": -334.5
+      },
+      "header--71": {
+        "height": 58,
+        "width": 142.33333333333331,
+        "x": -71.16666666666666,
+        "y": -29
+      },
+      "header--77": {
+        "height": 58,
+        "width": 154,
+        "x": -77,
+        "y": -57
+      },
+      "header--92": {
+        "height": 58,
+        "width": 184,
+        "x": -92,
+        "y": -81
+      },
+      "header-0": {
+        "height": 58,
+        "width": 395.66666666666663,
+        "x": 0,
+        "y": 0
+      },
+      "header-428": {
+        "height": 58,
+        "width": 375.33333333333337,
+        "x": 427.66666666666663,
+        "y": 0
+      },
+      "header-478": {
+        "height": 58,
+        "width": 472.66666666666674,
+        "x": 478.33333333333326,
+        "y": 0
+      },
+      "header-492": {
+        "height": 58,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      "header-64": {
+        "height": 58,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      "rail-0": {
+        "height": 669,
+        "width": 64,
+        "x": 0,
+        "y": 0
+      },
+      "root-0": {
+        "height": 669,
+        "width": 951,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-0": {
+        "height": 669,
+        "width": 395.5,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-64": {
+        "height": 669,
+        "width": 395.5,
+        "x": 64,
+        "y": 0
+      }
+    },
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  },
+  "v7-threads-duo": {
+    "appearance": "dark",
+    "height": 669,
+    "idiom": "phone",
+    "railBottom": [
+      16,
+      19,
+      19
+    ],
+    "railCenter": [
+      17,
+      19,
+      19
+    ],
+    "safeBottom": 34,
+    "safeRight": 84,
+    "safeTop": 0,
+    "screenHeight": 678,
+    "screenWidth": 466,
+    "scrolls": [
+      {
+        "adjustedBottom": 34,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 443.6666666666667,
+        "contentWidth": 395.66666666666663,
+        "height": 669,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 115.66666666666666,
+        "contentWidth": 518.3333333333333,
+        "height": 115.66666666666674,
+        "width": 427.33333333333337,
+        "x": 507.66666666666663,
+        "y": -1737.000000000029
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 121,
+        "contentWidth": 189,
+        "height": 121,
+        "width": 427.33333333333337,
+        "x": 507.66666666666663,
+        "y": 8.33333333331393
+      },
+      {
+        "adjustedBottom": 158,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 156105,
+        "contentWidth": 459.3333333333333,
+        "height": 669,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": true,
+        "contentHeight": 0,
+        "contentWidth": 0,
+        "height": 0,
+        "width": 343.33333333333337,
+        "x": 507.66666666666663,
+        "y": 527
+      },
+      {
+        "adjustedBottom": 0,
+        "adjustedRight": 0,
+        "clips": false,
+        "contentHeight": 38,
+        "contentWidth": 343.3333333333333,
+        "height": 38,
+        "width": 343.33333333333337,
+        "x": 507.66666666666663,
+        "y": 539
+      }
+    ],
+    "surfaces": {
+      "detail-428": {
+        "height": 669,
+        "width": 375.5,
+        "x": 427.5,
+        "y": 0
+      },
+      "detail-492": {
+        "height": 669,
+        "width": 459.5,
+        "x": 491.5,
+        "y": 0
+      },
+      "gutter-460": {
+        "height": 669,
+        "width": 32,
+        "x": 459.5,
+        "y": 0
+      },
+      "header--124": {
+        "height": 58,
+        "width": 248.66666666666666,
+        "x": -124.33333333333333,
+        "y": -57
+      },
+      "header--230": {
+        "height": 58,
+        "width": 459.3333333333333,
+        "x": -229.66666666666666,
+        "y": -334.5
+      },
+      "header--71": {
+        "height": 58,
+        "width": 142.33333333333331,
+        "x": -71.16666666666666,
+        "y": -29
+      },
+      "header-0": {
+        "height": 58,
+        "width": 395.66666666666663,
+        "x": 0,
+        "y": 0
+      },
+      "header-428": {
+        "height": 58,
+        "width": 375.33333333333337,
+        "x": 427.66666666666663,
+        "y": 0
+      },
+      "header-478": {
+        "height": 58,
+        "width": 472.66666666666674,
+        "x": 478.33333333333326,
+        "y": 0
+      },
+      "header-492": {
+        "height": 58,
+        "width": 459.33333333333337,
+        "x": 491.66666666666663,
+        "y": 0
+      },
+      "header-64": {
+        "height": 58,
+        "width": 395.66666666666663,
+        "x": 64,
+        "y": 0
+      },
+      "rail-0": {
+        "height": 669,
+        "width": 64,
+        "x": 0,
+        "y": 0
+      },
+      "root-0": {
+        "height": 669,
+        "width": 951,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-0": {
+        "height": 669,
+        "width": 395.5,
+        "x": 0,
+        "y": 0
+      },
+      "sidebar-64": {
+        "height": 669,
+        "width": 395.5,
+        "x": 64,
+        "y": 0
+      }
+    },
+    "width": 951,
+    "windows": [
+      {
+        "class": "UIWindow",
+        "height": 669,
+        "hidden": false,
+        "width": 951
+      }
+    ]
+  }
+}

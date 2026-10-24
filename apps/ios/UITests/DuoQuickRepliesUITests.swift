@@ -22,11 +22,11 @@ final class DuoQuickRepliesUITests: XCTestCase {
         let detail = try XCTUnwrap(geometry.scrolls.first {
             $0.x > geometry.width / 2 && $0.height > 200 && $0.contentHeight > $0.height
         })
-        XCTAssertEqual(geometry.width - detail.contentMaxX, geometry.safeRight, accuracy: 1,
-            "The detail must apply the window safe area once, with no doubled inset")
+        XCTAssertEqual(detail.contentMaxX, geometry.width, accuracy: 1,
+            "Scrolling content reaches the window edge beneath the status column")
         XCTAssertEqual(replies.frame.minX, composer.frame.minX, accuracy: 1)
         XCTAssertEqual(replies.frame.maxX, composer.frame.maxX, accuracy: 1)
-        XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, 12, accuracy: 1)
+        XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, geometry.safeRight + 12, accuracy: 1)
         XCTAssertEqual(geometry.height - geometry.safeBottom - composer.frame.maxY, 8, accuracy: 1,
             "Keep the system home-indicator inset plus the existing 8pt composer padding")
         let scroll = try XCTUnwrap(geometry.scrolls.first {

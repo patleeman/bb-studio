@@ -16,7 +16,7 @@ struct RegularPages<Sidebar: View, Detail: View>: View {
                 .accessibilityHidden(!layout.twoPages)
                 .background {
                     if layout.twoPages {
-                        Color(uiColor: .systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                        RegularSurfaceBackground(name: "sidebar", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                     }
                 }
             Rectangle().fill(Color(uiColor: .systemGroupedBackground))
@@ -24,6 +24,9 @@ struct RegularPages<Sidebar: View, Detail: View>: View {
                 .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
                 .accessibilityHidden(true)
             detail.frame(maxWidth: .infinity)
+                .background {
+                    if layout.twoPages { RegularSurfaceBackground(name: "detail", rightPage: true) }
+                }
         }
     }
 }
@@ -84,6 +87,7 @@ struct SettingsTab: View {
                     else if section == "Archived threads" { ArchivedView() }
                     else { SpeechSettingsView() }
                 }
+                .modifier(RegularScrollingSurface())
                 .toolbar(layout.twoPages ? .hidden : .automatic, for: .navigationBar)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if layout.twoPages {

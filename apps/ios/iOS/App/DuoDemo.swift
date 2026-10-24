@@ -7,6 +7,7 @@ import UIKit
 enum DuoDemo {
     nonisolated static var phone: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoPhone") }
 
+    static var surfaces: [String: CGRect] = [:]
     private static var configured: Set<ObjectIdentifier> = []
 
     static func configure(_ window: UIWindow) {
@@ -31,7 +32,19 @@ enum DuoDemo {
         }
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
-                "scrolls": scrolls(window)]
+                "scrolls": scrolls(window),
+                "surfaces": surfaces.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }]
+    }
+
+    private static func pixel(_ image: UIImage, x: CGFloat, y: CGFloat) -> [UInt8] {
+        guard let image = image.cgImage?.cropping(to: CGRect(x: x * image.scale, y: y * image.scale, width: 1, height: 1)) else { return [] }
+        var rgba = [UInt8](repeating: 0, count: 4)
+        rgba.withUnsafeMutableBytes { bytes in
+            let context = CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8,
+                bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        return Array(rgba.prefix(3))
     }
 
     static func handle(_ url: URL) -> Bool {
@@ -86,8 +99,6 @@ enum DuoDemo {
                 "windows": window.windowScene?.windows.map { ["class": String(describing: type(of: $0)),
                     "width": $0.bounds.width, "height": $0.bounds.height, "hidden": $0.isHidden] as [String: Any] } ?? []]
             metadata.merge(layoutGeometry(window)) { _, measured in measured }
-            try? JSONSerialization.data(withJSONObject: metadata, options: .sortedKeys)
-                .write(to: URL.documentsDirectory.appending(path: name + ".json"))
             let format = UIGraphicsImageRendererFormat()
             format.scale = 3
             let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
@@ -95,6 +106,12 @@ enum DuoDemo {
                 for overlay in window.windowScene?.windows ?? [] where overlay !== window && !overlay.isHidden {
                     overlay.drawHierarchy(in: window.convert(overlay.bounds, from: overlay), afterScreenUpdates: true)
                 }
+            }
+            metadata["railCenter"] = pixel(image, x: 8, y: window.bounds.height / 2)
+            metadata["railBottom"] = pixel(image, x: 8, y: window.bounds.height - 5)
+            if let data = try? JSONSerialization.data(withJSONObject: metadata, options: .sortedKeys) {
+                try? data.write(to: URL.documentsDirectory.appending(path: name + ".json"))
+                window.accessibilityValue = String(data: data, encoding: .utf8)
             }
             try? image.pngData()?.write(to: URL.documentsDirectory.appending(path: name + ".png"))
             return true
