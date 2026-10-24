@@ -73,7 +73,7 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
         // A running ring never lets the app idle, so nothing here scrolls:
         // the second launch closes the top groups to bring Runners up.
-        for (name, closed) in [("bot-rows-phone", "earlier"), ("bot-rows-phone-runners", "earlier,needs,running")] {
+        for (name, closed) in [("bot-rows-phone", "earlier"), ("bot-rows-phone-runners", "earlier,needs,running,waiting")] {
             launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity", "-bot.threads.closed", closed] + motion)
             let runners = app.staticTexts["Runners"]
             XCTAssertTrue(runners.waitForExistence(timeout: 20))

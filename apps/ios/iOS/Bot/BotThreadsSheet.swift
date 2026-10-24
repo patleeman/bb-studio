@@ -50,6 +50,11 @@ struct BotThreadsSheet: View {
                         ForEach(BotThreadGroups.rows(groups.running)) { threadRow($0.thread, depth: $0.depth) }
                     }
                 }
+                if !groups.waiting.isEmpty {
+                    group("waiting", "Waiting to start") {
+                        ForEach(BotThreadGroups.rows(groups.waiting)) { threadRow($0.thread, depth: $0.depth) }
+                    }
+                }
                 if !runners.isEmpty {
                     group("runners", "Runners") {
                         ForEach(runners) { runnerRow($0) }
@@ -142,10 +147,10 @@ struct BotThreadsSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                BotRowMark(state: state, providerId: thread.providerId)
+                BotRowMark(state: state, providerId: thread.providerId, dimmed: state == .queued)
                 Text(thread.title.isEmpty ? "Untitled" : thread.title)
                     .lineLimit(1)
-                    .foregroundStyle(tone == .idle ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(tone == .idle || tone == .waiting ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                 Spacer(minLength: 8)
                 BotRowTrailing(state: state, fallback: age)
             }
@@ -165,12 +170,12 @@ struct BotThreadsSheet: View {
                 BotRowMark(state: runner.rowState, providerId: runner.providerId, dimmed: runner.rowState == .idle || runner.rowState == .paused)
                     .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(runner.name)
-                            .lineLimit(1)
-                            .foregroundStyle(runner.paused ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-                        Spacer(minLength: 0)
-                        if runnerBusy != runner.id { BotRunnerTrailing(runner: runner) }
+                    // The name comes first: a tight row shortens "next 5:15 PM · quiet"
+                    // to "5:15 PM" (keeping "· failed") before the name truncates.
+                    ViewThatFits(in: .horizontal) {
+                        runnerTitle(runner, compact: false, truncates: false)
+                        runnerTitle(runner, compact: true, truncates: false)
+                        runnerTitle(runner, compact: true, truncates: true)
                     }
                     Text(runner.plainSchedule).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     if let report = runner.lastReport, !report.isEmpty {
@@ -205,6 +210,17 @@ struct BotThreadsSheet: View {
         .accessibilityActions {
             Button(runner.paused ? "Resume" : "Pause") { act(runner) { try await $0.setRunnerPaused(runner.id, paused: !runner.paused, botId: botId) } }
             if !runner.paused { Button("Run now") { act(runner) { try await $0.runRunnerNow(runner.id, botId: botId) } } }
+        }
+    }
+
+    private func runnerTitle(_ runner: BotRunner, compact: Bool, truncates: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(runner.name)
+                .lineLimit(1)
+                .fixedSize(horizontal: !truncates, vertical: false)
+                .foregroundStyle(runner.paused ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+            Spacer(minLength: 0)
+            if runnerBusy != runner.id { BotRunnerTrailing(runner: runner, compact: compact) }
         }
     }
 
@@ -342,7 +358,7 @@ struct BotRowMark: View {
             Circle().stroke(Color.orange, lineWidth: 1.5).frame(width: 14.5, height: 14.5)
         case .failed:
             Circle().stroke(Color.red, lineWidth: 1.5).frame(width: 14.5, height: 14.5)
-        case .idle, .paused:
+        case .idle, .paused, .queued:
             Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1.5).frame(width: 14.5, height: 14.5)
         }
     }
@@ -413,6 +429,7 @@ struct BotRowTrailing: View {
 /// "next 5:15 PM · quiet" with a failed last run in red.
 struct BotRunnerTrailing: View {
     var runner: BotRunner
+    var compact = false
 
     var body: some View {
         Group {
@@ -427,7 +444,7 @@ struct BotRunnerTrailing: View {
                     Text("running")
                 }
             } else {
-                let status = runner.rowStatus()
+                let status = runner.rowStatus(compact: compact)
                 HStack(spacing: 0) {
                     if let next = status.next { Text(next) }
                     if let outcome = status.outcome {

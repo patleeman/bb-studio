@@ -26,12 +26,31 @@ final class BotThreadsTests: XCTestCase {
         // Needs you is flat and only the threads it started; a childless one isn't repeated below.
         XCTAssertEqual(groups.needsYou.map(\.id), ["ask"])
         // A worker nests under the lead that started it, and pulls it into Running.
-        XCTAssertEqual(BotThreadGroups.rows(groups.running).map { "\($0.id):\($0.depth)" }, ["queued:0", "lead:0", "worker:1"])
+        // Running holds only running work; a queued thread waits to start.
+        XCTAssertEqual(BotThreadGroups.rows(groups.running).map { "\($0.id):\($0.depth)" }, ["lead:0", "worker:1"])
+        XCTAssertEqual(BotThreadGroups.rows(groups.waiting).map { "\($0.id):\($0.depth)" }, ["queued:0"])
         XCTAssertEqual(BotThreadGroups.rows(groups.recent).map { "\($0.id):\($0.depth)" }, ["old:0", "kid:1"])
         // Recurring leaves out the check-in.
         XCTAssertEqual(groups.recurring.map(\.id), ["au"])
         XCTAssertFalse(groups.isEmpty)
         XCTAssertTrue(BotThreadGroups(nil).isEmpty)
+    }
+
+    func testQueuedThreadsWaitToStartUnlessTheirTreeRuns() throws {
+        let activity = try activity("""
+        {"needsYou":[],
+         "waiting":[{"id":"q1","title":"Queued under a runner","status":"pending","relation":"started","needsYou":false,"updatedAt":40,"parentId":"run"},
+                    {"id":"q2","title":"Queued under an idle one","status":"pending","relation":"started","needsYou":false,"updatedAt":35,"parentId":"done"}],
+         "inProgress":[{"id":"run","title":"Running","status":"active","relation":"started","needsYou":false,"updatedAt":30}],
+         "scheduled":[],
+         "completed":[{"id":"done","title":"Done","status":"idle","relation":"started","needsYou":false,"updatedAt":20}],
+         "latest":null}
+        """)
+        let groups = BotThreadGroups(activity)
+        XCTAssertEqual(BotThreadGroups.rows(groups.running).map(\.id), ["run", "q1"])
+        XCTAssertEqual(BotThreadGroups.rows(groups.waiting).map(\.id), ["done", "q2"])
+        XCTAssertTrue(groups.recent.isEmpty)
+        XCTAssertEqual(BotRowState(BotThreadTone(activity.waiting![1])), .queued)
     }
 
     func testNeedsYouParentStaysInTreeToHoldChildren() throws {
@@ -187,6 +206,24 @@ final class BotRowStateTests: XCTestCase {
         XCTAssertEqual(later, "Wed 10:40\u{202F}PM")
     }
 
+    func testCompactStatusPutsTheNameFirstButKeepsAFailure() throws {
+        let utc = TimeZone(identifier: "UTC")!
+        let locale = Locale(identifier: "en_US")
+        let now = Date(timeIntervalSince1970: 1_761_000_000)
+        let today = (now.timeIntervalSince1970 - 3_600) * 1000
+        func status(_ json: String) throws -> (next: String?, outcome: String?) {
+            try runner(json).rowStatus(compact: true, now: now, locale: locale, timeZone: utc)
+        }
+        let quiet = try status(#""state":"active","nextRunAt":\#(today),"lastRunAt":1"#)
+        XCTAssertEqual(quiet.next, "9:40\u{202F}PM")
+        XCTAssertNil(quiet.outcome)
+        XCTAssertNil(try status(#""state":"active","nextRunAt":\#(today),"lastRunAt":1,"lastLevel":"tell","lastReportAt":1"#).outcome)
+        let failed = try status(#""state":"active","nextRunAt":\#(today),"lastRunAt":1,"lastRunStatus":"failed""#)
+        XCTAssertEqual(failed.next, "9:40\u{202F}PM")
+        XCTAssertEqual(failed.outcome, "failed")
+        XCTAssertEqual(try status(#""state":"paused","nextRunAt":\#(today)"#).next, "paused")
+    }
+
     func testElapsedClock() {
         let now = Date(timeIntervalSince1970: 10_000)
         XCTAssertEqual(BotRowTime.elapsed(since: (10_000 - 42) * 1000, now: now), "0:42")
@@ -197,7 +234,7 @@ final class BotRowStateTests: XCTestCase {
 
     func testThreadToneMapsToRowState() {
         XCTAssertEqual(BotRowState(.needs), .waiting)
-        XCTAssertEqual(BotRowState(.waiting), .waiting)
+        XCTAssertEqual(BotRowState(.waiting), .queued)
         XCTAssertEqual(BotRowState(.running, since: 3), .running(since: 3))
         XCTAssertEqual(BotRowState(.failed), .failed)
         XCTAssertEqual(BotRowState(.idle), .idle)

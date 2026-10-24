@@ -65,26 +65,29 @@ public struct BotThreadGroups: Equatable, Sendable {
 
     /// Flat: each one is a thing to do.
     public var needsYou: [BotActivity.Thread] = []
-    /// Started threads that are running or queued, or have one below them.
+    /// Started threads that are running, or have a running thread below them.
     public var running: [Node] = []
+    /// Started threads queued to start, with none running in their tree.
+    public var waiting: [Node] = []
     /// Automations that wake the Bot, other than its check-in.
     public var recurring: [BotActivity.Scheduled] = []
     /// The rest of the threads it started, newest first.
     public var recent: [Node] = []
 
-    public var isEmpty: Bool { needsYou.isEmpty && running.isEmpty && recent.isEmpty }
+    public var isEmpty: Bool { needsYou.isEmpty && running.isEmpty && waiting.isEmpty && recent.isEmpty }
 
-    /// Desktop `sidebarGroups`: Running and Recent are trees, a thread under
+    /// Desktop `sidebarGroups`: Running, Waiting to start and Recent are trees, a thread under
     /// the thread that started it at any depth, placed by its root. A
     /// childless thread that needs the user is only under Needs you.
     public init(_ activity: BotActivity?) {
         guard let activity else { return }
         func started(_ list: [BotActivity.Thread]) -> [BotActivity.Thread] { list.filter { $0.relation == "started" } }
-        let waiting = activity.waiting ?? []
-        let busy = Set((activity.inProgress + waiting).map(\.id))
+        let pending = activity.waiting ?? []
+        let working = Set(activity.inProgress.map(\.id))
+        let queued = Set(pending.map(\.id))
         var all: [String: BotActivity.Thread] = [:]
         var order: [String] = []
-        for thread in started(activity.needsYou + activity.inProgress + waiting + activity.completed) where all[thread.id] == nil {
+        for thread in started(activity.needsYou + activity.inProgress + pending + activity.completed) where all[thread.id] == nil {
             all[thread.id] = thread
             order.append(thread.id)
         }
@@ -108,7 +111,8 @@ public struct BotThreadGroups: Equatable, Sendable {
             for kid in newest(children[thread.id] ?? []) where !seen.contains(kid.id) { kids.append(build(kid, &seen)) }
             return Node(thread: thread, children: kids)
         }
-        func hasBusy(_ node: Node) -> Bool { busy.contains(node.thread.id) || node.children.contains(where: hasBusy) }
+        func hasRunning(_ node: Node) -> Bool { working.contains(node.thread.id) || node.children.contains(where: hasRunning) }
+        func hasQueued(_ node: Node) -> Bool { queued.contains(node.thread.id) || node.children.contains(where: hasQueued) }
         let trees = newest(roots).map { root -> Node in
             var seen = Set<String>()
             return build(root, &seen)
@@ -116,9 +120,10 @@ public struct BotThreadGroups: Equatable, Sendable {
         // A thread waiting on the user is already under Needs you; it stays in a tree only to hold its children.
         .filter { !$0.thread.needsYou || !$0.children.isEmpty }
         needsYou = started(activity.needsYou)
-        running = trees.filter(hasBusy)
+        running = trees.filter(hasRunning)
+        waiting = trees.filter { !hasRunning($0) && hasQueued($0) }
         recurring = activity.scheduled.filter { $0.kind == "automation" }
-        recent = trees.filter { !hasBusy($0) }
+        recent = trees.filter { !hasRunning($0) && !hasQueued($0) }
     }
 
     /// A tree as list rows, each child after its parent, one level deeper.
@@ -155,8 +160,10 @@ public enum BotThreadTone: String, Sendable {
 public enum BotRowState: Equatable, Sendable {
     /// Working now; ticks from `since` when BB knows it.
     case running(since: Double?)
-    /// Needs the user, or waiting to start: a still amber ring.
+    /// Needs the user: a still amber ring.
     case waiting
+    /// Queued to start: dimmed, with a muted hairline ring.
+    case queued
     /// The last run or the thread failed: a still red ring.
     case failed
     /// Done, or a runner between runs. A runner's mark is dimmed.
@@ -167,7 +174,8 @@ public enum BotRowState: Equatable, Sendable {
     public init(_ tone: BotThreadTone, since: Double? = nil) {
         switch tone {
         case .running: self = .running(since: since)
-        case .needs, .waiting: self = .waiting
+        case .needs: self = .waiting
+        case .waiting: self = .queued
         case .failed: self = .failed
         case .idle: self = .idle
         }
@@ -257,10 +265,13 @@ extension BotRunner {
 
     /// The row's right-hand text when it isn't running: "paused", or
     /// "next 5:15 PM" with the last outcome after it, "next 5:15 PM · quiet".
-    public func rowStatus(now: Date = Date(), locale: Locale = .current, timeZone: TimeZone = .current) -> (next: String?, outcome: String?) {
+    /// `compact`, for a tight row where the name comes first: just the time,
+    /// "5:15 PM", keeping only a failed outcome.
+    public func rowStatus(compact: Bool = false, now: Date = Date(), locale: Locale = .current, timeZone: TimeZone = .current) -> (next: String?, outcome: String?) {
         if paused { return ("paused", nil) }
-        let next = nextRunAt.map { "next \(BotRowTime.at($0, now: now, locale: locale, timeZone: timeZone))" }
-        return (next, lastOutcome)
+        let time = nextRunAt.map { BotRowTime.at($0, now: now, locale: locale, timeZone: timeZone) }
+        guard compact else { return (time.map { "next \($0)" }, lastOutcome) }
+        return (time, lastOutcome == "failed" ? "failed" : nil)
     }
 
     /// "Next run 5:15 PM, last run quiet", for VoiceOver.
