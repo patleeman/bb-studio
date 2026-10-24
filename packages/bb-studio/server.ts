@@ -942,7 +942,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),
     bot_maintenance_set: ({ botId, ...patch }) => maintenance.set(learnerId(botId), patch),
     bot_maintenance_run: ({ botId, dryRun }) => maintenance.run(learnerId(botId), { dryRun }),
-    bot_attention: async ({ botId }) => ({ attention: await bots.botAttention(botId) }),
+    bot_attention: ({ botId }) => bots.attentionView(botId),
     bot_activity: async ({ botId }) => ({ ...await bots.activity(botId), maintenance: bots.stored(botId) ? maintenance.view(bots.stored(botId)!.id).runs : [] }),
     bot_cache_state: ({ threadId, botId }) => warmer.state(cacheThread(threadId, botId)),
     bot_cache_set: ({ botId, ...patch }) => {

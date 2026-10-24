@@ -513,7 +513,8 @@ export const rpcContract = defineRpcContract({
   bot_maintenance_run: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: maintenanceRun.nullable() },
   bot_activity: { input: forBot, output: botActivity },
   /** Just the Bot's attention (bot_activity's), for a Bot row that isn't expanded. */
-  bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable() }) },
+  /** hasBot false: no such Bot (or it has no chat yet), so a client counts what waits on the user some other way. */
+  bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable(), hasBot: z.boolean().optional() }) },
   /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
   bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },
   /** Changes a Bot's cache-warming settings; returns its chat's cache state. */

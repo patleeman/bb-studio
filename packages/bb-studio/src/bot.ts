@@ -1169,6 +1169,11 @@ export class Bots {
     return this.attention(bot.threadId, thread);
   }
 
+  /** bot_attention: the Bot's attention, and whether there's a Bot with a chat at all (no Bot: clients fall back to BB's own count). */
+  async attentionView(botId?: string): Promise<{ attention: BotAttention | null; hasBot: boolean }> {
+    return { attention: await this.botAttention(botId), hasBot: !!this.stored(botId)?.threadId };
+  }
+
   async activity(botId?: string): Promise<BotActivityView> {
     const { bot, run } = await this.get(botId);
     if (!bot?.threadId) return { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };

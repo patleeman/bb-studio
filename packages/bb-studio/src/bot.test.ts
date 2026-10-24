@@ -260,8 +260,18 @@ it("the Bot's attention: a question in its hidden chat, until it's answered", as
   x.list.mockImplementation(async () => []);
   expect((await x.bots.activity()).attention).toMatchObject({ reason: "Asked you a question", count: 1 });
   expect(await x.bots.botAttention()).toMatchObject({ reason: "Asked you a question", count: 1 });
+  expect(await x.bots.attentionView()).toMatchObject({ attention: { reason: "Asked you a question" }, hasBot: true });
   x.pending.set("bot1", [{ id: "q1", status: "resolved" } as never]);
   expect((await x.bots.activity()).attention).toBeNull();
+});
+
+it("bot_attention says when there's no Bot, so widgets fall back to BB's own count", async () => {
+  const x = await setup();
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: false });
+  expect(await x.bots.attentionView("bot_gone")).toEqual({ attention: null, hasBot: false });
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: true });
 });
 
 it("the Bot's attention: its replies the user hasn't read, not [PASS], until the chat is read", async () => {
