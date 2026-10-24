@@ -1,5 +1,5 @@
 // The Backup and restore section of the Setup page. See use-backup.ts.
-import { Button, cn } from "../../kit/ui/index";
+import { Button, cn, Icon } from "../../kit/ui/index";
 import { useRef } from "react";
 import type { RestoreResult } from "../../backup-contract";
 import { useBackup, type BackupApi } from "./use-backup";
@@ -78,12 +78,24 @@ export function BackupView({ api }: { api: BackupApi }) {
       {state.step === "uploading" ? <p className="text-xs text-muted-foreground">Uploading {state.fileName}… {Math.round(state.progress * 100)}%</p> : null}
       {state.step === "checking" ? <p className="text-xs text-muted-foreground">Checking {state.fileName}…</p> : null}
       {state.step === "planned" || state.step === "restoring" ? (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-          <p className="text-xs text-foreground">{state.step === "planned" && state.error
-            ? `Restore did not finish for ${state.fileName}. Retry or cancel below.`
-            : `Restoring ${state.fileName} (backed up ${new Date(state.plan.createdAt).toLocaleString()}) would do this. Nothing has changed yet.`}</p>
+        <div className={cn("flex flex-col gap-2 rounded-md border p-3", state.step === "planned" && state.error ? "border-destructive/40 bg-destructive/5" : "border-border")}>
+          {state.step === "planned" && state.error ? (
+            <>
+              <div className="flex items-start gap-2">
+                <Icon name="AlertCircle" className="mt-px size-3.5 shrink-0 text-destructive" />
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="text-xs font-medium text-foreground">The restore didn't finish</p>
+                  <p role="alert" className="text-xs text-destructive">{state.error}</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Restoring <span className="break-all text-foreground">{state.fileName}</span> again is safe: it only adds what's still missing. This was the plan:
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-foreground">Restoring <span className="break-all">{state.fileName}</span> (backed up {new Date(state.plan.createdAt).toLocaleString()}) would do this. Nothing has changed yet.</p>
+          )}
           <Outcome result={state.plan} />
-          {state.step === "planned" && state.error ? <p role="alert" className="text-xs text-destructive">{state.error}</p> : null}
           <div className="flex items-center gap-1.5">
             <Button size="sm" disabled={state.step === "restoring"} onClick={() => void api.confirm()}>{state.step === "restoring" ? "Restoring…" : "Restore"}</Button>
             <Button size="sm" variant="ghost" disabled={state.step === "restoring"} onClick={api.cancel}>Cancel</Button>
