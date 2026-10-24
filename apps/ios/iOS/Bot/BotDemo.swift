@@ -240,12 +240,12 @@ enum BotDemo {
         let today = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
         let laterToday = max(now + 600_000, today + 23 * 3_600_000)
         return decode(#"""
-        [{"id":"run_inbox","name":"Inbox sweep","state":"active","running":true,"runningSince":\#(now - 42_000),"schedule":{"cadence":"every2hours"},"nextRunAt":\#(now + 7_200_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"log","lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 7_200_000)},
-         {"id":"run_prs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
-         {"id":"run_deploy","name":"Deploy check","state":"active","schedule":{"cadence":"hourly"},"nextRunAt":\#(laterToday),"lastRunAt":\#(now - 3_000_000),"lastRunStatus":"succeeded","lastLevel":"log"},
-         {"id":"run_rivals","name":"Competitor watch","state":"active","schedule":{"cadence":"daily","time":"07:30"},"nextRunAt":\#(now + 2 * 86_400_000),"lastRunAt":\#(now - 36_000_000),"lastRunStatus":"succeeded","lastLevel":"tell","lastReport":"Acme cut its Pro price by 20%.","lastReportAt":\#(now - 36_000_000)},
-         {"id":"run_metrics","name":"Metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
-         {"id":"run_news","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3),"lastRunAt":\#(now - 86_400_000 * 3)}]
+        [{"id":"run_inbox","threadId":"thr_runinbox","name":"Inbox sweep","state":"active","running":true,"runningSince":\#(now - 42_000),"schedule":{"cadence":"every2hours"},"nextRunAt":\#(now + 7_200_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"log","lastReport":"4 new threads, none urgent.","lastReportAt":\#(now - 7_200_000)},
+         {"id":"run_prs","threadId":"thr_runprs","name":"PR watcher","state":"active","schedule":{"cadence":"weekdays","time":"09:00"},"nextRunAt":\#(now + 86_400_000),"lastRunAt":\#(now - 7_200_000),"lastRunStatus":"succeeded","lastLevel":"urgent","lastReport":"Release PR is waiting on CI.","lastReportAt":\#(now - 7_200_000),"urgent":true},
+         {"id":"run_deploy","threadId":"thr_rundeploy","name":"Deploy check","state":"active","schedule":{"cadence":"hourly"},"nextRunAt":\#(laterToday),"lastRunAt":\#(now - 3_000_000),"lastRunStatus":"succeeded","lastLevel":"log"},
+         {"id":"run_rivals","threadId":"thr_runrivals","name":"Competitor watch","state":"active","schedule":{"cadence":"daily","time":"07:30"},"nextRunAt":\#(now + 2 * 86_400_000),"lastRunAt":\#(now - 36_000_000),"lastRunStatus":"succeeded","lastLevel":"tell","lastReport":"Acme cut its Pro price by 20%.","lastReportAt":\#(now - 36_000_000)},
+         {"id":"run_metrics","threadId":"thr_runmetrics","name":"Metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
+         {"id":"run_news","threadId":"thr_runnews","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3),"lastRunAt":\#(now - 86_400_000 * 3)}]
         """#)
     }
 

@@ -72,11 +72,19 @@ final class ErrorStatesCaptureUITests: XCTestCase {
     func testBotRowsPhone() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
         launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity"] + motion)
-        XCTAssertTrue(text(containing: "Lisbon offsite options").waitForExistence(timeout: 20))
-        app.swipeUp()
-        let runner = text(containing: "Metrics digest")
-        XCTAssertTrue(runner.waitForExistence(timeout: 10))
-        if !runner.isHittable { app.swipeUp() }
+        let runners = app.staticTexts["Runners"]
+        XCTAssertTrue(runners.waitForExistence(timeout: 20))
+        sleep(1)
+        // Full height, then Runners to the top.
+        runners.swipeUp()
+        sleep(1)
+        let digest = text(containing: "Metrics digest")
+        for _ in 0..<3 where !(digest.exists && digest.isHittable) {
+            let start = runners.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.05, thenDragTo: app.navigationBars["Activity"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)))
+            sleep(1)
+        }
+        XCTAssertTrue(digest.waitForExistence(timeout: 10))
         shot("bot-rows-phone" + suffix)
         hold()
     }
@@ -88,6 +96,11 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         XCTAssertTrue(text(containing: "Lisbon offsite options").waitForExistence(timeout: 30))
         sleep(2)
         shot("bot-rows-duo" + suffix)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: 250, dy: 600)).press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: 250, dy: 240)))
+        XCTAssertTrue(text(containing: "Metrics digest").waitForExistence(timeout: 10))
+        sleep(1)
+        shot("bot-rows-duo-runners" + suffix)
         hold()
     }
 
