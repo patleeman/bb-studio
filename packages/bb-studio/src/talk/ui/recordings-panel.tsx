@@ -87,16 +87,23 @@ export function UnsentAudio() {
           after updating Talk, download them, or discard them.
         </p>
         {status === "error" ? (
-          <div role="alert" className="mt-6 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
-            <p>Talk couldn’t check or upload local audio: {uploadError}</p>
-            <button type="button" className={`${OUTLINE_BUTTON} mt-3`} disabled={busy} onClick={() => act(() => talk.kickUpload())}>Retry check</button>
+          <div role="alert" className="mt-6 flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm max-md:flex-wrap">
+            <Icon name="AlertCircle" className="size-4 shrink-0 text-destructive" />
+            <span className="min-w-0 flex-1">
+              <span className="font-medium">Talk couldn’t check this device for unsent audio.</span>{" "}
+              <span className="text-muted-foreground">{uploadError?.replace(/[.\s]+$/, "")}. Nothing has been discarded.</span>
+            </span>
+            <button type="button" className={OUTLINE_BUTTON} disabled={busy} onClick={() => act(() => talk.kickUpload())}>
+              <Icon name="RotateCcw" />
+              Retry check
+            </button>
           </div>
         ) : null}
         {status === "checking" ? (
           <p className="mt-8 text-sm text-muted-foreground">Checking for unsent audio…</p>
         ) : status === "uploaded" ? (
           <p className="mt-8 text-sm text-muted-foreground">Nothing here: every piece of audio was uploaded.</p>
-        ) : status === "items" ? (
+        ) : setAside.length ? (
           <>
             <div className="mt-6 flex flex-wrap gap-2">
               <button type="button" className={OUTLINE_BUTTON} disabled={busy} onClick={() => act(() => talk.retrySetAside(setAside))}>
