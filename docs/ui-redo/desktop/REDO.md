@@ -36,7 +36,7 @@ node docs/ui-redo/desktop/capture.mjs before|after [scene,...]
 
 | Change | SHA | Finding | Renders |
 | --- | --- | --- | --- |
-| Page breadcrumb navigation | 5a368687 | Behaviour only (crumbs now open with `openAppPath`). The markup is unchanged and both renders are pixel-identical. See the note on the workspace below. | [before](img/breadcrumb-before-dark.png) · [after](img/breadcrumb-after-dark.png) |
+| Page breadcrumb navigation | 5a368687 | Behaviour only (crumbs now open with `openAppPath`), and its markup is unchanged. Its crumbs never showed in a workspace tab; that is fixed under [Crumbs in workspace tabs](#crumbs-in-workspace-tabs). The "after" render here includes that fix. | [before](img/breadcrumb-before-dark.png) · [after](img/breadcrumb-after-dark.png) |
 | Voice draft after a failed send | 6edbc95f | A toast with an "Add to draft" action when the composer already has newer text. It uses the standard sonner toast and action, so there is nothing to restyle. Not rendered, because it needs live dictation. | n/a |
 | Dashboards refresh and stale states | 0dca2c6c | Only `use-dashboard.ts` changed: the order in which snapshots are accepted. There is no markup or style change, so nothing to redo. | n/a |
 
@@ -53,7 +53,111 @@ node docs/ui-redo/desktop/capture.mjs before|after [scene,...]
 | 063e11cb | Removes the legacy initial target from the Studio tab. No visual change. |
 | aabc5749, a5b0def7, 27752b3e, c7cae2ae | Structural merges. I compared every `className` removed and added in their `.tsx` and `.css` diffs: they are the same set, only moved, and no stylesheet changed. No visual regression. The dropdown scope gap fixed above was not caused by these: `dropdown-menu.tsx` moved unchanged in 27752b3e. |
 
+## Dropdowns
+
+The lead kept the kit-wide fix in ebde4f05, which gives portaled menus the
+plugin scope. To check it, [menus.mjs](menus.mjs) seeds one item of each kind
+(pages, a temp note, a drawing, a recording, an artifact with two versions, a
+design, a dashboard, a mini app, a Bot) and opens every Studio dropdown in dark
+and light. It captures before (`main` at 1de68e82) and after (this branch).
+The capture is cropped to the open menus and their trigger. All 104 renders
+are in [img/menus](img/menus).
+
+**Result: nothing got worse.** 17 of the 26 menus are byte-identical before
+and after. The 9 that differ are either the scope now applying classes that
+were silently missing, or live content.
+
+| Menu | Where | Before → after | Verdict |
+| --- | --- | --- | --- |
+| Studio options ⋯ | Studio collection | [dark](img/menus/studio-options-before-dark.png) → [dark](img/menus/studio-options-after-dark.png) · [light](img/menus/studio-options-before-light.png) → [light](img/menus/studio-options-after-light.png) | Identical |
+| New (create) | Studio collection bar | [dark](img/menus/collection-new-before-dark.png) → [dark](img/menus/collection-new-after-dark.png) · [light](img/menus/collection-new-before-light.png) → [light](img/menus/collection-new-after-light.png) | Identical |
+| Row Actions ⋯ | Collection row | [dark](img/menus/collection-row-actions-before-dark.png) → [dark](img/menus/collection-row-actions-after-dark.png) · [light](img/menus/collection-row-actions-before-light.png) → [light](img/menus/collection-row-actions-after-light.png) | Identical |
+| Row ⋯ › Move to (project picker) | Collection row | [dark](img/menus/collection-row-move-to-before-dark.png) → [dark](img/menus/collection-row-move-to-after-dark.png) · [light](img/menus/collection-row-move-to-before-light.png) → [light](img/menus/collection-row-move-to-after-light.png) | **Better.** The submenu now gets its intended `w-60`; before, it shrank to its longest name. A chevron is added (see below). |
+| Row right-click menu | Collection row | [dark](img/menus/collection-row-context-before-dark.png) → [dark](img/menus/collection-row-context-after-dark.png) · [light](img/menus/collection-row-context-before-light.png) → [light](img/menus/collection-row-context-after-light.png) | Identical |
+| Selection: Move | Collection, one row selected | [dark](img/menus/collection-bulk-move-before-dark.png) → [dark](img/menus/collection-bulk-move-after-dark.png) · [light](img/menus/collection-bulk-move-before-light.png) → [light](img/menus/collection-bulk-move-after-light.png) | **Better.** It now gets its intended `w-60`. |
+| Selection: Tag | Collection, one row selected | [dark](img/menus/collection-bulk-tag-before-dark.png) → [dark](img/menus/collection-bulk-tag-after-dark.png) · [light](img/menus/collection-bulk-tag-before-light.png) → [light](img/menus/collection-bulk-tag-after-light.png) | **Better.** The "New tag" field now fills the menu instead of stopping short. |
+| Filter chip options | Studio query bar | [dark](img/menus/query-chip-before-dark.png) → [dark](img/menus/query-chip-after-dark.png) · [light](img/menus/query-chip-before-light.png) → [light](img/menus/query-chip-after-light.png) | Identical |
+| Sidebar New | Studio sidebar | [dark](img/menus/sidebar-new-before-dark.png) → [dark](img/menus/sidebar-new-after-dark.png) · [light](img/menus/sidebar-new-before-light.png) → [light](img/menus/sidebar-new-after-light.png) | Identical |
+| Item right-click menu | A page mention | [dark](img/menus/item-gesture-before-dark.png) → [dark](img/menus/item-gesture-after-dark.png) · [light](img/menus/item-gesture-before-light.png) → [light](img/menus/item-gesture-after-light.png) | Identical |
+| Page actions ⋯ | Page | [dark](img/menus/page-menu-before-dark.png) → [dark](img/menus/page-menu-after-dark.png) · [light](img/menus/page-menu-before-light.png) → [light](img/menus/page-menu-after-light.png) | Identical |
+| Page actions › Move to project | Page | [dark](img/menus/page-menu-move-project-before-dark.png) → [dark](img/menus/page-menu-move-project-after-dark.png) · [light](img/menus/page-menu-move-project-before-light.png) → [light](img/menus/page-menu-move-project-after-light.png) | Identical |
+| Icon picker | Page | [dark](img/menus/page-icon-picker-before-dark.png) → [dark](img/menus/page-icon-picker-after-dark.png) · [light](img/menus/page-icon-picker-before-light.png) → [light](img/menus/page-icon-picker-after-light.png) | **Fixed.** It's an 8-column grid instead of one 900px column. |
+| How to send | Temp note | [dark](img/menus/note-send-before-dark.png) → [dark](img/menus/note-send-after-dark.png) · [light](img/menus/note-send-before-light.png) → [light](img/menus/note-send-after-light.png) | The menu is identical; only the note title's timestamp differs. |
+| ⋯ | Drawing (Draw) | [dark](img/menus/drawing-more-before-dark.png) → [dark](img/menus/drawing-more-after-dark.png) · [light](img/menus/drawing-more-before-light.png) → [light](img/menus/drawing-more-after-light.png) | Identical |
+| ⋯ | Recording (Talk) | [dark](img/menus/recording-more-before-dark.png) → [dark](img/menus/recording-more-after-dark.png) · [light](img/menus/recording-more-before-light.png) → [light](img/menus/recording-more-after-light.png) | Identical |
+| ⋯ › Move to | Recording (Talk) | [dark](img/menus/recording-more-move-to-before-dark.png) → [dark](img/menus/recording-more-move-to-after-dark.png) · [light](img/menus/recording-more-move-to-before-light.png) → [light](img/menus/recording-more-move-to-after-light.png) | **Better.** It gets its intended width, plus the chevron. |
+| ⋯ | Artifact | [dark](img/menus/artifact-more-before-dark.png) → [dark](img/menus/artifact-more-after-dark.png) · [light](img/menus/artifact-more-before-light.png) → [light](img/menus/artifact-more-after-light.png) | Identical |
+| ⋯ › Versions | Artifact | [dark](img/menus/artifact-more-versions-before-dark.png) → [dark](img/menus/artifact-more-versions-after-dark.png) · [light](img/menus/artifact-more-versions-before-light.png) → [light](img/menus/artifact-more-versions-after-light.png) | **Better.** It gets its intended `w-60`, with "Latest" and the ages right-aligned. |
+| Widget ⋯ | Dashboard | [dark](img/menus/dashboard-widget-before-dark.png) → [dark](img/menus/dashboard-widget-after-dark.png) · [light](img/menus/dashboard-widget-before-light.png) → [light](img/menus/dashboard-widget-after-light.png) | Identical |
+| Version history | Dashboard | [dark](img/menus/dashboard-versions-before-dark.png) → [dark](img/menus/dashboard-versions-after-dark.png) · [light](img/menus/dashboard-versions-before-light.png) → [light](img/menus/dashboard-versions-after-light.png) | The menu is identical; only the version's timestamp differs. |
+| Kit dropdown inside a mini app | Mini app (sandboxed frame) | [dark](img/menus/mini-app-menu-before-dark.png) → [dark](img/menus/mini-app-menu-after-dark.png) · [light](img/menus/mini-app-menu-before-light.png) → [light](img/menus/mini-app-menu-after-light.png) | Identical |
+| Bot menu ⋯ (Bot info) | Bot page | [dark](img/menus/bot-menu-before-dark.png) → [dark](img/menus/bot-menu-after-dark.png) · [light](img/menus/bot-menu-before-light.png) → [light](img/menus/bot-menu-after-light.png) | Identical |
+| Sort and group threads | Bot sidebar | [dark](img/menus/bot-threads-sort-before-dark.png) → [dark](img/menus/bot-threads-sort-after-dark.png) · [light](img/menus/bot-threads-sort-before-light.png) → [light](img/menus/bot-threads-sort-after-light.png) | Identical |
+| Automations New | Bot page | [dark](img/menus/bot-automations-before-dark.png) → [dark](img/menus/bot-automations-after-dark.png) · [light](img/menus/bot-automations-before-light.png) → [light](img/menus/bot-automations-after-light.png) | Identical |
+| Prompt cache chip | Bot's thread header | [dark](img/menus/bot-cache-before-dark.png) → [dark](img/menus/bot-cache-after-dark.png) · [light](img/menus/bot-cache-before-light.png) → [light](img/menus/bot-cache-after-light.png) | The menu is identical. The countdown changed, and because the chip got narrower the pointer landed on Bot info, so its tooltip shows. |
+
+**Not rendered, and why:**
+
+- **The collection's own project and tag filter menus and its Display menu**
+  (`collection.tsx`). They render only when `CollectionPage` has no `filter`.
+  Its one caller, `StudioPanel`, always passes one, so these menus can't be
+  reached today.
+- **Item header Chat options.** The header shows them only outside the
+  workspace, and every desktop item opens as a workspace tab.
+- **Page activity.** It needs past agent requests or chats on the page.
+- **Bot runner machine picker and Design.** The machine picker is a native
+  `<select>`, and Design's tab row has no dropdown of its own. Neither uses the
+  kit menu.
+- **Context menus, popovers and selects** (`context-menu.tsx`, `popover.tsx`,
+  `select.tsx`). These are separate kit components that ebde4f05 didn't touch.
+
+**Fixed along the way:** "Move to" was the only submenu trigger without the
+chevron its neighbours ("Tags", "Move to project") have. The shared
+`MoveToSubmenu` now has it. The artifact menu's "Versions" trigger also has no
+chevron. It lives in `src/artifacts`, outside this surface, so I left it.
+
+**Bot UI (worker C's):** all four Bot menus are identical before and after.
+No change is needed there.
+
+**Pre-existing, for later:** in dark mode, BB's `muted-foreground` inside
+menus is lightness 0.78 against 0.81 for the item text. Descriptions such as
+the temp note's "How to send" lines barely read as secondary. That comes from
+BB's own tokens and is the same before and after.
+
+## Crumbs in workspace tabs
+
+Patrick's decision: in desktop workspace tabs, show only the parent crumbs,
+because the tab already names the page. Truncate them gracefully, with the
+full path in a tooltip.
+
+**Cause.** Two things hid every crumb in a tab row:
+
+1. `BarCrumb` and `BarSeparator` deliberately render nothing there.
+2. The item header and its `<nav>` were `flex-1` (basis 0) inside a slot that
+   is sized by its content, so the nav got zero width. That also hid what 49c2b81b3
+   meant to keep, including Pages' saving dot.
+
+**Change.**
+
+- In a tab row, the header and nav now take their content's width and shrink
+  before the tools do.
+- The slot may shrink, and the tabs keep at least 40% of the row.
+- `PageBreadcrumbs` has a tab-row form, `useInTabRow()`. It shows only the
+  parents as buttons, at the tab text's 13px, muted.
+- Each parent truncates. The first gives way before the nearest one, and a
+  squeezed crumb keeps its icon.
+- More than two parents fold the middle ones into "…". The whole path is the
+  tooltip.
+- A top-level page shows nothing beside its tab.
+- Full page views outside the workspace are unchanged.
+
+| State | Before (dark) | After (dark) | Light |
+| --- | --- | --- | --- |
+| Page two levels deep, wide | [before](img/crumbs-wide-before-dark.png) | [after](img/crumbs-wide-after-dark.png) | [before](img/crumbs-wide-before-light.png) · [after](img/crumbs-wide-after-light.png) |
+| While the title saves (saving dot) | [before](img/crumbs-saving-before-dark.png) | [after](img/crumbs-saving-after-dark.png) | [before](img/crumbs-saving-before-light.png) · [after](img/crumbs-saving-after-light.png) |
+| Narrow window (900px) | [before](img/crumbs-narrow-before-dark.png) | [after](img/crumbs-narrow-after-dark.png) | [before](img/crumbs-narrow-before-light.png) · [after](img/crumbs-narrow-after-light.png) |
+
 ## Needs Patrick's decision
 
-- **Page crumbs are invisible in the desktop workspace.** In a workspace tab row, the item header's `<nav>` is `flex-1 min-w-0` inside a `shrink-0` slot, so it collapses to zero width. A nested page's parent crumbs never show (see the breadcrumb render), and probably neither do the other crumb-row extras that 49c2b81b3 meant to keep, such as Pages' saving dot. This predates Codex and I didn't change it. Options: show only the parent crumbs in the tab row, since the tab already names the page, or let the nav size to its content and truncate.
-- **Menus now carry the plugin scope.** This is a kit-wide fix, so every Studio dropdown now gets Studio's scoped CSS, as dialogs and tooltips already do. The page menu renders pixel-identically before and after. Menus elsewhere may pick up plugin-only classes that silently didn't apply before. That's the intent, but it is a broader change than the icon picker alone.
+- **Decided:** page crumbs in workspace tabs show only the parents. Done; see [Crumbs in workspace tabs](#crumbs-in-workspace-tabs).
+- **Decided:** keep the kit-wide menu scope fix. Every dropdown was checked; see [Dropdowns](#dropdowns).

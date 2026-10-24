@@ -143,6 +143,45 @@ const scenes = {
     }
   },
 
+  // Patrick's crumbs decision: a page two levels deep in a workspace tab, wide,
+  // while its title saves (the saving dot), and in a narrow window.
+  async crumbs(mode) {
+    const top = await createPage({ title: "Offline mode launch program", icon: "🚀" });
+    const middle = await createPage({ title: "Q4 rollout plans and open risks", icon: "🗺️", parentId: top.id });
+    const child = await createPage({ title: "Rollout risks", icon: "⚠️", parentId: middle.id, markdown: "- Storage quota on older devices" });
+    const row = async () => {
+      const area = await workspaceRect();
+      return { x: area.x, y: 0, width: area.width, height: area.y + 150 };
+    };
+    try {
+      await openPage(child.id);
+      await client.waitForSelector('nav[aria-label="Breadcrumb"]');
+      await scheme(mode);
+      await sleep(600);
+      await shot("crumbs-wide", mode, await row());
+      // Hold the title save so the saving dot stays up.
+      faults.set("pages.update", { mode: "hold" });
+      await client.evaluate(`(() => { const title = document.querySelector('[aria-label="Page title"]'); title.focus(); if ("setSelectionRange" in title) { title.setSelectionRange(title.value.length, title.value.length); return; } const range = document.createRange(); range.selectNodeContents(title); range.collapse(false); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); })()`);
+      await client.command("Input.insertText", { text: " (draft)" });
+      await sleep(1200);
+      await shot("crumbs-saving", mode, await row());
+      releaseHeld("", "");
+      clearFaults();
+      await sleep(800);
+      await client.command("Emulation.setDeviceMetricsOverride", { width: 900, height: 700, deviceScaleFactor: 2, mobile: false });
+      await sleep(900);
+      const narrow = await workspaceRect();
+      await shot("crumbs-narrow", mode, { x: narrow.x, y: 0, width: narrow.width, height: narrow.y + 150 });
+    } finally {
+      await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 2, mobile: false });
+      clearFaults();
+      releaseHeld("", "");
+      await removePage(child.id);
+      await removePage(middle.id);
+      await removePage(top.id);
+    }
+  },
+
   // 26bf9d29: a failed icon change and the page menu while a change runs.
   async "page-icon-error"(mode) {
     const page = await createPage({ title: "Launch retro", markdown: "Notes from the October launch." });
