@@ -1,3 +1,5 @@
+> Latest design review and polish: [Duo v8](V8.md).
+
 > Latest edge-to-edge surfaces and safe controls: [Duo v7](V7.md).
 
 > Latest quick-reply clipping and system inset audit: [Duo v6](V6.md).
