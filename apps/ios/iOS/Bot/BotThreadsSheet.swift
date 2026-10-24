@@ -133,6 +133,7 @@ struct BotThreadsSheet: View {
 
     private func threadRow(_ thread: BotActivity.Thread, depth: Int) -> some View {
         let tone = BotThreadTone(thread)
+        let state = BotRowState(tone, since: thread.runningSince)
         let age = BotAge.label(thread.updatedAt)
         return Button { open(thread.id) } label: {
             HStack(spacing: 10) {
@@ -141,19 +142,19 @@ struct BotThreadsSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                BotStatusDot(tone: tone)
+                BotRowMark(state: state)
                 Text(thread.title.isEmpty ? "Untitled" : thread.title)
                     .lineLimit(1)
                     .foregroundStyle(tone == .idle ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                 Spacer(minLength: 8)
-                Text(age).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                BotRowTrailing(state: state, fallback: age)
             }
             .padding(.leading, CGFloat(max(depth - 1, 0)) * 16)
         }
         .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(thread.title), \(tone.label), \(age)")
+        .accessibilityLabel("\(thread.title), \(BotRowTrailing.spoken(state, tone: tone)), \(age)")
         .accessibilityHint(depth > 0 ? "Started by the thread above. Opens the thread" : "Opens the thread")
         .accessibilityAddTraits(.isButton)
     }
@@ -161,12 +162,17 @@ struct BotThreadsSheet: View {
     private func runnerRow(_ runner: BotRunner) -> some View {
         Button { openRunner(runner) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                BotStatusDot(color: runner.urgent == true ? .orange : runner.paused ? .secondary : .green, hollow: runner.paused && runner.urgent != true)
+                BotRowMark(state: runner.rowState, dimmed: runner.rowState == .idle || runner.rowState == .paused)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(runner.name)
-                        .lineLimit(1)
-                        .foregroundStyle(runner.paused ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-                    Text(runner.subtitle()).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(runner.name)
+                            .lineLimit(1)
+                            .foregroundStyle(runner.paused ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                        Spacer(minLength: 0)
+                        if runnerBusy != runner.id { BotRunnerTrailing(runner: runner) }
+                    }
+                    Text(runner.plainSchedule).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     if let report = runner.lastReport, !report.isEmpty {
                         Text(report)
                             .font(.caption)
@@ -174,7 +180,6 @@ struct BotThreadsSheet: View {
                             .lineLimit(2)
                     }
                 }
-                Spacer(minLength: 0)
                 if runnerBusy == runner.id { ProgressView() }
             }
         }
@@ -194,7 +199,7 @@ struct BotThreadsSheet: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(runner.name), \(runner.urgent == true ? "Needs you" : runner.paused ? "Paused" : "Active"), \(runner.subtitle())")
+        .accessibilityLabel("\(runner.name), \(runner.spokenStatus()), \(runner.plainSchedule)")
         .accessibilityValue(runner.lastReport ?? "")
         .accessibilityAddTraits(.isButton)
         .accessibilityActions {
@@ -205,17 +210,17 @@ struct BotThreadsSheet: View {
 
     private func recurringRow(_ item: BotActivity.Scheduled) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "repeat")
-                .font(.caption)
-                .foregroundStyle(item.enabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+            BotRowMark(state: item.enabled ? .idle : .paused, symbol: "repeat", dimmed: true)
             Text(item.name).lineLimit(1).foregroundStyle(item.enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             Spacer(minLength: 8)
-            Text(item.enabled ? item.nextRunAt.map { BotRunner.when($0) } ?? "On" : "Off")
+            Text(item.enabled ? item.nextRunAt.map { "next \(BotRowTime.at($0))" } ?? "on" : "paused")
                 .font(.caption)
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .modifier(SidebarRowContent(enabled: embedded))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.name), \(item.enabled ? item.nextRunAt.map { "Next run \(BotRowTime.at($0))" } ?? "On" : "Paused")")
     }
 
     private func earlierRow(_ id: String) -> some View {
@@ -277,35 +282,128 @@ struct BotThreadsSheet: View {
     }
 }
 
-/// A small status dot: filled, or a ring for waiting and paused. No animation.
-private struct BotStatusDot: View {
-    var color: Color
-    var hollow = false
+/// A row's mark, the same as desktop's provider mark: a 16 pt box with an
+/// 11 pt logo and a 1.5 pt ring for its state. Only a running row moves: a
+/// 2 pt quarter arc turning every 1.6 s. Under Reduce Motion it stands still
+/// as a full ring with a 6 pt live dot. Idle and paused runners are dimmed.
+struct BotRowMark: View {
+    var state: BotRowState
+    /// Stands in for the provider's logo, which iOS doesn't have yet.
+    var symbol = "sparkle"
+    var dimmed = false
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
-    init(color: Color, hollow: Bool = false) {
-        self.color = color
-        self.hollow = hollow
-    }
-
-    init(tone: BotThreadTone) {
-        switch tone {
-        case .needs: self.init(color: .orange)
-        case .running: self.init(color: .green)
-        case .waiting: self.init(color: .secondary, hollow: true)
-        case .failed: self.init(color: .red)
-        case .idle: self.init(color: .secondary.opacity(0.5))
-        }
+    private static let running = Color.green
+    private var reduceMotion: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-qaReduceMotion") { return true }
+        #endif
+        return systemReduceMotion
     }
 
     var body: some View {
-        Group {
-            if hollow {
-                Circle().strokeBorder(color, lineWidth: 1.2)
+        ZStack {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 11, height: 11)
+            ring
+        }
+        .frame(width: 16, height: 16)
+        .opacity(dimmed ? 0.45 : 1)
+        .grayscale(dimmed ? 1 : 0)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var ring: some View {
+        switch state {
+        case .running:
+            if reduceMotion {
+                Circle().stroke(Self.running, lineWidth: 1.5).frame(width: 14.5, height: 14.5)
+                Circle().fill(Self.running).frame(width: 6, height: 6)
+                    .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: 1))
+                    .offset(x: 5.5, y: 5.5)
             } else {
-                Circle().fill(color)
+                Circle().stroke(Self.running.opacity(0.25), lineWidth: 1.5).frame(width: 14.5, height: 14.5)
+                TimelineView(.animation) { context in
+                    let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+                    Circle().trim(from: 0, to: 0.25)
+                        .stroke(Self.running, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .frame(width: 14, height: 14)
+                        .rotationEffect(.degrees(turn * 360))
+                }
+            }
+        case .waiting:
+            Circle().stroke(Color.orange, lineWidth: 1.5).frame(width: 14.5, height: 14.5)
+        case .failed:
+            Circle().stroke(Color.red, lineWidth: 1.5).frame(width: 14.5, height: 14.5)
+        case .idle, .paused:
+            Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1.5).frame(width: 14.5, height: 14.5)
+        }
+    }
+}
+
+/// A thread row's right-hand text: the elapsed time while it runs, "failed", or its age.
+struct BotRowTrailing: View {
+    var state: BotRowState
+    var fallback: String
+
+    var body: some View {
+        Group {
+            switch state {
+            case .running(let since?):
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(BotRowTime.elapsed(since: since, now: context.date))
+                }
+            case .failed:
+                Text("failed").foregroundStyle(.red)
+            default:
+                Text(fallback)
             }
         }
-        .frame(width: 8, height: 8)
-        .accessibilityHidden(true)
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .fixedSize()
+    }
+
+    static func spoken(_ state: BotRowState, tone: BotThreadTone) -> String {
+        if case .running(let since?) = state { return BotRowTime.spokenElapsed(since: since) }
+        return tone.label
+    }
+}
+
+/// A runner row's right-hand text: elapsed while it runs, "paused", or
+/// "next 5:15 PM · quiet" with a failed last run in red.
+struct BotRunnerTrailing: View {
+    var runner: BotRunner
+
+    var body: some View {
+        Group {
+            if runner.urgent == true {
+                Text(BotAge.label(runner.lastReportAt ?? runner.lastRunAt ?? Date().timeIntervalSince1970 * 1000))
+            } else if runner.isRunning {
+                if let since = runner.runningSince {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(BotRowTime.elapsed(since: since, now: context.date))
+                    }
+                } else {
+                    Text("running")
+                }
+            } else {
+                let status = runner.rowStatus()
+                HStack(spacing: 0) {
+                    if let next = status.next { Text(next) }
+                    if let outcome = status.outcome {
+                        Text(status.next == nil ? outcome : " · \(outcome)")
+                            .foregroundStyle(outcome == "failed" ? AnyShapeStyle(.red) : AnyShapeStyle(.tertiary))
+                    }
+                }
+            }
+        }
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize()
     }
 }

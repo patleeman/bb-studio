@@ -71,22 +71,24 @@ final class ErrorStatesCaptureUITests: XCTestCase {
     /// `TEST_RUNNER_BBGO_STATES_HOLD=<s>` to keep it on screen for a recording.
     func testBotRowsPhone() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
-        launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity"] + motion)
-        let runners = app.staticTexts["Runners"]
-        XCTAssertTrue(runners.waitForExistence(timeout: 20))
-        sleep(1)
-        // Full height, then Runners to the top.
-        runners.swipeUp()
-        sleep(1)
-        let digest = text(containing: "Metrics digest")
-        for _ in 0..<3 where !(digest.exists && digest.isHittable) {
-            let start = runners.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            start.press(forDuration: 0.05, thenDragTo: app.navigationBars["Activity"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)))
+        // A running ring never lets the app idle, so nothing here scrolls:
+        // the second launch closes the top groups to bring Runners up.
+        for (name, closed) in [("bot-rows-phone", "earlier"), ("bot-rows-phone-runners", "earlier,needs,running")] {
+            launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity", "-bot.threads.closed", closed] + motion)
+            let runners = app.staticTexts["Runners"]
+            XCTAssertTrue(runners.waitForExistence(timeout: 20))
             sleep(1)
+            fullHeight()
+            shot(name + suffix)
+            app.terminate()
         }
-        XCTAssertTrue(digest.waitForExistence(timeout: 10))
-        shot("bot-rows-phone" + suffix)
-        hold()
+        if ProcessInfo.processInfo.environment["BBGO_STATES_HOLD"] != nil {
+            launch(["-qaBotDemo", "chat", "-qaBotSheet", "activity", "-bot.threads.closed", "earlier"] + motion)
+            XCTAssertTrue(app.staticTexts["Runners"].waitForExistence(timeout: 20))
+            sleep(1)
+            fullHeight()
+            hold()
+        }
     }
 
     /// The same rows in the unfolded Duo's sidebar, a 951×669 window on the iPad simulator.
@@ -102,6 +104,14 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         sleep(1)
         shot("bot-rows-duo-runners" + suffix)
         hold()
+    }
+
+    /// Drags the sheet's grabber to the top.
+    private func fullHeight() {
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.485))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)))
+        sleep(2)
     }
 
     private var motion: [String] { ProcessInfo.processInfo.environment["BBGO_STATES_MOTION"] == "reduced" ? ["-qaReduceMotion"] : [] }

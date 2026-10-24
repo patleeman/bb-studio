@@ -474,6 +474,14 @@ public struct BotRunner: Decodable, Hashable, Sendable, Identifiable {
     public var lastReport: String?
     public var lastReportAt: Double?
     public var urgent: Bool?
+    /// Its thread is working now. Older Studios leave these out.
+    public var running: Bool?
+    /// When the current run started (ms), while running; nil when BB couldn't tell.
+    public var runningSince: Double?
+    /// "succeeded", "failed", … from BB's automation.
+    public var lastRunStatus: String?
+    /// How loudly the last report spoke: "log", "tell" or "urgent".
+    public var lastLevel: String?
 
     public var paused: Bool { state == "paused" }
 
@@ -528,6 +536,8 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var updatedAt: Double
         /// The listed thread that started this one; nil when the Bot did (or older Studios).
         public var parentId: String?
+        /// When its current turn started (ms), while it works; nil when BB couldn't tell.
+        public var runningSince: Double?
     }
     public struct Scheduled: Decodable, Hashable, Sendable, Identifiable {
         public var id: String

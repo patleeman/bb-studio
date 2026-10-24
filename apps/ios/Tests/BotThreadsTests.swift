@@ -145,3 +145,61 @@ final class BotThreadsTests: XCTestCase {
         XCTAssertEqual(describe("61 9 * * *"), "Custom: 61 9 * * *")
     }
 }
+
+/// The Bot sidebar row states, shared with desktop (`sidebarAgenda.ts` `runnerLastRun`).
+final class BotRowStateTests: XCTestCase {
+    private func runner(_ json: String) throws -> BotRunner {
+        try JSONDecoder().decode(BotRunner.self, from: Data(#"{"id":"r","name":"Runner",\#(json)}"#.utf8))
+    }
+
+    func testLastOutcomeMatchesDesktop() throws {
+        XCTAssertNil(try runner(#""state":"active""#).lastOutcome)
+        XCTAssertEqual(try runner(#""state":"active","lastRunStatus":"failed""#).lastOutcome, "failed")
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":100,"lastRunStatus":"succeeded","lastLevel":"log","lastReportAt":100"#).lastOutcome, "quiet")
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":100,"lastLevel":"tell","lastReportAt":100"#).lastOutcome, "reported")
+        // An older report doesn't describe a later silent run.
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":200,"lastLevel":"urgent","lastReportAt":100"#).lastOutcome, "quiet")
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":200,"lastRunStatus":"Error: timed out""#).lastOutcome, "failed")
+    }
+
+    func testRowStatePrecedence() throws {
+        XCTAssertEqual(try runner(#""state":"active","running":true,"runningSince":5,"urgent":true"#).rowState, .waiting)
+        XCTAssertEqual(try runner(#""state":"active","running":true,"runningSince":5"#).rowState, .running(since: 5))
+        XCTAssertEqual(try runner(#""state":"paused","running":true"#).rowState, .paused)
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":1,"lastRunStatus":"failed""#).rowState, .failed)
+        XCTAssertEqual(try runner(#""state":"active","lastRunAt":1"#).rowState, .idle)
+        // Older Studios send neither field: never running.
+        XCTAssertFalse(try runner(#""state":"active""#).isRunning)
+    }
+
+    func testRowStatusWording() throws {
+        let utc = TimeZone(identifier: "UTC")!
+        let locale = Locale(identifier: "en_US")
+        let now = Date(timeIntervalSince1970: 1_761_000_000) // Mon Oct 20 2025, 22:40 UTC
+        let today = (now.timeIntervalSince1970 - 3_600) * 1000
+        let paused = try runner(#""state":"paused","nextRunAt":\#(today)"#).rowStatus(now: now, locale: locale, timeZone: utc)
+        XCTAssertEqual(paused.next, "paused")
+        XCTAssertNil(paused.outcome)
+        let quiet = try runner(#""state":"active","nextRunAt":\#(today),"lastRunAt":1"#).rowStatus(now: now, locale: locale, timeZone: utc)
+        XCTAssertEqual(quiet.next, "next 9:40\u{202F}PM")
+        XCTAssertEqual(quiet.outcome, "quiet")
+        let later = BotRowTime.at((now.timeIntervalSince1970 + 2 * 86_400) * 1000, now: now, locale: locale, timeZone: utc)
+        XCTAssertEqual(later, "Wed 10:40\u{202F}PM")
+    }
+
+    func testElapsedClock() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        XCTAssertEqual(BotRowTime.elapsed(since: (10_000 - 42) * 1000, now: now), "0:42")
+        XCTAssertEqual(BotRowTime.elapsed(since: (10_000 - 725) * 1000, now: now), "12:05")
+        XCTAssertEqual(BotRowTime.elapsed(since: (10_000 - 3_730) * 1000, now: now), "1:02:10")
+        XCTAssertEqual(BotRowTime.elapsed(since: (10_000 + 5) * 1000, now: now), "0:00")
+    }
+
+    func testThreadToneMapsToRowState() {
+        XCTAssertEqual(BotRowState(.needs), .waiting)
+        XCTAssertEqual(BotRowState(.waiting), .waiting)
+        XCTAssertEqual(BotRowState(.running, since: 3), .running(since: 3))
+        XCTAssertEqual(BotRowState(.failed), .failed)
+        XCTAssertEqual(BotRowState(.idle), .idle)
+    }
+}

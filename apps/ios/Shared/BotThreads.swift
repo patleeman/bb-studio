@@ -150,6 +150,61 @@ public enum BotThreadTone: String, Sendable {
     }
 }
 
+/// A Bot sidebar row's state, the same on desktop and iOS: what its mark
+/// shows and what its right-hand text says.
+public enum BotRowState: Equatable, Sendable {
+    /// Working now; ticks from `since` when BB knows it.
+    case running(since: Double?)
+    /// Needs the user, or waiting to start: a still amber ring.
+    case waiting
+    /// The last run or the thread failed: a still red ring.
+    case failed
+    /// Done, or a runner between runs. A runner's mark is dimmed.
+    case idle
+    /// A paused runner or automation: dimmed, "paused".
+    case paused
+
+    public init(_ tone: BotThreadTone, since: Double? = nil) {
+        switch tone {
+        case .running: self = .running(since: since)
+        case .needs, .waiting: self = .waiting
+        case .failed: self = .failed
+        case .idle: self = .idle
+        }
+    }
+}
+
+/// Times in Bot sidebar rows.
+public enum BotRowTime {
+    /// Since a run started: "0:42", "12:05", "1:02:10".
+    public static func elapsed(since: Double, now: Date = Date()) -> String {
+        let seconds = max(0, Int((now.timeIntervalSince1970 * 1000 - since) / 1000))
+        let (h, m, s) = (seconds / 3600, seconds / 60 % 60, seconds % 60)
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
+    /// "Running for 12 minutes", for VoiceOver.
+    public static func spokenElapsed(since: Double, now: Date = Date()) -> String {
+        let seconds = max(0, now.timeIntervalSince1970 - since / 1000)
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = seconds < 60 ? [.second] : seconds < 3600 ? [.minute] : [.hour, .minute]
+        return "Running for \(formatter.string(from: seconds) ?? "")"
+    }
+
+    /// As the Schedule shows it: the time today ("5:15 PM"), otherwise the weekday too ("Sat 5:15 PM").
+    public static func at(_ at: Double, now: Date = Date(), locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
+        let date = Date(timeIntervalSince1970: at / 1000)
+        var style = calendar.isDate(date, inSameDayAs: now)
+            ? Date.FormatStyle.dateTime.hour().minute() : Date.FormatStyle.dateTime.weekday(.abbreviated).hour().minute()
+        style.locale = locale
+        style.timeZone = timeZone
+        return date.formatted(style)
+    }
+}
+
 /// Desktop's short age: "now", "5m", "3h", "2d", "4w".
 public enum BotAge {
     public static func label(_ at: Double, now: Date = Date()) -> String {
@@ -176,6 +231,45 @@ extension BotRunner {
             return "\(days) \(time)"
         }
         return short[cadence] ?? cadence
+    }
+
+    /// Mid-run, as desktop counts it: running and not paused.
+    public var isRunning: Bool { running == true && state == "active" }
+
+    /// How its last run went, as desktop's `runnerLastRun`: "failed", "reported"
+    /// (it told you), "quiet" (nothing to report), or nil before its first run.
+    public var lastOutcome: String? {
+        let failed = lastRunStatus.map { $0.range(of: "fail|error", options: [.regularExpression, .caseInsensitive]) != nil } ?? false
+        guard let lastRunAt else { return failed ? "failed" : nil }
+        if failed { return "failed" }
+        // A previous report does not describe a later silent run.
+        let reported = (lastReportAt ?? 0) >= lastRunAt && (lastLevel == "tell" || lastLevel == "urgent")
+        return reported ? "reported" : "quiet"
+    }
+
+    /// Its row's state: needs you beats running, then paused, a failed last run, or between runs.
+    public var rowState: BotRowState {
+        if urgent == true { return .waiting }
+        if isRunning { return .running(since: runningSince) }
+        if paused { return .paused }
+        return lastOutcome == "failed" ? .failed : .idle
+    }
+
+    /// The row's right-hand text when it isn't running: "paused", or
+    /// "next 5:15 PM" with the last outcome after it, "next 5:15 PM · quiet".
+    public func rowStatus(now: Date = Date(), locale: Locale = .current, timeZone: TimeZone = .current) -> (next: String?, outcome: String?) {
+        if paused { return ("paused", nil) }
+        let next = nextRunAt.map { "next \(BotRowTime.at($0, now: now, locale: locale, timeZone: timeZone))" }
+        return (next, lastOutcome)
+    }
+
+    /// "Next run 5:15 PM, last run quiet", for VoiceOver.
+    public func spokenStatus(now: Date = Date()) -> String {
+        if urgent == true { return "Needs you" }
+        if isRunning { return runningSince.map { BotRowTime.spokenElapsed(since: $0, now: now) } ?? "Running" }
+        if paused { return "Paused" }
+        return [nextRunAt.map { "Next run \(BotRowTime.at($0, now: now))" }, lastOutcome.map { "last run \($0)" }]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     /// "Next run Tue 5:05 PM"; nil when paused or unknown.
