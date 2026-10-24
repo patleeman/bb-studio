@@ -81,6 +81,27 @@ the safe area, and 8 pt above the bottom safe-area edge.
 | Duo 951×669, at the latest message | ![](composer/before-composer-duo-bottom.png) | ![](composer/after-composer-duo-bottom.png) |
 | Duo 951×669, scrolled up | ![](composer/before-composer-duo-scrolled.png) | ![](composer/after-composer-duo-scrolled.png) |
 
+## Waiting to start, and runner names first
+
+Mirrors desktop `888af8a4`. Queued (pending) threads move out of Running into
+their own Waiting to start group, so Running holds only threads that run;
+a queued thread under a running one stays in Running with its tree. A queued
+row's mark is dimmed (45%, greyscale) with a muted hairline ring, and it
+shows its age.
+
+When a runner row is tight, the name comes first: "next 10:00 PM · quiet"
+(or "· reported", whose report shows on the row's third line) shortens to
+"10:00 PM", and "· failed" stays. Only when that still doesn't fit does the
+name truncate. `BotThreadsTests` covers the groups, the queued state and the
+short status.
+
+| Surface | Before | After |
+|---|---|---|
+| Phone, Running and Waiting to start | ![](waiting/before-bot-rows-phone.png) | ![](waiting/after-bot-rows-phone.png) |
+| Phone, Runners | ![](waiting/before-bot-rows-phone-runners.png) | ![](waiting/after-bot-rows-phone-runners.png) |
+| Duo 951×669, top | ![](waiting/before-bot-rows-duo.png) | ![](waiting/after-bot-rows-duo.png) |
+| Duo 951×669, Runners (tight names) | ![](waiting/before-bot-rows-duo-runners.png) | ![](waiting/after-bot-rows-duo-runners.png) |
+
 ## Provider logos in Bot rows
 
 Commit `2505cb74`. The 11 pt logo slot in each Running and Runners mark now
