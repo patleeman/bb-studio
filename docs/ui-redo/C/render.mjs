@@ -165,18 +165,39 @@ const moveConfirm = (preflight) => async (client) => {
 /** A runner whose every run takes ten minutes, so it can be seen mid-run. Its first run starts when it's made. */
 const RELEASE_WATCH = { name: "Release watch", job: "Use the shell to run `sleep 600`. Then finish without any message and without calling runner_report.", schedule: { cadence: "hourly", time: "09:00" } };
 
+/** A thread the Bot started that runs for ten minutes, so Running has a thread that's really running. */
+const CANARY = { title: "Watch the ORBIT-42 canary", prompt: "Use the shell to run `sleep 600`, then reply in one sentence that the canary looks healthy." };
+const isRunning = (status) => ["starting", "active"].includes(status);
+const runningCanary = async () => {
+  const { bot } = await pluginRpc("studio", "bot_get", {});
+  const kids = await fixtures.json(["thread", "list", "--parent-thread", bot.threadId, "--include-hidden"]).catch(() => []);
+  const canary = kids.find((thread) => thread.title === CANARY.title);
+  const status = async (id) => (await fixtures.json(["thread", "show", id]).catch(() => null))?.thread?.status;
+  if (canary && isRunning(await status(canary.id))) return;
+  const project = (await fixtures.json(["thread", "show", bot.threadId])).thread.projectId;
+  const made = canary
+    ? (await bbCli(["thread", "tell", canary.id, CANARY.prompt]), canary)
+    : await fixtures.json(["thread", "spawn", "--project", project, "--parent-thread", bot.threadId, "--title", CANARY.title, "--prompt", CANARY.prompt]);
+  const id = made.id ?? made.thread?.id;
+  for (let i = 0; !isRunning(await status(id)); i++) {
+    if (i > 120) throw new Error("The canary thread didn't start");
+    await sleep(500);
+  }
+};
+
 /** The Bots list with a thread running and Release watch mid-run, for the running states. */
 const runningView = async (client) => {
   // Not the README setup: it waits for every runner to go idle.
   await fixtures.seededBot();
+  await runningCanary();
   await client.navigate(BOT_PATH);
   await client.waitForSelector(SIDEBAR, 30000);
   await dismissProblems(client);
   const { runners } = await pluginRpc("studio", "bot_runners", {});
   const watch = runners.find((runner) => runner.name === RELEASE_WATCH.name) ?? await pluginRpc("studio", "bot_runner_create", RELEASE_WATCH);
   const status = async () => (await fixtures.json(["thread", "show", watch.threadId]).catch(() => null))?.thread?.status;
-  if (!["starting", "active"].includes(await status())) await pluginRpc("studio", "bot_runner_run_now", { id: watch.id });
-  for (let i = 0; !["starting", "active"].includes(await status()); i++) {
+  if (!isRunning(await status())) await pluginRpc("studio", "bot_runner_run_now", { id: watch.id });
+  for (let i = 0; !isRunning(await status()); i++) {
     if (i > 60) throw new Error("Release watch didn't start its run");
     await sleep(500);
   }

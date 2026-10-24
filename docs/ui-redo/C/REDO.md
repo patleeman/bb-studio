@@ -56,9 +56,11 @@ Bot sidebar, and to Bot info's Runners and Activity → Running.
 
 ### Running-state renders (Bots list, 2x)
 
-Seeded state: Release watch is a runner whose every run takes ten minutes,
-caught mid-run. Deploy watch has an unopened urgent report. Inbox watch is
-between runs. Draft Monday's status update is queued.
+Seeded state: Watch the ORBIT-42 canary is a thread the Bot started that
+runs for ten minutes, and Release watch is a runner whose every run takes
+ten minutes; both are caught mid-run. Deploy watch has an unopened urgent
+report. Inbox watch is between runs. Draft Monday's status update is queued:
+it now sits under Waiting to start, not Running.
 
 | | Before | After |
 |---|---|---|
@@ -70,5 +72,5 @@ between runs. Draft Monday's status update is queued.
 
 Before, every runner pulsed a green ring whether it was running or not,
 and the time beside it was the last run, which read as the next one. After,
-only Release watch moves and counts up (`2:37`). Idle runners are grey and
+only the running thread and Release watch move and count up (`2:32`). Idle runners are grey and
 say `next 9:45 PM · quiet`. Deploy watch is amber with its report's age.
