@@ -41,11 +41,18 @@ export function sidebarAgenda(items: BotAutomationView[], scheduled: BotSchedule
   };
 }
 
-export function runnerLastRun(runner: RunnerView): { text: string; failed: boolean } {
-  if (runner.state === "paused") return { text: "paused", failed: false };
+export type RunnerOutcome = "paused" | "failed" | "reported" | "quiet" | null;
+
+/**
+ * A runner's last run: `text` in one line ("ran 9:05 AM · reported"; "ran"
+ * so it doesn't read as the next run), and its parts.
+ */
+export function runnerLastRun(runner: RunnerView): { text: string; failed: boolean; outcome: RunnerOutcome; at: number | null } {
+  if (runner.state === "paused") return { text: "paused", failed: false, outcome: "paused", at: null };
   const failed = /fail|error/i.test(runner.lastRunStatus ?? "");
-  if (!runner.lastRunAt) return { text: failed ? "failed" : "", failed };
+  if (!runner.lastRunAt) return { text: failed ? "failed" : "", failed, outcome: failed ? "failed" : null, at: null };
   // A previous report does not describe a later silent run.
   const reported = (runner.lastReportAt ?? 0) >= runner.lastRunAt && (runner.lastLevel === "tell" || runner.lastLevel === "urgent");
-  return { text: `${sidebarTime(runner.lastRunAt)} ${failed ? "failed" : reported ? "reported" : "quiet"}`, failed };
+  const outcome = failed ? "failed" : reported ? "reported" : "quiet";
+  return { text: `ran ${sidebarTime(runner.lastRunAt)} · ${outcome}`, failed, outcome, at: runner.lastRunAt };
 }

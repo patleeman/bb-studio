@@ -22,10 +22,11 @@ import type { BotSideThreadListView, BotThreadView, BotView } from "../../contra
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
-import { ProviderStatusMark, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
+import { Elapsed, ProviderStatusMark, runningLabel, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
+import { KIND } from "./Automations";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
@@ -190,6 +191,8 @@ function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(ev
     },
   };
 }
+/** A quiet control row in a list (N done, Show archived), lined up with the rows around it. */
+const QUIET_ROW = "flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground";
 const DROP_RING = "ring-2 ring-inset ring-[var(--bot-accent,var(--ring))]";
 
 /** A Bot that isn't selected: one row that opens its chat, and its ⓘ. */
@@ -285,16 +288,27 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
                 : <RecurringRow key={item.id} item={item} botName={bot.name} />;
             })}
             {agenda.done.length ? <>
-              <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="flex h-7 items-center gap-2 rounded-md px-2 text-left text-[11px] text-muted-foreground hover:bg-state-hover">
-                <Icon name={showDone ? "ChevronDown" : "ChevronRight"} className="size-3.5" />{agenda.done.length} done
+              <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className={QUIET_ROW}>
+                <span className="flex size-4 shrink-0 items-center justify-center"><Icon name={showDone ? "ChevronDown" : "ChevronRight"} className="size-3.5" /></span>{agenda.done.length} done
               </button>
               {showDone ? agenda.done.map(item => <RecurringRow key={item.id} item={item} botName={bot.name} done />) : null}
             </> : null}
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
-        {bot.kind !== "external" ? <button type="button" className="self-start px-2 text-xs text-muted-foreground hover:text-foreground" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Hide archived" : "Show archived"}</button> : null}
-        {showArchived ? older.error ? <p role="alert" className="px-2 text-xs">{older.error}</p> : older.data?.threads.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />) : null}
+        {bot.kind !== "external" ? (
+          <div className="flex flex-col">
+            <button type="button" className={QUIET_ROW} aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>
+              <span className="flex size-4 shrink-0 items-center justify-center"><Icon name="Archive" className="size-3.5" /></span>{showArchived ? "Hide archived" : "Show archived"}
+            </button>
+            {showArchived
+              ? older.error ? <p role="alert" className="px-2 py-1 text-xs text-destructive">{older.error}</p>
+                : !older.data ? <p className="px-2 py-1 text-xs text-muted-foreground">Loading…</p>
+                  : older.data.threads.length ? older.data.threads.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)
+                    : <p className="px-2 py-1 text-xs text-muted-foreground">Nothing archived.</p>
+              : null}
+          </div>
+        ) : null}
         {sideThreads.data?.threads.length ? (
           <Group id="threads" title="Side threads" closed={layout.closed} onToggle={toggle}>
             {sideThreads.data.threads.map((thread) => <SideThreadRow botName={bot.name} key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
@@ -353,9 +367,13 @@ function Row({ botName, thread, active, onOpen, providers }: { botName: string; 
     <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
       draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
-      <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} />
+      <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} label={tone === "running" ? runningLabel(thread.runningSince) : undefined} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{botItemName(thread.title, botName)}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>
+      {tone === "running" && thread.runningSince != null
+        ? <Elapsed since={thread.runningSince} className="text-[11px] text-success" />
+        : tone === "failed"
+          ? <span className="shrink-0 text-[11px] text-destructive">failed</span>
+          : <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>}
     </button>
   );
 }
@@ -405,13 +423,17 @@ function SideThreadRow({ botName, thread, active, onOpen }: { botName: string; t
   );
 }
 
+/** The agenda's icon for a job that isn't a runner: its kind's, as in Info's Automations. */
+const AGENDA_ICON: Partial<Record<SidebarAgendaItem["kind"], string>> = { checkin: KIND.checkin.icon, reminder: KIND.reminder.icon, watcher: KIND.watcher.icon, heartbeat: KIND.checkin.icon };
+
 function RecurringRow({ item, botName, done = false }: { item: SidebarAgendaItem; botName: string; done?: boolean }) {
   const next = item.nextRunAt ? sidebarTime(item.nextRunAt) : null;
+  const offline = item.kind === "runner" && item.machineOffline;
   return (
     <div data-agenda={item.id} className={`flex h-7 min-w-0 items-center gap-2 px-2 text-[13px] ${done ? "opacity-50" : ""}`} title={item.scheduleText}>
-      <Icon name="Repeat" className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="flex size-4 shrink-0 items-center justify-center"><Icon name={AGENDA_ICON[item.kind] ?? "Repeat"} className="size-3.5 text-muted-foreground" /></span>
       <span className={`min-w-0 flex-1 truncate ${item.state !== "active" ? "text-muted-foreground" : ""}`}>{botItemName(item.name, botName)}{item.kind === "runner" && item.machineName ? <span className="text-muted-foreground"> · {item.machineName}</span> : null}</span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{item.kind === "runner" && item.machineOffline ? "offline" : item.state === "paused" ? "paused" : done ? "done" : next}</span>
+      <span className={`shrink-0 text-[11px] tabular-nums ${offline ? "text-warning" : "text-muted-foreground"}`}>{offline ? "offline" : item.state === "paused" ? "paused" : done ? "done" : next}</span>
     </div>
   );
 }

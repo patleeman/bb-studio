@@ -32,8 +32,8 @@ it("describes the last run, including silent runs after an older report and fail
   expect(runnerLastRun({ ...runner, lastLevel: "urgent" }).text).toMatch(/reported$/);
   expect(runnerLastRun({ ...runner, lastReportAt: 100 }).text).toMatch(/quiet$/);
   expect(runnerLastRun({ ...runner, lastLevel: "log" }).text).toMatch(/quiet$/);
-  expect(runnerLastRun({ ...runner, lastRunStatus: "failed" })).toEqual({ text: expect.stringMatching(/failed$/), failed: true });
-  expect(runnerLastRun({ ...runner, state: "paused" })).toEqual({ text: "paused", failed: false });
+  expect(runnerLastRun({ ...runner, lastRunStatus: "failed" })).toMatchObject({ text: expect.stringMatching(/failed$/), failed: true });
+  expect(runnerLastRun({ ...runner, state: "paused" })).toMatchObject({ text: "paused", failed: false });
   expect(runnerLastRun({ ...runner, lastRunAt: null }).text).toBe("");
 });
 

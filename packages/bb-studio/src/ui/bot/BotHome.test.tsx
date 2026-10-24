@@ -61,7 +61,7 @@ vi.mock("./Onboarding", () => ({
 vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   StudioBar: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
-  openAppPath: vi.fn(), usePathname: () => state.pathname, DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
+  openAppPath: vi.fn(), usePathname: () => state.pathname, Badge: ({ label }: { label: string }) => React.createElement("span", null, label), BAR_BUTTON: "", DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
 }));
 vi.mock("../../kit/ui/index", () => ({
   Icon: ({ name, className }: { name: string; className?: string }) => React.createElement("span", { "data-icon": name, className }),
@@ -777,7 +777,8 @@ test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens
   expect(state.toThread).toHaveBeenCalledWith("thr_security");
   Object.assign(runner, { lastRunStatus: "failed" });
   await show(<BotThreadList {...listProps} />);
-  expect(runners.querySelector(".text-destructive")?.textContent).toContain("failed");
+  expect([...runners.querySelectorAll(".text-destructive")].some((each) => each.textContent?.includes("failed"))).toBe(true);
+  expect(runners.querySelector('[data-runner] [data-tone="failed"]')).not.toBeNull();
 });
 
 
