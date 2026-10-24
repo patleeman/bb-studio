@@ -5,7 +5,7 @@
 // "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
 // chat and the threads it lists open as BB threads.
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { useState } from "react";
 import { experimental_useProviders as useProviders, useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotView } from "../../contract";
@@ -91,11 +91,6 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
           </>}
         {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
         {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
-        <DropdownMenuSeparator />
-        {bot.state === "active"
-          ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
-          : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
-        {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" className="fill-current" />Stop…</DropdownMenuItem> : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

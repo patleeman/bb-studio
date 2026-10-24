@@ -341,6 +341,10 @@ test("Bot info keeps profile and history collapsed until asked, then saves profi
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => button("Memory").click());
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
+  // Pause and Stop live once, in the button row, not again in the ⋯ menu.
+  const labelled = (text: string) => [...container.querySelectorAll("button, [role=menuitem]")].filter((el) => el.textContent?.trim() === text);
+  expect(labelled("Pause")).toHaveLength(1);
+  expect(labelled("Stop…")).toHaveLength(1);
   act(() => button("Skills…").click());
   expect(container.textContent).toContain("weekly-review");
   expect(container.querySelector('[role="dialog"]')).toBeNull();
