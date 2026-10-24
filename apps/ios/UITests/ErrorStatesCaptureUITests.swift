@@ -106,6 +106,55 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         hold()
     }
 
+    /// A plain thread's composer on the phone: at the latest message, scrolled
+    /// up with Jump to latest, with the keyboard up, and with a shelf card.
+    func testThreadComposerPhone() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
+        let thread = ["-qaBotDemo", "chat", "-openURL", "bbstudio://thread/thr_botdemo01"]
+        launch(thread)
+        let composer = app.textViews["Message"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 20))
+        sleep(2)
+        shot("composer-phone-bottom")
+        let jump = app.buttons["Jump to latest"]
+        for _ in 0..<4 where !jump.exists { app.swipeDown() }
+        XCTAssertTrue(jump.waitForExistence(timeout: 5))
+        sleep(1)
+        shot("composer-phone-scrolled")
+        composer.tap()
+        composer.typeText("Can you check the hotel options too?")
+        sleep(1)
+        shot("composer-phone-keyboard")
+        app.terminate()
+        launch(thread + ["-qaOutboxUnreadable"])
+        XCTAssertTrue(text(containing: "queued messages").waitForExistence(timeout: 20))
+        sleep(1)
+        shot("composer-phone-shelf")
+    }
+
+    /// The same composer in the unfolded Duo's thread page, 951×669 on the iPad simulator.
+    func testThreadComposerDuo() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
+        launch(["-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-openURL", "bbstudio://bot"])
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
+        duo("tab?threads")
+        let thread = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(thread.waitForExistence(timeout: 20))
+        thread.tap()
+        XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
+        sleep(3)
+        shot("composer-duo-bottom")
+        let jump = app.buttons["Jump to latest"]
+        for _ in 0..<3 where !jump.exists {
+            duo("mid")
+            _ = jump.waitForExistence(timeout: 10)
+        }
+        sleep(2)
+        shot("composer-duo-scrolled")
+    }
+
+    private func duo(_ path: String) { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!) }
+
     /// Drags the sheet's grabber to the top.
     private func fullHeight() {
         let window = app.windows.firstMatch
