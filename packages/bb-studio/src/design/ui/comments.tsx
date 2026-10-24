@@ -214,7 +214,7 @@ export function DraftPopover({ design, draft, board, inThread, onClose }: { desi
     try {
       const result = await rpc.call("designs.addComment", { designId: design.id, screenId: draft.screenId, step: draft.step, selector: draft.selector, elementHtml: draft.html, elementText: draft.text, body: body.trim(), send });
       if (result.sent) sent();
-      else if (send) toast.error("Comment saved, but couldn't send it. Retry from the saved comment.");
+      else if (send) toast.error("Saved the comment, but couldn't send it to the agent", { description: "Open its pin and choose Send to agent to try again." });
       onClose();
     } catch (error) {
       toast.error(errorMessage(error));
