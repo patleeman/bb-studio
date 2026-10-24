@@ -130,7 +130,7 @@ it("says when a runner is mid-run and since when (its open turn), and not betwee
   x.threads.set(runner.threadId!, { ...x.threads.get(runner.threadId!)!, status: "idle" });
   expect((await x.runners.list())[0]).toMatchObject({ running: false, runningSince: null });
   x.threads.set(runner.threadId!, { ...x.threads.get(runner.threadId!)!, status: "active" });
-  x.timeline.mockResolvedValue({ rows: [{ kind: "turn", createdAt: 100, completedAt: 150 }, { kind: "turn", createdAt: 500, completedAt: null }] });
+  x.timeline.mockResolvedValue({ rows: [{ kind: "turn", createdAt: 100, completedAt: 150 }, { kind: "conversation", createdAt: 500 }, { kind: "work", createdAt: 520 }] });
   expect((await x.runners.list())[0]).toMatchObject({ running: true, runningSince: 500 });
   expect(await x.runners.get(runner.id)).toMatchObject({ running: true, runningSince: 500 });
   x.timeline.mockRejectedValue(new Error("no timeline"));
