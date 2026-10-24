@@ -35,6 +35,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 }));
 vi.mock("../../kit/app/index", () => ({
   ICON_BUTTON: "",
+  OUTLINE_BUTTON: "",
   PRIMARY_BUTTON: "",
   THUMBNAIL: "",
   Icon: () => null,

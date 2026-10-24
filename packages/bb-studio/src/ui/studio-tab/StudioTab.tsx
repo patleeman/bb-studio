@@ -5,7 +5,7 @@ import { requestGeneration } from "../../kit/ui/request-generation";
 // item opens in place in its kind's editor, with a way back; an add-on's item
 // opens its page in BB's main area. Cards open it with `{ kind, id }`; see
 // ./model.ts for params and kinds.
-import { ICON_BUTTON, Icon, ItemTile, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "../../kit/app/index";
+import { ICON_BUTTON, Icon, ItemTile, OUTLINE_BUTTON, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "../../kit/app/index";
 import { errorMessage, relativeTime, untitled } from "../../kit/format";
 import { useRealtime, useRpc, useSdk, type JsonValue } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -259,8 +259,19 @@ function Collection({
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        {loadError ? <p role="alert" className="px-2 py-3 text-sm text-destructive">Couldn't load thread items: {loadError} <button type="button" onClick={() => setRefreshKey((key) => key + 1)}>Retry loading items</button></p> : null}
-        {items === null && !loadError ? (
+        {loadError ? (
+          <div role="alert" className="flex flex-col items-start gap-2 px-2 py-3 text-sm">
+            <p className="flex items-start gap-2 text-muted-foreground">
+              <Icon name="AlertCircle" className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <span><span className="text-foreground">Couldn't load this thread's items.</span> {loadError.replace(/[.\s]+$/, "")}.</span>
+            </p>
+            <button type="button" className={cn(OUTLINE_BUTTON, "ml-6")} onClick={() => setRefreshKey((key) => key + 1)}>
+              <Icon name="RotateCcw" />
+              Retry loading items
+            </button>
+          </div>
+        ) : null}
+        {loadError && items === null ? null : items === null ? (
           <p className="px-2 py-3 text-sm text-muted-foreground">Loading…</p>
         ) : sections.length === 0 ? (
           <p className="px-2 py-3 text-sm text-muted-foreground">{query ? "Nothing matches." : `No ${noun} yet.${creatable.length ? " New makes one for this thread." : ""}`}</p>
