@@ -155,17 +155,20 @@ struct DictationView: View {
                             operation.complete(on: app) { dismiss() }
                         }
                     }
-                } label: { wide(submission.sending ? "Sending…" : "Send to thread", "paperplane.fill") }
+                } label: {
+                    if submission.sending { ProgressView().frame(maxWidth: .infinity) } else { wide("Send to thread", "paperplane.fill") }
+                }
                 .buttonStyle(.borderedProminent)
                 .disabled(submission.sending)
-                if let error = submission.error { Text(error).font(.footnote).foregroundStyle(.red) }
+                .accessibilityLabel(submission.sending ? "Sending to thread" : "Send to thread")
+                if let error = submission.error { failure(error) }
             } else if runningPlugins.split(separator: ",").contains("studio") {
                 Button { Task { await saveAsPage(trimmed) } } label: {
                     if savingPage { ProgressView().frame(maxWidth: .infinity) } else { wide("Save as Page", "doc.richtext") }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(savingPage)
-                if let saveError { Text(saveError).font(.footnote).foregroundStyle(.red) }
+                if let saveError { failure(saveError) }
             }
             HStack {
                 Button { creatingThread = true } label: { wide("New thread", "square.and.pencil") }
@@ -197,6 +200,17 @@ struct DictationView: View {
             .foregroundStyle(.white)
             .frame(width: 84, height: 84)
             .background(color, in: .circle)
+    }
+
+    /// Why the last action failed, under its button. The text stays, so it can be tried again.
+    private func failure(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(message)
+        }
+        .font(.footnote)
+        .foregroundStyle(.red)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func wide(_ title: String, _ symbol: String) -> some View {
