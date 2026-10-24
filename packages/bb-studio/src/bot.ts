@@ -105,7 +105,9 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
       "Save a reusable procedure as a skill with bot_skill_write (bot_skill_patch fixes one). Search past threads with bot_history_search.",
       ...(bot.skills?.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...bot.skills.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
     ].join("\n");
-    const quiet = "Your chat is the user's inbox: post only what changed or needs them. When nothing did (a check-in with nothing new, a notice that a thread you started finished fine, an automation result like [PASS]), reply exactly [PASS]: no \"✓\", \"noted\" or other acknowledgement.";
+    // The Bot is the triage layer (docs/needs-you/REDO.md): reports, alerts and its threads' questions come
+    // to it, and nothing else in Studio asks the user for attention.
+    const quiet = "You triage: reports, alerts and your threads' questions come to you. Your chat is the user's inbox: post only what changed or needs them (a thread waiting on them: what it needs, linked); else (nothing new, a thread finished fine) reply exactly [PASS], no \"✓\".";
     const runners = "Schedule with automation_create: check-ins, reminders, watchers, runners.";
     return [who, memory, quiet, runners, skills].filter(Boolean).join("\n");
   }

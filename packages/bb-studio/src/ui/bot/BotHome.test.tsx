@@ -47,7 +47,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
   experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
-const sdk = { threads: { update: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
+const sdk = { threads: { update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };
 } }, system: { uiPreferences: {
@@ -133,6 +133,20 @@ test("with no Bot, the welcome's Create makes it with the setup and opens its ch
   state.call.mockImplementation(async () => ({}));
 });
 
+test("the Bot's chat open marks it read, so the Bot's badge clears", async () => {
+  sdk.threads.markRead.mockClear();
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, attention: { reason: "1 thing for you", count: 1, since: 5 } } };
+  await show(<BotThreadList {...listProps} activeThreadId="t_other" />);
+  expect(sdk.threads.markRead).not.toHaveBeenCalled();
+  await show(<BotThreadList {...listProps} activeThreadId="thr_bot" />);
+  expect(sdk.threads.markRead).toHaveBeenCalledWith({ threadId: "thr_bot" });
+  // Nothing waiting: nothing to mark.
+  sdk.threads.markRead.mockClear();
+  state.data = { ...state.data, bot_activity: empty };
+  await show(<BotThreadList {...listProps} activeThreadId="thr_bot" />);
+  expect(sdk.threads.markRead).not.toHaveBeenCalled();
+});
+
 test("the Bot page lives under the Studio panel", () => {
   expect(BOT_PATH).toBe("/plugins/studio/studio/bot");
 });
@@ -173,6 +187,8 @@ test("the Bots list: the bot on top saying what waits on you, no Needs you, star
   expect(main.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("Asked you a question");
   expect(main.querySelector("[data-testid=bot-attention-reason]")?.textContent).toBe("Asked you a question");
   expect(main.getAttribute("title")).toBe("Dot: Asked you a question");
+  // Not read until its chat is the open thread; then Studio marks it read, so the badge clears.
+  expect(sdk.threads.markRead).not.toHaveBeenCalled();
   // A thread held by an approval is under Running, by its state: the Bot's to handle.
   const waiting = nav.querySelector('section[aria-label="Running"] [data-thread="t1"]')!;
   expect(waiting.textContent).toContain("waiting");

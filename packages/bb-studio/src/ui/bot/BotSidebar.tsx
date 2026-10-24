@@ -265,6 +265,15 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const [showDone, setShowDone] = useState(false);
   const openRunner = useOpenRunner(onOpen);
   const attention = activity.data?.attention ?? null;
+  const sdk = useSdk();
+  // The Bot's chat open and on screen is read: its badge clears. BB may not
+  // mark a hidden chat read on view, so Studio does, each time something new
+  // waits there (src/bot-attention.ts).
+  useEffect(() => {
+    if (!attention || !bot.threadId || active !== bot.threadId || document.visibilityState !== "visible") return;
+    void sdk.threads.markRead({ threadId: bot.threadId }).then(() => activity.refresh(), () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, bot.threadId, attention?.count, attention?.since]);
   const tree = (nodes: TreeNode[]) => <ThreadTree botName={bot.name} nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
   const drop = useThreadDrop(bot);
 

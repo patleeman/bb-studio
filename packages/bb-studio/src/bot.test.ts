@@ -467,6 +467,7 @@ it("makes one Memory page on first need and points the Bot at it briefly", async
   expect(botHeartbeat("Dot")).toMatch(/Memory page/);
   expect(botHeartbeat("Dot")).toMatch(/reply exactly \[PASS\]: no "✓"/);
   expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/finished fine.*no "✓"/);
+  expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/You triage: reports, alerts and your threads. questions come to you/);
   expect(botInstructions({ name: "Dot", state: "paused", memoryPageId: "pg1" })).not.toContain("pg1");
 });
 
