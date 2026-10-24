@@ -122,9 +122,12 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         sleep(1)
         shot("composer-phone-scrolled")
         composer.tap()
-        composer.typeText("Can you check the hotel options too?")
+        let typed = "Can you check the hotel options too?"
+        composer.typeText(typed)
         sleep(1)
         shot("composer-phone-keyboard")
+        // Leave no saved draft for the next launch or run.
+        composer.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: typed.count))
         app.terminate()
         launch(thread + ["-qaOutboxUnreadable"])
         XCTAssertTrue(text(containing: "queued messages").waitForExistence(timeout: 20))

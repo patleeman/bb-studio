@@ -1120,7 +1120,7 @@ struct ThreadView: View {
                 text: $draft, focused: $composerFocused, attachments: $attachments,
                 placeholder: composerVoice.shown.placeholder ?? botChrome.map { "Message \($0.bot.name)" } ?? "Message",
                 dictate: { talk.startDictation() }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
-                clear: botChrome != nil, dictation: dictation,
+                clear: true, dictation: dictation,
                 toPage: canUseNotes && !editing ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
@@ -1185,16 +1185,16 @@ struct ThreadView: View {
                 .accessibilityLabel(editing ? "Save edit" : model.thread?.isRunning == true ? "Queue message" : "Send")
                 }
             }
-            .modifier(BotComposerGlass(active: botChrome != nil))
+            .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("threadComposer")
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
-        .padding(.horizontal, botChrome != nil ? 12 : 16)
+        // Floats over the transcript, as in the Bot chat: no bar behind it.
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
-        .background { if botChrome == nil { Rectangle().fill(.bar).ignoresSafeArea() } }
         // A `bbstudio://reply/<id>` link lands here.
         .onChange(of: app.replyThreadId, initial: true) { _, id in
             guard id == model.threadId else { return }
