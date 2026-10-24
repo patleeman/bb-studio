@@ -6,6 +6,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "./utils";
 import { MenuHoverProvider, useMenuItemHover } from "./menu-item-hover";
 import { LIST_HOVER_TRANSITION } from "./motion";
+import { usePortalScopeProps } from "./portal-scope";
 
 const MENU_ITEM_NEUTRAL_STATE_CLASS =
   "focus:bg-state-hover focus:text-foreground data-[last-hovered]:bg-state-hover data-[last-hovered]:text-foreground";
@@ -21,7 +22,9 @@ const DropdownMenuContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
 >(({ className, sideOffset = 4, children, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
+    {/* Portaled to the body, so it carries the plugin scope its styles need. */}
     <DropdownMenuPrimitive.Content
+      {...usePortalScopeProps()}
       ref={ref}
       sideOffset={sideOffset}
       collisionPadding={8}
@@ -101,6 +104,7 @@ const DropdownMenuSubContent = React.forwardRef<
 >(({ className, sideOffset = 4, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.SubContent
+      {...usePortalScopeProps()}
       ref={ref}
       sideOffset={sideOffset}
       collisionPadding={8}

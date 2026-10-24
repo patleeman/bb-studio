@@ -30,7 +30,7 @@ export function PageIconPicker({ page, rpc, children }: { page: PageMetaView; rp
       <DropdownMenuContent align="start" className="w-64 p-2">
         <div className="grid grid-cols-8 gap-1">
           {PAGE_ICONS.map((icon) => (
-            <button key={icon} type="button" disabled={pending} className="rounded p-1 text-lg hover:bg-state-hover" onClick={() => void update(icon)}>
+            <button key={icon} type="button" aria-label={`Use ${icon} as the icon`} aria-pressed={page.icon === icon} disabled={pending} className="flex size-7 items-center justify-center rounded-md text-lg outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active" onClick={() => void update(icon)}>
               {icon}
             </button>
           ))}
