@@ -81,6 +81,43 @@ the safe area, and 8 pt above the bottom safe-area edge.
 | Duo 951×669, at the latest message | ![](composer/before-composer-duo-bottom.png) | ![](composer/after-composer-duo-bottom.png) |
 | Duo 951×669, scrolled up | ![](composer/before-composer-duo-scrolled.png) | ![](composer/after-composer-duo-scrolled.png) |
 
+## Provider logos in Bot rows
+
+Commit `2505cb74`. The 11 pt logo slot in each Running and Runners mark now
+shows the provider's real logo instead of the sparkle. The artwork is BB's
+own, the same file desktop's `ProviderIcon` draws: `logoUrl` in
+`/api/v1/system/execution-options` points at
+`/api/v1/system/providers/<id>/logo`. Those are SVGs drawn as a mask in the
+text colour. iOS can't draw SVG at runtime without a web view, so the files
+for Codex, Claude Code, Pi and opencode (fetched from a staged BB) are
+bundled as vector template images in `Assets.xcassets/ProviderLogos`. Each is
+tinted with the provider's `strings.iconTint` (Codex has none, so it uses the
+text colour). Other providers keep the neutral sparkle. Rows read the
+`providerId` that `bot_activity` and `bot_runners` already send. The ring, its
+sizes and the dimming are unchanged. A new provider needs its SVG added to
+the catalog and a line in `ProviderLogo.known`.
+
+| Surface | Before (sparkle) | After | Reduce Motion |
+|---|---|---|---|
+| Phone, Running | ![](bot-rows/after-bot-rows-phone.png) | ![](provider-logos/after-bot-rows-phone.png) | ![](provider-logos/after-bot-rows-phone-reduced-motion.png) |
+| Phone, every runner state | ![](bot-rows/after-bot-rows-phone-runners.png) | ![](provider-logos/after-bot-rows-phone-runners.png) | ![](provider-logos/after-bot-rows-phone-runners-reduced-motion.png) |
+| Duo 951×669, top | ![](bot-rows/after-bot-rows-duo.png) | ![](provider-logos/after-bot-rows-duo.png) | ![](provider-logos/after-bot-rows-duo-reduced-motion.png) |
+| Duo 951×669, Runners | ![](bot-rows/after-bot-rows-duo-runners.png) | ![](provider-logos/after-bot-rows-duo-runners.png) | ![](provider-logos/after-bot-rows-duo-runners-reduced-motion.png) |
+
+## Item chat when the project's defaults can't be read
+
+Commit `a9c9708b`, following up 8c64c3c7. Chat About This no longer fails when
+reading the project's default settings fails. It starts the chat with the
+standard settings and shows the app's brief notice: "Couldn't read this
+project's default settings. The chat uses the standard ones." The notice
+lasts 4 seconds and doesn't block touches. A cancelled start still starts
+nothing. `UnavailableReadTests` covers the fallback, the normal path (no
+notice) and cancellation.
+
+| Asking | After a failed defaults read |
+|---|---|
+| ![](studio-chat/after-phone-studio-chat-ask.png) | ![](studio-chat/after-phone-studio-chat-standard-settings.png) |
+
 ## Redone changes
 
 | Change | Codex SHA | What I changed | Before | After |
@@ -107,11 +144,6 @@ Unit tests for the behaviour of each change (`OutboxPersistenceTests`,
 
 ## Not changed and worth noting
 
-- iOS has no provider artwork, so the 11 pt logo slot in Bot rows uses a
-  neutral `sparkle` glyph (and `repeat` for Recurring) where desktop shows the
-  provider's logo. Matching desktop exactly means shipping provider logos to
-  the app, and decoding `providerId`, which `bot_activity` and `bot_runners`
-  already send.
 - `DuoEdgeToEdgeUITests.testSurfacesReachEdgesWhileControlsStaySafe` and
   `DuoQuickRepliesUITests.testRepliesClipAtComposerAndKeepSystemSafeAreas`
   fail here with or without the composer change. The first reaches its
