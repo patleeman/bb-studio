@@ -50,6 +50,7 @@ export function MoveToSubmenu(props: Parameters<typeof MoveToItems>[0]) {
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
         <Icon name="MoveTo" className="size-4" /> Move to
+        <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="max-h-96 w-60 overflow-y-auto">
         <MoveToItems {...props} />
