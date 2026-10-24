@@ -81,6 +81,8 @@ struct WatchThreadView: View {
     @State private var reply = ""
     @State private var status: String?
     @State private var stopping = false
+    /// Why the last Stop failed, shown under Working… while the thread still runs.
+    @State private var stopError: String?
     /// Why the thread couldn't load, when nothing has loaded.
     @State private var loadError: String?
     /// BB says the thread doesn't exist: deleted since the list or notification.
@@ -125,13 +127,25 @@ struct WatchThreadView: View {
                 Section { WatchInteraction(interaction: interaction, answer: answer) }
             }
             if thread?.isRunning == true && interactions.isEmpty {
-                HStack {
-                    ProgressView().frame(width: 20)
-                    Text("Working…").font(.footnote)
-                    Spacer()
-                    Button { Task { await stop() } } label: { Image(systemName: "stop.fill") }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        ProgressView().frame(width: 20)
+                        Text(stopping ? "Stopping…" : "Working…").font(.footnote)
+                        Spacer()
+                        Button { Task { await stop() } } label: {
+                            Image(systemName: "stop.fill")
+                                .frame(width: 32, height: 32)
+                                .contentShape(.rect)
+                        }
                         .buttonStyle(.plain)
                         .disabled(stopping)
+                        .accessibilityLabel("Stop")
+                    }
+                    if let stopError {
+                        Label(stopError, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    }
                 }
             }
             Section {
@@ -164,13 +178,15 @@ struct WatchThreadView: View {
     private func stop() async {
         guard !stopping else { return }
         stopping = true
+        stopError = nil
         defer { stopping = false }
         do {
             try await client.stop(threadId)
         } catch {
             let message = BBClient.describe(error, server: client.baseURL)
             await load()
-            status = message
+            // Under the Stop button while it still runs; with the replies once it has ended.
+            if thread?.isRunning == true, interactions.isEmpty { stopError = message } else { status = message }
         }
     }
 
