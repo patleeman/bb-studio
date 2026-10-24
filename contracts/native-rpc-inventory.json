@@ -430,6 +430,12 @@
     {
       "file": "apps/ios/Shared/Bot.swift",
       "plugin": "studio",
+      "method": "bot_attention",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Bot.swift",
+      "plugin": "studio",
       "method": "bot_cache_state",
       "coverage": "generated method"
     },
