@@ -116,6 +116,9 @@ struct WindowGeometry: UIViewRepresentable {
 /// Expanded phone windows use an in-page header, rather than iOS's compact
 /// floating navigation controls. Narrow windows keep their native bars.
 struct DuoHeader<Title: View, Actions: View>: View {
+    /// Sidebar headers share the sidebar's surface, as on desktop and iPad,
+    /// instead of a separate bar band above the list.
+    var sidebar = false
     @ViewBuilder var title: Title
     @ViewBuilder var actions: Actions
 
@@ -129,7 +132,11 @@ struct DuoHeader<Title: View, Actions: View>: View {
         .padding(.horizontal, 16)
         .frame(minHeight: 58)
         .background {
-            RegularSurfaceBackground(name: "header", style: AnyShapeStyle(.bar), bottom: false, rightPage: true)
+            if sidebar {
+                RegularSurfaceBackground(name: "sidebarHeader", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), bottom: false)
+            } else {
+                RegularSurfaceBackground(name: "header", style: AnyShapeStyle(.bar), bottom: false, rightPage: true)
+            }
         }
     }
 }
@@ -214,21 +221,28 @@ struct SidebarSearchField: View {
 struct SidebarSelectionBackground: View {
     let selected: Bool
     var body: some View {
-        (selected ? Color.accentColor.opacity(0.15) : .clear)
+        // A whole rounded highlight, like the desktop sidebar's, rather than a
+        // cell fill that the section clips to rounded top corners only.
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(selected ? Color.accentColor.opacity(0.15) : .clear)
+            .padding(.vertical, 2)
             .ignoresSafeArea(.container, edges: .trailing)
     }
 }
 
-/// A phone list's automatic row inset includes the window's trailing safe
-/// area even inside the left page. Subtract that measured window inset to
-/// retain the normal 20pt interior padding inside the expanded card.
-/// iPad retains its existing automatic row insets.
+/// Rows keep the same 20-point interior padding on both sides of their card,
+/// as on the leading edge. A phone list's row inset includes the window's
+/// trailing safe area even inside the left page, less the sidebar's trailing
+/// content margin. The iPad's automatic inset is 16 points, so set it too.
 struct SidebarRowContent: ViewModifier {
+    static let padding: CGFloat = 20
     @Environment(\.duoLayout) private var layout
     let enabled: Bool
     @ViewBuilder func body(content: Content) -> some View {
         if enabled && UIDevice.current.userInterfaceIdiom == .phone {
-            content.listRowInsets(.trailing, 20 - layout.sidebarWindowInset)
+            content.listRowInsets(.trailing, Self.padding - layout.sidebarWindowInset + SidebarContentInsets.trailing)
+        } else if enabled {
+            content.listRowInsets(.trailing, Self.padding)
         } else { content }
     }
 }
@@ -263,7 +277,8 @@ struct RegularSurfaceBackground: View {
                 .allowsHitTesting(false)
                 .modifier(RegularSurfaceProbe(name: name))
         }
-        .ignoresSafeArea(.container, edges: bottom ? .bottom : [])
+        // Surfaces at the top of the window also fill an iPad's status bar.
+        .ignoresSafeArea(.container, edges: bottom ? [.top, .bottom] : .top)
     }
 }
 
@@ -277,5 +292,45 @@ private struct RegularSurfaceProbe: ViewModifier {
         #else
         content
         #endif
+    }
+}
+
+/// A sidebar column on the left page. UIKit already extends its list through
+/// the home-indicator area and insets the last row; only the horizontal edges
+/// are clipped, so rows keep drawing to the window's bottom edge.
+struct SidebarColumn: ViewModifier {
+    @Environment(\.duoLayout) private var layout
+    func body(content: Content) -> some View {
+        content
+            .ignoresSafeArea(.container, edges: .trailing)
+            .frame(width: layout.listWidth)
+            .clipShape(HorizontalClip())
+    }
+}
+
+private struct HorizontalClip: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: 0, dy: -10_000))
+    }
+}
+
+/// The crease between the pages: sidebar-coloured, with a hairline that runs
+/// the full window height rather than stopping at the home indicator.
+struct CreaseGutter: View {
+    @Environment(\.duoLayout) private var layout
+    var body: some View {
+        Color.clear
+            .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
+            .background {
+                if layout.twoPages {
+                    RegularSurfaceBackground(name: "crease", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
+                }
+            }
+            .overlay {
+                if layout.twoPages {
+                    RegularSurfaceBackground(name: "creaseLine", style: AnyShapeStyle(Color(uiColor: .separator))).frame(width: 1)
+                }
+            }
+            .accessibilityHidden(true)
     }
 }

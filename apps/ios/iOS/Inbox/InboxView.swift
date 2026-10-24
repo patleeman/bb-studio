@@ -274,6 +274,9 @@ struct InboxView: View {
         home
         .listStyle(.sidebar)
         .modifier(SidebarListMargins(enabled: layout.twoPages && selectsDetail))
+        // Headerless sections (the open Bot thread, Automations, the thread
+        // list) otherwise sit 35 points apart, unlike the desktop sidebar.
+        .listSectionSpacing(layout.twoPages && selectsDetail ? .compact : .default)
         .overlay {
             if !model.loaded { ProgressView() }
         }
@@ -283,7 +286,7 @@ struct InboxView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if layout.twoPages && selectsDetail {
                 VStack(spacing: 0) {
-                    DuoHeader {
+                    DuoHeader(sidebar: true) {
                         Text("Threads").font(.title2.bold()).accessibilityIdentifier("duoInboxTitle")
                     } actions: {
                         Button { app.startDictation() } label: { Image(systemName: "mic").frame(width: 44, height: 44) }
@@ -293,7 +296,7 @@ struct InboxView: View {
                     }
                     SidebarSearchField(prompt: "Search threads and messages", text: $query)
                 }
-                .background(.bar)
+                .background(Color(uiColor: .systemGroupedBackground))
                 .ignoresSafeArea(.container, edges: .trailing)
             }
         }

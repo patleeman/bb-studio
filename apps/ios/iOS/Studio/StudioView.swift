@@ -385,7 +385,7 @@ struct StudioView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if duoLayout.twoPages && selectsDetail {
                 VStack(spacing: 0) {
-                    DuoHeader {
+                    DuoHeader(sidebar: true) {
                         Text(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio").font(.title2.bold())
                     } actions: {
                         if selecting {
@@ -403,7 +403,7 @@ struct StudioView: View {
                         }
                     }
                     SidebarSearchField(prompt: "Search Studio", text: $query)
-                }.background(.bar)
+                }.background(Color(uiColor: .systemGroupedBackground))
                 .ignoresSafeArea(.container, edges: .trailing)
             }
         }
@@ -605,12 +605,16 @@ struct StudioView: View {
                     Section("Folders") {
                         Button { folder = nil } label: { Label("All items", systemImage: "tray") }
                             .modifier(SidebarRowContent(enabled: true))
+                            .accessibilityIdentifier("studio-folder-all")
+                            .accessibilityAddTraits(folder == nil ? .isSelected : [])
+                            .listRowBackground(SidebarSelectionBackground(selected: folder == nil))
                         ForEach(folders) { parent in
                             Button { folder = parent.itemId } label: {
                                 Label(parent.displayTitle, systemImage: "folder")
                             }
                             .modifier(SidebarRowContent(enabled: true))
                             .accessibilityIdentifier("studio-folder")
+                            .accessibilityAddTraits(folder == parent.itemId ? .isSelected : [])
                             .listRowBackground(SidebarSelectionBackground(selected: folder == parent.itemId))
                         }
                     }
@@ -733,7 +737,11 @@ struct StudioView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .foregroundStyle(selected ? Color.white : .primary)
-            .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
+            // On the grouped sidebar, the secondary background matches the
+            // page in light mode; use the search field's fill there instead.
+            .background(selected ? AnyShapeStyle(Color.accentColor)
+                : duoLayout.twoPages && selectsDetail ? AnyShapeStyle(Color(uiColor: .tertiarySystemFill))
+                : AnyShapeStyle(.background.secondary), in: .capsule)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])

@@ -90,7 +90,7 @@ struct BotThreadsSheet: View {
             .toolbar(embedded ? .hidden : .automatic, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if embedded {
-                    DuoHeader { Text(name).font(.title2.bold()) } actions: { EmptyView() }
+                    DuoHeader(sidebar: true) { Text(name).font(.title2.bold()) } actions: { EmptyView() }
                         .ignoresSafeArea(.container, edges: .trailing)
                 }
             }

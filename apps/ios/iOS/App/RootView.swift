@@ -114,25 +114,14 @@ struct InboxTab: View {
                     NavigationStack { InboxView(selectsDetail: true, model: inbox) }
                 }
             }
-            .ignoresSafeArea(.container, edges: .trailing)
-            .frame(width: layout.listWidth)
-            .clipped()
+            .modifier(SidebarColumn())
             .background {
                 if layout.twoPages {
                     RegularSurfaceBackground(name: "sidebar", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                 }
             }
             .accessibilityHidden(!layout.twoPages)
-            Rectangle()
-                .fill(Color(uiColor: .systemGroupedBackground))
-                .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
-                .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
-                .background {
-                    if layout.twoPages {
-                        RegularSurfaceBackground(name: "gutter", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
-                    }
-                }
-                .accessibilityHidden(true)
+            CreaseGutter()
             NavigationStack(path: $model.path) {
                 InboxView(model: inbox)
                 .opacity(layout.twoPages ? 0 : 1)

@@ -24,6 +24,7 @@ enum DuoDemo {
                 let rect = scroll.convert(scroll.bounds, to: window)
                 result.append(["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height,
                     "contentWidth": scroll.contentSize.width, "contentHeight": scroll.contentSize.height,
+                    "contentOffsetY": scroll.contentOffset.y,
                     "adjustedRight": scroll.adjustedContentInset.right,
                     "adjustedBottom": scroll.adjustedContentInset.bottom,
                     "clips": scroll.clipsToBounds])
@@ -109,6 +110,11 @@ enum DuoDemo {
             }
             metadata["railCenter"] = pixel(image, x: 8, y: window.bounds.height / 2)
             metadata["railBottom"] = pixel(image, x: 8, y: window.bounds.height - 5)
+            // Just inside the sidebar, left of its 16-point content margin.
+            let sidebarX = window.safeAreaInsets.left + 64 + 6
+            metadata["sidebarHeader"] = pixel(image, x: sidebarX, y: 20)
+            metadata["sidebarBody"] = pixel(image, x: sidebarX, y: window.bounds.height / 2)
+            metadata["sidebarRowBottom"] = pixel(image, x: sidebarX + 40, y: window.bounds.height - 6)
             if let data = try? JSONSerialization.data(withJSONObject: metadata, options: .sortedKeys) {
                 try? data.write(to: URL.documentsDirectory.appending(path: name + ".json"))
                 window.accessibilityValue = String(data: data, encoding: .utf8)

@@ -10,19 +10,14 @@ struct RegularPages<Sidebar: View, Detail: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .ignoresSafeArea(.container, edges: .trailing)
-                .frame(width: layout.listWidth)
-                .clipped()
+                .modifier(SidebarColumn())
                 .accessibilityHidden(!layout.twoPages)
                 .background {
                     if layout.twoPages {
                         RegularSurfaceBackground(name: "sidebar", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                     }
                 }
-            Rectangle().fill(Color(uiColor: .systemGroupedBackground))
-                .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
-                .overlay { if layout.twoPages { Color(uiColor: .separator).frame(width: 1) } }
-                .accessibilityHidden(true)
+            CreaseGutter()
             detail.frame(maxWidth: .infinity)
                 .background {
                     if layout.twoPages { RegularSurfaceBackground(name: "detail", rightPage: true) }
@@ -75,7 +70,7 @@ struct SettingsTab: View {
                 .listStyle(.sidebar)
                 .modifier(SidebarListMargins(enabled: true))
                 .safeAreaInset(edge: .top, spacing: 0) {
-                    DuoHeader { Text("Settings").font(.title2.bold()) } actions: { EmptyView() }
+                    DuoHeader(sidebar: true) { Text("Settings").font(.title2.bold()) } actions: { EmptyView() }
                         .ignoresSafeArea(.container, edges: .trailing)
                 }
             }
@@ -88,6 +83,10 @@ struct SettingsTab: View {
                     else { SpeechSettingsView() }
                 }
                 .modifier(RegularScrollingSurface())
+                // Its grouped background runs under the status column, but the
+                // cards, toggles and steppers keep the same 20-point margin
+                // from the safe edge that they have on the leading side.
+                .contentMargins(.trailing, layout.twoPages ? layout.sidebarWindowInset + 20 : 0, for: .scrollContent)
                 .toolbar(layout.twoPages ? .hidden : .automatic, for: .navigationBar)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if layout.twoPages {
