@@ -27,6 +27,19 @@ the only place that asks for Patrick's attention.
      and for threads) carry the same kind of note (`STOPPED_NOTE`,
      `server.ts`): fix it if you can, tell the user if they must act, else
      [PASS].
+   - **Its threads' questions**: BB's notice when a thread stops on a
+     question reads like it finished ("@thread … completed: Waiting for your
+     vault selection"), and the Bot replied `[PASS]` to it. So when a thread
+     a Bot owns starts waiting on an answer (`interaction.pending`), Studio
+     sends the Bot one agent-only note (`src/bot-nudge.ts`): "Your thread
+     "<title>" (<link>) is waiting on an answer: <the question>. If you can
+     handle it, do (answer it in that thread) and reply exactly [PASS]. If
+     only the user can, ask them in a line or two here, with its link."
+     Once per waiting episode: `bot_nudges` remembers it until a turn starts
+     or ends with nothing pending, so the next question nudges again. "Owns"
+     means the Bot's runner, a thread it owns, or a thread started from
+     those (up to four levels up). Not for the Bot's own chat (its question
+     is already the badge) or a paused or stopped Bot.
    - The Bot's instructions say so, inside the existing 800-character
      budget: "You triage: reports, alerts and your threads' questions come
      to you. Your chat is the user's inbox: post only what changed or needs
@@ -49,7 +62,8 @@ the only place that asks for Patrick's attention.
    `RunnerView.urgent` and `bot_runner_seen` are gone, and a migration clears
    every existing urgent flag (`UPDATE bot_runners SET urgent = 0`).
 5. **Threads the Bot started that wait on a question or approval** are the
-   Bot's. They show under **Running** by their state: the waiting mark,
+   Bot's. They show under **Running** by their state: the amber "waiting
+   for you" mark (as in the shared row-state spec, the same on iOS),
    "waiting" on the right, and `waitingFor` ("Waiting for an answer",
    "Waiting for approval") in the tooltip and in Bot info. The Bot's
    `bot_activity` tool lists them as "Waiting on an answer (yours to handle,
@@ -70,7 +84,8 @@ the only place that asks for Patrick's attention.
   this. iOS marks a thread read when it's viewed.
 - **Other Bots' rows**: the same dot, count and tooltip, from
   `bot_attention` (polled every 30 s).
-- **Running**: a thread held by an approval or question shows as waiting.
+- **Running**: a thread held by an approval or question shows as waiting,
+  with the amber mark.
 - **Bot info → Activity**: no Needs you. Running shows "waiting for
   approval" / "waiting for an answer" on such a thread.
 
@@ -81,6 +96,11 @@ the only place that asks for Patrick's attention.
   count; tapping it goes to the chat. Running lists the waiting thread with
   its `waitingFor` as a muted second line.
 - **Bell badge**: counts `attention.count`, and VoiceOver reads the reason.
+- **Chat header**: the Bot's status line shows the attention reason ("Asked
+  you a question", "1 thing for you") instead of "Needs you".
+- **Widgets and the watch complication** count the Bot's attention
+  (`bot_attention`), not pending questions across all of BB. With an older
+  Studio (no `bot_attention`), they fall back to the old count.
 - **Duo sidebar**: the Chat row shows the reason and count.
 - **Bots list**: each row gets a dot, the reason as its status line and a
   count, from `bot_attention`.
@@ -101,12 +121,18 @@ this branch's Studio installed into the same instance:
 - A runner "Backups" reported urgent "Last night's red4 backup failed: the
   backup disk is full." The Bot escalated it: "1 thing for you".
 - The thread "Rotate the ORBIT-42 deploy key" asked a question. It shows
-  under Running as "Waiting for an answer", and Patrick got no Needs you.
-  **Gap:** the Bot replied `[PASS]` to BB's notice about it (see the
-  decisions below).
+  under Running as "Waiting for an answer". Before the nudge, the Bot
+  replied `[PASS]` to BB's notice about it; that's why the nudge exists.
 - Runner rows: Deploy watch and Security show "reported", with no flag.
-- Opening the Bot's chat from its row cleared "1 thing for you" (the clip
-  below).
+- Opening the Bot's chat from its row cleared the badge (the clip below).
+- **The nudge** (round 3): the deploy-key thread asked again, and Studio
+  sent the Bot one agent-only note: "Your thread "Rotate the ORBIT-42
+  deploy key" (/projects/…/threads/…) is waiting on an answer: Which vault
+  holds the ORBIT-42 deploy key? …". The Bot asked Patrick in its chat:
+  "Which vault holds the ORBIT-42 deploy key: 1Password, AWS Secrets
+  Manager, or Vault? Answer in @thread:…". The badge read "2 things for
+  you" (it had also posted "I'll check whether the vault choice is already
+  recorded."). No second note came while the thread kept waiting.
 
 ## Renders
 
@@ -136,9 +162,21 @@ iOS (dark, demo fixture `-qaBotAttention`, `UITests/BotAttentionCaptureUITests.s
 | Phone, Activity | ![](ios/before-phone.png) | ![](ios/after-phone.png) |
 | Duo | ![](ios/before-duo.png) | ![](ios/after-duo.png) |
 | Phone, Bots list | n/a | ![](ios/after-phone-botlist.png) |
+| Phone, the Bot's chat header | n/a | ![](ios/after-phone-chat.png) |
+| Widgets (the status widget's views drawn in the app: small, circular, medium, rectangular) | n/a | ![](ios/after-widget.png) |
+
+The widget render is the widget's own view drawn inside the app
+(`-qaStateDemo widgets`), not a home-screen capture: unsigned simulator
+builds may not share the app group. No watch render: the harness has no
+watchOS path.
 
 ## Tests
 
+- `src/bot-nudge.test.ts`: one agent-only note per waiting episode, with the
+  thread's title, link and question; no repeat while it still waits; a new
+  episode after it's answered nudges again (an approval says so); none for
+  the Bot's own chat, an unowned thread or a paused Bot; a failed send can
+  try again.
 - `src/bot-attention.test.ts`: reasons and counts; only unread replies that
   aren't `[PASS]`; approval beats question; what a waiting thread says.
 - `src/bot.test.ts`: attention from a question in the Bot's hidden chat,
@@ -153,43 +191,37 @@ iOS (dark, demo fixture `-qaBotAttention`, `UITests/BotAttentionCaptureUITests.s
   while something waits), `workspace.test.ts`,
   `ProviderStatusMark.test.ts`, `Runners.test.tsx`: no Needs you group; the
   Bot row's dot, reason, count and tooltip; another Bot's row from
-  `bot_attention`; the waiting thread under Running; runner tones without
-  urgent.
+  `bot_attention`; the waiting thread under Running, with the amber mark;
+  runner tones without urgent.
 - iOS: `BotThreadsTests`, `BotRowStateTests`, `BotChatTests`, `BotTests`
   (attention decoding, `waitingFor` in Running, runners without urgent,
   `bot_attention` scoped by `botId`). Full `BBStudioTests`: 350 tests,
   1 skipped, 0 failures.
 
-## Needs Patrick's decision
+## Decided (round 3)
 
-1. **The Bot doesn't reliably bring its threads' questions to him.** BB tells
-   the Bot "@thread … completed: Waiting for your vault selection", and the
-   staged model replied `[PASS]` twice, even with the new instructions. If
-   the Bot doesn't escalate, the question waits unseen: it shows only as
-   "waiting" under Running. Options:
-   - (a) leave it to the Bot's instructions and model;
-   - (b) when a thread the Bot started starts waiting on Patrick, Studio
-     sends the Bot an agent-only nudge to answer it or escalate it;
-   - (c) count such threads in the Bot's badge directly ("Its thread asks
-     you a question").
+- The Bot gets a nudge when one of its threads waits on an answer (above).
+- The badge keeps counting unread Bot replies, including replies to
+  Patrick's own messages: it works as the Bot chat's unread count.
+- iOS chat header shows the attention reason; widgets and the watch count
+  the Bot's attention.
+- The waiting mark is amber on both platforms.
 
-   I'd pick (b). It keeps the Bot as the triage layer.
-2. **Unread replies count as "things for you".** That includes replies to
-   Patrick's own messages that he hasn't read yet, so the badge works as an
-   unread count for the Bot's chat. The Bot's chat rule ("post only what
-   changed or needs them, else [PASS]") is what keeps this meaningful.
-3. **iOS chat header**: it still says "Needs you" for the chat's own pending
-   questions, not `attention.reason`. Should it show the reason too?
-4. **iOS widgets and the watch complication** count BB-wide threads with
-   pending questions, from BB's thread list, not the Bot. Should they switch
-   to the Bot's attention?
-5. **The waiting mark differs**: iOS gives a thread waiting on an answer an
-   amber ring, desktop the muted "waiting" ring. One should change to match.
-6. **Older Studio with this iOS build**: iOS no longer reads `needsYou`, so
-   waiting threads from an older Studio show nowhere on iOS.
-7. **Reloading or reinstalling Studio cancels a pending `design_ask`
-   question** (seen while staging). That's BB's plugin-interaction
-   behaviour, not this change.
-8. **README screenshots** `bot.png` and `bot-runners.png` still show Needs
+## Still open
+
+1. **Older Studio with this iOS build**: iOS no longer reads `needsYou`, so
+   waiting threads from an older Studio show nowhere on iOS (the widgets fall
+   back; the Activity sheet doesn't).
+2. **README screenshots** `bot.png` and `bot-runners.png` still show Needs
    you. They need a capture run from a pushed commit
    (`scripts/capture/captures/bb-studio-bot.mjs` is updated for it).
+3. **Widgets with Studio but no Bot**: `bot_attention` answers "nothing", so
+   the widgets show 0, not BB's pending-question count. The fallback is only
+   for a Studio without `bot_attention`. Should "no Bot" also fall back?
+4. **iOS chat header truncates** the reason on a phone ("Asked you a
+   questi…") beside the call and bell buttons.
+5. `Widgets/StatusWidget.swift` is now also built into the app target, for
+   the in-app widget render.
+6. Reloading or reinstalling Studio cancels a pending `design_ask` question
+   (seen while staging). That's BB's plugin-interaction behaviour, not this
+   change.
