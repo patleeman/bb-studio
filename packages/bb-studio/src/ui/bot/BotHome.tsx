@@ -9,10 +9,10 @@
 // (/plugins/studio/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts).
 import { errorMessage, relativeTime } from "../../kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "../../kit/app/index";
+import { Badge, BAR_BUTTON, DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openAppPath, PageColumn, PRIMARY_BUTTON, usePathname } from "../../kit/app/index";
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { BotActivityView, BotLearningView, BotScheduledView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
 import { describeCron } from "../../schedule";
@@ -20,6 +20,7 @@ import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE, isBotShape } from "./BotAvatar";
 import { Welcome } from "./Onboarding";
+import { Elapsed, ProviderStatusMark, runningLabel, type ProviderCatalogEntry } from "./ProviderStatusMark";
 import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
@@ -239,7 +240,7 @@ export function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_
 }
 
 /** Activity's sections, only those with something in them; one quiet line when all are empty. */
-export function ActivityPanel({ data, loading, error, onOpen = openThreadPage }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void }) {
+export function ActivityPanel({ data, loading, error, onOpen = openThreadPage, providers }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void; providers?: readonly ProviderCatalogEntry[] }) {
   const [allRecent, setAllRecent] = useState(false);
   if (!data) return <p className="px-4 py-3 text-xs text-muted-foreground">{loading ? "Loading…" : ""}</p>;
   const recent = allRecent ? data.completed : data.completed.slice(0, COMPLETED_PREVIEW);
@@ -249,7 +250,7 @@ export function ActivityPanel({ data, loading, error, onOpen = openThreadPage }:
       {data.maintenance?.map((run) => <div key={run.at} className="px-1.5 text-xs"><span className="font-medium">Maintenance</span> · {run.summary}</div>)}
       {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
       {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} onOpen={onOpen} /></Section> : null}
-      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} /></Section> : null}
+      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} running={providers ?? []} /></Section> : null}
       {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} onOpen={onOpen} /></Section> : null}
       {data.scheduled.length ? <Section title="Scheduled"><ScheduledList items={data.scheduled} /></Section> : null}
       {data.completed.length ? (
@@ -276,14 +277,18 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ThreadList({ threads, onOpen }: { threads: BotThreadView[]; onOpen(threadId: string): void }) {
+/** `running`: the provider catalog, when these threads are running: each gets the running mark and its ticking time, as in the sidebar. */
+function ThreadList({ threads, onOpen, running }: { threads: BotThreadView[]; onOpen(threadId: string): void; running?: readonly ProviderCatalogEntry[] }) {
   return (
     <ul className="flex flex-col">
       {threads.map((thread) => (
         <li key={thread.id}>
           <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-state-hover" onClick={() => onOpen(thread.id)}>
+            {running ? <ProviderStatusMark providerId={thread.providerId} tone="running" providers={running} label={runningLabel(thread.runningSince)} /> : null}
             <span className="min-w-0 flex-1 truncate">{thread.relation === "self" ? "Its chat" : thread.title}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">{ago(thread.updatedAt)}</span>
+            {running && thread.runningSince != null
+              ? <Elapsed since={thread.runningSince} className="text-xs text-success" />
+              : <span className="shrink-0 text-xs text-muted-foreground">{ago(thread.updatedAt)}</span>}
           </button>
         </li>
       ))}
@@ -339,8 +344,13 @@ function CheckinsDialog({ run, busy, onClose, onPreset, onSave }: { run: Heartbe
   );
 }
 
-/** Profile fields live in the Bot info surface. Avatar image choices apply at once; the fields save together. */
-export function BotProfileEditor({ bot, value, status, statusDot, working, busy, onChanged, onSave, children }: {
+/**
+ * The head of Bot info: avatar, name, status and description, with Edit and
+ * `actions` (the ⋯ menu) on the name's row. Edit, the name or the avatar
+ * opens the inline editor; avatar image choices apply at once, the fields
+ * save together. `children` (Profile changes) sit under the description.
+ */
+export function BotProfileEditor({ bot, value, status, statusDot, working, busy, onChanged, onSave, actions, children }: {
   bot: NonNullable<BotView["bot"]>;
   value: Profile;
   status: string;
@@ -349,6 +359,7 @@ export function BotProfileEditor({ bot, value, status, statusDot, working, busy,
   busy: boolean;
   onChanged(): void;
   onSave(next: Profile): void;
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Profile>({ ...value, color: value.color ?? colorForName(value.name) });
@@ -387,8 +398,7 @@ export function BotProfileEditor({ bot, value, status, statusDot, working, busy,
     setEditing(false);
   };
   return (
-    <section aria-label="Profile" className="mx-4 mt-3 flex flex-col gap-2.5 border-b border-border pb-3" data-testid="bot-profile-section">
-      <h3 className="text-xs font-medium text-muted-foreground">Profile</h3>
+    <section aria-label="Profile" className="mx-4 flex flex-col gap-3 pt-5 pb-4" data-testid="bot-profile-section">
       {editing ? (
         <div id="bot-profile-editor" className="flex flex-col gap-2.5">
           <header className="flex items-start gap-3">
@@ -444,34 +454,36 @@ export function BotProfileEditor({ bot, value, status, statusDot, working, busy,
         </div>
       ) : (
         <>
-          <header className="flex items-start gap-3">
+          <header className="flex items-center gap-3">
             <button type="button" aria-label={`Edit ${bot.name} avatar and profile`} aria-expanded={false} onClick={openEditor}
               className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
               <BotAvatar shape={value.shape} color={value.color ?? colorForName(value.name)} emoji={value.emoji || "🤖"} image={bot.avatarImageUrl} size={44} working={working} provider={botProvider(bot)} />
             </button>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h2 className="min-w-0">
                 <button type="button" aria-label={`Edit ${bot.name} profile`} aria-expanded={false} onClick={openEditor}
-                  className="min-w-0 truncate rounded-sm text-left text-sm font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  className="block max-w-full truncate rounded-sm text-left text-base leading-tight font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
                   {bot.name}
                 </button>
-                <button ref={editButton} type="button" aria-label="Edit profile" aria-expanded={false} onClick={openEditor}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
-                  <Icon name="Edit" className="size-3" aria-hidden />Edit
-                </button>
-              </div>
+              </h2>
               <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground" data-testid="bot-info-status">
                 <span className={`size-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
                 <span className="truncate">{status}</span>
               </span>
             </div>
+            <div className="flex shrink-0 items-center gap-0.5 self-start">
+              <button ref={editButton} type="button" aria-label="Edit profile" title="Edit profile" aria-expanded={false} onClick={openEditor} className={BAR_BUTTON}>
+                <Icon name="Edit" aria-hidden />Edit
+              </button>
+              {actions}
+            </div>
           </header>
-          <p className={`whitespace-pre-wrap break-words text-sm ${value.role.trim() ? "text-foreground" : "text-muted-foreground"}`}>
+          <p className={`whitespace-pre-wrap break-words text-sm ${value.role.trim() ? "text-foreground/90" : "text-muted-foreground"}`}>
             {value.role.trim() ? value.role : "No description."}
           </p>
         </>
       )}
-      {children ? <div className="border-t border-border pt-2">{children}</div> : null}
+      {children}
     </section>
   );
 }
@@ -570,26 +582,65 @@ function SkillsList({ botId, name }: { botId: string; name: string }) {
   );
 }
 
-/** History includes deleted skills, so a mistaken deletion can also be reverted. */
+/**
+ * Skill history, collapsed: every saved version newest first (deleted skills
+ * too, so a mistaken delete can be undone), each opening to its diff, its
+ * review warnings (advice only) and Revert.
+ */
 function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) {
   const [cursors, setCursors] = useState<number[]>([]);
+  const [open, setOpen] = useState(false);
+  const [shown, setShown] = useState<number | null>(null);
   const history = useLive("bot_skill_history", { botId, ...(cursors.length ? { before: cursors[cursors.length - 1] } : {}) }, { pollMs: 30_000 });
   const { run, busy, error } = useAction(() => { history.refresh(); onRevert(); }, botId);
-  return <details className="text-xs">
-    <summary className="cursor-pointer">Skill history</summary>
-    <p className="py-1 text-muted-foreground">Saves apply immediately. Revert keeps the current version in history. Review warnings are advisory.</p>
-    {(history.data?.versions ?? []).map((version) => <details key={version.id} className="border-b border-border py-1">
-      <summary className="cursor-pointer">{version.name} · {relativeTime(version.at)}{version.body === null ? " · deleted" : ""}{version.warnings.length ? ` · ${version.warnings.length} warnings` : ""}</summary>
-      <pre className="max-h-40 overflow-auto whitespace-pre-wrap py-1">{version.diff}</pre>
-      {version.warnings.map((warning, index) => <p key={index} className="text-amber-700 dark:text-amber-400">{warning}</p>)}
-      <button type="button" className={GHOST_BUTTON} disabled={!!busy} aria-label={`Revert ${version.name} to version ${version.id}`} onClick={() => void run("bot_skill_revert", { versionId: version.id })}>Revert</button>
-    </details>)}
-    <div className="flex gap-2">
-      {cursors.length ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors(cursors.slice(0, -1))}>Newer versions</button> : null}
-      {history.data?.versions.length === 50 ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors([...cursors, history.data!.versions[49]!.id])}>Older versions</button> : null}
+  const versions = history.data?.versions ?? [];
+  return (
+    <div className="flex flex-col" aria-label="Skill history">
+      <button type="button" aria-expanded={open} aria-controls="bot-skill-history" onClick={() => setOpen(!open)}
+        className="-ml-1 flex h-7 items-center gap-1 self-start rounded-md pr-1.5 pl-0.5 text-xs text-muted-foreground hover:text-foreground">
+        <Icon name={open ? "ChevronDown" : "ChevronRight"} className="size-3.5" aria-hidden />Skill history
+      </button>
+      <div id="bot-skill-history" hidden={!open} className="flex flex-col gap-1.5 pt-1">
+        <p className="text-xs text-muted-foreground">Saves apply right away. Revert brings back a version and keeps the current one here. Review warnings are advice; they don't block a save.</p>
+        {versions.length ? (
+          <ul className="flex flex-col divide-y divide-border border-y border-border">
+            {versions.map((version) => {
+              const expanded = shown === version.id;
+              return (
+                <li key={version.id} data-skill-version={version.id} className="flex flex-col">
+                  <button type="button" aria-expanded={expanded} onClick={() => setShown(expanded ? null : version.id)} className="flex min-h-9 min-w-0 items-center gap-2 py-1 text-left text-sm">
+                    <Icon name={expanded ? "ChevronDown" : "ChevronRight"} className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 truncate font-medium">{version.name}</span>
+                    {version.body === null ? <Badge label="Deleted" /> : null}
+                    {version.warnings.length ? <Badge label={version.warnings.length === 1 ? "1 warning" : `${version.warnings.length} warnings`} tone="warning" /> : null}
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{relativeTime(version.at)}</span>
+                  </button>
+                  <div hidden={!expanded} className="flex flex-col gap-2 pb-2.5 pl-5.5">
+                    <pre className="max-h-48 overflow-auto rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+                      {version.diff.split("\n").map((line, index) => <Fragment key={index}>{index ? "\n" : ""}<span className={line.startsWith("+") ? "text-success" : line.startsWith("-") ? "text-destructive" : "text-muted-foreground"}>{line}</span></Fragment>)}
+                    </pre>
+                    {version.warnings.length ? (
+                      <ul className="flex flex-col gap-1 text-xs">
+                        {version.warnings.map((warning, index) => <li key={index} className="flex items-start gap-1.5"><Icon name="AlertTriangle" className="mt-px size-3.5 shrink-0 text-warning" aria-hidden /><span>{warning}</span></li>)}
+                      </ul>
+                    ) : null}
+                    <button type="button" className={`${OUTLINE_BUTTON} self-start`} disabled={!!busy} aria-label={`Revert ${version.name} to version ${version.id}`} onClick={() => void run("bot_skill_revert", { versionId: version.id })}><Icon name="RotateCcw" />Revert</button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="text-xs text-muted-foreground">{history.loading && !history.data ? "Loading…" : history.error ?? "No saved versions yet."}</p>}
+        {cursors.length || versions.length === 50 ? (
+          <div className="flex gap-1">
+            {cursors.length ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors(cursors.slice(0, -1))}>Newer versions</button> : null}
+            {versions.length === 50 ? <button type="button" className={GHOST_BUTTON} onClick={() => setCursors([...cursors, versions[49]!.id])}>Older versions</button> : null}
+          </div>
+        ) : null}
+        {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
+      </div>
     </div>
-    {error ? <p role="alert" className="text-destructive">{error}</p> : null}
-  </details>;
+  );
 }
 
 const LEARN_INTERVALS = [5, 10, 20, 30, 50];

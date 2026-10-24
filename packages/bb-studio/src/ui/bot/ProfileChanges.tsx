@@ -3,6 +3,7 @@
 // Revert, which restores the old value. Reverts are listed too. Shown in the
 // Profile section of Bot info.
 import { relativeTime } from "../../kit/format";
+import { Icon } from "../../kit/ui/index";
 import { useState } from "react";
 import type { BotProfileChangeView } from "../../contract";
 import { useLive } from "../live";
@@ -39,13 +40,13 @@ export function ProfileChanges({ botId, onChanged, limit = 5 }: { botId: string;
   return (
     <section aria-label="Profile changes" className="flex flex-col">
       <button type="button" aria-expanded={expanded} aria-controls="bot-profile-changes-content" onClick={() => setExpanded((open) => !open)}
-        className="self-start rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
-        Profile changes
+        className="-ml-1 flex h-6 items-center gap-1 self-start rounded-md pr-1.5 pl-0.5 text-xs text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+        <Icon name={expanded ? "ChevronDown" : "ChevronRight"} className="size-3.5" aria-hidden />Profile changes
       </button>
-      <div id="bot-profile-changes-content" hidden={!expanded}>
-        {list.length ? <ul className="flex flex-col">
+      <div id="bot-profile-changes-content" hidden={!expanded} className="pt-1">
+        {list.length ? <ul className="flex flex-col divide-y divide-border border-y border-border">
           {list.map((change) => (
-            <li key={change.id} className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-sm" data-testid="bot-profile-change">
+            <li key={change.id} className="flex min-h-9 min-w-0 items-center gap-2 py-1 text-sm" data-testid="bot-profile-change">
               <span className="shrink-0 text-xs text-muted-foreground">{changedBy(change)} {FIELD_LABEL[change.field]}</span>
               <span className="flex min-w-0 flex-1 items-center gap-1">
                 <Value change={change} side="old" />
@@ -54,13 +55,13 @@ export function ProfileChanges({ botId, onChanged, limit = 5 }: { botId: string;
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(change.at)}</span>
               {change.reverts === null && change.revertedAt === null
-                ? <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" disabled={!!busy}
+                ? <button type="button" className="h-7 shrink-0 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50" disabled={!!busy}
                     aria-label={`Revert ${FIELD_LABEL[change.field]}`} onClick={() => void run("bot_profile_revert", { changeId: change.id })}>Revert</button>
                 : change.revertedAt !== null ? <span className="shrink-0 text-xs text-muted-foreground">Reverted</span> : null}
             </li>
           ))}
-        </ul> : <p className="px-1.5 py-1 text-xs text-muted-foreground">{changes.loading && !changes.data ? "Loading…" : "No profile changes yet."}</p>}
-        {error ? <p role="alert" className="px-1.5 text-xs text-destructive">{error}</p> : null}
+        </ul> : <p className="py-1 text-xs text-muted-foreground">{changes.loading && !changes.data ? "Loading…" : "No profile changes yet."}</p>}
+        {error ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
       </div>
     </section>
   );

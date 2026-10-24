@@ -70,7 +70,7 @@ export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" data-testid="bot-cache-chip" aria-label={indicator.label} title={indicator.label}
-          className="inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-xs hover:bg-state-hover hover:text-foreground">
+          className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-xs outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-state-active">
           <Icon name="Clock" className={`size-3.5 ${indicator.tone === "amber" ? "text-warning" : indicator.tone === "dim" ? "text-muted-foreground/40" : "text-muted-foreground"}`} aria-hidden />
           {indicator.text ? <span className={`tabular-nums ${indicator.tone === "amber" ? "text-warning" : "text-muted-foreground"}`}>{indicator.text}</span> : null}
         </button>

@@ -7,7 +7,7 @@
 import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { useState } from "react";
-import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { experimental_useProviders as useProviders, useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotView } from "../../contract";
 import { useLive } from "../live";
 import { ActivityPanel, BotHome, BotProfileEditor, runningCount, statusLabel, useBotControls } from "./BotHome";
@@ -47,7 +47,7 @@ export function BotInfoPanel({ threadId }: PluginThreadPanelProps) {
   return <BotInfo botId={botId} threadId={threadId} />;
 }
 
-/** Header action beside the cache indicator on a Bot-owned thread. */
+/** Header action beside the cache indicator on a Bot-owned thread: a borderless chrome button, like the indicator. */
 export function BotInfoHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
   const owner = useLive("bot_thread_owner", { threadId }, { pollMs: 120_000 });
   const navigate = useBbNavigate();
@@ -55,7 +55,7 @@ export function BotInfoHeaderAction({ threadId }: PluginThreadHeaderActionProps)
   return (
     <button type="button" data-testid="bot-info-header" aria-label="Bot info" title="Bot info"
       onClick={() => navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })}
-      className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4">
+      className={ICON_BUTTON}>
       <Icon name="Bot" aria-hidden />
     </button>
   );
@@ -76,34 +76,35 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
   const openSub = useOpenThread();
   const [switching, setSwitching] = useState(false);
   const profileChanged = () => { refresh(); activity.refresh(); };
+  const { providers } = useProviders();
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className={ICON_BUTTON} aria-label="Bot menu" title="More" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        {bot.kind === "external"
+          ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
+          : <>
+            <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
+            <DropdownMenuItem onSelect={toggleSkills}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
+          </>}
+        {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
+        {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
+        <DropdownMenuSeparator />
+        {bot.state === "active"
+          ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
+          : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
+        {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
       <BotProfileEditor bot={bot} value={profile} status={statusLabel(view.run, bot.state, running)} statusDot={STATE_DOT[bot.state]} working={running > 0} busy={!!busy}
-        onChanged={profileChanged} onSave={saveProfile}>
+        onChanged={profileChanged} onSave={saveProfile} actions={menu}>
         <ProfileChanges botId={bot.id} onChanged={profileChanged} />
       </BotProfileEditor>
-      <div className="flex justify-end px-4 pt-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className={ICON_BUTTON} aria-label="Bot menu" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            {bot.kind === "external"
-              ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
-              : <>
-                <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-                <DropdownMenuItem onSelect={toggleSkills}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
-              </>}
-            {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
-            {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
-            <DropdownMenuSeparator />
-            {bot.state === "active"
-              ? <DropdownMenuItem onSelect={() => void run("bot_pause")}><Icon name="Pause" />Pause</DropdownMenuItem>
-              : <DropdownMenuItem onSelect={() => void run("bot_resume")}><Icon name="Play" />Resume</DropdownMenuItem>}
-            {bot.state !== "stopped" ? <DropdownMenuItem variant="destructive" onSelect={() => setSheet("stop")}><Icon name="Square" />Stop…</DropdownMenuItem> : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
       {switching && bot.threadId && bot.providerId && bot.model
         ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
         : null}
@@ -133,10 +134,10 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
       <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} />
       {bot.kind === "external"
         ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>
-        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} />}
+        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} providers={providers} fallbackProviderId={bot.providerId} />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
-      <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} />
+      <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} providers={providers} />
       {sheets}
     </div>
   );

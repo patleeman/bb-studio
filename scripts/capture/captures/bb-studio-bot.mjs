@@ -672,12 +672,13 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     await client.evaluate(`(() => {
       const section = document.querySelector('section[aria-label="Skills"]');
       if (/Waiting for your approval|Review skills before saving/i.test(section?.textContent ?? "")) throw new Error("Skills still shows a save-approval state");
-      const history = [...(section?.querySelectorAll("details") ?? [])].find((details) => details.querySelector(":scope > summary")?.textContent.includes("Skill history"));
-      if (!history) throw new Error("Skill history is missing");
-      history.open = true;
-      const version = history.querySelector(":scope > details");
+      const history = section?.querySelector('button[aria-controls="bot-skill-history"]');
+      if (!history?.textContent.includes("Skill history")) throw new Error("Skill history is missing");
+      if (history.getAttribute("aria-expanded") !== "true") history.click();
+      const version = section.querySelector("#bot-skill-history [data-skill-version]");
       if (!version) throw new Error("Skill history has no saved version");
-      version.open = true;
+      const toggle = version.querySelector(":scope > button[aria-expanded]");
+      if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
       if (!version.querySelector('button[aria-label^="Revert "]')) throw new Error("The saved version has no Revert action");
       section.scrollIntoView({ block: "start" });
       return true;
