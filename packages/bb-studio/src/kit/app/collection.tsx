@@ -1,4 +1,5 @@
 import { useContentSearch } from "./use-content-search";
+import { ContentSearchStatus } from "./content-search-status";
 // The Studio collection: one searchable, filterable list of items of any
 // kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on that
 // keeps its own page renders it alone for its own kind.
@@ -961,8 +962,7 @@ export function CollectionPage({
           </div>
 
           <div className="@container/list mt-3">
-            {!filter && search.loading ? <p role="status" className="py-2 text-sm text-muted-foreground">Searching content…</p> : null}
-            {!filter && search.error ? <p role="alert" className="py-2 text-sm text-destructive">Couldn't search content: {search.error} <button type="button" onClick={search.retry}>Retry search</button></p> : null}
+            {!filter ? <ContentSearchStatus {...search} className="px-2" /> : null}
             {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
             {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
             {filter && items !== null && !shown.length ? (
@@ -974,7 +974,7 @@ export function CollectionPage({
                 {archived
                   ? "Nothing archived."
                   : query.trim()
-                    ? "Nothing matches."
+                    ? search.loading ? "" : "Nothing matches."
                     : tagging && activeTag
                       ? `Nothing tagged ${activeTag.name}${activeKind ? ` among ${activeKind.plural.toLowerCase()}` : ""}.`
                       : tagging && tagFilter === UNTAGGED

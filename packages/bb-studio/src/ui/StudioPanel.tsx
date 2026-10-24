@@ -1,5 +1,6 @@
 import { useOverview } from "./use-overview";
 import { useContentSearch } from "../kit/app/use-content-search";
+import { ContentSearchStatus } from "../kit/app/content-search-status";
 // The Studio collection: every add-on's items in one list, filtered by one
 // query (src/query.ts) from search and the filter menus above it. It is the
 // workspace's new tab page, never a page of its own: openCollection starts it
@@ -329,8 +330,7 @@ export function StudioPanel() {
       {/* Talk kept its own page for these; recordings are Studio's now. */}
       {onlyKind?.id === "recording" || onlyKind?.id === "dictation" ? <UnsentNotice className="mb-2" /> : null}
       {searchText ? <SearchFreshness {...freshness} /> : null}
-      {contentSearch.loading ? <p role="status" className="px-4 text-sm text-muted-foreground">Searching content…</p> : null}
-      {contentSearch.error ? <p role="alert" className="px-4 text-sm text-destructive">Couldn't search content: {contentSearch.error} <button type="button" onClick={contentSearch.retry}>Retry search</button></p> : null}
+      {searchText ? <ContentSearchStatus {...contentSearch} className="px-3" /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name="AlertTriangle" className="size-4 shrink-0" />
@@ -417,7 +417,8 @@ export function StudioPanel() {
     : compiled.archived
       ? "Nothing archived matches."
       : searchText || query.filters.length
-          ? "Nothing matches."
+          // A content search still running may yet find something.
+          ? contentSearch.loading ? "" : "Nothing matches."
           : "No items yet.";
 
   return (
