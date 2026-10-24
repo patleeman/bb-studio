@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, workspaceBlock } from "./bot-maintenance";
+import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, readPullRequest, workspaceBlock } from "./bot-maintenance";
 import { MIGRATIONS } from "./migrations";
 import { SkillLearning, type SkillState } from "./skill-learning";
 const DAY = 86_400_000;
@@ -163,6 +163,11 @@ it("keeps a parent while a child thread is still open, since archiving cascades"
   expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid"]);
   x.rows.splice(1, 1); await x.maintenance.run("bot", { now: now + 2 });
   expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid", "child"]);
+});
+it("treats a missing environments.pullRequest (stable 0.47) as no pull request instead of failing", async () => {
+  expect(await readPullRequest({}, "env")).toBeNull();
+  expect(await readPullRequest({ pullRequest: () => { throw new Error("sync boom"); } }, "env")).toBeNull();
+  expect(await readPullRequest({ pullRequest: async () => ({ outcome: "available" }) } as never, "env")).toEqual({ outcome: "available" });
 });
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";

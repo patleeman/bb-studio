@@ -38,6 +38,16 @@ export function workspaceBlock(status: Awaited<ReturnType<Sdk["environments"]["s
   if (checkout.kind === "branch" && remote === checkout.branchName && mergeBase!.aheadCount > 0 && mergeBase!.files.length) return `${count(mergeBase!.aheadCount, "unpushed commit")}.`;
   return null;
 }
+/**
+ * A thread environment's pull request, or null when unavailable. Stable BB
+ * 0.47 has no environments.pullRequest; calling it threw synchronously
+ * (before any .catch), which stopped the whole maintenance run.
+ */
+export async function readPullRequest(environments: Pick<Sdk["environments"], "pullRequest"> | Record<string, unknown>, environmentId: string) {
+  const pullRequest = (environments as { pullRequest?: Sdk["environments"]["pullRequest"] }).pullRequest;
+  if (typeof pullRequest !== "function") return null;
+  return Promise.resolve().then(() => pullRequest.call(environments, { environmentId })).catch(() => null);
+}
 export function memoryNeedsTidy(text: string, budget: number, updatedAt: number, now: number): boolean {
   const dates = [...text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => Date.parse(m[1]!)).filter(Number.isFinite);
   return text.trim().split(/\s+/).filter(Boolean).length > budget || (text.trim().length > 0 && now - Math.min(updatedAt, ...dates) >= 60 * DAY);
@@ -146,7 +156,7 @@ export class BotMaintenance {
         if (plans.some((p) => (p.data as { plan?: { status: string }[] }).plan?.some((s) => s.status !== "completed"))) continue;
         let captured = !!this.deps.db.prepare("SELECT 1 FROM item_threads WHERE thread_id = ? LIMIT 1").get(id);
         if (!captured && thread.environmentId) {
-          const pr = await this.deps.sdk.environments.pullRequest({ environmentId: thread.environmentId }).catch(() => null);
+          const pr = await readPullRequest(this.deps.sdk.environments, thread.environmentId);
           captured = pr?.outcome === "available" && pr.pullRequest.attention === "merged";
         }
         const ownerId = thread.lifecycleOwnerThreadId ?? thread.parentThreadId ?? thread.sourceThreadId;
