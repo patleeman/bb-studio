@@ -69,8 +69,9 @@ function RunnerState({ runner, running }: { runner: RunnerView; running: boolean
   if (summary.outcome === "paused") return <span className="shrink-0 text-muted-foreground">paused</span>;
   return (
     <span className="flex min-w-0 shrink-0 items-baseline gap-1 tabular-nums text-muted-foreground">
-      {summary.next ? <span className="text-foreground/70">next {summary.next}</span> : null}
-      {summary.outcome ? <span className={OUTCOME_TEXT[summary.outcome]}>{summary.next ? "· " : ""}{summary.outcome}</span> : null}
+      {/* The name keeps the room: on a narrow row "next 10:00 PM · quiet" is "10:00 PM", and only a failure stays; the rest is in the tooltip. */}
+      {summary.next ? <span className="text-foreground/70"><span className="@max-[19rem]/runner:hidden">next </span>{summary.next}</span> : null}
+      {summary.outcome ? <span className={`${OUTCOME_TEXT[summary.outcome]} ${summary.outcome === "failed" || !summary.next ? "" : "@max-[19rem]/runner:hidden"}`}>{summary.next ? "· " : ""}{summary.outcome}</span> : null}
     </span>
   );
 }
@@ -85,7 +86,7 @@ export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackPr
   const running = tone === "running";
   return (
     <button type="button" data-runner={runner.id} data-agenda={agenda ? runner.id : undefined} aria-current={active ? "true" : undefined} title={runnerTitle(runner)} disabled={!runner.threadId} onClick={() => onOpen(runner)}
-      className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover disabled:hover:bg-transparent aria-[current]:bg-state-active">
+      className="@container/runner flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover disabled:hover:bg-transparent aria-[current]:bg-state-active">
       <ProviderStatusMark providerId={runner.providerId ?? fallbackProviderId} tone={tone} providers={providers} label={running ? runningLabel(runner.runningSince) : runnerSummary(runner).label} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" || tone === "waiting" ? "text-muted-foreground" : ""}`}>{botItemName(runner.name, botName)}{runner.machineName ? <span className="text-muted-foreground"> · {runner.machineName}</span> : null}</span>
       <span className="flex shrink-0 text-[11px]"><RunnerState runner={runner} running={running} /></span>
