@@ -44,6 +44,11 @@ Bot sidebar, and to Bot info's Runners and Activity → Running.
   green ring, and a 6 pt green "live" dot sits at the logo's bottom-right,
   outlined 2 pt in the sidebar colour. The clock still ticks.
 - **Only running rows move.** The old status ring pulsed on every active runner.
+- **Narrow rows** (Patrick's call): the runner's name keeps the room. On a
+  row narrower than 19 rem (304 pt), which is the sidebar, an idle runner shows
+  just the time (`10:00 PM`, no `next`, no `· quiet` or `· reported`), and
+  `· failed` stays. The full form shows where there's room (Bot info), and
+  the outcome is always in the tooltip and the spoken label.
 - **Time format**: `next` uses Schedule's format, the time if today, else the
   weekday and time (`Thu 9:32 PM`).
 - **Spoken labels**: `Running for 12 minutes`, `Next run 5:15 PM, last run quiet`,
@@ -73,4 +78,4 @@ it now sits under Waiting to start, not Running.
 Before, every runner pulsed a green ring whether it was running or not,
 and the time beside it was the last run, which read as the next one. After,
 only the running thread and Release watch move and count up (`2:32`). Idle runners are grey and
-say `next 9:45 PM · quiet`. Deploy watch is amber with its report's age.
+say `next 10:00 PM · quiet`, shortened to `10:00 PM` in the narrow sidebar. Deploy watch is amber with its report's age.
