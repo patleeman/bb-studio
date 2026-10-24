@@ -76,6 +76,16 @@ final class BotChatTests: XCTestCase {
         XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: " ", lead: bot?.lead), "Checks in weekdays 8:00")
     }
 
+    func testShortAttentionForATightHeader() {
+        XCTAssertEqual(BotStatus.short(reason: "Asked you a question", count: 1), "1 question")
+        XCTAssertEqual(BotStatus.short(reason: "Asked you a question", count: 3), "3 questions")
+        XCTAssertEqual(BotStatus.short(reason: "Waiting for approval", count: 1), "Approval")
+        XCTAssertEqual(BotStatus.short(reason: "Waiting for approval", count: 2), "2 approvals")
+        XCTAssertEqual(BotStatus.short(reason: "1 thing for you", count: 1), "1 thing")
+        XCTAssertEqual(BotStatus.short(reason: "2 things for you", count: 2), "2 things")
+        XCTAssertEqual(BotStatus.short(reason: "Something else", count: 1), "Needs you")
+    }
+
     // MARK: Message grouping
 
     private func rows(_ json: String) throws -> [TimelineRow] {

@@ -377,7 +377,7 @@ struct ThreadView: View {
             if let botChrome { botChrome.openThread(id) } else { app.path.append(.thread(id: id)) }
             return .handled
         })
-        .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, working: model.thread?.isRunning == true))
+        .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
         .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
@@ -479,6 +479,12 @@ struct ThreadView: View {
     private var botStatus: String {
         BotStatus.line(state: botChrome?.bot.state, running: model.thread?.isRunning == true, thinking: model.shelf.thinking,
                        attention: botChrome?.attention?.reason, lead: botChrome?.bot.lead)
+    }
+
+    /// "1 question", "Approval", "2 things": the Bot's attention, short, for a tight header.
+    private var botShortStatus: String? {
+        guard let attention = botChrome?.attention, botStatus == attention.reason else { return nil }
+        return BotStatus.short(reason: attention.reason, count: attention.count)
     }
 
     private var timeline: some View {

@@ -74,10 +74,13 @@ final class BotTests: XCTestCase {
         let asked = client(URL(string: "https://bot-attention.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":{"reason":"Asked you a question","count":1,"since":1}}}"#)])
         let needs = await asked.needsYouCount(fallback: summary)
         XCTAssertEqual(needs, NeedsYouCount(count: 1, reason: "Asked you a question", fromBot: true))
-        // The Bot needing nothing is zero, not the BB-wide count.
-        let clear = client(URL(string: "https://bot-clear.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":null}}"#)])
+        // The Bot needing nothing is zero, not the BB-wide count, whether the server says it has a Bot or leaves hasBot out.
+        let clear = client(URL(string: "https://bot-clear.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":null,"hasBot":true}}"#)])
         let none = await clear.needsYouCount(fallback: summary)
         XCTAssertEqual(none, NeedsYouCount(count: 0, reason: nil, fromBot: true))
+        let olderClear = client(URL(string: "https://bot-clear-older.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":null}}"#)])
+        let olderNone = await olderClear.needsYouCount(fallback: summary)
+        XCTAssertEqual(olderNone, none)
 
         let status = StatusSnapshot(summary, needs: needs, serverURL: a)
         XCTAssertEqual(status.needsYou, 1)
@@ -103,6 +106,10 @@ final class BotTests: XCTestCase {
             XCTAssertEqual(status.label, "2 need you")
             XCTAssertEqual(status.headlineThreadId, "ask1")
         }
+        // Studio with no Bot counts the same way.
+        let noBot = client(URL(string: "https://bot-none.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":null,"hasBot":false}}"#)])
+        let noBotNeeds = await noBot.needsYouCount(fallback: summary)
+        XCTAssertEqual(noBotNeeds, NeedsYouCount(count: 2, reason: nil, fromBot: false))
         // No answer at all counts the same way, and an older phone's snapshot (no reason) still decodes.
         XCTAssertEqual(StatusSnapshot(summary, serverURL: a).needsYou, 2)
         let old = StatusSnapshot(dictionary: ["serverURL": a.absoluteString, "needsYou": 1, "running": 0, "updatedAt": 1.0])

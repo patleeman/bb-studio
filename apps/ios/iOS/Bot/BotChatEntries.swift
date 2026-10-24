@@ -287,6 +287,19 @@ enum BotStatus {
         return checkIns(lead) ?? "Here when you need me"
     }
 
+    /// The Bot's attention reason, short, for a header with no room for it:
+    /// "Asked you a question" is "1 question", "Waiting for approval" is
+    /// "Approval", "2 things for you" is "2 things"; anything else "Needs you".
+    static func short(reason: String, count: Int) -> String {
+        let text = reason.lowercased()
+        if text.contains("question") { return count > 1 ? "\(count) questions" : "1 question" }
+        if text.contains("approval") { return count > 1 ? "\(count) approvals" : "Approval" }
+        if let match = text.firstMatch(of: /^(\d+) things? for you/), let n = Int(match.1) {
+            return n == 1 ? "1 thing" : "\(n) things"
+        }
+        return "Needs you"
+    }
+
     /// "Checks in weekdays 8:00", nil when check-ins are off.
     static func checkIns(_ lead: ThreadLead?) -> String? {
         guard let cadence = lead?.heartbeat else { return nil }

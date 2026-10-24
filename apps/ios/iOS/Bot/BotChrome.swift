@@ -31,6 +31,8 @@ struct BotChrome {
 struct BotChromeToolbar: ViewModifier {
     let chrome: BotChrome?
     let status: String
+    /// A shorter status ("1 question") for when `status` doesn't fit beside the buttons.
+    var shortStatus: String? = nil
     let working: Bool
     @Environment(\.duoLayout) private var layout
     @Environment(\.duoBotActions) private var actions
@@ -60,26 +62,35 @@ struct BotChromeToolbar: ViewModifier {
             BotAvatar(chrome.bot.look, size: 26, working: working)
             VStack(alignment: .leading, spacing: 0) {
                 Text(chrome.bot.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                HStack(spacing: 4) {
-                    Text(status)
-                        .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
-                        .contentTransition(.opacity)
-                    if !working, let cache = chrome.cache {
-                        // Minutes left, counted down between loads.
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            if let line = cache.line(now: context.date) {
-                                Text("· \(line)").foregroundStyle(.tertiary)
-                            }
-                        }
-                    }
+                // The full status when it fits, else the short one, never cut off mid-word.
+                ViewThatFits(in: .horizontal) {
+                    statusLine(chrome, status)
+                    if let shortStatus, shortStatus != status { statusLine(chrome, shortStatus) }
                 }
-                .font(.caption2)
-                .lineLimit(1)
             }
         }
         .animation(.smooth, value: status)
         .accessibilityElement(children: .combine)
+        // VoiceOver always reads the full status.
         .accessibilityLabel("\(chrome.bot.name), \(status)")
+    }
+
+    private func statusLine(_ chrome: BotChrome, _ status: String) -> some View {
+        HStack(spacing: 4) {
+            Text(status)
+                .foregroundStyle(working ? AnyShapeStyle(BotPalette.color(chrome.bot.color)) : AnyShapeStyle(.secondary))
+                .contentTransition(.opacity)
+            if !working, let cache = chrome.cache {
+                // Minutes left, counted down between loads.
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    if let line = cache.line(now: context.date) {
+                        Text("· \(line)").foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+        .font(.caption2)
+        .lineLimit(1)
     }
 }
 

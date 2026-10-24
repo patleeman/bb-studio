@@ -61,7 +61,8 @@ final class BotAttentionCaptureUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Juniper"].firstMatch.waitForExistence(timeout: 20))
         sleep(2)
         if app.staticTexts["Primary"].exists { app.staticTexts["Primary"].tap() }
-        XCTAssertTrue(text(containing: "Asked you a question").waitForExistence(timeout: 20))
+        // VoiceOver reads the full reason even when the header shows the short one.
+        XCTAssertTrue(text(containing: "Juniper, Asked you a question").waitForExistence(timeout: 20))
         sleep(2)
         shot("phone-chat")
     }

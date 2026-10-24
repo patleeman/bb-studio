@@ -232,20 +232,24 @@ extension BBClient {
         try await rpc("studio", Studio.Method.bot_activity, Self.scoped(botId))
     }
 
+    /// `bot_attention`'s answer. `hasBot` is false when there's no Bot; older Studios leave it out.
+    struct AttentionOutput: Decodable { var attention: BotActivity.Attention?; var hasBot: Bool? }
+
     /// Just the Bot's "needs you" (`bot_attention`), for a list row.
     public func botAttention(botId: String? = nil) async throws -> BotActivity.Attention? {
-        struct Output: Decodable { var attention: BotActivity.Attention? }
-        let output: Output = try await rpc("studio", Studio.Method.bot_attention, Self.scoped(botId))
+        let output: AttentionOutput = try await rpc("studio", Studio.Method.bot_attention, Self.scoped(botId))
         return output.attention
     }
 
     /// What the widgets and the watch count as needing you: the primary Bot's
     /// attention, or the threads waiting on you across BB when Studio can't
-    /// say (no `bot_attention`, an older Studio, or the call failed).
+    /// say (no `bot_attention`, an older Studio, or the call failed) or there's
+    /// no Bot (`hasBot` false; a Studio that leaves it out is taken as having one).
     public func needsYouCount(fallback summary: ThreadSummary) async -> NeedsYouCount {
         do {
-            let attention = try await botAttention()
-            return .bot(count: attention?.count, reason: attention?.reason)
+            let output: AttentionOutput = try await rpc("studio", Studio.Method.bot_attention, Self.scoped(nil))
+            if output.hasBot == false { return .fallback(summary) }
+            return .bot(count: output.attention?.count, reason: output.attention?.reason)
         } catch {
             return .fallback(summary)
         }
