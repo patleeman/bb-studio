@@ -274,6 +274,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
           </Group>
         ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
+        {groups.waiting.length ? <Group id="waiting" title="Waiting to start" closed={layout.closed} onToggle={toggle}>{tree(groups.waiting)}</Group> : null}
         {runners.data?.runners.length ? (
           <Group id="runners" title="Runners" closed={layout.closed} onToggle={toggle}>
             {runners.data.runners.map((runner) => <RunnerSidebarRow botName={bot.name} key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />)}
@@ -314,7 +315,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
             {sideThreads.data.threads.map((thread) => <SideThreadRow botName={bot.name} key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
           </Group>
         ) : null}
-        {!groups.needsYou.length && !groups.running.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
+        {!groups.needsYou.length && !groups.running.length && !groups.waiting.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
           <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
         ) : null}
         {earlier.length ? (

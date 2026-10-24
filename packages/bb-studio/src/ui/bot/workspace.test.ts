@@ -26,7 +26,7 @@ test("sidebar groups: Needs you flat; trees placed by their root; grandchildren 
   expect(root.children[0]!.children.map((node) => node.thread.id)).toEqual(["grand"]);
   expect(groups.recent.map((node) => node.thread.id)).toEqual(["other", "orphan"]);
   expect(groups.recurring.map((each) => each.id)).toEqual(["a"]);
-  expect(sidebarGroups(null)).toEqual({ needsYou: [], running: [], recurring: [], recent: [] });
+  expect(sidebarGroups(null)).toEqual({ needsYou: [], running: [], waiting: [], recurring: [], recent: [] });
 });
 
 test("a thread that needs the user isn't repeated in the trees unless it holds children", () => {
@@ -38,4 +38,11 @@ test("a thread that needs the user isn't repeated in the trees unless it holds c
 test("a parent cycle can't loop the tree", () => {
   const groups = sidebarGroups(view({ completed: [t("a", { parentId: "b" }), t("b", { parentId: "a" }), t("c")] }));
   expect(groups.recent.map((node) => node.thread.id)).toEqual(["c"]);
+});
+
+test("a queued thread waits to start in its own group, not under Running", () => {
+  const groups = sidebarGroups(view({ inProgress: [t("run", { status: "active" })], waiting: [t("queued", { status: "pending" })], completed: [t("done")] }));
+  expect(groups.running.map((node) => node.thread.id)).toEqual(["run"]);
+  expect(groups.waiting.map((node) => node.thread.id)).toEqual(["queued"]);
+  expect(groups.recent.map((node) => node.thread.id)).toEqual(["done"]);
 });
