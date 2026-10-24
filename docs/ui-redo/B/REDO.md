@@ -60,6 +60,27 @@ The running animation: [phone (MP4)](bot-rows/phone-running.mp4) ·
 
 ![Phone running animation](bot-rows/phone-running.gif) ![Duo running animation](bot-rows/duo-running.gif)
 
+## Floating thread composer
+
+Commit `b1df0b88`. Every thread's composer now matches the Bot chat's: a
+Liquid Glass shape (24 pt corners) with a clear field, 12 pt from the sides
+and 8 pt above the safe area. The full-width grey bar behind it is gone, so
+the transcript scrolls under the composer to the bottom edge, on the phone and
+in the unfolded Duo's thread page. Keyboard handling is unchanged: the
+composer rides on the keyboard. Jump to latest keeps its place above the
+composer, and shelf cards stack above it as before. The Duo test's
+safe-area checks pass for the composer on the Bot and Threads pages: inside
+the safe area, and 8 pt above the bottom safe-area edge.
+
+| State | Before | After |
+|---|---|---|
+| Phone, at the latest message | ![](composer/before-composer-phone-bottom.png) | ![](composer/after-composer-phone-bottom.png) |
+| Phone, scrolled up (Jump to latest) | ![](composer/before-composer-phone-scrolled.png) | ![](composer/after-composer-phone-scrolled.png) |
+| Phone, keyboard up | ![](composer/before-composer-phone-keyboard.png) | ![](composer/after-composer-phone-keyboard.png) |
+| Phone, with a shelf card | ![](composer/before-composer-phone-shelf.png) | ![](composer/after-composer-phone-shelf.png) |
+| Duo 951×669, at the latest message | ![](composer/before-composer-duo-bottom.png) | ![](composer/after-composer-duo-bottom.png) |
+| Duo 951×669, scrolled up | ![](composer/before-composer-duo-scrolled.png) | ![](composer/after-composer-duo-scrolled.png) |
+
 ## Redone changes
 
 | Change | Codex SHA | What I changed | Before | After |
@@ -91,5 +112,10 @@ Unit tests for the behaviour of each change (`OutboxPersistenceTests`,
   provider's logo. Matching desktop exactly means shipping provider logos to
   the app, and decoding `providerId`, which `bot_activity` and `bot_runners`
   already send.
+- `DuoEdgeToEdgeUITests.testSurfacesReachEdgesWhileControlsStaySafe` and
+  `DuoQuickRepliesUITests.testRepliesClipAtComposerAndKeepSystemSafeAreas`
+  fail here with or without the composer change. The first reaches its
+  Studio step, after the composer checks pass, and needs a QA server with
+  Studio items. The second waits for the quick-reply overflow hint.
 - `PlanReviewSheet` still uses the old red capsule for its error. It could use
   the new `ErrorToast`.
