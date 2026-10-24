@@ -268,13 +268,15 @@ enum BotChatEntry: Identifiable, Equatable {
 
 /// The Bot's status line under its name.
 enum BotStatus {
-    static func line(state: BotInfo.State?, running: Bool, thinking: String?, needsYou: Int, lead: ThreadLead?) -> String {
+    /// `attention` is the Bot's reason it needs you ("Asked you a question",
+    /// "1 thing for you"), from `bot_activity`; nil when nothing does.
+    static func line(state: BotInfo.State?, running: Bool, thinking: String?, attention: String?, lead: ThreadLead?) -> String {
         switch state {
         case .paused: return "Paused"
         case .stopped: return "Stopped"
         default: break
         }
-        if needsYou > 0 { return needsYou == 1 ? "Needs you" : "\(needsYou) things need you" }
+        if let attention = attention?.trimmingCharacters(in: .whitespacesAndNewlines), !attention.isEmpty { return attention }
         if running {
             if let thought = thinking?.split(whereSeparator: \.isNewline).last.map(String.init)?
                 .replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespaces), !thought.isEmpty, thought.count <= 48 {

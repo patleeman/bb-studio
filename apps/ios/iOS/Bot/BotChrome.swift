@@ -23,6 +23,8 @@ struct BotChrome {
     var environmentChanged: (_ threadId: String, _ environmentId: String?) -> Void = { _, _ in }
     /// Its prompt cache, shown small beside the status while it's idle.
     var cache: BotCacheState? = nil
+    /// Why the Bot needs you (`bot_activity`'s `attention`), for its status line.
+    var attention: BotActivity.Attention? = nil
 }
 
 /// The Bot's name and live status in the middle of the navigation bar.

@@ -1,7 +1,8 @@
 #if DEBUG
 import SwiftUI
+import WidgetKit
 
-/// Debug builds: `-qaStateDemo dictation|related|studio-chat` opens that sheet with local
+/// Debug builds: `-qaStateDemo dictation|related|studio-chat|widgets` opens that sheet with local
 /// data, for screenshots of its states without a server. The app's client
 /// answers from fixtures here; sends and replies fail as if BB were
 /// unreachable. `-qaBotSheet skills` with `-qaBotDemo` gets its skills here too.
@@ -74,21 +75,64 @@ enum StateDemo {
 struct StateDemoSheets: ViewModifier {
     @State private var related = false
     @State private var chat = false
+    @State private var widgets = false
 
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $related) {
                 RelatedView(pluginId: "pages", itemId: "pg_launch01").environmentObject(AppModel.shared)
             }
+            .fullScreenCover(isPresented: $widgets) { WidgetsDemo() }
             .studioChat(isPresented: $chat, pluginId: "pages", itemId: "pg_launch01", title: "Launch plan", projectId: "proj_statedemo")
             .task {
                 // Before anything it opens loads.
                 StateDemo.install(AppModel.shared)
                 related = StateDemo.variant == "related"
                 chat = StateDemo.variant == "studio-chat"
+                widgets = StateDemo.variant == "widgets"
             }
             // Outermost, so the sheets above it get the app too.
             .environmentObject(AppModel.shared)
+    }
+}
+
+/// `-qaStateDemo widgets`: the BB status widget's own view, small, medium and
+/// Lock Screen, while the Bot asked you a question and two threads run.
+/// WidgetKit can't be pointed at a fixture server safely here, so this draws
+/// the widget's view in the app, in its sizes on a phone.
+private struct WidgetsDemo: View {
+    private var entry: StatusEntry {
+        let now = Date().timeIntervalSince1970 * 1000
+        let running = ["Lisbon offsite options", "Approve deploy to prod"].enumerated().map { index, title in
+            try! JSONDecoder().decode(ThreadEntry.self, from: Data(#"{"id":"thr_w\#(index)","projectId":"p","title":"\#(title)","status":"active","createdAt":\#(now),"updatedAt":\#(now)}"#.utf8))
+        }
+        return StatusEntry(date: .now, needsYou: [], running: running, stale: false,
+                           bot: .bot(count: 1, reason: "Asked you a question"))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(spacing: 20) {
+                tile(.systemSmall).frame(width: 170, height: 170)
+                tile(.accessoryCircular).frame(width: 76, height: 76)
+            }
+            tile(.systemMedium).frame(width: 364, height: 170)
+            tile(.accessoryRectangular).frame(width: 172, height: 76)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(LinearGradient(colors: [Color(red: 0.12, green: 0.14, blue: 0.24), .black], startPoint: .top, endPoint: .bottom))
+    }
+
+    private func tile(_ family: WidgetFamily) -> some View {
+        let lockScreen = family == .accessoryCircular || family == .accessoryRectangular
+        return StatusWidgetView(entry: entry, family: family)
+            // A widget's links don't take the app's accent colour.
+            .tint(.primary)
+            .padding(lockScreen ? 0 : 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(lockScreen ? AnyShapeStyle(.clear) : AnyShapeStyle(.thinMaterial), in: .rect(cornerRadius: 22))
+            .accessibilityIdentifier("widget-\(family)")
     }
 }
 #endif

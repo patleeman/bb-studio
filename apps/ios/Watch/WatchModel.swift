@@ -223,7 +223,8 @@ final class WatchModel: ObservableObject {
                 chiefId = client.cachedBotThreadId
                 botName = client.cachedBotName
             }
-            StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
+            let summary = ThreadSummary(threads)
+            StatusSnapshot(summary, needs: await client.needsYouCount(fallback: summary), serverURL: client.baseURL).save()
             guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             error = nil
         } catch {

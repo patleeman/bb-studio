@@ -24,6 +24,8 @@ targets:
       - path: iOS
       - path: Shared
       - path: LiveActivity
+      # The status widget's view, for `-qaStateDemo widgets` screenshots of it.
+      - path: Widgets/StatusWidget.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo

@@ -239,6 +239,18 @@ extension BBClient {
         return output.attention
     }
 
+    /// What the widgets and the watch count as needing you: the primary Bot's
+    /// attention, or the threads waiting on you across BB when Studio can't
+    /// say (no `bot_attention`, an older Studio, or the call failed).
+    public func needsYouCount(fallback summary: ThreadSummary) async -> NeedsYouCount {
+        do {
+            let attention = try await botAttention()
+            return .bot(count: attention?.count, reason: attention?.reason)
+        } catch {
+            return .fallback(summary)
+        }
+    }
+
     /// A Bot chat's prompt cache (`bot_cache_state`); nil on a Studio without it.
     public func botCacheState(threadId: String) async throws -> BotCacheState? {
         do {

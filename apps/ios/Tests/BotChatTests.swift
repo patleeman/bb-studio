@@ -67,10 +67,13 @@ final class BotChatTests: XCTestCase {
         XCTAssertEqual(bot?.color, "#2ba59a")
         XCTAssertEqual(bot?.role, "Keeps me honest.")
         XCTAssertEqual(client.cachedBotLook.shape, .cloud)
-        XCTAssertEqual(BotStatus.line(state: bot?.state, running: true, thinking: nil, needsYou: 0, lead: bot?.lead), "Paused")
-        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, needsYou: 0, lead: bot?.lead), "Checks in weekdays 8:00")
-        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, needsYou: 0, lead: bot?.lead), "Thinking…")
-        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, needsYou: 2, lead: bot?.lead), "2 things need you")
+        XCTAssertEqual(BotStatus.line(state: bot?.state, running: true, thinking: nil, attention: "Asked you a question", lead: bot?.lead), "Paused")
+        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: nil, lead: bot?.lead), "Checks in weekdays 8:00")
+        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, attention: nil, lead: bot?.lead), "Thinking…")
+        // The Bot's attention reason replaces "Needs you"; a blank one is nothing.
+        XCTAssertEqual(BotStatus.line(state: .active, running: true, thinking: nil, attention: "1 thing for you", lead: bot?.lead), "1 thing for you")
+        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: "Asked you a question", lead: bot?.lead), "Asked you a question")
+        XCTAssertEqual(BotStatus.line(state: .active, running: false, thinking: nil, attention: " ", lead: bot?.lead), "Checks in weekdays 8:00")
     }
 
     // MARK: Message grouping

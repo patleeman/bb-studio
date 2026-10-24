@@ -174,7 +174,8 @@ struct BotTab: View {
                          environmentChanged: { thread, environment in
                              if chatEnvironments[thread] != environment { chatEnvironments[thread] = environment }
                          },
-                         cache: cache)
+                         cache: cache,
+                         attention: activity?.attention)
     }
 
     @ToolbarContentBuilder

@@ -113,8 +113,11 @@ final class InboxModel: ObservableObject {
                 DiskCache.save(snapshot, as: InboxSnapshot.cacheKey, serverURL: serverURL)
                 savedSignature = signature
             }
-            StatusWidgets.reloadIfChanged(self.threads)
-            PhoneRelay.shared.pushStatus(self.threads)
+            // Widgets and the watch count the Bot's attention (BB's waiting threads on an older Studio).
+            let needs = await client.needsYouCount(fallback: ThreadSummary(self.threads))
+            guard serverURL == ServerScope.selectedURL else { return }
+            StatusWidgets.reloadIfChanged(self.threads, needs: needs)
+            PhoneRelay.shared.pushStatus(self.threads, needs: needs)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

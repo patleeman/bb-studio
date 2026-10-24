@@ -478,7 +478,7 @@ struct ThreadView: View {
     /// The Bot's status line, for its header.
     private var botStatus: String {
         BotStatus.line(state: botChrome?.bot.state, running: model.thread?.isRunning == true, thinking: model.shelf.thinking,
-                       needsYou: model.interactions.count, lead: botChrome?.bot.lead)
+                       attention: botChrome?.attention?.reason, lead: botChrome?.bot.lead)
     }
 
     private var timeline: some View {

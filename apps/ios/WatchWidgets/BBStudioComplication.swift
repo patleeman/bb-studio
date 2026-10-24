@@ -1,7 +1,8 @@
 import SwiftUI
 import WidgetKit
 
-/// Watch face complication: how many threads need you, and how many are running.
+/// Watch face complication: what needs you (the Bot's attention, or on an
+/// older Studio the threads waiting on you), and how many are running.
 /// The phone sends the counts (PhoneRelay.pushStatus); this only reads them.
 struct StatusEntry: TimelineEntry {
     var date: Date
@@ -56,7 +57,7 @@ struct ComplicationView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("BB").font(.headline).foregroundStyle(tint).widgetAccentable()
                 Text(label).font(.caption)
-                if let headline = entry.status?.headline, needsYou + running > 0 {
+                if let headline = entry.status?.headline, needsYou + running > 0, headline != entry.status?.reason {
                     Text(headline).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
@@ -64,15 +65,7 @@ struct ComplicationView: View {
         }
     }
 
-    private var label: String {
-        if entry.status == nil { return "BB" }
-        switch (needsYou, running) {
-        case (0, 0): return "All clear"
-        case (0, _): return "\(running) running"
-        case (_, 0): return "\(needsYou) need\(needsYou == 1 ? "s" : "") you"
-        default: return "\(needsYou) need you · \(running) running"
-        }
-    }
+    private var label: String { entry.status?.label ?? "BB" }
 }
 
 @main

@@ -63,6 +63,54 @@ final class BotTests: XCTestCase {
         XCTAssertEqual(calls.all.map(\.0), ["bot_get"])
     }
 
+    // MARK: What the widgets and watch count
+
+    private func waiting(_ id: String, running: Bool = false) throws -> ThreadEntry {
+        try JSONDecoder().decode(ThreadEntry.self, from: Data(#"{"id":"\#(id)","projectId":"p","title":"\#(id)","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":1,"hasPendingInteraction":\#(!running)}"#.utf8))
+    }
+
+    func testWidgetsCountTheBotsAttention() async throws {
+        let summary = ThreadSummary([try waiting("ask1"), try waiting("ask2"), try waiting("run", running: true)])
+        let asked = client(URL(string: "https://bot-attention.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":{"reason":"Asked you a question","count":1,"since":1}}}"#)])
+        let needs = await asked.needsYouCount(fallback: summary)
+        XCTAssertEqual(needs, NeedsYouCount(count: 1, reason: "Asked you a question", fromBot: true))
+        // The Bot needing nothing is zero, not the BB-wide count.
+        let clear = client(URL(string: "https://bot-clear.invalid")!, ["bot_attention": (200, #"{"ok":true,"result":{"attention":null}}"#)])
+        let none = await clear.needsYouCount(fallback: summary)
+        XCTAssertEqual(none, NeedsYouCount(count: 0, reason: nil, fromBot: true))
+
+        let status = StatusSnapshot(summary, needs: needs, serverURL: a)
+        XCTAssertEqual(status.needsYou, 1)
+        XCTAssertEqual(status.running, 1)
+        XCTAssertEqual(status.reason, "Asked you a question")
+        XCTAssertEqual(status.headline, "Asked you a question")
+        XCTAssertNil(status.headlineThreadId)
+        XCTAssertEqual(status.label, "Asked you a question · 1 running")
+        XCTAssertFalse(status.sameCounts(StatusSnapshot(summary, needs: .bot(count: 1, reason: "Waiting for approval"), serverURL: a)))
+        XCTAssertEqual(StatusSnapshot(dictionary: status.dictionary)?.reason, "Asked you a question")
+        let quiet = StatusSnapshot(summary, needs: none, serverURL: a)
+        XCTAssertEqual(quiet.label, "1 running")
+        XCTAssertEqual(quiet.headline, "run")
+    }
+
+    func testWidgetsFallBackToWaitingThreadsOnAnOlderStudio() async throws {
+        let summary = ThreadSummary([try waiting("ask1"), try waiting("ask2")])
+        // No bot_attention (unknown method), or the call fails: BB's threads waiting on you.
+        for answers in [[:], ["bot_attention": (500, #"{"ok":false,"error":{"code":"internal","message":"boom"}}"#)]] as [[String: (Int, String)]] {
+            let needs = await client(URL(string: "https://bot-older.invalid")!, answers).needsYouCount(fallback: summary)
+            XCTAssertEqual(needs, NeedsYouCount(count: 2, reason: nil, fromBot: false))
+            let status = StatusSnapshot(summary, needs: needs, serverURL: a)
+            XCTAssertEqual(status.label, "2 need you")
+            XCTAssertEqual(status.headlineThreadId, "ask1")
+        }
+        // No answer at all counts the same way, and an older phone's snapshot (no reason) still decodes.
+        XCTAssertEqual(StatusSnapshot(summary, serverURL: a).needsYou, 2)
+        let old = StatusSnapshot(dictionary: ["serverURL": a.absoluteString, "needsYou": 1, "running": 0, "updatedAt": 1.0])
+        XCTAssertNil(old?.reason)
+        XCTAssertEqual(old?.label, "1 needs you")
+        XCTAssertEqual(NeedsYouCount.bot(count: 2, reason: "  "), NeedsYouCount(count: 2, reason: nil, fromBot: true))
+    }
+
     func testNoStudioMeansNoBot() async throws {
         let none = try await client(URL(string: "https://bot-absent.invalid")!, [:]).bot()
         XCTAssertNil(none)

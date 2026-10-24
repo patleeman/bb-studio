@@ -4,7 +4,10 @@ import WidgetKit
 struct WorkEntry: TimelineEntry {
     var serverURL: URL = ServerScope.selectedURL
     var date: Date
+    /// The Bot's attention count, or BB's threads waiting on you from an older Studio.
     var attention: Int
+    /// The Bot's reason ("Asked you a question"); nil on the fallback.
+    var reason: String? = nil
     var approvals: Int
     var running: [ThreadEntry]
     var stale: Bool
@@ -24,10 +27,12 @@ struct WorkProvider: TimelineProvider {
                 let threadRows = try await client.threads(limit: 100)
                 let summary = ThreadSummary(threadRows)
                 entry.running = summary.running
-                entry.attention = summary.needsYou.count
+                let needs = await client.needsYouCount(fallback: summary)
+                entry.attention = needs.count
+                entry.reason = needs.reason
                 entry.approvals = threadRows.filter { $0.hasPendingInteraction == true }.count
                 entry.stale = false
-                DiskCache.save(WorkCache(attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget", serverURL: client.baseURL)
+                DiskCache.save(WorkCache(attention: entry.attention, reason: entry.reason, approvals: entry.approvals, running: entry.running), as: "work-widget", serverURL: client.baseURL)
             } catch { entry.stale = true }
             entry.date = .now
             entry.serverURL = client.baseURL
@@ -37,12 +42,13 @@ struct WorkProvider: TimelineProvider {
     }
     private func cached() -> WorkEntry? {
         guard let value = DiskCache.load(WorkCache.self, key: "work-widget") else { return nil }
-        return WorkEntry(date: .now, attention: value.attention, approvals: value.approvals, running: value.running, stale: false)
+        return WorkEntry(date: .now, attention: value.attention, reason: value.reason, approvals: value.approvals, running: value.running, stale: false)
     }
 }
 
 private struct WorkCache: Codable {
     var attention: Int
+    var reason: String?
     var approvals: Int
     var running: [ThreadEntry]
 }
@@ -72,8 +78,9 @@ private struct WorkWidgetView: View {
                 if entry.stale { Image(systemName: "wifi.slash").foregroundStyle(.secondary) }
             }
             HStack(spacing: 12) {
-                Link(destination: AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)) {
-                    Label("\(entry.attention) attention", systemImage: "exclamationmark.bubble")
+                // The Bot's reason opens the Bot; the BB-wide count opens the inbox.
+                Link(destination: AppLink.scoped(URL(string: entry.reason == nil ? "bbstudio://inbox" : "bbstudio://bot")!, serverURL: entry.serverURL)) {
+                    Label(entry.reason ?? "\(entry.attention) attention", systemImage: "exclamationmark.bubble")
                 }
                 Label("\(entry.running.count) running", systemImage: "circle.fill")
             }.font(.caption).lineLimit(1)

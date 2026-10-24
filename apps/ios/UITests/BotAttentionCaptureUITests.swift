@@ -53,6 +53,29 @@ final class BotAttentionCaptureUITests: XCTestCase {
         shot("phone-botlist")
     }
 
+    /// The Bot's chat: its header says why it needs you instead of "Needs you".
+    func testChatHeaderPhone() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
+        launch(["-qaBotDemo", "chat", "-qaBotAttention", "-qaReduceMotion"])
+        // A launch after the Bots list may reopen the list; the chat is its row.
+        XCTAssertTrue(app.staticTexts["Juniper"].firstMatch.waitForExistence(timeout: 20))
+        sleep(2)
+        if app.staticTexts["Primary"].exists { app.staticTexts["Primary"].tap() }
+        XCTAssertTrue(text(containing: "Asked you a question").waitForExistence(timeout: 20))
+        sleep(2)
+        shot("phone-chat")
+    }
+
+    /// The BB status widget's view with the Bot's attention (`-qaStateDemo widgets`).
+    func testWidgetsPhone() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
+        launch(["-qaStateDemo", "widgets"])
+        XCTAssertTrue(app.descendants(matching: .any)["widget-systemMedium"].waitForExistence(timeout: 20))
+        XCTAssertTrue(text(containing: "Asked you a question").exists)
+        sleep(1)
+        shot("widget")
+    }
+
     /// Drags the sheet's grabber to the top.
     private func fullHeight() {
         let window = app.windows.firstMatch

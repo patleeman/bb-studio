@@ -37,8 +37,8 @@ final class PhoneRelay: NSObject, WCSessionDelegate {
 
     /// Sends the needs-you counts to the watch complication when they change.
     /// Complication transfers wake the watch app but are budgeted, so only on change.
-    func pushStatus(_ threads: [ThreadEntry]) {
-        let status = StatusSnapshot(ThreadSummary(threads))
+    func pushStatus(_ threads: [ThreadEntry], needs: NeedsYouCount? = nil) {
+        let status = StatusSnapshot(ThreadSummary(threads), needs: needs)
         guard WCSession.isSupported(), WCSession.default.activationState == .activated,
             WCSession.default.isPaired, WCSession.default.isWatchAppInstalled, !status.sameCounts(lastStatus)
         else { return }
