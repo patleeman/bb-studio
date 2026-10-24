@@ -80,7 +80,14 @@ vi.mock("../../kit/ui/index", () => ({
   DialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement("h2", null, children),
   DialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement("p", null, children),
+  Tooltip: ({ children }: { children: React.ReactNode }) => children,
+  ContextMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", { "data-context-menu": "" }, children),
+  ContextMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
+  ContextMenuContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "menu" }, children),
+  ContextMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { type: "button", role: "menuitem", onClick: onSelect }, children),
 }));
+const toasts = vi.hoisted(() => [] as { text: string; action?: { label: string; onClick(): void } }[]);
+vi.mock("sonner", () => ({ toast: Object.assign((text: string, options?: { action?: { label: string; onClick(): void } }) => { toasts.push({ text, action: options?.action }); }, { success: (text: string) => toasts.push({ text }), error: (text: string) => toasts.push({ text }) }) }));
 
 const { ActivityPanel, BOT_PATH } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
@@ -131,6 +138,52 @@ test("with no Bot, the welcome's Create makes it with the setup and opens its ch
   expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Chief of Staff", avatar: "🤖", shape: "blob", color: "#5b8def", setup: "Watch my PRs" });
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   state.call.mockImplementation(async () => ({}));
+});
+
+test("Needs you: each row says why; ✕ or the context menu marks it handled, and the toast's Undo brings it back", async () => {
+  toasts.length = 0;
+  state.data = {
+    bot_get: { bot: dot, run: null },
+    bot_activity: {
+      ...empty,
+      needsYou: [
+        { ...thread("run_sec", "Security · Runner"), needsYou: true, reason: "Urgent report: SSH on red4 accepts passwords again" },
+        { ...thread("t1", "Approve deploy"), needsYou: true, reason: "Waiting for approval" },
+      ],
+    },
+  };
+  await show(<BotThreadList {...listProps} />);
+  const needs = () => container.querySelector('nav[aria-label="Bots"] section[aria-label="Needs you"]');
+  expect([...needs()!.querySelectorAll("[data-testid=needs-you-reason]")].map((each) => each.textContent)).toEqual(["Urgent report: SSH on red4 accepts passwords again", "Waiting for approval"]);
+  // ✕: the row leaves at once, the server records it, and Undo restores it.
+  await act(async () => click(needs()!.querySelector('[data-thread="run_sec"] [data-testid=needs-you-handled]')));
+  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "run_sec" });
+  expect(needs()!.querySelector('[data-thread="run_sec"]')).toBeNull();
+  expect(toasts.at(-1)).toMatchObject({ text: "Marked handled: Security · Runner", action: { label: "Undo" } });
+  await act(async () => toasts.at(-1)!.action!.onClick());
+  expect(state.call).toHaveBeenCalledWith("bot_needs_you_restore", { botId: "bot_main", threadId: "run_sec" });
+  expect(needs()!.querySelector('[data-thread="run_sec"]')).not.toBeNull();
+  // The context menu's Mark handled does the same.
+  const menu = [...needs()!.querySelectorAll('[role=menu] [role=menuitem]')].find((each) => each.textContent === "Mark handled" && each.closest("[data-context-menu]")?.querySelector('[data-thread="t1"]'));
+  await act(async () => click(menu));
+  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "t1" });
+  // A failed dismiss puts the row back and says so.
+  state.call.mockImplementationOnce((async () => { throw new Error("offline"); }) as never);
+  await act(async () => click(needs()!.querySelector('[data-thread="run_sec"] [data-testid=needs-you-handled]')));
+  expect(needs()!.querySelector('[data-thread="run_sec"]')).not.toBeNull();
+  expect(toasts.at(-1)?.text).toBe("Couldn't mark it handled: offline");
+});
+
+test("Activity in Bot info: Needs you rows show their reason and can be marked handled", async () => {
+  const data = { ...empty, needsYou: [{ ...thread("t1", "Pick a venue"), needsYou: true, reason: "Asked you a question" }] };
+  await show(<ActivityPanel loading={false} data={data} botId="bot_main" refresh={() => {}} />);
+  expect(container.querySelector("[data-testid=needs-you-reason]")?.textContent).toBe("Asked you a question");
+  await act(async () => click(container.querySelector("[data-testid=needs-you-handled]")));
+  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "t1" });
+  expect(container.textContent).not.toContain("Pick a venue");
+  // Without a Bot to act on, no ✕.
+  await show(<ActivityPanel loading={false} data={data} />);
+  expect(container.querySelector("[data-testid=needs-you-handled]")).toBeNull();
 });
 
 test("the Bot page lives under the Studio panel", () => {

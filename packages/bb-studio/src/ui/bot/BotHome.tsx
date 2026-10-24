@@ -22,6 +22,7 @@ import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_S
 import { Welcome } from "./Onboarding";
 import { Elapsed, ProviderStatusMark, runningLabel, type ProviderCatalogEntry } from "./ProviderStatusMark";
 import { useOpenThread } from "./workspace";
+import { HandledButton, NeedsYouMenu, useMarkHandled, type MarkHandled } from "./NeedsYou";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
@@ -240,16 +241,17 @@ export function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_
 }
 
 /** Activity's sections, only those with something in them; one quiet line when all are empty. */
-export function ActivityPanel({ data, loading, error, onOpen = openThreadPage, providers }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void; providers?: readonly ProviderCatalogEntry[] }) {
+export function ActivityPanel({ data, loading, error, onOpen = openThreadPage, providers, botId, refresh }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void; providers?: readonly ProviderCatalogEntry[]; /** With both, Needs you rows can be marked handled. */ botId?: string; refresh?(): void }) {
   const [allRecent, setAllRecent] = useState(false);
+  const needs = useMarkHandled(botId ?? "", data?.needsYou ?? [], refresh ?? (() => {}));
   if (!data) return <p className="px-4 py-3 text-xs text-muted-foreground">{loading ? "Loading…" : ""}</p>;
   const recent = allRecent ? data.completed : data.completed.slice(0, COMPLETED_PREVIEW);
-  const empty = !data.needsYou.length && !data.waiting?.length && !data.inProgress.length && !data.scheduled.length && !data.completed.length;
+  const empty = !needs.shown.length && !data.waiting?.length && !data.inProgress.length && !data.scheduled.length && !data.completed.length;
   return (
     <div className="flex flex-col gap-4 px-2.5 pt-2 pb-3">
       {data.maintenance?.map((run) => <div key={run.at} className="px-1.5 text-xs"><span className="font-medium">Maintenance</span> · {run.summary}</div>)}
       {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
-      {data.needsYou.length ? <Section title="Needs you"><ThreadList threads={data.needsYou} onOpen={onOpen} /></Section> : null}
+      {needs.shown.length ? <Section title="Needs you"><NeedsYouList threads={needs.shown} onOpen={onOpen} onHandled={botId ? needs.markHandled : null} /></Section> : null}
       {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} running={providers ?? []} /></Section> : null}
       {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} onOpen={onOpen} /></Section> : null}
       {data.scheduled.length ? <Section title="Scheduled"><ScheduledList items={data.scheduled} /></Section> : null}
@@ -278,6 +280,30 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** `running`: the provider catalog, when these threads are running: each gets the running mark and its ticking time, as in the sidebar. */
+/** Needs you in Activity: each thread with its reason under it, and Mark handled (NeedsYou.tsx). */
+function NeedsYouList({ threads, onOpen, onHandled }: { threads: BotThreadView[]; onOpen(threadId: string): void; onHandled: MarkHandled | null }) {
+  return (
+    <ul className="flex flex-col">
+      {threads.map((thread) => {
+        const title = thread.relation === "self" ? "Its chat" : thread.title;
+        const row = (
+          <div data-needs-you="" className="group/needs flex w-full min-w-0 items-start rounded-md pr-1 hover:bg-state-hover">
+            <button type="button" className="flex min-w-0 flex-1 flex-col px-1.5 py-1 text-left" onClick={() => onOpen(thread.id)}>
+              <span className="truncate text-sm">{title}</span>
+              {thread.reason ? <span data-testid="needs-you-reason" className="truncate text-xs text-muted-foreground">{thread.reason}</span> : null}
+            </button>
+            <span className="flex h-7 shrink-0 items-center">
+              <span className={`text-xs text-muted-foreground ${onHandled ? "group-hover/needs:hidden group-focus-within/needs:hidden" : ""}`}>{ago(thread.updatedAt)}</span>
+              {onHandled ? <HandledButton label={title} onClick={() => onHandled(thread, title)} className="hidden group-hover/needs:inline-flex group-focus-within/needs:inline-flex" /> : null}
+            </span>
+          </div>
+        );
+        return <li key={thread.id}>{onHandled ? <NeedsYouMenu onOpen={() => onOpen(thread.id)} onHandled={() => onHandled(thread, title)}>{row}</NeedsYouMenu> : row}</li>;
+      })}
+    </ul>
+  );
+}
+
 function ThreadList({ threads, onOpen, running }: { threads: BotThreadView[]; onOpen(threadId: string): void; running?: readonly ProviderCatalogEntry[] }) {
   return (
     <ul className="flex flex-col">

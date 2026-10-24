@@ -27,6 +27,7 @@ import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./thre
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { KIND } from "./Automations";
+import { HandledButton, NeedsYouMenu, useMarkHandled, type MarkHandled } from "./NeedsYou";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
@@ -240,6 +241,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
   const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
+  const needs = useMarkHandled(bot.id, groups.needsYou, () => { activity.refresh(); runners.refresh(); });
   const automations = useLive("bot_automations", { botId: bot.id }, { pollMs: 15_000 });
   const agenda = sidebarAgenda(automations.data?.automations ?? [], activity.data?.scheduled ?? []);
   const [showDone, setShowDone] = useState(false);
@@ -257,7 +259,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
           <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={28} working={running > 0} provider={botProvider(bot)} />
-          {groups.needsYou.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
+          {needs.shown.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-medium">{bot.name}</span>
@@ -268,9 +270,9 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
       </div>
 
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
-        {groups.needsYou.length ? (
-          <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={groups.needsYou.length}>
-            {groups.needsYou.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)}
+        {needs.shown.length ? (
+          <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={needs.shown.length}>
+            {needs.shown.map((thread) => <NeedsYouRow botName={bot.name} key={thread.id} thread={thread} active={active === thread.id} onOpen={onOpen} providers={providers} onHandled={needs.markHandled} />)}
           </Group>
         ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
@@ -315,7 +317,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
             {sideThreads.data.threads.map((thread) => <SideThreadRow botName={bot.name} key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
           </Group>
         ) : null}
-        {!groups.needsYou.length && !groups.running.length && !groups.waiting.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
+        {!needs.shown.length && !groups.running.length && !groups.waiting.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
           <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
         ) : null}
         {earlier.length ? (
@@ -376,6 +378,36 @@ function Row({ botName, thread, active, onOpen, providers }: { botName: string; 
           ? <span className="shrink-0 text-[11px] text-destructive">failed</span>
           : <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>}
     </button>
+  );
+}
+
+/**
+ * A Needs you row: the thread's mark and name, its reason in one muted line
+ * under it, and its age; on hover a ✕ to mark it handled, which the
+ * right-click menu also has (NeedsYou.tsx).
+ */
+function NeedsYouRow({ botName, thread, active, onOpen, providers, onHandled }: { botName: string; thread: BotThreadView; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[]; onHandled: MarkHandled }) {
+  const title = botItemName(thread.title, botName);
+  const handled = () => onHandled(thread, title);
+  return (
+    <NeedsYouMenu onOpen={() => onOpen(thread.id)} onHandled={handled}>
+      <div data-thread={thread.id} data-needs-you="" aria-current={active ? "true" : undefined}
+        className="group/needs flex w-full min-w-0 items-start rounded-md pr-1 hover:bg-state-hover aria-[current]:bg-state-active">
+        <button type="button" onClick={() => onOpen(thread.id)} title={thread.reason ? `${title}\n${thread.reason}` : title}
+          draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
+          className="flex min-w-0 flex-1 items-start gap-2 py-1 pl-2 text-left">
+          <span className="flex h-5 shrink-0 items-center"><ProviderStatusMark providerId={thread.providerId} tone="needs" providers={providers} /></span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13px] leading-5">{title}</span>
+            {thread.reason ? <span data-testid="needs-you-reason" className="truncate text-[11px] leading-4 text-muted-foreground">{thread.reason}</span> : null}
+          </span>
+        </button>
+        <span className="flex h-7 shrink-0 items-center pl-1">
+          <span className="text-[11px] text-muted-foreground tabular-nums group-hover/needs:hidden group-focus-within/needs:hidden">{age(thread.updatedAt)}</span>
+          <HandledButton label={title} onClick={handled} className="hidden group-hover/needs:inline-flex group-focus-within/needs:inline-flex" />
+        </span>
+      </div>
+    </NeedsYouMenu>
   );
 }
 
