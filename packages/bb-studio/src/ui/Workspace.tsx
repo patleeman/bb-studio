@@ -297,7 +297,8 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       onDragOver={event => { if (accepts(event)) { event.preventDefault(); event.stopPropagation(); } }}
       onDrop={event => { const item = dragged(event); if (item) { event.preventDefault(); event.stopPropagation(); move(item, pane.id, "tab"); } }}>
       {/* As in Chrome, + follows the last tab, and stays in view once tabs overflow. */}
-      <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      {/* The tabs keep at least 40% of the row; the active tab's crumbs and tools take the rest. */}
+      <div className="flex min-w-[40%] flex-1 items-center gap-0.5">
       <div role="tablist" aria-label="Studio items" className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
         {pane.tabs.map((tab, index) => <ContextMenu key={tab.href}><ContextMenuTrigger asChild><div onDragEnd={() => setDragging(null)} className={`group/tab flex h-7 max-w-56 shrink-0 items-center rounded-md outline-none transition-colors ${pane.active !== tab.href ? "text-muted-foreground hover:bg-state-hover hover:text-foreground" : focused === pane.id ? "bg-state-active text-foreground" : "bg-state-hover text-foreground"}`} data-studio-workspace-tab={tab.href} draggable onDragStart={event => { event.dataTransfer.setData(WORKSPACE_DRAG, JSON.stringify(tab)); event.dataTransfer.effectAllowed = "move"; setDragging({ source: tab.href }); }}
           onDragOver={event => { if (accepts(event)) event.preventDefault(); }}
@@ -318,7 +319,7 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
       </div>
       <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
       </div>
-      {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink-0 items-center" />)}
+      {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink items-center" />)}
 
     </div>
   );

@@ -175,6 +175,11 @@ export function StudioBar({ children, className }: { children: ReactNode; classN
  */
 const InTabRow = createContext(false);
 
+/** True in a workspace tab row, where a view shows only what the tab can't: Pages' parent pages, say. */
+export function useInTabRow(): boolean {
+  return useContext(InTabRow);
+}
+
 /** The parent crumb, then the item's own crumbs or title, separated like BB's breadcrumbs. */
 export function BarCrumb({ children, onClick, current = false, title }: { children: ReactNode; onClick?(): void; current?: boolean; title?: string }) {
   const inTabRow = useContext(InTabRow);
@@ -279,10 +284,11 @@ export function ItemHeader({
   const splitHere = !inWorkspace && moved;
   const tools = splitHere || trailing;
   const bar = (
-    <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
+    <div data-studio-bar="" data-studio-item-header="" className={cn("flex h-full min-w-0 items-center gap-2", !inWorkspace && "flex-1")}>
       {/* In the workspace a tab has nowhere to go back to; the view's own crumbs,
-          renames and status stay. */}
-      <nav aria-label="Breadcrumb" data-studio-item-crumbs="" className="flex min-w-0 flex-1 items-center gap-0.5">
+          renames and status stay. Beside the tabs they take their own width
+          (a share of nothing is nothing) and shrink before the tools do. */}
+      <nav aria-label="Breadcrumb" data-studio-item-crumbs="" className={cn("flex min-w-0 items-center gap-0.5", inWorkspace ? "shrink" : "flex-1")}>
         {inWorkspace ? null : <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>}
         {leading && !inWorkspace ? <BarSeparator /> : null}
         {leading}
