@@ -482,6 +482,8 @@ public struct BotRunner: Decodable, Hashable, Sendable, Identifiable {
     public var lastRunStatus: String?
     /// How loudly the last report spoke: "log", "tell" or "urgent".
     public var lastLevel: String?
+    /// The agent provider it runs on, for its logo.
+    public var providerId: String?
 
     public var paused: Bool { state == "paused" }
 
@@ -538,6 +540,8 @@ public struct BotActivity: Decodable, Hashable, Sendable {
         public var parentId: String?
         /// When its current turn started (ms), while it works; nil when BB couldn't tell.
         public var runningSince: Double?
+        /// The agent provider it runs on, for its logo.
+        public var providerId: String?
     }
     public struct Scheduled: Decodable, Hashable, Sendable, Identifiable {
         public var id: String

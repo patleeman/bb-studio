@@ -142,7 +142,7 @@ struct BotThreadsSheet: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                BotRowMark(state: state)
+                BotRowMark(state: state, providerId: thread.providerId)
                 Text(thread.title.isEmpty ? "Untitled" : thread.title)
                     .lineLimit(1)
                     .foregroundStyle(tone == .idle ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
@@ -162,7 +162,7 @@ struct BotThreadsSheet: View {
     private func runnerRow(_ runner: BotRunner) -> some View {
         Button { openRunner(runner) } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                BotRowMark(state: runner.rowState, dimmed: runner.rowState == .idle || runner.rowState == .paused)
+                BotRowMark(state: runner.rowState, providerId: runner.providerId, dimmed: runner.rowState == .idle || runner.rowState == .paused)
                     .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -289,6 +289,8 @@ struct BotThreadsSheet: View {
 struct BotRowMark: View {
     var state: BotRowState
     /// Stands in for the provider's logo, which iOS doesn't have yet.
+    /// Draws its provider's logo; unknown providers get `symbol`.
+    var providerId: String? = nil
     var symbol = "sparkle"
     var dimmed = false
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
@@ -303,9 +305,13 @@ struct BotRowMark: View {
 
     var body: some View {
         ZStack {
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .semibold))
-                .frame(width: 11, height: 11)
+            if let logo = ProviderLogo(providerId) {
+                logo.frame(width: 11, height: 11)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 9, weight: .semibold))
+                    .frame(width: 11, height: 11)
+            }
             ring
         }
         .frame(width: 16, height: 16)
@@ -339,6 +345,37 @@ struct BotRowMark: View {
         case .idle, .paused:
             Circle().stroke(Color.secondary.opacity(0.3), lineWidth: 1.5).frame(width: 14.5, height: 14.5)
         }
+    }
+}
+
+/// An agent provider's logo: BB's own artwork (`/api/v1/system/providers/<id>/logo`),
+/// bundled because it is SVG, drawn as a mask in the provider's `iconTint`, or
+/// in the text colour when it has none, as desktop's `ProviderIcon` does.
+struct ProviderLogo: View {
+    private let asset: String
+    private let tint: Color?
+
+    /// Nil for a provider the app has no logo for.
+    init?(_ providerId: String?) {
+        guard let providerId, let tint = Self.known[providerId] else { return nil }
+        asset = "ProviderLogos/\(providerId)"
+        self.tint = tint
+    }
+
+    /// The providers with bundled artwork and their `strings.iconTint`.
+    static let known: [String: Color?] = [
+        "codex": nil,
+        "claude-code": Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255),
+        "pi": Color(red: 0x6D / 255, green: 0x5D / 255, blue: 0xFB / 255),
+        "acp-opencode": Color(red: 0x25 / 255, green: 0x63 / 255, blue: 0xEB / 255),
+    ]
+
+    var body: some View {
+        Image(asset)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(tint.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.primary))
     }
 }
 
