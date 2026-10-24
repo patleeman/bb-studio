@@ -51,15 +51,13 @@ export const BOT_STYLES = `
 .bb-bot-shimmer { -webkit-text-fill-color: transparent; opacity: .75; }
 @keyframes bb-bot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .bot-pulse { animation: bb-bot-pulse 1.6s ease-in-out infinite; }
-@keyframes bb-provider-ring-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 24%, transparent); }
-  50% { box-shadow: 0 0 0 2px color-mix(in oklab, var(--provider-ring-color) 36%, transparent), 0 0 5px color-mix(in oklab, var(--provider-ring-color) 30%, transparent); }
-}
-.bb-provider-ring { border-color: var(--provider-ring-color); box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 20%, transparent); }
-.bb-provider-ring[data-provider-status="running"] { animation: bb-provider-ring-pulse 1.8s ease-in-out infinite; }
+@keyframes bb-run-arc { to { transform: rotate(360deg); } }
+.bb-run-arc { transform-box: view-box; transform-origin: 50% 50%; animation: bb-run-arc 1.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) {
+  .bb-run-arc { display: none; }
+  .bb-run-track { stroke-opacity: 1; }
+  .bb-run-dot { display: block !important; }
   .bb-bot-eyes, .bb-bot-pupils, .bb-bot-in, .bb-bot-dot, .bb-bot-shimmer, .bot-pulse { animation: none !important; }
-  .bb-provider-ring[data-provider-status="running"] { animation: none !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--provider-ring-color) 36%, transparent); }
   .bb-bot-shimmer { -webkit-text-fill-color: currentColor; }
 }
 `;

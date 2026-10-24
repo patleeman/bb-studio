@@ -124,6 +124,19 @@ it("creates a runner: an unparented thread, its first run, and a schedule that w
   await expect(x.runners.create({ name: "inbox", job: "x", schedule })).rejects.toThrow(/already/);
 });
 
+it("says when a runner is mid-run and since when (its open turn), and not between runs", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check the inbox.", schedule });
+  x.threads.set(runner.threadId!, { ...x.threads.get(runner.threadId!)!, status: "idle" });
+  expect((await x.runners.list())[0]).toMatchObject({ running: false, runningSince: null });
+  x.threads.set(runner.threadId!, { ...x.threads.get(runner.threadId!)!, status: "active" });
+  x.timeline.mockResolvedValue({ rows: [{ kind: "turn", createdAt: 100, completedAt: 150 }, { kind: "turn", createdAt: 500, completedAt: null }] });
+  expect((await x.runners.list())[0]).toMatchObject({ running: true, runningSince: 500 });
+  expect(await x.runners.get(runner.id)).toMatchObject({ running: true, runningSince: 500 });
+  x.timeline.mockRejectedValue(new Error("no timeline"));
+  expect((await x.runners.list())[0]).toMatchObject({ running: true, runningSince: null });
+});
+
 it("updates, pauses, resumes, runs now and deletes", async () => {
   const x = await setup();
   const { id, threadId } = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });

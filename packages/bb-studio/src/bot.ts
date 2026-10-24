@@ -34,6 +34,7 @@ import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-provi
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
+import { turnStartedAt } from "./turn-started";
 import { lineDiff, lintSkill } from "./skill-learning";
 import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
 
@@ -1180,6 +1181,8 @@ export class Bots {
     scheduled.sort((a, b) => Number(b.kind === "heartbeat") - Number(a.kind === "heartbeat") || (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity));
     const latest = output?.output ? output.output.slice(-1200) : null;
     const compactions = (this.deps.db.prepare("SELECT thread_id AS threadId, at, tokens FROM bot_cache_compactions WHERE bot_id = ? ORDER BY at").all(bot.id) as { threadId: string; at: number; tokens: number | null }[]);
-    return { needsYou, inProgress, waiting, scheduled, completed, latest, compactions };
+    // Running rows count up from their turn's start.
+    const running = await Promise.all(inProgress.map(async (thread) => ({ ...thread, runningSince: await turnStartedAt(this.deps.sdk, thread.id) })));
+    return { needsYou, inProgress: running, waiting, scheduled, completed, latest, compactions };
   }
 }

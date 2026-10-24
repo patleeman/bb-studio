@@ -38,9 +38,12 @@ import type { HeartbeatRun, RunnerAdoptableView, RunnerView } from "./contract";
 import { automationName } from "./automation-names";
 import { heartbeatRunSchema } from "./contract";
 import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
+import { turnStartedAt } from "./turn-started";
 
 type Sdk = BbPluginApi["sdk"];
 type TimelineRow = Awaited<ReturnType<Sdk["threads"]["timeline"]>>["rows"][number];
+/** Runner thread statuses that mean a run is going on now. */
+const RUNNING = new Set(["starting", "active", "stopping"]);
 export type RunnerLevel = "log" | "tell" | "urgent";
 export type RunnerSchedule = Omit<HeartbeatRun, "enabled">;
 type RunnerRow = {
@@ -380,7 +383,7 @@ export class Runners {
       const runner = this.view(row, automations.find((each) => each.id === row.automation_id));
       if (!runner.threadId) return runner;
       const thread = await this.deps.sdk.threads.get({ threadId: runner.threadId }).catch(() => null);
-      return { ...runner, providerId: thread?.providerId ?? null };
+      return { ...runner, providerId: thread?.providerId ?? null, ...await this.runState(runner.threadId, thread?.status) };
     }));
   }
 
@@ -450,7 +453,13 @@ export class Runners {
     const row = this.row(id);
     const automation = (await this.automations([row.automation_project_id ?? row.project_id])).find((a) => a.id === row.automation_id);
     const thread = row.thread_id ? await this.deps.sdk.threads.get({ threadId: row.thread_id }).catch(() => null) : null;
-    return { ...this.view(row, automation), providerId: thread?.providerId ?? null };
+    return { ...this.view(row, automation), providerId: thread?.providerId ?? null, ...(row.thread_id ? await this.runState(row.thread_id, thread?.status) : {}) };
+  }
+
+  /** Mid-run, and since when (the run's turn start). */
+  private async runState(threadId: string, status: string | undefined): Promise<Pick<RunnerView, "running" | "runningSince">> {
+    const running = RUNNING.has(status ?? "");
+    return { running, runningSince: running ? await turnStartedAt(this.deps.sdk, threadId) : null };
   }
 
   /** Makes or updates the runner's automation to match its row (adopted runners keep their prompt). */

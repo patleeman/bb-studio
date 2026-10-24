@@ -7932,6 +7932,12 @@
                     "string",
                     "null"
                   ]
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -8545,6 +8551,12 @@
                     "string",
                     "null"
                   ]
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -8603,6 +8615,12 @@
                   "default": null,
                   "type": [
                     "string",
+                    "null"
+                  ]
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
                     "null"
                   ]
                 }
@@ -8664,6 +8682,12 @@
                   "default": null,
                   "type": [
                     "string",
+                    "null"
+                  ]
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
                     "null"
                   ]
                 }
@@ -8769,6 +8793,12 @@
                   "default": null,
                   "type": [
                     "string",
+                    "null"
+                  ]
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
                     "null"
                   ]
                 }
@@ -10718,6 +10748,15 @@
                 },
                 "urgent": {
                   "type": "boolean"
+                },
+                "running": {
+                  "type": "boolean"
+                },
+                "runningSince": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -10991,6 +11030,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11217,6 +11265,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11401,6 +11458,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11734,6 +11800,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11908,6 +11983,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -12082,6 +12166,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [
@@ -12346,6 +12439,15 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "runningSince": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         },
         "required": [

@@ -270,6 +270,8 @@ const botThread = z.object({
   needsYou: z.boolean(),
   /** The listed thread that started this one; null when the Bot did (or for its own). */
   parentId: z.string().nullable().default(null),
+  /** Running threads: when the current turn started, for the elapsed time. */
+  runningSince: z.number().nullable().optional(),
 });
 export type BotThreadView = z.infer<typeof botThread>;
 const botScheduled = z.object({
@@ -321,6 +323,10 @@ const runner = z.object({
   lastReportAt: z.number().nullable(),
   /** An urgent report the user hasn't opened: it's in Needs you. */
   urgent: z.boolean(),
+  /** Its thread is working now: a run is going on. */
+  running: z.boolean().optional(),
+  /** Mid-run: when the run's turn started, for the elapsed time. */
+  runningSince: z.number().nullable().optional(),
 });
 export type RunnerView = z.infer<typeof runner>;
 /** A thread the Bot started that an automation wakes: it can be adopted as a runner. */

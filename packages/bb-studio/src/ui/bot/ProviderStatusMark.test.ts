@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { providerRingState, resolveProviderIcon, runnerStatusTone, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
+import { elapsedClock, providerRingState, resolveProviderIcon, runnerStatusTone, runningLabel, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
 
 describe("provider status rings", () => {
   it.each([
@@ -15,10 +15,20 @@ describe("provider status rings", () => {
     expect(providerRingState(threadStatusTone(status, needsYou))).toBe(ring);
   });
 
-  it("maps runner urgency and enablement to its visible status", () => {
-    expect(runnerStatusTone("active", false)).toBe("running");
+  it("shows a runner as running only mid-run; between runs it's idle", () => {
+    expect(runnerStatusTone("active", false)).toBe("idle");
+    expect(runnerStatusTone("active", false, true)).toBe("running");
+    expect(runnerStatusTone("paused", false, true)).toBe("idle");
     expect(runnerStatusTone("paused", false)).toBe("idle");
-    expect(runnerStatusTone("active", true)).toBe("needs");
+    expect(runnerStatusTone("active", true, true)).toBe("needs");
+  });
+
+  it("ticks the elapsed time as m:ss, then h:mm:ss, and says it in words", () => {
+    expect(elapsedClock(0, 42_000)).toBe("0:42");
+    expect(elapsedClock(0, 12 * 60_000 + 5_000)).toBe("12:05");
+    expect(elapsedClock(0, 3_600_000 + 2 * 60_000 + 10_000)).toBe("1:02:10");
+    expect(runningLabel(0, 12 * 60_000)).toBe("Running for 12 minutes");
+    expect(runningLabel(null)).toBe("Running");
   });
 });
 
