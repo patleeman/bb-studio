@@ -56,8 +56,6 @@ final class ErrorStatesCaptureUITests: XCTestCase {
         shot("related-reply-draft")
         app.buttons.matching(NSPredicate(format: "label == 'Send' OR label == 'Send Reply'")).firstMatch.tap()
         XCTAssertTrue(text(containing: unreachable).waitForExistence(timeout: 40))
-        if app.keyboards.firstMatch.exists { app.navigationBars.firstMatch.tap() }
-        sleep(1)
         shot("related-reply-failed")
     }
 
