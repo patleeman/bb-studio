@@ -32,7 +32,10 @@ export function nudgeNote(thread: Thread, interaction: Interaction): string {
   const title = (thread.title || thread.titleFallback || "Untitled thread").replace(/"/g, "'");
   const { what, detail } = waitsOn(interaction);
   const link = thread.projectId ? `/projects/${thread.projectId}/threads/${thread.id}` : thread.id;
-  return `Your thread "${title}" (${link}) is waiting on ${what}${detail ? `: ${detail.trim().replace(/\s+/g, " ").slice(0, 200)}` : ""}. If you can handle it, do (answer it in that thread) and reply exactly [PASS]. If only the user can, ask them in a line or two here, with its link.`;
+  // The question keeps its own ending ("?"); anything else gets a full stop.
+  const words = detail?.trim().replace(/\s+/g, " ").slice(0, 200) ?? "";
+  const said = words ? `: ${words}${/[.?!]$/.test(words) ? "" : "."}` : ".";
+  return `Your thread "${title}" (${link}) is waiting on ${what}${said} If you can handle it, do (answer it in that thread) and reply exactly [PASS]. If only the user can, ask them in a line or two here, with its link.`;
 }
 
 export class BotNudges {

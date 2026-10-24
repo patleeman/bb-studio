@@ -31,7 +31,7 @@ it("nudges the Bot once per waiting episode, with one agent-only note", async ()
   const sent = (x.send.mock.calls[0] as unknown[])[0] as { threadId: string; senderThreadId: string; input: { text: string; visibility?: string }[] };
   expect(sent).toMatchObject({ threadId: "bot1", senderThreadId: "t_key" });
   expect(sent.input).toEqual([expect.objectContaining({ visibility: "agent-only", text: nudgeNote(thread, question) })]);
-  expect(sent.input[0]!.text).toContain('Your thread "Rotate the ORBIT-42 deploy key" (/projects/proj_o/threads/t_key) is waiting on an answer: Which vault holds the ORBIT-42 deploy key?');
+  expect(sent.input[0]!.text).toContain('Your thread "Rotate the ORBIT-42 deploy key" (/projects/proj_o/threads/t_key) is waiting on an answer: Which vault holds the ORBIT-42 deploy key? If you can handle it');
   expect(sent.input[0]!.text).toMatch(/reply exactly \[PASS\]\. If only the user can, ask them in a line or two/);
   // Another question in the same episode: no repeat.
   x.pending.set("t_key", [question, question]);
@@ -43,7 +43,7 @@ it("nudges the Bot once per waiting episode, with one agent-only note", async ()
   x.pending.set("t_key", [{ status: "resolved" }]);
   await x.nudges.settled("t_key");
   expect(await x.nudges.pending(thread, approval)).toBe(true);
-  expect(((x.send.mock.calls[1] as unknown[])[0] as { input: { text: string }[] }).input[0]!.text).toContain("is waiting on an approval: Run `git push --force`");
+  expect(((x.send.mock.calls[1] as unknown[])[0] as { input: { text: string }[] }).input[0]!.text).toContain("is waiting on an approval: Run `git push --force`. If you can");
 });
 
 it("doesn't nudge about the Bot's own chat, a thread no Bot owns, or for a paused Bot; a failed send can try again", async () => {
