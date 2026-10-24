@@ -237,6 +237,7 @@ final class Outbox: ObservableObject {
     }
 
     private func report(_ error: Error) {
-        storageError = "Couldn't save queued messages: \(error.localizedDescription). Keep this app open and retry saving."
+        let reason = error.localizedDescription.trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        storageError = "Couldn't save queued messages: \(reason). Keep this app open and retry saving."
     }
 }

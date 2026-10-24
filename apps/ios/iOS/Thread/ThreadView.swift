@@ -217,20 +217,12 @@ struct ThreadView: View {
             .presentationDetents([.medium, .large])
         }
         .overlay(alignment: .top) {
-            if let error = outbox.storageError {
-                VStack(spacing: 4) {
-                    Text(error).font(.caption)
-                    Button("Retry saving") {
-                        outbox.retryStorage()
-                        if outbox.storageError == nil, model.error == error { model.error = nil }
-                    }
-                }
-                .padding(8).background(.red.opacity(0.15), in: .rect(cornerRadius: 8)).padding(.top, 4)
-            } else if let error = model.error {
-                Text(error).font(.caption).padding(8).background(.red.opacity(0.15), in: .capsule).padding(.top, 4)
-                    .onTapGesture { model.error = nil }
+            // The outbox's own error shows once, on its shelf card.
+            if let error = model.error, error != outbox.storageError {
+                ErrorToast(message: error) { model.error = nil }
             }
         }
+        .animation(.snappy, value: model.error)
         .task {
             app.lastThreadId = model.threadId
             if draft.isEmpty, let saved = Drafts.load(model.threadId, serverURL: model.serverURL) {
@@ -1043,6 +1035,19 @@ struct ThreadView: View {
                 }
             }
             ThreadShelf(model: model)
+            if let error = outbox.storageError {
+                ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
+                    Text(error).lineLimit(3)
+                } trailing: {
+                    Button("Retry") {
+                        outbox.retryStorage()
+                        if outbox.storageError == nil, model.error == error { model.error = nil }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .padding(.trailing, 6)
+                }
+                .accessibilityIdentifier("outboxStorageError")
+            }
             if let status = handoffStatus {
                 ShelfCard(icon: status.working ? "arrow.triangle.2.circlepath" : "checkmark.circle", tint: status.working ? .orange : .green) {
                     HStack(spacing: 6) {
@@ -1129,12 +1134,17 @@ struct ThreadView: View {
                 if let botChrome, model.thread?.isRunning == true, !canSend, !dictation.blocksSend {
                     // Nothing typed while the Bot works: stop it.
                     Button { Task { await model.stop() } } label: {
-                        Image(systemName: "stop.fill")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.primary.opacity(0.85), in: .circle)
-                            .frame(width: 36, height: 36)
+                        Group {
+                            if model.stopping {
+                                ProgressView().tint(Color(uiColor: .systemBackground))
+                            } else {
+                                Image(systemName: "stop.fill").font(.footnote.weight(.bold))
+                            }
+                        }
+                        .foregroundStyle(Color(uiColor: .systemBackground))
+                        .frame(width: 32, height: 32)
+                        .background(Color.primary.opacity(0.85), in: .circle)
+                        .frame(width: 36, height: 36)
                     }
                     .disabled(model.stopping)
                     .accessibilityLabel("Stop \(botChrome.bot.name)")
@@ -1265,6 +1275,39 @@ struct UnreadDivider: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("New since you last looked")
+    }
+}
+
+/// Something that went wrong on this screen, over the top of the chat. Tap to dismiss.
+struct ErrorToast: View {
+    let message: String
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            Text(message).frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .font(.footnote)
+        .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 6)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .frame(maxWidth: 560)
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
+        .onTapGesture(perform: dismiss)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Dismiss", dismiss)
     }
 }
 
