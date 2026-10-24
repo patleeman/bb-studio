@@ -37,7 +37,7 @@ export function resolveProviderIcon(providerId: string | null | undefined, provi
 /**
  * A row's state, the same wherever Bot rows show (the Bot sidebar's Running,
  * Runners and Schedule, and Bot info), on desktop and iOS
- * (docs/ui-redo/bot/REDO.md has the shared spec). Only running rows move.
+ * (docs/ui-redo/C/REDO.md has the shared spec). Only running rows move.
  * - running (a thread working, a runner mid-run): the logo in full color in
  *   a green arc that turns once every 1.6 s. Under reduced motion the arc
  *   stops: a full green ring and a still "live" dot.
