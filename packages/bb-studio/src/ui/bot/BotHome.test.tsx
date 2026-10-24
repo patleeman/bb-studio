@@ -80,14 +80,7 @@ vi.mock("../../kit/ui/index", () => ({
   DialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement("h2", null, children),
   DialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement("p", null, children),
-  Tooltip: ({ children }: { children: React.ReactNode }) => children,
-  ContextMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", { "data-context-menu": "" }, children),
-  ContextMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
-  ContextMenuContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "menu" }, children),
-  ContextMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { type: "button", role: "menuitem", onClick: onSelect }, children),
 }));
-const toasts = vi.hoisted(() => [] as { text: string; action?: { label: string; onClick(): void } }[]);
-vi.mock("sonner", () => ({ toast: Object.assign((text: string, options?: { action?: { label: string; onClick(): void } }) => { toasts.push({ text, action: options?.action }); }, { success: (text: string) => toasts.push({ text }), error: (text: string) => toasts.push({ text }) }) }));
 
 const { ActivityPanel, BOT_PATH } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
@@ -125,8 +118,8 @@ const show = async (node: React.ReactNode) => {
 const button = (label: string) => [...container.querySelectorAll("button")].find((each) => each.textContent === label)!;
 
 const click = (el: Element | null | undefined) => (el as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: Date.now(), relation: "started" as const, needsYou: false, parentId: null as string | null });
-const empty = { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
+const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: Date.now(), relation: "started" as const, parentId: null as string | null });
+const empty = { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
 
 test("with no Bot, the welcome's Create makes it with the setup and opens its chat", async () => {
@@ -138,52 +131,6 @@ test("with no Bot, the welcome's Create makes it with the setup and opens its ch
   expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Chief of Staff", avatar: "🤖", shape: "blob", color: "#5b8def", setup: "Watch my PRs" });
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   state.call.mockImplementation(async () => ({}));
-});
-
-test("Needs you: each row says why; ✕ or the context menu marks it handled, and the toast's Undo brings it back", async () => {
-  toasts.length = 0;
-  state.data = {
-    bot_get: { bot: dot, run: null },
-    bot_activity: {
-      ...empty,
-      needsYou: [
-        { ...thread("run_sec", "Security · Runner"), needsYou: true, reason: "Urgent report: SSH on red4 accepts passwords again" },
-        { ...thread("t1", "Approve deploy"), needsYou: true, reason: "Waiting for approval" },
-      ],
-    },
-  };
-  await show(<BotThreadList {...listProps} />);
-  const needs = () => container.querySelector('nav[aria-label="Bots"] section[aria-label="Needs you"]');
-  expect([...needs()!.querySelectorAll("[data-testid=needs-you-reason]")].map((each) => each.textContent)).toEqual(["Urgent report: SSH on red4 accepts passwords again", "Waiting for approval"]);
-  // ✕: the row leaves at once, the server records it, and Undo restores it.
-  await act(async () => click(needs()!.querySelector('[data-thread="run_sec"] [data-testid=needs-you-handled]')));
-  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "run_sec" });
-  expect(needs()!.querySelector('[data-thread="run_sec"]')).toBeNull();
-  expect(toasts.at(-1)).toMatchObject({ text: "Marked handled: Security · Runner", action: { label: "Undo" } });
-  await act(async () => toasts.at(-1)!.action!.onClick());
-  expect(state.call).toHaveBeenCalledWith("bot_needs_you_restore", { botId: "bot_main", threadId: "run_sec" });
-  expect(needs()!.querySelector('[data-thread="run_sec"]')).not.toBeNull();
-  // The context menu's Mark handled does the same.
-  const menu = [...needs()!.querySelectorAll('[role=menu] [role=menuitem]')].find((each) => each.textContent === "Mark handled" && each.closest("[data-context-menu]")?.querySelector('[data-thread="t1"]'));
-  await act(async () => click(menu));
-  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "t1" });
-  // A failed dismiss puts the row back and says so.
-  state.call.mockImplementationOnce((async () => { throw new Error("offline"); }) as never);
-  await act(async () => click(needs()!.querySelector('[data-thread="run_sec"] [data-testid=needs-you-handled]')));
-  expect(needs()!.querySelector('[data-thread="run_sec"]')).not.toBeNull();
-  expect(toasts.at(-1)?.text).toBe("Couldn't mark it handled: offline");
-});
-
-test("Activity in Bot info: Needs you rows show their reason and can be marked handled", async () => {
-  const data = { ...empty, needsYou: [{ ...thread("t1", "Pick a venue"), needsYou: true, reason: "Asked you a question" }] };
-  await show(<ActivityPanel loading={false} data={data} botId="bot_main" refresh={() => {}} />);
-  expect(container.querySelector("[data-testid=needs-you-reason]")?.textContent).toBe("Asked you a question");
-  await act(async () => click(container.querySelector("[data-testid=needs-you-handled]")));
-  expect(state.call).toHaveBeenCalledWith("bot_needs_you_dismiss", { botId: "bot_main", threadId: "t1" });
-  expect(container.textContent).not.toContain("Pick a venue");
-  // Without a Bot to act on, no ✕.
-  await show(<ActivityPanel loading={false} data={data} />);
-  expect(container.querySelector("[data-testid=needs-you-handled]")).toBeNull();
 });
 
 test("the Bot page lives under the Studio panel", () => {
@@ -203,13 +150,13 @@ test("Activity: one quiet line when all is empty, sections only when non-empty, 
   expect(container.textContent).toContain("Done e");
 });
 
-test("the Bots list: the bot on top, Needs you flat, started threads nested under the one that started them; a row opens the thread as a BB thread", async () => {
+test("the Bots list: the bot on top saying what waits on you, no Needs you, started threads nested under the one that started them; a row opens the thread as a BB thread", async () => {
   state.data = {
     bot_get: { bot: dot, run: null },
     bot_activity: {
       ...empty,
-      needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }],
-      inProgress: [{ ...thread("t3", "Fix flaky test"), status: "active", parentId: "t2" }],
+      attention: { reason: "Asked you a question", count: 1, since: Date.now() },
+      inProgress: [{ ...thread("t3", "Fix flaky test"), status: "active", parentId: "t2" }, { ...thread("t1", "Approve deploy"), status: "active", waitingFor: "Waiting for approval" }],
       completed: [thread("t2", "Research CI"), thread("t4", "Weekly digest")],
       scheduled: [{ id: "a1", kind: "automation", name: "Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: null }],
     },
@@ -220,7 +167,16 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
   const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
-  expect(groups).toEqual(["Needs you", "Running", "Schedule", "Recent", "Earlier conversations"]);
+  expect(groups).toEqual(["Running", "Schedule", "Recent", "Earlier conversations"]);
+  // The Bot's row is the one "needs you" signal: a dot, its count, and why.
+  const main = nav.querySelector("[data-testid=bot-main]")!;
+  expect(main.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("Asked you a question");
+  expect(main.querySelector("[data-testid=bot-attention-reason]")?.textContent).toBe("Asked you a question");
+  expect(main.getAttribute("title")).toBe("Dot: Asked you a question");
+  // A thread held by an approval is under Running, by its state: the Bot's to handle.
+  const waiting = nav.querySelector('section[aria-label="Running"] [data-thread="t1"]')!;
+  expect(waiting.textContent).toContain("waiting");
+  expect(waiting.getAttribute("title")).toBe("Approve deploy · Waiting for approval");
   // The running child pulls its parent into Running and nests under it.
   const running = nav.querySelector('section[aria-label="Running"]')!;
   expect(running.querySelector('li > button[data-thread="t2"] + ul button[data-thread="t3"]')).not.toBeNull();
@@ -248,7 +204,9 @@ test("the Bots list: the bot on top, Needs you flat, started threads nested unde
   // The Bot page is its Info, with what needs the user; no embedded chat.
   await show(<BotPanel />);
   expect(container.querySelector("nav")).toBeNull();
-  expect(container.querySelector('section[aria-label="Needs you"]')?.textContent).toContain("Approve deploy");
+  expect(container.querySelector('section[aria-label="Needs you"]')).toBeNull();
+  expect(container.querySelector('section[aria-label="Running"]')?.textContent).toContain("Approve deploy");
+  expect(container.querySelector('section[aria-label="Running"]')?.textContent).toContain("waiting for approval");
 });
 
 test("on the Studio panel the Bots list puts Studio's list back and shows a placeholder", async () => {
@@ -337,7 +295,7 @@ test("the Bots list forgets the removed Threads tab's saved strips", async () =>
 test("Info tab: profile, controls, automations, and activity whose rows open as BB threads", async () => {
   state.data = {
     bot_get: { bot: { ...dot, role: "You are my chief of staff." }, run: { enabled: true, cadence: "weekdays", time: "08:00" } },
-    bot_activity: { ...empty, needsYou: [{ ...thread("t1", "Approve deploy"), needsYou: true }] },
+    bot_activity: { ...empty, inProgress: [{ ...thread("t1", "Approve deploy"), status: "active", waitingFor: "Waiting for approval" }] },
     bot_automations: { automations: [
       { id: "heartbeat", kind: "checkin", name: "Check-in", original: true, instruction: "Memory", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"] }, scheduleText: "Weekdays 8:00", state: "active", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: null, target: "main", targetName: "Dot", threadId: "thr_bot" },
       { id: "aut_w", kind: "watcher", name: "Release watch", original: false, instruction: "", schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] }, scheduleText: "Every 15 min, every day", state: "paused", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: { body: "echo hi", interpreter: "bash", timeoutMs: 60000, workingDirectory: null, envKeys: [] }, target: "main", targetName: "Dot", threadId: "thr_bot" },
@@ -536,10 +494,16 @@ const scout = { ...dot, id: "bot_scout", name: "Scout", avatar: "🛰️", threa
 test("several Bots: the selected one (from the route) is expanded and scoped; a row opens its chat, its ⓘ its Info", async () => {
   const { openAppPath } = await import("../../kit/app/index");
   state.pathname = "/plugins/studio/studio/bot/bot_scout";
-  state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: scout, run: null }, bot_activity: empty };
+  state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_get: { bot: scout, run: null }, bot_activity: empty, bot_attention: { attention: { reason: "2 things for you", count: 2, since: 1 } } };
   await show(<BotThreadList {...listProps} />);
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Scout");
+  // Another Bot's row still says when its chat has something for you (bot_attention).
+  expect(state.inputs).toContainEqual(["bot_attention", { botId: "bot_main" }]);
+  const dotRow = nav.querySelector('[data-testid=bot-row][data-bot="bot_main"]')!;
+  expect(dotRow.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("2 things for you");
+  expect(dotRow.textContent).toContain("2");
+  expect(dotRow.getAttribute("title")).toBe("Dot: 2 things for you");
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_scout" }]);
   expect(state.inputs).toContainEqual(["bot_activity", { botId: "bot_scout" }]);
   expect(state.inputs).toContainEqual(["bot_runners", { botId: "bot_scout" }]);
@@ -794,7 +758,7 @@ test("Recent hides old idle threads and Show archived reveals them in one click"
 
 test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens runner threads from either section", async () => {
   const now = Date.now();
-  const runner = { id: "security", name: "Dot · Security", threadId: "thr_security", providerId: "codex", state: "active", urgent: false,
+  const runner = { id: "security", name: "Dot · Security", threadId: "thr_security", providerId: "codex", state: "active",
     schedule: { cadence: "hourly", time: "09:00" }, nextRunAt: now + 120_000, lastRunAt: now - 60_000, lastReportAt: now - 60_000, lastLevel: "tell" };
   const automation = (id: string, kind: string, name: string, nextRunAt: number | null, status = "active") => ({ id, kind, name, nextRunAt, state: status, schedule: { type: "once" }, scheduleText: "Once" });
   state.data = {
@@ -857,7 +821,7 @@ test("Schedule runner rows show machine and offline metadata even without runner
   expect(serverRow.textContent).not.toContain("offline");
 
   // The full runner renderer presents the same machine and state in Schedule.
-  state.data.bot_runners = { runners: [{ ...remote, threadId: "thr_remote", urgent: false,
+  state.data.bot_runners = { runners: [{ ...remote, threadId: "thr_remote",
     schedule: { cadence: "hourly", time: "09:00" } }], adoptable: [] };
   await show(<BotThreadList {...listProps} />);
   const matched = schedule.querySelector('[data-agenda="remote"]')!;

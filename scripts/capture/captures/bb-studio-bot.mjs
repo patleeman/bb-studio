@@ -161,14 +161,14 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       }
       const nextWeek = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
       await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", "Draft Monday's status update", "--prompt", "Draft Monday's ORBIT-42 status update.", "--send-at", nextWeek]);
-      // A question waiting on the user in a thread it started: a Needs-you card with Open.
+      // A question in a thread it started: the Bot's to handle; it shows under Running, waiting.
       await json(["thread", "spawn", "--project", projectId, "--parent-thread", botThread, "--title", "Rotate the ORBIT-42 deploy key", "--prompt", "We need to rotate the ORBIT-42 deploy key. Use the design_ask tool to ask me one multiple-choice question: which vault holds the key (1Password, AWS Secrets Manager, or Vault). Wait for my answer."]);
       await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "180"]).catch(() => {});
       await bbCli(["thread", "tell", botThread, HISTORY]);
       await bbCli(["thread", "wait", botThread, "--status", "idle", "--timeout", "240"]).catch(() => {});
     }
     await workspaceExtras(botThread);
-    for (let i = 0; i < 60 && !(await pluginRpc("studio", "bot_activity", {})).needsYou.length; i++) await sleep(3000);
+    for (let i = 0; i < 60 && !(await pluginRpc("studio", "bot_activity", {})).inProgress.some((thread) => thread.waitingFor); i++) await sleep(3000);
     await pluginRpc("studio", "bot_checkin_preset", { preset: "morning" });
     return bot;
   };
@@ -182,7 +182,7 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     if (pref !== "studio/bot") throw new Error(`On the Bot page the thread list is ${pref}, not studio/bot`);
     // The Bots list sits in BB's sidebar itself, left of the page, not a column inside it.
     await client.evaluate(`(() => { if (document.querySelector('${SIDEBAR}').getBoundingClientRect().left > 120) throw new Error("The Bots list isn't in BB's sidebar"); return true; })()`);
-    for (const text of ["Needs you", "Running", "Schedule", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
+    for (const text of ["Running", "Schedule", "Recent", "Rotate the ORBIT-42 deploy key", "Watch the ORBIT-42 staging deploy", "Inbox sweep", "Pull the ORBIT-42 thread digests", ...CHILDREN.map((child) => child.title)]) await client.waitForText(text, 90000);
     // The follow-up nests under the thread that started it.
     await client.evaluate(`(() => {
       if (!document.querySelector('${SIDEBAR} li > button[data-thread] + ul button[data-thread]')) throw new Error("No nested sub-thread in the Bot sidebar");

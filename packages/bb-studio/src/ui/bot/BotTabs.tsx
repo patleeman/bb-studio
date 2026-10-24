@@ -132,7 +132,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
         : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} providers={providers} fallbackProviderId={bot.providerId} />}
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
-      <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} providers={providers} botId={bot.id} refresh={activity.refresh} />
+      <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} providers={providers} />
       {sheets}
     </div>
   );

@@ -82,7 +82,6 @@ export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: rea
 
 export interface TreeNode { thread: BotThreadView; children: TreeNode[] }
 export interface SidebarGroups {
-  needsYou: BotThreadView[];
   /** Started threads that are running, or have a running thread below them. */
   running: TreeNode[];
   /** Started threads queued to start (none running in their tree). */
@@ -94,18 +93,18 @@ export interface SidebarGroups {
 }
 
 /**
- * Groups the Bot's threads for its sidebar. Needs you is flat (each one is a
- * thing to do); Running, Waiting to start and Recent are trees, a thread under the thread that
- * started it at any depth, placed by its root. A childless thread that
- * needs the user is only under Needs you.
+ * Groups the Bot's threads for its sidebar. Running, Waiting to start and
+ * Recent are trees, a thread under the thread that started it at any depth,
+ * placed by its root. A thread waiting on an answer is under Running: the
+ * Bot owns it, and the Bot's row says when something needs the user.
  */
 export function sidebarGroups(activity: BotActivityView | null | undefined): SidebarGroups {
-  if (!activity) return { needsYou: [], running: [], waiting: [], recurring: [], recent: [] };
+  if (!activity) return { running: [], waiting: [], recurring: [], recent: [] };
   const started = (list: readonly BotThreadView[]) => list.filter((thread) => thread.relation === "started");
   const working = new Set(activity.inProgress.map((thread) => thread.id));
   const queued = new Set((activity.waiting ?? []).map((thread) => thread.id));
   const all = new Map<string, BotThreadView>();
-  for (const thread of started([...activity.needsYou, ...activity.inProgress, ...(activity.waiting ?? []), ...activity.completed])) {
+  for (const thread of started([...activity.inProgress, ...(activity.waiting ?? []), ...activity.completed])) {
     if (!all.has(thread.id)) all.set(thread.id, thread);
   }
   const children = new Map<string | null, BotThreadView[]>();
@@ -121,10 +120,8 @@ export function sidebarGroups(activity: BotActivityView | null | undefined): Sid
   };
   const hasRunning = (node: TreeNode): boolean => working.has(node.thread.id) || node.children.some(hasRunning);
   const hasQueued = (node: TreeNode): boolean => queued.has(node.thread.id) || node.children.some(hasQueued);
-  // A thread waiting on the user is already under Needs you; it stays in a tree only to hold its children.
-  const roots = (children.get(null) ?? []).sort(newest).map((thread) => build(thread, new Set())).filter((node) => !node.thread.needsYou || node.children.length);
+  const roots = (children.get(null) ?? []).sort(newest).map((thread) => build(thread, new Set()));
   return {
-    needsYou: started(activity.needsYou),
     running: roots.filter(hasRunning),
     waiting: roots.filter((node) => !hasRunning(node) && hasQueued(node)),
     recurring: activity.scheduled.filter((item) => item.kind === "automation"),

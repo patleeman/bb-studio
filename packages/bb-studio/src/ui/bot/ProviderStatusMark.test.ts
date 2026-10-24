@@ -11,16 +11,16 @@ describe("provider status rings", () => {
     ["active", true, "waiting"],
     ["error", false, "failed"],
     ["failed", false, "failed"],
-  ] as const)("maps thread status %s (needs-you: %s) to the %s ring", (status, needsYou, ring) => {
-    expect(providerRingState(threadStatusTone(status, needsYou))).toBe(ring);
+  ] as const)("maps thread status %s (waiting on an answer: %s) to the %s ring", (status, waiting, ring) => {
+    expect(providerRingState(threadStatusTone(status, waiting))).toBe(ring);
+    if (waiting) expect(threadStatusTone(status, waiting)).toBe("waiting");
   });
 
   it("shows a runner as running only mid-run; between runs it's idle", () => {
-    expect(runnerStatusTone("active", false)).toBe("idle");
-    expect(runnerStatusTone("active", false, true)).toBe("running");
-    expect(runnerStatusTone("paused", false, true)).toBe("idle");
-    expect(runnerStatusTone("paused", false)).toBe("idle");
-    expect(runnerStatusTone("active", true, true)).toBe("needs");
+    expect(runnerStatusTone("active")).toBe("idle");
+    expect(runnerStatusTone("active", true)).toBe("running");
+    expect(runnerStatusTone("paused", true)).toBe("idle");
+    expect(runnerStatusTone("paused")).toBe("idle");
   });
 
   it("ticks the elapsed time as m:ss, then h:mm:ss, and says it in words", () => {

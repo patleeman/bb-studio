@@ -3,7 +3,7 @@
 // Threads on top, under BB's New thread (ThreadsSection.tsx), then Bots.
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts; on a thread, the thread's owner) expanded under
-// it into the threads it started: Needs you, Running, Runners, Recurring,
+// it into the threads it started: Running, Runners, Recurring,
 // Recent (each nested under the thread that started it) and its earlier
 // conversations. A thread opens as a BB thread in the main pane, as from BB's
 // own list; so does a Bot's row, which opens its chat, with the Bot info
@@ -18,7 +18,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotActivityView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -27,7 +27,6 @@ import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./thre
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { KIND } from "./Automations";
-import { HandledButton, NeedsYouMenu, useMarkHandled, type MarkHandled } from "./NeedsYou";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
@@ -196,17 +195,37 @@ function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(ev
 const QUIET_ROW = "flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground";
 const DROP_RING = "ring-2 ring-inset ring-[var(--bot-accent,var(--ring))]";
 
-/** A Bot that isn't selected: one row that opens its chat, and its ⓘ. */
+type Attention = BotActivityView["attention"];
+
+/**
+ * The Bot's one "needs you" signal (src/bot-attention.ts): a dot on its
+ * avatar, and its count beside the name. The Bot triages everything else
+ * (runners, alerts, its threads' questions); this says its chat has
+ * something for the user.
+ */
+function AttentionDot({ attention }: { attention: Attention }) {
+  return attention ? <span data-testid="bot-attention" className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label={attention.reason} /> : null;
+}
+function AttentionCount({ attention }: { attention: Attention }) {
+  return attention ? <span aria-hidden className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] leading-4 text-foreground tabular-nums">{attention.count}</span> : null;
+}
+
+/** A Bot that isn't selected: one row that opens its chat, and its ⓘ; with what waits on the user in its chat. */
 function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
   const openBot = useOpenBot(onNavigate);
   const drop = useThreadDrop(bot);
+  const attention = useLive("bot_attention", { botId: bot.id }, { pollMs: 30_000 }).data?.attention ?? null;
   return (
     <div {...drop.props} data-drop-over={drop.over || undefined} style={{ "--bot-accent": bot.color ?? colorForName(bot.name) } as CSSProperties}
       className={`group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover ${drop.over ? DROP_RING : ""}`}>
-      <button type="button" data-testid="bot-row" data-bot={bot.id} title={bot.name} onClick={() => openBot(bot)}
+      <button type="button" data-testid="bot-row" data-bot={bot.id} title={attention ? `${bot.name}: ${attention.reason}` : bot.name} onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left">
-        <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={22} provider={botProvider(bot)} />
+        <span className="relative shrink-0">
+          <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={22} provider={botProvider(bot)} />
+          <AttentionDot attention={attention} />
+        </span>
         <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
+        <AttentionCount attention={attention} />
         {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
       </button>
       <InfoButton bot={bot} onThread={false} onNavigate={onNavigate} />
@@ -241,11 +260,11 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
   const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
-  const needs = useMarkHandled(bot.id, groups.needsYou, () => { activity.refresh(); runners.refresh(); });
   const automations = useLive("bot_automations", { botId: bot.id }, { pollMs: 15_000 });
   const agenda = sidebarAgenda(automations.data?.automations ?? [], activity.data?.scheduled ?? []);
   const [showDone, setShowDone] = useState(false);
-  const openRunner = useOpenRunner(bot.id, onOpen, () => { runners.refresh(); activity.refresh(); });
+  const openRunner = useOpenRunner(onOpen);
+  const attention = activity.data?.attention ?? null;
   const tree = (nodes: TreeNode[]) => <ThreadTree botName={bot.name} nodes={nodes} depth={0} active={active} onOpen={onOpen} providers={providers} />;
   const drop = useThreadDrop(bot);
 
@@ -254,27 +273,25 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
       {/* The bot: its row opens its chat as a BB thread; ⓘ opens its Info. */}
       {/* Tinted in the Bot's color only while its chat (or an earlier conversation of it) is the open thread. */}
       <div {...drop.props} data-drop-over={drop.over || undefined} className={`group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover ${drop.over ? DROP_RING : ""}`} style={chatOpen ? { background: "color-mix(in oklab, var(--bot-accent) 14%, transparent)" } : undefined}>
-      <button type="button" aria-current={chatOpen ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${status}`}
+      <button type="button" aria-current={chatOpen ? "page" : undefined} data-testid="bot-main" title={`${bot.name}: ${attention?.reason ?? status}`}
         onClick={() => openBot(bot)}
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
           <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={28} working={running > 0} provider={botProvider(bot)} />
-          {needs.shown.length ? <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label="Needs you" /> : null}
+          <AttentionDot attention={attention} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">{bot.name}</span>
-          <span className="truncate text-[11px] text-muted-foreground">{status}</span>
+          <span className="flex min-w-0 items-center gap-1.5"><span className="truncate text-sm font-medium">{bot.name}</span><AttentionCount attention={attention} /></span>
+          {/* Why it needs you, while something does; else what it's doing. */}
+          {attention
+            ? <span data-testid="bot-attention-reason" className="truncate text-[11px] text-foreground/80">{attention.reason}</span>
+            : <span className="truncate text-[11px] text-muted-foreground">{status}</span>}
         </span>
       </button>
       <InfoButton bot={bot} onThread={onThread} onNavigate={onNavigate} always />
       </div>
 
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
-        {needs.shown.length ? (
-          <Group id="needs" title="Needs you" closed={layout.closed} onToggle={toggle} badge={needs.shown.length}>
-            {needs.shown.map((thread) => <NeedsYouRow botName={bot.name} key={thread.id} thread={thread} active={active === thread.id} onOpen={onOpen} providers={providers} onHandled={needs.markHandled} />)}
-          </Group>
-        ) : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
         {groups.waiting.length ? <Group id="waiting" title="Waiting to start" closed={layout.closed} onToggle={toggle}>{tree(groups.waiting)}</Group> : null}
         {runners.data?.runners.length ? (
@@ -317,7 +334,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
             {sideThreads.data.threads.map((thread) => <SideThreadRow botName={bot.name} key={thread.threadId} thread={thread} active={active === thread.threadId} onOpen={onOpen} />)}
           </Group>
         ) : null}
-        {!needs.shown.length && !groups.running.length && !groups.waiting.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
+        {!groups.running.length && !groups.waiting.length && !groups.recent.length && !sideThreads.data?.threads.length ? (
           <p className="px-2 text-xs text-muted-foreground">Threads {bot.name} starts show up here.</p>
         ) : null}
         {earlier.length ? (
@@ -365,49 +382,22 @@ function ThreadTree({ botName, nodes, depth, active, onOpen, providers }: { botN
 }
 
 function Row({ botName, thread, active, onOpen, providers }: { botName: string; thread: BotThreadView; depth: number; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[] }) {
-  const tone = threadStatusTone(thread.status, thread.needsYou);
+  // A question or approval holds it: waiting, the Bot's to handle.
+  const tone = threadStatusTone(thread.status, !!thread.waitingFor);
   return (
-    <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.title}
+    <button type="button" data-thread={thread.id} aria-current={active ? "true" : undefined} onClick={() => onOpen(thread.id)} title={thread.waitingFor ? `${thread.title} · ${thread.waitingFor}` : thread.title}
       draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover aria-[current]:bg-state-active">
-      <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} label={tone === "running" ? runningLabel(thread.runningSince) : undefined} />
+      <ProviderStatusMark providerId={thread.providerId} tone={tone} providers={providers} label={tone === "running" ? runningLabel(thread.runningSince) : thread.waitingFor ?? undefined} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" ? "text-muted-foreground" : ""}`}>{botItemName(thread.title, botName)}</span>
       {tone === "running" && thread.runningSince != null
         ? <Elapsed since={thread.runningSince} className="text-[11px] text-success" />
         : tone === "failed"
           ? <span className="shrink-0 text-[11px] text-destructive">failed</span>
-          : <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>}
+          : thread.waitingFor
+            ? <span className="shrink-0 text-[11px] text-muted-foreground">waiting</span>
+            : <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{age(thread.updatedAt)}</span>}
     </button>
-  );
-}
-
-/**
- * A Needs you row: the thread's mark and name, its reason in one muted line
- * under it, and its age; on hover a ✕ to mark it handled, which the
- * right-click menu also has (NeedsYou.tsx).
- */
-function NeedsYouRow({ botName, thread, active, onOpen, providers, onHandled }: { botName: string; thread: BotThreadView; active: boolean; onOpen(threadId: string): void; providers: readonly ProviderCatalogEntry[]; onHandled: MarkHandled }) {
-  const title = botItemName(thread.title, botName);
-  const handled = () => onHandled(thread, title);
-  return (
-    <NeedsYouMenu onOpen={() => onOpen(thread.id)} onHandled={handled}>
-      <div data-thread={thread.id} data-needs-you="" aria-current={active ? "true" : undefined}
-        className="group/needs flex w-full min-w-0 items-start rounded-md pr-1 hover:bg-state-hover aria-[current]:bg-state-active">
-        <button type="button" onClick={() => onOpen(thread.id)} title={thread.reason ? `${title}\n${thread.reason}` : title}
-          draggable onDragStart={(event) => { event.dataTransfer.setData(THREAD_DRAG, thread.id); event.dataTransfer.setData(BOT_THREAD_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; }}
-          className="flex min-w-0 flex-1 items-start gap-2 py-1 pl-2 text-left">
-          <span className="flex h-5 shrink-0 items-center"><ProviderStatusMark providerId={thread.providerId} tone="needs" providers={providers} /></span>
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[13px] leading-5">{title}</span>
-            {thread.reason ? <span data-testid="needs-you-reason" className="truncate text-[11px] leading-4 text-muted-foreground">{thread.reason}</span> : null}
-          </span>
-        </button>
-        <span className="flex h-7 shrink-0 items-center pl-1">
-          <span className="text-[11px] text-muted-foreground tabular-nums group-hover/needs:hidden group-focus-within/needs:hidden">{age(thread.updatedAt)}</span>
-          <HandledButton label={title} onClick={handled} className="hidden group-hover/needs:inline-flex group-focus-within/needs:inline-flex" />
-        </span>
-      </div>
-    </NeedsYouMenu>
   );
 }
 

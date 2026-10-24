@@ -9,8 +9,9 @@ export type ProviderCatalogEntry = ReturnType<typeof BbApp.experimental_useProvi
 
 const WORKING_THREAD_STATUSES = new Set(["active", "starting", "stopping"]);
 
-export function threadStatusTone(status: string, needsYou: boolean): ProviderStatusTone {
-  if (needsYou) return "needs";
+/** A thread's state; one held by a question or approval (its Bot's to handle) is waiting. */
+export function threadStatusTone(status: string, waitingForAnswer = false): ProviderStatusTone {
+  if (waitingForAnswer) return "waiting";
   if (WORKING_THREAD_STATUSES.has(status)) return "running";
   if (status === "pending") return "waiting";
   if (/error|fail/i.test(status)) return "failed";
@@ -23,8 +24,7 @@ export function providerRingState(tone: ProviderStatusTone): ProviderRingState {
 }
 
 /** A runner is running only while a run is going on; between runs it's idle, however active its schedule. */
-export function runnerStatusTone(state: "active" | "paused", urgent: boolean, running = false): ProviderStatusTone {
-  if (urgent) return "needs";
+export function runnerStatusTone(state: "active" | "paused", running = false): ProviderStatusTone {
   if (running && state === "active") return "running";
   return "idle";
 }

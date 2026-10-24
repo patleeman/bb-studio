@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RunnerView } from "../../contract";
 
 const state = vi.hoisted(() => ({ call: vi.fn(async (_method: string, _input: unknown) => ({})), check: { warnings: [] as string[], blocked: null as string | null, install: false, providerName: "Codex", machineName: "red4", signInHint: null as string | null } }));
-const runner: RunnerView = { id: "r1", name: "Files", job: "Check files", threadId: "t1", state: "active", adopted: false, schedule: { cadence: "daily", time: "09:00" }, nextRunAt: null, lastRunAt: null, lastLevel: null, lastReport: null, lastReportAt: null, urgent: false };
+const runner: RunnerView = { id: "r1", name: "Files", job: "Check files", threadId: "t1", state: "active", adopted: false, schedule: { cadence: "daily", time: "09:00" }, nextRunAt: null, lastRunAt: null, lastLevel: null, lastReport: null, lastReportAt: null };
 vi.mock("../live", () => ({
   useCall: () => state.call,
   useLive: (method: string) => ({ data: method === "bot_runners" ? { runners: [runner], adoptable: [] } : method === "bot_runner_machines" ? [{ id: "red", name: "red4", connected: true }] : state.check, loading: false, error: null, refresh: () => {} }),

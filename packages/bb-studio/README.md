@@ -1462,8 +1462,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   The list is Studio's thread list provider `studio/bot` ("Bot (Studio)" in
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the
-  threads it started: **Needs you**, **Running** (a thread that is running
-  or queued, or has one below it), **Runners**, **Schedule** (automations
+  threads it started: **Running** (a thread that is running, waiting on an
+  answer, or queued, or has one below it), **Runners**, **Schedule** (automations
   that wake it, other than its check-in), **Recent**, **Side threads** (on
   its replies), and **Earlier conversations** (its
   handoff chain, closed by default). A thread another of its threads started
@@ -1508,10 +1508,19 @@ of Staff", with the same thread and check-ins; rename it from its page.
   you open it. The ⋯ menu has Memory, Skills, Check-ins,
   Switch model, Pause / Resume and Stop. It also has **Open chat** (not on the
   chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
-  Activity: **Needs you**, **Running**, **Waiting to start**, **Scheduled**
+  Activity: **Running**, **Waiting to start**, **Scheduled**
   (its check-in and automations, with the next run) and **Recent** (the
-  last three, then Show all). A thread clicked in the Bots sidebar,
-  Activity or Needs you opens as a normal BB thread in the main pane.
+  last three, then Show all). A thread clicked in the Bots sidebar or
+  Activity opens as a normal BB thread in the main pane.
+- **The Bot is the triage layer** (docs/needs-you/REDO.md): runner
+  reports, urgent alerts, failures and its threads' questions go to the
+  Bot, which handles them or tells you in its own chat. There's no Needs
+  you list. The one signal is on the Bot's row: a dot, a count and why
+  ("Asked you a question", "1 thing for you") while its chat has a pending
+  question or approval, or replies you haven't read; it clears when you
+  read or answer the chat (`bot_activity`'s `attention`, `bot_attention`).
+  A thread the Bot started that waits on a question or approval shows
+  under Running as **waiting**; it's the Bot's to handle.
 
 ![Bot info with Dot's profile collapsed: avatar, name, active check-in status, description and Edit are visible.](assets/bot-info.png)
 
@@ -1612,8 +1621,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   "Resumed after BB turned it off (host disconnected) — 1 of 3 today": a
   runner's last report (log level), or a check-in's or watcher's last
   outcome and runs. At most three resumes per automation in a rolling 24
-  hours; past that it stays off and goes to the owning Bot's **Needs you**
-  with a phone push and one line in its chat (the urgent `runner_report`
+  hours; past that it stays off, with a phone push and one line in the
+  owning Bot's chat for the Bot to triage (the urgent `runner_report`
   path), once per failure, until it's on again. Studio checks at startup,
   on the five-minute sweep and shortly after a runner's or Bot's thread
   goes idle or fails; the plugin SDK has no automation events.
@@ -1631,8 +1640,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   deleted threads, threads of a paused or stopped Bot, threads whose host
   is still disconnected and anything with a newer event. Each interrupt is
   resumed once, at most twice per thread in a rolling hour; past that the
-  thread stays in error and, once, a Bot's thread goes to its **Needs you**
-  with a line in its chat and a phone push, and any other thread gets a
+  thread stays in error and, once, a Bot's thread gets a line in its Bot's
+  chat for the Bot to triage and a phone push, and any other thread gets a
   phone push (Studio Mobile). Studio checks 30 seconds after a thread
   fails, a few seconds after a host connects (`host:changed`), at startup
   once the first minute is past and on the five-minute sweep; it starts one
@@ -1941,9 +1950,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
     threads get: `log` stays in its thread and the Bot's Info; `tell` posts
     one line, "From runner <name>: …", into the Bot's thread (a message
     sent from the runner's thread, with an agent-only note telling the Bot
-    not to answer it); `urgent` is a tell plus **Needs you** and a phone push
+    not to answer it); `urgent` is a tell plus a phone push
     (Studio Mobile's `notify`, `turn-finished` on the Bot's thread, so the
-    lock screen has **Reply**). A run with nothing to report ends without a
+    lock screen has **Reply**), and its note asks the Bot to triage it:
+    handle it, tell you in its own words, or [PASS]. A runner has no
+    attention flag; its row shows only its state. A run with nothing to report ends without a
     message and produces nothing.
   - **No child notices**: BB posts "child completed / failed / needs
     attention" into a thread's `parentThreadId` (any non-fork child) and
@@ -1953,8 +1964,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     handoff archives the Bot's old thread). So runner threads are spawned
     with no parent or owner, tagged `pluginMetadata: { runner, bot }`, and
     `bot_runners` groups them under the Bot. They're kept out of Activity's
-    thread lists; an urgent report puts the thread in Needs you until you
-    open it.
+    thread lists.
   - **Not in BB's thread list**: a runner belongs to its Bot, so its thread
     lives only under the Bot (Runners) and is hidden from BB's main Threads
     list. Runners are spawned with `visibility: "hidden"`; an adopted thread
@@ -1987,8 +1997,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     Studio records each thread it hid (`bot_hidden_threads`) and hides a
     thread only once, so one you show again in BB, the Bot's chat included,
     stays visible. A hidden thread has no unread dot or attention in BB, so
-    a question the Bot asks in its chat reaches you through Activity's
-    **Needs you** (Studio reads its pending interactions). BB's thread
+    a question the Bot asks in its chat reaches you through the Bot's row
+    (Studio reads its pending interactions). BB's thread
     search skips hidden threads, so the Bot's history search does too.
   - **Sidebar**: a **Runners** group (status dot, next run; hover for the
     schedule and last report). A click opens the runner's thread as a

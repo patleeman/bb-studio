@@ -14,7 +14,6 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { Elapsed, ProviderStatusMark, runnerStatusTone, runningLabel, type ProviderCatalogEntry } from "./ProviderStatusMark";
 
 import { botItemName, runnerLastRun, sidebarTime, type RunnerOutcome } from "./sidebarAgenda";
-import { compactAge } from "./ThreadsSection";
 
 export type RunnersData = { runners: RunnerView[]; adoptable: RunnerAdoptableView[] };
 export const useRunners = (botId: string) => useLive("bot_runners", { botId }, { pollMs: 15_000 });
@@ -43,7 +42,7 @@ const OUTCOME_TEXT: Record<NonNullable<RunnerOutcome>, string> = { paused: "text
 /** The runner's state, the same in the sidebar and Bot info: running only mid-run; failed when its last run did. */
 export function runnerTone(runner: RunnerView) {
   if (runner.machineOffline) return "waiting" as const;
-  const tone = runnerStatusTone(runner.state, runner.urgent, runner.running);
+  const tone = runnerStatusTone(runner.state, runner.running);
   return tone === "idle" && runner.state === "active" && runnerLastRun(runner).failed ? "failed" as const : tone;
 }
 
@@ -51,7 +50,6 @@ export function runnerTone(runner: RunnerView) {
 export function runnerSummary(runner: RunnerView): { label: string; next: string | null; outcome: RunnerOutcome } {
   const last = runnerLastRun(runner);
   if (runner.machineOffline) return { label: `${runner.machineName ?? "Its machine"} is offline`, next: null, outcome: null };
-  if (runner.urgent) return { label: "Waiting for you", next: null, outcome: null };
   if (runner.state === "paused") return { label: "Paused", next: null, outcome: "paused" };
   const outcome = last.outcome === "paused" ? null : last.outcome;
   const next = runner.nextRunAt ? sidebarTime(runner.nextRunAt) : null;
@@ -63,8 +61,6 @@ export function runnerSummary(runner: RunnerView): { label: string; next: string
 function RunnerState({ runner, running }: { runner: RunnerView; running: boolean }) {
   if (running) return runner.runningSince ? <Elapsed since={runner.runningSince} className="text-success" /> : <span className="shrink-0 text-success">running</span>;
   if (runner.machineOffline) return <span className="shrink-0 text-warning">offline</span>;
-  // Waiting for you: the urgent report's age, as on a thread that needs you.
-  if (runner.urgent && runner.lastReportAt) return <span className="shrink-0 tabular-nums text-muted-foreground">{compactAge(runner.lastReportAt)}</span>;
   const summary = runnerSummary(runner);
   if (summary.outcome === "paused") return <span className="shrink-0 text-muted-foreground">paused</span>;
   return (
@@ -105,13 +101,10 @@ function RunnerStatusLine({ runner }: { runner: RunnerView }) {
   );
 }
 
-/** Opens a runner's thread; an urgent report counts as seen. */
-export function useOpenRunner(botId: string, open: (threadId: string) => void, refresh: () => void) {
-  const call = useCall();
+/** Opens a runner's thread. */
+export function useOpenRunner(open: (threadId: string) => void) {
   return (runner: RunnerView) => {
-    if (!runner.threadId) return;
-    open(runner.threadId);
-    if (runner.urgent) void call("bot_runner_seen", { botId, id: runner.id }).then(refresh, () => {});
+    if (runner.threadId) open(runner.threadId);
   };
 }
 
@@ -124,7 +117,7 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const open = useOpenRunner(botId, onOpen, data.refresh);
+  const open = useOpenRunner(onOpen);
   const run = async <M extends Method,>(method: M, input: RpcInput<M>) => {
     setBusy(true); setError(null);
     try { await call(method, { ...input, botId }); setSheet(null); data.refresh(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
