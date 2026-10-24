@@ -7,6 +7,7 @@ import { cn } from "./utils";
 import { MenuHoverProvider, useMenuItemHover } from "./menu-item-hover";
 import { LIST_HOVER_TRANSITION } from "./motion";
 import { usePortalScopeProps } from "./portal-scope";
+import { Icon } from "./icon";
 
 const MENU_ITEM_NEUTRAL_STATE_CLASS =
   "focus:bg-state-hover focus:text-foreground data-[last-hovered]:bg-state-hover data-[last-hovered]:text-foreground";
@@ -85,7 +86,7 @@ DropdownMenuItem.displayName = "DropdownMenuItem";
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ComponentRef<typeof DropdownMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
@@ -94,7 +95,11 @@ const DropdownMenuSubTrigger = React.forwardRef<
       className,
     )}
     {...props}
-  />
+  >
+    {children}
+    {/* The submenu's chevron, as BB's own menus draw it. */}
+    <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" aria-hidden />
+  </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
 
