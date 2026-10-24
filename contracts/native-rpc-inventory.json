@@ -494,6 +494,18 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/BotThreads.swift",
+      "plugin": "studio",
+      "method": "bot_needs_you_dismiss",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BotThreads.swift",
+      "plugin": "studio",
+      "method": "bot_needs_you_restore",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/Shared/Dashboards.swift",
       "plugin": "studio",
       "method": "dashboards.get",

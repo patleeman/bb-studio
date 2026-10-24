@@ -64,6 +64,64 @@ final class BotThreadsTests: XCTestCase {
         XCTAssertEqual(BotThreadGroups.rows(groups.recent).map(\.id), ["p", "c"])
     }
 
+    // MARK: Needs you reasons and Mark handled
+
+    private let needsYouJSON = """
+    {"needsYou":[{"id":"run","title":"Security · Runner","status":"idle","relation":"started","needsYou":true,"updatedAt":30,"reason":"Urgent report: SSH on red4 accepts passwords again"},
+                 {"id":"ask","title":"Approve deploy to prod","status":"active","relation":"started","needsYou":true,"updatedAt":20,"reason":"Waiting for approval"},
+                 {"id":"old","title":"Older Studio","status":"active","relation":"started","needsYou":true,"updatedAt":10}],
+     "inProgress":[],"scheduled":[],"completed":[]}
+    """
+
+    func testNeedsYouReasonDecodesAndStaysInTheGroup() throws {
+        let activity = try activity(needsYouJSON)
+        XCTAssertEqual(activity.needsYou.map(\.reason), ["Urgent report: SSH on red4 accepts passwords again", "Waiting for approval", nil])
+        let groups = BotThreadGroups(activity)
+        XCTAssertEqual(groups.needsYou.map(\.id), ["run", "ask", "old"])
+        XCTAssertEqual(groups.needsYou.first?.reason, "Urgent report: SSH on red4 accepts passwords again")
+    }
+
+    func testHandledItemsHideUntilTheServerDropsThem() throws {
+        let before = try activity(needsYouJSON)
+        var handled = BotHandledItems()
+        handled.mark("run")
+        XCTAssertEqual(handled.last, "run")
+        // Hidden at once, while the server still lists it.
+        XCTAssertEqual(BotThreadGroups(before, hiding: handled.hidden).needsYou.map(\.id), ["ask", "old"])
+        handled.settle(before)
+        XCTAssertEqual(handled.hidden, ["run"])
+        // Once the Activity drops it, nothing is left to hide, and Undo is still offered.
+        let after = try activity(needsYouJSON.replacingOccurrences(of: #""id":"run""#, with: #""id":"gone""#))
+        handled.settle(after)
+        XCTAssertEqual(handled.hidden, [])
+        XCTAssertEqual(handled.last, "run")
+        handled.settle(nil)
+        XCTAssertEqual(handled.last, "run")
+    }
+
+    func testHandledUndoFailureAndExpiry() {
+        var handled = BotHandledItems()
+        handled.mark("a")
+        handled.mark("b")
+        // Undo restores the last one marked; a second Undo has nothing to do.
+        XCTAssertEqual(handled.undo(), "b")
+        XCTAssertEqual(handled.hidden, ["a"])
+        XCTAssertNil(handled.last)
+        XCTAssertNil(handled.undo())
+        // A refused dismiss shows the row again with no Undo.
+        handled.mark("c")
+        handled.failed("c")
+        XCTAssertEqual(handled.hidden, ["a"])
+        XCTAssertNil(handled.last)
+        // The offer runs out, but only for the item it was made for.
+        handled.mark("d")
+        handled.expire("a")
+        XCTAssertEqual(handled.last, "d")
+        handled.expire("d")
+        XCTAssertNil(handled.last)
+        XCTAssertEqual(handled.hidden, ["a", "d"])
+    }
+
     func testParentCycleDoesNotLoop() throws {
         let activity = try activity("""
         {"needsYou":[],"inProgress":[],"scheduled":[],

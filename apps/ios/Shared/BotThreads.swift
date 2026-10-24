@@ -48,6 +48,59 @@ extension BBClient {
     public func markRunnerSeen(_ id: String, botId: String? = nil) async throws {
         let _: JSONValue = try await rpc("studio", Studio.Method.bot_runner_seen, Self.scoped(botId, ["id": .string(id)]))
     }
+
+    /// Mark handled: the item leaves Needs you until its signal changes (`bot_needs_you_dismiss`).
+    public func dismissNeedsYou(_ threadId: String, botId: String? = nil) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.bot_needs_you_dismiss, Self.scoped(botId, ["threadId": .string(threadId)]))
+    }
+
+    /// Undo for Mark handled: the item is back in Needs you (`bot_needs_you_restore`).
+    public func restoreNeedsYou(_ threadId: String, botId: String? = nil) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.bot_needs_you_restore, Self.scoped(botId, ["threadId": .string(threadId)]))
+    }
+}
+
+/// Needs you items marked handled on this device: hidden at once, before the
+/// server's Activity drops them, and the last one kept for Undo. Pure, so it's tested.
+public struct BotHandledItems: Equatable, Sendable {
+    /// Hidden from Needs you until the server's Activity stops listing them.
+    public private(set) var hidden: Set<String> = []
+    /// The last one marked handled, while its Undo is offered.
+    public private(set) var last: String?
+
+    public init() {}
+
+    /// Mark handled: hide it and offer Undo.
+    public mutating func mark(_ id: String) {
+        hidden.insert(id)
+        last = id
+    }
+
+    /// The server refused: show it again, with no Undo.
+    public mutating func failed(_ id: String) {
+        hidden.remove(id)
+        if last == id { last = nil }
+    }
+
+    /// Undo: the item to restore, shown again once the server lists it.
+    public mutating func undo() -> String? {
+        guard let id = last else { return nil }
+        hidden.remove(id)
+        last = nil
+        return id
+    }
+
+    /// The Undo offer ran out.
+    public mutating func expire(_ id: String) {
+        if last == id { last = nil }
+    }
+
+    /// Forget what the server no longer lists in Needs you; keep hiding the rest.
+    public mutating func settle(_ activity: BotActivity?) {
+        guard let activity else { return }
+        let listed = Set(activity.needsYou.map(\.id))
+        hidden.formIntersection(listed)
+    }
 }
 
 /// The Bot's threads in the desktop sidebar's groups.
@@ -79,7 +132,8 @@ public struct BotThreadGroups: Equatable, Sendable {
     /// Desktop `sidebarGroups`: Running, Waiting to start and Recent are trees, a thread under
     /// the thread that started it at any depth, placed by its root. A
     /// childless thread that needs the user is only under Needs you.
-    public init(_ activity: BotActivity?) {
+    /// `hiding` leaves out Needs you items marked handled that the server still lists.
+    public init(_ activity: BotActivity?, hiding: Set<String> = []) {
         guard let activity else { return }
         func started(_ list: [BotActivity.Thread]) -> [BotActivity.Thread] { list.filter { $0.relation == "started" } }
         let pending = activity.waiting ?? []
@@ -119,7 +173,7 @@ public struct BotThreadGroups: Equatable, Sendable {
         }
         // A thread waiting on the user is already under Needs you; it stays in a tree only to hold its children.
         .filter { !$0.thread.needsYou || !$0.children.isEmpty }
-        needsYou = started(activity.needsYou)
+        needsYou = started(activity.needsYou).filter { !hiding.contains($0.id) }
         running = trees.filter(hasRunning)
         waiting = trees.filter { !hasRunning($0) && hasQueued($0) }
         recurring = activity.scheduled.filter { $0.kind == "automation" }

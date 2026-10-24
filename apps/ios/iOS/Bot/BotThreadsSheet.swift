@@ -3,8 +3,10 @@ import SwiftUI
 /// The threads under a Bot, as on the desktop Bots sidebar: Needs you,
 /// Running, Runners, Recurring, Recent and Earlier conversations, a thread
 /// nested under the thread that started it, each with its status dot. A tap
-/// opens the thread. It refreshes with the Bot tab's Activity (BB's thread
-/// changes) and on pull; it adds no timers.
+/// opens the thread. A Needs you row says why in a muted second line, and
+/// swipes (or holds) to Mark handled, with Undo for a few seconds. It
+/// refreshes with the Bot tab's Activity (BB's thread changes) and on pull;
+/// it adds no timers.
 struct BotThreadsSheet: View {
     let bot: BotInfo?
     var botId: String? = nil
@@ -20,6 +22,9 @@ struct BotThreadsSheet: View {
     @State private var chain = BotChainThreads()
     @State private var runnerBusy: String?
     @State private var runnerError: String?
+    /// Needs you items marked handled here, hidden until the Activity drops them.
+    @State private var handled = BotHandledItems()
+    @State private var needsYouError: String?
     /// Collapsed groups, as on desktop; Earlier conversations starts closed.
     @AppStorage("bot.threads.closed") private var closedGroups = "earlier"
 
@@ -27,7 +32,7 @@ struct BotThreadsSheet: View {
 
     var body: some View {
         NavigationStack {
-            let groups = BotThreadGroups(activity)
+            let groups = BotThreadGroups(activity, hiding: handled.hidden)
             let earlier = chain.earlier(current: bot?.lead.threadId)
             List {
                 if embedded, let id = bot?.lead.threadId {
@@ -40,9 +45,10 @@ struct BotThreadsSheet: View {
                         .modifier(SidebarRowContent(enabled: embedded))
                     }
                 }
-                if !groups.needsYou.isEmpty {
+                if !groups.needsYou.isEmpty || needsYouError != nil {
                     group("needs", "Needs you", badge: groups.needsYou.count) {
-                        ForEach(groups.needsYou) { threadRow($0, depth: 0) }
+                        ForEach(groups.needsYou) { needsYouRow($0) }
+                        if let needsYouError { Text(needsYouError).font(.footnote).foregroundStyle(.red) }
                     }
                 }
                 if !groups.running.isEmpty {
@@ -85,6 +91,9 @@ struct BotThreadsSheet: View {
             .listStyle(.sidebar)
             .modifier(SidebarListMargins(enabled: embedded))
             .overlay { if activity == nil { ProgressView() } }
+            .overlay(alignment: .bottom) { if let id = handled.last { undoBanner(id) } }
+            .animation(.snappy, value: handled)
+            .onChange(of: activity) { handled.settle(activity) }
             .refreshable { await refresh(); await loadRunners(); await loadChain() }
             .task { await loadChain() }
             // Runners follow the Activity, which BB's thread changes refresh.
@@ -136,21 +145,41 @@ struct BotThreadsSheet: View {
 
     // MARK: Rows
 
-    private func threadRow(_ thread: BotActivity.Thread, depth: Int) -> some View {
+    /// A Needs you row: its reason under the title, and Mark handled.
+    private func needsYouRow(_ thread: BotActivity.Thread) -> some View {
+        threadRow(thread, depth: 0, reason: thread.reason)
+            .swipeActions(edge: .trailing) {
+                Button { markHandled(thread) } label: { Label("Mark handled", systemImage: "checkmark") }
+                    .tint(.accentColor)
+            }
+            .contextMenu {
+                Button { markHandled(thread) } label: { Label("Mark handled", systemImage: "checkmark") }
+            }
+            .accessibilityAction(named: "Mark handled") { markHandled(thread) }
+    }
+
+    private func threadRow(_ thread: BotActivity.Thread, depth: Int, reason: String? = nil) -> some View {
         let tone = BotThreadTone(thread)
         let state = BotRowState(tone, since: thread.runningSince)
         let age = BotAge.label(thread.updatedAt)
+        let reason = reason.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         return Button { open(thread.id) } label: {
-            HStack(spacing: 10) {
+            HStack(alignment: reason == nil ? .center : .firstTextBaseline, spacing: 10) {
                 if depth > 0 {
                     Image(systemName: "arrow.turn.down.right")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
                 BotRowMark(state: state, providerId: thread.providerId, dimmed: state == .queued)
-                Text(thread.title.isEmpty ? "Untitled" : thread.title)
-                    .lineLimit(1)
-                    .foregroundStyle(tone == .idle || tone == .waiting ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(thread.title.isEmpty ? "Untitled" : thread.title)
+                        .lineLimit(1)
+                        .foregroundStyle(tone == .idle || tone == .waiting ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    if let reason {
+                        Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 8)
                 BotRowTrailing(state: state, fallback: age)
             }
@@ -159,7 +188,7 @@ struct BotThreadsSheet: View {
         .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(thread.title), \(BotRowTrailing.spoken(state, tone: tone)), \(age)")
+        .accessibilityLabel([thread.title, BotRowTrailing.spoken(state, tone: tone), reason, age].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint(depth > 0 ? "Started by the thread above. Opens the thread" : "Opens the thread")
         .accessibilityAddTraits(.isButton)
     }
@@ -250,6 +279,65 @@ struct BotThreadsSheet: View {
         .modifier(SidebarRowContent(enabled: embedded))
         .foregroundStyle(.primary)
         .accessibilityHint("Opens an earlier conversation")
+    }
+
+    /// "Marked handled · Undo", over the bottom of the list for a few seconds.
+    private func undoBanner(_ id: String) -> some View {
+        HStack(spacing: 12) {
+            Label("Marked handled", systemImage: "checkmark.circle.fill")
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            Button("Undo") { undoHandled() }
+                .font(.subheadline.weight(.semibold))
+                .accessibilityHint("Puts it back in Needs you")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.bottom, 12)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .task(id: id) {
+            try? await Task.sleep(for: .seconds(5))
+            if !Task.isCancelled { handled.expire(id) }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Mark handled
+
+    /// Hides the row at once, then tells the server; a refusal puts it back.
+    private func markHandled(_ thread: BotActivity.Thread) {
+        handled.mark(thread.id)
+        needsYouError = nil
+        Task {
+            do {
+                try await needsYouCall(thread.id, dismiss: true)
+                await refresh()
+            } catch {
+                handled.failed(thread.id)
+                needsYouError = BBClient.describe(error, server: app.client.baseURL)
+            }
+        }
+    }
+
+    private func undoHandled() {
+        guard let id = handled.undo() else { return }
+        needsYouError = nil
+        Task {
+            do {
+                try await needsYouCall(id, dismiss: false)
+            } catch {
+                needsYouError = BBClient.describe(error, server: app.client.baseURL)
+            }
+            await refresh()
+        }
+    }
+
+    private func needsYouCall(_ id: String, dismiss: Bool) async throws {
+        #if DEBUG
+        if BotDemo.current != nil { BotDemo.setHandled(id, dismiss); return }
+        #endif
+        if dismiss { try await app.client.dismissNeedsYou(id, botId: botId) }
+        else { try await app.client.restoreNeedsYou(id, botId: botId) }
     }
 
     // MARK: Loading

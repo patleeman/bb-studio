@@ -4,6 +4,8 @@ import Foundation
 /// Debug builds: `-qaBotDemo chat|working|needs|onboarding|list` fills the Bot tab
 /// with a deterministic local Bot, chat and Activity, for screenshots without
 /// a server. `-qaBotSheet activity|profile` opens a sheet over it.
+/// `-qaNeedsYou` puts three items with reasons under Needs you, and Mark
+/// handled and Undo work on them locally.
 enum BotDemo {
     static let threadId = "thr_botdemo01"
 
@@ -325,10 +327,30 @@ enum BotDemo {
         decode(#"[{"id":"int_demo1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"approval","subject":{"kind":"command","command":"git push origin release/1.4","cwd":"~/code/app"},"reason":"Push the release workflow fix","availableDecisions":["allow_once","deny"]}}]"#)
     }
 
+    /// Needs you items marked handled in this launch (`-qaNeedsYou`).
+    @MainActor static func setHandled(_ id: String, _ handled: Bool) {
+        if handled { handledIds.insert(id) } else { handledIds.remove(id) }
+    }
+    nonisolated(unsafe) private static var handledIds: Set<String> = []
+
+    /// `-qaNeedsYou`: an urgent runner, an approval and a question, each with its reason.
+    private static func needsYouItems(_ t: Double) -> String {
+        let items = [
+            ("thr_runsecurity", "claude-code", "Security · Runner", "Urgent report: SSH on red4 accepts passwords again", t - 240_000),
+            ("thr_deployprod", "codex", "Approve deploy to prod", "Waiting for approval", t - 1_500_000),
+            ("thr_venue0001", "claude-code", "Pick a venue for Friday", "Asked you a question", t - 7_800_000),
+        ].filter { !handledIds.contains($0.0) }
+        return "[" + items.map { id, provider, title, reason, at in
+            #"{"id":"\#(id)","providerId":"\#(provider)","title":"\#(title)","status":"idle","relation":"started","needsYou":true,"updatedAt":\#(at),"reason":"\#(reason)"}"#
+        }.joined(separator: ",") + "]"
+    }
+
     private static func activity(needs: Bool) -> BotActivity {
         let t = now
+        let needsYou = ProcessInfo.processInfo.arguments.contains("-qaNeedsYou") ? needsYouItems(t)
+            : needs ? #"[{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"
         return decode(#"""
-        {"needsYou":\#(needs ? #"[{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"active","relation":"started","needsYou":true,"updatedAt":\#(t)}]"# : "[]"),
+        {"needsYou":\#(needsYou),
          "waiting":[{"id":"thr_waiting01","providerId":"codex","title":"Summarize inbox","status":"pending","relation":"started","needsYou":false,"updatedAt":\#(t - 120000)}],
          "inProgress":[{"id":"thr_research1","providerId":"claude-code","title":"Lisbon offsite options","status":"active","relation":"started","needsYou":false,"updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":\#(t + 50400000)},
