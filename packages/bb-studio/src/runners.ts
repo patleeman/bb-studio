@@ -8,7 +8,10 @@ import { resolveRunnerMachine, runnerMachineCheck, runnerEnvironment, RunnerPref
 // runner_report (runner threads only):
 //   log    → stays in the runner thread and the Bot's Activity;
 //   tell   → one "From runner X:" line in the Bot's thread;
-//   urgent → tell, plus Needs you and a phone push (Studio Mobile's notify).
+//   urgent → tell, plus a phone push (Studio Mobile's notify).
+// The Bot triages every line (docs/needs-you/REDO.md): it handles it, or
+// tells the user in its own chat. A runner has no attention flag of its own;
+// its row shows only its state.
 // A run with nothing to report ends with exactly [PASS] (docs/silent-output.md)
 // and produces nothing.
 //
@@ -38,7 +41,6 @@ import type { HeartbeatRun, RunnerAdoptableView, RunnerView } from "./contract";
 import { automationName } from "./automation-names";
 import { heartbeatRunSchema } from "./contract";
 import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
-import { urgentReason, urgentSettled, type UrgentKind } from "./needs-you";
 import { turnStartedAt } from "./turn-started";
 
 type Sdk = BbPluginApi["sdk"];
@@ -51,8 +53,6 @@ type RunnerRow = {
   id: string; bot_id: string; name: string; job: string; thread_id: string | null; project_id: string; state: "active" | "paused";
   cadence: HeartbeatRun["cadence"]; time: string; cron: string | null; timezone: string | null; automation_id: string | null; automation_project_id: string | null; adopted: number;
   last_run_at: number | null; last_level: RunnerLevel | null; last_report: string | null; last_report_at: number | null; urgent: number;
-  /** The urgent report that put it in Needs you: when, what, why, and the sequence of the turn request that made it (docs/needs-you/REDO.md). */
-  urgent_at: number | null; urgent_report: string | null; urgent_kind: UrgentKind | null; urgent_turn: number | null;
   /** 1 once Studio made the thread hidden. */
   hidden: number; cleanup_pending: number; machine: string | null; machine_name: string | null; machine_offline: number; machine_suspended: number;
   created_at: number; updated_at: number;
@@ -73,7 +73,7 @@ export function runnerPrompt(runner: { name: string; job: string }): string {
 }
 
 /** How a runner reports; short, given every run and every session. */
-export const RUNNER_RULES = "Report only through runner_report: level log (kept here and in the Bot's Activity), tell (one short line to the user via the Bot), urgent (also Needs you and a phone push; only when the user must act now). Nothing new, or after reporting: reply exactly [PASS], no ✓ or summary. Never message the Bot's thread yourself.";
+export const RUNNER_RULES = "Report only through runner_report: level log (kept here and in the Bot's Activity), tell (one short line to the user via the Bot), urgent (also a phone push, and the Bot decides whether to bring it to the user; only when the user must act now). Nothing new, or after reporting: reply exactly [PASS], no ✓ or summary. Never message the Bot's thread yourself.";
 
 /** A runner thread's instructions at each session start. */
 export function runnerInstructions(runner: { name: string; job: string; state: string }, botName: string): string {
@@ -300,9 +300,9 @@ export class Runners {
     return new Set((this.deps.db.prepare("SELECT thread_id FROM bot_runners WHERE thread_id IS NOT NULL").all() as { thread_id: string }[]).map((row) => row.thread_id));
   }
 
-  /** Runner threads, with whether an urgent report waits on the user. */
-  threads(botId?: string): Map<string, { urgent: boolean }> {
-    return new Map(this.rows(botId).flatMap((row) => row.thread_id ? [[row.thread_id, { urgent: !!row.urgent }] as const] : []));
+  /** A Bot's runner threads. */
+  threads(botId?: string): Set<string> {
+    return new Set(this.rows(botId).flatMap((row) => row.thread_id ? [row.thread_id] : []));
   }
 
   /** A Bot's own chat (any Bot's, handed-off ones included): src/bot-owned.ts hides it, not a runner. */
@@ -375,7 +375,7 @@ export class Runners {
       nextRunAt: state === "active" ? automation?.nextRunAt ?? null : null,
       lastRunAt: Math.max(automation?.lastRunAt ?? 0, row.last_run_at ?? 0) || null,
       lastRunStatus: automation?.lastRunStatus ?? null,
-      lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at, urgent: !!row.urgent,
+      lastLevel: row.last_level, lastReport: row.last_report, lastReportAt: row.last_report_at,
     };
   }
 
@@ -613,59 +613,10 @@ export class Runners {
     }
   }
 
-  /** The user saw an urgent report, or marked it handled: it leaves Needs you. */
-  seen(id: string, botId?: string): void {
-    const row = this.row(id, botId);
-    if (row.urgent) this.changedRow(row.id, { urgent: 0 });
-  }
-
-  /** Undo of seen (Mark handled's Undo): the last urgent report is back in Needs you. */
-  unseen(id: string, botId?: string): void {
-    const row = this.row(id, botId);
-    if (!row.urgent && row.urgent_at != null) this.changedRow(row.id, { urgent: 1 });
-  }
-
-  /** The sequence of the thread's latest turn request: which run an urgent report came from. */
-  private async lastTurn(threadId: string): Promise<number | null> {
-    const events = await this.events(threadId, ["client/turn/requested"], 1);
-    return events[0]?.seq ?? null;
-  }
-
-  /** A runner thread's latest events of `types`, newest first; none when BB can't say. */
-  private async events(threadId: string, types: string[], limit: number): Promise<{ seq?: number; type: string; createdAt?: number; data?: unknown }[]> {
-    try {
-      return await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: String(limit), types: types as never }) as { seq?: number; type: string }[];
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * A runner thread in Needs you: its reason line, or null once the user read
-   * the thread after the report, replied there, or a later run finished
-   * (src/needs-you.ts); then the flag clears. `thread` is the thread as BB
-   * lists it (for lastReadAt).
-   */
-  async needsYou(threadId: string, thread: { lastReadAt?: number | null } | null): Promise<string | null> {
-    const row = this.forThread(threadId);
-    if (!row?.urgent) return null;
-    // Flagged before Studio kept the report's time: its last urgent report's.
-    const at = row.urgent_at ?? (row.last_level === "urgent" ? row.last_report_at : null);
-    const reason = urgentReason(row.urgent_kind, row.urgent_report ?? row.last_report);
-    if (at == null) return reason;
-    const events = thread?.lastReadAt != null && thread.lastReadAt >= at ? [] : await this.events(threadId, ["client/turn/requested", "turn/completed"], 100);
-    if (urgentSettled({ at, turn: row.urgent_turn }, thread, events)) {
-      this.changedRow(row.id, { urgent: 0 });
-      return null;
-    }
-    return reason;
-  }
-
   /**
    * runner_report from a runner's thread. log stays here; tell posts one line
-   * into the Bot's thread; urgent also goes to Needs you and the phone.
-   * An urgent flag stays until the user reads or answers it, marks it
-   * handled, or a later run reports log or tell (or ends [PASS]; needsYou).
+   * into the Bot's thread; urgent also pushes to the phone and asks the Bot
+   * to triage it. Nothing waits on the user here: the Bot decides.
    */
   async report(threadId: string, input: { level: RunnerLevel; summary: string }): Promise<string> {
     const row = this.forThread(threadId);
@@ -674,14 +625,7 @@ export class Runners {
     const now = Date.now();
     this.deps.db.prepare("INSERT INTO runner_reports(runner_id, summary) VALUES (?, ?)").run(row.id, summary);
     this.deps.db.prepare("DELETE FROM runner_reports WHERE runner_id = ? AND id NOT IN (SELECT id FROM runner_reports WHERE runner_id = ? ORDER BY id DESC LIMIT 3)").run(row.id, row.id);
-    const turn = input.level === "urgent" || row.urgent ? await this.lastTurn(threadId) : null;
-    // A log or tell from a later run than the urgent one: that one's over.
-    // (The same run reporting again doesn't count.)
-    const later = input.level !== "urgent" && !!row.urgent && (turn == null || row.urgent_turn == null || turn > row.urgent_turn);
-    this.changedRow(row.id, {
-      last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now,
-      ...(input.level === "urgent" ? { urgent: 1, urgent_at: now, urgent_report: summary, urgent_kind: "report" as const, urgent_turn: turn } : later ? { urgent: 0 } : {}),
-    });
+    this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now });
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
@@ -689,10 +633,10 @@ export class Runners {
     return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
   }
 
-  /** A tell or urgent report's line in the Bot's thread; urgent also pushes to the phone. */
+  /** A tell or urgent report's line in the Bot's thread; urgent also pushes to the phone, and the Bot triages it. */
   private async tell(row: RunnerRow, level: "tell" | "urgent", summary: string, bot: RunnerBot & { threadId: string }): Promise<void> {
     await alertBot(this.deps.sdk, {
-      botThreadId: bot.threadId, senderThreadId: row.thread_id, line: tellLine(row.name, level, summary),
+      botThreadId: bot.threadId, senderThreadId: row.thread_id, line: tellLine(row.name, level, summary), ...(level === "urgent" ? { note: TRIAGE_NOTE } : {}),
       push: level === "urgent" ? { title: `${bot.name} · ${row.name}`, body: summary, coalesceKey: `runner:${row.id}` } : null,
     });
   }
@@ -711,13 +655,11 @@ export class Runners {
     this.changedRow(id, { last_level: "log", last_report: summary, last_report_at: Date.now() });
   }
 
-  /** Studio's own urgent report for a runner (auto-resume past its cap): Needs you, the phone and one line in the Bot's chat. */
+  /** Studio's own urgent report for a runner (auto-resume past its cap): the phone, and one line in the Bot's chat for it to triage. */
   async alert(id: string, summary: string): Promise<void> {
     const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
     if (!row) return;
-    const now = Date.now();
-    const turn = row.thread_id ? await this.lastTurn(row.thread_id) : null;
-    this.changedRow(row.id, { last_level: "urgent", last_report: summary, last_report_at: now, urgent: 1, urgent_at: now, urgent_report: summary, urgent_kind: "failed", urgent_turn: turn });
+    this.changedRow(row.id, { last_level: "urgent", last_report: summary, last_report_at: Date.now() });
     const bot = this.deps.bot(row.bot_id);
     if (bot?.threadId) await this.tell(row, "urgent", summary, bot as RunnerBot & { threadId: string });
   }
@@ -773,6 +715,12 @@ export class Runners {
     return this.one(id);
   }
 }
+
+/**
+ * The agent-only note on an urgent line: the Bot is the triage layer. The
+ * user hears about it from the Bot, in its own words, only when they must act.
+ */
+export const TRIAGE_NOTE = "Urgent report. You decide what the user sees: if you can handle it yourself, do. If the user must act, tell them in one or two short lines what happened and what to do. If it needs nothing from them, reply exactly [PASS].";
 
 /**
  * One line in a Bot's thread the user reads as is (runner reports, Studio's

@@ -35,7 +35,7 @@ export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./e
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
 import { turnStartedAt } from "./turn-started";
-import { failedReason, interactionReason, pendingInteractions, readSince } from "./needs-you";
+import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
 import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
 
@@ -237,19 +237,16 @@ function providerName(providerId: string | null | undefined): string {
   return (providerId && names[providerId]) ?? externalName(providerId);
 }
 
-type Interaction = { id?: string; status?: string; payload?: { kind?: string } | null };
-
-/** A Needs-you item's state as one string: its pending interactions and its latest failure alert. */
-function signalKey(interactions: readonly { id?: string }[], alertsAt: number): string {
-  return `${interactions.map((each) => each.id ?? "").sort().join(",")}|${alertsAt}`;
-}
-
-/** Sorts threads into the Bot's Activity. Pending interactions win; then running; then queued; the rest are done. */
-export function classifyActivity(threads: readonly ActivityThread[], botThreadId: string | null, limit = 15): Pick<BotActivityView, "needsYou" | "inProgress" | "waiting" | "completed"> {
+/**
+ * Sorts threads into the Bot's Activity: running (with threads waiting on an
+ * answer, which the Bot owns), then queued; the rest are done. Nothing here
+ * waits on the user: the Bot does (src/bot-attention.ts).
+ */
+export function classifyActivity(threads: readonly ActivityThread[], botThreadId: string | null, limit = 15): Pick<BotActivityView, "inProgress" | "waiting" | "completed"> {
   // A thread started by another listed thread nests under it; the rest hang off the Bot.
   const listed = new Set(threads.map((thread) => thread.id).filter((id) => id !== botThreadId));
   const parentOf = (thread: ActivityThread) => [thread.parentThreadId, thread.sourceThreadId, thread.lifecycleOwnerThreadId].find((id) => !!id && id !== thread.id && listed.has(id)) ?? null;
-  const view = (thread: ActivityThread): BotThreadView & { queued: boolean } => ({
+  const view = (thread: ActivityThread): BotThreadView & { queued: boolean; answer: boolean } => ({
     id: thread.id,
     title: thread.title || thread.titleFallback || "Untitled thread",
     status: thread.status,
@@ -257,19 +254,20 @@ export function classifyActivity(threads: readonly ActivityThread[], botThreadId
     projectId: thread.projectId ?? null,
     updatedAt: thread.updatedAt ?? 0,
     relation: thread.id === botThreadId ? "self" : "started",
-    needsYou: !!thread.hasPendingInteraction,
+    answer: !!thread.hasPendingInteraction,
     parentId: thread.id === botThreadId ? null : parentOf(thread),
     queued: thread.status === "pending" || (thread.queuedWork === "waiting" && !WORKING.has(thread.status)),
   });
   const seen = new Set<string>();
   const unique = threads.filter((thread) => !thread.archivedAt && !seen.has(thread.id) && !!seen.add(thread.id)).map(view);
   const newest = (a: BotThreadView, b: BotThreadView) => b.updatedAt - a.updatedAt;
-  const strip = ({ queued: _queued, ...thread }: BotThreadView & { queued: boolean }): BotThreadView => thread;
-  const needsYou = unique.filter((thread) => thread.needsYou).sort(newest).map(strip);
-  const waiting = unique.filter((thread) => !thread.needsYou && thread.queued).sort(newest).map(strip);
-  const inProgress = unique.filter((thread) => !thread.needsYou && !thread.queued && WORKING.has(thread.status)).sort(newest).map(strip);
-  const completed = unique.filter((thread) => !thread.needsYou && !thread.queued && !WORKING.has(thread.status) && thread.relation === "started").sort(newest).slice(0, limit).map(strip);
-  return { needsYou, inProgress, waiting, completed };
+  const strip = ({ queued: _queued, answer, ...thread }: BotThreadView & { queued: boolean; answer: boolean }): BotThreadView => answer ? { ...thread, waitingFor: "Waiting for an answer" } : thread;
+  // A question or approval holds the thread's turn open: it's still going.
+  const live = (thread: { status: string; answer: boolean }) => thread.answer || WORKING.has(thread.status);
+  const waiting = unique.filter((thread) => !thread.answer && thread.queued).sort(newest).map(strip);
+  const inProgress = unique.filter((thread) => !(thread.queued && !thread.answer) && live(thread)).sort(newest).map(strip);
+  const completed = unique.filter((thread) => !thread.queued && !live(thread) && thread.relation === "started").sort(newest).slice(0, limit).map(strip);
+  return { inProgress, waiting, completed };
 }
 
 /** Threads in `threads` started (at any depth) by one of `roots`, not including the roots. */
@@ -338,14 +336,9 @@ export interface BotDeps {
   memory?: BotMemoryPages;
   /** BB's user skills directory (`<data dir>/skills`), where a shared skill goes. */
   userSkillsDir?: string;
-  /** Runner threads (src/runners.ts): kept out of Activity's thread lists; an urgent one is in Needs you. */
+  /** Runner threads (src/runners.ts): kept out of Activity's thread lists (they have their own group). */
   runners?: {
-    threads(botId?: string): Map<string, { urgent: boolean }>;
-    /** An urgent runner thread's reason line, or null once it's read, answered or past (that clears it). */
-    needsYou?(threadId: string, thread: { lastReadAt?: number | null } | null): Promise<string | null>;
-    /** Mark handled, and its Undo. */
-    seen?(id: string, botId?: string): void;
-    unseen?(id: string, botId?: string): void;
+    threads(botId?: string): ReadonlySet<string>;
     pauseAll(botId?: string, onPaused?: (id: string) => void): Promise<string[]>;
     /** Turns a runner Stop paused back on; false when it was deleted since. */
     restore(id: string): Promise<boolean>;
@@ -356,8 +349,6 @@ export interface BotDeps {
   ownedThreads?(botId: string): ReadonlySet<string>;
   /** A Bot got a thread (made, set or handed off): its chain leaves BB's thread list (src/bot-owned.ts). */
   claimChains?(): Promise<unknown>;
-  /** Automations BB kept turning off that Studio stopped resuming (src/auto-resume.ts): Needs you until they're on again. */
-  automationAlerts?(botId: string): readonly { name: string; message: string; at: number }[];
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -1156,87 +1147,38 @@ export class Bots {
   }
 
   /**
-   * What a thread in Needs you waits on: its pending interactions, and for
-   * the Bot's chat the latest failure alert. `key` names that state, so a
-   * mark handled lasts until it changes (a new question, a new failure).
+   * The Bot's one "needs you" signal: a pending question or approval in its
+   * chat, or a reply the user hasn't read (src/bot-attention.ts).
    */
-  private async needsYouSignal(bot: { id: string; threadId: string | null }, threadId: string, alerts = this.deps.automationAlerts?.(bot.id) ?? []): Promise<{ interactions: Interaction[] | null; alertsAt: number; key: string }> {
-    // null: BB didn't answer, so what the thread list said stands.
-    const listed = await this.deps.sdk.threads.interactions.list({ threadId }).catch(() => null) as Interaction[] | null;
-    const interactions = listed && pendingInteractions(listed);
-    const alertsAt = threadId === bot.threadId && alerts.length ? Math.max(...alerts.map((each) => each.at)) : 0;
-    return { interactions, alertsAt, key: signalKey(interactions ?? [], alertsAt) };
+  private async attention(threadId: string, thread: { lastReadAt?: number | null } | undefined): Promise<BotAttention | null> {
+    const [interactions, events] = await Promise.all([
+      this.deps.sdk.threads.interactions.list({ threadId }).catch(() => []) as Promise<{ status?: string; payload?: { kind?: string } | null; createdAt?: number }[]>,
+      Promise.resolve().then(() => this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "40", types: ["item/completed"] })).catch(() => []) as Promise<{ createdAt?: number; data?: { item?: { type?: string; text?: string } } }[]>,
+    ]);
+    const replies = events.flatMap((event) => event.data?.item?.type === "agentMessage" && typeof event.data.item.text === "string" && event.createdAt ? [{ createdAt: event.createdAt, text: event.data.item.text }] : []);
+    return botAttention({ lastReadAt: thread?.lastReadAt ?? null, interactions: pendingInteractions(interactions), replies });
   }
 
-  /** The signal a Needs-you item was marked handled at, if it was. */
-  private handled(botId: string, threadId: string | null): string | null {
-    if (!threadId) return null;
-    return (this.deps.db.prepare("SELECT signal FROM bot_needs_you_handled WHERE bot_id = ? AND thread_id = ?").get(botId, threadId) as { signal: string } | undefined)?.signal ?? null;
-  }
-
-  /**
-   * Mark handled: the thread leaves Needs you. A runner's urgent report is
-   * seen; anything else stays out until what it waits on changes.
-   */
-  async markHandled(threadId: string, botId?: string): Promise<void> {
+  /** A Bot's attention alone (bot_attention): its chat, nothing else. */
+  async botAttention(botId?: string): Promise<BotAttention | null> {
     const bot = this.stored(botId);
-    if (!bot) throw new Error("No Bot.");
-    if (this.deps.runners?.threads(bot.id).has(threadId)) { this.deps.runners.seen?.(threadId, bot.id); return; }
-    const signal = await this.needsYouSignal(bot, threadId);
-    this.deps.db.prepare("INSERT OR REPLACE INTO bot_needs_you_handled (bot_id, thread_id, signal, at) VALUES (?, ?, ?, ?)").run(bot.id, threadId, signal.key, Date.now());
-    this.deps.changed();
-  }
-
-  /** Mark handled's Undo: the thread is back in Needs you, if it still waits on something. */
-  restoreHandled(threadId: string, botId?: string): void {
-    const bot = this.stored(botId);
-    if (!bot) throw new Error("No Bot.");
-    if (this.deps.runners?.threads(bot.id).has(threadId)) { this.deps.runners.unseen?.(threadId, bot.id); return; }
-    this.deps.db.prepare("DELETE FROM bot_needs_you_handled WHERE bot_id = ? AND thread_id = ?").run(bot.id, threadId);
-    this.deps.changed();
+    if (!bot?.threadId) return null;
+    const thread = await this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => undefined);
+    return this.attention(bot.threadId, thread);
   }
 
   async activity(botId?: string): Promise<BotActivityView> {
     const { bot, run } = await this.get(botId);
-    if (!bot?.threadId) return { needsYou: [], inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
+    if (!bot?.threadId) return { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
     const [threads, automations, output] = await Promise.all([
       this.workThreads(bot.threadId, bot.id),
       this.automations(bot.threadId),
       this.deps.sdk.threads.output({ threadId: bot.threadId }).catch(() => ({ output: null })),
     ]);
-    // Runners have their own group; an urgent report puts its thread in Needs you.
-    const runnerThreads = this.deps.runners?.threads(bot.id) ?? new Map<string, { urgent: boolean }>();
+    const runnerThreads = this.deps.runners?.threads(bot.id) ?? new Set<string>();
     const hidden = this.deps.hiddenThreads?.() ?? new Set<string>();
-    const classified = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id) && !hidden.has(thread.id)), bot.threadId);
-    const { inProgress, waiting, completed } = classified;
-    const alerts = this.deps.automationAlerts?.(bot.id) ?? [];
-    const own = threads.find((thread) => thread.id === bot.threadId);
-    // A question or approval stays until it's answered or marked handled.
-    const needsYou: BotThreadView[] = [];
-    for (const thread of classified.needsYou) {
-      const signal = await this.needsYouSignal(bot, thread.id, alerts);
-      // Answered since BB listed it.
-      if (signal.interactions && !signal.interactions.length && !signal.alertsAt) continue;
-      if (this.handled(bot.id, thread.id) === signal.key) continue;
-      needsYou.push({ ...thread, reason: signal.interactions?.length !== 0 ? interactionReason(signal.interactions ?? []) : failedReason(alerts.length) });
-    }
-    const urgent = [...runnerThreads].filter(([, runner]) => runner.urgent).map(([id]) => id).filter((id) => !needsYou.some((thread) => thread.id === id));
-    for (const thread of await Promise.all(urgent.map((threadId) => this.deps.sdk.threads.get({ threadId }).catch(() => null)))) {
-      if (!thread || thread.archivedAt) continue;
-      // Read after the report, answered, or a later run finished: it's handled.
-      const reason = this.deps.runners?.needsYou ? await this.deps.runners.needsYou(thread.id, thread) : "Urgent report";
-      if (reason == null) continue;
-      needsYou.push({ id: thread.id, title: thread.title || thread.titleFallback || "Untitled runner", status: thread.status, providerId: thread.providerId ?? null, projectId: thread.projectId ?? null, updatedAt: thread.updatedAt ?? 0, relation: "started", needsYou: true, parentId: null, reason });
-    }
-    // An automation or thread past its auto-resume cap: one entry, opening the
-    // Bot's chat, where its line is; read there after the line, it's seen.
-    const alertsAt = alerts.length ? Math.max(...alerts.map((each) => each.at)) : 0;
-    if (alerts.length && !needsYou.some((thread) => thread.id === bot.threadId) && !readSince(own, alertsAt) && this.handled(bot.id, bot.threadId) !== signalKey([], alertsAt)) {
-      needsYou.unshift({
-        id: bot.threadId, title: alerts.length === 1 ? alerts[0]!.message : `${alerts.length} automations or threads stopped after failing: ${alerts.map((each) => each.name).join(", ")}`,
-        status: "idle", providerId: own?.providerId ?? null, projectId: own?.projectId ?? PERSONAL_PROJECT_ID, updatedAt: alertsAt, relation: "self", needsYou: true, parentId: null, reason: failedReason(alerts.length),
-      });
-    }
+    const { inProgress, waiting, completed } = classifyActivity(threads.filter((thread) => !runnerThreads.has(thread.id) && !hidden.has(thread.id)), bot.threadId);
+    const attention = await this.attention(bot.threadId, threads.find((thread) => thread.id === bot.threadId));
     const HEARTBEAT_NAME = heartbeatName(bot.primary === false ? `${BOT_RUN_PREFIX}${bot.id}` : PERSONAL_PROJECT_ID);
     const scheduled: BotScheduledView[] = automations.rows.filter((automation) => !automation.execution.targetThreadId || !runnerThreads.has(automation.execution.targetThreadId)).map((automation) => ({
       id: automation.id,
@@ -1254,6 +1196,8 @@ export class Bots {
     const compactions = (this.deps.db.prepare("SELECT thread_id AS threadId, at, tokens FROM bot_cache_compactions WHERE bot_id = ? ORDER BY at").all(bot.id) as { threadId: string; at: number; tokens: number | null }[]);
     // Running rows count up from their turn's start.
     const running = await Promise.all(inProgress.map(async (thread) => ({ ...thread, runningSince: await turnStartedAt(this.deps.sdk, thread.id) })));
-    return { needsYou, inProgress: running, waiting, scheduled, completed, latest, compactions };
+    // A thread waiting on an answer says what for (a question or an approval).
+    const withReasons = await Promise.all(running.map(async (thread) => thread.waitingFor ? { ...thread, waitingFor: threadWaitingFor(await this.deps.sdk.threads.interactions.list({ threadId: thread.id }).catch(() => [])) } : thread));
+    return { attention, inProgress: withReasons, waiting, scheduled, completed, latest, compactions };
   }
 }

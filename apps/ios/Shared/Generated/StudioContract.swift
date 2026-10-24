@@ -76,6 +76,7 @@ public enum Studio {
     public static let bot_maintenance_set = "bot_maintenance_set"
     public static let bot_maintenance_run = "bot_maintenance_run"
     public static let bot_activity = "bot_activity"
+    public static let bot_attention = "bot_attention"
     public static let bot_cache_state = "bot_cache_state"
     public static let bot_cache_set = "bot_cache_set"
     public static let bot_cache_banner_hide = "bot_cache_banner_hide"
@@ -113,9 +114,6 @@ public enum Studio {
     public static let bot_runner_resume = "bot_runner_resume"
     public static let bot_runner_run_now = "bot_runner_run_now"
     public static let bot_runner_delete = "bot_runner_delete"
-    public static let bot_runner_seen = "bot_runner_seen"
-    public static let bot_needs_you_dismiss = "bot_needs_you_dismiss"
-    public static let bot_needs_you_restore = "bot_needs_you_restore"
     public static let bot_runner_adopt = "bot_runner_adopt"
     public static let bot_automations = "bot_automations"
     public static let bot_automation_create = "bot_automation_create"
@@ -484,6 +482,8 @@ public enum Studio {
 
   public typealias BotActivity = BotActivityOutput
 
+  public typealias BotAttention = BotAttentionOutput
+
   public typealias BotCacheState = BotCacheStateOutput
 
   public typealias BotCacheSet = BotCacheSetOutput
@@ -559,12 +559,6 @@ public enum Studio {
   public typealias BotRunnerRunNow = BotRunnerRunNowOutput
 
   public typealias BotRunnerDelete = BotRunnerDeleteOutput
-
-  public typealias BotRunnerSeen = BotRunnerSeenOutput
-
-  public typealias BotNeedsYouDismiss = BotNeedsYouDismissOutput
-
-  public typealias BotNeedsYouRestore = BotNeedsYouRestoreOutput
 
   public typealias BotRunnerAdopt = BotRunnerAdoptOutput
 
@@ -6931,12 +6925,11 @@ public enum Studio {
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotMaintenanceThreadsOutputThreadsItemRelation?
-    public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
-    public var reason: String?
+    public var waitingFor: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotMaintenanceThreadsOutputThreadsItemRelation? = nil, parentId: String? = nil, runningSince: Double? = nil, waitingFor: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -6944,10 +6937,9 @@ public enum Studio {
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
-      self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
-      self.reason = reason
+      self.waitingFor = waitingFor
     }
   }
 
@@ -7273,55 +7265,15 @@ public enum Studio {
     }
   }
 
-  public enum BotActivityOutputNeedsYouItemRelation: Sendable, Hashable, Codable {
-    case `self`
-    case started
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "self": self = .`self`
-      case "started": self = .started
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .`self`: try container.encode("self")
-      case .started: try container.encode("started")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct BotActivityOutputNeedsYouItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var providerId: String?
-    public var projectId: String?
-    public var updatedAt: Double?
-    public var relation: BotActivityOutputNeedsYouItemRelation?
-    public var needsYou: Bool?
-    public var parentId: String?
-    public var runningSince: Double?
+  public struct BotActivityOutputAttention: Sendable, Hashable, Codable {
     public var reason: String?
+    public var count: Double?
+    public var since: Double?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputNeedsYouItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.providerId = providerId
-      self.projectId = projectId
-      self.updatedAt = updatedAt
-      self.relation = relation
-      self.needsYou = needsYou
-      self.parentId = parentId
-      self.runningSince = runningSince
+    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil) {
       self.reason = reason
+      self.count = count
+      self.since = since
     }
   }
 
@@ -7357,12 +7309,11 @@ public enum Studio {
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputInProgressItemRelation?
-    public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
-    public var reason: String?
+    public var waitingFor: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputInProgressItemRelation? = nil, parentId: String? = nil, runningSince: Double? = nil, waitingFor: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7370,10 +7321,9 @@ public enum Studio {
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
-      self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
-      self.reason = reason
+      self.waitingFor = waitingFor
     }
   }
 
@@ -7409,12 +7359,11 @@ public enum Studio {
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputWaitingItemRelation?
-    public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
-    public var reason: String?
+    public var waitingFor: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputWaitingItemRelation? = nil, parentId: String? = nil, runningSince: Double? = nil, waitingFor: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7422,10 +7371,9 @@ public enum Studio {
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
-      self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
-      self.reason = reason
+      self.waitingFor = waitingFor
     }
   }
 
@@ -7503,12 +7451,11 @@ public enum Studio {
     public var projectId: String?
     public var updatedAt: Double?
     public var relation: BotActivityOutputCompletedItemRelation?
-    public var needsYou: Bool?
     public var parentId: String?
     public var runningSince: Double?
-    public var reason: String?
+    public var waitingFor: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, needsYou: Bool? = nil, parentId: String? = nil, runningSince: Double? = nil, reason: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, providerId: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, relation: BotActivityOutputCompletedItemRelation? = nil, parentId: String? = nil, runningSince: Double? = nil, waitingFor: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
@@ -7516,10 +7463,9 @@ public enum Studio {
       self.projectId = projectId
       self.updatedAt = updatedAt
       self.relation = relation
-      self.needsYou = needsYou
       self.parentId = parentId
       self.runningSince = runningSince
-      self.reason = reason
+      self.waitingFor = waitingFor
     }
   }
 
@@ -7537,7 +7483,7 @@ public enum Studio {
 
   public struct BotActivityOutput: Sendable, Hashable, Codable {
     public var maintenance: [BotActivityOutputMaintenanceItem]?
-    public var needsYou: [BotActivityOutputNeedsYouItem]?
+    public var attention: BotActivityOutputAttention?
     public var inProgress: [BotActivityOutputInProgressItem]?
     public var waiting: [BotActivityOutputWaitingItem]?
     public var scheduled: [BotActivityOutputScheduledItem]?
@@ -7545,15 +7491,43 @@ public enum Studio {
     public var latest: String?
     public var compactions: [BotActivityOutputCompactionsItem]?
 
-    public init(maintenance: [BotActivityOutputMaintenanceItem]? = nil, needsYou: [BotActivityOutputNeedsYouItem]? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil, compactions: [BotActivityOutputCompactionsItem]? = nil) {
+    public init(maintenance: [BotActivityOutputMaintenanceItem]? = nil, attention: BotActivityOutputAttention? = nil, inProgress: [BotActivityOutputInProgressItem]? = nil, waiting: [BotActivityOutputWaitingItem]? = nil, scheduled: [BotActivityOutputScheduledItem]? = nil, completed: [BotActivityOutputCompletedItem]? = nil, latest: String? = nil, compactions: [BotActivityOutputCompactionsItem]? = nil) {
       self.maintenance = maintenance
-      self.needsYou = needsYou
+      self.attention = attention
       self.inProgress = inProgress
       self.waiting = waiting
       self.scheduled = scheduled
       self.completed = completed
       self.latest = latest
       self.compactions = compactions
+    }
+  }
+
+  public struct BotAttentionInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotAttentionOutputAttention: Sendable, Hashable, Codable {
+    public var reason: String?
+    public var count: Double?
+    public var since: Double?
+
+    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil) {
+      self.reason = reason
+      self.count = count
+      self.since = since
+    }
+  }
+
+  public struct BotAttentionOutput: Sendable, Hashable, Codable {
+    public var attention: BotAttentionOutputAttention?
+
+    public init(attention: BotAttentionOutputAttention? = nil) {
+      self.attention = attention
     }
   }
 
@@ -8791,11 +8765,10 @@ public enum Studio {
     public var lastLevel: BotRunnersOutputRunnersItemLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnersOutputRunnersItemState? = nil, adopted: Bool? = nil, schedule: BotRunnersOutputRunnersItemSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnersOutputRunnersItemLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -8813,7 +8786,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -9058,11 +9030,10 @@ public enum Studio {
     public var lastLevel: BotRunnerCreateOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerCreateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerCreateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerCreateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -9080,7 +9051,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -9297,11 +9267,10 @@ public enum Studio {
     public var lastLevel: BotRunnerUpdateOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerUpdateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerUpdateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerUpdateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -9319,7 +9288,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -9470,11 +9438,10 @@ public enum Studio {
     public var lastLevel: BotRunnerMigrateOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerMigrateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerMigrateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerMigrateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerMigrateOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerMigrateOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerMigrateOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -9492,7 +9459,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -9713,11 +9679,10 @@ public enum Studio {
     public var lastLevel: BotRunnerPauseOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerPauseOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerPauseOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerPauseOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -9735,7 +9700,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -9882,11 +9846,10 @@ public enum Studio {
     public var lastLevel: BotRunnerResumeOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerResumeOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerResumeOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerResumeOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -9904,7 +9867,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -10051,11 +10013,10 @@ public enum Studio {
     public var lastLevel: BotRunnerRunNowOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerRunNowOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerRunNowOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerRunNowOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -10073,7 +10034,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }
@@ -10096,60 +10056,6 @@ public enum Studio {
     public init(deleted: Bool? = nil, kept: Bool? = nil) {
       self.deleted = deleted
       self.kept = kept
-    }
-  }
-
-  public struct BotRunnerSeenInput: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var id: String?
-
-    public init(botId: String? = nil, id: String? = nil) {
-      self.botId = botId
-      self.id = id
-    }
-  }
-
-  public struct BotRunnerSeenOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct BotNeedsYouDismissInput: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var threadId: String?
-
-    public init(botId: String? = nil, threadId: String? = nil) {
-      self.botId = botId
-      self.threadId = threadId
-    }
-  }
-
-  public struct BotNeedsYouDismissOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct BotNeedsYouRestoreInput: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var threadId: String?
-
-    public init(botId: String? = nil, threadId: String? = nil) {
-      self.botId = botId
-      self.threadId = threadId
-    }
-  }
-
-  public struct BotNeedsYouRestoreOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
     }
   }
 
@@ -10300,11 +10206,10 @@ public enum Studio {
     public var lastLevel: BotRunnerAdoptOutputLastLevel?
     public var lastReport: String?
     public var lastReportAt: Double?
-    public var urgent: Bool?
     public var running: Bool?
     public var runningSince: Double?
 
-    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, urgent: Bool? = nil, running: Bool? = nil, runningSince: Double? = nil) {
+    public init(machine: String? = nil, machineName: String? = nil, machineOffline: Bool? = nil, id: String? = nil, name: String? = nil, job: String? = nil, threadId: String? = nil, providerId: String? = nil, state: BotRunnerAdoptOutputState? = nil, adopted: Bool? = nil, schedule: BotRunnerAdoptOutputSchedule? = nil, nextRunAt: Double? = nil, lastRunAt: Double? = nil, lastRunStatus: String? = nil, lastLevel: BotRunnerAdoptOutputLastLevel? = nil, lastReport: String? = nil, lastReportAt: Double? = nil, running: Bool? = nil, runningSince: Double? = nil) {
       self.machine = machine
       self.machineName = machineName
       self.machineOffline = machineOffline
@@ -10322,7 +10227,6 @@ public enum Studio {
       self.lastLevel = lastLevel
       self.lastReport = lastReport
       self.lastReportAt = lastReportAt
-      self.urgent = urgent
       self.running = running
       self.runningSince = runningSince
     }

@@ -267,13 +267,12 @@ const botThread = z.object({
   projectId: z.string().nullable(),
   updatedAt: z.number(),
   relation: z.enum(["self", "started"]),
-  needsYou: z.boolean(),
   /** The listed thread that started this one; null when the Bot did (or for its own). */
   parentId: z.string().nullable().default(null),
   /** Running threads: when the current turn started, for the elapsed time. */
   runningSince: z.number().nullable().optional(),
-  /** Needs you: why, in one short line ("Asked you a question", "Urgent report: …", "Failed"). */
-  reason: z.string().nullable().optional(),
+  /** A running thread held by a pending question or approval, which its Bot owns: "Waiting for an answer", "Waiting for approval". */
+  waitingFor: z.string().nullable().optional(),
 });
 export type BotThreadView = z.infer<typeof botThread>;
 const botScheduled = z.object({
@@ -288,9 +287,12 @@ export type BotScheduledView = z.infer<typeof botScheduled>;
 export const maintenanceRun = z.object({ at: z.number(), dryRun: z.boolean(), summary: z.string(), actions: z.array(z.string()), needsCall: z.array(z.object({ threadId: z.string(), title: z.string(), reason: z.string() })), suggestions: z.array(z.object({ text: z.string(), threadId: z.string().optional(), automationId: z.string().optional() })) });
 const maintenanceRulesSchema = z.object({ threads: z.boolean(), workers: z.boolean(), automations: z.boolean(), memory: z.boolean(), skills: z.boolean(), adopt: z.boolean() });
 const maintenanceView = z.object({ settings: z.object({ enabled: z.boolean(), enabledAt: z.number().nullable(), memoryWords: z.number(), rules: maintenanceRulesSchema }), liveAt: z.number().nullable(), runs: z.array(maintenanceRun) });
+/** What waits on the user in a Bot's chat: why ("Asked you a question", "2 things for you"), how many, and since when. */
+const botAttention = z.object({ reason: z.string(), count: z.number(), since: z.number() });
 const botActivity = z.object({
   maintenance: z.array(maintenanceRun).optional(),
-  needsYou: z.array(botThread),
+  /** The Bot's one "needs you" signal: its own chat has a pending question or approval, or replies the user hasn't read (src/bot-attention.ts). */
+  attention: botAttention.nullable().default(null),
   inProgress: z.array(botThread),
   /** Queued threads, or ones whose message is scheduled for later. */
   waiting: z.array(botThread).default([]),
@@ -323,8 +325,6 @@ const runner = z.object({
   lastLevel: runnerLevel.nullable(),
   lastReport: z.string().nullable(),
   lastReportAt: z.number().nullable(),
-  /** An urgent report the user hasn't opened: it's in Needs you. */
-  urgent: z.boolean(),
   /** Its thread is working now: a run is going on. */
   running: z.boolean().optional(),
   /** Mid-run: when the run's turn started, for the elapsed time. */
@@ -512,6 +512,8 @@ export const rpcContract = defineRpcContract({
   bot_maintenance_set: { input: z.object({ botId, enabled: z.boolean().optional(), memoryWords: z.number().int().min(100).max(100000).optional(), rules: maintenanceRulesSchema.partial().optional() }), output: maintenanceView },
   bot_maintenance_run: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: maintenanceRun.nullable() },
   bot_activity: { input: forBot, output: botActivity },
+  /** Just the Bot's attention (bot_activity's), for a Bot row that isn't expanded. */
+  bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable() }) },
   /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
   bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },
   /** Changes a Bot's cache-warming settings; returns its chat's cache state. */
@@ -578,12 +580,6 @@ export const rpcContract = defineRpcContract({
   bot_runner_run_now: { input: z.object({ botId, id: runnerId }), output: runner },
   /** Deletes a runner Studio made (automation deleted, thread archived); an adopted one is only let go. */
   bot_runner_delete: { input: z.object({ botId, id: runnerId }), output: z.object({ deleted: z.literal(true), kept: z.boolean() }) },
-  /** The user opened a runner: its urgent report leaves Needs you. */
-  bot_runner_seen: { input: z.object({ botId, id: runnerId }), output: z.object({ ok: z.literal(true) }) },
-  /** Mark handled: the thread leaves Needs you (a runner's urgent report is seen; anything else until what it waits on changes). */
-  bot_needs_you_dismiss: { input: z.object({ botId, threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
-  /** Mark handled's Undo. */
-  bot_needs_you_restore: { input: z.object({ botId, threadId: threadIdInput }), output: z.object({ ok: z.literal(true) }) },
   /** Adopt as runner: registers the thread, keeps its automation, switches it to runner_report. The user's choice only. */
   bot_runner_adopt: { input: z.object({ botId, threadId: z.string().min(1).max(200), automationId: z.string().min(1).max(200), name: runnerName.optional(), job: runnerJob.optional() }), output: runner },
   /** A Bot's automations: check-ins (its original one first), reminders, watchers and runners. */

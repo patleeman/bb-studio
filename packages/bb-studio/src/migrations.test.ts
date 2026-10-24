@@ -110,3 +110,16 @@ describe("migration history", () => {
     expect(initializer.elements).toHaveLength(MIGRATIONS.length);
   });
 });
+
+describe("the Bot triages runner reports (docs/needs-you/REDO.md)", () => {
+  it("clears every runner's urgent flag", async () => {
+    const { default: Database } = await import("better-sqlite3");
+    const db = new Database(":memory:");
+    const last = MIGRATIONS.findIndex((sql) => sql.trim() === "UPDATE bot_runners SET urgent = 0;");
+    expect(last).toBeGreaterThan(0);
+    for (const sql of MIGRATIONS.slice(0, last)) db.exec(sql);
+    db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, project_id, state, cadence, time, urgent, created_at, updated_at) VALUES ('r1', 'b', 'Security', 'Check', 'p', 'active', 'daily', '09:00', 1, 1, 1)").run();
+    db.exec(MIGRATIONS[last]!);
+    expect(db.prepare("SELECT urgent FROM bot_runners").get()).toEqual({ urgent: 0 });
+  });
+});

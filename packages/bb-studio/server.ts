@@ -61,6 +61,9 @@ import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
 import { alertBot, parseSchedule, Runners } from "./src/runners";
+
+/** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
+const STOPPED_NOTE = "Studio notice: something you own stopped after failing. You decide what the user sees: if you can fix it (resume it, retry it), do. If the user must act, tell them in one or two short lines what stopped and what to do. If it needs nothing from them, reply exactly [PASS].";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { THREAD_RESUME_SETTINGS, ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -511,11 +514,7 @@ export default async function plugin(bb: BbPluginApi) {
     hiddenThreads: () => learning.reviewThreads(),
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
-    runners: {
-      threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id),
-      needsYou: (threadId, thread) => runners.needsYou(threadId, thread), seen: (id, botId) => runners.seen(id, botId), unseen: (id, botId) => runners.unseen(id, botId),
-    },
-    automationAlerts: (botId) => [...autoResume.alerts(botId).filter((alert) => alert.owner !== "runner"), ...threadResume.alerts(botId)],
+    runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
       restore: (id) => automations.restore(id),
@@ -587,7 +586,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // Runner and Bot automations BB turned off after a transient failure come
   // back on (src/auto-resume.ts), at most three times a day each; past that,
-  // Needs you. At startup, on the five-minute sweep, and soon after a
+  // a line in the owning Bot's chat for it to triage. At startup, on the five-minute sweep, and soon after a
   // target thread goes idle or fails.
   const resumeTargets = (): ResumeTarget[] => [
     ...runners.resumeTargets().map((target) => ({ ...target, owner: "runner" as const })),
@@ -609,7 +608,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (bot?.threadId) {
         await alertBot(bb.sdk, {
           botThreadId: bot.threadId, line: `⚠️ ${line}`,
-          note: "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].",
+          note: STOPPED_NOTE,
           push: { title: `${bot.name} · ${target.name}`, body: line, coalesceKey: `auto-resume:${target.automationId}` },
         });
       }
@@ -622,8 +621,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.failed", ({ thread }) => resumeSoon(thread.id));
   resumeSweep();
   // Threads a host restart cut off (src/thread-resume.ts): resumed with a
-  // marker, at most twice an hour each; past that, Needs you (a Bot's thread)
-  // or a phone push (any other).
+  // marker, at most twice an hour each; past that, a line in the owning Bot's
+  // chat for it to triage (a Bot's thread) or a phone push (any other).
   const threadOwner = (threadId: string): ThreadOwner | null => {
     const bot = bots.list().find((each) => bots.chain(each.id).includes(threadId))
       ?? (() => { const runner = runners.forThread(threadId); return runner ? bots.stored(runner.bot_id) : null; })()
@@ -638,7 +637,7 @@ export default async function plugin(bb: BbPluginApi) {
         tagsChanged();
         await alertBot(bb.sdk, {
           botThreadId: owner.threadId, line: `⚠️ ${line}`,
-          note: "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].",
+          note: STOPPED_NOTE,
           push: { title: `${owner.name} · ${thread.title}`, body: line, coalesceKey: `thread-resume:${thread.id}` },
         });
         return;
@@ -923,6 +922,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),
     bot_maintenance_set: ({ botId, ...patch }) => maintenance.set(learnerId(botId), patch),
     bot_maintenance_run: ({ botId, dryRun }) => maintenance.run(learnerId(botId), { dryRun }),
+    bot_attention: async ({ botId }) => ({ attention: await bots.botAttention(botId) }),
     bot_activity: async ({ botId }) => ({ ...await bots.activity(botId), maintenance: bots.stored(botId) ? maintenance.view(bots.stored(botId)!.id).runs : [] }),
     bot_cache_state: ({ threadId, botId }) => warmer.state(cacheThread(threadId, botId)),
     bot_cache_set: ({ botId, ...patch }) => {
@@ -981,9 +981,6 @@ export default async function plugin(bb: BbPluginApi) {
     bot_runner_resume: ({ botId, id }) => runners.setState(id, "active", botId),
     bot_runner_run_now: ({ botId, id }) => runners.runNow(id, botId),
     bot_runner_delete: ({ botId, id }) => runners.delete(id, botId),
-    bot_runner_seen: ({ botId, id }) => { runners.seen(id, botId); return { ok: true as const }; },
-    bot_needs_you_dismiss: async ({ botId, threadId }) => { await bots.markHandled(threadId, botId); return { ok: true as const }; },
-    bot_needs_you_restore: ({ botId, threadId }) => { bots.restoreHandled(threadId, botId); return { ok: true as const }; },
     bot_runner_adopt: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.adopt(input, botId); },
     // Deprecated aliases of bot_get, bot_set_thread and bot_set_run, for one release.
     chief_of_staff: () => projectLeads.chief(),
@@ -1245,11 +1242,13 @@ export default async function plugin(bb: BbPluginApi) {
     execute: async (_input, ctx) => { const self = await acting(ctx.threadId); const refused = botControlRefusal(self, "stop"); if (refused) return refused; const result = await bots.stop(self!.botId); return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n"); },
   });
   bb.agents.registerTool({
-    name: "bot_activity", description: "What the user's Bot is doing: threads that need the user, in progress, scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
+    name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
     execute: async (_input, ctx) => {
       const activity = await bots.activity(await selfBot(ctx.threadId));
       const lines = [
-        ...listThreads("Needs you", activity.needsYou), ...listThreads("In progress", activity.inProgress),
+        ...(activity.attention ? [`Waiting on the user in your chat: ${activity.attention.reason}`] : []),
+        ...listThreads("Waiting on an answer (yours to handle, or bring to the user)", activity.inProgress.filter((each) => each.waitingFor)),
+        ...listThreads("In progress", activity.inProgress.filter((each) => !each.waitingFor)),
         ...(activity.scheduled.length ? ["Scheduled:", ...activity.scheduled.map((each) => `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}`)] : []),
         ...listThreads("Completed", activity.completed),
       ];
@@ -1443,7 +1442,7 @@ export default async function plugin(bb: BbPluginApi) {
   runnerTool("automation_delete", "Delete an automation. Only when the user asks or it's no longer needed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => { await automations.delete(id, botId); return "Deleted."; });
   bb.agents.registerTool({
     name: "runner_report",
-    description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus Needs you and a phone push, only when the user must act now. With nothing new, don't call it and finish without a final message.",
+    description: "Report from this run. log: kept in this thread and the Bot's Activity. tell: one short line to the user in the Bot's chat. urgent: tell plus a phone push, and the Bot decides whether to bring it to the user; only when the user must act now. With nothing new, don't call it and finish without a final message.",
     parameters: z.object({ level: z.enum(["log", "tell", "urgent"]), summary: z.string().trim().min(1).max(600).describe("One or two short sentences") }),
     execute: async (input, ctx) => {
       if (!ctx.threadId || !runners.forThread(ctx.threadId)) throw new Error("Only a runner's thread can report.");

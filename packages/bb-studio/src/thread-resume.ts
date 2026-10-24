@@ -19,8 +19,8 @@
 //
 // Cap: at most RESUME_CAP resumes per thread in a rolling hour, recorded in
 // thread_auto_resumes (append-only). Past the cap the thread stays in error:
-// once per interrupt, a Bot-owned thread goes to its Bot's Needs you plus one
-// line in its chat and a phone push (the alertBot urgent path); any other
+// once per interrupt, a Bot-owned thread gets one line in its Bot's chat for
+// the Bot to triage, and a phone push (the alertBot urgent path); any other
 // thread gets a phone push from Studio Mobile.
 //
 // When: 30s after a thread fails, soon after a host connects
@@ -161,7 +161,7 @@ export class ThreadResume {
       .run(threadId, eventId, event, fields.botId ?? null, fields.title ?? null, fields.reason ?? null, fields.message ?? null, this.now(), event === "exhausted" ? 0 : 1);
   }
 
-  /** A Bot's threads past the cap and still where Studio left them, for Needs you. */
+  /** A Bot's threads past the cap and still where Studio left them. */
   alerts(botId: string): { threadId: string; name: string; message: string; at: number }[] {
     const rows = this.deps.db.prepare(`SELECT * FROM thread_auto_resumes AS row WHERE bot_id = ? AND id = (SELECT MAX(id) FROM thread_auto_resumes WHERE thread_id = row.thread_id) AND event = 'exhausted' AND at > ?`).all(botId, this.now() - 24 * HOUR) as Row[];
     return rows.map((row) => ({ threadId: row.thread_id, name: row.title ?? "A thread", message: row.message ?? "A thread stopped after a restart", at: row.at }));
@@ -184,7 +184,7 @@ export class ThreadResume {
     this.pump();
   }
 
-  /** A thread finished a turn (the user picked it up): its Needs you entry ends. */
+  /** A thread finished a turn (the user or the Bot picked it up): the episode ends. */
   idle(threadId: string): void {
     this.settled(threadId);
     const latest = this.deps.db.prepare("SELECT * FROM thread_auto_resumes WHERE thread_id = ? ORDER BY id DESC LIMIT 1").get(threadId) as Row | undefined;

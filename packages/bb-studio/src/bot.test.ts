@@ -41,6 +41,7 @@ async function setup(migrations = MIGRATIONS) {
   const automations: Record<string, unknown>[] = [];
   // Each thread's interactions (threads.interactions.list).
   const pending = new Map<string, { id: string; status: string }[]>();
+  const replies = new Map<string, { at: number; text: string }[]>();
   const callRpc = vi.fn(async ({ method, input }: { method: string; input: Record<string, unknown> }) => {
     if (method === "automations_list") return automations;
     if (method === "automations_create") { const made = { id: `a${automations.length + 1}`, name: input.name, enabled: false, trigger: input.trigger, execution: input.execution, nextRunAt: 99 }; automations.push(made); return made; }
@@ -61,6 +62,8 @@ async function setup(migrations = MIGRATIONS) {
       spawn: spawn as never, get: get as never, archive: archive as never, list: list as never, stop: stop as never,
       unpin: async () => ({}) as never, update: update as never, output: async () => ({ output: "All quiet." }),
       interactions: { list: (async ({ threadId }: { threadId: string }) => pending.get(threadId) ?? []) as never } as never,
+      // The Bot's replies (item/completed agentMessage events), newest first.
+      events: { list: (async ({ threadId }: { threadId: string }) => [...(replies.get(threadId) ?? [])].reverse().map(({ at, text }) => ({ type: "item/completed", createdAt: at, data: { item: { type: "agentMessage", text } } }))) as never } as never,
       search: (async ({ query }: { query: string }) => {
         const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
         return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
@@ -80,7 +83,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, memory, userSkillsDir });
-  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending };
+  return { bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies };
 }
 
 const prompts = (x: Awaited<ReturnType<typeof setup>>) => x.automations.map((a) => (a.execution as { prompt: string }).prompt);
@@ -208,17 +211,17 @@ it("keeps the Bot across a handoff, and counts threads its old thread started", 
   expect((await x.bots.chainThreads()).map((t) => t.title)).toEqual(["Relay", "Today"]);
 });
 
-it("keeps hidden runner threads under the Bot: out of BB's list, still in Needs you when urgent; its chat isn't the runners' to hide", async () => {
+it("keeps hidden runner threads under the Bot: out of BB's list and Activity's thread lists; its chat isn't the runners' to hide", async () => {
   const x = await setup();
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
   x.add({ id: "run_t", visibility: "hidden", title: "Inbox · Runner", status: "idle" });
   x.add({ id: "run_quiet", visibility: "hidden", title: "Feeds · Runner", status: "idle" });
   x.add({ id: "w1", parentThreadId: "bot1", status: "idle" });
-  const runnerThreads = new Map([["run_t", { urgent: true }], ["run_quiet", { urgent: false }]]);
+  const runnerThreads = new Set(["run_t", "run_quiet"]);
   (x.bots as unknown as { deps: { runners: unknown } }).deps.runners = { threads: () => runnerThreads, pauseAll: async () => [], restore: async () => true };
   const activity = await x.bots.activity();
-  expect(activity.needsYou.map((t) => t.id)).toEqual(["run_t"]);
+  expect(activity.attention).toBeNull();
   expect([...activity.inProgress, ...activity.waiting, ...activity.completed].map((t) => t.id)).toEqual(["w1"]);
   expect(x.threads.get("bot1")?.visibility).toBe("visible");
   expect(x.update).not.toHaveBeenCalled();
@@ -248,17 +251,44 @@ it("hides the Bot's chain from BB's list as it gets a thread: made, set or hande
   await expect(x.bots.create({ name: "Third", avatar: "3️⃣" })).resolves.toBeTruthy();
 });
 
-it("puts a question in the Bot's hidden chat in Needs you, from its pending interactions", async () => {
+it("the Bot's attention: a question in its hidden chat, until it's answered", async () => {
   const x = await setup();
   x.add({ id: "bot1", visibility: "hidden", status: "idle" });
   await x.bots.setThread("bot1");
-  x.pending.set("bot1", [{ id: "q1", status: "pending" }]);
+  x.pending.set("bot1", [{ id: "q1", status: "pending", payload: { kind: "user_question" } } as never]);
   // Past BB's recent list: Studio fetches it, and its interactions say it waits on you.
   x.list.mockImplementation(async () => []);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "Asked you a question", count: 1 });
+  expect(await x.bots.botAttention()).toMatchObject({ reason: "Asked you a question", count: 1 });
+  x.pending.set("bot1", [{ id: "q1", status: "resolved" } as never]);
+  expect((await x.bots.activity()).attention).toBeNull();
+});
+
+it("the Bot's attention: its replies the user hasn't read, not [PASS], until the chat is read", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle", lastReadAt: 100 });
+  await x.bots.setThread("bot1");
+  x.replies.set("bot1", [{ at: 90, text: "Morning: nothing new." }, { at: 150, text: "[PASS]" }, { at: 200, text: "Deploy watch: staging is down since build 419. Roll back?" }]);
+  expect((await x.bots.activity()).attention).toEqual({ reason: "1 thing for you", count: 1, since: 200 });
+  x.replies.set("bot1", [...x.replies.get("bot1")!, { at: 300, text: "Also: the lease payment failed." }]);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "2 things for you", count: 2 });
+  // An approval in its chat comes first.
+  x.pending.set("bot1", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "Waiting for approval", count: 3 });
+  x.pending.set("bot1", []);
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, lastReadAt: 300 });
+  expect((await x.bots.activity()).attention).toBeNull();
+});
+
+it("a thread the Bot started that waits on an approval runs under Running, saying so; it's the Bot's, not the user's", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "deploy", parentThreadId: "bot1", status: "active", hasPendingInteraction: true } as never);
+  x.pending.set("deploy", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
   const activity = await x.bots.activity();
-  expect(activity.needsYou).toEqual([expect.objectContaining({ id: "bot1", relation: "self", needsYou: true })]);
-  x.pending.set("bot1", [{ id: "q1", status: "resolved" }]);
-  expect((await x.bots.activity()).needsYou).toEqual([]);
+  expect(activity.inProgress).toEqual([expect.objectContaining({ id: "deploy", waitingFor: "Waiting for approval" })]);
+  expect(activity.attention).toBeNull();
 });
 
 it("lists the threads a Bot owns in Activity though they're hidden from BB's list, but not hidden forks", async () => {
@@ -339,7 +369,7 @@ it("Resume turns back on only the automations and runners Stop paused", async ()
   const runnerStates = new Map([["run_on", "active"], ["run_off", "paused"]]);
   const restore = vi.fn(async (id: string) => { if (!runnerStates.has(id)) return false; runnerStates.set(id, "active"); return true; });
   const runners = {
-    threads: () => new Map<string, { urgent: boolean }>(),
+    threads: () => new Set<string>(),
     pauseAll: async (_botId?: string, onPaused?: (id: string) => void) => {
       const paused = [...runnerStates].filter(([, state]) => state === "active").map(([id]) => id);
       for (const id of paused) { runnerStates.set(id, "paused"); onPaused?.(id); }
@@ -382,7 +412,7 @@ it("lists heartbeat and automations aimed at the Bot as Scheduled", async () => 
   expect(scheduled.map((each) => [each.kind, each.id])).toEqual([["heartbeat", "a1"], ["automation", "other"]]);
 });
 
-it("classifies activity: pending interactions first, running, then completed threads it started", () => {
+it("classifies activity: running (a thread held by a question is the Bot's, so it's running), then completed threads it started", () => {
   const t = (id: string, { hasPendingInteraction = false, ...fields }: Partial<Thread> & { hasPendingInteraction?: boolean }) => ({ ...makeThreadResponse({ id, projectId: "p", providerId: "codex", ...fields }), hasPendingInteraction });
   const result = classifyActivity([
     t("bot", { status: "active", updatedAt: 9 }),
@@ -392,8 +422,8 @@ it("classifies activity: pending interactions first, running, then completed thr
     t("err", { status: "error", updatedAt: 4 }),
     t("gone", { status: "idle", archivedAt: 1 }),
   ], "bot");
-  expect(result.needsYou.map((each) => each.id)).toEqual(["ask"]);
-  expect(result.inProgress.map((each) => [each.id, each.relation])).toEqual([["bot", "self"], ["run", "started"]]);
+  expect(result).not.toHaveProperty("needsYou");
+  expect(result.inProgress.map((each) => [each.id, each.relation, each.waitingFor ?? null])).toEqual([["bot", "self", null], ["run", "started", null], ["ask", "started", "Waiting for an answer"]]);
   expect(result.completed.map((each) => each.id)).toEqual(["err", "old"]);
   expect(startedBy({ sourceThreadId: null, parentThreadId: null, lifecycleOwnerThreadId: "b" }, new Set(["b"]))).toBe(true);
   expect(startedBy({ sourceThreadId: null, parentThreadId: null, lifecycleOwnerThreadId: null }, new Set(["b"]))).toBe(false);
@@ -646,75 +676,6 @@ it("Pause and Stop turn the Bot's own automations off; Resume turns back on only
   expect([...states.values()]).toEqual(["active", "paused"]);
 });
 
-it("puts a Bot automation past its auto-resume cap in Needs you, opening the Bot's chat", async () => {
-  const x = await setup();
-  x.add({ id: "bot1", status: "idle" });
-  await x.bots.setThread("bot1");
-  let alerts = [{ name: "Brief", message: "Brief is off: BB turned it off again (host disconnected) after 3 resumes today. Check it, then resume it.", at: 5 }];
-  (x.bots as unknown as { deps: { automationAlerts(): unknown } }).deps.automationAlerts = () => alerts;
-  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", relation: "self", needsYou: true, title: expect.stringContaining("Brief is off") })]);
-  alerts = [];
-  expect((await x.bots.activity()).needsYou).toEqual([]);
-});
-
-it("Needs you says why: a question, an approval; Mark handled hides it until a new one comes, and Undo brings it back", async () => {
-  const x = await setup();
-  x.add({ id: "bot1", status: "idle" });
-  await x.bots.setThread("bot1");
-  x.add({ id: "ask", parentThreadId: "bot1", status: "idle", hasPendingInteraction: true } as never);
-  x.add({ id: "deploy", parentThreadId: "bot1", status: "idle", hasPendingInteraction: true } as never);
-  x.pending.set("ask", [{ id: "q1", status: "pending", payload: { kind: "user_question" } } as never]);
-  x.pending.set("deploy", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
-  const reasons = async () => Object.fromEntries((await x.bots.activity()).needsYou.map((t) => [t.id, t.reason]));
-  expect(await reasons()).toEqual({ ask: "Asked you a question", deploy: "Waiting for approval" });
-
-  await x.bots.markHandled("ask");
-  expect(await reasons()).toEqual({ deploy: "Waiting for approval" });
-  x.bots.restoreHandled("ask");
-  expect(await reasons()).toEqual({ ask: "Asked you a question", deploy: "Waiting for approval" });
-  // Handled stays handled until what it waits on changes: a new question is back.
-  await x.bots.markHandled("ask");
-  expect(Object.keys(await reasons())).toEqual(["deploy"]);
-  x.pending.set("ask", [{ id: "q1", status: "pending", payload: { kind: "user_question" } }, { id: "q2", status: "pending", payload: { kind: "user_question" } }] as never);
-  expect(Object.keys(await reasons()).sort()).toEqual(["ask", "deploy"]);
-  // Answered: it leaves on its own, even before BB's list catches up.
-  x.pending.set("deploy", [{ id: "p1", status: "resolved", payload: { kind: "approval" } } as never]);
-  expect(Object.keys(await reasons())).toEqual(["ask"]);
-});
-
-it("Needs you: a failure alert in the Bot's chat leaves once the chat is read after it, or is marked handled until the next one", async () => {
-  const x = await setup();
-  x.add({ id: "bot1", status: "idle", lastReadAt: 1 });
-  await x.bots.setThread("bot1");
-  let alerts = [{ name: "Brief", message: "Brief is off.", at: 100 }];
-  (x.bots as unknown as { deps: { automationAlerts(): unknown } }).deps.automationAlerts = () => alerts;
-  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", reason: "Failed" })]);
-  await x.bots.markHandled("bot1");
-  expect((await x.bots.activity()).needsYou).toEqual([]);
-  alerts = [...alerts, { name: "Digest", message: "Digest is off.", at: 200 }];
-  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "bot1", reason: "2 failed" })]);
-  // Read after the latest alert: seen.
-  x.threads.set("bot1", { ...x.threads.get("bot1")!, lastReadAt: 200 });
-  expect((await x.bots.activity()).needsYou).toEqual([]);
-});
-
-it("Needs you: an urgent runner shows its report; read or answered it's gone; Mark handled and Undo go through the runner", async () => {
-  const x = await setup();
-  x.add({ id: "bot1" });
-  await x.bots.setThread("bot1");
-  x.add({ id: "run_t", visibility: "hidden", title: "Security · Runner", status: "idle" });
-  let reason: string | null = "Urgent report: Port 22 is open";
-  const runners = { threads: () => new Map([["run_t", { urgent: true }]]), pauseAll: async () => [], restore: async () => true, needsYou: vi.fn(async () => reason), seen: vi.fn(), unseen: vi.fn() };
-  (x.bots as unknown as { deps: { runners: unknown } }).deps.runners = runners;
-  expect((await x.bots.activity()).needsYou).toEqual([expect.objectContaining({ id: "run_t", reason: "Urgent report: Port 22 is open" })]);
-  expect(runners.needsYou).toHaveBeenCalledWith("run_t", expect.objectContaining({ id: "run_t" }));
-  reason = null;
-  expect((await x.bots.activity()).needsYou).toEqual([]);
-  await x.bots.markHandled("run_t");
-  expect(runners.seen).toHaveBeenCalledWith("run_t", expect.any(String));
-  x.bots.restoreHandled("run_t");
-  expect(runners.unseen).toHaveBeenCalledWith("run_t", expect.any(String));
-});
 
 it("applies skill saves immediately, preserves diffs and warnings, and reverts without losing history", async () => {
   const x = await setup();

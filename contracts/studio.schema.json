@@ -7923,9 +7923,6 @@
                     "started"
                   ]
                 },
-                "needsYou": {
-                  "type": "boolean"
-                },
                 "parentId": {
                   "default": null,
                   "type": [
@@ -7939,7 +7936,7 @@
                     "null"
                   ]
                 },
-                "reason": {
+                "waitingFor": {
                   "type": [
                     "string",
                     "null"
@@ -7953,7 +7950,6 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou",
                 "parentId"
               ],
               "additionalProperties": false
@@ -8512,77 +8508,33 @@
               "additionalProperties": false
             }
           },
-          "needsYou": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
+          "attention": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "number"
+                  },
+                  "since": {
+                    "type": "number"
+                  }
                 },
-                "title": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "projectId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                },
-                "relation": {
-                  "type": "string",
-                  "enum": [
-                    "self",
-                    "started"
-                  ]
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "parentId": {
-                  "default": null,
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "runningSince": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "reason": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
+                "required": [
+                  "reason",
+                  "count",
+                  "since"
+                ],
+                "additionalProperties": false
               },
-              "required": [
-                "id",
-                "title",
-                "status",
-                "projectId",
-                "updatedAt",
-                "relation",
-                "needsYou",
-                "parentId"
-              ],
-              "additionalProperties": false
-            }
+              {
+                "type": "null"
+              }
+            ]
           },
           "inProgress": {
             "type": "array",
@@ -8620,9 +8572,6 @@
                     "started"
                   ]
                 },
-                "needsYou": {
-                  "type": "boolean"
-                },
                 "parentId": {
                   "default": null,
                   "type": [
@@ -8636,7 +8585,7 @@
                     "null"
                   ]
                 },
-                "reason": {
+                "waitingFor": {
                   "type": [
                     "string",
                     "null"
@@ -8650,7 +8599,6 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou",
                 "parentId"
               ],
               "additionalProperties": false
@@ -8693,9 +8641,6 @@
                     "started"
                   ]
                 },
-                "needsYou": {
-                  "type": "boolean"
-                },
                 "parentId": {
                   "default": null,
                   "type": [
@@ -8709,7 +8654,7 @@
                     "null"
                   ]
                 },
-                "reason": {
+                "waitingFor": {
                   "type": [
                     "string",
                     "null"
@@ -8723,7 +8668,6 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou",
                 "parentId"
               ],
               "additionalProperties": false
@@ -8810,9 +8754,6 @@
                     "started"
                   ]
                 },
-                "needsYou": {
-                  "type": "boolean"
-                },
                 "parentId": {
                   "default": null,
                   "type": [
@@ -8826,7 +8767,7 @@
                     "null"
                   ]
                 },
-                "reason": {
+                "waitingFor": {
                   "type": [
                     "string",
                     "null"
@@ -8840,7 +8781,6 @@
                 "projectId",
                 "updatedAt",
                 "relation",
-                "needsYou",
                 "parentId"
               ],
               "additionalProperties": false
@@ -8880,12 +8820,62 @@
           }
         },
         "required": [
-          "needsYou",
+          "attention",
           "inProgress",
           "waiting",
           "scheduled",
           "completed",
           "latest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_attention": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "attention": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": "number"
+                  },
+                  "since": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "reason",
+                  "count",
+                  "since"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "attention"
         ],
         "additionalProperties": false
       }
@@ -10776,9 +10766,6 @@
                     "null"
                   ]
                 },
-                "urgent": {
-                  "type": "boolean"
-                },
                 "running": {
                   "type": "boolean"
                 },
@@ -10801,8 +10788,7 @@
                 "lastRunAt",
                 "lastLevel",
                 "lastReport",
-                "lastReportAt",
-                "urgent"
+                "lastReportAt"
               ],
               "additionalProperties": false
             }
@@ -11058,9 +11044,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -11083,8 +11066,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -11293,9 +11275,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -11318,8 +11297,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -11486,9 +11464,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -11511,8 +11486,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -11828,9 +11802,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -11853,8 +11824,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -12011,9 +11981,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -12036,8 +12003,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -12194,9 +12160,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -12219,8 +12182,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }
@@ -12260,111 +12222,6 @@
         "required": [
           "deleted",
           "kept"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "bot_runner_seen": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "botId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "bot_needs_you_dismiss": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "botId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "threadId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "bot_needs_you_restore": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "botId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "threadId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "required": [
-          "ok"
         ],
         "additionalProperties": false
       }
@@ -12537,9 +12394,6 @@
               "null"
             ]
           },
-          "urgent": {
-            "type": "boolean"
-          },
           "running": {
             "type": "boolean"
           },
@@ -12562,8 +12416,7 @@
           "lastRunAt",
           "lastLevel",
           "lastReport",
-          "lastReportAt",
-          "urgent"
+          "lastReportAt"
         ],
         "additionalProperties": false
       }

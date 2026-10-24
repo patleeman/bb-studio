@@ -16,9 +16,9 @@
 //
 // Cap: at most RESUME_CAP resumes per automation in a rolling 24 hours,
 // recorded in automation_auto_resumes (append-only). Past the cap it stays
-// off; the owning Bot gets it in Needs you, a phone push and one line in its
-// chat (the urgent runner_report path), once per failed run, not every sweep.
-// When it's on again, a "cleared" row ends the Needs you entry.
+// off; the owning Bot gets a phone push and one line in its chat to triage
+// (the urgent runner_report path), once per failed run, not every sweep.
+// When it's on again, a "cleared" row ends the episode.
 //
 // When: at startup, on the five-minute sweep, and soon after a target thread
 // goes idle or fails (BB sends plugins no automation events).
@@ -68,7 +68,7 @@ export interface AutoResumeDeps {
   targets(): ResumeTarget[];
   /** Logs a resume: a runner's log entry; a Bot automation's shows in its runs. */
   resumed(target: ResumeTarget, line: string): void | Promise<void>;
-  /** Past the cap: Needs you, a phone push and one line in the Bot's chat. */
+  /** Past the cap: a phone push and one line in the Bot's chat, for the Bot to triage. */
   exhausted(target: ResumeTarget, line: string): Promise<void>;
   log?(message: string): void;
   now?(): number;
@@ -128,7 +128,7 @@ export class AutoResume {
     return (this.deps.db.prepare("SELECT COUNT(*) AS n FROM automation_auto_resumes WHERE automation_id = ? AND event = 'resumed' AND at > ?").get(automationId, this.now() - DAY) as { n: number }).n;
   }
 
-  /** A Bot's automations past the cap and still off, for Needs you. */
+  /** A Bot's automations past the cap and still off. */
   alerts(botId: string): { automationId: string; owner: ResumeTarget["owner"]; name: string; message: string; at: number }[] {
     return this.deps.targets().filter((target) => target.botId === botId && target.on).flatMap((target) => {
       const row = this.latest(target.automationId);
@@ -202,7 +202,7 @@ export class AutoResume {
 
   private async check(target: ResumeTarget, automation: z.infer<typeof automationRow>): Promise<boolean> {
     if (automation.enabled) {
-      // On again (the user resumed it, or a resume took): its Needs you entry ends.
+      // On again (the user or the Bot resumed it, or a resume took): the episode ends.
       if (this.latest(target.automationId)?.event === "exhausted") this.append(target, "cleared");
       return false;
     }
