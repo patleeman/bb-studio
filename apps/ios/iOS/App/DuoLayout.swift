@@ -124,7 +124,9 @@ struct DuoHeader<Title: View, Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            title.fixedSize(horizontal: true, vertical: false)
+            // The title takes the room the actions leave and truncates there.
+            // Never fixedSize: an inset this wide widens the whole page under it.
+            title.lineLimit(1).layoutPriority(1)
             Spacer(minLength: 8)
             HStack(spacing: 12) { actions }.fixedSize(horizontal: true, vertical: false)
         }
