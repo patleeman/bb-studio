@@ -653,8 +653,14 @@ struct ThreadView: View {
                 lastPoint: TranscriptResizeAnchor.lastPoint(contentHeight: geometry.contentSize.height,
                     viewportHeight: geometry.containerSize.height),
                 point: geometry.contentOffset.y + geometry.contentInsets.top,
-                nearEnd: geometry.unobscuredBottom >= geometry.contentSize.height - 120)
+                nearEnd: geometry.unobscuredBottom >= geometry.contentSize.height - 120,
+                bottomInset: geometry.contentInsets.bottom)
         } action: { _, next in
+            // The keyboard, composer or quick replies changing the bottom
+            // inset while the reader was at the end: keep the end in view.
+            if next.bottomInset != end.geometry.bottomInset, end.geometry.nearEnd, !end.readerScrolling {
+                end.following = true
+            }
             end.geometry = next
             if pastEnd != next.distance { pastEnd = next.distance }
             keepAtEnd()
@@ -664,10 +670,17 @@ struct ThreadView: View {
             if phase == .tracking || phase == .interacting {
                 resizeRestore?.cancel()
                 resizeAnchor.cancel()
+                end.readerScrolling = true
             }
-            // The reader decides: wherever a scroll comes to rest, the chat
-            // follows its end only if that's near the end.
-            if phase == .idle { end.following = end.geometry.nearEnd }
+            // The reader decides: wherever their scroll comes to rest, the
+            // chat follows its end only if that's near the end. The app's own
+            // animated scrolls don't decide it: one cut short by a newer
+            // request rests wherever it was, short of a reply still growing,
+            // and the chat stopped following with no one having scrolled.
+            if phase == .idle, end.readerScrolling {
+                end.following = end.geometry.nearEnd
+                end.readerScrolling = false
+            }
             keepAtEnd()
         }
         // The first page lands at the bottom through `defaultScrollAnchor`;
@@ -729,7 +742,16 @@ struct ThreadView: View {
             // check is held off; check once it's done.
             defer {
                 resizeAnchor.finish(token)
+                #if DEBUG
+                ScrollLog.request("restore released")
+                #endif
                 keepAtEnd()
+                // Once more after the layout the release lets through: the
+                // geometry seen here can predate the restore's last jump.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    keepAtEnd()
+                }
             }
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
@@ -1446,14 +1468,18 @@ private struct EndGeometry: Equatable {
     var lastPoint: CGFloat = 0
     var point: CGFloat = 0
     var nearEnd = true
+    var bottomInset: CGFloat = 0
 }
 
 private final class TranscriptEnd {
     var geometry = EndGeometry()
     var markerVisible = false
     /// The newest row stays at the bottom. Opens true (the chat opens at its
-    /// end); set where a scroll comes to rest, and by `scrollToBottom`.
+    /// end); set where the reader's scroll comes to rest, by `scrollToBottom`,
+    /// and when the bottom inset changes while the reader is at the end.
     var following = true
+    /// The reader's finger is on the transcript, or its fling is still going.
+    var readerScrolling = false
 }
 
 extension ScrollGeometry {
