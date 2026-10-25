@@ -162,6 +162,20 @@ enum BotDemo {
             }
         }
 
+        /// QA: `count` rows land at once, as when the Bot works through a
+        /// long turn while the phone is away: more than one page.
+        func burst(_ count: Int) {
+            let at = Date().timeIntervalSince1970 * 1000
+            lock.withLock {
+                sends += 1
+                for index in 0..<count {
+                    rows.append(BotDemo.row(id: "burst\(sends)-\(index)", role: "assistant",
+                        text: "Burst \(sends) step \(index). Checked the release notes and the build.", at: at + Double(index)))
+                }
+            }
+            notify()
+        }
+
         private func notify() {
             Task { @MainActor in changed?() }
         }

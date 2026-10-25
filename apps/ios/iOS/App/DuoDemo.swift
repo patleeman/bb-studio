@@ -26,7 +26,7 @@ enum DuoDemo {
                     "contentWidth": scroll.contentSize.width, "contentHeight": scroll.contentSize.height,
                     "contentOffsetY": scroll.contentOffset.y,
                     "adjustedRight": scroll.adjustedContentInset.right,
-                    "adjustedBottom": scroll.adjustedContentInset.bottom,
+                    "adjustedBottom": scroll.adjustedContentInset.bottom, "adjustedTop": scroll.adjustedContentInset.top,
                     "clips": scroll.clipsToBounds])
             }
             return result
@@ -49,7 +49,7 @@ enum DuoDemo {
     }
 
     static func handle(_ url: URL) -> Bool {
-        guard BotDemo.variant == "duo", url.host() == "qa-duo",
+        guard BotDemo.variant != nil, url.host() == "qa-duo",
               let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                 .flatMap(\.windows).first(where: \.isKeyWindow) else { return false }
         let size: CGSize
@@ -82,6 +82,12 @@ enum DuoDemo {
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }
+            return true
+        case "dismiss":
+            window.endEditing(true)
+            return true
+        case "burst":
+            BotDemo.Server.shared.burst(Int(url.query() ?? "") ?? 40)
             return true
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)

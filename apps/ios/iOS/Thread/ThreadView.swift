@@ -587,7 +587,7 @@ struct ThreadView: View {
             window?.accessibilityValue = "\(ObjectIdentifier(model))|loads=\(model.qaLoadCount)|keeper=\(ObjectIdentifier(resizeAnchor))#\(resizeAnchor.debugState)"
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
-            guard BotDemo.variant == "duo" else { return }
+            guard BotDemo.variant != nil else { return }
             resizeRestore?.cancel()
             resizeAnchor.cancel()
             if event.object as? String == "mid" {
@@ -597,7 +597,15 @@ struct ThreadView: View {
         }
         #endif
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { resizeAnchor.frame = $0 }
-        .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { resizeAnchor.visible($0) }
+        .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
+            resizeAnchor.visible(ids)
+            #if DEBUG
+            ScrollLog.visible(ids)
+            #endif
+        }
+        #if DEBUG
+        .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, geometry in ScrollLog.geometry(geometry) }
+        #endif
         .coordinateSpace(name: "threadTranscript")
         .scrollPosition($position)
         .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
@@ -688,6 +696,9 @@ struct ThreadView: View {
     /// materialize the saved row in the lazy stack, then restore its pixel
     /// offset as the new widths settle. An interaction cancels this work.
     private func restoreAfterWidthChange(_ anchor: TranscriptResizeAnchor.Anchor) {
+        #if DEBUG
+        ScrollLog.request("restoreAfterWidthChange \(anchor)")
+        #endif
         resizeRestore?.cancel()
         let token = resizeAnchor.generation
         resizeRestore = Task { @MainActor in
@@ -715,6 +726,9 @@ struct ThreadView: View {
                         position.scrollTo(id: id, anchor: UnitPoint(x: 0, y: alignment))
                         restored = true
                     } else if let y = resizeAnchor.correction(for: id, offset: offset) {
+                        #if DEBUG
+                        ScrollLog.request("restore scrollTo(y: \(y))")
+                        #endif
                         position.scrollTo(y: y)
                         restored = true
                     } else { restored = false }
@@ -778,6 +792,9 @@ struct ThreadView: View {
         let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started, compactions: $0.compactions).first?.id } ?? TimelineItem.group(model.rows).first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
+        #if DEBUG
+        ScrollLog.request("loadOlder \(result) keep \(first)")
+        #endif
         if result == .added { position.scrollTo(id: first, anchor: .top) }
         return result
     }
@@ -788,6 +805,9 @@ struct ThreadView: View {
 
     private func settlePastEnd() {
         guard !resizeAnchor.restoring else { return }
+        #if DEBUG
+        if pastEnd > 0.5 { ScrollLog.request("settlePastEnd \(pastEnd)") }
+        #endif
         if pastEnd > 0.5 { scrollToBottom(animated: false) }
     }
 
@@ -799,6 +819,9 @@ struct ThreadView: View {
     /// (no animation) lays it out at once, and draws the end after a raised
     /// keyboard, where a scroll to the edge alone could land blank.
     private func scrollToBottom(animated: Bool = true) {
+        #if DEBUG
+        ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(pastEnd)")
+        #endif
         guard animated, atBottom else {
             position.scrollTo(id: Self.bottomId, anchor: .bottom)
             return
