@@ -90,28 +90,70 @@ Checked and ruled out: the bottom inset is applied once. It is the
 bar. The measured insets (phone 207 at rest, 267 with quick replies, 452
 with the keyboard; Duo 158 / 218 / 428) match the composer's frame.
 
+## Follow-up: black right after sending with the keyboard open
+
+Patrick, Oct 24 10:22 PM, on the Duo outer screen: black right after sending,
+keyboard still open. With the keyboard up the outer screen shows only 168 pt
+of chat, so any overshoot that size blanks the whole chat.
+
+`testSendingWithTheKeyboardOpenFollowsTheStreamingReply` sends with the
+keyboard open while the reply streams in over 8 updates (`-qaDemoStream`),
+then a message from elsewhere streams in (`qa-duo/stream`). It samples every
+~0.3 s and fails if the visible chat is ever wholly blank. On main at
+b0c6a0bd it **fails on the Duo** (passes on the phone): 2 blank samples while
+the reply streamed, and after one keyboard-up the newest row rested 180 pt
+behind the keyboard.
+
+The cause was the first fix itself. It pinned to the bottom with
+`ScrollPosition.scrollTo(edge: .bottom)`. With a bottom inset, that lands
+exactly one bottom inset past the end: 428 pt with the keyboard up, 158 pt
+without. Every streamed update re-pinned, then the clamp pulled it back:
+
+```
+35.965 req scrollToBottom animated=false atBottom=true     (pinned to the edge)
+35.968 req settlePastEnd 428.0 marker=false to 4499.0
+35.968 geo offset=4845.0 content=4667.0 container=168.0 insetBottom=428.0 past=428.0 visible=
+```
+
+Each one is a black flash of up to 0.8 s. A 90 pt overshoot also stayed at
+rest for about 4 s, because "pin to the edge" just re-landed in the same
+place.
+
+`testReopeningTheChatOpensAtTheNewestRow` goes back to the Bots list and
+reopens the chat five times: plain, again, after a streamed reply while away,
+after a 40-row burst while away, and after that. It passes on main and with
+the fix, on the phone and the Duo, with no blank sample. That path didn't
+reproduce here.
+
 ## The fix
 
-All in `apps/ios/iOS/Thread/ThreadView.swift` and `TranscriptResizeAnchor.swift`:
+All in `apps/ios/iOS/Thread/ThreadView.swift` (`TranscriptResizeAnchor.swift`
+has the measurements):
 
-- **One way to the bottom, pinned to the edge.** `pinToBottom()` is used by
-  every scroll-to-bottom. When the marker is on screen, the end is measured,
-  so it pins to `.bottom` edge. SwiftUI holds an edge pin through inset
-  changes, so the chat stays at its end as the keyboard, composer or quick
-  replies change. When the marker is off screen, the edge is only a
-  lazy-stack estimate, so it jumps to the marker first, which lays it out,
-  and pins to the edge when the marker comes on screen.
-- **Any overshoot at rest is clamped.** `TranscriptResizeAnchor.overshoot`
-  measures any part of the view past the last row, not just a whole screen.
-  `settlePastEnd` runs once scrolling is idle (a bounce isn't fought). It
-  scrolls to `lastPoint`, the last valid offset of the *measured* content,
-  by point rather than to the marker's estimated place, which could land
-  past the end again. Then it re-pins to the edge.
-- **The fold restore re-checks when it ends.** `settlePastEnd` runs after
-  `resizeAnchor.finish`. The restore's own "beyond maximum" check is gone
-  in favour of it; the restore still handles blank and above-the-top cases.
-- `TranscriptResizeAnchor.correction` uses the same `lastPoint`, so restore
-  corrections and the clamp agree on the valid range.
+- **One owner of the end: `keepAtEnd()`.** The scroll geometry (`EndGeometry`)
+  reports how far the view runs past the last row, the point that puts the
+  last row at the bottom (`lastPoint`, from the *measured* content), and
+  where the view is now. While the reader follows the end, any change
+  scrolls to `lastPoint`: a reply streaming in, the keyboard opening or
+  closing, the composer or quick replies changing. A view resting past its
+  end comes back, following or not. It acts only once scrolling is idle,
+  so a bounce isn't fought.
+- **Following is the reader's choice.** It is set wherever a scroll comes to
+  rest (near the end means following) and by `scrollToBottom`. It is
+  cleared when the app takes the reader to a row with `read(_:anchor:)`: the
+  unread row, a find match, the restored reading position, or an older
+  page.
+- **By point, never by edge.** Pinned to the marker's id, SwiftUI kept the
+  offset when the inset changed (the first bug). Pinned to the edge, it
+  landed one inset past the end (the follow-up). `scrollTo(edge:)` is no
+  longer used. From far up, `scrollToBottom` still jumps to the marker's id
+  first, because that lays the end out in the lazy stack; `keepAtEnd` then
+  settles on the measured end.
+- **The fold restore hands over when it ends.** `keepAtEnd` runs after
+  `resizeAnchor.finish`. The restore still handles blank and above-the-top
+  cases.
+- The separate "follow the streaming text" `onChange` is gone; `keepAtEnd`
+  covers it.
 
 ## Tests
 
@@ -119,15 +161,16 @@ All in `apps/ios/iOS/Thread/ThreadView.swift` and `TranscriptResizeAnchor.swift`
 `TEST_RUNNER_SCROLL_DUO=1` for the Duo's outer screen and
 `TEST_RUNNER_SCROLL_SHOTS=<dir>` for screenshots.
 
-| Test | Before (fce99dd3) | After |
+| Test | Before | After (phone and Duo) |
 | --- | --- | --- |
-| `testClosingTheKeyboardAtTheBottomLeavesNoBlank` | **fails**, phone 236 pt, Duo 261 pt | passes, phone and Duo (settled 0 to −1 pt) |
+| `testClosingTheKeyboardAtTheBottomLeavesNoBlank` | **fails** at fce99dd3: phone 236 pt, Duo 261 pt | passes |
+| `testSendingWithTheKeyboardOpenFollowsTheStreamingReply` | **fails** on the Duo at b0c6a0bd: blank frames, newest row 180 pt behind the keyboard | passes, no blank sample |
+| `testReopeningTheChatOpensAtTheNewestRow` | passes at b0c6a0bd | passes |
 | `testRowsReplacedUnderTheReaderLeaveNoBlank` | passes (guard) | passes |
 | `testFoldingNeverLeavesThePastEnd` (Duo) | passes (guard) | passes |
 
-The keyboard test also checks that the newest row rides up with the keyboard
-when it reopens. A point-only clamp failed that check at −238 pt, which is
-why the clamp re-pins to the edge.
+The keyboard tests also check that the newest row rides up with the
+keyboard when it opens.
 
 Reproduce (`apps/ios`, your own simulators):
 
@@ -145,13 +188,13 @@ For the step-by-step geometry, launch with `-qaScrollLog` and read
 
 ## Risks
 
-- An edge pin that is held while lazy rows *above* the viewport measure in
-  should keep the bottom in place; that is what the follow-the-reply flows
-  rely on, and they passed in the tests. It hasn't been tried on a real
-  device with Markdown images or mini cards resizing at the bottom.
+- While an animated scroll runs, `keepAtEnd` waits for it to finish. A reply
+  that grows during that time can sit up to a second behind the composer
+  before it catches up. The test allows this; it never goes past the end.
 - During a fold or unfold, the viewport can still pass the end for a moment
-  while the restore runs (up to about 2.6 s, as before). It's repaired as
-  soon as the restore finishes. Real hinge folds can't be driven in this
-  simulator; the tests resize the window.
+  while the restore runs. It's repaired as soon as the restore finishes.
+  Real hinge folds can't be driven in this simulator; the tests resize the
+  window.
 - Not tried on a real Duo: the hardware keyboard's actual height on the outer
-  screen, and Patrick's exact all-black frame.
+  screen. Images or mini cards resizing at the bottom are untested on
+  device.
