@@ -69,3 +69,15 @@ actor PushRegistration {
         if let data = try? JSONEncoder().encode(states) { defaults.set(data, forKey: key) }
     }
 }
+
+extension PushRegistration {
+    /// The device's name in BB's push device list, with the app's version and
+    /// build, so the server shows which build a phone runs. Sent on every
+    /// launch's registration.
+    static func label(device: String, info: [String: Any]? = Bundle.main.infoDictionary) -> String {
+        let version = info?["CFBundleShortVersionString"] as? String
+        let build = info?["CFBundleVersion"] as? String
+        let app = [version, build.map { "(\($0))" }].compactMap { $0 }.joined(separator: " ")
+        return app.isEmpty ? "BB Studio · \(device)" : "BB Studio \(app) · \(device)"
+    }
+}

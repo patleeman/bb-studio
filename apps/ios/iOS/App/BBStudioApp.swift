@@ -105,7 +105,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             PushRegistration.allowed(arguments: ProcessInfo.processInfo.arguments,
             environment: ProcessInfo.processInfo.environment) else { return }
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        let label = "BB Studio · \(UIDevice.current.name)"
+        let label = PushRegistration.label(device: UIDevice.current.name)
         Task { try? await PushRegistration.shared.register(apnsToken: token, label: label, client: BBClient()) }
         #endif
     }

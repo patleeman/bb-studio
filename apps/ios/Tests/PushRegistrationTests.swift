@@ -38,6 +38,13 @@ final class PushRegistrationTests: XCTestCase {
         XCTAssertTrue(PushRegistration.allowed(arguments: ["app"], environment: [:]))
     }
 
+    func testDeviceLabelCarriesVersionAndBuild() {
+        XCTAssertEqual(PushRegistration.label(device: "Patrick's Duo",
+            info: ["CFBundleShortVersionString": "1.4", "CFBundleVersion": "20261025.0214"]),
+            "BB Studio 1.4 (20261025.0214) · Patrick's Duo")
+        XCTAssertEqual(PushRegistration.label(device: "iPhone", info: nil), "BB Studio · iPhone")
+    }
+
     func testFailedRemovalRetriesOnNextRegistration() async throws {
         let suite = "PushRegistrationRetryTests-\(UUID())"
         let defaults = UserDefaults(suiteName: suite)!
