@@ -102,6 +102,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
+            ScrollLogSection()
             Section("Action button") {
                 Text(
                     "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, New voice chat with BB, or Open BB thread."

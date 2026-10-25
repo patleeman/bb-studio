@@ -617,13 +617,9 @@ struct ThreadView: View {
         .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
             resizeAnchor.visible(ids)
             end.markerVisible = ids.contains(Self.bottomId)
-            #if DEBUG
             ScrollLog.visible(ids)
-            #endif
         }
-        #if DEBUG
         .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, geometry in ScrollLog.geometry(geometry) }
-        #endif
         .coordinateSpace(name: "threadTranscript")
         .scrollPosition($position)
         .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
@@ -732,9 +728,7 @@ struct ThreadView: View {
     /// materialize the saved row in the lazy stack, then restore its pixel
     /// offset as the new widths settle. An interaction cancels this work.
     private func restoreAfterWidthChange(_ anchor: TranscriptResizeAnchor.Anchor) {
-        #if DEBUG
-        ScrollLog.request("restoreAfterWidthChange \(anchor)")
-        #endif
+        ScrollLog.request("restoreAfterWidthChange \(ScrollLog.describe(anchor))")
         resizeRestore?.cancel()
         let token = resizeAnchor.generation
         resizeRestore = Task { @MainActor in
@@ -742,9 +736,7 @@ struct ThreadView: View {
             // check is held off; check once it's done.
             defer {
                 resizeAnchor.finish(token)
-                #if DEBUG
                 ScrollLog.request("restore released")
-                #endif
                 keepAtEnd()
                 // Once more after the layout the release lets through: the
                 // geometry seen here can predate the restore's last jump.
@@ -776,9 +768,7 @@ struct ThreadView: View {
                         read(id, anchor: UnitPoint(x: 0, y: alignment))
                         restored = true
                     } else if let y = resizeAnchor.correction(for: id, offset: offset) {
-                        #if DEBUG
                         ScrollLog.request("restore scrollTo(y: \(y))")
-                        #endif
                         end.following = false
                         position.scrollTo(y: y)
                         restored = true
@@ -843,9 +833,7 @@ struct ThreadView: View {
         let first = botChrome.map { BotChatEntry.memo.entries(model.chainRows, started: $0.started, compactions: $0.compactions).first?.id } ?? TimelineItem.group(model.rows).first?.id
         guard let first else { return .nothing }
         let result = await model.loadOlder()
-        #if DEBUG
-        ScrollLog.request("loadOlder \(result) keep \(first)")
-        #endif
+        ScrollLog.request("loadOlder \(result) keep \(ScrollLog.id(first))")
         if result == .added { read(first, anchor: .top) }
         return result
     }
@@ -868,17 +856,13 @@ struct ThreadView: View {
     /// every streamed update.
     private func keepAtEnd() {
         guard scrollPhase == .idle, !resizeAnchor.restoring else {
-            #if DEBUG
             if pastEnd > 0.5 || end.following { ScrollLog.request("keepAtEnd held phase=\(scrollPhase) restoring=\(resizeAnchor.restoring) past=\(pastEnd)") }
-            #endif
             return
         }
         guard end.following || pastEnd > 0.5 else { return }
         let target = end.geometry.lastPoint
         guard abs(end.geometry.point - target) > 0.5 else { return }
-        #if DEBUG
         ScrollLog.request("keepAtEnd following=\(end.following) from \(end.geometry.point) to \(target)")
-        #endif
         position.scrollTo(y: target)
     }
 
@@ -897,9 +881,7 @@ struct ThreadView: View {
     /// in a long chat of uneven rows, the whole transcript visibly scrolled
     /// past.
     private func scrollToBottom(animated: Bool = true) {
-        #if DEBUG
         ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(pastEnd)")
-        #endif
         end.following = true
         if end.markerVisible || atBottom {
             if animated {
