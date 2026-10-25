@@ -37,17 +37,6 @@ struct DictateControl: ControlWidget {
     }
 }
 
-struct VoiceControl: ControlWidget {
-    var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "nyc.plee.bbgo.voice") {
-            ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://voice")!)) {
-                Label("New voice chat", systemImage: Symbols.voiceChat)
-            }
-        }
-        .displayName("New voice chat with BB")
-    }
-}
-
 struct NewThreadControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.new") {

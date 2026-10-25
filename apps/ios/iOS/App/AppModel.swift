@@ -223,7 +223,7 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
-        case "voice": if let id { openWithVoice(id) } else { startVoiceChat() }
+        case "voice": if let id { openWithVoice(id) }
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)
@@ -293,30 +293,6 @@ final class AppModel: ObservableObject {
     func openBots(_ route: BotRoute) {
         botRoute = route
         tab = .bot
-    }
-
-    /// Set while `voice.new` runs, so a second tap doesn't start a second chat.
-    @Published private(set) var startingVoiceChat = false
-
-    /// A new voice chat (Studio's `voice.new`): a thread on a fast model with
-    /// voice mode on, whose agent greets you. Opens it; without a project it
-    /// goes in BB's personal project, as on desktop.
-    func startVoiceChat(projectId: String? = nil) {
-        guard !startingVoiceChat else { return }
-        startingVoiceChat = true
-        sheet = nil
-        let client = client
-        Task {
-            defer { startingVoiceChat = false }
-            do {
-                let threadId = try await client.newVoiceChat(projectId: projectId)
-                guard client.baseURL == serverURL else { return }
-                ThreadVoice.startedOn.insert(threadId)
-                openThread(threadId)
-            } catch {
-                flash("Couldn't start a voice chat: \(BBClient.describe(error, plugin: "Studio", server: client.baseURL))")
-            }
-        }
     }
 
     /// `bbstudio://voice/<id>`: the thread, with voice mode turned on.

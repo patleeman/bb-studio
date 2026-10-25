@@ -92,9 +92,6 @@ struct SettingsView: View {
                         Label("Voice", systemImage: "speaker.wave.2")
                     }
                     .accessibilityIdentifier("settingsVoice")
-                    Button { app.startVoiceChat() } label: {
-                        Label("New Voice Chat", systemImage: Symbols.voiceChat)
-                    }
                 } header: {
                     Text("Voice").foregroundStyle(Color.primary.opacity(0.75))
                 } footer: {
@@ -105,7 +102,7 @@ struct SettingsView: View {
             ScrollLogSection()
             Section("Action button") {
                 Text(
-                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, New voice chat with BB, or Open BB thread."
+                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB or Open BB thread."
                 )
                 .font(.footnote)
             }

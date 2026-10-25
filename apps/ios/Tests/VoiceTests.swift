@@ -371,7 +371,7 @@ final class ThreadVoiceTests: XCTestCase {
         defer { ThreadVoice.startedOn.remove("thr_v") }
         let backend = FakeBackendPlayer()
         let voice = ThreadVoice(threadId: "thr_v", player: backend.player)
-        XCTAssertTrue(voice.on, "a new voice chat is on before voice.state answers")
+        XCTAssertTrue(voice.on, "a thread opened by a voice link is on before voice.state answers")
         voice.attach(client: BBClient(baseURL: URL(string: "https://bb.invalid")!), realtime: BBRealtime(client: BBClient(baseURL: URL(string: "https://bb.invalid")!)))
         defer { voice.detach() }
 

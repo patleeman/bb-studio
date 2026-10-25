@@ -12,7 +12,6 @@ struct BBStudioWidgets: WidgetBundle {
         CaptureControl()
         BotTalkControl()
         DictateControl()
-        VoiceControl()
         NewThreadControl()
     }
 }

@@ -62,19 +62,6 @@ struct DictateIntent: AppIntent {
     }
 }
 
-/// Kept under its old type name so shortcuts people made still run.
-struct VoiceChatIntent: AppIntent {
-    static let title: LocalizedStringResource = "New voice chat with BB"
-    static let description = IntentDescription("Start a new voice chat: a thread whose replies are spoken, which can hand work to your Bot.")
-    static let openAppWhenRun = true
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        AppModel.shared.startVoiceChat()
-        return .result()
-    }
-}
-
 struct OpenThreadIntent: AppIntent {
     static let title: LocalizedStringResource = "Open BB thread"
     static let openAppWhenRun = true
@@ -233,9 +220,6 @@ struct BBShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: DictateIntent(), phrases: ["Dictate to \(.applicationName)"], shortTitle: "Dictate",
             systemImageName: "mic.fill")
-        AppShortcut(
-            intent: VoiceChatIntent(), phrases: ["Voice chat with \(.applicationName)", "New voice chat in \(.applicationName)"], shortTitle: "Voice chat",
-            systemImageName: "waveform.and.person.filled")
         AppShortcut(
             intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",
             systemImageName: "square.and.pencil")

@@ -427,27 +427,23 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Voice mode end to end, against a staged BB whose Studio can speak
-    /// (`TEST_RUNNER_BBGO_QA_VOICE_SERVER=http://127.0.0.1:<port>`; it starts a thread and sends to it).
-    /// New voice chat greets you aloud; a typed message's reply plays and is
-    /// lit up as it's read; Read Aloud reads a reply again; the speaker's
-    /// menu opens the voice settings.
+    /// (`TEST_RUNNER_BBGO_QA_VOICE_SERVER=http://127.0.0.1:<port>` and a scratch
+    /// thread there, `TEST_RUNNER_BBGO_QA_VOICE_THREAD`, which it sends to).
+    /// `bbstudio://voice/<id>` turns voice mode on; a typed message's reply
+    /// plays and is lit up as it's read; Read Aloud reads a reply again; the
+    /// speaker's menu opens the voice settings.
     func testVoiceChat() throws {
-        guard let server = ProcessInfo.processInfo.environment["BBGO_QA_VOICE_SERVER"] else { throw XCTSkip("no staged voice server") }
+        let env = ProcessInfo.processInfo.environment
+        guard let server = env["BBGO_QA_VOICE_SERVER"], let thread = env["BBGO_QA_VOICE_THREAD"] else { throw XCTSkip("no staged voice server and thread") }
         app.terminate()
-        app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://voice"]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://voice/\(thread)"]
         app.launch()
         let composer = app.textViews["Message"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the new voice chat opens")
+        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the thread opens")
         let voice = app.descendants(matching: .any)["composerVoice"].firstMatch
         XCTAssertTrue(voice.waitForExistence(timeout: 15), "the speaker beside the mic")
-        XCTAssertEqual(voice.value as? String, "On", "voice mode is on in a new voice chat")
-
-        // The agent's greeting is spoken: Studio's audio downloads and plays.
+        XCTAssertTrue(wait(15) { voice.value as? String == "On" }, "the voice link turns voice mode on")
         let speaking = app.descendants(matching: .any)["voiceSpeaking"].firstMatch
-        XCTAssertTrue(speaking.waitForExistence(timeout: 120), "the greeting plays")
-        XCTAssertTrue(wait(60) { speaking.label == "Speaking" }, "the greeting's audio loaded")
-        shot("voice-greeting")
-        XCTAssertTrue(wait(90) { !speaking.exists }, "the greeting finishes")
 
         composer.tap()
         composer.typeText("In two short sentences: what is a haiku, and how many syllables does it have?")

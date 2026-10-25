@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One bot's chat, with its status, Activity, voice, profile, automations and
+/// One bot's chat, with its status, Activity, profile, automations and
 /// Pause / Resume / Stop. Without a Bot, it greets you and the first message
 /// makes it. Every call is scoped to `botId`; nil is the primary bot.
 struct BotTab: View {
@@ -188,11 +188,6 @@ struct BotTab: View {
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if bot.lead.threadId != nil {
-                Button { model.startVoiceChat() } label: { Image(systemName: "phone.fill") }
-                    .accessibilityLabel("New voice chat")
-                    .accessibilityHint("Starts a voice chat that can hand work to \(bot.name)")
-            }
             Button { sheet = .activity } label: {
                 Image(systemName: needsYou > 0 ? "bell.badge.fill" : "bell")
                     .symbolRenderingMode(needsYou > 0 ? .multicolor : .monochrome)
@@ -207,11 +202,6 @@ struct BotTab: View {
 
     private func wideActions(_ bot: BotInfo) -> some View {
         HStack(spacing: 16) {
-            if bot.lead.threadId != nil {
-                Button { model.startVoiceChat() } label: { Image(systemName: "phone.fill") }
-                    .accessibilityLabel("New voice chat")
-                    .accessibilityHint("Starts a voice chat that can hand work to \(bot.name)")
-            }
             Button { sheet = .activity } label: {
                 Image(systemName: needsYou > 0 ? "bell.badge.fill" : "bell")
                     .symbolRenderingMode(needsYou > 0 ? .multicolor : .monochrome)

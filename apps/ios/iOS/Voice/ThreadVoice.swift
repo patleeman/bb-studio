@@ -26,7 +26,7 @@ final class ThreadVoice: ObservableObject {
     private var realtime: BBRealtime?
     private var listener: UUID?
 
-    /// Threads just started as voice chats: voice is on before `voice.state` answers, so the greeting plays.
+    /// Threads just opened by `bbstudio://voice/<id>`: voice is on before `voice.state` answers.
     static var startedOn: Set<String> = []
     /// Whether the last thread opened had voice mode, so the next one shows its controls at once.
     private static var knownAvailable: Bool?
