@@ -125,7 +125,39 @@ after a 40-row burst while away, and after that. It passes on main and with
 the fix, on the phone and the Duo, with no blank sample. That path didn't
 reproduce here.
 
-## The fix
+## Follow-up: black on reopen with an empty composer (not reproduced)
+
+Patrick, Oct 25, TestFlight 20261025.0255 (with the fix below), on the Duo's
+outer screen: back to the Bots list, reopen the Bot chat, and everything
+between the header and the composer is black. It doesn't happen with a
+draft in the composer, and tapping the composer brings the chat into place.
+
+`testReopeningAfterAReplyWithAnEmptyComposerLeavesNoBlank` sends, waits for
+a reply that offers quick replies (`-qaDemoNext`), goes back with the
+keyboard up or closed, and reopens with an empty composer.
+`testReopeningTheChatOpensAtTheNewestRow` covers a reopen without quick
+replies, after a reply streamed while away, and after a 40-row burst. Both
+pass on an iPhone and on the iPhone Duo simulator, whose outer screen has
+the same layout as Patrick's screenshot (the status column and tab bar on
+the right, an 82 pt top inset). No sample was blank.
+
+Found on the way, from `-qaScrollLog`:
+
+- Every open runs the fold restore. The scroll view first reports a
+  zero-size container, and `TranscriptResizeAnchor.update` takes the
+  change from width 0 to the real width as a fold. For about 2.6 s
+  `keepAtEnd` is held (`keepAtEnd held … restoring=true` in the log),
+  while the restore scrolls to the bottom 24 times. In every run here it
+  ended at the newest row. Not opening a restore for a width of 0 didn't
+  change any result, so it was left as it is.
+- Repeated `scrollTo(y:)` requests for the same point are applied each
+  time, so a request ignored as "unchanged" isn't the cause.
+
+So the open questions are what on the device holds `keepAtEnd`, or drops
+its request, after the last layout change. The geometry (a scroll phase
+that never returns to idle, or a restore still running) can't be read on a
+TestFlight build, because the scroll log is Debug-only.
+
 
 All in `apps/ios/iOS/Thread/ThreadView.swift` (`TranscriptResizeAnchor.swift`
 has the measurements):
