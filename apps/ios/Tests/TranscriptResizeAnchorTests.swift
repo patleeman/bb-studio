@@ -79,10 +79,17 @@ final class TranscriptResizeAnchorTests: XCTestCase {
         XCTAssertEqual(keeper.update(viewport(951)), .message("reading", offset: 120))
     }
 
-    func testShortContentIsNotMistakenForOverscrollAndRealExcessIsDetected() {
-        XCTAssertEqual(TranscriptResizeAnchor.excessBottom(contentHeight: 100, viewportHeight: 500, visibleBottom: 500), 0)
-        XCTAssertEqual(TranscriptResizeAnchor.excessBottom(contentHeight: 2000, viewportHeight: 500, visibleBottom: 2700), 200)
-        XCTAssertEqual(TranscriptResizeAnchor.excessBottom(contentHeight: 2000, viewportHeight: 500, visibleBottom: 2200), 0)
+    func testShortContentIsNotMistakenForOverscrollAndAnyOvershootIsDetected() {
+        XCTAssertEqual(TranscriptResizeAnchor.overshoot(contentHeight: 100, viewportHeight: 500, visibleBottom: 500), 0)
+        XCTAssertEqual(TranscriptResizeAnchor.overshoot(contentHeight: 2000, viewportHeight: 500, visibleBottom: 2700), 700)
+        // Part of the viewport past the end is still blank: the keyboard closed.
+        XCTAssertEqual(TranscriptResizeAnchor.overshoot(contentHeight: 2000, viewportHeight: 500, visibleBottom: 2200), 200)
+        XCTAssertEqual(TranscriptResizeAnchor.overshoot(contentHeight: 2000, viewportHeight: 500, visibleBottom: 1990), 0)
+    }
+
+    func testTheLastPointPutsTheLastRowAtTheViewportBottom() {
+        XCTAssertEqual(TranscriptResizeAnchor.lastPoint(contentHeight: 2933, viewportHeight: 438), 2495)
+        XCTAssertEqual(TranscriptResizeAnchor.lastPoint(contentHeight: 300, viewportHeight: 438), 0)
     }
 
     func testToolOrDayRowsDoNotReplaceTheVisibleMessageAnchor() {

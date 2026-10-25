@@ -84,7 +84,7 @@ final class TranscriptResizeAnchor {
         // ScrollPosition's point is measured from the content's inset origin;
         // ScrollGeometry.contentOffset includes the negative top inset.
         let target = viewport.offset + viewport.inset + row.frame.minY - offset
-        let maximum = max(0, viewport.contentHeight - viewport.size.height)
+        let maximum = Self.lastPoint(contentHeight: viewport.contentHeight, viewportHeight: viewport.size.height)
         guard target.isFinite, target >= 0, target <= maximum else { return nil }
         return target
     }
@@ -112,9 +112,21 @@ final class TranscriptResizeAnchor {
         remember()
     }
 
-    static func excessBottom(contentHeight: CGFloat, viewportHeight: CGFloat, visibleBottom: CGFloat) -> CGFloat {
+    /// How far the bottom of what the reader sees (above the composer and
+    /// keyboard) runs below the last row. Any of it is blank screen: closing
+    /// the keyboard shrinks the bottom inset and leaves the offset where it
+    /// was, a band of black the height of the keyboard. Content shorter than
+    /// the viewport sits at the top, so nothing is past its end.
+    static func overshoot(contentHeight: CGFloat, viewportHeight: CGFloat, visibleBottom: CGFloat) -> CGFloat {
         guard contentHeight > viewportHeight else { return 0 }
-        return max(0, visibleBottom - viewportHeight - contentHeight)
+        return max(0, visibleBottom - contentHeight)
+    }
+
+    /// The furthest valid `ScrollPosition` point: the last row at the bottom
+    /// of the viewport. Points are measured from the content's inset origin,
+    /// and `viewportHeight` leaves the insets out.
+    static func lastPoint(contentHeight: CGFloat, viewportHeight: CGFloat) -> CGFloat {
+        max(0, contentHeight - viewportHeight)
     }
 
     var hasVisibleRows: Bool {
