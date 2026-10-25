@@ -35,6 +35,60 @@ final class TranscriptPastEndUITests: XCTestCase {
         finish()
     }
 
+    /// Patrick, Oct 24 10:22 PM: black right after sending with the keyboard
+    /// open. Send with the keyboard up; the user row goes in, the reply
+    /// streams in over several updates, then the keyboard closes. Throughout,
+    /// the chat's end stays at the bottom of what the reader sees: never
+    /// resting past it, and not left below the composer.
+    func testSendingWithTheKeyboardOpenFollowsTheStreamingReply() {
+        let composer = open(stream: true)
+        for round in 0..<2 {
+            composer.tap()
+            expectAtEnd("r\(round) keyboard up")
+            composer.typeText("Plan the release \(round)")
+            app.buttons["Send"].firstMatch.tap()
+            // The reply starts 3 s after the send and streams for about 4 s.
+            watchStream("r\(round) send and stream", seconds: 9)
+            expectAtEnd("r\(round) streamed")
+            shot("streamed-keyboard-open-\(round)")
+            command("dismiss")
+            expectAtEnd("r\(round) keyboard closed")
+        }
+        composer.tap()
+        expectAtEnd("keyboard up for a reply from elsewhere")
+        command("stream?From%20the%20web")
+        watchStream("elsewhere: user row and stream", seconds: 7)
+        expectAtEnd("elsewhere: streamed")
+        finish()
+    }
+
+    /// Patrick: back from the Bot chat to the Bots list, tap the Bot again,
+    /// and the chat opens scrolled into black. Reopen several times, also
+    /// after rows came in while away (a short reply, a streamed one, and more
+    /// than a page), and the chat must open at its newest row.
+    func testReopeningTheChatOpensAtTheNewestRow() {
+        _ = open(stream: true)
+        let away: [(String, String?)] = [("plain", nil), ("again", nil), ("reply while away", "stream?While%20away"),
+                                         ("burst while away", "burst?40"), ("after burst", nil)]
+        for (name, change) in away {
+            let back = app.buttons["Bots"].firstMatch
+            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
+            back.tap()
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
+            if let change {
+                command(change)
+                Thread.sleep(forTimeInterval: 6)
+            }
+            row.tap()
+            XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch.waitForExistence(timeout: 10))
+            watchStream("reopen \(name): opening", seconds: 3)
+            expectAtEnd("reopen \(name)")
+            shot("reopen-\(name.replacingOccurrences(of: " ", with: "-"))")
+        }
+        finish()
+    }
+
     /// More rows than a page come in at once (a long turn while away): the
     /// newest page replaces the rows and the content shrinks under the offset.
     func testRowsReplacedUnderTheReaderLeaveNoBlank() {
@@ -68,9 +122,10 @@ final class TranscriptPastEndUITests: XCTestCase {
         finish()
     }
 
-    private func open() -> XCUIElement {
+    private func open(stream: Bool = false) -> XCUIElement {
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaScrollLog",
             "-qaBotDemo", duo ? "duo" : "chat", "-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDark", "-openURL", "bbstudio://bot"]
+        if stream { app.launchArguments.append("-qaDemoStream") }
         if duo { app.launchArguments += ["-qaDuoPhone", "-qaDuoLong"] }
         app.launch()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
@@ -82,6 +137,43 @@ final class TranscriptPastEndUITests: XCTestCase {
 
     private func expectAtRest(_ step: String, seconds: Double = 3) {
         if record(step, seconds: seconds) > 1 { failures.append(step) }
+    }
+
+    /// At rest with the chat's last row at the bottom of what the reader
+    /// sees: not past it (blank), and not short of it (the newest row
+    /// hidden under the composer or keyboard).
+    private func expectAtEnd(_ step: String, seconds: Double = 3) {
+        let past = record(step, seconds: seconds)
+        if past > 1 || past < -40 { failures.append(step) }
+    }
+
+    /// While rows go in and grow: fails if the chat the reader sees is ever
+    /// wholly blank (with the keyboard up the Duo shows only 168 pt, so any
+    /// overshoot that large is a black screen, however short), or if the
+    /// view stays off its end for more than a second.
+    private func watchStream(_ step: String, seconds: Double) {
+        var run = 0.0
+        var longest = 0.0
+        var blank = 0
+        var samples: [String] = []
+        let end = Date().addingTimeInterval(seconds)
+        var last = Date()
+        repeat {
+            if let scroll = transcript() {
+                let now = Date()
+                let off = scroll.past > 1 || scroll.past < -120
+                if scroll.past >= scroll.height - scroll.adjustedTop - scroll.adjustedBottom { blank += 1 }
+                run = off ? run + now.timeIntervalSince(last) : 0
+                longest = max(longest, run)
+                last = now
+                samples.append(String(format: "%.0f", scroll.past))
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        } while Date() < end
+        let line = String(format: "%@: blank samples=%d longest off-end run=%.1fs past samples=%@", step, blank, longest, samples.joined(separator: ","))
+        steps.append(line)
+        print("SCROLL-STEP " + line)
+        if longest > 1 || blank > 0 { failures.append(step) }
     }
 
     private func finish() {

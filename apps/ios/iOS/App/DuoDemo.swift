@@ -86,6 +86,9 @@ enum DuoDemo {
         case "dismiss":
             window.endEditing(true)
             return true
+        case "stream":
+            BotDemo.Server.shared.sendAndStream(url.query()?.removingPercentEncoding ?? "From another device")
+            return true
         case "burst":
             BotDemo.Server.shared.burst(Int(url.query() ?? "") ?? 40)
             return true

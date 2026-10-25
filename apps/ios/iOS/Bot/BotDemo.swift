@@ -154,6 +154,10 @@ enum BotDemo {
             notify()
             Task {
                 try? await Task.sleep(for: .seconds(3))
+                if ProcessInfo.processInfo.arguments.contains("-qaDemoStream") {
+                    await streamReply(id: "reply\(sent)", at: at + 3_000)
+                    return
+                }
                 lock.withLock {
                     rows.append(BotDemo.row(id: "reply\(sent)", role: "assistant", text: "Got it. I'll take care of **that** now.", at: at + 3_000))
                     running = false
@@ -161,6 +165,39 @@ enum BotDemo {
                 notify()
             }
         }
+
+        /// QA: a user row from elsewhere, then the Bot's reply streaming in.
+        func sendAndStream(_ text: String) {
+            let at = Date().timeIntervalSince1970 * 1000
+            let sent = lock.withLock {
+                sends += 1
+                running = true
+                rows.append(BotDemo.row(id: "sent\(sends)", role: "user", text: text, at: at))
+                return sends
+            }
+            notify()
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                await streamReply(id: "reply\(sent)", at: at + 1_000)
+            }
+        }
+
+        /// The reply grows over `streamChunks` updates, as BB streams a turn:
+        /// the same row id with longer text each time, then the turn ends.
+        private func streamReply(id: String, at: Double) async {
+            let paragraph = "Here's the plan for the release. I checked the build, the notes and the open reviews, and lined up what's left for today. "
+            for chunk in 1...Self.streamChunks {
+                lock.withLock {
+                    let row = BotDemo.row(id: id, role: "assistant", text: String(repeating: paragraph, count: chunk), at: at)
+                    if let index = rows.firstIndex(where: { $0.id == id }) { rows[index] = row } else { rows.append(row) }
+                    if chunk == Self.streamChunks { running = false }
+                }
+                notify()
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+
+        static let streamChunks = 8
 
         /// QA: `count` rows land at once, as when the Bot works through a
         /// long turn while the phone is away: more than one page.
