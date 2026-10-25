@@ -125,6 +125,36 @@ final class TranscriptPastEndUITests: XCTestCase {
         finish()
     }
 
+    /// Every open holds `keepAtEnd` for about 2.6 s while the open restore
+    /// runs. The composer growing and emptying again (and quick replies
+    /// going and coming back with it) during that hold, or just after it,
+    /// changes the bottom inset. Once at rest, the newest row must sit at
+    /// the bottom of what the reader sees, never past it.
+    func testComposerHeightChangingAroundTheOpenRestoreLeavesNoBlank() {
+        let composer = open(stream: true, next: true)
+        composer.tap()
+        command("stream?Plan%20the%20release")
+        Thread.sleep(forTimeInterval: 8)
+        command("dismiss")
+        expectAtEnd("replied, quick replies up")
+        for delay in [0.2, 0.8, 1.6, 2.4, 2.8, 3.4] {
+            let back = app.buttons["Bots"].firstMatch
+            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
+            back.tap()
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
+            row.tap()
+            Thread.sleep(forTimeInterval: delay)
+            command("draft?4")
+            Thread.sleep(forTimeInterval: 0.3)
+            command("draft?0")
+            watchStream("composer changed \(delay)s after reopen", seconds: 3)
+            expectAtEnd("at rest after a change \(delay)s after reopen")
+            shot("composer-change-\(delay)")
+        }
+        finish()
+    }
+
     /// More rows than a page come in at once (a long turn while away): the
     /// newest page replaces the rows and the content shrinks under the offset.
     func testRowsReplacedUnderTheReaderLeaveNoBlank() {

@@ -590,6 +590,11 @@ struct ThreadView: View {
             let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
             window?.accessibilityValue = "\(ObjectIdentifier(model))|loads=\(model.qaLoadCount)|keeper=\(ObjectIdentifier(resizeAnchor))#\(resizeAnchor.debugState)"
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-draft"))) { event in
+            // `n` lines in the composer, which grows with them; 0 empties it, and quick replies come back.
+            let lines = event.object as? Int ?? 0
+            draft = (0..<lines).map { "Draft line \($0 + 1)" }.joined(separator: "\n")
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-attach"))) { _ in
             // A photo in the composer, as if picked from the library.
             let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
