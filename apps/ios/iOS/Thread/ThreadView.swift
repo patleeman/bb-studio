@@ -43,8 +43,8 @@ struct ThreadView: View {
     @State private var atTop = false
     /// How far the timeline is scrolled past its last row (0 when it isn't).
     @State private var pastEnd: CGFloat = 0
-    /// The point that puts the last row at the bottom. Not state: it changes
-    /// with every row the lazy stack measures, and nothing draws from it.
+    /// Where the timeline's end is, and whether it follows it. Not state: it
+    /// changes with every scroll frame, and nothing draws from it.
     @State private var end = TranscriptEnd()
     /// Rebuilds the timeline so it opens at the bottom of the server's rows.
     @State private var timelineKey = 0
@@ -279,7 +279,7 @@ struct ThreadView: View {
         .task(id: model.unreadFrom) {
             guard model.unreadFrom != nil else { return }
             try? await Task.sleep(for: .milliseconds(150))
-            if let item = unreadItem() { position.scrollTo(id: item, anchor: .top) }
+            if let item = unreadItem() { read(item, anchor: .top) }
         }
         .onDisappear {
             resizeRestore?.cancel()
@@ -595,7 +595,7 @@ struct ThreadView: View {
             resizeAnchor.cancel()
             if event.object as? String == "mid" {
                 let entries = BotChatEntry.memo.entries(model.chainRows, started: botChrome?.started ?? [], compactions: [])
-                if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { position.scrollTo(id: entry.id, anchor: .top) }
+                if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { read(entry.id, anchor: .top) }
             } else { scrollToBottom(animated: false) }
         }
         #endif
@@ -603,10 +603,6 @@ struct ThreadView: View {
         .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
             resizeAnchor.visible(ids)
             end.markerVisible = ids.contains(Self.bottomId)
-            if end.repin, end.markerVisible {
-                end.repin = false
-                position.scrollTo(edge: .bottom)
-            }
             #if DEBUG
             ScrollLog.visible(ids)
             #endif
@@ -633,29 +629,32 @@ struct ThreadView: View {
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
-        // Nothing else keeps the offset inside the content when the bottom
-        // inset shrinks (the keyboard closes, quick replies go) or the rows
-        // shrink under it, so this does, once nothing is scrolling: a bounce
-        // at the bottom isn't fought.
-        .onScrollGeometryChange(for: Overshoot.self) { geometry in
-            Overshoot(
+        // The one owner of the timeline's end: rows growing or shrinking,
+        // the keyboard, composer or quick replies changing the bottom inset
+        // all come through here as geometry, and `keepAtEnd` answers them.
+        .onScrollGeometryChange(for: EndGeometry.self) { geometry in
+            EndGeometry(
                 distance: TranscriptResizeAnchor.overshoot(contentHeight: geometry.contentSize.height,
                     viewportHeight: geometry.containerSize.height, visibleBottom: geometry.unobscuredBottom),
                 lastPoint: TranscriptResizeAnchor.lastPoint(contentHeight: geometry.contentSize.height,
-                    viewportHeight: geometry.containerSize.height))
+                    viewportHeight: geometry.containerSize.height),
+                point: geometry.contentOffset.y + geometry.contentInsets.top,
+                nearEnd: geometry.unobscuredBottom >= geometry.contentSize.height - 120)
         } action: { _, next in
-            end.lastPoint = next.lastPoint
+            end.geometry = next
             if pastEnd != next.distance { pastEnd = next.distance }
-            settlePastEnd()
+            keepAtEnd()
         }
         .onScrollPhaseChange { _, phase in
             scrollPhase = phase
             if phase == .tracking || phase == .interacting {
                 resizeRestore?.cancel()
                 resizeAnchor.cancel()
-                end.repin = false
             }
-            settlePastEnd()
+            // The reader decides: wherever a scroll comes to rest, the chat
+            // follows its end only if that's near the end.
+            if phase == .idle { end.following = end.geometry.nearEnd }
+            keepAtEnd()
         }
         // The first page lands at the bottom through `defaultScrollAnchor`;
         // scrolling by hand while lazy rows are still measuring can overshoot.
@@ -688,13 +687,10 @@ struct ThreadView: View {
         .onChange(of: findQuery) { _, _ in findIndex = 0 }
         // Earlier pages going in above would carry the match off screen.
         .onChange(of: model.rows.first?.id) { _, _ in
-            if finding, let currentMatch { position.scrollTo(id: currentMatch, anchor: .center) }
+            if finding, let currentMatch { read(currentMatch, anchor: .center) }
         }
         .onChange(of: currentMatch) { _, id in
-            if let id { withAnimation(.snappy) { position.scrollTo(id: id, anchor: .center) } }
-        }
-        .onChange(of: model.rows.last?.text) { _, _ in
-            if atBottom { scrollToBottom(animated: false) }
+            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
         }
         .onChange(of: model.interactions.first?.id) { _, id in
             if id != nil { scrollToBottom() }
@@ -719,7 +715,7 @@ struct ThreadView: View {
             // check is held off; check once it's done.
             defer {
                 resizeAnchor.finish(token)
-                settlePastEnd()
+                keepAtEnd()
             }
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
@@ -733,7 +729,7 @@ struct ThreadView: View {
                     try? await Task.sleep(for: .milliseconds(100))
                 }
             case .message(let id, let offset):
-                position.scrollTo(id: id, anchor: .top)
+                read(id, anchor: .top)
                 var restored = false
                 for _ in 0..<12 {
                     try? await Task.sleep(for: .milliseconds(100))
@@ -741,12 +737,13 @@ struct ThreadView: View {
                     if let alignment = resizeAnchor.alignment(for: id, offset: offset) {
                         // Keep an id anchor after the restore. A raw point loses
                         // its message as estimated heights above it settle.
-                        position.scrollTo(id: id, anchor: UnitPoint(x: 0, y: alignment))
+                        read(id, anchor: UnitPoint(x: 0, y: alignment))
                         restored = true
                     } else if let y = resizeAnchor.correction(for: id, offset: offset) {
                         #if DEBUG
                         ScrollLog.request("restore scrollTo(y: \(y))")
                         #endif
+                        end.following = false
                         position.scrollTo(y: y)
                         restored = true
                     } else { restored = false }
@@ -757,7 +754,7 @@ struct ThreadView: View {
             }
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
-            // Past the end is `settlePastEnd`'s, once this finishes.
+            // Past the end is `keepAtEnd`'s, once this finishes.
             if let viewport = resizeAnchor.viewport {
                 let point = viewport.offset + viewport.inset
                 if !point.isFinite || point < -Self.pastEndSlack || !resizeAnchor.hasVisibleRows {
@@ -813,7 +810,7 @@ struct ThreadView: View {
         #if DEBUG
         ScrollLog.request("loadOlder \(result) keep \(first)")
         #endif
-        if result == .added { position.scrollTo(id: first, anchor: .top) }
+        if result == .added { read(first, anchor: .top) }
         return result
     }
 
@@ -821,56 +818,56 @@ struct ThreadView: View {
     private static let pastEndSlack: CGFloat = 40
     private static let bottomId = "timeline-bottom"
 
-    /// Brings a timeline at rest past its last row back to it: by point, the
-    /// last valid offset of the measured content, not the marker's estimated
-    /// place, which could land past the end again. Then pinned to the edge.
-    private func settlePastEnd() {
-        guard scrollPhase == .idle, !resizeAnchor.restoring, pastEnd > 0.5 else { return }
+    /// Keeps the timeline at its end, by point: the last valid offset of the
+    /// measured content. While the reader follows the end, any change that
+    /// moves it (a reply streaming in, the keyboard opening or closing,
+    /// quick replies going) brings the newest row back to the bottom; and
+    /// a timeline resting past its end, following or not, comes back to it.
+    ///
+    /// By point, because the alternatives miss: pinned to the marker's id,
+    /// SwiftUI kept the offset when the bottom inset changed, a keyboard of
+    /// black under the last row once it closed; pinned to the bottom edge,
+    /// it landed one bottom inset past the end (428 pt with the Duo's
+    /// keyboard up, where only 168 pt of chat shows: a black screen) on
+    /// every streamed update.
+    private func keepAtEnd() {
+        guard scrollPhase == .idle, !resizeAnchor.restoring else { return }
+        guard end.following || pastEnd > 0.5 else { return }
+        let target = end.geometry.lastPoint
+        guard abs(end.geometry.point - target) > 0.5 else { return }
         #if DEBUG
-        ScrollLog.request("settlePastEnd \(pastEnd) marker=\(end.markerVisible) to \(end.lastPoint)")
+        ScrollLog.request("keepAtEnd following=\(end.following) from \(end.geometry.point) to \(target)")
         #endif
-        if end.markerVisible {
-            pinToBottom()
-        } else {
-            end.repin = true
-            position.scrollTo(y: end.lastPoint)
-        }
+        position.scrollTo(y: target)
     }
 
-    /// The one way to the bottom. Pinned to the bottom edge, the timeline
-    /// stays at its end as the keyboard, composer or quick replies change the
-    /// bottom inset. Pinned to the marker's id, it kept its offset instead,
-    /// and closing the keyboard left a keyboard-high band of black under
-    /// the last row. But the edge is only exact once the end is laid out:
-    /// a lazy stack's edge is an estimate. So while the marker is off
-    /// screen, jump to it first (that lays it out), and take the edge when
-    /// it comes on screen.
-    private func pinToBottom() {
-        if end.markerVisible {
-            position.scrollTo(edge: .bottom)
-        } else {
-            end.repin = true
-            position.scrollTo(id: Self.bottomId, anchor: .bottom)
-        }
+    /// Takes the reader to a row (unread, a find match, where they were):
+    /// not following the end, or the next change would carry them off it.
+    private func read(_ id: String, anchor: UnitPoint) {
+        end.following = false
+        position.scrollTo(id: id, anchor: anchor)
     }
 
-    /// Animates only a short way, from near the bottom, and then toward the
-    /// edge rather than the marker. An animated scroll to an id in a lazy
-    /// stack goes to where the stack estimates it, and re-aims as unmeasured
-    /// rows above measure in: after a send in a long chat of uneven rows,
-    /// the whole transcript visibly scrolled past.
+    /// Follows the end from now on. Near it, a short animated scroll; from
+    /// far up, a jump to the marker's id, which lays the end out at once in
+    /// the lazy stack (a point there is only an estimate), and `keepAtEnd`
+    /// then settles on the measured end. An animated scroll to an id in a
+    /// lazy stack re-aims as unmeasured rows above measure in: after a send
+    /// in a long chat of uneven rows, the whole transcript visibly scrolled
+    /// past.
     private func scrollToBottom(animated: Bool = true) {
         #if DEBUG
         ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(pastEnd)")
         #endif
-        guard animated, atBottom else {
-            pinToBottom()
-            return
-        }
-        withAnimation(.snappy) { position.scrollTo(edge: .bottom) }
-        Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            if atBottom || pastEnd > Self.pastEndSlack { pinToBottom() }
+        end.following = true
+        if end.markerVisible || atBottom {
+            if animated {
+                withAnimation(.snappy) { position.scrollTo(y: end.geometry.lastPoint) }
+            } else {
+                position.scrollTo(y: end.geometry.lastPoint)
+            }
+        } else {
+            position.scrollTo(id: Self.bottomId, anchor: .bottom)
         }
     }
 
@@ -1417,19 +1414,22 @@ private struct OpenFile: Identifiable {
     var id: String { path }
 }
 
-/// How far the timeline's viewport runs past its last row, and the point
-/// that puts the last row at the bottom instead.
-private struct Overshoot: Equatable {
+/// The timeline's end as measured: how far the view runs past the last
+/// row, the `ScrollPosition` point that puts the last row at the bottom,
+/// the point it's at now, and whether that's near the end.
+private struct EndGeometry: Equatable {
     var distance: CGFloat = 0
     var lastPoint: CGFloat = 0
+    var point: CGFloat = 0
+    var nearEnd = true
 }
 
 private final class TranscriptEnd {
-    var lastPoint: CGFloat = 0
+    var geometry = EndGeometry()
     var markerVisible = false
-    /// Headed for the end by point or by marker: pin to the edge once the
-    /// marker is on screen.
-    var repin = false
+    /// The newest row stays at the bottom. Opens true (the chat opens at its
+    /// end); set where a scroll comes to rest, and by `scrollToBottom`.
+    var following = true
 }
 
 extension ScrollGeometry {
