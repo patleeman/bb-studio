@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// A photo or file waiting to be sent. Uploaded to the thread's project at send time.
 struct PendingAttachment: Identifiable, Equatable {
-    let id = UUID()
+    var id = UUID()
     var data: Data
     var name: String
     var mimeType: String

@@ -232,6 +232,7 @@ struct ThreadView: View {
                 draft = saved.text
                 mentions = saved.mentions
             }
+            if attachments.isEmpty { attachments = DraftAttachments.load(model.threadId, serverURL: model.serverURL) }
             #if DEBUG
             if let demo = NotesDemo.draft { draft = demo }
             #endif
@@ -962,6 +963,7 @@ struct ThreadView: View {
         Task {
             if await !model.send(text, mentions: sentMentions, attachments: files) {
                 restoreDraft(text, sentMentions)
+                DraftAttachments.restore(files, threadId: model.threadId, serverURL: model.serverURL)
                 if attachments.isEmpty { attachments = files }
             }
         }
@@ -1270,6 +1272,10 @@ struct ThreadView: View {
             .accessibilityIdentifier("threadComposer")
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
+        // Kept with the draft text, for when the thread opens again.
+        .onChange(of: attachments.map(\.id)) { _, _ in
+            DraftAttachments.save(attachments, threadId: model.threadId, serverURL: model.serverURL)
+        }
         // Floats over the transcript, as in the Bot chat: no bar behind it.
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
