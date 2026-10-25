@@ -158,6 +158,55 @@ its request, after the last layout change. The geometry (a scroll phase
 that never returns to idle, or a restore still running) can't be read on a
 TestFlight build, because the scroll log is Debug-only.
 
+### Found next: following lost to the app's own scroll
+
+`testComposerHeightChangingAroundTheOpenRestoreLeavesNoBlank` grows the
+composer to four lines and empties it again (quick replies go and come
+back) from 0.2 to 3.4 s after a reopen: during the open restore's hold and
+just after. The reopens all landed at the end, but its setup failed on the
+phone and the Duo. After a reply from elsewhere streamed in with the
+keyboard up and its quick replies appeared, the newest row rested 153 pt
+(phone) and 184 pt (Duo) under the composer.
+
+```
+9.026 req keepAtEnd following=true from 2435.0 to 2345.0
+9.080 req keepAtEnd held phase=animating restoring=false past=90.0
+9.080 geo offset=2078.0 content=2513.0 … past=-185.0
+11.616 geo offset=2353.0 content=2997.0 … past=-394.0   (nothing follows)
+15.492 geo offset=2353.0 content=2997.0 … insetBottom=218.0 past=-184.0
+```
+
+An animated `scrollToBottom`, started by the new row, was cut short by
+`keepAtEnd`'s own requests and came to rest 185 pt short. When a scroll
+came to rest, the chat set `following` from where it rested, whoever had
+scrolled, so it stopped following with no one touching the screen.
+
+The fix, with `keepAtEnd` still the one owner:
+
+- Only the reader's scroll (tracking or interacting) decides `following`
+  when it comes to rest.
+- A bottom-inset change (keyboard, composer, quick replies) while the view
+  is near the end keeps it following.
+- When the open restore releases its hold (`restore released` in the log),
+  `keepAtEnd` checks once more after the next layout.
+
+It is not shown to be Patrick's black reopen, which still hasn't
+reproduced. It is the same kind of fault, though: the end owner held or
+switched off, with nothing to wake it.
+
+### The scroll log in Release builds
+
+Settings ▸ Diagnostics ▸ Scroll log turns it on, in TestFlight builds
+too. It writes the same lines as `-qaScrollLog`:
+- scroll geometry: offset, content size, insets, `past`, the number of
+  visible rows and their ids;
+- the transcript's scroll requests, holds and releases, with timestamps.
+
+It never writes message text. Row ids go through `ScrollLog.id`, which
+drops anything that isn't shaped like an id. It stays on the phone in
+`Documents/scroll-log.txt`, at most 512 KB: past that the oldest lines go.
+Share log opens the system share sheet, and Clear deletes the file.
+
 
 All in `apps/ios/iOS/Thread/ThreadView.swift` (`TranscriptResizeAnchor.swift`
 has the measurements):
@@ -215,8 +264,9 @@ TEST_RUNNER_SCROLL_DUO=1 xcodebuild test -scheme BBStudio -destination id=<iphon
   CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptPastEndUITests
 ```
 
-For the step-by-step geometry, launch with `-qaScrollLog` and read
-`Documents/scroll-log.txt` in the app's container.
+For the step-by-step geometry, launch with `-qaScrollLog` (or turn on
+Settings ▸ Diagnostics ▸ Scroll log) and read `Documents/scroll-log.txt` in
+the app's container.
 
 ## Risks
 
