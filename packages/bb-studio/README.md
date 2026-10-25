@@ -2254,8 +2254,7 @@ Clients (Setup's sample, and the voice features to come) call the
 
 Voice mode is a setting on any thread, in BB's own thread view. A speaker
 button beside the composer's mic turns it on; then you talk, and the thread's
-replies are spoken with [Speech](#speech). **New voice chat** starts a thread
-with it on.
+replies are spoken with [Speech](#speech).
 
 ![Live BB screenshot of a voice chat speaking its reply, with the Speaking pill beside the composer's buttons](assets/voice.png)
 
@@ -2290,11 +2289,11 @@ piece being read is lit in the transcript. Recapture with
   Captured from a staged BB: the voice menu, opened from the caret beside
   a voice chat's speaker button, with Conversational replies on, OpenRouter's
   Fish Drama 3 and its default voice Hannah, and speed 1.25×. Recapture with
-  `BB_CAPTURE_ONLY=studio-voice-menu`. In a new
-  thread's composer the same spot starts a **New voice chat**, as does the
-  *New voice chat* command: a thread on GPT-6-Luna's fast tier, in the
-  current project (the Personal project otherwise), in the project's main
-  checkout: a voice chat never makes its own worktree.
+  `BB_CAPTURE_ONLY=studio-voice-menu`. A new thread's composer has no
+  voice button, and there's no New voice chat button or command: turn voice
+  mode on in any thread instead. The `voice.new` RPC (a thread on
+  GPT-6-Luna's fast tier with voice mode on) remains, but no Studio or iPhone
+  UI calls it.
 - **The composer, state by state.** Captured from a staged BB in a seeded
   thread with `BB_CAPTURE_ONLY=studio-composer-voice`. Idle, dictating, the
   hint, push-to-talk and dictating in a voice thread are live, on Chrome's

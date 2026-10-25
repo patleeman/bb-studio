@@ -255,7 +255,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "bot-list-switch", component: ThreadListSwitcher });
   // The thread panel's Automations tab and the header's clock badge.
   registerThreadAutomations(app);
-  // Voice mode (src/voice/): the speaker button and orb in thread composers, and New voice chat.
+  // Voice mode (src/voice/): the speaker button and orb in thread composers.
   registerVoiceApp(app);
   app.commands.register({
     id: "search",

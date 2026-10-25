@@ -9,11 +9,11 @@
 // to hands-free, and tapping the red pill switches back (voice-input.ts has
 // the rules). While you talk, your words stream into the input phrase by
 // phrase and are sent when you finish; while the Bot speaks, the piece being
-// read lights up in the transcript. New voice chat starts a thread with it on.
+// read lights up in the transcript.
 import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "../../kit/ui/index";
 import { SpeechSection } from "../../ui/setup/SpeechSection";
 import { errorMessage } from "../../kit/format";
-import { useBbNavigate, useComposer, useRealtime, useRpc, useSdk, type PluginAppBuilder, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
+import { useComposer, useRealtime, useRpc, useSdk, type PluginAppBuilder, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { talk, useTalkState } from "../../talk/ui/controller";
@@ -24,7 +24,6 @@ import { useVoiceSnapshot, voicePlayer } from "./state";
 import { HINT_TEXT, INITIAL_INPUT, SpeechGate, footer, reduce, takeHint, wantsCapture, type VoiceEffect, type VoiceEvent, type VoiceInput } from "./voice-input";
 import { canRestoreFailedDictation } from "./dictation-recovery";
 
-const NEW_VOICE_CHAT_EVENT = "studio:new-voice-chat";
 const TOGGLE_VOICE_EVENT = "studio:toggle-voice";
 const BARS = 28;
 /** The pill's speed button steps through these. */
@@ -101,21 +100,11 @@ function useVoiceMode(threadId: string) {
   return { on: on[threadId] ?? false, set, conversational, setConversational };
 }
 
-/** Beside the mic: voice mode and its pill in a thread; New voice chat in a new thread's composer. */
+/** Beside the mic: voice mode and its pill in a thread. */
 function VoiceControls() {
   const composer = useComposer();
   const scope = composer.scope;
-  if (scope.kind === "thread") return <ThreadVoiceControls composer={composer} threadId={scope.threadId} />;
-  if (scope.kind === "new-thread") {
-    return (
-      <Tooltip label="New voice chat" side="top">
-        <button type="button" aria-label="New voice chat" className={ACTION_BUTTON} onClick={() => newVoiceChat(scope.projectId)}>
-          <Icon name="studio/talk" className="size-4" />
-        </button>
-      </Tooltip>
-    );
-  }
-  return null;
+  return scope.kind === "thread" ? <ThreadVoiceControls composer={composer} threadId={scope.threadId} /> : null;
 }
 
 /** Screenshots and tests set a voice state without a microphone or a reply: `{ threadId, state }`, state null to clear. */
@@ -504,10 +493,6 @@ function Wave({ level, className }: { level: () => number; className: string }) 
   );
 }
 
-function newVoiceChat(projectId: string | null): void {
-  window.dispatchEvent(new CustomEvent(NEW_VOICE_CHAT_EVENT, { detail: { projectId } }));
-}
-
 /** Above a voice thread's composer, once: how the hold-to-talk control works. */
 function VoiceHint() {
   const composer = useComposer();
@@ -523,30 +508,6 @@ function VoiceHint() {
       </button>
     </div>
   );
-}
-
-/** Makes new voice chats for the button and the command, and opens them. */
-function VoiceChatStarter() {
-  const rpc = useRpc<typeof voiceContract>();
-  const navigate = useBbNavigate();
-  useEffect(() => {
-    let starting = false;
-    const start = (event: Event) => {
-      if (starting) return;
-      starting = true;
-      const projectId = (event as CustomEvent<{ projectId?: string | null }>).detail?.projectId ?? null;
-      rpc.call("voice.new", { projectId })
-        .then(({ threadId }) => {
-          voicePlayer.setOn(threadId, true);
-          navigate.toThread(threadId);
-        })
-        .catch((error: unknown) => toast.error("Couldn't start a voice chat", { description: errorMessage(error) }))
-        .finally(() => { starting = false; });
-    };
-    window.addEventListener(NEW_VOICE_CHAT_EVENT, start);
-    return () => window.removeEventListener(NEW_VOICE_CHAT_EVENT, start);
-  }, [rpc, navigate]);
-  return null;
 }
 
 /** Studio's RPC from outside React (a message action's run). */
@@ -567,11 +528,10 @@ export function registerVoiceApp(app: PluginAppBuilder): void {
   };
   app.composer.customize({
     id: "voice",
-    scopes: ["thread", "new-thread"],
+    scopes: ["thread"],
     actions: [{ id: "voice", component: VoiceControls }],
     banners: [{ id: "ptt-hint", chrome: "bare", component: VoiceHint }],
   });
-  app.slots.experimental_appOverlay({ id: "voice-chat-starter", component: VoiceChatStarter });
   // Under any reply: read it aloud (again), in the Speech voice and speed; pressing it while it reads stops it.
   app.slots.messageAction({
     id: "read-aloud",
@@ -585,7 +545,6 @@ export function registerVoiceApp(app: PluginAppBuilder): void {
       voicePlayer.readAloud(threadId, text, prepareSpeech).catch((error: unknown) => toast.error("Couldn't read it aloud", { description: errorMessage(error) }));
     },
   });
-  app.commands.register({ id: "new-voice-chat", title: "New voice chat", run: ({ projectId }) => newVoiceChat(projectId) });
   app.commands.register({
     id: "toggle-voice",
     title: "Voice mode: turn on or off in this thread",
