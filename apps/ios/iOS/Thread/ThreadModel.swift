@@ -292,6 +292,12 @@ final class ThreadModel: ObservableObject {
             loaded = true
             return
         }
+        if BotDemo.served == nil, let wide = BotDemo.wideThread(threadId) {
+            thread = wide.thread
+            rows = wide.rows
+            loaded = true
+            return
+        }
         #endif
         guard let client else { return }
         do {
@@ -343,7 +349,7 @@ final class ThreadModel: ObservableObject {
     /// at most one refresh every ~150ms.
     func scheduleRefresh(_ changes: Set<String>?) {
         #if DEBUG
-        if BotDemo.served == nil, BotDemo.current != nil, threadId == BotDemo.threadId { return }
+        if BotDemo.served == nil, BotDemo.current != nil, threadId == BotDemo.threadId || BotDemo.wideThread(threadId) != nil { return }
         #endif
         if let changes, let known = pending { pending = known.union(changes) } else { pending = nil }
         guard refreshTask == nil else { return }

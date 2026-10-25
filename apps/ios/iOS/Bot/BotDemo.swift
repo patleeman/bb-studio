@@ -255,7 +255,8 @@ enum BotDemo {
             }
             let phoneBot = DuoDemo.phone ? BotInfo(name: "Juniper", avatar: "🌿", state: .active,
                 lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
-            return Fixture(bot: phoneBot, activity: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? activity(needs: true) : nil, thread: thread(running: false, needs: false), rows: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? longRows : transcript, interactions: [])
+            let duoActivity = args.contains("-qaDuoLong") ? activity(needs: true) : wideTitles ? activity(needs: false) : nil
+            return Fixture(bot: phoneBot, activity: duoActivity, thread: thread(running: false, needs: false), rows: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? longRows : transcript, interactions: [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
@@ -310,7 +311,7 @@ enum BotDemo {
     private static var now: Double { Date().timeIntervalSince1970 * 1000 }
 
     private static func thread(running: Bool, needs: Bool) -> ThreadEntry {
-        decode(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
+        decode(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"\#(wideTitles ? wideTitle(threadId) : "Juniper")","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
     }
 
     /// The served chat's rows, made once.
@@ -381,8 +382,34 @@ enum BotDemo {
 
     private static var qaAttention: Bool { ProcessInfo.processInfo.arguments.contains("-qaBotAttention") }
 
+    /// `-qaDuoWideTitles`: the Duo threads and the Bot's Running and Waiting
+    /// threads have titles far wider than the right page, as worker threads
+    /// do, and each of those threads opens offline with a short transcript.
+    static var wideTitles: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoWideTitles") }
+
+    static func wideTitle(_ id: String) -> String {
+        switch id {
+        case "thr_research1": "iOS: black on reopen (empty composer) + draft attachments on the Duo inner screen"
+        case "thr_waiting01": "Summarize inbox: every unread thread from this week, grouped by project, with the replies they need"
+        default: "Juniper: plan the ORBIT-42 launch checklist, release notes and the follow-up review meeting"
+        }
+    }
+
+    /// A Bot thread under `-qaDuoWideTitles`, other than the chat itself.
+    static func wideThread(_ id: String) -> (thread: ThreadEntry, rows: [TimelineRow])? {
+        guard variant == "duo", wideTitles, ["thr_research1", "thr_waiting01"].contains(id) else { return nil }
+        let thread: ThreadEntry = decode(#"{"id":"\#(id)","projectId":"proj_personal","providerId":"claude-code","title":"\#(wideTitle(id))","status":"idle","parentThreadId":"\#(threadId)","createdAt":1,"updatedAt":\#(now)}"#)
+        let rows = (1...12).map { index in
+            row(id: "\(id)-\(index)", role: index.isMultiple(of: 2) ? "assistant" : "user",
+                text: "Wide \(index). Composer and draft code now. Next I'll set up simulators and run the existing tests on the Duo geometry.", at: Double(index) * 60_000)
+        }
+        return (thread, rows)
+    }
+
     private static func activity(needs: Bool) -> BotActivity {
         let t = now
+        let research = wideTitles ? wideTitle("thr_research1") : "Lisbon offsite options"
+        let waiting = wideTitles ? wideTitle("thr_waiting01") : "Summarize inbox"
         let qa = qaAttention
         // The Bot asks; a thread it started waits on an approval the Bot owns.
         let attention = qa ? #"{"reason":"Asked you a question","count":1,"since":\#(t - 300000)}"#
@@ -391,8 +418,8 @@ enum BotDemo {
             : needs ? #"{"id":"thr_reviewprs1","providerId":"codex","title":"Review open PRs","status":"active","relation":"started","updatedAt":\#(t),"waitingFor":"Waiting for approval"},"# : ""
         return decode(#"""
         {"attention":\#(attention),
-         "waiting":[{"id":"thr_waiting01","providerId":"codex","title":"Summarize inbox","status":"pending","relation":"started","updatedAt":\#(t - 120000)}],
-         "inProgress":[\#(held){"id":"thr_research1","providerId":"claude-code","title":"Lisbon offsite options","status":"active","relation":"started","updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
+         "waiting":[{"id":"thr_waiting01","providerId":"codex","title":"\#(waiting)","status":"pending","relation":"started","updatedAt":\#(t - 120000)}],
+         "inProgress":[\#(held){"id":"thr_research1","providerId":"claude-code","title":"\#(research)","status":"active","relation":"started","updatedAt":\#(t - 60000),"runningSince":\#(t - 742000)}],
          "scheduled":[{"id":"hb","kind":"heartbeat","name":"Check-in","enabled":true,"nextRunAt":\#(t + 50400000)},
                       {"id":"auto1","kind":"automation","name":"Friday wrap-up","enabled":true,"nextRunAt":\#(t + 259200000)},
                       {"id":"auto2","kind":"automation","name":"Monthly invoices","enabled":false,"nextRunAt":null}],
