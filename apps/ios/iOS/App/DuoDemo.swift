@@ -92,6 +92,9 @@ enum DuoDemo {
         case "burst":
             BotDemo.Server.shared.burst(Int(url.query() ?? "") ?? 40)
             return true
+        case "attach":
+            NotificationCenter.default.post(name: Notification.Name("qa-attach"), object: nil)
+            return true
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
             return true

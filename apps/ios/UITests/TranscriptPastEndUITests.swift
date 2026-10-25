@@ -89,6 +89,42 @@ final class TranscriptPastEndUITests: XCTestCase {
         finish()
     }
 
+    /// Patrick, Oct 25, on the Duo's outer screen: send, the reply streams
+    /// in, back to the Bots list, reopen: black between the header and an
+    /// empty composer until the composer is tapped. Not with a draft in the
+    /// composer. Each round sends with the keyboard up, waits for the reply,
+    /// and goes back with the keyboard still up or closed; the finished reply
+    /// offers quick replies, which show only while the composer is empty.
+    func testReopeningAfterAReplyWithAnEmptyComposerLeavesNoBlank() {
+        let composer = open(stream: true, next: true)
+        for (round, keyboard) in [(0, true), (1, false), (2, true)] {
+            // The Duo's outer window is wider than the simulator's screen, and
+            // Send is off it: there the message comes in as if sent from here.
+            composer.tap()
+            if duo {
+                command("stream?Plan%20the%20release%20\(round)")
+            } else {
+                composer.typeText("Plan the release \(round)")
+                app.buttons["Send"].firstMatch.tap()
+            }
+            Thread.sleep(forTimeInterval: 9)
+            if !keyboard { command("dismiss") }
+            record("r\(round) replied, keyboard \(keyboard ? "up" : "closed")")
+            let back = app.buttons["Bots"].firstMatch
+            XCTAssertTrue(back.waitForExistence(timeout: 10), "No way back to the Bots list")
+            back.tap()
+            let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "The Bots list has no Juniper row")
+            Thread.sleep(forTimeInterval: 1)
+            row.tap()
+            XCTAssertTrue(composer.waitForExistence(timeout: 10))
+            watchStream("r\(round) reopened", seconds: 3)
+            expectAtEnd("r\(round) reopened at rest")
+            shot("reopen-empty-\(round)")
+        }
+        finish()
+    }
+
     /// More rows than a page come in at once (a long turn while away): the
     /// newest page replaces the rows and the content shrinks under the offset.
     func testRowsReplacedUnderTheReaderLeaveNoBlank() {
@@ -122,10 +158,11 @@ final class TranscriptPastEndUITests: XCTestCase {
         finish()
     }
 
-    private func open(stream: Bool = false) -> XCUIElement {
+    private func open(stream: Bool = false, next: Bool = false) -> XCUIElement {
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaScrollLog",
             "-qaBotDemo", duo ? "duo" : "chat", "-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDark", "-openURL", "bbstudio://bot"]
         if stream { app.launchArguments.append("-qaDemoStream") }
+        if next { app.launchArguments.append("-qaDemoNext") }
         if duo { app.launchArguments += ["-qaDuoPhone", "-qaDuoLong"] }
         app.launch()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch

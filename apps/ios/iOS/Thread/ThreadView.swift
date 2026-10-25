@@ -589,6 +589,14 @@ struct ThreadView: View {
             let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
             window?.accessibilityValue = "\(ObjectIdentifier(model))|loads=\(model.qaLoadCount)|keeper=\(ObjectIdentifier(resizeAnchor))#\(resizeAnchor.debugState)"
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-attach"))) { _ in
+            // A photo in the composer, as if picked from the library.
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
+                UIColor.systemTeal.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+            }
+            if let attachment = PendingAttachment.image(image) { attachments.append(attachment) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
             guard BotDemo.variant != nil else { return }
             resizeRestore?.cancel()
@@ -831,7 +839,12 @@ struct ThreadView: View {
     /// keyboard up, where only 168 pt of chat shows: a black screen) on
     /// every streamed update.
     private func keepAtEnd() {
-        guard scrollPhase == .idle, !resizeAnchor.restoring else { return }
+        guard scrollPhase == .idle, !resizeAnchor.restoring else {
+            #if DEBUG
+            if pastEnd > 0.5 || end.following { ScrollLog.request("keepAtEnd held phase=\(scrollPhase) restoring=\(resizeAnchor.restoring) past=\(pastEnd)") }
+            #endif
+            return
+        }
         guard end.following || pastEnd > 0.5 else { return }
         let target = end.geometry.lastPoint
         guard abs(end.geometry.point - target) > 0.5 else { return }

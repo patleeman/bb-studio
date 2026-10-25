@@ -188,7 +188,12 @@ enum BotDemo {
             let paragraph = "Here's the plan for the release. I checked the build, the notes and the open reviews, and lined up what's left for today. "
             for chunk in 1...Self.streamChunks {
                 lock.withLock {
-                    let row = BotDemo.row(id: id, role: "assistant", text: String(repeating: paragraph, count: chunk), at: at)
+                    var text = String(repeating: paragraph, count: chunk)
+                    // `-qaDemoNext`: the finished reply offers quick replies, as most Bot replies do.
+                    if chunk == Self.streamChunks, ProcessInfo.processInfo.arguments.contains("-qaDemoNext") {
+                        text += "\n\n::next{reply=\"👍 Ship it|🕒 Later|❓ Explain\"}"
+                    }
+                    let row = BotDemo.row(id: id, role: "assistant", text: text, at: at)
                     if let index = rows.firstIndex(where: { $0.id == id }) { rows[index] = row } else { rows.append(row) }
                     if chunk == Self.streamChunks { running = false }
                 }
