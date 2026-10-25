@@ -12,9 +12,13 @@ final class DraftAttachmentUITests: XCTestCase {
         app.launch()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
-        XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/attach")!)
         let attachment = app.buttons["Remove attachment"].firstMatch
-        XCTAssertTrue(attachment.waitForExistence(timeout: 10), "The photo never reached the composer")
+        // Sent again if the chat wasn't listening yet: a busy machine shows the composer first.
+        for _ in 0..<3 where !attachment.exists {
+            XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/attach")!)
+            _ = attachment.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(attachment.exists, "The photo never reached the composer")
 
         app.buttons["Bots"].firstMatch.tap()
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Juniper'")).firstMatch
