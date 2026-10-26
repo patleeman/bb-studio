@@ -2,15 +2,19 @@ import XCTest
 
 /// The Duo inner screen (951×669, phone idiom): in the right page, the
 /// composer has the transcript's margins, the jump button is centred on the
-/// page above the composer, and no transcript text runs under the status bar.
-/// Run on an owned iPhone Duo simulator.
+/// page above the composer, and the composer sits as close to the bottom edge
+/// as a phone's does above its home indicator. Run on an owned iPhone Duo
+/// simulator.
 @MainActor
 final class DuoSplitComposerUITests: XCTestCase {
     private let app = XCUIApplication()
     /// The crease's right edge: the window midpoint plus half the gutter.
     private let pageMinX: CGFloat = 951 / 2 + 16
+    /// Below a phone's composer, above the home indicator or keyboard: its
+    /// vertical padding.
+    private let composerGap: CGFloat = 8
 
-    func testComposerJumpButtonAndStatusBarInTheRightPage() throws {
+    func testComposerJumpButtonAndBottomGapInTheRightPage() throws {
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
@@ -30,11 +34,20 @@ final class DuoSplitComposerUITests: XCTestCase {
         conversation.tap()
         XCTAssertTrue(app.staticTexts["duoThreadTitle"].waitForExistence(timeout: 15))
         try check("thread", last: "Duo message 80")
+
+        // With the keyboard up the composer still sits above it.
+        let composer = app.otherElements["threadComposer"].firstMatch
+        command("focus")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
+        print("SPLIT KEYBOARD composer=\(composer.frame) keyboard=\(keyboard.frame)")
+        XCTAssertLessThanOrEqual(composer.frame.maxY, keyboard.frame.minY + 1, "The composer stays above the keyboard")
     }
 
     /// One page (the Duo's outer screen, or any iPhone): the composer keeps
-    /// its 12-point margins inside the safe area, the jump button floats in
-    /// the corner above it, and there is no status corner.
+    /// its 12-point margins inside the safe area, stays clear of the home
+    /// indicator, and the jump button floats in the corner above it.
     func testNarrowWindowKeepsItsComposerAndJumpButton() throws {
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDark", "-openURL", "bbstudio://bot"]
@@ -50,12 +63,15 @@ final class DuoSplitComposerUITests: XCTestCase {
         guard jump.exists else { return XCTFail("The jump button shows up in the history") }
         Thread.sleep(forTimeInterval: 1)
         let layout = try geometry()
-        print("NARROW width=\(layout.width) safeRight=\(layout.safeRight) composer=\(composer.frame) jump=\(jump.frame)")
+        print("NARROW width=\(layout.width) height=\(layout.height) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom) composer=\(composer.frame) jump=\(jump.frame)")
         XCTAssertLessThan(layout.width, 900)
         XCTAssertEqual(composer.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 1)
+        XCTAssertGreaterThan(layout.safeBottom, 0, "A home indicator")
+        // 8 points above the home indicator, or above the tab bar where it shows.
+        XCTAssertGreaterThanOrEqual(layout.height - layout.safeBottom - composer.frame.maxY, composerGap - 1,
+                                    "Above the home indicator, as before")
         XCTAssertEqual(jump.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 2, "In the corner, as before")
         XCTAssertLessThanOrEqual(jump.frame.maxY, composer.frame.minY + 1)
-        XCTAssertFalse(layout.surfaces.keys.contains { $0.hasPrefix("statusCorner-") })
         command("capture?split-composer-narrow-\(Int(layout.width))")
     }
 
@@ -75,12 +91,14 @@ final class DuoSplitComposerUITests: XCTestCase {
         let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") }
         XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on screen")
         let transcript = try XCTUnwrap(transcripts.first?.value, "\(name): transcript content probe")
-        print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight)")
+        print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
         XCTAssertEqual(composer.frame.maxX, transcript.maxX, accuracy: 4, "\(name): composer ends where the transcript does")
         XCTAssertEqual(composer.frame.minX, transcript.x, accuracy: 4, "\(name): composer starts where the transcript does")
 
-        // 3. No transcript text lies under the status bar.
-        assertClearOfStatusBar(name, layout)
+        // 3. The composer sits as far above the window's bottom edge as a
+        // phone's does above its home indicator, not above a second inset.
+        XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2,
+                       "\(name): the gap under the composer, with a \(layout.safeBottom)-point bottom safe area")
 
         // 2. Up in the history, the jump button is centred on the page,
         // above the composer and below the transcript's visible rows.
@@ -103,7 +121,7 @@ final class DuoSplitComposerUITests: XCTestCase {
         let rows = transcriptTexts().filter { $0.maxY <= visibleBottom + 1 }
         let lastRow = try XCTUnwrap(rows.max { $0.maxY < $1.maxY }, "\(name): a visible transcript row")
         XCTAssertFalse(lastRow.intersects(jump.frame), "\(name): jump button covers the last row's text \(lastRow)")
-        assertClearOfStatusBar(name + " in history", layout)
+        XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2, "\(name): the gap under the composer in history")
         command("capture?split-composer-" + name + "-history")
 
         // At the end the button goes, and the last row is whole above the composer.
@@ -130,27 +148,6 @@ final class DuoSplitComposerUITests: XCTestCase {
         }
     }
 
-    /// The status bar is a column on the inner screen's trailing edge, with
-    /// the clock and icons in its top 100 points, inside the safe area's
-    /// trailing inset. The system reports the column's width only (and the
-    /// simulator's status bar frame is the outer screen's). Text may scroll
-    /// under the header bar, but any that reaches that corner must be covered.
-    private func assertClearOfStatusBar(_ name: String, _ layout: Geometry) {
-        XCTAssertGreaterThan(layout.safeRight, 0, "\(name): the status column")
-        let cluster = CGRect(x: layout.width - layout.safeRight, y: 0, width: layout.safeRight, height: 100)
-        // Probes keep frames from earlier transitions; take the one at the window's edge.
-        let corner = layout.surfaces.first {
-            $0.key.hasPrefix("statusCorner-") && abs($0.value.maxX - layout.width) < 1 && abs($0.value.y) < 1
-        }?.value.rect ?? .null
-        for text in app.staticTexts.allElementsBoundByIndex.map(\.frame)
-            where text.width > 0 && text.height > 0 && text.minX >= pageMinX - 1 {
-            let under = text.intersection(cluster)
-            guard !under.isNull, under.width > 1, under.height > 1 else { continue }
-            XCTAssertTrue(corner.insetBy(dx: -1, dy: -1).contains(under),
-                          "\(name): text \(text) under the status bar's clock and icons \(cluster), covered by \(corner)")
-        }
-    }
-
     private func geometry() throws -> Geometry {
         command("layout")
         let value = try XCTUnwrap(app.windows.firstMatch.value as? String)
@@ -163,7 +160,9 @@ final class DuoSplitComposerUITests: XCTestCase {
 
     private struct Geometry: Decodable {
         let width: CGFloat
+        let height: CGFloat
         let safeRight: CGFloat
+        let safeBottom: CGFloat
         let surfaces: [String: Rect]
         let scrolls: [Scroll]
     }
@@ -173,7 +172,6 @@ final class DuoSplitComposerUITests: XCTestCase {
         let width: CGFloat
         let height: CGFloat
         var maxX: CGFloat { x + width }
-        var rect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
     }
     private struct Scroll: Decodable {
         let x: CGFloat

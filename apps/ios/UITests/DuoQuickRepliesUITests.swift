@@ -34,8 +34,10 @@ final class DuoQuickRepliesUITests: XCTestCase {
         XCTAssertEqual(replies.frame.maxX - scroll.adjustedRight, composer.frame.maxX, accuracy: 1)
         // The composer has the transcript's 12-point margin, under the status column too.
         XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, 12, accuracy: 1)
-        XCTAssertEqual(geometry.height - geometry.safeBottom - composer.frame.maxY, 8, accuracy: 1,
-            "Keep the system home-indicator inset plus the existing 8pt composer padding")
+        // Its 8-point padding from the window's edge: beside two pages the
+        // inner screen's home-indicator inset isn't added under it.
+        XCTAssertEqual(geometry.height - composer.frame.maxY, 8, accuracy: 1,
+            "The existing 8pt composer padding at the window's bottom edge")
         XCTAssertTrue(scroll.clips, "Quick replies must clip horizontally at the composer edge")
         command("capture?v6-bot-duo")
         command("portrait")
