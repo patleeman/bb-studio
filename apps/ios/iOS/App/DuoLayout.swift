@@ -23,6 +23,7 @@ final class DuoPaneState {
 
     var pane: DuoPane {
         didSet {
+            if pane != oldValue { Breadcrumbs.shared.record("pane \(pane.rawValue)") }
             UserDefaults.standard.set(pane.rawValue, forKey: Self.key)
             if pane != .hidden {
                 lastShown = pane
@@ -242,15 +243,42 @@ struct WindowGeometry: UIViewRepresentable {
             lastInnerScreen = innerScreen
             lastLeading = leading
             lastTrailing = trailing
-            // SwiftUI's environment alone does not change UIKit navigation
-            // chrome on a phone. Give its hosting hierarchy the same regular
-            // trait used by the shared iPad layout, without changing idiom.
-            window.rootViewController?.traitOverrides.horizontalSizeClass =
-                DuoLayout(size: size).twoPages ? .regular : .unspecified
+            ResizeSettling.shared.changed()
+            Breadcrumbs.shared.record(String(format: "window %.0fx%.0f safe %.0f/%.0f%@", size.width, size.height, leading, trailing,
+                                             DuoLayout(size: size).twoPages ? " two-pages" : ""))
             #if DEBUG
             RenderCount.bump("write.window")
             #endif
-            DispatchQueue.main.async { [weak self] in self?.changed(size, leading, trailing, innerScreen) }
+            DispatchQueue.main.async { [weak self] in
+                self?.changed(size, leading, trailing, innerScreen)
+                self?.overrideSizeClass()
+            }
+        }
+
+        /// SwiftUI's environment alone does not change UIKit navigation
+        /// chrome on a phone. Give its hosting hierarchy the same regular
+        /// trait used by the shared iPad layout, without changing idiom.
+        ///
+        /// Only when it changes, and never inside the resize's own layout
+        /// pass: a trait change on the first responder's chain reloads the
+        /// keyboard. With the keyboard up it waits until the window has
+        /// settled, so the keyboard isn't reloaded in the middle of its own
+        /// transition around the fold (crash 3).
+        private func overrideSizeClass() {
+            let apply = { [weak self] in
+                guard let controller = self?.window?.rootViewController, let size = self?.window?.bounds.size else { return }
+                let sizeClass: UIUserInterfaceSizeClass = DuoLayout(size: size).twoPages ? .regular : .unspecified
+                // Reading an override that was never set traps in UIKit.
+                let current = controller.traitOverrides.contains(UITraitHorizontalSizeClass.self)
+                    ? controller.traitOverrides.horizontalSizeClass : nil
+                guard current != sizeClass else { return }
+                #if DEBUG
+                RenderCount.bump("window.traitOverride")
+                #endif
+                Breadcrumbs.shared.record("size class " + (sizeClass == .regular ? "regular" : "unspecified"))
+                controller.traitOverrides.horizontalSizeClass = sizeClass
+            }
+            apply()
         }
     }
 }

@@ -25,6 +25,7 @@ struct ComposerField: UIViewRepresentable {
         view.isScrollEnabled = false
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         view.accessibilityLabel = placeholder
+        view.accessibilityIdentifier = "composerField"
         view.placeholder.text = placeholder
         return view
     }
@@ -46,10 +47,8 @@ struct ComposerField: UIViewRepresentable {
             view.text = text
             view.placeholder.isHidden = !text.isEmpty
         }
-        if focused, !view.isFirstResponder, view.window != nil {
-            DispatchQueue.main.async { view.becomeFirstResponder() }
-        } else if !focused, view.isFirstResponder {
-            DispatchQueue.main.async { view.resignFirstResponder() }
+        if focused != view.isFirstResponder, focused ? view.window != nil : true {
+            context.coordinator.applyFocus(to: view)
         }
     }
 
@@ -69,6 +68,37 @@ struct ComposerField: UIViewRepresentable {
         var parent: ComposerField
         init(_ parent: ComposerField) { self.parent = parent }
 
+        private var applyingFocus = false
+
+        /// Takes or gives up the keyboard to match `focused`, on a later
+        /// pass and once the window has stopped resizing: a responder change
+        /// during a fold reloads the keyboard in the middle of its own
+        /// transition (crash 3). Checked again when it runs; one at a time.
+        func applyFocus(to view: UITextView) {
+            guard !applyingFocus else { return }
+            applyingFocus = true
+            ResizeSettling.shared.afterSettling { [weak self, weak view] in
+                guard let self else { return }
+                applyingFocus = false
+                guard let view, view.window != nil else { return }
+                if parent.focused, !view.isFirstResponder {
+                    Breadcrumbs.shared.focus("composer-field", "take")
+                    #if DEBUG
+                    RenderCount.bump("composer.become")
+                    ResizeSettling.shared.reloadingKeyboard()
+                    #endif
+                    view.becomeFirstResponder()
+                } else if !parent.focused, view.isFirstResponder {
+                    Breadcrumbs.shared.focus("composer-field", "give-up")
+                    #if DEBUG
+                    RenderCount.bump("composer.resign")
+                    ResizeSettling.shared.reloadingKeyboard()
+                    #endif
+                    view.resignFirstResponder()
+                }
+            }
+        }
+
         func textViewDidChange(_ view: UITextView) {
             parent.text = view.text
             (view as? PastingTextView)?.placeholder.isHidden = !view.text.isEmpty
@@ -76,10 +106,12 @@ struct ComposerField: UIViewRepresentable {
         }
 
         func textViewDidBeginEditing(_ view: UITextView) {
+            Breadcrumbs.shared.focus("composer-field", "began")
             if !parent.focused { parent.focused = true }
         }
 
         func textViewDidEndEditing(_ view: UITextView) {
+            Breadcrumbs.shared.focus("composer-field", "ended")
             if parent.focused { parent.focused = false }
             // The keyboard's dictation ends with the field's focus.
             parent.dictation?.handle(.cancelled(.keyboard))

@@ -20,7 +20,10 @@ struct BBStudioApp: App {
                     #endif
                     model.handle(url)
                 }
-                .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    model.scenePhaseChanged(phase)
+                    Breadcrumbs.shared.scene(phase == .background ? "background" : phase == .active ? "active" : "inactive")
+                }
                 #if DEBUG
                 .modifier(StateDemoSheets())
                 #endif
@@ -55,6 +58,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(
         _ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // Keeps the last session's breadcrumbs if it crashed, then records
+        // this one's keyboard and window events (Settings ▸ Diagnostics).
+        Breadcrumbs.shared.launch()
+        ScrollLog.observeKeyboard()
+        ResizeSettling.shared.observeKeyboard()
         PhoneRelay.shared.activate()
         // Also runs when iOS wakes the app for a silent push.
         let center = UNUserNotificationCenter.current()

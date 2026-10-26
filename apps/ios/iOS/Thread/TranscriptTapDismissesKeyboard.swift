@@ -65,7 +65,12 @@ struct TranscriptTapDismissesKeyboard: UIViewRepresentable {
             guard active, state == .ended else { return }
             // After the tap's own handlers: a text link acts once the touch
             // ends, and resigning first in the same pass dropped it.
-            DispatchQueue.main.async { [weak self] in self?.view?.window?.endEditing(true) }
+            // And not while the window is resizing, which reloads the keyboard
+            // in the middle of its own transition (crash 3).
+            ResizeSettling.shared.afterSettling { [weak self] in
+                Breadcrumbs.shared.focus("transcript-tap", "end-editing")
+                self?.view?.window?.endEditing(true)
+            }
         }
 
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool { active }

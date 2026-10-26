@@ -81,8 +81,8 @@ enum ScrollLog {
 
     private static var observing = false
 
+    /// Also kept as crash breadcrumbs, with the scroll log off.
     private static func keyboardEvent(_ what: String, end: CGRect?, local: Bool?) {
-        guard on else { return }
         let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows).first { $0.isKeyWindow }
         var line = "kbd " + what
@@ -100,6 +100,8 @@ enum ScrollLog {
                 window.frame.width, window.frame.height)
             line += " state=\(window.windowScene.map { "\($0.activationState.rawValue)" } ?? "-")"
         }
+        Breadcrumbs.shared.record(line)
+        guard on else { return }
         write(line)
     }
 
@@ -165,6 +167,8 @@ enum ScrollLog {
 struct ScrollLogSection: View {
     @AppStorage(ScrollLog.enabledKey) private var enabled = false
     @State private var exists = FileManager.default.fileExists(atPath: ScrollLog.file.path)
+    /// The breadcrumbs of a session that didn't end cleanly.
+    @State private var crash = Breadcrumbs.shared.hasLastCrash
 
     var body: some View {
         Section {
@@ -177,12 +181,25 @@ struct ScrollLogSection: View {
                     exists = false
                 }
             }
+            if crash {
+                ShareLink(item: Breadcrumbs.shared.lastCrash) {
+                    Label("Share last crash breadcrumbs", systemImage: "exclamationmark.triangle")
+                }
+                .accessibilityIdentifier("settingsShareCrashBreadcrumbs")
+                Button("Clear crash breadcrumbs", role: .destructive) {
+                    Breadcrumbs.shared.clearLastCrash()
+                    crash = false
+                }
+            }
         } header: {
             Text("Diagnostics").foregroundStyle(Color.primary.opacity(0.75))
         } footer: {
-            Text("Records how chats scroll: positions, sizes and row ids, never what messages say. Stays on this phone until you share it.")
+            Text("Records how chats scroll: positions, sizes and row ids, never what messages say. Stays on this phone until you share it. After a crash, the keyboard and window events before it are kept here too.")
                 .foregroundStyle(Color.primary.opacity(0.75))
         }
-        .onAppear { exists = FileManager.default.fileExists(atPath: ScrollLog.file.path) }
+        .onAppear {
+            exists = FileManager.default.fileExists(atPath: ScrollLog.file.path)
+            crash = Breadcrumbs.shared.hasLastCrash
+        }
     }
 }
