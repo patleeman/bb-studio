@@ -149,6 +149,28 @@ while the Duo folds, splits, resizes its list and comes back from the
 background with the keyboard up; `TEST_RUNNER_HANG_MESSAGES` sets the
 chat's length.
 
+Nothing of ours reloads the keyboard while the window resizes under it. A
+third crash on the Duo (TestFlight 1421) was the keyboard itself, in the
+split transition it runs around the fold, removing a constraint Auto Layout
+had already broken, after a reload of its input views. The window probe
+used to set the regular size class from inside every resize's layout pass,
+and a trait change on the first responder's chain reloads the keyboard;
+the composer also took or gave up focus on the next run loop whatever the
+window was doing. Now the size class is set only when it changes, after the
+layout pass, and with the keyboard up only once the window has kept its size
+for 0.4 s (`ResizeSettling`); the composer's focus changes and the
+transcript's tap-to-close wait the same way. `KeyboardFoldUITests` folds,
+unfolds, splits and backgrounds the Duo with the keyboard up and coming up,
+and fails on any unsatisfiable-constraint report (read from the app's own
+log, `qa-duo/constraints`) or a keyboard reload mid-resize.
+
+**Crash breadcrumbs.** The last 200 keyboard, window, pane, focus and scene
+events (frames, sizes and ids, never message text) are kept in memory and
+written to Application Support about once a second and on each scene phase
+change, with the scroll log on or off (`Breadcrumbs`). A launch after a
+session that was still in front when it ended keeps that file, and Settings
+▸ Diagnostics offers **Share last crash breadcrumbs** and a Clear.
+
 ## Bot chat: terminals
 
 The Bot chat's ⋯ menu has **Terminals**, the same item a regular thread's ⋯

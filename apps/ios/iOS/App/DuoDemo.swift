@@ -1,4 +1,5 @@
 #if DEBUG
+import OSLog
 import UIKit
 
 /// Simulator-only window resizing for the Duo fixture. The hosting controller,
@@ -71,6 +72,25 @@ enum DuoDemo {
         return Array(rgba.prefix(3))
     }
 
+    private static var constraintsSince = Date.distantPast
+
+    private static func constraintReport() -> String {
+        var count = 0
+        var samples: [String] = []
+        if let store = try? OSLogStore(scope: .currentProcessIdentifier),
+           let entries = try? store.getEntries(at: store.position(date: constraintsSince),
+               matching: NSPredicate(format: "subsystem == 'com.apple.UIKit' AND category == 'LayoutConstraints'")) {
+            for case let entry as OSLogEntryLog in entries where entry.date >= constraintsSince
+                && entry.composedMessage.contains("Unable to simultaneously satisfy constraints") {
+                count += 1
+                let lines = entry.composedMessage.split(separator: "\n").filter { $0.contains("NSLayoutConstraint") || $0.contains("NSAutoresizing") }
+                if samples.count < 6 { samples.append(lines.prefix(4).joined(separator: " | ")) }
+            }
+        }
+        let data = try? JSONSerialization.data(withJSONObject: ["count": count, "samples": samples], options: .sortedKeys)
+        return data.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
     static func handle(_ url: URL) -> Bool {
         guard BotDemo.variant != nil, url.host() == "qa-duo",
               let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
@@ -132,6 +152,13 @@ enum DuoDemo {
             return true
         case "dismiss":
             window.endEditing(true)
+            return true
+        case "constraints":
+            // UIKit's "Unable to simultaneously satisfy constraints" reports
+            // since launch, from this process's own log, with the first
+            // line of each constraint list. `?clear` starts over from now.
+            if url.query() == "clear" { constraintsSince = Date() }
+            window.accessibilityValue = constraintReport()
             return true
         case "counts":
             // `?reset` starts over; otherwise the counts since then, as JSON.
