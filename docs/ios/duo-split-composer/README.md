@@ -37,10 +37,13 @@ Beside two pages (`DuoLayout.twoPages`), in `ThreadView`:
   transcript's margins (12 points in the Bot's chat, 16 in other threads), so
   both edges line up with the bubbles. The header and find bar keep their
   buttons clear of the status column.
-- **Jump button.** It sits in its own band above the composer, centred on the
-  page. The band is a bottom safe-area inset, so the transcript's bottom inset
-  includes it. Rows fade out under it on the page's background, so the button
-  never sits on a row's text. The band shows only while the button does.
+- **Jump button.** It floats above the composer, centred on the page, in the
+  transcript's bottom inset. Behind it, one soft scrim of the page's background
+  starts 24 points above the button, is nearly opaque by its middle, and runs
+  down behind the composer to the window's bottom edge. Rows fade out as they
+  pass under the button and composer, with no hard edge, and none shows between
+  them. The button and scrim show only up in the history; at the end both go,
+  and the last row sits whole above the composer.
 - **Status corner.** `StatusCorner` covers the top 104 points of the status
   column with the page's background, fading out over 16 points below it.
   Rows scroll under it as they scroll under the header. It shows only when the
@@ -68,6 +71,7 @@ normal thread from the Threads list, it checks that:
   2 points and is above the composer;
 - the jump button lies below the transcript's visible area (its bottom inset
   includes the button), and doesn't overlap the last visible row's text;
+- at the end, the button is gone and the last row ends above the composer;
 - any transcript text in the status column's top 100 points is covered.
 
 Before the fix, all four failed in all three cases: the composer ended at
@@ -84,17 +88,19 @@ chat. The quick-reply test's Duo history fixture has one reply made longer
 
 ## Renders
 
-Dark, UIKit window renders at 2×, scrolled up into the history so that the jump
-button shows.
+Dark, UIKit window renders at 2×, on `origin/main` 8acc6877 (no New voice chat
+button). “History” is scrolled up so the jump button shows; there the status
+column's cover hides the top right of the rows scrolled under it. The before
+renders come from the earlier base, 5c1c8f8a.
 
-| Case | Before | After |
-| --- | --- | --- |
-| Bot chat | ![](before-bot-chat.png) | ![](after-bot-chat.png) |
-| Bot thread (Running) | ![](before-bot-thread.png) | ![](after-bot-thread.png) |
-| Normal thread (Threads) | ![](before-thread.png) | ![](after-thread.png) |
+| Case | Before (history) | After, history | After, end |
+| --- | --- | --- | --- |
+| Bot chat | ![](before-bot-chat.png) | ![](after-bot-chat.png) | ![](after-bot-chat-end.png) |
+| Bot thread (Running) | ![](before-bot-thread.png) | ![](after-bot-thread.png) | ![](after-bot-thread-end.png) |
+| Normal thread (Threads) | ![](before-thread.png) | ![](after-thread.png) | ![](after-thread-end.png) |
 
-The Duo's outer screen (466 × 678) and an iPhone 18 Pro, after the change, are
-unchanged: [outer](after-outer.png), [iPhone](after-iphone.png).
+The Duo's outer screen (466 × 678) and an iPhone 18 Pro keep one page and the
+old layout: [outer](after-outer.png), [iPhone](after-iphone.png).
 
 The simulator doesn't draw the Duo's clock and icons, so the renders show the
 covered corner but not the cluster itself. Its height (104 points) is measured
