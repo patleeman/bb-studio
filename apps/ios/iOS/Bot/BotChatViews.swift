@@ -33,6 +33,9 @@ struct BotChatTimeline: View {
     var unmeasure: (String) -> Void = { _ in }
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderCount.bump("botTimeline.body")
+        #endif
         let entries = BotChatEntry.memo.entries(rows, started: started, compactions: compactions)
         let live = Dictionary(started.map { ($0.id, $0.status) }, uniquingKeysWith: { first, _ in first })
         ForEach(entries) { entry in

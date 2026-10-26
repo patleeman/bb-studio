@@ -41,8 +41,6 @@ struct ThreadView: View {
     /// Follow new output only while the reader is at the bottom.
     @State private var atBottom = true
     @State private var atTop = false
-    /// How far the timeline is scrolled past its last row (0 when it isn't).
-    @State private var pastEnd: CGFloat = 0
     /// Where the timeline's end is, and whether it follows it. Not state: it
     /// changes with every scroll frame, and nothing draws from it.
     @State private var end = TranscriptEnd()
@@ -54,7 +52,9 @@ struct ThreadView: View {
     @State private var selecting: SelectionText?
     @State private var selectedExcerpt = ""
     @State private var reactionSettings = ReactionSettings.defaults
-    @State private var position = ScrollPosition()
+    /// The scroll position, outside this view's state: as state, each
+    /// scroll request (ten a second while a fold restores) redrew all of this.
+    @State private var scroller = TranscriptScroller()
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
     @Environment(\.duoLayout) private var duoLayout
@@ -112,6 +112,9 @@ struct ThreadView: View {
     }
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderCount.bump("thread.body")
+        #endif
         screen
         .navigationBarBackButtonHidden(duoLayout.twoPages && app.tab == .inbox && hidesTabBar)
         .sheet(isPresented: $showingWeb) {
@@ -362,7 +365,7 @@ struct ThreadView: View {
         // since than one page holds) does it replace them: start again at the
         // bottom then, unless the reader has scrolled up into the cached rows.
         .onChange(of: model.replacedCache) { _, _ in
-            if atBottom || pastEnd > Self.pastEndSlack { timelineKey += 1 }
+            if atBottom || end.pastEnd > Self.pastEndSlack { timelineKey += 1 }
         }
         // Beside two pages, centred on the page above the composer, in the
         // transcript's bottom inset. One soft scrim runs from above it down
@@ -529,11 +532,13 @@ struct ThreadView: View {
                         running: model.thread?.isRunning == true, thinking: model.shelf.thinking, started: botChrome.started, compactions: botChrome.compactions,
                         react: { send(text: $0) }, quote: { quote($0) }, select: { selecting = SelectionText(text: $0) },
                         edit: startEditing, editableId: lastUserRowId, openThread: botChrome.openThread,
-                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: Set(model.rows.map(\.id)), cached: model.showsCache, measure: { resizeAnchor.measure($0, row: $1) }, unmeasure: { resizeAnchor.forget($0) })
+                        sideThreads: botChrome.sideThreads, replyInThread: botChrome.replyInThread, threadRows: model.rowIds, cached: model.showsCache, measure: { resizeAnchor.measure($0, row: $1) }, unmeasure: { resizeAnchor.forget($0) })
                 }
-                let items = botChrome != nil ? [] : TimelineItem.group(model.shownRows)
+                let items = botChrome != nil ? [] : model.shownItems
                 let unread = unreadItem(in: items)
                 let editable = lastUserRowId
+                // Once, not per row: it searches every row while Find is open.
+                let match = currentMatch
                 let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
                 ForEach(items) { item in
                     // One view per item, so scrolling to the item lands on the divider.
@@ -560,7 +565,7 @@ struct ThreadView: View {
                             }
                         }
                         .background {
-                            if item.id == currentMatch {
+                            if item.id == match {
                                 RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
                             }
                         }
@@ -658,7 +663,7 @@ struct ThreadView: View {
         }
         .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { _, geometry in ScrollLog.geometry(geometry) }
         .coordinateSpace(name: "threadTranscript")
-        .scrollPosition($position)
+        .modifier(TranscriptScrollPosition(scroller: scroller))
         .onScrollGeometryChange(for: TranscriptResizeAnchor.Viewport.self) { geometry in
             TranscriptResizeAnchor.Viewport(size: geometry.containerSize, offset: geometry.contentOffset.y,
                 inset: geometry.contentInsets.top, bottomGap: geometry.contentSize.height - geometry.unobscuredBottom,
@@ -674,6 +679,9 @@ struct ThreadView: View {
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.unobscuredBottom >= geometry.contentSize.height - 120
         } action: { _, isAtBottom in
+            #if DEBUG
+            RenderCount.bump("write.atBottom")
+            #endif
             atBottom = isAtBottom
         }
         // The one owner of the timeline's end: rows growing or shrinking,
@@ -696,10 +704,15 @@ struct ThreadView: View {
             }
             if next.point != end.geometry.point { end.moved = .now }
             end.geometry = next
-            if pastEnd != next.distance { pastEnd = next.distance }
+            #if DEBUG
+            RenderCount.bump("geometry.end")
+            #endif
             keepAtEnd()
         }
         .onScrollPhaseChange { _, phase in
+            #if DEBUG
+            RenderCount.bump("write.scrollPhase")
+            #endif
             scrollPhase = phase
             end.animationOver = false
             if phase == .animating { watchAnimation() }
@@ -732,6 +745,9 @@ struct ThreadView: View {
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < 40
         } action: { _, isAtTop in
+            #if DEBUG
+            RenderCount.bump("write.atTop")
+            #endif
             atTop = isAtTop
         }
         // Keeps loading while the reader stays at the top and a page is too
@@ -768,6 +784,9 @@ struct ThreadView: View {
     /// materialize the saved row in the lazy stack, then restore its pixel
     /// offset as the new widths settle. An interaction cancels this work.
     private func restoreAfterWidthChange(_ anchor: TranscriptResizeAnchor.Anchor) {
+        #if DEBUG
+        RenderCount.bump("restore")
+        #endif
         ScrollLog.request("restoreAfterWidthChange \(ScrollLog.describe(anchor))")
         resizeRestore?.cancel()
         let token = resizeAnchor.generation
@@ -810,7 +829,7 @@ struct ThreadView: View {
                     } else if let y = resizeAnchor.correction(for: id, offset: offset) {
                         ScrollLog.request("restore scrollTo(y: \(y))")
                         end.following = false
-                        position.scrollTo(y: y)
+                        scroller.scrollTo(y: y)
                         restored = true
                     } else { restored = false }
                 }
@@ -896,14 +915,17 @@ struct ThreadView: View {
     /// every streamed update.
     private func keepAtEnd() {
         guard scrollPhase == .idle || end.animationOver, !resizeAnchor.restoring else {
-            if pastEnd > 0.5 || end.following { ScrollLog.request("keepAtEnd held phase=\(scrollPhase) restoring=\(resizeAnchor.restoring) past=\(pastEnd)") }
+            if end.pastEnd > 0.5 || end.following { ScrollLog.request("keepAtEnd held phase=\(scrollPhase) restoring=\(resizeAnchor.restoring) past=\(end.pastEnd)") }
             return
         }
-        guard end.following || pastEnd > 0.5 else { return }
+        guard end.following || end.pastEnd > 0.5 else { return }
         let target = end.geometry.lastPoint
         guard abs(end.geometry.point - target) > 0.5 else { return }
         ScrollLog.request("keepAtEnd following=\(end.following) from \(end.geometry.point) to \(target)")
-        position.scrollTo(y: target)
+        #if DEBUG
+        RenderCount.bump("keepAtEnd.scroll")
+        #endif
+        scroller.scrollTo(y: target)
     }
 
     /// SwiftUI's animated scroll can end without the phase going back to idle.
@@ -936,8 +958,11 @@ struct ThreadView: View {
     /// Takes the reader to a row (unread, a find match, where they were):
     /// not following the end, or the next change would carry them off it.
     private func read(_ id: String, anchor: UnitPoint) {
+        #if DEBUG
+        RenderCount.bump("read")
+        #endif
         end.following = false
-        position.scrollTo(id: id, anchor: anchor)
+        scroller.scrollTo(id: id, anchor: anchor)
     }
 
     /// Follows the end from now on. Near it, a short animated scroll; from
@@ -948,11 +973,14 @@ struct ThreadView: View {
     /// in a long chat of uneven rows, the whole transcript visibly scrolled
     /// past.
     private func scrollToBottom(animated: Bool = true) {
-        ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(pastEnd)")
+        #if DEBUG
+        RenderCount.bump("scrollToBottom")
+        #endif
+        ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(end.pastEnd)")
         end.following = true
         if end.markerVisible || atBottom {
             if animated {
-                withAnimation(.snappy) { position.scrollTo(y: end.geometry.lastPoint) }
+                withAnimation(.snappy) { scroller.scrollTo(y: end.geometry.lastPoint) }
                 // Still "animating" from one that never reported its end, the
                 // phase won't change for this one: watch it from here.
                 if scrollPhase == .animating {
@@ -960,10 +988,10 @@ struct ThreadView: View {
                     watchAnimation()
                 }
             } else {
-                position.scrollTo(y: end.geometry.lastPoint)
+                scroller.scrollTo(y: end.geometry.lastPoint)
             }
         } else {
-            position.scrollTo(id: Self.bottomId, anchor: .bottom)
+            scroller.scrollTo(id: Self.bottomId, anchor: .bottom)
         }
     }
 
@@ -1551,6 +1579,8 @@ private struct EndGeometry: Equatable {
 
 private final class TranscriptEnd {
     var geometry = EndGeometry()
+    /// How far the timeline is scrolled past its last row (0 when it isn't).
+    var pastEnd: CGFloat { geometry.distance }
     var markerVisible = false
     /// The newest row stays at the bottom. Opens true (the chat opens at its
     /// end); set where the reader's scroll comes to rest, by `scrollToBottom`,

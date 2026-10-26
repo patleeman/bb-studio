@@ -49,6 +49,9 @@ struct BotTab: View {
     private var needsYou: Int { activity?.attention?.count ?? 0 }
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderCount.bump("botTab.body")
+        #endif
         RegularPages {
             if duoLayout.twoPages {
                 BotThreadsSheet(bot: bot, botId: botId, activity: activity, open: { id in

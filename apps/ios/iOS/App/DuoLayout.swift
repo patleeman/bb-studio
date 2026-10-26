@@ -201,7 +201,10 @@ struct WindowGeometry: UIViewRepresentable {
             let size = window.bounds.size
             let leading = window.safeAreaInsets.left
             let trailing = window.safeAreaInsets.right
-            guard size != lastSize || leading != lastLeading || trailing != lastTrailing else { return }
+            // Half a point or more, so rounding in a layout pass can't
+            // report a new window, which lays out the whole app again.
+            guard abs(size.width - lastSize.width) >= 0.5 || abs(size.height - lastSize.height) >= 0.5
+                || abs(leading - lastLeading) >= 0.5 || abs(trailing - lastTrailing) >= 0.5 else { return }
             lastSize = size
             lastLeading = leading
             lastTrailing = trailing
@@ -210,6 +213,9 @@ struct WindowGeometry: UIViewRepresentable {
             // trait used by the shared iPad layout, without changing idiom.
             window.rootViewController?.traitOverrides.horizontalSizeClass =
                 DuoLayout(size: size).twoPages ? .regular : .unspecified
+            #if DEBUG
+            RenderCount.bump("write.window")
+            #endif
             DispatchQueue.main.async { [weak self] in self?.changed(size, leading, trailing) }
         }
     }

@@ -559,7 +559,11 @@ struct MarkdownTable: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
             .clipShape(.rect(cornerRadius: 8))
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { available = $0 }
+        // The width sets the columns' cap, which can change the width: only
+        // whole points, and only a real change, so it can't trade back and forth.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width.rounded() } action: { width in
+            if abs(width - available) >= 1 { available = width }
+        }
     }
 
     @ViewBuilder

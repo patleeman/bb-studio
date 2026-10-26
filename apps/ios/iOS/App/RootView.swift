@@ -9,6 +9,9 @@ struct RootView: View {
     @State private var pane = DuoPaneState.shared
 
     var body: some View {
+        #if DEBUG
+        let _ = RenderCount.bump("root.body")
+        #endif
         let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
                                pane: pane.pane, dragWidth: pane.dragWidth)
         HStack(spacing: 0) {

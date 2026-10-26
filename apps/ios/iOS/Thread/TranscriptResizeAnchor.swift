@@ -35,6 +35,9 @@ final class TranscriptResizeAnchor {
     #endif
 
     func measure(_ id: String, row: Row) {
+        #if DEBUG
+        RenderCount.bump("anchor.measure")
+        #endif
         let width = key(row.width)
         if let viewport, width != key(viewport.size.width) {
             // Row geometry for the next width may precede ScrollGeometry.

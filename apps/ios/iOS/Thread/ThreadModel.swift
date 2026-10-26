@@ -8,12 +8,17 @@ final class ThreadModel: ObservableObject {
     @Published var rows: [TimelineRow] = [] {
         didSet {
             chainMemo = nil
+            rowIdsMemo = nil
+            itemsMemo = nil
             if !pendingSends.isEmpty { confirmPending() }
         }
     }
     /// Messages sent from here that the server hasn't shown yet, drawn after the rows.
     @Published private(set) var pendingSends: [PendingSend] = [] {
-        didSet { chainMemo = nil }
+        didSet {
+            chainMemo = nil
+            itemsMemo = nil
+        }
     }
     /// Rows that stood for a pending send already.
     private var claimedRows = Set<String>()
@@ -130,6 +135,26 @@ final class ThreadModel: ObservableObject {
 
     /// This thread's rows and the messages on their way.
     var shownRows: [TimelineRow] { pendingSends.isEmpty ? rows : rows + pendingSends.map(\.row) }
+
+    /// The ids of this thread's own rows (not the chain's earlier threads'),
+    /// once per change. The view asks on every redraw, and building it there
+    /// for a long Bot chat was where a 10 s hang spent its time.
+    var rowIds: Set<String> {
+        if let rowIdsMemo { return rowIdsMemo }
+        let ids = Set(rows.map(\.id))
+        rowIdsMemo = ids
+        return ids
+    }
+    private var rowIdsMemo: Set<String>?
+
+    /// `shownRows` grouped into the timeline's items, once per change.
+    var shownItems: [TimelineItem] {
+        if let itemsMemo { return itemsMemo }
+        let items = TimelineItem.group(shownRows)
+        itemsMemo = items
+        return items
+    }
+    private var itemsMemo: [TimelineItem]?
 
     private func confirmPending() {
         let left = TimelineMerge.unconfirmed(pendingSends, in: rows, claimed: &claimedRows)

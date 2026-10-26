@@ -863,7 +863,9 @@ private struct CustomWidget: View {
                 asked: $asked)
                 .frame(height: height)
                 .frame(maxWidth: .infinity)
-                .onGeometryChange(for: Double.self) { $0.size.width } action: { width = $0 }
+                .onGeometryChange(for: Double.self) { $0.size.width } action: { next in
+                    if abs(next - width) >= 0.5 { width = next }
+                }
                 .accessibilityLabel(widget.title ?? "Custom widget")
         } else {
             DashboardEmpty(text: widget.customType != nil ? "This widget's library type is gone." : "This widget has no HTML yet.")

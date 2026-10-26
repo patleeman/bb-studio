@@ -159,7 +159,9 @@ struct ClampedText: View {
             MarkdownText(text)
                 .environment(\.threadId, nil)
                 .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { fullHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if abs(height - fullHeight) >= 0.5 { fullHeight = height }
+                }
                 .frame(maxHeight: expanded ? nil : limit, alignment: .top)
                 .clipped()
                 .mask {
