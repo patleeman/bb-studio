@@ -360,6 +360,11 @@ final class TranscriptReplay {
             }
         }
 
+        // Every row on screen as tall as it measures at this width.
+        for misfit in controller.misfitRows().prefix(3) {
+            failures.append(String(format: "row %@ is %.1f pt, measures %.1f", "\(misfit.id)", misfit.layout, misfit.fitted))
+        }
+
         let layout = currentLayout ?? self.layout
         let safeBottom = window.safeAreaInsets.bottom
         let expectedGap = layout.chrome.composerGap + keyboardHeight(safeBottom: safeBottom, layout: layout)
@@ -379,10 +384,9 @@ final class TranscriptReplay {
     }
 
     private func keyboardHeight(safeBottom: CGFloat, layout: Layout) -> CGFloat {
-        if let realKeyboard {
-            let guide = controller.view.keyboardLayoutGuide.layoutFrame
-            _ = realKeyboard
-            return controller.view.bounds.maxY - guide.minY
+        if realKeyboard != nil {
+            // The container ends at the keyboard; the composer rests on its bottom.
+            return layout.chrome.composerIgnoresBottomSafeArea ? 0 : controller.view.safeAreaInsets.bottom
         }
         return keyboard + (layout.chrome.composerIgnoresBottomSafeArea ? 0 : safeBottom)
     }

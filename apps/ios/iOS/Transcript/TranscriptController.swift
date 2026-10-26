@@ -91,6 +91,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var composerHeight: NSLayoutConstraint!
     private var topHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
+    private var composerFloor: NSLayoutConstraint?
     private var composerEdges: [NSLayoutConstraint] = []
     private var pillPlacement: [NSLayoutConstraint] = []
     private var hasTop = false
@@ -116,7 +117,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// The harness raises a keyboard this tall without one (tests can't
     /// summon the real keyboard deterministically).
     var simulatedKeyboard: CGFloat = 0 {
-        didSet { if isViewLoaded { composerBottom.constant = -(chrome.composerGap + simulatedKeyboard); view.setNeedsLayout() } }
+        didSet { if isViewLoaded { applyChrome() } }
     }
 
     // MARK: Lifecycle
@@ -167,11 +168,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         pillHost.view.alpha = 0
         pillHost.view.isUserInteractionEnabled = false
 
-        // Floating and undocked keyboards don't lift the composer: with
-        // `followsUndockedKeyboard` off, the guide drops to the bottom when
-        // the keyboard floats, and the composer rests as if it were gone.
-        view.keyboardLayoutGuide.followsUndockedKeyboard = false
-        composerBottom = composerHost.view.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor)
+        // The keyboard: the container's bottom is the keyboard's top. Its
+        // host leaves the keyboard's safe area in (`TranscriptContainer`), so
+        // the container ends where the keyboard begins, docked or in an
+        // interactive dismissal. A UIKit keyboard layout guide never moved
+        // here: hosted in SwiftUI, both the view's and the window's stayed
+        // at zero size through every keyboard show and hide (iOS 27).
+        //
+        // The composer rests on the lower of the container's bottom and its
+        // resting edge (the safe area, which includes a tab bar; or the
+        // bottom edge on the Duo's inner screen), pulled down to it.
+        let pullDown = composerHost.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        pullDown.priority = .defaultLow
+        composerBottom = composerHost.view.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor)
         composerHeight = composerHost.view.heightAnchor.constraint(equalToConstant: 0)
         topHeight = topHost.view.heightAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
@@ -179,7 +188,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            composerBottom, composerHeight, topHeight,
+            composerBottom, pullDown, composerHeight, topHeight,
             topHost.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             topHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             topHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
@@ -192,7 +201,16 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     private func applyChrome() {
-        view.keyboardLayoutGuide.usesBottomSafeArea = !chrome.composerIgnoresBottomSafeArea
+        NSLayoutConstraint.deactivate([composerBottom])
+        composerBottom = composerHost.view.bottomAnchor.constraint(lessThanOrEqualTo: chrome.composerIgnoresBottomSafeArea
+            ? view.bottomAnchor : view.safeAreaLayoutGuide.bottomAnchor)
+        composerBottom.isActive = true
+        // Always under the container's bottom (the keyboard's top), too.
+        if composerFloor == nil {
+            composerFloor = composerHost.view.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor)
+            composerFloor?.isActive = true
+        }
+        composerFloor?.constant = -(chrome.composerGap + simulatedKeyboard)
         collectionView.topEdgeEffect.style = chrome.softTopEdge ? .soft : .automatic
         composerBottom.constant = -(chrome.composerGap + simulatedKeyboard)
         NSLayoutConstraint.deactivate(composerEdges + pillPlacement)
@@ -312,7 +330,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func configure(_ cell: TranscriptCell, _ id: AnyHashable) {
         counters.configures += 1
         let view = content(id)
-        cell.contentConfiguration = UIHostingConfiguration { view.id(id) }
+        // Its ideal height, as a lazy stack proposes: a row with a flexible
+        // `frame(maxHeight:)` (a clamped long message) otherwise grows to
+        // whatever height the sizing pass offers.
+        cell.contentConfiguration = UIHostingConfiguration { view.fixedSize(horizontal: false, vertical: true).id(id) }
             .margins(.all, 0)
             .minSize(width: 0, height: 0)
     }
@@ -521,12 +542,42 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     private func transcriptDidLayout() {
         if animating { counters.animationLayouts += 1 } else { counters.layouts += 1 }
+        measureStaleCells()
         #if DEBUG
         log?(String(format: "v2 layout offset=%.1f content=%.1f tracking=%@ decel=%@", collectionView.contentOffset.y, collectionView.contentSize.height, "\(collectionView.isTracking)", "\(collectionView.isDecelerating)"))
         #endif
         settle("transcript layout")
         updatePill()
         checkNearTop()
+    }
+
+    /// UIKit sizes a cell when it first shows, not again when only the
+    /// width changes: a row measured at another width (a fold, a split, the
+    /// zero width a hosted view starts at) kept that height, and a short
+    /// bubble stood 140 pt tall. Visible rows not measured at this width
+    /// measure here, through the layout's own invalidation, so the anchor
+    /// holds as they change.
+    private func measureStaleCells() {
+        guard collectionView.bounds.width > 0 else { return }
+        for cell in collectionView.visibleCells {
+            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell),
+                  layout.ids.indices.contains(indexPath.item), !layout.isMeasured(layout.ids[indexPath.item]),
+                  let original = layout.layoutAttributesForItem(at: indexPath) else { continue }
+            let fitted = cell.preferredLayoutAttributesFitting(original)
+            if layout.shouldInvalidateLayout(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original) {
+                layout.invalidateLayout(with: layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original))
+            }
+        }
+    }
+
+    /// Visible rows whose height isn't what they measure now, for the harness.
+    func misfitRows() -> [(id: AnyHashable, layout: CGFloat, fitted: CGFloat)] {
+        collectionView.visibleCells.compactMap { cell in
+            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell),
+                  let original = layout.layoutAttributesForItem(at: indexPath) else { return nil }
+            let fitted = cell.preferredLayoutAttributesFitting(original).size.height
+            return abs(fitted - original.size.height) > 1 ? (layout.ids[indexPath.item], original.size.height, fitted) : nil
+        }
     }
 
     // MARK: Scrolling

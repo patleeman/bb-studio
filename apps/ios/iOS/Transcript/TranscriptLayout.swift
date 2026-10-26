@@ -167,7 +167,9 @@ final class TranscriptListLayout: UICollectionViewLayout {
     override func shouldInvalidateLayout(forPreferredLayoutAttributes preferred: UICollectionViewLayoutAttributes,
                                          withOriginalAttributes original: UICollectionViewLayoutAttributes) -> Bool {
         let index = preferred.indexPath.item
-        guard preferred.representedElementCategory == .cell, ids.indices.contains(index) else { return false }
+        // At no width (a hosted view's first pass) nothing measures for real.
+        guard preferred.representedElementCategory == .cell, ids.indices.contains(index), width > 0,
+              frames[index].width > 0 else { return false }
         measures += 1
         let height = Self.pixel(preferred.size.height)
         let id = ids[index]

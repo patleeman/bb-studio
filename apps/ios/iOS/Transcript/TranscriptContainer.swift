@@ -32,6 +32,10 @@ final class TranscriptHandle {
 ///
 /// Rows are compared by value: a changed row reconfigures only its cell,
 /// and only a change of order or membership goes through a snapshot.
+/// Place it with `.ignoresSafeArea(.container)`: it runs under the header
+/// and to the edges, and ends at the keyboard's top, which the composer
+/// rests on.
+///
 /// The SwiftUI environment here (environment objects, `openURL`, custom
 /// keys) is carried into the cells, the composer and the header.
 struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: View, Top: View, Pill: View>: UIViewControllerRepresentable {
