@@ -3,7 +3,7 @@ import XCTest
 /// A thread with sub-threads collapses and expands from its long-press menu.
 /// Set TEST_RUNNER_BBGO_PARENT_TITLE to the title of a thread on Home that has
 /// sub-threads. It's left as it was: expanded again if it started expanded.
-final class CollapseSubThreadsUITests: XCTestCase {
+final class CollapseSubThreadsUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
     func testCollapseFromLongPress() throws {
@@ -11,7 +11,7 @@ final class CollapseSubThreadsUITests: XCTestCase {
             throw XCTSkip("set TEST_RUNNER_BBGO_PARENT_TITLE")
         }
         app.launchArguments += ["-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         let row = app.staticTexts[title].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 20))
 

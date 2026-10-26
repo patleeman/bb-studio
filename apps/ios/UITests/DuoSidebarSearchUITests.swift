@@ -1,14 +1,14 @@
 import XCTest
 
 @MainActor
-final class DuoSidebarSearchUITests: XCTestCase {
+final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
     func testWideSidebarAlignmentAndCaptures() throws {
         let env = ProcessInfo.processInfo.environment
         let device = try XCTUnwrap(env["BBGO_QA_DEVICE"])
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 30))
         try assertCard(app, device: device)
         capture("v5-bot-" + device)
@@ -43,9 +43,9 @@ final class DuoSidebarSearchUITests: XCTestCase {
             throw XCTSkip("Wide clear-button interaction uses iPad's full touch surface; phone search is checked separately")
         }
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-openURL", "bbstudio://home"]
-        app.launch()
+        app.launchOffline()
         command("tab?studio")
         let input = app.textFields["sidebarSearchInput"]
         XCTAssertTrue(input.waitForExistence(timeout: 20))
@@ -68,9 +68,9 @@ final class DuoSidebarSearchUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://home"]
-        app.launch()
+        app.launchOffline()
         for tab in ["studio", "threads"] {
             command("tab?" + tab)
             XCTAssertTrue(app.textFields["sidebarSearchInput"].waitForExistence(timeout: 20))
@@ -82,9 +82,9 @@ final class DuoSidebarSearchUITests: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         guard env["BBGO_QA_DEVICE"] == "duo" else { throw XCTSkip("Phone-only native search check") }
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://home"]
-        app.launch()
+        app.launchOffline()
         for tab in ["threads", "studio"] {
             command("tab?" + tab)
             if app.buttons["Search"].exists { app.buttons["Search"].tap() }

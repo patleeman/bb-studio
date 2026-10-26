@@ -6,7 +6,7 @@ import XCTest
 /// as a phone's does above its home indicator. Run on an owned iPhone Duo
 /// simulator.
 @MainActor
-final class DuoSplitComposerUITests: XCTestCase {
+final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     /// The crease's right edge: the window midpoint plus half the gutter.
     private let pageMinX: CGFloat = 951 / 2 + 16
@@ -15,10 +15,10 @@ final class DuoSplitComposerUITests: XCTestCase {
     private let composerGap: CGFloat = 8
 
     func testComposerJumpButtonAndBottomGapInTheRightPage() throws {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
 
         try check("bot-chat", last: "Duo message 80")
@@ -49,9 +49,9 @@ final class DuoSplitComposerUITests: XCTestCase {
     /// its 12-point margins inside the safe area, stays clear of the home
     /// indicator, and the jump button floats in the corner above it.
     func testNarrowWindowKeepsItsComposerAndJumpButton() throws {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         let composer = app.otherElements["threadComposer"].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch.waitForExistence(timeout: 15))

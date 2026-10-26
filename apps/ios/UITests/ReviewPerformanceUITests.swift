@@ -1,13 +1,13 @@
 import XCTest
 
 /// Opt-in read-only performance observation. The runner and app must use staged BB.
-final class ReviewPerformanceUITests: XCTestCase {
-    private let fixture = "http://127.0.0.1:49486"
+final class ReviewPerformanceUITests: StagedServerUITestCase {
+    private var fixture: String { qaServer }
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
-        guard ProcessInfo.processInfo.environment["BB_PERFORMANCE_QA_SERVER_URL"] == fixture,
-              ProcessInfo.processInfo.environment["BB_PERFORMANCE_QA_PRIVATE_SIM"] == "YES" else {
+        guard ProcessInfo.processInfo.environment["BB_PERFORMANCE_QA_PRIVATE_SIM"] == "YES" else {
             throw XCTSkip("Requires exact staged origin and fresh private simulator opt-in before app launch.")
         }
     }
@@ -15,7 +15,7 @@ final class ReviewPerformanceUITests: XCTestCase {
     func testRepeatedStudioPageNavigation() {
         let app = XCUIApplication()
         app.launchArguments = ["-serverURL", fixture, "-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         defer { app.terminate() }
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()

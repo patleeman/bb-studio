@@ -7,7 +7,7 @@ device_id="${BB_TEST_SIMULATOR_ID:?Set BB_TEST_SIMULATOR_ID to your private empt
 # The unit-test host launches the app too. Keep its background requests away
 # from the user's server, including after tests temporarily change the origin.
 for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
-  xcrun simctl spawn "$device_id" defaults write "$domain" serverURL http://127.0.0.1:1
+  xcrun simctl spawn "$device_id" defaults write "$domain" serverURL https://unit-tests.invalid
 done
 xcodebuild test -scheme BBStudio -destination "id=$device_id" \
   -derivedDataPath build/system/DerivedData -only-testing:BBStudioTests "$@"

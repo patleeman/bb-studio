@@ -3,16 +3,16 @@ import XCTest
 /// The Duo inner screen (951×669, phone idiom): every thread in the right page
 /// fits that page, however long its title. Run on an owned iPhone Duo simulator.
 @MainActor
-final class DuoSplitWidthUITests: XCTestCase {
+final class DuoSplitWidthUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     /// The crease's right edge: the window midpoint plus half the gutter.
     private let pageMinX: CGFloat = 951 / 2 + 16
 
     func testEveryDetailFitsTheRightPage() throws {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
             "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
 
         // The Bot's chat, then threads from its Running and Waiting groups.

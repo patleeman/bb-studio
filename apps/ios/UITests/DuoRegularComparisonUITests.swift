@@ -3,14 +3,13 @@ import XCTest
 /// Run on owned iPhone Duo and iPad simulators with the same 951×669 window.
 /// Only the actual idiom and its safe areas differ; both use RegularPages.
 @MainActor
-final class DuoRegularComparisonUITests: XCTestCase {
+final class DuoRegularComparisonUITests: ServerIsolatedUITestCase {
     func testDarkSidebarsAndOpenDetails() throws {
         let env = ProcessInfo.processInfo.environment
-        let server = try XCTUnwrap(env["BBGO_QA_SERVER"])
         let device = try XCTUnwrap(env["BBGO_QA_DEVICE"])
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", server, "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launchOffline()
         let last = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "History turn 299.")).firstMatch
         XCTAssertTrue(last.waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["Chat"].exists)

@@ -1,15 +1,13 @@
 import XCTest
 
 /// Opt-in, read-only UI review. Never inherit BB's production/default server.
-final class ReviewQualityUITests: XCTestCase {
-    private let fixture = "http://127.0.0.1:49486"
+final class ReviewQualityUITests: StagedServerUITestCase {
+    private var fixture: String { qaServer }
     private var auditFindings: [String] = []
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
-        guard ProcessInfo.processInfo.environment["BB_QA_SERVER_URL"] == fixture else {
-            throw XCTSkip("Set BB_QA_SERVER_URL=http://127.0.0.1:49486 in this test target's xctestrun EnvironmentVariables. Only the isolated review fixture is allowed.")
-        }
     }
 
     func testNavigationAtDefaultText() throws { try navigation(largeText: false) }
@@ -18,7 +16,7 @@ final class ReviewQualityUITests: XCTestCase {
     /// Let XCTest retain its native issue attachments for an unidentified finding.
     func testSettingsElementDetectionAtDefaultText() throws {
         let app = application(largeText: false)
-        app.launch()
+        app.launchStaged(server: qaServer)
         defer { app.terminate() }
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
@@ -42,7 +40,7 @@ final class ReviewQualityUITests: XCTestCase {
     /// Localize unidentified OCR findings without changing Settings or its data.
     func testSettingsDetectionAtScrollPositions() throws {
         let app = application(largeText: false)
-        app.launch()
+        app.launchStaged(server: qaServer)
         defer { app.terminate() }
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
@@ -77,7 +75,7 @@ final class ReviewQualityUITests: XCTestCase {
 
     func testStudioRowsAtAccessibilityText() throws {
         let app = application(largeText: true)
-        app.launch()
+        app.launchStaged(server: qaServer)
         defer { app.terminate() }
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
@@ -174,7 +172,7 @@ final class ReviewQualityUITests: XCTestCase {
 
     private func diagnosticApplication(largeText: Bool) throws -> XCUIApplication {
         let app = application(largeText: largeText)
-        app.launch()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
         let server = app.descendants(matching: .any)["settingsServerURL"]
@@ -214,7 +212,7 @@ final class ReviewQualityUITests: XCTestCase {
         let options = XCTMeasureOptions()
         options.iterationCount = 3
         measure(metrics: [XCTApplicationLaunchMetric()], options: options) {
-            app.launch()
+            app.launchStaged(server: qaServer)
             app.terminate()
         }
     }
@@ -230,7 +228,7 @@ final class ReviewQualityUITests: XCTestCase {
 
     private func navigation(largeText: Bool) throws {
         let app = application(largeText: largeText)
-        app.launch()
+        app.launchStaged(server: qaServer)
         defer { app.terminate() }
         let size = largeText ? "accessibility-xxxl" : "default"
         let settings = app.tabBars.buttons["Settings"]

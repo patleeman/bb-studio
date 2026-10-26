@@ -4,12 +4,12 @@ import XCTest
 /// again, and the photo is gone; the draft text survives. Attachments wait
 /// in the composer with the draft, per thread.
 @MainActor
-final class DraftAttachmentUITests: XCTestCase {
+final class DraftAttachmentUITests: ServerIsolatedUITestCase {
     func testAnAttachedPhotoSurvivesLeavingAndReopeningTheChat() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "chat", "-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         let attachment = app.buttons["Remove attachment"].firstMatch

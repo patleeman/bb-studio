@@ -7,15 +7,15 @@ import XCTest
 /// `TEST_RUNNER_NO_VOICE_DUO=1` on the iPhone Duo's outer screen (466×678).
 /// `TEST_RUNNER_NO_VOICE_SHOTS=<dir>` saves dark screenshots there.
 @MainActor
-final class NoVoiceChatUITests: XCTestCase {
+final class NoVoiceChatUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let duo = ProcessInfo.processInfo.environment["NO_VOICE_DUO"] != nil
 
     func testBotRailHasNoVoiceChatButton() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaDark", "-qaReduceMotion",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaDark", "-qaReduceMotion",
                                "-qaBotDemo", duo ? "duo" : "chat", "-openURL", "bbstudio://bot"]
         if duo { app.launchArguments.append("-qaDuoPhone") }
-        app.launch()
+        app.launchOffline()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
@@ -30,10 +30,10 @@ final class NoVoiceChatUITests: XCTestCase {
     }
 
     func testThreadMenuHasNoVoiceChat() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaDark", "-qaReduceMotion",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaDark", "-qaReduceMotion",
                                "-qaBotDemo", "duo", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if duo { app.launchArguments.append("-qaDuoPhone") }
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         if duo { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!) }
         sleep(2)

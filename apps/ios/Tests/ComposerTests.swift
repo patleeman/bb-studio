@@ -83,7 +83,7 @@ final class ComposerTests: XCTestCase {
     }
 
     func testPluginRPCBodiesMatchServerSchemas() async throws {
-        let client = BBClient(baseURL: URL(string: "http://localhost")!)
+        let client = BBClient(baseURL: URL(string: "https://client.invalid")!)
         client.transport = { _, path, body in
             let value = try JSONDecoder().decode(JSONValue.self, from: body ?? Data())
             switch path {
@@ -113,9 +113,14 @@ final class ComposerTests: XCTestCase {
     }
 
     func testLivePluginInputsReachHandlers() async throws {
-        guard let address = ProcessInfo.processInfo.environment["BBGO_LIVE_RPC"], let url = URL(string: address) else {
-            throw XCTSkip("Set BBGO_LIVE_RPC to audit the live server")
+        let env = ProcessInfo.processInfo.environment
+        guard let address = env["TEST_RUNNER_BBGO_QA_SERVER"] ?? env["BBGO_QA_SERVER"],
+              !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw XCTSkip("Set TEST_RUNNER_BBGO_QA_SERVER (BBGO_QA_SERVER in the runner) to an isolated staged BB. No default server is allowed.")
         }
+        let url = try XCTUnwrap(URL(string: address))
+        XCTAssertTrue(["http", "https"].contains(url.scheme ?? "") && url.host != nil)
+        guard ["http", "https"].contains(url.scheme ?? ""), url.host != nil else { return }
         let client = BBClient(baseURL: url)
         do {
             try await client.renameRecording("rec_aaaaaaaaaaaa", title: "QA recording")

@@ -11,7 +11,7 @@ import XCTest
 /// on an iPhone Duo simulator.
 /// `TEST_RUNNER_TAP_SHOTS=<dir>` saves screenshots.
 @MainActor
-final class TranscriptTapDismissUITests: XCTestCase {
+final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let layout = ProcessInfo.processInfo.environment["TAP_LAYOUT"] ?? "phone"
     private var steps: [String] = []
@@ -137,7 +137,7 @@ final class TranscriptTapDismissUITests: XCTestCase {
     // MARK: - Harness
 
     private func open() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaScrollLog",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",
             "-qaBotDemo", layout == "phone" ? "chat" : "duo", "-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDark",
             "-openURL", "bbstudio://bot"]
         switch layout {
@@ -145,7 +145,7 @@ final class TranscriptTapDismissUITests: XCTestCase {
         case "split": app.launchArguments += ["-qaDuoPhone", "-qaDuoColdWide"]
         default: break
         }
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         if layout == "split" {

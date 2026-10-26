@@ -1,10 +1,10 @@
 import XCTest
 
-final class CaptureUITests: XCTestCase {
+final class CaptureUITests: ServerIsolatedUITestCase {
     func testCaptureDeepLinkShowsAllOptions() {
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchOffline()
         app.open(URL(string: "bbstudio://capture")!)
         let notificationAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
         if notificationAlert.waitForExistence(timeout: 10) {

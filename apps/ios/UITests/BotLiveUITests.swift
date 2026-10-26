@@ -5,7 +5,7 @@ import XCTest
 /// Activity. Sends nothing and changes nothing. Screenshots land in
 /// `/tmp/qa-bot-live-*.png`. Skipped unless `TEST_RUNNER_BBGO_BOT_PROBE=1`;
 /// `TEST_RUNNER_BBGO_BOT_PROBE_SWIPES=<n>` scrolls further.
-final class BotLiveUITests: XCTestCase {
+final class BotLiveUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
     func testBrowseBotReadOnly() throws {
@@ -13,7 +13,7 @@ final class BotLiveUITests: XCTestCase {
         guard env["BBGO_BOT_PROBE"] == "1" else { throw XCTSkip("Set TEST_RUNNER_BBGO_BOT_PROBE=1") }
         let swipes = Int(env["BBGO_BOT_PROBE_SWIPES"] ?? "") ?? 12
         app.launchArguments += ["-skipPushPrompt", "YES", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         sleep(8)
         screenshot("chat")
         for index in 1...swipes {

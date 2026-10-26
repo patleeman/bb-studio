@@ -1,15 +1,16 @@
 import XCTest
 
-final class ComposerUITests: XCTestCase {
+final class ComposerUITests: ServerIsolatedUITestCase {
     /// A tap on the composer's mic dictates inline, in New thread against a
     /// server that has Studio (`TEST_RUNNER_BBGO_QA_SERVER`; nothing is sent):
     /// no sheet, the mic turns active, Listening with ✓ and ✕ over the
     /// composer. ✕ puts back what was typed; ✓ transcribes into the field.
     func testMicTapDictatesInline() throws {
-        guard let server = ProcessInfo.processInfo.environment["BBGO_QA_SERVER"] else { throw XCTSkip("no server with Studio") }
+        try requireQAServer()
+        let server = qaServer
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://new"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         let field = app.textViews["What should the agent do?"]
         XCTAssertTrue(field.waitForExistence(timeout: 20))
         field.tap()
@@ -45,7 +46,7 @@ final class ComposerUITests: XCTestCase {
     func testMicHoldDoesNotOpenDictation() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         let mic = app.descendants(matching: .any)["composerMic"].firstMatch
         XCTAssertTrue(mic.waitForExistence(timeout: 20))
         mic.press(forDuration: 1.2)
@@ -63,11 +64,12 @@ final class ComposerUITests: XCTestCase {
     }
 
     func testCommandsAndContextMenu() throws {
+        try requireQAServer()
         let threadId = try XCTUnwrap(scratchThread())
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
         let app = XCUIApplication()
         app.launchArguments += ["-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
 
         let composer = app.textViews["Message"]
@@ -116,7 +118,7 @@ final class ComposerUITests: XCTestCase {
     }
 
     private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

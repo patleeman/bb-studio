@@ -1,7 +1,7 @@
 import XCTest
 
 @MainActor
-final class DuoLongTranscriptUITests: XCTestCase {
+final class DuoLongTranscriptUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     func testColdWideBotAndBottomWidthChangesNeverBlank() {
@@ -56,9 +56,9 @@ final class DuoLongTranscriptUITests: XCTestCase {
     }
 
     private func launch(coldWide: Bool) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDark", "-openURL", "bbstudio://bot"]
         if coldWide { app.launchArguments += ["-qaDuoColdWide"] }
-        app.launch()
+        app.launchOffline()
     }
     private func command(_ path: String) { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!) }
     private func visible(_ element: XCUIElement) -> Bool {

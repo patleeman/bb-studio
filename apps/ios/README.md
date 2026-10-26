@@ -287,7 +287,7 @@ staged server.
 
 ```sh
 BB_STAGED_DIR=$TMPDIR/bb-staged-ios-voice BB_STAGED_PORT=49550 node ../../scripts/staged-bb.mjs start
-TEST_RUNNER_BBGO_QA_VOICE_SERVER=http://127.0.0.1:49550 TEST_RUNNER_BBGO_QA_VOICE_THREAD=thr_... xcodebuild test -scheme BBStudio \
+TEST_RUNNER_BBGO_QA_SERVER="$STAGED_SERVER_URL" TEST_RUNNER_BBGO_QA_VOICE_THREAD=thr_... xcodebuild test -scheme BBStudio \
   -destination 'id=<your-private-simulator-id>' -only-testing:BBStudioUITests/ThreadUITests/testVoiceChat
 ```
 
@@ -330,13 +330,37 @@ scripts/device.sh
 Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 `-qaShelfDemo` (Debug builds) fills every thread's shelf with sample cards.
 
+### Testing
+
+Set `STAGED_SERVER_URL` in the examples below to your isolated staged BB's URL.
+Server-backed UI tests require `TEST_RUNNER_BBGO_QA_SERVER` to name an isolated
+staged BB (`BBGO_QA_SERVER` inside the test runner). Without it, those tests skip
+before launching the app or sending requests. There is no default BB server.
+Their launches, relaunches, and API/RPC helpers use that same staged origin.
+Never point this variable at your personal BB.
+
+Offline demo tests run without the variable. This includes the transcript,
+keyboard, Duo layout, draft attachment, scroll log, and voice-menu fixtures.
+`launchOffline()` pins them to `https://offline-fixtures.invalid`, even when a
+QA variable or saved server is present. They never use the staged or personal
+BB. Mixed suites gate only their server-backed test methods.
+
+The Xcode build runs `scripts/check-test-servers.py` before tests. It rejects
+hard-coded server ports in `Tests` and `UITests`, direct app launches that
+bypass the isolated launch helpers, and UI classes that bypass the shared
+server helpers. Run it directly with `python3 scripts/check-test-servers.py`.
+Unit tests keep reserved `.invalid` and `.test` URLs for mock transports.
+The optional `ComposerTests.testLivePluginInputsReachHandlers` unit test also
+requires the QA server variable; the old `BBGO_LIVE_RPC` opt-in is no longer used.
+The Share runtime helper uses the same QA variable. Additional fixture IDs and
+private-simulator opt-ins still apply to tests that need them.
+
 UI tests click through Home and a thread (reaction chips, paste, the message
-menu, quoting, and jump-to-latest) against the BB server the simulator is
-signed in to. Point them at a throwaway thread whose newest reply ends with a
-`::reactions` line:
+menu, quoting, and jump-to-latest). Use a throwaway thread on the staged BB
+whose newest reply ends with a `::reactions` line:
 
 ```sh
-TEST_RUNNER_BBGO_QA_THREAD=thr_xxx xcodebuild test -scheme BBStudio \
+TEST_RUNNER_BBGO_QA_SERVER="$STAGED_SERVER_URL" TEST_RUNNER_BBGO_QA_THREAD=thr_xxx xcodebuild test -scheme BBStudio \
   -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:BBStudioUITests
 ```
 

@@ -1,18 +1,20 @@
 import XCTest
 
-/// Clicks through the thread screen against the live BB server the simulator
-/// app is signed in to. Set `TEST_RUNNER_BBGO_QA_THREAD` to a thread whose last
+/// Clicks through the thread screen against the explicitly configured staged BB.
+/// Set `TEST_RUNNER_BBGO_QA_THREAD` to a thread whose last
 /// assistant message ends with a `::reactions` directive. Nothing is sent.
-final class ThreadUITests: XCTestCase {
+final class ThreadUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private var threadId: String { ProcessInfo.processInfo.environment["BBGO_QA_THREAD"] ?? "thr_64r2wmjrim" }
 
-    override func setUp() {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = true
-        app.launch()
     }
 
-    func testHome() {
+    func testHome() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.tabBars.buttons["Threads"].tap()
         XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
         shot("home-top")
@@ -23,6 +25,8 @@ final class ThreadUITests: XCTestCase {
 
     /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
     func testIPad() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
         // A leftover "Open in BB Studio?" prompt from `simctl openurl` swallows keys.
         let prompt = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Cancel"]
@@ -49,6 +53,8 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testThread() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         guard app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10) else {
             throw XCTSkip("the thread's last reply has no reactions")
@@ -120,6 +126,8 @@ final class ThreadUITests: XCTestCase {
     /// TEST_RUNNER_BBGO_PROBE_FAST=1 for full-speed swipes, and
     /// TEST_RUNNER_BBGO_PROBE_FIND=<label> to stop once that element is on screen.
     func testProbe() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let env = ProcessInfo.processInfo.environment
         guard let id = env["BBGO_PROBE_THREAD"] else { throw XCTSkip("no probe thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
@@ -143,6 +151,8 @@ final class ThreadUITests: XCTestCase {
     /// Find, mentions, drafts, diffs and the model sheet, without sending or
     /// saving anything, so it can point at any thread: TEST_RUNNER_BBGO_PROBE_THREAD.
     func testFeatures() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let env = ProcessInfo.processInfo.environment
         guard let id = env["BBGO_PROBE_THREAD"] else { throw XCTSkip("no probe thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
@@ -204,7 +214,9 @@ final class ThreadUITests: XCTestCase {
 
     /// Every Pages block kind, from a built-in page rather than a real one.
     /// Automations, usage and host settings. Read-only: nothing is run, paused or sent.
-    func testTools() {
+    func testTools() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
         sleep(2)
@@ -227,6 +239,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: opens sheets and screens, never sends, forks or compacts.
     func testThreadExtras() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 10))
@@ -276,7 +290,9 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
-    func testStudio() {
+    func testStudio() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         openStudioCollection()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
@@ -312,7 +328,9 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Read-only: browses custom instructions.
-    func testPluginScreens() {
+    func testPluginScreens() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://home")!)
         app.tabBars.buttons["Settings"].tap()
         let instructions = app.buttons["Custom Instructions"]
@@ -328,7 +346,9 @@ final class ThreadUITests: XCTestCase {
 
     /// Records a few seconds from the microphone (the Mac's, in the simulator).
     /// Play speech near the mic while it runs; a silent recording is discarded by Talk.
-    func testDictationCapture() {
+    func testDictationCapture() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://dictate")!)
         sleep(8)
         shot("dictation-recording")
@@ -341,7 +361,7 @@ final class ThreadUITests: XCTestCase {
     func testPageDemo() {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]
-        app.launch()
+        app.launchOffline()
         app.open(URL(string: "bbstudio://page/qa-demo")!)
         XCTAssertTrue(app.staticTexts["Launch plan"].waitForExistence(timeout: 10))
         sleep(1)
@@ -353,6 +373,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Needs a running thread with a queued message.
     func testQueueRemove() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let remove = app.buttons["Remove from queue"].firstMatch
         guard remove.waitForExistence(timeout: 10) else { throw XCTSkip("nothing queued") }
@@ -365,6 +387,8 @@ final class ThreadUITests: XCTestCase {
     /// Rewrites the first queued message. Only runs against a scratch thread
     /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testQueueEdit() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Hello'")).firstMatch
@@ -383,6 +407,8 @@ final class ThreadUITests: XCTestCase {
     /// Collapses, expands and drags queued messages. Scratch thread only,
     /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, with three or more queued.
     func testQueueReorder() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let summary = app.buttons["queueSummary"]
@@ -407,6 +433,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Renames the scratch thread from the ⋯ menu.
     func testRenameThread() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
@@ -427,17 +455,20 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Voice mode end to end, against a staged BB whose Studio can speak
-    /// (`TEST_RUNNER_BBGO_QA_VOICE_SERVER=http://127.0.0.1:<port>` and a scratch
+    /// (`TEST_RUNNER_BBGO_QA_SERVER=http://127.0.0.1:<port>` and a scratch
     /// thread there, `TEST_RUNNER_BBGO_QA_VOICE_THREAD`, which it sends to).
     /// `bbstudio://voice/<id>` turns voice mode on; a typed message's reply
     /// plays and is lit up as it's read; Read Aloud reads a reply again; the
     /// speaker's menu opens the voice settings.
     func testVoiceChat() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let env = ProcessInfo.processInfo.environment
-        guard let server = env["BBGO_QA_VOICE_SERVER"], let thread = env["BBGO_QA_VOICE_THREAD"] else { throw XCTSkip("no staged voice server and thread") }
+        let server = qaServer
+        guard let thread = env["BBGO_QA_VOICE_THREAD"] else { throw XCTSkip("no staged voice server and thread") }
         app.terminate()
         app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://voice/\(thread)"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         let composer = app.textViews["Message"]
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "the thread opens")
         let voice = app.descendants(matching: .any)["composerVoice"].firstMatch
@@ -486,6 +517,8 @@ final class ThreadUITests: XCTestCase {
     /// mentions `README.md`, or the file named by `TEST_RUNNER_BBGO_QA_FILE_NAME`
     /// (a link to `/tmp/…` checks files outside the workspace).
     func testFileLink() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_FILE_THREAD"] else { throw XCTSkip("no scratch thread") }
         let name = ProcessInfo.processInfo.environment["BBGO_QA_FILE_NAME"] ?? "README.md"
         app.open(URL(string: "bbstudio://thread/\(id)")!)
@@ -505,7 +538,7 @@ final class ThreadUITests: XCTestCase {
     func testShelfDemo() {
         app.terminate()
         app.launchArguments = ["-qaShelfDemo"]
-        app.launch()
+        app.launchOffline()
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
         shot("shelf-demo")
@@ -542,6 +575,8 @@ final class ThreadUITests: XCTestCase {
     /// changed meanwhile, then stays live. Creates two scratch threads, held
     /// with a far-off send, and deletes them.
     func testResumeReconnects() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
@@ -573,6 +608,8 @@ final class ThreadUITests: XCTestCase {
     /// Opens a scratch artifact named by `TEST_RUNNER_BBGO_QA_ARTIFACT`, then its
     /// card in the reply of the scratch thread `TEST_RUNNER_BBGO_QA_ARTIFACT_THREAD`.
     func testArtifact() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_ARTIFACT"] else { throw XCTSkip("no scratch artifact") }
         app.open(URL(string: "bbstudio://artifact/\(id)")!)
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "rendered Markdown")
@@ -600,6 +637,8 @@ final class ThreadUITests: XCTestCase {
     /// A scratch page named by `TEST_RUNNER_BBGO_QA_PAGE`: the work bar, a saved
     /// version, and rename. Nothing is sent, so no thread starts.
     func testPageTools() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
         app.open(URL(string: "bbstudio://page/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
@@ -630,6 +669,8 @@ final class ThreadUITests: XCTestCase {
     /// Comments on a scratch page named by `TEST_RUNNER_BBGO_QA_PAGE` that has one
     /// open thread: reply, resolve, then start a new thread on "Ship it".
     func testPageComments() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
         // Reopen the first thread and drop what earlier runs added.
         let threads = (rpc("studio", "pages.comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
@@ -671,6 +712,8 @@ final class ThreadUITests: XCTestCase {
     /// Plays real recordings, read-only: WebM/Opus ones from the browser and MP4 ones
     /// from the phone. Playback crosses segments, skips, jumps from the transcript, and speeds up.
     func testRecordingPlayback() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let webm = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"] ?? "rec_ad0bc5936076aad9"
         let mp4 = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"] ?? "rec_4e03a488bb709b29"
         let position = app.staticTexts["playerPosition"]
@@ -719,6 +762,8 @@ final class ThreadUITests: XCTestCase {
 
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
     func testSaveToStudio() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
         app.open(URL(string: "bbstudio://thread/\(thread)")!)
@@ -737,6 +782,8 @@ final class ThreadUITests: XCTestCase {
     /// Studio's New menu makes a page (deleted after), and a scratch page's
     /// Studio embeds show their items and open them.
     func testStudioHub() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let start = Date().timeIntervalSince1970 * 1000
         addTeardownBlock {
             // Pages this test made: untitled ones created since it started.
@@ -789,6 +836,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Studio's Write tile. The page it makes is a scratch item, found by title and deleted afterwards.
     func testQuickCapture() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let stamp = Int(Date().timeIntervalSince1970)
         let titles = ["QA quick page \(stamp)"]
         addTeardownBlock {
@@ -814,7 +863,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     private func rpc(_ plugin: String, _ method: String, _ input: Any) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)
@@ -831,6 +880,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Picks a thread's permissions on a scratch thread; the sheet then shows the choice.
     func testPermissions() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let thread = try XCTUnwrap(scratchThread("QA permissions \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
         app.open(URL(string: "bbstudio://thread/\(thread)")!)
@@ -862,6 +913,8 @@ final class ThreadUITests: XCTestCase {
 
     /// A message's menu ends with when it was sent. Read-only on a real thread.
     func testMessageSentTime() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://thread/thr_64r2wmjrim")!)
         let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
         XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
@@ -877,6 +930,8 @@ final class ThreadUITests: XCTestCase {
     /// Opens terminals from a scratch thread's menu, named by
     /// `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testTerminal() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
@@ -913,6 +968,8 @@ final class ThreadUITests: XCTestCase {
     /// `TEST_RUNNER_BBGO_QA_VIS_THREAD`: an HTML chart whose script runs, a
     /// Markdown file, a missing file and a bad height.
     func testInlineVis() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_VIS_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         XCTAssertTrue(app.staticTexts["QA inline-vis reply"].waitForExistence(timeout: 15), "reply")
@@ -937,6 +994,8 @@ final class ThreadUITests: XCTestCase {
     /// `BBGO_QA_IMAGE_THREAD`: a reply with `![QA silk icon](/abs.png)`, an image
     /// inside a paragraph, and a missing one.
     func testMarkdownImage() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_IMAGE_THREAD"] else { throw XCTSkip("no scratch thread") }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         XCTAssertTrue(app.staticTexts["QA image reply"].waitForExistence(timeout: 15), "reply")
@@ -958,6 +1017,8 @@ final class ThreadUITests: XCTestCase {
 
     /// Tags a scratch page from Studio's long-press menu, then deletes the tag and the page.
     func testStudioTags() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let stamp = Int(Date().timeIntervalSince1970)
         let title = "QA tag page \(stamp)", tagName = "QA tag \(stamp)"
         let created = rpc("studio", "pages.create", ["projectId": NSNull(), "parentId": NSNull(), "title": title, "markdown": ""])
@@ -997,6 +1058,8 @@ final class ThreadUITests: XCTestCase {
     /// Finds two scratch pages by their text, renames and deletes a scratch
     /// tag, archives one page and deletes both from select mode.
     func testStudioBulk() throws {
+        try requireQAServer()
+        app.launchStaged(server: qaServer)
         let stamp = Int(Date().timeIntervalSince1970)
         let word = "zebracorn\(stamp)", titleA = "QA bulk A \(stamp)", titleB = "QA bulk B \(stamp)"
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
@@ -1080,7 +1143,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if method != "GET" { request.httpBody = try? JSONSerialization.data(withJSONObject: body) }

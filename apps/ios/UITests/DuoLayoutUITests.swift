@@ -2,12 +2,12 @@ import XCTest
 
 /// Run on an owned 13-inch iPad simulator, which fits each Duo-sized window.
 /// The debug URL resizes the existing UIWindow; it never relaunches the app.
-final class DuoLayoutUITests: XCTestCase {
+final class DuoLayoutUITests: ServerIsolatedUITestCase {
     func testThreadAndDraftSurviveThreeWindowSizes() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
                                "-qaBotDemo", "duo", "-openURL", "bbstudio://thread/thr_botdemo01"]
-        app.launch()
+        app.launchOffline()
         let composer = app.textViews["Message"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
         resize(app, "outer", CGSize(width: 466, height: 678))
@@ -52,9 +52,9 @@ final class DuoLayoutUITests: XCTestCase {
 
     func testNewestMessageStaysPinnedThroughThreeWindowSizes() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
                                "-qaBotDemo", "duo", "-openURL", "bbstudio://thread/thr_botdemo01"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 20))
         for (name, size) in [("outer", CGSize(width: 466, height: 678)),
                              ("landscape", CGSize(width: 951, height: 669)),
@@ -73,9 +73,9 @@ final class DuoLayoutUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
                                "-qaBotDemo", "duo", "-openURL", "bbstudio://thread/thr_botdemo01"]
-        app.launch()
+        app.launchOffline()
         let composer = app.textViews["Message"]
         XCTAssertTrue(composer.waitForExistence(timeout: 20))
         composer.tap()

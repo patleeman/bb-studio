@@ -1,7 +1,7 @@
 import XCTest
 
 @MainActor
-final class DuoEdgeToEdgeUITests: XCTestCase {
+final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     func testSurfacesReachEdgesWhileControlsStaySafe() throws {
@@ -11,10 +11,10 @@ final class DuoEdgeToEdgeUITests: XCTestCase {
         // documented renders are dark, as Patrick uses the app.
         let light = env["BBGO_QA_LIGHT"] != nil
         let prefix = light ? "qa-v8-light-" : "v8-"
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong",
             "-qaNotesDemo", "draft", "-qaVoice", "idle", "-openURL", "bbstudio://bot"] + (light ? [] : ["-qaDark"])
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try assertEdges(composer: true)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "History turn 299.")).firstMatch.waitForExistence(timeout: 30))
@@ -81,10 +81,10 @@ final class DuoEdgeToEdgeUITests: XCTestCase {
         guard env["BBGO_QA_DEVICE"] == "ipad" else { throw XCTSkip("Native iPad window") }
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", try XCTUnwrap(env["BBGO_QA_SERVER"]),
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDark", "-qaNotesDemo", "draft",
             "-qaVoice", "idle", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try assertEdges(composer: true)
         try capture("qa-v7-native-ipad")

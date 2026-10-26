@@ -7,10 +7,11 @@ import XCTest
 /// Skipped unless `TEST_RUNNER_BBGO_STATES_OUT` names a folder; PNGs land
 /// there as `<TEST_RUNNER_BBGO_STATES_TAG><name>.png`.
 @MainActor
-final class BotAttentionCaptureUITests: XCTestCase {
+final class BotAttentionCaptureUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         guard ProcessInfo.processInfo.environment["BBGO_STATES_OUT"] != nil else {
             throw XCTSkip("Set TEST_RUNNER_BBGO_STATES_OUT to a folder")
         }
@@ -86,8 +87,8 @@ final class BotAttentionCaptureUITests: XCTestCase {
     }
 
     private func launch(_ arguments: [String]) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9"] + arguments
-        app.launch()
+        app.launchArguments = ["-skipPushPrompt", "YES"] + arguments
+        app.launchOffline()
     }
 
     private func text(containing value: String) -> XCUIElement {

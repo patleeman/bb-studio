@@ -4,14 +4,15 @@ import XCTest
 /// its existing phone window; capture the complete 951×669 hosting hierarchy
 /// through UIKit because XCTest's screen capture clips to the outer display.
 @MainActor
-final class DuoPhoneRootUITests: XCTestCase {
+final class DuoPhoneRootUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     func testPhoneRootTabsAndPopulatedSplit() throws {
-        let server = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_SERVER"])
+        try requireQAServer()
+        let server = qaServer
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", server, "-qaBotDemo", "duo", "-qaDuoPhone",
                                "-openURL", "bbstudio://home"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.staticTexts["Threads"].firstMatch.waitForExistence(timeout: 20))
         command("landscape")
         let window = app.windows.firstMatch
@@ -66,10 +67,11 @@ final class DuoPhoneRootUITests: XCTestCase {
     }
 
     func testColdUnfoldedInboxLoadsWithoutNarrowInbox() throws {
-        let server = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_SERVER"])
+        try requireQAServer()
+        let server = qaServer
         app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", server.replacingOccurrences(of: "127.0.0.1", with: "localhost"),
                                "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://settings"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 20))
         command("landscape")
         command("tab?threads")
@@ -90,10 +92,9 @@ final class DuoPhoneRootUITests: XCTestCase {
     }
 
     func testOuterAndPortraitKeepNativePhoneChrome() throws {
-        let server = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_SERVER"])
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", server, "-qaBotDemo", "duo", "-qaDuoPhone",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone",
                                "-openURL", "bbstudio://settings"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 20))
         let nativeSettingsButtons = app.buttons.matching(identifier: "Settings").count
         let nativeTabBars = app.tabBars.count

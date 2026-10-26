@@ -13,7 +13,7 @@ import XCTest
 /// for a record named "Server task", which the person running it inserts
 /// through Studio's RPC, to arrive by realtime.
 @MainActor
-final class MiniCardUITests: XCTestCase {
+final class MiniCardUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
     func testMiniCardsRunInline() async throws {
@@ -78,8 +78,8 @@ final class MiniCardUITests: XCTestCase {
 
         FileManager.default.createFile(atPath: "/tmp/qa-mini-cards-ready", contents: Data())
         if let ids = ProcessInfo.processInfo.environment["BBGO_QA_MINI_IDS"],
-           let server = ProcessInfo.processInfo.environment["BBGO_QA_SERVER"], let id = ids.split(separator: ",").first {
-            var request = URLRequest(url: URL(string: server + "/api/v1/plugins/studio/rpc/minis.db.insert")!)
+           let id = ids.split(separator: ",").first {
+            var request = URLRequest(url: URL(string: qaServer + "/api/v1/plugins/studio/rpc/minis.db.insert")!)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: ["id": String(id), "clientId": "duo-ui-test",
@@ -164,9 +164,9 @@ final class MiniCardUITests: XCTestCase {
     private func launch(_ thread: String) {
         app.launchArguments = ["-skipPushPrompt", "YES", "-openURL", "bbstudio://thread/\(thread)"]
         let env = ProcessInfo.processInfo.environment
-        if let server = env["BBGO_QA_SERVER"] { app.launchArguments += ["-serverURL", server] }
+        app.launchArguments += ["-serverURL", qaServer]
         if let ids = env["BBGO_QA_MINI_IDS"] { app.launchArguments += ["-qaBotDemo", "duo", "-qaDuoMinis", ids] }
-        app.launch()
+        app.launchStaged(server: qaServer)
     }
 
     private func cardDrag(x: CGFloat, y: CGFloat, distance: CGFloat) {

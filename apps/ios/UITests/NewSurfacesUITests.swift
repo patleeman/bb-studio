@@ -1,6 +1,6 @@
 import XCTest
 
-final class NewSurfacesUITests: XCTestCase {
+final class NewSurfacesUITests: StagedServerUITestCase {
     private let projectId = "proj_8ztiq6dkh5"
 
     func testSearch() throws {
@@ -43,7 +43,7 @@ final class NewSurfacesUITests: XCTestCase {
     private func launch() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         return app
     }
 
@@ -56,7 +56,7 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     private func rpcRaw(_ plugin: String, _ method: String, _ input: Any) -> Any? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)

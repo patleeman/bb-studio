@@ -7,11 +7,12 @@ import XCTest
 /// nothing leaves the simulator. Skipped unless `TEST_RUNNER_BBGO_STATES_OUT`
 /// names a folder; PNGs land there as `<TEST_RUNNER_BBGO_STATES_TAG><name>.png`.
 @MainActor
-final class ErrorStatesCaptureUITests: XCTestCase {
+final class ErrorStatesCaptureUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let unreachable = "Can't reach BB"
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         guard ProcessInfo.processInfo.environment["BBGO_STATES_OUT"] != nil else {
             throw XCTSkip("Set TEST_RUNNER_BBGO_STATES_OUT to a folder")
         }
@@ -186,8 +187,8 @@ final class ErrorStatesCaptureUITests: XCTestCase {
     }
 
     private func launch(_ arguments: [String]) {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9"] + arguments
-        app.launch()
+        app.launchArguments = ["-skipPushPrompt", "YES"] + arguments
+        app.launchOffline()
     }
 
     private func launch(_ arguments: String...) { launch(arguments) }

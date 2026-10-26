@@ -5,19 +5,19 @@ import XCTest
 /// thread from another reply's menu (Reply in Thread). It forks the chat, so
 /// point it at a throwaway server. Screenshots land in
 /// `/tmp/qa-side-thread-*.png`. Skipped unless
-/// `TEST_RUNNER_BBGO_SIDE_THREAD_SERVER=<url>`; the newest Bot reply needs a
+/// `TEST_RUNNER_BBGO_QA_SERVER=<url>`; the newest Bot reply needs a
 /// side thread whose first message is `TEST_RUNNER_BBGO_SIDE_THREAD_TEXT`, and
 /// `TEST_RUNNER_BBGO_SIDE_THREAD_REPLY` is the exact text of a reply without one.
-final class BotSideThreadUITests: XCTestCase {
+final class BotSideThreadUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
     func testOpenAndStartSideThreads() throws {
         let env = ProcessInfo.processInfo.environment
-        guard let server = env["BBGO_SIDE_THREAD_SERVER"] else { throw XCTSkip("Set TEST_RUNNER_BBGO_SIDE_THREAD_SERVER") }
+        let server = qaServer
         let forkText = env["BBGO_SIDE_THREAD_TEXT"] ?? ""
         let otherReply = env["BBGO_SIDE_THREAD_REPLY"] ?? ""
         app.launchArguments += ["-serverURL", server, "-skipPushPrompt", "YES", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchStaged(server: qaServer)
 
         // The row under the reply with a side thread opens it.
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '1 reply'")).firstMatch

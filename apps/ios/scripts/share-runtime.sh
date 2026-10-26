@@ -2,10 +2,12 @@
 # Read-only Share checks against the isolated staged BB. Never reuse a device.
 set -euo pipefail
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-fixture=http://127.0.0.1:49486
+fixture=${TEST_RUNNER_BBGO_QA_SERVER:-${BBGO_QA_SERVER:-}}
 repo_ios=$(cd "$(dirname "$0")/.." && pwd)
-: "${BB_SHARE_QA_SERVER_URL:?Set BB_SHARE_QA_SERVER_URL=http://127.0.0.1:49486}"
-[[ "$BB_SHARE_QA_SERVER_URL" == "$fixture" ]] || exit 1
+if [[ -z "$fixture" ]]; then
+  echo "SKIP: Set TEST_RUNNER_BBGO_QA_SERVER or BBGO_QA_SERVER to an isolated staged BB."
+  exit 0
+fi
 command -v xcodegen >/dev/null
 curl -fsS "$fixture/api/v1/projects" | python3 -c 'import json,sys; assert any(p["name"] == "Share Runtime QA" for p in json.load(sys.stdin)), "Create the dedicated staged Share Runtime QA project first"'
 run_dir=$(mktemp -d /tmp/bb-share-runtime.XXXXXX)
@@ -19,9 +21,10 @@ printf 'Share runtime artifacts: %s\nPrivate simulator: %s\n' "$run_dir" "$devic
 xcrun simctl boot "$device_id"
 mkdir -p "$run_dir/project/UITests" "$run_dir/host"
 cp "$repo_ios/project.yml" "$run_dir/project/project.yml"
-for path in iOS Shared Share LiveActivity Watch WatchWidgets Widgets NotificationService Tests; do
+for path in iOS Shared Share LiveActivity Watch WatchWidgets Widgets NotificationService Tests scripts; do
   ln -s "$repo_ios/$path" "$run_dir/project/$path"
 done
+ln -s "$repo_ios/UITests/StagedServerUITestCase.swift" "$run_dir/project/UITests/StagedServerUITestCase.swift"
 ln -s "$repo_ios/UITests/ShareRuntimeUITests.swift" "$run_dir/project/UITests/ShareRuntimeUITests.swift"
 cp "$repo_ios/docs/share-runtime/fixture-host/Host.swift" "$run_dir/host/Host.swift"
 cp "$repo_ios/docs/share-runtime/fixture-host/project.yml" "$run_dir/host/project.yml"
@@ -37,11 +40,11 @@ for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
 done
 app_data=$(xcrun simctl get_app_container "$device_id" nyc.plee.bbgo data)
 group_data=$(xcrun simctl get_app_container "$device_id" nyc.plee.bbgo group.nyc.plee.bbgo)
-python3 - "$app_data" "$group_data" "$run_dir" <<'PY'
+python3 - "$app_data" "$group_data" "$run_dir" "$fixture" <<'PY'
 import plistlib, sys
 from pathlib import Path
-origin = 'http://127.0.0.1:49486'
-app, group, run = map(Path, sys.argv[1:])
+origin = sys.argv[4]
+app, group, run = map(Path, sys.argv[1:4])
 for folder, domain in [(app, 'nyc.plee.bbgo'), (group, 'group.nyc.plee.bbgo')]:
     path = folder / 'Library/Preferences' / (domain + '.plist')
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,7 +63,7 @@ else:
     targets = [t for c in values['TestConfigurations'] for t in c['TestTargets'] if t['BlueprintName'] == 'BBStudioUITests']
     assert len(targets) == 1
     target = targets[0]
-target.setdefault('EnvironmentVariables', {}).update(BB_SHARE_QA_SERVER_URL=origin, BB_SHARE_QA_PRIVATE_SIM='YES')
+target.setdefault('EnvironmentVariables', {}).update(BBGO_QA_SERVER=origin, BB_SHARE_QA_PRIVATE_SIM='YES')
 path.write_bytes(plistlib.dumps(values))
 PY
 xctestrun=$(find "$run_dir/build/Build/Products" -maxdepth 1 -name '*.xctestrun' -print)

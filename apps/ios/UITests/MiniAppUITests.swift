@@ -6,7 +6,7 @@ import XCTest
 /// call is refused with the desktop note. The app must have an "Add task"
 /// button, a "Count <n>" button and a "Fetch" button that shows the error,
 /// as scripts in the README set up. It adds a record and bumps the count.
-final class MiniAppUITests: XCTestCase {
+final class MiniAppUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
     func testMiniAppRelaysRecordsStateAndRefusals() throws {
@@ -15,7 +15,7 @@ final class MiniAppUITests: XCTestCase {
         }
         continueAfterFailure = false
         app.launchArguments += ["-skipPushPrompt", "YES", "-openURL", "bbstudio://mini/\(id)"]
-        app.launch()
+        app.launchStaged(server: qaServer)
 
         let web = app.webViews.firstMatch
         let add = web.buttons["Add task"]

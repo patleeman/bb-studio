@@ -90,7 +90,7 @@ final class StudioDesignTests: XCTestCase {
     }
 
     func testRecordingsGoToStudio() async throws {
-        let client = BBClient(baseURL: URL(string: "http://localhost")!)
+        let client = BBClient(baseURL: URL(string: "https://client.invalid")!)
         var paths: [String] = []
         client.transport = { _, path, _ in
             paths.append(path)

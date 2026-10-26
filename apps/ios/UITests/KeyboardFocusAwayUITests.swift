@@ -12,7 +12,7 @@ import XCTest
 /// the simulator's screen), on an iPhone Duo simulator.
 /// `TEST_RUNNER_TAP_SHOTS=<dir>` saves screenshots.
 @MainActor
-final class KeyboardFocusAwayUITests: XCTestCase {
+final class KeyboardFocusAwayUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let layout = ProcessInfo.processInfo.environment["TAP_LAYOUT"] ?? "phone"
     private var steps: [String] = []
@@ -64,11 +64,11 @@ final class KeyboardFocusAwayUITests: XCTestCase {
     }
 
     private func open() {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaScrollLog",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",
             "-qaBotDemo", layout == "phone" ? "chat" : "duo", "-qaDemoLatency", "300", "-qaDark", "-openURL", "bbstudio://bot"]
         if layout != "phone" { app.launchArguments.append("-qaDuoPhone") }
         if layout == "split" { app.launchArguments.append("-qaDuoColdWide") }
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         if layout == "split" { command("split-right") }

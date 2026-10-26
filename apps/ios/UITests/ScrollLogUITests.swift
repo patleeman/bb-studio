@@ -3,12 +3,12 @@ import XCTest
 /// Settings ▸ Diagnostics: the scroll log is off until turned on, fills as
 /// the chat scrolls, and can be shared or cleared.
 @MainActor
-final class ScrollLogUITests: XCTestCase {
+final class ScrollLogUITests: ServerIsolatedUITestCase {
     func testTurningTheLogOnSharingAndClearingIt() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "chat", "-qaDemoLatency", "300", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch.waitForExistence(timeout: 30))
         command("tab?settings")
         let toggle = app.switches["settingsScrollLog"].firstMatch

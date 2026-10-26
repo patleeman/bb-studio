@@ -1,11 +1,12 @@
 import XCTest
 
-final class WorkflowUITests: XCTestCase {
+final class WorkflowUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
-    override func setUp() {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
-        app.launch()
+        app.launchStaged(server: qaServer)
     }
 
     func testPluginStatusAndWorkspaceChoices() {

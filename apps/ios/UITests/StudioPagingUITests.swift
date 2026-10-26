@@ -4,13 +4,14 @@ import XCTest
 /// swipe, while an item row's own swipe still reveals its actions. Needs a
 /// server whose Studio has at least two kinds; changes nothing (a row is only
 /// dragged partway open and closed again).
-final class StudioPagingUITests: XCTestCase {
+final class StudioPagingUITests: StagedServerUITestCase {
     private let app = XCUIApplication()
 
-    override func setUp() {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
         app.launchArguments += ["-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
     }
 
     /// The selected kind chip (the tab bar's selected tab aside).

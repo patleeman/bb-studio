@@ -2,18 +2,16 @@ import XCTest
 import UIKit
 
 /// Opt-in native previews against the isolated staged BB; never launch on a default origin.
-final class ArtifactRuntimeUITests: XCTestCase {
-    private var origin: String {
-        ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES"
-            ? "http://127.0.0.1:49626" : "http://127.0.0.1:49486"
-    }
+final class ArtifactRuntimeUITests: StagedServerUITestCase {
+    private var origin: String { qaServer }
     private var fixtures: [String: [String: Any]] = [:]
     private var baseline: Bool { ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_BASELINE"] == "YES" }
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
         let env = ProcessInfo.processInfo.environment
-        guard env["BB_ARTIFACT_QA_SERVER_URL"] == origin, env["BB_ARTIFACT_QA_PRIVATE_SIM"] == "YES",
+        guard env["BB_ARTIFACT_QA_PRIVATE_SIM"] == "YES",
               let json = env["BB_ARTIFACT_QA_FIXTURES"] else {
             throw XCTSkip("Requires exact staged origin, private simulator, and owned artifact fixtures before launch.")
         }
@@ -146,7 +144,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testCorruptHeaderPDFShowsRecoveryAction() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        guard ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES" else { throw XCTSkip("Requires isolated edge-case proxy") }
         let app = try launch()
         defer { app.terminate() }
         try open("headerPDF", in: app)
@@ -164,7 +162,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testInitialLookupCanRetry() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        guard ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES" else { throw XCTSkip("Requires isolated edge-case proxy") }
         let app = try launch()
         defer { app.terminate() }
         try control("arm-lookup")
@@ -181,7 +179,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testDelayedVersionCannotReplaceSelection() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        guard ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES" else { throw XCTSkip("Requires isolated edge-case proxy") }
         let app = try launch()
         defer { app.terminate() }
         try control("arm-delay")
@@ -211,7 +209,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testLockedPDFOffersShare() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        guard ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES" else { throw XCTSkip("Requires isolated edge-case proxy") }
         let app = try launch()
         defer { app.terminate() }
         try open("lockedPDF", in: app)
@@ -235,7 +233,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
 
     @discardableResult
     private func control(_ action: String) throws -> [String: Bool] {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        guard ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES" else { throw XCTSkip("Requires isolated edge-case proxy") }
         let done = expectation(description: "Controlled edge response")
         var result: [String: Bool] = [:]
         URLSession.shared.dataTask(with: URL(string: origin + "/__edge/" + action)!) { data, response, error in
@@ -251,7 +249,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     private func launch() throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-serverURL", origin, "-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
         let setting = app.descendants(matching: .any)["settingsServerURL"]

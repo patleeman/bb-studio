@@ -1,12 +1,13 @@
 import XCTest
 
-final class PageEditingUITests: XCTestCase {
+final class PageEditingUITests: ServerIsolatedUITestCase {
     func testDrawingEditorOpens() throws {
+        try requireQAServer()
         let drawing = try XCTUnwrap(rpc("createDrawing", ["name": "QA iOS2 drawing", "projectId": NSNull()])?["drawing"] as? [String: Any])
         let id = try XCTUnwrap(drawing["id"] as? String)
         addTeardownBlock { _ = self.rpc("deleteDrawing", ["id": id]) }
         let app = XCUIApplication()
-        app.launch()
+        app.launchStaged(server: qaServer)
         app.open(URL(string: "bbstudio://drawing/\(id)")!)
         XCTAssertTrue(app.navigationBars["QA iOS2 drawing"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.navigationBars["Edit drawing"].waitForExistence(timeout: 10), "empty drawings open in Excalidraw")
@@ -18,7 +19,7 @@ final class PageEditingUITests: XCTestCase {
     func testPageEditorIsOneContinuousText() {
         let app = XCUIApplication()
         app.launchArguments = ["-qaPageDemo"]
-        app.launch()
+        app.launchOffline()
         app.open(URL(string: "bbstudio://page/qa-demo")!)
         let edit = app.buttons["Edit page"]
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
@@ -42,7 +43,7 @@ final class PageEditingUITests: XCTestCase {
     }
 
     private func rpc(_ method: String, _ input: Any) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/studio/rpc/drawings.\(method)")!)
+        var request = URLRequest(url: URL(string: "\(qaServer)/api/v1/plugins/studio/rpc/drawings.\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input)

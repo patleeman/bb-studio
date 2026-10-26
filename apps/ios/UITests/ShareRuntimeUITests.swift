@@ -2,19 +2,19 @@ import XCTest
 
 /// Opt-in system share-sheet checks. Run only on a fresh simulator whose app
 /// and app-group serverURL preferences are already pinned to the staged origin.
-final class ShareRuntimeUITests: XCTestCase {
-    private let fixture = "http://127.0.0.1:49486"
+final class ShareRuntimeUITests: StagedServerUITestCase {
+    private var fixture: String { qaServer }
     private let host = XCUIApplication(bundleIdentifier: "local.bb.qa.ShareRuntimeHost")
 
     override func setUpWithError() throws {
+        try super.setUpWithError()
         continueAfterFailure = false
-        guard ProcessInfo.processInfo.environment["BB_SHARE_QA_SERVER_URL"] == fixture,
-              ProcessInfo.processInfo.environment["BB_SHARE_QA_PRIVATE_SIM"] == "YES" else {
+        guard ProcessInfo.processInfo.environment["BB_SHARE_QA_PRIVATE_SIM"] == "YES" else {
             throw XCTSkip("Use the documented isolated Share runtime harness. Both server preference domains must be staged before launch.")
         }
         let app = XCUIApplication()
         app.launchArguments = ["-serverURL", fixture, "-skipPushPrompt", "YES"]
-        app.launch()
+        app.launchStaged(server: qaServer)
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 20))
         app.buttons["Settings"].tap()
         let server = app.descendants(matching: .any)["settingsServerURL"]

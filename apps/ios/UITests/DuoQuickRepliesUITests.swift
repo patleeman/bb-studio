@@ -1,13 +1,13 @@
 import XCTest
 
 @MainActor
-final class DuoQuickRepliesUITests: XCTestCase {
+final class DuoQuickRepliesUITests: ServerIsolatedUITestCase {
     func testRepliesClipAtComposerAndKeepSystemSafeAreas() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-qaNotesDemo", "draft", "-qaVoice", "idle", "-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-qaNotesDemo", "draft", "-qaVoice", "idle", "-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark",
             "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         let replies = app.scrollViews["botQuickReplies"]
         XCTAssertTrue(replies.waitForExistence(timeout: 30))
         let composer = app.otherElements["threadComposer"].firstMatch
@@ -50,9 +50,9 @@ final class DuoQuickRepliesUITests: XCTestCase {
 
     func testOfflineFixtureHidesUnavailableComposerCapabilities() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9",
+        app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDark", "-openURL", "bbstudio://bot"]
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         XCTAssertFalse(app.buttons["composerExpandToPage"].exists)
         XCTAssertFalse(app.buttons["Voice mode"].exists)

@@ -96,7 +96,7 @@ final class VoiceTextTests: XCTestCase {
             SpeechURL.resolve("/api/v1/plugins/studio/http/speech/audio?key=abc", against: base)?.absoluteString,
             "https://mac.tail.ts.net/api/v1/plugins/studio/http/speech/audio?key=abc")
         XCTAssertEqual(
-            SpeechURL.resolve("http://other:1/a.mp3", against: base)?.absoluteString, "http://other:1/a.mp3")
+            SpeechURL.resolve("http://other.invalid/a.mp3", against: base)?.absoluteString, "http://other.invalid/a.mp3")
     }
 
     func testVoiceSignalDecodes() throws {

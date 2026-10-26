@@ -9,7 +9,7 @@ import XCTest
 /// Runs on a phone; with `TEST_RUNNER_SCROLL_DUO=1`, on the Duo's outer
 /// screen (466x678). `TEST_RUNNER_SCROLL_SHOTS=<dir>` saves screenshots.
 @MainActor
-final class TranscriptPastEndUITests: XCTestCase {
+final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let duo = ProcessInfo.processInfo.environment["SCROLL_DUO"] != nil
     private var steps: [String] = []
@@ -189,12 +189,12 @@ final class TranscriptPastEndUITests: XCTestCase {
     }
 
     private func open(stream: Bool = false, next: Bool = false) -> XCUIElement {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaScrollLog",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog",
             "-qaBotDemo", duo ? "duo" : "chat", "-qaDemoLatency", "300", "-qaDemoColdCache", "-qaDark", "-openURL", "bbstudio://bot"]
         if stream { app.launchArguments.append("-qaDemoStream") }
         if next { app.launchArguments.append("-qaDemoNext") }
         if duo { app.launchArguments += ["-qaDuoPhone", "-qaDuoLong"] }
-        app.launch()
+        app.launchOffline()
         let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 30))
         if duo { command("outer") }

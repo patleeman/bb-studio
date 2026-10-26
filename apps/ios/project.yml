@@ -20,6 +20,10 @@ targets:
   BBStudio:
     type: application
     platform: iOS
+    preBuildScripts:
+      - name: Guard test server isolation
+        script: /usr/bin/python3 "$SRCROOT/scripts/check-test-servers.py"
+        basedOnDependencyAnalysis: false
     sources:
       - path: iOS
       - path: Shared
