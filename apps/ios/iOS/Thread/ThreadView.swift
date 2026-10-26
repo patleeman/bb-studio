@@ -294,6 +294,7 @@ struct ThreadView: View {
         .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
         .modifier(TalkLifecycle(talk: talk))
         .onAppear {
+            ScrollLog.observeKeyboard()
             talk.send = { [model, voice] text in
                 if voice.on { return sendSpoken(text) }
                 Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }

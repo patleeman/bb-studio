@@ -50,6 +50,59 @@ enum ScrollLog {
         write("req " + what)
     }
 
+    /// Keyboard and scene events, for a composer held up with no keyboard
+    /// (Patrick, Oct 26, beside Safari in the Duo's split view): each
+    /// keyboard's end frame, whether it is this app's, how much of it is over
+    /// this window, and the scene's activation. A geometry line's
+    /// `insetBottom` then shows whether the transcript kept that inset.
+    static func observeKeyboard() {
+        guard !observing else { return }
+        observing = true
+        let center = NotificationCenter.default
+        let keyboard: [(Notification.Name, String)] = [
+            (UIResponder.keyboardWillShowNotification, "willShow"), (UIResponder.keyboardWillHideNotification, "willHide"),
+            (UIResponder.keyboardDidHideNotification, "didHide"), (UIResponder.keyboardWillChangeFrameNotification, "willChange")]
+        for (name, label) in keyboard {
+            center.addObserver(forName: name, object: nil, queue: .main) { note in
+                let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .null
+                let local = (note.userInfo?[UIResponder.keyboardIsLocalUserInfoKey] as? Bool) ?? true
+                MainActor.assumeIsolated { keyboardEvent(label, end: end, local: local) }
+            }
+        }
+        let scene: [(Notification.Name, String)] = [
+            (UIScene.didActivateNotification, "active"), (UIScene.willDeactivateNotification, "inactive"),
+            (UIScene.didEnterBackgroundNotification, "background"), (UIScene.willEnterForegroundNotification, "foreground")]
+        for (name, label) in scene {
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { keyboardEvent("scene " + label, end: nil, local: nil) }
+            }
+        }
+    }
+
+    private static var observing = false
+
+    private static func keyboardEvent(_ what: String, end: CGRect?, local: Bool?) {
+        guard on else { return }
+        let window = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows).first { $0.isKeyWindow }
+        var line = "kbd " + what
+        if let local { line += " local=\(local)" }
+        if let end, !end.isNull {
+            line += String(format: " end=%.0f,%.0f,%.0fx%.0f", end.minX, end.minY, end.width, end.height)
+            if let window {
+                // The end frame is in screen coordinates.
+                let mine = window.convert(end, from: window.screen.coordinateSpace).intersection(window.bounds)
+                line += String(format: " overWindow=%.0f", mine.isNull ? 0 : mine.height)
+            }
+        }
+        if let window {
+            line += String(format: " window=%.0f,%.0f,%.0fx%.0f", window.frame.minX, window.frame.minY,
+                window.frame.width, window.frame.height)
+            line += " state=\(window.windowScene.map { "\($0.activationState.rawValue)" } ?? "-")"
+        }
+        write(line)
+    }
+
     static func clear() {
         try? FileManager.default.removeItem(at: file)
         last = ""

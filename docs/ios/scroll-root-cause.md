@@ -200,7 +200,12 @@ Settings ▸ Diagnostics ▸ Scroll log turns it on, in TestFlight builds
 too. It writes the same lines as `-qaScrollLog`:
 - scroll geometry: offset, content size, insets, `past`, the number of
   visible rows and their ids;
-- the transcript's scroll requests, holds and releases, with timestamps.
+- the transcript's scroll requests, holds and releases, with timestamps;
+- keyboard and scene events (`kbd …`): each keyboard's end frame, whether
+  it is this app's (`local`), how much of it is over this window
+  (`overWindow`), the window's frame and the scene's activation. A
+  `geo` line's `insetBottom` then shows whether the chat kept a keyboard's
+  inset after it went (see [tap-dismiss](tap-dismiss/README.md)).
 
 It never writes message text. Row ids go through `ScrollLog.id`, which
 drops anything that isn't shaped like an id. It stays on the phone in
