@@ -174,6 +174,7 @@ struct ScrollLogSection: View {
         Section {
             Toggle("Scroll log", isOn: $enabled)
                 .accessibilityIdentifier("settingsScrollLog")
+            TranscriptV2Toggle()
             if exists {
                 ShareLink(item: ScrollLog.file) { Label("Share log", systemImage: "square.and.arrow.up") }
                 Button("Clear", role: .destructive) {

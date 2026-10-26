@@ -99,6 +99,8 @@ struct ThreadView: View {
     private let botChrome: BotChrome?
     /// Counts sends, for the send haptic.
     @State private var sends = 0
+    /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
+    @State private var transcriptV2 = TranscriptHandle()
 
     init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false, botChrome: BotChrome? = nil) {
         self.hidesTabBar = hidesTabBar
@@ -337,6 +339,10 @@ struct ThreadView: View {
 
     /// The timeline, find bar, composer, and toolbar; `body` adds sheets and tasks.
     private var screen: some View {
+        TranscriptV2Switch { legacyScreen } next: { transcriptV2Screen }
+    }
+
+    private var legacyScreen: some View {
         Group {
             // Built once the first page is in, so it opens at the bottom of real
             // content rather than growing from empty.
@@ -959,6 +965,7 @@ struct ThreadView: View {
         #if DEBUG
         RenderCount.bump("read")
         #endif
+        if transcriptV2.controller != nil { return transcriptV2.scrollTo(id, position: anchor == .center ? .center : .top) }
         end.following = false
         scroller.scrollTo(id: id, anchor: anchor)
     }
@@ -974,6 +981,7 @@ struct ThreadView: View {
         #if DEBUG
         RenderCount.bump("scrollToBottom")
         #endif
+        if transcriptV2.controller != nil { return transcriptV2.jumpToLatest(animated: animated) }
         ScrollLog.request("scrollToBottom animated=\(animated) atBottom=\(atBottom) pastEnd=\(end.pastEnd)")
         end.following = true
         if end.markerVisible || atBottom {
@@ -1668,5 +1676,209 @@ private struct VoiceHooks: ViewModifier {
         guard let piece, player.threadId == voice.threadId else { return nil }
         if let rowId = player.rowId { return rowId }
         return rows.last { $0.isConversation && !$0.isUser && ReadAlong.contains($0.text ?? "", piece: piece) }?.id
+    }
+}
+
+// MARK: - The new chat transcript (Settings ▸ Diagnostics ▸ New chat transcript)
+
+/// The same thread on the UIKit transcript: the rows, composer, header and
+/// find bar go into one `TranscriptContainer`, which owns scrolling, the
+/// keyboard and the insets. Everything else (sheets, tasks, the model) is
+/// `body`'s, shared with the SwiftUI transcript.
+extension ThreadView {
+    fileprivate var transcriptV2Screen: some View {
+        transcriptV2Body
+            .modifier(TranscriptV2Hooks(view: self))
+            .environment(\.threadId, model.threadId)
+            .environment(\.openURL, transcriptV2OpenURL)
+            .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
+            .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
+            .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+            .toolbar {
+                if botChrome == nil && !duoLayout.twoPages {
+                    ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
+                }
+            }
+    }
+
+    private var transcriptV2Body: some View {
+        TranscriptContainer(
+            items: transcriptV2Rows, chrome: transcriptV2Chrome, handle: transcriptV2,
+            row: { [actions = transcriptV2Actions] row in ThreadTranscriptRowView(row: row, actions: actions) },
+            composer: { composer },
+            top: transcriptV2HasTop ? { transcriptV2Top } : nil,
+            pill: { state, jump in transcriptV2Pill(state, jump: jump) },
+            onNearTop: { transcriptV2LoadOlder() },
+            log: ScrollLog.on ? { ScrollLog.request($0) } : nil)
+        // Under the header and to the edges; it ends at the keyboard's top.
+        .ignoresSafeArea(.container)
+        .overlay {
+            // Nothing cached yet: the shape of a chat, not a blank screen.
+            if !model.loaded { ChatSkeleton(bot: botChrome != nil).allowsHitTesting(false) }
+        }
+    }
+
+    /// As the SwiftUI transcript's: Studio paths and in-app thread links open here.
+    private var transcriptV2OpenURL: OpenURLAction {
+        OpenURLAction { url in
+            if let path = FilePathLink.path(from: url) ?? (url.host() == client.baseURL.host() ? url.path() : nil),
+                let route = Route(href: path)
+            {
+                app.path.append(route)
+                return .handled
+            }
+            if let path = FilePathLink.path(from: url) {
+                openingFile = OpenFile(path: path)
+                return .handled
+            }
+            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
+                return .systemAction
+            }
+            if let botChrome { botChrome.openThread(id) } else { app.path.append(.thread(id: id)) }
+            return .handled
+        }
+    }
+
+    /// A message you send takes you to the end, as the jump does; find
+    /// takes you to its match; the Debug QA commands drive the chat.
+    fileprivate struct TranscriptV2Hooks: ViewModifier {
+        let view: ThreadView
+
+        func body(content: Content) -> some View {
+            content
+                .onChange(of: view.sends) { _, _ in view.transcriptV2.jumpToLatest() }
+                .onChange(of: view.outbox.messages.count) { old, new in if new > old { view.transcriptV2.jumpToLatest() } }
+                .onChange(of: view.finding) { _, finding in if finding { Task { await view.model.loadAll() } } }
+                .onChange(of: view.findQuery) { _, _ in view.findIndex = 0 }
+                .onChange(of: view.currentMatch) { _, id in
+                    if let id { view.transcriptV2.scrollTo(id, position: .center, animated: true) }
+                }
+                #if DEBUG
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-draft"))) { event in
+                    let lines = event.object as? Int ?? 0
+                    view.draft = (0..<lines).map { "Draft line \($0 + 1)" }.joined(separator: "\n")
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("qa-attach"))) { _ in
+                    let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
+                        UIColor.systemTeal.setFill()
+                        context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+                    }
+                    if let attachment = PendingAttachment.image(image) { view.attachments.append(attachment) }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
+                    guard BotDemo.variant != nil else { return }
+                    guard event.object as? String == "mid" else { return view.transcriptV2.jumpToLatest(animated: false) }
+                    let ids = view.transcriptV2Rows.map(\.id)
+                    let target = ids.first { $0 == "a150" } ?? ids.dropFirst(view.botChrome != nil ? ids.count / 2 : ids.count / 4).first
+                    if let target { view.transcriptV2.scrollTo(target, position: .top) }
+                }
+                #endif
+        }
+    }
+
+    fileprivate var transcriptV2Rows: [ThreadTranscriptRow] {
+        guard model.loaded else { return [] }
+        let pending = outbox.messages(for: model.threadId)
+        if let botChrome {
+            return ThreadTranscriptRow.bot(botChrome, rows: model.chainRows, status: botStatus, working: model.thread?.isRunning == true,
+                canLoadOlder: model.canLoadOlder, editableId: lastUserRowId, threadRows: model.rowIds, pending: pending,
+                typing: showsWorking, thinking: model.shelf.thinking)
+        }
+        let items = model.shownItems
+        return ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
+            editableId: lastUserRowId, reading: { player.isReading($0) },
+            readAlong: readAlongRow.map { ($0, player.piece) }, pending: pending, interactions: model.interactions,
+            working: showsWorking, thinking: model.shelf.thinking)
+    }
+
+    fileprivate var transcriptV2Actions: ThreadTranscriptActions {
+        let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
+        return ThreadTranscriptActions(
+            bot: botChrome?.bot, projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
+            draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
+            select: { selecting = SelectionText(text: $0) }, edit: startEditing, sideChat: sideChat,
+            saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
+            readAloud: voice.available == true ? { voice.readAloud(rowId: $0, text: $1) } : nil,
+            openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
+            resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true })
+    }
+
+    fileprivate var transcriptV2Chrome: TranscriptChrome {
+        var chrome = TranscriptChrome()
+        // The composer's own 8 pt padding is the gap above the keyboard or the edge.
+        chrome.composerGap = 0
+        chrome.composerIgnoresBottomSafeArea = TranscriptV2.composerIgnoresBottomSafeArea(duoLayout)
+        chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
+        chrome.rows.margin = Self.margin(bot: botChrome != nil)
+        chrome.rows.readableWidth = Self.readableWidth
+        if duoLayout.twoPages {
+            chrome.rowsTrailingClear = RegularScrollingSurface.inset(column: duoLayout.statusColumn, width: duoLayout.detailWidth,
+                readableWidth: Self.readableWidth)
+        }
+        chrome.pill = duoLayout.twoPages ? .center : .trailing
+        chrome.nearEnd = 120
+        chrome.softTopEdge = botChrome != nil
+        return chrome
+    }
+
+    fileprivate var transcriptV2HasTop: Bool { finding || (duoLayout.twoPages && botChrome == nil) }
+
+    /// The Duo's header beside two pages, and the find bar under it.
+    fileprivate var transcriptV2Top: some View {
+        VStack(spacing: 0) {
+            if duoLayout.twoPages && botChrome == nil {
+                DuoHeader {
+                    Text(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+                        .font(.headline).lineLimit(1).accessibilityIdentifier("duoThreadTitle")
+                } actions: { threadActions }
+            }
+            if finding {
+                FindBar(query: $findQuery, index: $findIndex, count: findMatches.count, loading: model.loadingAll) {
+                    finding = false
+                    findQuery = ""
+                }
+                .padding(.trailing, duoLayout.statusColumn)
+            }
+        }
+    }
+
+    /// The jump button: in the corner on a phone; beside two pages centred
+    /// in its band, over a scrim that runs down behind the composer.
+    @ViewBuilder fileprivate func transcriptV2Pill(_ state: TranscriptPillState, jump: @escaping () -> Void) -> some View {
+        let button = Button(action: jump) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down").font(.body.weight(.semibold))
+                if state.unseen > 0 { Text("\(state.unseen) new").font(.subheadline.weight(.semibold)).monospacedDigit() }
+            }
+            .frame(minWidth: 40, minHeight: 40)
+            .padding(.horizontal, state.unseen > 0 ? 10 : 0)
+        }
+        .buttonStyle(.glass)
+        .clipShape(.capsule)
+        .padding(12)
+        .accessibilityLabel(state.unseen > 0 ? "Jump to latest, \(state.unseen) new" : "Jump to latest")
+        .accessibilityIdentifier("jumpToLatest")
+        if duoLayout.twoPages {
+            button.frame(maxWidth: .infinity).background { JumpScrim().padding(.bottom, -400) }
+        } else {
+            button
+        }
+    }
+
+    /// Older pages while the top is near: the container keeps the reader's
+    /// row in place as they go in above, and asks again while still near.
+    fileprivate func transcriptV2LoadOlder() {
+        guard botChrome != nil ? model.canLoadOlder : model.hasOlder else { return }
+        Task {
+            var failures = 0
+            while !Task.isCancelled {
+                let result = await model.loadOlder()
+                ScrollLog.request("v2 loadOlder \(result)")
+                guard result != .added, let delay = result.retryDelay(failures: &failures) else { return }
+                try? await Task.sleep(for: delay)
+            }
+        }
     }
 }
