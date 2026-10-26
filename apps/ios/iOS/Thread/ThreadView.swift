@@ -342,12 +342,15 @@ struct ThreadView: View {
                 ChatSkeleton(bot: botChrome != nil)
             }
         }
+        .overlay { StatusCorner() }
         .safeAreaInset(edge: .top, spacing: 0) {
             if finding {
                 FindBar(query: $findQuery, index: $findIndex, count: findMatches.count, loading: model.loadingAll) {
                     finding = false
                     findQuery = ""
                 }
+                // Its buttons stay clear of the Duo's clock and icons.
+                .padding(.trailing, duoLayout.statusColumn)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -359,9 +362,33 @@ struct ThreadView: View {
         .onChange(of: model.replacedCache) { _, _ in
             if atBottom || pastEnd > Self.pastEndSlack { timelineKey += 1 }
         }
-        .overlay(alignment: .bottomTrailing) { jumpButton }
+        // Beside two pages, centred on the page in its own band above the
+        // composer. The transcript's bottom inset includes the band, and rows
+        // fade out under it, so the button never sits on a row's text. A
+        // phone keeps it floating in the corner.
+        .overlay(alignment: .bottomTrailing) { if !duoLayout.twoPages { jumpButton } }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if duoLayout.twoPages && !atBottom {
+                jumpButton
+                    .frame(maxWidth: .infinity)
+                    .background {
+                        let surface = Color(uiColor: .systemBackground)
+                        VStack(spacing: 0) {
+                            LinearGradient(colors: [surface.opacity(0), surface], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 12)
+                            surface
+                        }
+                        .allowsHitTesting(false)
+                    }
+                    .transition(.opacity)
+            }
+        }
         .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
+        // Beside two pages the transcript, jump button and composer all run
+        // under the status column, so they share the page's width and centre;
+        // the header still keeps its actions inside the safe area.
+        .ignoresSafeArea(.container, edges: duoLayout.twoPages ? .trailing : [])
         .environment(\.threadId, model.threadId)
         .environment(\.openURL, OpenURLAction { url in
             // Agents link Studio items by their BB web path, which reads like a file path.
@@ -574,7 +601,12 @@ struct ThreadView: View {
                 // until the reply. Scrolling to a view lays that view out.
                 Color.clear.frame(height: 1).id(Self.bottomId)
             }
-            .padding(.horizontal, botChrome != nil ? 12 : 16)
+            #if DEBUG
+            // The transcript's content edges, which bubbles reach; the composer matches them.
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { DuoDemo.surfaces["transcript-" + model.threadId] = $0 }
+            .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
+            #endif
+            .padding(.horizontal, Self.margin(bot: botChrome != nil))
             .padding(.vertical, 8)
             .animation(botChrome != nil ? .smooth(duration: 0.3) : nil, value: showsWorking)
             .scrollTargetLayout()
@@ -605,8 +637,13 @@ struct ThreadView: View {
             resizeRestore?.cancel()
             resizeAnchor.cancel()
             if event.object as? String == "mid" {
-                let entries = BotChatEntry.memo.entries(model.chainRows, started: botChrome?.started ?? [], compactions: [])
-                if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { read(entry.id, anchor: .top) }
+                if botChrome != nil {
+                    let entries = BotChatEntry.memo.entries(model.chainRows, started: botChrome?.started ?? [], compactions: [])
+                    if let entry = entries.first(where: { $0.id == "a150" }) ?? entries.dropFirst(entries.count / 2).first { read(entry.id, anchor: .top) }
+                } else {
+                    let items = TimelineItem.group(model.shownRows)
+                    if let item = items.dropFirst(items.count / 4).first { read(item.id, anchor: .top) }
+                }
             } else { scrollToBottom(animated: false) }
         }
         #endif
@@ -1283,7 +1320,8 @@ struct ThreadView: View {
             DraftAttachments.save(attachments, threadId: model.threadId, serverURL: model.serverURL)
         }
         // Floats over the transcript, as in the Bot chat: no bar behind it.
-        .padding(.horizontal, 12)
+        // Beside two pages it has the transcript's margins.
+        .padding(.horizontal, duoLayout.twoPages ? Self.margin(bot: botChrome != nil) : 12)
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
@@ -1297,6 +1335,8 @@ struct ThreadView: View {
 
     /// Lines past this get hard to follow on an iPad or a wide window.
     private static let readableWidth: CGFloat = 760
+    /// The transcript's side margins: the Bot chat's bubbles sit closer to the edges.
+    private static func margin(bot: Bool) -> CGFloat { bot ? 12 : 16 }
 }
 
 /// The draft on a whole screen, for writing something long.

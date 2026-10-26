@@ -54,7 +54,8 @@ final class DuoSplitWidthUITests: XCTestCase {
         XCTAssertEqual(geometry.width, 951, accuracy: 1)
 
         XCTAssertGreaterThanOrEqual(composer.frame.minX, pageMinX - 1, "\(name): composer starts in the right page")
-        XCTAssertLessThanOrEqual(composer.frame.maxX, 951 - geometry.safeRight + 1, "\(name): composer ends inside the safe page")
+        // Like the transcript, the composer runs under the status column, keeping its margin.
+        XCTAssertLessThanOrEqual(composer.frame.maxX, 951 - 12 + 1, "\(name): composer ends inside the page")
         XCTAssertGreaterThanOrEqual(message.frame.minX, pageMinX - 1, "\(name): transcript text is not cut at the crease")
         XCTAssertLessThanOrEqual(message.frame.maxX, 951 + 1, "\(name): transcript text is not cut at the window edge")
         let title = app.staticTexts["duoThreadTitle"]
@@ -63,7 +64,7 @@ final class DuoSplitWidthUITests: XCTestCase {
             XCTAssertLessThanOrEqual(title.frame.maxX, 951 + 1, "\(name): title ends in the window")
         }
         let jump = app.buttons["Jump to latest"]
-        if jump.exists { XCTAssertLessThanOrEqual(jump.frame.maxX, 951 - geometry.safeRight + 1, "\(name): jump button is on screen") }
+        if jump.exists { XCTAssertLessThanOrEqual(jump.frame.maxX, 951 - 12 + 1, "\(name): jump button is on screen") }
         let detail = try XCTUnwrap(geometry.scrolls.first { $0.x + $0.width > 951 / 2 + 100 && $0.height > 200 && $0.contentHeight > 0 },
                                    "\(name): the transcript scroll view")
         XCTAssertGreaterThanOrEqual(detail.x, pageMinX - 1, "\(name): transcript starts at the crease")

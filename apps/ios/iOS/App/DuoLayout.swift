@@ -9,12 +9,19 @@ struct DuoLayout: Equatable {
     let railWidth: CGFloat
     let listWidth: CGFloat
     let sidebarWindowInset: CGFloat
+    /// The Duo's status bar: a column on the trailing edge, with no leading
+    /// inset to match (a landscape iPhone's insets are on both sides).
+    let statusColumn: CGFloat
+    /// How far down the window the status column's clock and icons reach,
+    /// from the inner screen: the system reports the column's width only.
+    static let statusClusterHeight: CGFloat = 104
 
     init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0) {
         windowSize = size
         twoPages = size.width >= 900 && size.width > size.height
         railWidth = twoPages ? 64 : 0
         sidebarWindowInset = twoPages ? trailingInset : 0
+        statusColumn = twoPages && leadingInset == 0 ? trailingInset : 0
         // Half the gutter on either side of the window midpoint, even with
         // asymmetric safe areas. No control occupies the crease.
         listWidth = twoPages ? max(0, size.width / 2 - leadingInset - 64 - Self.gutter / 2) : 0
@@ -256,6 +263,31 @@ struct RegularScrollingSurface: ViewModifier {
     @Environment(\.duoLayout) private var layout
     func body(content: Content) -> some View {
         content.ignoresSafeArea(.container, edges: layout.twoPages ? .trailing : [])
+    }
+}
+
+/// Content runs under the status column (`RegularScrollingSurface`), but not
+/// under its clock and icons: the page's own surface covers that corner,
+/// fading out below it, as the header bar covers the rows above.
+struct StatusCorner: View {
+    @Environment(\.duoLayout) private var layout
+    static let fade: CGFloat = 16
+
+    var body: some View {
+        if layout.statusColumn > 0 {
+            let surface = Color(uiColor: .systemBackground)
+            VStack(spacing: 0) {
+                surface.frame(height: DuoLayout.statusClusterHeight)
+                LinearGradient(colors: [surface, surface.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: Self.fade)
+            }
+            .frame(width: layout.statusColumn)
+            .modifier(RegularSurfaceProbe(name: "statusCorner"))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .ignoresSafeArea(.container, edges: [.top, .trailing])
+        }
     }
 }
 

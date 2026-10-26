@@ -71,7 +71,9 @@ enum DuoDemo {
                 if let scroll = view as? UIScrollView, scroll.bounds.height < 100,
                    scroll.bounds.width > 100, scroll.contentSize.width > scroll.bounds.width,
                    scroll.convert(scroll.bounds, to: window).minX > window.bounds.width / 2 {
-                    scroll.setContentOffset(CGPoint(x: scroll.contentSize.width - scroll.bounds.width, y: scroll.contentOffset.y), animated: false)
+                    // The end includes a trailing inset where the row borders the status column.
+                    let end = scroll.contentSize.width + scroll.adjustedContentInset.right - scroll.bounds.width
+                    scroll.setContentOffset(CGPoint(x: end, y: scroll.contentOffset.y), animated: false)
                     return true
                 }
                 return view.subviews.contains(where: revealEnd)

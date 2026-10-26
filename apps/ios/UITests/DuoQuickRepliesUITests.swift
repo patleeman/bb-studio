@@ -24,14 +24,18 @@ final class DuoQuickRepliesUITests: XCTestCase {
         })
         XCTAssertEqual(detail.contentMaxX, geometry.width, accuracy: 1,
             "Scrolling content reaches the window edge beneath the status column")
-        XCTAssertEqual(replies.frame.minX, composer.frame.minX, accuracy: 1)
-        XCTAssertEqual(replies.frame.maxX, composer.frame.maxX, accuracy: 1)
-        XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, geometry.safeRight + 12, accuracy: 1)
-        XCTAssertEqual(geometry.height - geometry.safeBottom - composer.frame.maxY, 8, accuracy: 1,
-            "Keep the system home-indicator inset plus the existing 8pt composer padding")
         let scroll = try XCTUnwrap(geometry.scrolls.first {
             abs($0.x - replies.frame.minX) < 1 && abs($0.width - replies.frame.width) < 1 && $0.height < 100
         })
+        // Where the row borders the status column, SwiftUI stretches its scroll
+        // view to the window edge and insets the content by as much; the
+        // viewport the replies show in ends at the composer's edge.
+        XCTAssertEqual(replies.frame.minX, composer.frame.minX, accuracy: 1)
+        XCTAssertEqual(replies.frame.maxX - scroll.adjustedRight, composer.frame.maxX, accuracy: 1)
+        // The composer has the transcript's 12-point margin, under the status column too.
+        XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, 12, accuracy: 1)
+        XCTAssertEqual(geometry.height - geometry.safeBottom - composer.frame.maxY, 8, accuracy: 1,
+            "Keep the system home-indicator inset plus the existing 8pt composer padding")
         XCTAssertTrue(scroll.clips, "Quick replies must clip horizontally at the composer edge")
         command("capture?v6-bot-duo")
         command("portrait")
@@ -75,6 +79,7 @@ final class DuoQuickRepliesUITests: XCTestCase {
         let contentHeight: CGFloat
         let clips: Bool
         let contentWidth: CGFloat
+        let adjustedRight: CGFloat
         // SwiftUI lays out the vertical transcript's content inside the
         // safe area while its native scroll-view frame fills the window.
         var contentMaxX: CGFloat { x + contentWidth }

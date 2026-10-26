@@ -28,7 +28,8 @@ final class DuoEdgeToEdgeUITests: XCTestCase {
         XCTAssertTrue(jump.exists)
         command("layout")
         let metrics = try JSONDecoder().decode(Geometry.self, from: Data(try XCTUnwrap(app.windows.firstMatch.value as? String).utf8))
-        XCTAssertLessThanOrEqual(jump.frame.maxX, metrics.width - metrics.safeRight + 1)
+        // Centred on the page, in its own band above the composer.
+        XCTAssertEqual(jump.frame.midX, (metrics.width / 2 + 16 + metrics.width) / 2, accuracy: 2)
         command("bottom")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "History turn 299.")).firstMatch.waitForExistence(timeout: 15))
         try capture(prefix + "bot-" + device, cardRows: true)
@@ -133,7 +134,9 @@ final class DuoEdgeToEdgeUITests: XCTestCase {
         if composer {
             let box = app.otherElements["threadComposer"].firstMatch
             XCTAssertTrue(box.exists)
-            XCTAssertLessThanOrEqual(box.frame.maxX, layout.width - layout.safeRight + 1)
+            // The composer has the transcript's margins, under the status column too.
+            XCTAssertLessThanOrEqual(box.frame.maxX, layout.width - 12 + 1)
+            XCTAssertGreaterThanOrEqual(box.frame.maxX, layout.width - layout.safeRight - 17, "The composer reaches past the safe edge when there is a status column")
             XCTAssertEqual(layout.height - layout.safeBottom - box.frame.maxY, 8, accuracy: 1)
         }
     }

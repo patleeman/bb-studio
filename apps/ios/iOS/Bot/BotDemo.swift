@@ -366,7 +366,9 @@ enum BotDemo {
             "## Release notes\n\nThe build is green. Three changes went in:\n\n1. Faster sync on launch\n2. Fixed the share sheet\n3. New `::next` chips\n\n::reactions{items=\"👍|🎉|👀\"}",
             "I checked the logs. The failure is in the retry loop:\n\n```swift\nfunc retry() async throws {\n    for attempt in 1...3 {\n        do { return try await send() }\n        catch { try await Task.sleep(for: .seconds(attempt)) }\n    }\n}\n```\n\nIt never rethrows after the last attempt. Want me to fix it?",
             "| Item | Owner | Due |\n| --- | --- | --- |\n| Budget | Dana | Fri |\n| Venue | Sam | Mon |\n| Flights | You | Tue |\n\nThe venue is the one to watch.",
-            "Quick summary of today: two meetings, one review, and the **Lisbon** flight checks in tonight. > Remember the passport.\n\n::next{reply=\"👍 Thanks|🕒 Later\" do=\"📅 Block time\"}",
+            // In the Duo's history, a row wider than the landscape composer
+            // (435 points) that still fits the portrait one (473).
+            "Quick summary of today: two meetings, one review, and the **Lisbon** flight checks in tonight. > Remember the passport.\n\n::next{reply=\"👍 Thanks|🕒 Later\(ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? " today" : "")\" do=\"📅 Block time\"}",
         ]
         let asks = ["What's on today?", "Can you check the build?", "Why did the deploy fail?", "Who owns what for the offsite?", "Anything I'm forgetting?"]
         var out: [String] = []
