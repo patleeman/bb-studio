@@ -608,6 +608,10 @@ struct ThreadView: View {
             .scrollTargetLayout()
             .frame(maxWidth: Self.readableWidth)
             .frame(maxWidth: .infinity)
+            // A tap on the transcript puts the keyboard away; rows keep their taps.
+            .background(alignment: .topLeading) {
+                TranscriptTapDismissesKeyboard(active: composerFocused).frame(width: 1, height: 1)
+            }
         }
         #if DEBUG
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-inspect"))) { _ in
