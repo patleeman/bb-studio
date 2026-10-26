@@ -194,6 +194,36 @@ It is not shown to be Patrick's black reopen, which still hasn't
 reproduced. It is the same kind of fault, though: the end owner held or
 switched off, with nothing to wake it.
 
+### Found next: held for good by an animation that never ended
+
+Found with the tap-to-close test (Oct 26): a tap on the chat, then a reply
+soon after. The newest row rested 107 pt under the composer, and 352 pt
+under the keyboard once it came back, until the reader scrolled.
+
+```
+19.751 req scrollToBottom animated=true atBottom=true pastEnd=0.0
+19.751 geo offset=1985.0 content=2652.0 … past=0.0
+19.759 geo offset=1891.0 content=2558.0 … past=0.0
+19.788 req keepAtEnd held phase=animating restoring=false past=0.0
+19.788 geo offset=1784.0 content=2558.0 … past=-107.0
+22.765 req keepAtEnd held phase=animating restoring=false past=0.0   (keyboard up)
+22.765 geo offset=1784.0 content=2558.0 … insetBottom=452.0 past=-352.0
+```
+
+The new row's animated `scrollToBottom` aims at the end of the row's
+*estimated* height (content 2652). The row measures shorter (2558) and
+the target is gone. The offset snapped back to where it started (1784),
+and SwiftUI never reported the phase going back to idle. `keepAtEnd` waits
+for idle, so it held from then on. When the reply came in without a tap
+just before it, `keepAtEnd` got in before the phase turned "animating",
+so the same reply was followed.
+
+The fix, with `keepAtEnd` still the one owner: while the phase says
+"animating", a watcher marks the animation over once the offset hasn't
+moved for 0.3 s (an animation moves every frame). `keepAtEnd` then
+settles on the measured end (`animation over: still …s` in the log). Any
+phase change, or a new animated scroll, starts over.
+
 ### The scroll log in Release builds
 
 Settings ▸ Diagnostics ▸ Scroll log turns it on, in TestFlight builds
@@ -223,7 +253,8 @@ has the measurements):
   scrolls to `lastPoint`: a reply streaming in, the keyboard opening or
   closing, the composer or quick replies changing. A view resting past its
   end comes back, following or not. It acts only once scrolling is idle,
-  so a bounce isn't fought.
+  so a bounce isn't fought, or once an animated scroll has stopped moving
+  for 0.3 s while the phase still says "animating".
 - **Following is the reader's choice.** It is set wherever a scroll comes to
   rest (near the end means following) and by `scrollToBottom`. It is
   cleared when the app takes the reader to a row with `read(_:anchor:)`: the
@@ -254,6 +285,7 @@ has the measurements):
 | `testReopeningTheChatOpensAtTheNewestRow` | passes at b0c6a0bd | passes |
 | `testRowsReplacedUnderTheReaderLeaveNoBlank` | passes (guard) | passes |
 | `testFoldingNeverLeavesThePastEnd` (Duo) | passes (guard) | passes |
+| `testAReplySoonAfterATapIsFollowed` | **fails** at e10cb371: phone 107 pt under the composer, 352 pt under the keyboard | passes |
 
 The keyboard tests also check that the newest row rides up with the
 keyboard when it opens.
