@@ -9,7 +9,12 @@ enum DuoPane: String, CaseIterable {
 }
 
 /// The list pane's width, remembered on this device. A drag sets `dragWidth`
-/// until it ends and snaps to a `DuoPane`.
+/// for its preview until it ends and snaps to a `DuoPane`.
+///
+/// The width changes once, on release, without animating: a transcript
+/// relaid out at every frame of a drag or animation lost its place, as it
+/// would through many folds in a row. One change is one fold's worth, which
+/// its resize anchor keeps.
 @MainActor @Observable
 final class DuoPaneState {
     static let shared = DuoPaneState()
@@ -25,7 +30,7 @@ final class DuoPaneState {
             }
         }
     }
-    /// The width under the finger, while the divider or edge is dragged.
+    /// The list width under the finger, while the divider or edge is dragged.
     var dragWidth: CGFloat?
     private var lastShown: DuoPane
 
@@ -37,14 +42,12 @@ final class DuoPaneState {
 
     /// The header button: hide the list, or bring back the width it had.
     func toggle() {
-        withAnimation(.snappy) { pane = pane == .hidden ? lastShown : .hidden }
+        pane = pane == .hidden ? lastShown : .hidden
     }
 
     func set(_ next: DuoPane) {
-        withAnimation(.snappy) {
-            dragWidth = nil
-            pane = next
-        }
+        dragWidth = nil
+        pane = next
     }
 
     /// Ends a drag at the snap point nearest where it was flung.
@@ -66,8 +69,9 @@ struct DuoLayout: Equatable {
     let narrowWidth: CGFloat
     let listWidth: CGFloat
     let pane: DuoPane
-    /// The divider or the detail's edge is being dragged.
-    let dragging: Bool
+    /// Where a drag of the divider or the detail's edge would put the
+    /// list's edge, for its preview; the list itself keeps `listWidth`.
+    let dragTarget: CGFloat?
     let sidebarWindowInset: CGFloat
     /// The Duo's status bar: a column on the trailing edge, with no leading
     /// inset to match (a landscape iPhone's insets are on both sides).
@@ -85,7 +89,6 @@ struct DuoLayout: Equatable {
         evenWidth = twoPages ? max(0, size.width / 2 - leadingInset - 64 - Self.gutter / 2) : 0
         narrowWidth = min(Self.narrowList, evenWidth)
         self.pane = pane
-        dragging = twoPages && dragWidth != nil
         let width: CGFloat = switch pane {
         case .hidden: 0
         case .narrow: narrowWidth
@@ -93,7 +96,8 @@ struct DuoLayout: Equatable {
         }
         // A little give past the even width, so the drag doesn't stop dead.
         let limit = evenWidth + 24
-        listWidth = twoPages ? (dragWidth.map { min(max(0, $0), limit) } ?? width) : 0
+        dragTarget = twoPages ? dragWidth.map { min(max(0, $0), limit) } : nil
+        listWidth = twoPages ? width : 0
     }
 
     /// The list is on screen, at some width.
@@ -103,8 +107,7 @@ struct DuoLayout: Equatable {
     var detailWidth: CGFloat { twoPages ? max(0, windowSize.width - leadingInset - railWidth - listWidth - gutterWidth) : windowSize.width }
 
     /// The divider between the list and the detail; none with the list hidden.
-    /// It stays while dragged, so a drag to zero still ends on it.
-    var gutterWidth: CGFloat { twoPages && (showsList || dragging) ? Self.gutter : 0 }
+    var gutterWidth: CGFloat { twoPages && showsList ? Self.gutter : 0 }
 
     func width(of pane: DuoPane) -> CGFloat {
         switch pane {
@@ -487,6 +490,12 @@ struct CreaseGutter: View {
                     handle(pane)
                 }
             }
+            .overlay {
+                // Where the divider will land, under the finger.
+                if layout.gutterWidth > 0, let target = layout.dragTarget {
+                    DuoPanePreview().offset(x: target - layout.listWidth)
+                }
+            }
             // Its hit area reaches past the gutter, over the detail's edge.
             .zIndex(1)
     }
@@ -531,7 +540,7 @@ struct DuoPaneEdge: View {
     @Environment(DuoPaneState.self) private var pane: DuoPaneState?
 
     var body: some View {
-        if layout.twoPages, !layout.showsList || layout.dragging, let pane {
+        if layout.twoPages, !layout.showsList, let pane {
             Color.clear
                 .frame(width: 20)
                 .frame(maxHeight: .infinity)
@@ -543,7 +552,28 @@ struct DuoPaneEdge: View {
                         let width = drag.translation.width
                         pane.settle(at: width > layout.narrowWidth / 2 ? max(width, layout.narrowWidth) : 0, layout: layout)
                     })
+                .overlay(alignment: .leading) {
+                    // The divider's centre, where the list's edge would be.
+                    if let target = layout.dragTarget {
+                        DuoPanePreview().frame(width: 0).offset(x: target + Self.halfGutter)
+                    }
+                }
                 .accessibilityHidden(true)
         }
+    }
+
+    private static let halfGutter = DuoLayout.gutter / 2
+}
+
+/// A drag's preview: an accent line, the height of the window, with the grab
+/// handle on it.
+private struct DuoPanePreview: View {
+    var body: some View {
+        ZStack {
+            Rectangle().fill(Color.accentColor.opacity(0.6)).frame(width: 2)
+            Capsule().fill(Color.accentColor).frame(width: 5, height: 44)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }

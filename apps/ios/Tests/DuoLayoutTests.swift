@@ -37,9 +37,12 @@ final class DuoLayoutTests: XCTestCase {
         XCTAssertEqual(hidden.listWidth, 0)
         XCTAssertEqual(hidden.gutterWidth, 0, "No divider with the list hidden")
         XCTAssertFalse(hidden.showsList)
-        // A drag follows the finger, with a little give past even, and keeps its divider at zero.
-        XCTAssertEqual(DuoLayout(size: size, dragWidth: 500).listWidth, 419.5)
-        XCTAssertEqual(DuoLayout(size: size, pane: .hidden, dragWidth: -20).gutterWidth, DuoLayout.gutter)
+        // A drag previews under the finger, with a little give past even;
+        // the list keeps its width until the drag ends.
+        let dragged = DuoLayout(size: size, dragWidth: 500)
+        XCTAssertEqual(dragged.dragTarget, 419.5)
+        XCTAssertEqual(dragged.listWidth, 395.5)
+        XCTAssertEqual(DuoLayout(size: size, pane: .hidden, dragWidth: -20).dragTarget, 0)
         for (width, pane) in [(0, DuoPane.hidden), (140, .hidden), (160, .narrow), (340, .narrow), (360, .even), (440, .even)] as [(CGFloat, DuoPane)] {
             XCTAssertEqual(even.snap(width), pane, "\(width)")
         }

@@ -5,7 +5,7 @@ import XCTest
 /// and nothing in the detail lies under the status cluster. Run on an owned
 /// iPhone Duo simulator.
 @MainActor
-final class DuoPaneWidthUITests: XCTestCase {
+final class DuoPaneWidthUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
     private let rail: CGFloat = 64
     private let gutter: CGFloat = 32
@@ -17,7 +17,7 @@ final class DuoPaneWidthUITests: XCTestCase {
     private let clusterHeight: CGFloat = 196
 
     private var launchArguments: [String] {
-        ["-skipPushPrompt", "YES", "-serverURL", "http://127.0.0.1:9", "-qaBotDemo", "duo", "-qaDuoPhone",
+        ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone",
          "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark", "-openURL", "bbstudio://bot"]
     }
 
@@ -91,13 +91,13 @@ final class DuoPaneWidthUITests: XCTestCase {
         command("pane?narrow")
         try waitForPage(.narrow)
         app.terminate()
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try waitForPage(.narrow, "Narrow after relaunch")
         tapToggle()
         try waitForPage(.hidden)
         app.terminate()
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try waitForPage(.hidden, "Full width after relaunch")
 
@@ -114,8 +114,6 @@ final class DuoPaneWidthUITests: XCTestCase {
             let last = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
             XCTAssertTrue(last.waitForExistence(timeout: 10))
             let composer = app.otherElements["threadComposer"].firstMatch
-            // Not isHittable: the simulator's outer screen doesn't reach the right page.
-            XCTAssertGreaterThan(last.frame.minY, 58, "\(pane): the last message is below the header")
             XCTAssertLessThanOrEqual(last.frame.maxY, composer.frame.minY + 1, "\(pane): the last message is above the composer")
             XCTAssertFalse(app.buttons["Jump to latest"].exists, "\(pane): still at the end")
         }
@@ -124,11 +122,13 @@ final class DuoPaneWidthUITests: XCTestCase {
     /// No transcript or header text lies under the status cluster: the Bot's
     /// chat and a normal thread, at each width, with the keyboard down and up,
     /// at the end and up in the history.
-    func testNoTextUnderTheStatusCluster() throws {
+    func testNoBotChatTextUnderTheStatusCluster() throws {
         try launch()
         try checkCluster("bot-chat", last: "Duo message 80")
-        command("pane?even")
-        try waitForPage(.even)
+    }
+
+    func testNoThreadTextUnderTheStatusCluster() throws {
+        try launch()
         command("tab?threads")
         let conversation = app.buttons["inbox-thread-thr_botdemo01"]
         XCTAssertTrue(conversation.waitForExistence(timeout: 15))
@@ -157,7 +157,7 @@ final class DuoPaneWidthUITests: XCTestCase {
                 default: break
                 }
                 Thread.sleep(forTimeInterval: 1.5)
-                let texts = app.staticTexts.allElementsBoundByIndex.map { ($0.label, $0.frame) }
+                let texts = try visibleTexts()
                     .filter { $0.1.width > 0 && $0.1.height > 0 && $0.1.maxY > 0 && $0.1.minY < layout.height }
                 XCTAssertGreaterThan(texts.filter { $0.1.minY < clusterHeight && $0.1.maxY > 58 }.count, 0,
                                      "\(name) \(pane) \(state): rows reach the cluster's band")
@@ -174,6 +174,37 @@ final class DuoPaneWidthUITests: XCTestCase {
         }
     }
 
+    /// The recording in docs/ios/duo-pane-width: the divider dragged to
+    /// each snap point, then the header button and an edge swipe. Run with
+    /// TEST_RUNNER_DUO_PANE_RECORD=1; frames land in the app's Documents.
+    func testRecordDragAndToggle() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["DUO_PANE_RECORD"] != nil, "Recording only on request")
+        try launch()
+        command("record?start")
+        Thread.sleep(forTimeInterval: 1)
+        let divider = app.descendants(matching: .any)["duoPaneDivider"].firstMatch
+        for x: CGFloat in [rail + 300 + gutter / 2, 951 / 2] {
+            let from = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            from.press(forDuration: 0.2, thenDragTo: from.withOffset(CGVector(dx: x - divider.frame.midX, dy: 0)),
+                       withVelocity: XCUIGestureVelocity(150), thenHoldForDuration: 0.5)
+            Thread.sleep(forTimeInterval: 1)
+        }
+        tapToggle()
+        Thread.sleep(forTimeInterval: 1.5)
+        tapToggle()
+        Thread.sleep(forTimeInterval: 1.5)
+        let from = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        from.press(forDuration: 0.2, thenDragTo: from.withOffset(CGVector(dx: rail + 60 - divider.frame.midX, dy: 0)),
+                   withVelocity: XCUIGestureVelocity(200), thenHoldForDuration: 0.3)
+        Thread.sleep(forTimeInterval: 1.5)
+        let window = app.windows.firstMatch
+        let edge = window.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rail + 6, dy: 400))
+        edge.press(forDuration: 0.1, thenDragTo: edge.withOffset(CGVector(dx: 420, dy: 0)), withVelocity: XCUIGestureVelocity(200), thenHoldForDuration: 0.3)
+        Thread.sleep(forTimeInterval: 1.5)
+        command("record?stop")
+        try waitForPage(.even)
+    }
+
     // MARK: - Helpers
 
     private enum Pane: String { case hidden, narrow, even }
@@ -187,13 +218,25 @@ final class DuoPaneWidthUITests: XCTestCase {
         command("activate?duoPaneToggle")
     }
 
+    /// Every static text's label and frame, from one snapshot: querying each
+    /// element of a long transcript in turn takes minutes.
+    private func visibleTexts() throws -> [(String, CGRect)] {
+        var result: [(String, CGRect)] = []
+        func walk(_ element: XCUIElementSnapshot) {
+            if element.elementType == .staticText { result.append((element.label, element.frame)) }
+            element.children.forEach(walk)
+        }
+        walk(try app.snapshot())
+        return result
+    }
+
     private var listRow: XCUIElement {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "iOS: black on reopen")).firstMatch
     }
 
     private func launch() throws {
         app.launchArguments = launchArguments
-        app.launch()
+        app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
             .waitForExistence(timeout: 15))

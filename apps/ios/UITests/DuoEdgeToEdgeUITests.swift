@@ -109,8 +109,10 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         let scroll = try XCTUnwrap(layout.scrolls.first { $0.x > layout.width / 2 && $0.height >= layout.height - 1 })
         XCTAssertEqual(scroll.maxX, layout.width, accuracy: 1)
         XCTAssertEqual(scroll.maxY, layout.height, accuracy: 1)
-        XCTAssertEqual(scroll.contentWidth, scroll.width, accuracy: 1,
-            "Scrolling content uses the status-column width, without reserving an empty band")
+        // The scroll view runs under the status column, but its content keeps
+        // clear of the Duo's clock, battery and Now Playing floating there.
+        XCTAssertEqual(scroll.contentWidth, scroll.width - layout.safeRight, accuracy: 1,
+            "Scrolling content stops at the status column")
         XCTAssertGreaterThanOrEqual(scroll.adjustedBottom, layout.safeBottom)
         let sidebar = try XCTUnwrap(layout.scrolls.first { $0.x < layout.width / 2 && $0.height >= layout.height - 1 })
         XCTAssertEqual(sidebar.maxY, layout.height, accuracy: 1)

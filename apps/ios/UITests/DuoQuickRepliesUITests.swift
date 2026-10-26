@@ -22,8 +22,8 @@ final class DuoQuickRepliesUITests: ServerIsolatedUITestCase {
         let detail = try XCTUnwrap(geometry.scrolls.first {
             $0.x > geometry.width / 2 && $0.height > 200 && $0.contentHeight > $0.height
         })
-        XCTAssertEqual(detail.contentMaxX, geometry.width, accuracy: 1,
-            "Scrolling content reaches the window edge beneath the status column")
+        XCTAssertEqual(detail.contentMaxX, geometry.width - geometry.safeRight, accuracy: 1,
+            "Scrolling content stops at the status column, clear of the clock and Now Playing")
         let scroll = try XCTUnwrap(geometry.scrolls.first {
             abs($0.x - replies.frame.minX) < 1 && abs($0.width - replies.frame.width) < 1 && $0.height < 100
         })
@@ -32,8 +32,8 @@ final class DuoQuickRepliesUITests: ServerIsolatedUITestCase {
         // viewport the replies show in ends at the composer's edge.
         XCTAssertEqual(replies.frame.minX, composer.frame.minX, accuracy: 1)
         XCTAssertEqual(replies.frame.maxX - scroll.adjustedRight, composer.frame.maxX, accuracy: 1)
-        // The composer has the transcript's 12-point margin, under the status column too.
-        XCTAssertEqual(detail.contentMaxX - composer.frame.maxX, 12, accuracy: 1)
+        // The composer runs under the status column, 12 points from the window's edge.
+        XCTAssertEqual(geometry.width - composer.frame.maxX, 12, accuracy: 1)
         // Its 8-point padding from the window's edge: beside two pages the
         // inner screen's home-indicator inset isn't added under it.
         XCTAssertEqual(geometry.height - composer.frame.maxY, 8, accuracy: 1,

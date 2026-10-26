@@ -8,6 +8,7 @@ enum DuoDemo {
     nonisolated static var phone: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoPhone") }
 
     static var surfaces: [String: CGRect] = [:]
+    private static var recorder: Timer?
     private static var configured: Set<ObjectIdentifier> = []
 
     static func configure(_ window: UIWindow) {
@@ -155,6 +156,28 @@ enum DuoDemo {
         case "focus":
             if let id = url.query() { AppModel.shared.replyThreadId = id }
             else if case .thread(let id)? = AppModel.shared.path.last { AppModel.shared.replyThreadId = id }
+            return true
+        case "record":
+            // Frames of the whole window for docs: the simulator's own screen
+            // recording shows only the outer screen.
+            recorder?.invalidate()
+            recorder = nil
+            guard url.query() == "start" else { return true }
+            let folder = URL.documentsDirectory.appending(path: "recording")
+            try? FileManager.default.removeItem(at: folder)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            var frame = 0
+            recorder = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { _ in
+                MainActor.assumeIsolated {
+                    let format = UIGraphicsImageRendererFormat()
+                    format.scale = 2
+                    let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
+                        window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+                    }
+                    try? image.jpegData(compressionQuality: 0.8)?.write(to: folder.appending(path: String(format: "%05d.jpg", frame)))
+                    frame += 1
+                }
+            }
             return true
         case "activate":
             // The simulator's screen is the outer one, so XCUITest can't touch
