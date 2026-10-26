@@ -166,6 +166,16 @@ enum BotDemo {
             }
         }
 
+        /// QA: the Bot says `text` (Markdown), as a finished reply.
+        func say(_ text: String) {
+            let at = Date().timeIntervalSince1970 * 1000
+            lock.withLock {
+                sends += 1
+                rows.append(BotDemo.row(id: "said\(sends)", role: "assistant", text: text, at: at))
+            }
+            notify()
+        }
+
         /// QA: a user row from elsewhere, then the Bot's reply streaming in.
         func sendAndStream(_ text: String) {
             let at = Date().timeIntervalSince1970 * 1000
