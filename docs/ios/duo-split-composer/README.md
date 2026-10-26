@@ -1,4 +1,8 @@
-# Duo split view: composer width, jump button and the status corner
+# Duo split view: composer width, jump button and bottom gap
+
+> **Follow-up, 25 October 2026 (TestFlight 20261026.0130).** The status corner
+> described below is gone, and the composer sits lower. See
+> [No status corner, no gap under the composer](#no-status-corner-no-gap-under-the-composer).
 
 25 October 2026. On the iPhone Duo inner screen (951 × 669 points, phone
 idiom, two pages), three things were wrong in a chat in the right page:
@@ -105,3 +109,61 @@ old layout: [outer](after-outer.png), [iPhone](after-iphone.png).
 The simulator doesn't draw the Duo's clock and icons, so the renders show the
 covered corner but not the cluster itself. Its height (104 points) is measured
 from a screenshot of the real inner screen.
+
+## No status corner, no gap under the composer
+
+Patrick, on TestFlight 20261026.0130, in the inner split's right page:
+
+1. “The black area is unnecessary.” The status corner's 104-point box behind
+   the clock and Wi-Fi covered the top of the bubbles. Text passing under the
+   clock is fine.
+2. “There is also a gap under the input area.” The composer stood well clear
+   of the screen's bottom edge, while the list in the left page ran to it.
+
+### Cause
+
+The inner window reports a 34-point bottom safe area (`safeBottom` 34 in the
+Debug `layout` probe, at 951 × 669), the home indicator's. The thread screen
+ignored only the trailing safe area beside two pages, so the composer's
+`safeAreaInset` sat inside the bottom one too: 34 points of inset plus its own
+8-point padding, a 42-point gap. In Patrick's screenshot the gap is the same,
+about 42 points. The left page's list ignores the bottom safe area, so it ran
+to the edge. Nothing added the inset twice.
+
+### Fix
+
+- **Status corner.** `StatusCorner` and `DuoLayout.statusClusterHeight` are
+  removed. Rows scroll under the clock and icons.
+- **Composer.** Beside two pages the thread screen ignores the bottom container
+  safe area as well as the trailing one. The composer keeps its 8-point
+  padding, so it ends 8 points above the window's bottom edge: the gap a phone
+  leaves under its composer above the home indicator, the tab bar or the
+  keyboard. The keyboard's safe area still applies. The jump button, its scrim
+  and the composer's width are unchanged. Only the phone idiom (the Duo's
+  inner screen) drops the bottom inset: a landscape iPad also shows two pages,
+  and keeps its composer above its home indicator.
+
+The outer screen (466 × 678) and an iPhone keep one page and are unchanged:
+the composer sits 8 points above the 34-point home indicator on the outer
+screen, and above the tab bar on an iPhone 18 Pro.
+
+### Tests
+
+`DuoSplitComposerUITests` no longer checks the status corner. In the Bot's
+chat, a Bot thread and a normal thread, it now checks that the composer ends
+8 points (within 2) above the window's bottom edge, at the end and up in the
+history, and that with the keyboard up the composer stays above it. Before
+the fix it failed with a 42-point gap in every case. The narrow test checks
+that the composer still clears the home indicator by at least 8 points.
+`DuoQuickRepliesUITests` now expects the composer's 8 points from the
+window's edge, not from the home indicator.
+
+### Renders
+
+Dark, inner split, Bot chat, at 2×. Before is this branch's test-first state
+(base 6b785288), after is the fix.
+
+| | Up in the history | At the end |
+| --- | --- | --- |
+| Before | ![](gap-before-bot-chat.png) | ![](gap-before-bot-chat-end.png) |
+| After | ![](gap-after-bot-chat.png) | ![](gap-after-bot-chat-end.png) |
