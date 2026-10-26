@@ -1,4 +1,16 @@
-export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => {
+// A thread on GPT-6-Luna (Codex's fast tier) whose first reply offers help,
+// then voice mode on: later replies are spoken.
+const voiceThread = async () => {
+  const thread = JSON.parse(await bbCli([
+    "thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low",
+    "--title", "Voice chat", "--prompt", "Reply only: Hi! What can I help with? Do not use tools.", "--json",
+  ]));
+  await bbCli(["thread", "wait", thread.id, "--timeout", "90s", "--json"]);
+  await pluginRpc("studio", "voice.set", { threadId: thread.id, on: true });
+  return thread.id;
+};
+return [
   {
     id: "studio-workspace",
     packageDir: "bb-studio",
@@ -515,7 +527,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     })()`),
   },
   {
-    // Voice mode: a new voice chat on GPT-6-Luna (Codex's fast tier), asked a
+    // Voice mode: a voice thread on GPT-6-Luna (Codex's fast tier), asked a
     // question, its reply playing with the Speaking pill beside the composer's
     // buttons. Needs Codex signed in and OPENROUTER_API_KEY in the staged BB's
     // environment.
@@ -523,12 +535,9 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     packageDir: "bb-studio",
     fileName: "voice.png",
     setup: async (client) => {
-      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      const threadId = await voiceThread();
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
       await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
-      // The greeting is spoken first; stop it and ask a question.
-      await client.waitForAriaButton("Stop speaking", 120000);
-      await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
       await bbCli(["thread", "tell", threadId, "In one sentence: what's a good name for a release about offline mode?"]);
       await sleep(4000);
       await client.waitForAriaButton("Stop speaking", 180000);
@@ -548,7 +557,7 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     fileName: "voice-menu.png",
     setup: async (client) => {
       await pluginRpc("studio", "speech.update", { engine: "openrouter", model: "fish-audio/drama-3", voice: "", speed: 1.25 });
-      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      const threadId = await voiceThread();
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
       await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
       await client.evaluate(`document.querySelector('[aria-label="Voice settings"]').click()`);
@@ -565,16 +574,15 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     })()`),
   },
   {
-    // Read aloud under a reply: a voice chat's greeting, stopped, then read
-    // again from the message's action bar.
+    // Read aloud under a reply: a voice thread's first reply (written before
+    // voice mode was on), read from the message's action bar.
     id: "studio-voice-read-aloud",
     packageDir: "bb-studio",
     fileName: "voice-read-aloud.png",
     setup: async (client) => {
-      const { threadId } = await pluginRpc("studio", "voice.new", { projectId });
+      const threadId = await voiceThread();
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForAriaButton("Stop speaking", 120000);
-      await client.evaluate(`document.querySelector('[aria-label="Stop speaking"]')?.click()`);
+      await client.waitForAriaButton("Voice mode on: replies are spoken. Turn off", 30000);
       await sleep(800);
       const found = await client.evaluate(`(() => {
         const messages = [...document.querySelectorAll("[data-timeline-row-id]")];
@@ -811,3 +819,4 @@ export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seed
     },
   },
 ];
+};
