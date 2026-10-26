@@ -3,6 +3,10 @@
 > **Follow-up, 25 October 2026 (TestFlight 20261026.0130).** The status corner
 > described below is gone, and the composer sits lower. See
 > [No status corner, no gap under the composer](#no-status-corner-no-gap-under-the-composer).
+>
+> **Follow-up, 26 October 2026.** Beside another app in iOS's split of the
+> inner screen, the gap came back: that rule ran only in our two pages. See
+> [the gap under the composer beside another app](../composer-gap/README.md).
 
 25 October 2026. On the iPhone Duo inner screen (951 × 669 points, phone
 idiom, two pages), three things were wrong in a chat in the right page:
