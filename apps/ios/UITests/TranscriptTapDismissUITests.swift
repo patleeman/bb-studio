@@ -104,6 +104,7 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         // The quick replies go with the new reply, and the composer moves down.
         expectAtRest("the reply is in")
 
+        command("pasteboard?clear")
         composerField.tap()
         expectKeyboard(true, "keyboard up for Copy")
         expectAtEnd("keyboard up, the reply at the bottom")
@@ -111,7 +112,11 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         let copy = copies.allElementsBoundByIndex.max { $0.frame.minY < $1.frame.minY }
         XCTAssertNotNil(copy)
         copy?.tap()
-        XCTAssertTrue(app.buttons["Copied"].firstMatch.waitForExistence(timeout: 3), "Copy fired on the first tap")
+        // "Copied" shows for only 1.5 s, which a slow accessibility snapshot
+        // can miss; what was copied stays.
+        expectation(for: NSPredicate { _, _ in self.copied() == "make release" }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5) { _ in }
+        XCTAssertEqual(copied(), "make release", "Copy fired on the first tap")
         expectKeyboard(false, "tap on Copy")
         watch("tap on Copy closed it", atEnd: true)
         shot("6-copy")
@@ -266,6 +271,12 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
         guard let dir = ProcessInfo.processInfo.environment["TAP_SHOTS"] else { return }
         try? XCUIScreen.main.screenshot().pngRepresentation
             .write(to: URL(fileURLWithPath: dir).appending(path: "\(layout)-\(name).png"))
+    }
+
+    /// What the app last copied (`qa-duo/pasteboard`).
+    private func copied() -> String? {
+        command("pasteboard")
+        return app.windows.firstMatch.value as? String
     }
 
     private func command(_ path: String) { XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/" + path)!) }

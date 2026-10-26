@@ -100,6 +100,11 @@ enum DuoDemo {
         case "dismiss":
             window.endEditing(true)
             return true
+        case "pasteboard":
+            // What this app last copied (its own copy: no paste prompt); `?clear` empties it.
+            if url.query() == "clear" { UIPasteboard.general.string = "" }
+            window.accessibilityValue = UIPasteboard.general.string ?? ""
+            return true
         case "say":
             BotDemo.Server.shared.say(url.query()?.removingPercentEncoding ?? "")
             return true
