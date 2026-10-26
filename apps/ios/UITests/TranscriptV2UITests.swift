@@ -33,6 +33,21 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     func testBotChat() {
         open()
         checkChat("bot-chat")
+        if layout == "split" {
+            // Full width: the list hidden, the chat across the inner screen
+            // (renders only; the right half is what's on the simulator's screen).
+            command("pane?hidden")
+            command("split-right")
+            Thread.sleep(forTimeInterval: 1.5)
+            watch("full width", atEnd: true)
+            shot("full-width-keyboard-down")
+            composerField.tap()
+            expectKeyboard(true, "full width: keyboard up")
+            watch("full width: keyboard up", atEnd: true)
+            shot("full-width-keyboard-up")
+            command("dismiss")
+            command("pane?even")
+        }
         finish()
     }
 
