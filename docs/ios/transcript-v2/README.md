@@ -148,14 +148,18 @@ outer screen: [outer](duo-outer-thread.png).
 
 ## Known gaps
 
-- **Replay edge cases after the row-height fix.** The checks fail on 6 of the
-  phone's 158 steps, all in the harness's instant 6,000 pt jumps through rows
-  that haven't measured yet:
-  - three rows 3 to 11 pt off their measured height;
-  - one 24 pt anchor drift;
-  - one rest window with 8 layout passes and nothing written.
+- **Replay edge cases after the row-height fix.** Some checks fail on a few
+  steps, all in the harness's instant 6,000 pt jumps through rows that
+  haven't measured yet, plus one fold:
+  - phone, 6 of 158: three rows 3 to 11 pt off their measured height, one
+    24.3 pt anchor drift, and two rest windows with 8 and 3 layout passes and
+    nothing written;
+  - Duo inner, 4: a 3.3 pt drift, one step of 41 passes, and two rest
+    windows with 3 and 4 no-op passes;
+  - Duo outer, 3: the same kinds.
 
-  The UI tests in the real app pass. To do next.
+  Never past the end, and never off the end while following. The UI tests
+  in the real app pass. To do next.
 - Not wired on the new path yet:
   - the Duo `transcript-<id>` content probe used by `DuoSplitComposerUITests`;
   - the older UI suites (`TranscriptPastEndUITests` and the rest), which run
