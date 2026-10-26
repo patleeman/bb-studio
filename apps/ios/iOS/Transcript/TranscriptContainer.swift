@@ -50,6 +50,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var onFollowChange: ((TranscriptFollow) -> Void)?
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
+    var dismissKeyboard: ((UIWindow) -> Void)?
 
     final class Coordinator {
         var items: [Item] = []
@@ -72,6 +73,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.onFollowChange = onFollowChange
         controller.onPillChange = onPillChange
         controller.log = log
+        if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
         controller.chrome = chrome
         let row = row
         controller.content = { id in

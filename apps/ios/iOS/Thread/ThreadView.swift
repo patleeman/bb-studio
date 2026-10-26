@@ -1711,7 +1711,14 @@ extension ThreadView {
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
             pill: { state, jump in transcriptV2Pill(state, jump: jump) },
             onNearTop: { transcriptV2LoadOlder() },
-            log: ScrollLog.on ? { ScrollLog.request($0) } : nil)
+            log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
+            // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
+            dismissKeyboard: { window in
+                ResizeSettling.shared.afterSettling { [weak window] in
+                    Breadcrumbs.shared.focus("transcript-tap", "end-editing")
+                    window?.endEditing(true)
+                }
+            })
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {

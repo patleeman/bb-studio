@@ -74,6 +74,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
     var log: ((String) -> Void)?
+    /// Ends editing after a tap on the transcript. The default waits a run
+    /// loop turn; an app can hold it further (BB waits out window resizes).
+    var dismissKeyboard: (UIWindow) -> Void = { window in
+        DispatchQueue.main.async { window.endEditing(true) }
+    }
 
     var chrome = TranscriptChrome() {
         didSet { if chrome != oldValue, isViewLoaded { applyChrome() } }
@@ -317,6 +322,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             guard let indexPath = dataSource.indexPath(for: id),
                   let cell = collectionView.cellForItem(at: indexPath) as? TranscriptCell else { continue }
             configure(cell, id)
+            measure(cell, at: indexPath)
         }
     }
 
@@ -551,23 +557,30 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         checkNearTop()
     }
 
-    /// UIKit sizes a cell when it first shows, not again when only the
-    /// width changes: a row measured at another width (a fold, a split, the
-    /// zero width a hosted view starts at) kept that height, and a short
-    /// bubble stood 140 pt tall. Visible rows not measured at this width
-    /// measure here, through the layout's own invalidation, so the anchor
-    /// holds as they change.
+    /// UIKit sizes a cell when it shows and when it asks to, not when only
+    /// the width changes, and a measure taken before SwiftUI applied a new
+    /// configuration is the old size: rows kept heights 20 to 60 pt off
+    /// (a short bubble stood 140 pt tall). After each transcript layout pass
+    /// the rows on screen measure again, and any that changed by more than
+    /// 1 pt go through the layout's own invalidation, so the anchor holds.
+    /// About ten rows, only when something laid out; nothing at rest.
     private func measureStaleCells() {
         guard collectionView.bounds.width > 0 else { return }
         for cell in collectionView.visibleCells {
-            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell),
-                  layout.ids.indices.contains(indexPath.item), !layout.isMeasured(layout.ids[indexPath.item]),
-                  let original = layout.layoutAttributesForItem(at: indexPath) else { continue }
-            let fitted = cell.preferredLayoutAttributesFitting(original)
-            if layout.shouldInvalidateLayout(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original) {
-                layout.invalidateLayout(with: layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original))
-            }
+            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell) else { continue }
+            measure(cell, at: indexPath)
         }
+    }
+
+    /// One row measured now, its height changed through the layout's own
+    /// invalidation (with the anchor's adjustment) if it moved by more than 1 pt.
+    private func measure(_ cell: TranscriptCell, at indexPath: IndexPath) {
+        guard collectionView.bounds.width > 0, layout.ids.indices.contains(indexPath.item),
+              let original = layout.layoutAttributesForItem(at: indexPath) else { return }
+        let fitted = cell.preferredLayoutAttributesFitting(original)
+        guard abs(fitted.size.height - original.size.height) > 1,
+              layout.shouldInvalidateLayout(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original) else { return }
+        layout.invalidateLayout(with: layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original))
     }
 
     /// Visible rows whose height isn't what they measure now, for the harness.
@@ -659,7 +672,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         guard recognizer.state == .ended else { return }
         // After the tap's own handlers: a text link acts as the touch ends,
         // and resigning in the same pass dropped it.
-        DispatchQueue.main.async { [weak self] in self?.view.window?.endEditing(true) }
+        guard let window = view.window else { return }
+        dismissKeyboard(window)
     }
 
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
@@ -696,10 +710,13 @@ final class TranscriptCollectionView: UICollectionView {
 final class TranscriptCell: UICollectionViewCell {
     override func preferredLayoutAttributesFitting(_ attributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
         let fitted = attributes.copy() as! UICollectionViewLayoutAttributes
+        // A just-set configuration lands in SwiftUI on layout; measure after it.
+        let width = attributes.size.width
+        contentView.layoutIfNeeded()
         let size = contentView.systemLayoutSizeFitting(
-            CGSize(width: attributes.size.width, height: UIView.layoutFittingCompressedSize.height),
+            CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
-        fitted.size = CGSize(width: attributes.size.width, height: TranscriptListLayout.pixel(size.height))
+        fitted.size = CGSize(width: width, height: TranscriptListLayout.pixel(size.height))
         return fitted
     }
 }
