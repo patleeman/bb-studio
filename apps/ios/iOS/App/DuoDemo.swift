@@ -100,6 +100,14 @@ enum DuoDemo {
         case "dismiss":
             window.endEditing(true)
             return true
+        case "counts":
+            // `?reset` starts over; otherwise the counts since then, as JSON.
+            RenderCount.watchMainThread()
+            if url.query() == "reset" { RenderCount.reset() }
+            if let data = try? JSONSerialization.data(withJSONObject: RenderCount.counts, options: .sortedKeys) {
+                window.accessibilityValue = String(data: data, encoding: .utf8)
+            }
+            return true
         case "pasteboard":
             // What this app last copied (its own copy: no paste prompt); `?clear` empties it.
             if url.query() == "clear" { UIPasteboard.general.string = "" }

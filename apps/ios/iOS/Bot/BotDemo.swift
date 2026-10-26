@@ -271,13 +271,20 @@ enum BotDemo {
             let phoneBot = DuoDemo.phone ? BotInfo(name: "Juniper", avatar: "🌿", state: .active,
                 lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
             let duoActivity = args.contains("-qaDuoLong") ? activity(needs: true) : wideTitles ? activity(needs: false) : nil
-            return Fixture(bot: phoneBot, activity: duoActivity, thread: thread(running: false, needs: false), rows: ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? longRows : transcript, interactions: [])
+            return Fixture(bot: phoneBot, activity: duoActivity, thread: thread(running: false, needs: question),
+                           rows: args.contains("-qaDuoLong") || question ? longRows : transcript, interactions: question ? questionInteractions : [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
             name: "Juniper", avatar: "🌿", state: .active,
             lead: ThreadLead(threadId: threadId, heartbeat: "weekdays", time: "08:00"),
             shape: "blob", color: "#2ba59a", role: "My chief of staff. Keeps the week on track and chases loose ends.")
+        // `-qaDemoQuestion`: the long chat, waiting on a question for you
+        // (choices and a typed answer), as when the first hang was hit.
+        if question {
+            return Fixture(bot: bot, activity: activity(needs: true), thread: thread(running: false, needs: true),
+                           rows: longRows, interactions: questionInteractions)
+        }
         return Fixture(bot: bot, activity: activity(needs: variant == "needs"), thread: thread(running: running, needs: variant == "needs"),
                        rows: served != nil && variant == "chat" ? longRows : rows(variant), interactions: variant == "needs" ? interactions : [])
     }
@@ -329,8 +336,14 @@ enum BotDemo {
         decode(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"\#(wideTitles ? wideTitle(threadId) : "Juniper")","status":"\#(running || needs ? "active" : "idle")","createdAt":1,"updatedAt":\#(now),"hasPendingInteraction":\#(needs)}"#)
     }
 
-    /// The served chat's rows, made once.
-    static let longRows: [TimelineRow] = rows("chat", long: served?.messages ?? (ProcessInfo.processInfo.arguments.contains("-qaDuoLong") ? 600 : 300))
+    static var question: Bool { ProcessInfo.processInfo.arguments.contains("-qaDemoQuestion") }
+
+    /// The served chat's rows, made once. `-qaDemoMessages <n>` sizes it offline too.
+    static let longRows: [TimelineRow] = {
+        let arguments = ProcessInfo.processInfo.arguments
+        let asked = arguments.firstIndex(of: "-qaDemoMessages").flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
+        return rows("chat", long: served?.messages ?? asked ?? (arguments.contains("-qaDuoLong") ? 600 : 300))
+    }()
 
     private static func rows(_ variant: String, long: Int? = nil) -> [TimelineRow] {
         let yesterday = now - 86_400_000 - 3_600_000
@@ -395,6 +408,10 @@ enum BotDemo {
 
     private static var interactions: [PendingInteraction] {
         decode(#"[{"id":"int_demo1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"approval","subject":{"kind":"command","command":"git push origin release/1.4","cwd":"~/code/app"},"reason":"Push the release workflow fix","availableDecisions":["allow_once","deny"]}}]"#)
+    }
+
+    private static var questionInteractions: [PendingInteraction] {
+        decode(#"[{"id":"int_question1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"user_question","questions":[{"id":"q1","prompt":"Which venue should I book for the Lisbon offsite?","multiSelect":false,"allowFreeText":true,"options":[{"value":"lx","label":"LX Factory","description":"Biggest room, furthest from the hotel"},{"value":"tivoli","label":"Tivoli","description":"Walkable, smaller room"},{"value":"later","label":"Decide later"}]}]}}]"#)
     }
 
     private static var qaAttention: Bool { ProcessInfo.processInfo.arguments.contains("-qaBotAttention") }

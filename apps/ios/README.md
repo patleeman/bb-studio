@@ -132,6 +132,23 @@ fake server serves a 300-message chat (`-qaDemoMessages`) through
 `BBClient.transport`. `-qaDemoColdCache` drops the caches first, and
 `-qaDemoSend <text>` types a message and sends it.
 
+The thread view's body stays cheap and runs only when something it draws
+changes. Two watchdog kills on the Duo (0x8BADF00D, 10 s of main-thread
+CPU; Oct 26), one while answering a Bot question and one while the window
+changed, were that body running over and over on a long chat: the scroll
+position lived in the view's own state, so each scroll request (the
+restore after a fold or a pane change asks ten times a second) redrew the
+whole thread, and each redraw rebuilt a set of every row id and diffed every
+row. The position now lives in `TranscriptScroller`, read only by a small
+modifier and bound one way; the row ids and grouped items are worked out in
+`ThreadModel` once per change; and geometry readers write only real
+changes. `TranscriptHangUITests` counts redraws, geometry writes and the
+longest main-thread stretch (`bbstudio://qa-duo/counts`, Debug builds) while
+a question is answered over a 1,000-message chat (`-qaDemoQuestion`) and
+while the Duo folds, splits, resizes its list and comes back from the
+background with the keyboard up; `TEST_RUNNER_HANG_MESSAGES` sets the
+chat's length.
+
 ## Bot chat: terminals
 
 The Bot chat's ⋯ menu has **Terminals**, the same item a regular thread's ⋯
