@@ -62,6 +62,35 @@ final class TranscriptPastEndUITests: ServerIsolatedUITestCase {
         finish()
     }
 
+    /// Found with the tap-to-close test: a tap on the chat, then a reply
+    /// soon after. The reply's scroll to the end stopped where it started,
+    /// the scroll phase stayed "animating", and `keepAtEnd` held for good:
+    /// the newest row under the composer, and under the keyboard once it
+    /// came back. Each round: a reply, the keyboard up, a tap on the reply
+    /// (the keyboard closes), a second reply, then the keyboard up again.
+    func testAReplySoonAfterATapIsFollowed() {
+        let composer = open()
+        for round in 0..<3 {
+            let first = "Round%20\(round)%3A%0A%0A%60%60%60sh%0Amake%20release\(round)%0A%60%60%60"
+            command("say?\(first)")
+            let code = app.staticTexts["make release\(round)"].firstMatch
+            XCTAssertTrue(code.waitForExistence(timeout: 10), "r\(round): the first reply is on screen")
+            expectAtEnd("r\(round) first reply")
+            composer.tap()
+            expectAtEnd("r\(round) keyboard up")
+            code.tap()
+            expectAtEnd("r\(round) tapped, keyboard closed")
+            command("say?See%20%5BRelease%20brief%5D(https%3A%2F%2Fexample.com%2Fbrief)%20for%20round%20\(round).%0A%0A%60%60%60sh%0Amake%20notes\(round)%0A%60%60%60")
+            expectAtEnd("r\(round) second reply")
+            composer.tap()
+            expectAtEnd("r\(round) second reply, keyboard up")
+            shot("reply-after-tap-\(round)")
+            command("dismiss")
+            expectAtEnd("r\(round) keyboard closed")
+        }
+        finish()
+    }
+
     /// Patrick: back from the Bot chat to the Bots list, tap the Bot again,
     /// and the chat opens scrolled into black. Reopen several times, also
     /// after rows came in while away (a short reply, a streamed one, and more
