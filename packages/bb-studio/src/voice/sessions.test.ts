@@ -5,13 +5,10 @@ type Sent = { threadId: string; mode: string; senderThreadId?: string; input: { 
 
 function setup(options: { events?: Record<string, { seq: number; type: string; data?: unknown }[]>; bot?: string | null } = {}) {
   const kv = new Map<string, unknown>();
-  const spawned: Record<string, unknown>[] = [];
   const sent: Sent[] = [];
   const events = options.events ?? {};
   const sdk = {
-    system: { config: async () => ({ primaryHostId: "host_main" }) },
     threads: {
-      spawn: async (args: Record<string, unknown>) => { spawned.push(args); return { id: "thr_voice" }; },
       get: async ({ threadId }: { threadId: string }) => ({ id: threadId, title: `Title of ${threadId}` }),
       send: async (args: Sent) => { sent.push(args); return { delivery: "sent" }; },
       events: {
@@ -29,20 +26,10 @@ function setup(options: { events?: Record<string, { seq: number; type: string; d
     botThread: () => (options.bot === undefined ? "thr_bot" : options.bot),
     warn: () => {},
   });
-  return { sessions, kv, spawned, sent, events, sdk };
+  return { sessions, kv, sent, events, sdk };
 }
 
 describe("VoiceSessions", () => {
-  it("starts a voice chat in a new thread on the fast model, with voice on", async () => {
-    const { sessions, kv, spawned } = setup();
-    expect(await sessions.start("luna-fast", "proj_app")).toBe("thr_voice");
-    expect(spawned[0]).toMatchObject({ projectId: "proj_app", environment: { type: "host", hostId: "host_main", workspace: { type: "unmanaged", path: null } }, providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", executionInputSources: { serviceTier: "explicit" }, pluginMetadata: { voice: "on" } });
-    expect((kv.get(VOICE_KV_KEY) as { threads: string[] }).threads).toEqual(["thr_voice"]);
-    expect(sessions.isOn("thr_voice")).toBe(true);
-    await sessions.start("luna-fast");
-    expect(spawned[1]).toMatchObject({ projectId: "proj_personal", environment: { type: "project-default" } });
-  });
-
   it("turns voice mode on and off in any thread", async () => {
     const { sessions } = setup();
     expect(sessions.isOn("thr_code")).toBe(false);
@@ -55,17 +42,8 @@ describe("VoiceSessions", () => {
     await sessions.setConversational(false);
     expect(sessions.conversational).toBe(false);
     await sessions.setConversational(true);
-    // A new voice chat's first turn comes before Studio has stored it.
+    // A voice chat from before New voice chat was removed says so in its metadata.
     expect(sessions.isOn("thr_new", { voice: "on" })).toBe(true);
-  });
-
-  it("falls back to the first model for an unknown one, and gives Haiku no service tier", async () => {
-    const { sessions, spawned } = setup();
-    await sessions.start("nope");
-    await sessions.start("haiku");
-    expect(spawned[0]).toMatchObject({ model: "gpt-6-luna" });
-    expect(spawned[1]).toMatchObject({ providerId: "claude-code", model: "claude-haiku-5-5" });
-    expect(spawned[1]!.serviceTier).toBeUndefined();
   });
 
   it("delegates to the Bot as the voice thread, and asks for a speakable summary", async () => {
@@ -178,7 +156,7 @@ describe("VoiceSessions", () => {
   it("ignores threads it isn't waiting on, and keeps its state across a reload", async () => {
     const { sessions, kv } = setup();
     expect(await sessions.idle("thr_random", "Hi")).toBe(false);
-    await sessions.start("luna-fast");
+    await sessions.set("thr_voice", true);
     await sessions.delegate("thr_voice", "thr_work", "Do it.");
     const reloaded = new VoiceSessions({ sdk: {} as never, kv: { get: async (key) => kv.get(key), set: async () => {} }, botThread: () => null, warn: () => {} });
     await reloaded.load();

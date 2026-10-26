@@ -10,7 +10,7 @@ import type { SpeechService } from "../speech/service";
 import { voiceContract, type VoiceState } from "./contract";
 import { VOICE_REALTIME_CHANNEL, type VoiceSpoken } from "./shared";
 import { speakable, VOICE_CHAT_INSTRUCTIONS, VOICE_MODE_INSTRUCTIONS, VOICE_TURN_NOTE, VOICE_TURN_OFF_NOTE } from "./instructions";
-import { VOICE_MODELS, VoiceSessions } from "./sessions";
+import { VoiceSessions } from "./sessions";
 
 /** A voice thread's own tools, beside its usual ones. */
 export const VOICE_TOOLS = ["voice_delegate", "voice_threads", "voice_read"] as const;
@@ -63,7 +63,6 @@ export async function registerVoice(bb: BbPluginApi, deps: {
       const note = await sessions.turnNote(threadId);
       return { note: note === "on" ? VOICE_TURN_NOTE : note === "off" ? VOICE_TURN_OFF_NOTE : null };
     },
-    "voice.new": async ({ projectId, modelId }) => ({ threadId: await sessions.start(modelId ?? VOICE_MODELS[0]!.id, projectId ?? null) }),
   });
 
   // A voice reply is spoken: the server starts making each piece's audio now

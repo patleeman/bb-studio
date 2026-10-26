@@ -2258,7 +2258,7 @@ replies are spoken with [Speech](#speech).
 
 ![Live BB screenshot of a voice chat speaking its reply, with the Speaking pill beside the composer's buttons](assets/voice.png)
 
-Captured from a staged BB: a new voice chat on GPT-6-Luna (Codex's fast
+Captured from a staged BB: a voice thread on GPT-6-Luna (Codex's fast
 tier) was asked for a release name. Its reply is playing: the pill beside the
 speaker and mic buttons shows the agent's level, "Speaking" and Stop, and the
 piece being read is lit in the transcript. Recapture with
@@ -2281,8 +2281,8 @@ piece being read is lit in the transcript. Recapture with
   voice mode keeps writing as it does (its replies are still spoken); the
   first spoken message after you turn it off carries a one-time note saying
   so, since the agent has seen the earlier ones. Studio picks the note
-  (`voice.turnNote`), so desktop and iPhone agree. A new voice chat is always
-  conversational.
+  (`voice.turnNote`), so desktop and iPhone agree. A voice chat (a thread
+  made by the old New voice chat) is always conversational.
 
   ![Live BB screenshot of the voice menu above a thread's composer](assets/voice-menu.png)
 
@@ -2291,9 +2291,7 @@ piece being read is lit in the transcript. Recapture with
   Fish Drama 3 and its default voice Hannah, and speed 1.25×. Recapture with
   `BB_CAPTURE_ONLY=studio-voice-menu`. A new thread's composer has no
   voice button, and there's no New voice chat button or command: turn voice
-  mode on in any thread instead. The `voice.new` RPC (a thread on
-  GPT-6-Luna's fast tier with voice mode on) remains, but no Studio or iPhone
-  UI calls it.
+  mode on in any thread instead.
 - **The composer, state by state.** Captured from a staged BB in a seeded
   thread with `BB_CAPTURE_ONLY=studio-composer-voice`. Idle, dictating, the
   hint, push-to-talk and dictating in a voice thread are live, on Chrome's
@@ -2385,7 +2383,7 @@ piece being read is lit in the transcript. Recapture with
   Captured from a staged BB: a voice chat's greeting, stopped, then read
   again with Read aloud from its action bar. Recapture with
   `BB_CAPTURE_ONLY=studio-voice-read-aloud`.
-- **Written for listening.** A voice chat's agent is told it's a voice chat:
+- **Written for listening.** An old voice chat's agent is told it's a voice chat:
   short spoken sentences, no markdown or code, numbers and paths said as a
   person would, and real work handed off. Voice mode in any other thread adds
   the same speaking rules to what the thread already does, from its next

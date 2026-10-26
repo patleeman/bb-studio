@@ -232,12 +232,6 @@
     {
       "file": "apps/ios/Shared/BBClient+Voice.swift",
       "plugin": "studio",
-      "method": "voice.new",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+Voice.swift",
-      "plugin": "studio",
       "method": "speech.state",
       "coverage": "generated method"
     },

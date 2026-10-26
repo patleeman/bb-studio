@@ -18,11 +18,6 @@ public enum VoiceRequests {
 
     public static func turnNote(_ threadId: String) -> JSONValue { json(Studio.VoiceTurnNoteInput(threadId: threadId)) }
 
-    /// No project starts it in BB's personal project, as on desktop.
-    public static func new(projectId: String?) -> JSONValue {
-        projectId.map { json(Studio.VoiceNewInput(projectId: $0)) } ?? .object([:])
-    }
-
     public static func prepare(_ text: String) -> JSONValue { json(Studio.SpeechPrepareInput(text: text)) }
 
     public static func update(engine: String? = nil, model: String? = nil, voice: String? = nil, speed: Double? = nil) -> JSONValue {
@@ -57,13 +52,6 @@ extension BBClient {
     public func voiceTurnNote(_ threadId: String) async throws -> String? {
         let result: Studio.VoiceTurnNoteOutput = try await rpc("studio", Studio.Method.voice_turnNote, VoiceRequests.turnNote(threadId))
         return result.note
-    }
-
-    /// A new voice chat: a thread on a fast model with voice mode on, whose agent greets you.
-    public func newVoiceChat(projectId: String?) async throws -> String {
-        let result: Studio.VoiceNewOutput = try await rpc("studio", Studio.Method.voice_new, VoiceRequests.new(projectId: projectId))
-        guard let threadId = result.threadId else { throw BBError(status: 0, message: "Studio didn't start a voice chat.") }
-        return threadId
     }
 
     public func speechSettings() async throws -> SpeechSettings {

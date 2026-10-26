@@ -1,4 +1,4 @@
-// The RPCs behind voice mode: the speaker button in a thread's composer and New voice chat.
+// The RPCs behind voice mode: the speaker button in a thread's composer.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
@@ -38,10 +38,5 @@ export const voiceContract = defineRpcContract({
     experimental_description: "The unseen note to send with a spoken message in a thread: the conversational note while it's on, a one-time 'conversational is off' note after it's turned off, else null.",
     input: z.object({ threadId }).strict(),
     output: z.object({ note: z.string().nullable() }),
-  },
-  "voice.new": {
-    experimental_description: "Start a new voice chat: a thread on a fast model with voice mode on. Returns its thread id.",
-    input: z.object({ projectId: z.string().max(100).nullable().optional(), modelId: z.string().max(50).optional() }).strict(),
-    output: z.object({ threadId }),
   },
 });

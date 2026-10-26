@@ -266,8 +266,7 @@ shows the dictating pill).
 | Dark | ![Idle, dark](docs/voice/composer-idle-dark.png) | ![Dictating, dark](docs/voice/composer-dictating-dark.png) | ![Push to talk held, dark](docs/voice/composer-ptt-dark.png) | ![Hands-free, dark](docs/voice/composer-handsfree-dark.png) | ![The Bot speaking, dark](docs/voice/composer-speaking-dark.png) | ![The hint, dark](docs/voice/composer-hint-dark.png) |
 
 The app has no New voice chat: turn voice mode on in any thread with the
-speaker beside the mic, or open `bbstudio://voice/<id>`. Studio's
-`voice.new` RPC (and `BBClient.newVoiceChat`) remain, unused by the app.
+speaker beside the mic, or open `bbstudio://voice/<id>`.
 Before and after: [docs/ios/no-voice-chat](../../docs/ios/no-voice-chat/README.md).
 
 | Speaking, with the piece lit up | The speaker's menu | Voice settings |

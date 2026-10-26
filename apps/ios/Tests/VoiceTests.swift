@@ -118,9 +118,7 @@ final class VoiceTextTests: XCTestCase {
         XCTAssertEqual(BBClient.input("Hello", []), [["type": "text", "text": "Hello", "mentions": []]])
     }
 
-    func testVoiceNewAndUpdateBodies() {
-        XCTAssertEqual(VoiceRequests.new(projectId: nil), .object([:]))
-        XCTAssertEqual(VoiceRequests.new(projectId: "proj_1"), ["projectId": "proj_1"])
+    func testVoiceUpdateAndSetBodies() {
         XCTAssertEqual(VoiceRequests.update(speed: 1.5), ["speed": 1.5])
         XCTAssertEqual(VoiceRequests.set("thr_1", on: true), ["threadId": "thr_1", "on": true])
     }

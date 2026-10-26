@@ -1,6 +1,5 @@
 // Voice mode: any BB thread can have it on. Its replies are spoken (see
-// register.ts) and its agent is told to answer for listening. A new voice chat
-// is a thread on a fast model with voice on from the start. A voice thread can
+// register.ts) and its agent is told to answer for listening. A voice thread can
 // hand real work to the Bot or other threads (delegate); when one of those
 // finishes the turn it asked for, its reply is posted back into the voice
 // thread as a note for the agent to sum up aloud.
@@ -14,26 +13,10 @@ type Sdk = BbPluginApi["sdk"];
 type Kv = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
 
 export const VOICE_KV_KEY = "voice:state";
-const PERSONAL_PROJECT_ID = "proj_personal";
 /** A reply longer than this is cut before it goes back to the voice agent. */
 const REPLY_CHARS = 6000;
 /** Delegations nobody answered in a day are forgotten. */
 const DELEGATION_TTL_MS = 86_400_000;
-
-export interface VoiceModel {
-  id: string;
-  label: string;
-  providerId: string;
-  model: string;
-  serviceTier?: string;
-  reasoningLevel?: string;
-}
-
-/** Fast models for a new voice chat. Only Codex models have a fast tier in BB. */
-export const VOICE_MODELS: readonly VoiceModel[] = [
-  { id: "luna-fast", label: "GPT-6-Luna, fast (Codex)", providerId: "codex", model: "gpt-6-luna", serviceTier: "fast", reasoningLevel: "low" },
-  { id: "haiku", label: "Haiku 5.5 (Claude Code)", providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: "low" },
-];
 
 interface Delegation {
   voiceThreadId: string;
@@ -107,7 +90,7 @@ export class VoiceSessions {
     await this.deps.kv.set(VOICE_KV_KEY, this.state);
   }
 
-  /** Whether a thread has voice mode on (a new voice chat's metadata says so from its first turn). */
+  /** Whether a thread has voice mode on (a voice chat started before New voice chat was removed says so in its metadata). */
   isOn(threadId: string, metadata?: { readonly [key: string]: unknown }): boolean {
     return this.state.threads.includes(threadId) || metadata?.voice === "on";
   }
@@ -140,31 +123,6 @@ export class VoiceSessions {
     const threads = this.state.threads.filter((each) => each !== threadId);
     this.state.threads = on ? [...threads, threadId] : threads;
     await this.save();
-  }
-
-  /** A new voice chat: a thread on a fast model with voice on, in the given project (the Personal project otherwise). */
-  async start(modelId: string, projectId: string | null = null): Promise<string> {
-    const model = VOICE_MODELS.find((each) => each.id === modelId) ?? VOICE_MODELS[0]!;
-    // A project's main checkout, never a new worktree: a voice chat talks and hands work off.
-    const hostId = projectId ? (await this.deps.sdk.system.config()).primaryHostId : null;
-    const thread = await this.deps.sdk.threads.spawn({
-      projectId: projectId ?? PERSONAL_PROJECT_ID,
-      title: "New voice chat",
-      environment: hostId ? { type: "host", hostId, workspace: { type: "unmanaged", path: null } } : { type: "project-default" },
-      providerId: model.providerId,
-      model: model.model,
-      ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
-      ...(model.serviceTier ? { serviceTier: model.serviceTier } : {}),
-      executionInputSources: {
-        providerId: "explicit", model: "explicit",
-        ...(model.reasoningLevel ? { reasoningLevel: "explicit" } : {}),
-        ...(model.serviceTier ? { serviceTier: "explicit" } : {}),
-      },
-      pluginMetadata: { voice: "on" },
-      input: [{ type: "text", text: "The user opened a voice chat. Greet them in one short sentence and ask what they need.", mentions: [], visibility: "agent-only" }],
-    } as never);
-    await this.set(thread.id, true);
-    return thread.id;
   }
 
   /** Send work to the Bot ("bot") or a thread, and remember to bring its reply back. */

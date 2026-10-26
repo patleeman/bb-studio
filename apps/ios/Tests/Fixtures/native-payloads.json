@@ -171,26 +171,6 @@
     }
   },
   {
-    "id": "voice-new",
-    "plugin": "studio",
-    "method": "voice.new",
-    "input": {
-      "projectId": "proj_contract"
-    },
-    "output": {
-      "threadId": "thr_voice"
-    }
-  },
-  {
-    "id": "voice-new-personal",
-    "plugin": "studio",
-    "method": "voice.new",
-    "input": {},
-    "output": {
-      "threadId": "thr_voice"
-    }
-  },
-  {
     "id": "speech-state",
     "plugin": "studio",
     "method": "speech.state",

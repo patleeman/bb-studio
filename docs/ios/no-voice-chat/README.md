@@ -24,5 +24,8 @@ without a thread id. `bbstudio://voice/<id>` still turns voice mode on in that
 thread. In Studio: the voice button in a new thread's composer and the
 *New voice chat* command.
 
-Kept, now unused by any UI: Studio's `voice.new` RPC (`src/voice/register.ts`,
-`contract.ts`, `sessions.start`) and the iOS client's `BBClient.newVoiceChat`.
+Then deleted, with Patrick's approval: Studio's `voice.new` RPC and
+`VoiceSessions.start` (its fast models and greeting), and the iOS client's
+`BBClient.newVoiceChat`. Voice chats made before keep working: their
+`voice: "on"` metadata still turns on voice mode and the voice chat
+instructions.

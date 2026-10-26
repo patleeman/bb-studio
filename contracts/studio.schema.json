@@ -32735,45 +32735,6 @@
         ],
         "additionalProperties": false
       }
-    },
-    "voice.new": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "projectId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "modelId": {
-            "type": "string",
-            "maxLength": 50
-          }
-        },
-        "additionalProperties": false
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "threadId"
-        ],
-        "additionalProperties": false
-      }
     }
   },
   "StudioItem": {
