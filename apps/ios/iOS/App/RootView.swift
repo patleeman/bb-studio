@@ -6,9 +6,11 @@ struct RootView: View {
     @State private var windowSize = CGSize.zero
     @State private var windowLeadingInset: CGFloat = 0
     @State private var windowTrailingInset: CGFloat = 0
+    @State private var pane = DuoPaneState.shared
 
     var body: some View {
-        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset)
+        let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
+                               pane: pane.pane, dragWidth: pane.dragWidth)
         HStack(spacing: 0) {
             DuoTabRail(selection: $model.tab)
                 .frame(width: layout.railWidth)
@@ -27,6 +29,7 @@ struct RootView: View {
             }
         }
         .environment(\.duoLayout, layout)
+        .environment(pane)
         .background(WindowGeometry { size, leading, trailing in
             windowSize = size
             windowLeadingInset = leading
@@ -108,34 +111,23 @@ struct InboxTab: View {
     @StateObject private var inbox = InboxModel()
 
     var body: some View {
-        HStack(spacing: 0) {
+        RegularPages {
             ZStack {
                 if layout.twoPages {
                     NavigationStack { InboxView(selectsDetail: true, model: inbox) }
                 }
             }
-            .modifier(SidebarColumn())
-            .background {
-                if layout.twoPages {
-                    RegularSurfaceBackground(name: "sidebar", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
-                }
-            }
-            .accessibilityHidden(!layout.twoPages)
-            CreaseGutter()
+        } detail: {
             NavigationStack(path: $model.path) {
                 InboxView(model: inbox)
                 .opacity(layout.twoPages ? 0 : 1)
                 .accessibilityHidden(layout.twoPages)
                 .overlay {
                     if layout.twoPages {
-                        ContentUnavailableView("No thread selected", systemImage: Symbols.thread)
+                        DuoEmptyDetail(title: "No thread selected", systemImage: Symbols.thread)
                     }
                 }
                 .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            }
-            .frame(maxWidth: .infinity)
-            .background {
-                if layout.twoPages { RegularSurfaceBackground(name: "detail", rightPage: true) }
             }
         }
         // One live store and load task for both presentations. On the phone,

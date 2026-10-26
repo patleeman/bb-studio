@@ -28,6 +28,33 @@ final class DuoLayoutTests: XCTestCase {
         XCTAssertEqual(portrait.listWidth, 0)
     }
 
+    func testPaneWidthsAndSnapPoints() {
+        let size = CGSize(width: 951, height: 669)
+        let even = DuoLayout(size: size, trailingInset: 84)
+        XCTAssertEqual(even.listWidth, 395.5)
+        XCTAssertEqual(DuoLayout(size: size, pane: .narrow).listWidth, 300)
+        let hidden = DuoLayout(size: size, pane: .hidden)
+        XCTAssertEqual(hidden.listWidth, 0)
+        XCTAssertEqual(hidden.gutterWidth, 0, "No divider with the list hidden")
+        XCTAssertFalse(hidden.showsList)
+        // A drag follows the finger, with a little give past even, and keeps its divider at zero.
+        XCTAssertEqual(DuoLayout(size: size, dragWidth: 500).listWidth, 419.5)
+        XCTAssertEqual(DuoLayout(size: size, pane: .hidden, dragWidth: -20).gutterWidth, DuoLayout.gutter)
+        for (width, pane) in [(0, DuoPane.hidden), (140, .hidden), (160, .narrow), (340, .narrow), (360, .even), (440, .even)] as [(CGFloat, DuoPane)] {
+            XCTAssertEqual(even.snap(width), pane, "\(width)")
+        }
+        // One page: no list at any choice.
+        XCTAssertEqual(DuoLayout(size: CGSize(width: 466, height: 678), pane: .narrow).listWidth, 0)
+    }
+
+    func testTranscriptClearsTheStatusColumnOnlyAsFarAsItMust() {
+        XCTAssertEqual(RegularScrollingSurface.inset(column: 84, width: 459.5, readableWidth: 760), 84)
+        XCTAssertEqual(RegularScrollingSurface.inset(column: 84, width: 887, readableWidth: 760), 20.5)
+        XCTAssertEqual(RegularScrollingSurface.inset(column: 84, width: 1200, readableWidth: 760), 0)
+        XCTAssertEqual(RegularScrollingSurface.inset(column: 84, width: 887, readableWidth: nil), 84)
+        XCTAssertEqual(RegularScrollingSurface.inset(column: 0, width: 459.5, readableWidth: 760), 0)
+    }
+
     @MainActor
     func testResizeDoesNotChangeSelectedRouteOrStoredDraft() {
         let app = AppModel.shared

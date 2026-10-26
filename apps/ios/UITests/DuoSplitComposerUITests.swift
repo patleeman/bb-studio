@@ -85,14 +85,17 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         waitForExpectations(timeout: 5) { _ in }
         Thread.sleep(forTimeInterval: 1)
 
-        // 1. The composer has the transcript's leading and trailing margins.
+        // 1. The composer has the transcript's leading margin. It runs under
+        // the status column; the transcript keeps clear of it, so its rows
+        // never pass under the Duo's clock, battery and Now Playing.
         var layout = try geometry()
         // Only the thread on screen keeps its probe.
         let transcripts = layout.surfaces.filter { $0.key.hasPrefix("transcript-") }
         XCTAssertEqual(transcripts.count, 1, "\(name): one transcript on screen")
         let transcript = try XCTUnwrap(transcripts.first?.value, "\(name): transcript content probe")
         print("SPLIT COMPOSER \(name) composer=\(composer.frame) transcript=\(transcript) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom)")
-        XCTAssertEqual(composer.frame.maxX, transcript.maxX, accuracy: 4, "\(name): composer ends where the transcript does")
+        XCTAssertEqual(composer.frame.maxX, transcript.maxX + layout.safeRight, accuracy: 4,
+                       "\(name): composer runs under the status column; the transcript stops short of it")
         XCTAssertEqual(composer.frame.minX, transcript.x, accuracy: 4, "\(name): composer starts where the transcript does")
 
         // 3. The composer sits as far above the window's bottom edge as a

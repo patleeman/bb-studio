@@ -337,7 +337,7 @@ struct ThreadView: View {
             // content rather than growing from empty.
             if model.loaded {
                 timeline.id(timelineKey)
-                    .modifier(RegularScrollingSurface())
+                    .modifier(RegularScrollingSurface(readableWidth: Self.readableWidth))
             } else {
                 // Nothing cached yet: the shape of a chat, not a blank screen.
                 ChatSkeleton(bot: botChrome != nil)

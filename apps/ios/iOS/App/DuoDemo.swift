@@ -32,6 +32,7 @@ enum DuoDemo {
             return result
         }
         return ["width": window.bounds.width, "height": window.bounds.height,
+                "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "scrolls": scrolls(window),
                 "surfaces": surfaces.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }]
@@ -85,6 +86,10 @@ enum DuoDemo {
                 return view.subviews.contains(where: revealEnd)
             }
             _ = revealEnd(window)
+            return true
+        case "pane":
+            guard let pane = url.query().flatMap(DuoPane.init) else { return false }
+            DuoPaneState.shared.set(pane)
             return true
         case "layout":
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
@@ -148,7 +153,30 @@ enum DuoDemo {
             try? image.pngData()?.write(to: URL.documentsDirectory.appending(path: name + ".png"))
             return true
         case "focus":
-            if case .thread(let id)? = AppModel.shared.path.last { AppModel.shared.replyThreadId = id }
+            if let id = url.query() { AppModel.shared.replyThreadId = id }
+            else if case .thread(let id)? = AppModel.shared.path.last { AppModel.shared.replyThreadId = id }
+            return true
+        case "activate":
+            // The simulator's screen is the outer one, so XCUITest can't touch
+            // most of the stretched inner window. Activate a control as
+            // VoiceOver does instead: it runs the same action as a tap.
+            guard let id = url.query() else { return false }
+            func identifier(_ element: NSObject) -> String? {
+                let getter = #selector(getter: UIAccessibilityIdentification.accessibilityIdentifier)
+                return element.responds(to: getter) ? element.perform(getter)?.takeUnretainedValue() as? String : nil
+            }
+            func find(_ element: NSObject) -> NSObject? {
+                if identifier(element) == id { return element }
+                var children = (element.accessibilityElements as? [NSObject]) ?? []
+                let count = element.accessibilityElementCount()
+                if children.isEmpty, count != NSNotFound, count > 0 {
+                    children = (0..<count).compactMap { element.accessibilityElement(at: $0) as? NSObject }
+                }
+                children += (element as? UIView)?.subviews ?? []
+                for child in children { if let found = find(child) { return found } }
+                return nil
+            }
+            _ = find(window)?.accessibilityActivate()
             return true
         default: return false
         }

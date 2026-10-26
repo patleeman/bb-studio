@@ -1,27 +1,122 @@
 import SwiftUI
 import UIKit
 
+/// How much of a two-page window the list takes: about 300 points, half the
+/// window (its edge on the crease), or none, so the detail fills the window
+/// beside the rail.
+enum DuoPane: String, CaseIterable {
+    case hidden, narrow, even
+}
+
+/// The list pane's width, remembered on this device. A drag sets `dragWidth`
+/// until it ends and snaps to a `DuoPane`.
+@MainActor @Observable
+final class DuoPaneState {
+    static let shared = DuoPaneState()
+    static let key = "duoListPane"
+    static let lastKey = "duoListPaneShown"
+
+    var pane: DuoPane {
+        didSet {
+            UserDefaults.standard.set(pane.rawValue, forKey: Self.key)
+            if pane != .hidden {
+                lastShown = pane
+                UserDefaults.standard.set(pane.rawValue, forKey: Self.lastKey)
+            }
+        }
+    }
+    /// The width under the finger, while the divider or edge is dragged.
+    var dragWidth: CGFloat?
+    private var lastShown: DuoPane
+
+    private init() {
+        let defaults = UserDefaults.standard
+        pane = defaults.string(forKey: Self.key).flatMap(DuoPane.init) ?? .even
+        lastShown = defaults.string(forKey: Self.lastKey).flatMap(DuoPane.init).flatMap { $0 == .hidden ? nil : $0 } ?? .even
+    }
+
+    /// The header button: hide the list, or bring back the width it had.
+    func toggle() {
+        withAnimation(.snappy) { pane = pane == .hidden ? lastShown : .hidden }
+    }
+
+    func set(_ next: DuoPane) {
+        withAnimation(.snappy) {
+            dragWidth = nil
+            pane = next
+        }
+    }
+
+    /// Ends a drag at the snap point nearest where it was flung.
+    func settle(at width: CGFloat, layout: DuoLayout) {
+        set(layout.snap(width))
+    }
+}
+
 /// Window geometry, independent of device model, size class and keyboard height.
 struct DuoLayout: Equatable {
     static let gutter: CGFloat = 32
+    static let narrowList: CGFloat = 300
     let windowSize: CGSize
+    let leadingInset: CGFloat
     let twoPages: Bool
     let railWidth: CGFloat
+    /// The list's width at each snap point; `listWidth` is the current one.
+    let evenWidth: CGFloat
+    let narrowWidth: CGFloat
     let listWidth: CGFloat
+    let pane: DuoPane
+    /// The divider or the detail's edge is being dragged.
+    let dragging: Bool
     let sidebarWindowInset: CGFloat
     /// The Duo's status bar: a column on the trailing edge, with no leading
     /// inset to match (a landscape iPhone's insets are on both sides).
     let statusColumn: CGFloat
 
-    init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0) {
+    init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0, pane: DuoPane = .even, dragWidth: CGFloat? = nil) {
         windowSize = size
+        self.leadingInset = leadingInset
         twoPages = size.width >= 900 && size.width > size.height
         railWidth = twoPages ? 64 : 0
         sidebarWindowInset = twoPages ? trailingInset : 0
         statusColumn = twoPages && leadingInset == 0 ? trailingInset : 0
         // Half the gutter on either side of the window midpoint, even with
-        // asymmetric safe areas. No control occupies the crease.
-        listWidth = twoPages ? max(0, size.width / 2 - leadingInset - 64 - Self.gutter / 2) : 0
+        // asymmetric safe areas, so the divider sits on the crease.
+        evenWidth = twoPages ? max(0, size.width / 2 - leadingInset - 64 - Self.gutter / 2) : 0
+        narrowWidth = min(Self.narrowList, evenWidth)
+        self.pane = pane
+        dragging = twoPages && dragWidth != nil
+        let width: CGFloat = switch pane {
+        case .hidden: 0
+        case .narrow: narrowWidth
+        case .even: evenWidth
+        }
+        // A little give past the even width, so the drag doesn't stop dead.
+        let limit = evenWidth + 24
+        listWidth = twoPages ? (dragWidth.map { min(max(0, $0), limit) } ?? width) : 0
+    }
+
+    /// The list is on screen, at some width.
+    var showsList: Bool { listWidth > 0 }
+    /// The detail page, from the divider (or the rail) to the window's edge.
+    /// The status column is part of it; only a leading inset is not.
+    var detailWidth: CGFloat { twoPages ? max(0, windowSize.width - leadingInset - railWidth - listWidth - gutterWidth) : windowSize.width }
+
+    /// The divider between the list and the detail; none with the list hidden.
+    /// It stays while dragged, so a drag to zero still ends on it.
+    var gutterWidth: CGFloat { twoPages && (showsList || dragging) ? Self.gutter : 0 }
+
+    func width(of pane: DuoPane) -> CGFloat {
+        switch pane {
+        case .hidden: 0
+        case .narrow: narrowWidth
+        case .even: evenWidth
+        }
+    }
+
+    /// The snap point nearest a list width.
+    func snap(_ width: CGFloat) -> DuoPane {
+        DuoPane.allCases.min { abs(self.width(of: $0) - width) < abs(self.width(of: $1) - width) } ?? .even
     }
 }
 
@@ -128,6 +223,8 @@ struct DuoHeader<Title: View, Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            // The detail's header hides and shows the list beside it.
+            if !sidebar { DuoPaneToggle() }
             // The title takes the room the actions leave and truncates there.
             // Never fixedSize: an inset this wide widens the whole page under it.
             title.lineLimit(1).layoutPriority(1)
@@ -143,6 +240,23 @@ struct DuoHeader<Title: View, Actions: View>: View {
             } else {
                 RegularSurfaceBackground(name: "header", style: AnyShapeStyle(.bar), bottom: false, rightPage: true)
             }
+        }
+    }
+}
+
+/// Hides the list so the detail fills the window beside the rail, and brings
+/// it back at the width it had.
+struct DuoPaneToggle: View {
+    @Environment(\.duoLayout) private var layout
+    @Environment(DuoPaneState.self) private var pane: DuoPaneState?
+
+    var body: some View {
+        if layout.twoPages, let pane {
+            Button { pane.toggle() } label: {
+                Image(systemName: "sidebar.left").frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel(layout.showsList ? "Hide list" : "Show list")
+            .accessibilityIdentifier("duoPaneToggle")
         }
     }
 }
@@ -253,13 +367,32 @@ struct SidebarRowContent: ViewModifier {
     }
 }
 
-/// Scroll views may draw and lay out content under the system status column.
-/// Their surrounding safe-area insets still position fixed chrome and preserve
-/// the native bottom content inset for the home indicator and composer.
+/// Scroll views draw under the system status column, but keep their content
+/// clear of it: the Duo's clock, battery and Now Playing float there, over
+/// whatever scrolls under them. Their surrounding safe-area insets still
+/// position fixed chrome and preserve the native bottom content inset for the
+/// home indicator and composer.
+///
+/// Content held to `readableWidth` and centred only moves as far as it must:
+/// on a wide page, the room beside it already clears part of the column.
 struct RegularScrollingSurface: ViewModifier {
+    var readableWidth: CGFloat? = nil
     @Environment(\.duoLayout) private var layout
+
     func body(content: Content) -> some View {
-        content.ignoresSafeArea(.container, edges: layout.twoPages ? .trailing : [])
+        // The page's width comes from the layout, not a measurement: a
+        // measured width fed back into the inset never settled.
+        content
+            .safeAreaPadding(.trailing, Self.inset(column: layout.statusColumn, width: layout.detailWidth, readableWidth: readableWidth))
+            .ignoresSafeArea(.container, edges: layout.twoPages ? .trailing : [])
+    }
+
+    /// Centred content `readableWidth` wide leaves (width - readableWidth) / 2
+    /// on each side; it needs only the rest of the column as an inset.
+    static func inset(column: CGFloat, width: CGFloat, readableWidth: CGFloat?) -> CGFloat {
+        guard column > 0 else { return 0 }
+        guard let readableWidth, width > readableWidth else { return column }
+        return max(0, column - (width - readableWidth) / 2)
     }
 }
 
@@ -275,7 +408,8 @@ struct RegularSurfaceBackground: View {
     var body: some View {
         GeometryReader { geometry in
             let origin = geometry.frame(in: .global).origin
-            let extendsRight = fullWidth || (rightPage && origin.x >= layout.windowSize.width / 2)
+            // The detail page runs to the window's edge at any list width.
+            let extendsRight = fullWidth || rightPage
             Rectangle().fill(style)
                 .frame(width: extendsRight ? max(0, layout.windowSize.width - origin.x) : geometry.size.width,
                        height: bottom ? max(0, layout.windowSize.height - origin.y) : geometry.size.height,
@@ -304,13 +438,18 @@ private struct RegularSurfaceProbe: ViewModifier {
 /// A sidebar column on the left page. UIKit already extends its list through
 /// the home-indicator area and insets the last row; only the horizontal edges
 /// are clipped, so rows keep drawing to the window's bottom edge.
+///
+/// Narrower than its narrow snap point, while dragged shut, the list keeps
+/// that width and slides out under the rail rather than squeezing its rows.
 struct SidebarColumn: ViewModifier {
     @Environment(\.duoLayout) private var layout
     func body(content: Content) -> some View {
         content
             .ignoresSafeArea(.container, edges: .trailing)
-            .frame(width: layout.listWidth)
+            .frame(width: max(layout.listWidth, layout.narrowWidth))
+            .frame(width: layout.listWidth, alignment: .trailing)
             .clipShape(HorizontalClip())
+            .allowsHitTesting(layout.showsList)
     }
 }
 
@@ -320,23 +459,91 @@ private struct HorizontalClip: Shape {
     }
 }
 
-/// The crease between the pages: sidebar-coloured, with a hairline that runs
-/// the full window height rather than stopping at the home indicator.
+/// The divider between the list and the detail: sidebar-coloured, with a
+/// hairline that runs the full window height rather than stopping at the home
+/// indicator. At the even width it sits on the crease. Its grab handle drags
+/// the list between its snap points (narrow, even and hidden) through a
+/// 44-point hit area.
 struct CreaseGutter: View {
     @Environment(\.duoLayout) private var layout
+    @Environment(DuoPaneState.self) private var pane: DuoPaneState?
+    @State private var start: CGFloat?
+
     var body: some View {
         Color.clear
-            .frame(width: layout.twoPages ? DuoLayout.gutter : 0)
+            .frame(width: layout.gutterWidth)
             .background {
-                if layout.twoPages {
+                if layout.gutterWidth > 0 {
                     RegularSurfaceBackground(name: "crease", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)))
                 }
             }
             .overlay {
-                if layout.twoPages {
+                if layout.gutterWidth > 0 {
                     RegularSurfaceBackground(name: "creaseLine", style: AnyShapeStyle(Color(uiColor: .separator))).frame(width: 1)
                 }
             }
-            .accessibilityHidden(true)
+            .overlay {
+                if layout.gutterWidth > 0, let pane {
+                    handle(pane)
+                }
+            }
+            // Its hit area reaches past the gutter, over the detail's edge.
+            .zIndex(1)
+    }
+
+    private func handle(_ pane: DuoPaneState) -> some View {
+        Capsule()
+            .fill(Color(uiColor: .tertiaryLabel))
+            .frame(width: 5, height: 44)
+            .frame(width: 44)
+            .frame(maxHeight: .infinity)
+            .contentShape(.rect)
+            .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global)
+                .onChanged { drag in
+                    let origin = start ?? layout.listWidth
+                    start = origin
+                    pane.dragWidth = origin + drag.translation.width
+                }
+                .onEnded { drag in
+                    let origin = start ?? layout.listWidth
+                    start = nil
+                    pane.settle(at: origin + drag.predictedEndTranslation.width, layout: layout)
+                })
+            .accessibilityElement()
+            .accessibilityLabel("List width")
+            .accessibilityValue(layout.pane == .narrow ? "Narrow" : "Half")
+            .accessibilityHint("Drag to resize the list")
+            .accessibilityIdentifier("duoPaneDivider")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: pane.set(.even)
+                case .decrement: pane.set(layout.pane == .even ? .narrow : .hidden)
+                @unknown default: break
+                }
+            }
+    }
+}
+
+/// With the list hidden, a swipe in from the detail's leading edge pulls it
+/// back, following the finger and snapping where it's let go.
+struct DuoPaneEdge: View {
+    @Environment(\.duoLayout) private var layout
+    @Environment(DuoPaneState.self) private var pane: DuoPaneState?
+
+    var body: some View {
+        if layout.twoPages, !layout.showsList || layout.dragging, let pane {
+            Color.clear
+                .frame(width: 20)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+                .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                    .onChanged { pane.dragWidth = $0.translation.width }
+                    .onEnded { drag in
+                        // A swipe shows the list; a short drag, let go, doesn't.
+                        let width = drag.translation.width
+                        pane.settle(at: width > layout.narrowWidth / 2 ? max(width, layout.narrowWidth) : 0, layout: layout)
+                    })
+                .accessibilityHidden(true)
+        }
     }
 }
