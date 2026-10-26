@@ -104,9 +104,21 @@ final class DuoSplitComposerUITests: XCTestCase {
         let lastRow = try XCTUnwrap(rows.max { $0.maxY < $1.maxY }, "\(name): a visible transcript row")
         XCTAssertFalse(lastRow.intersects(jump.frame), "\(name): jump button covers the last row's text \(lastRow)")
         assertClearOfStatusBar(name + " in history", layout)
-        command("capture?split-composer-" + name)
+        command("capture?split-composer-" + name + "-history")
+
+        // At the end the button goes, and the last row is whole above the composer.
         command("bottom")
         XCTAssertTrue(message.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(jump.exists, "\(name): no jump button at the end")
+        let top = composer.frame.minY
+        let endRows = app.staticTexts.allElementsBoundByIndex.map(\.frame).filter {
+            $0.width > 0 && $0.height > 0 && $0.minX >= pageMinX - 1 && $0.minY < 669 && !composer.frame.contains($0)
+        }
+        let last = try XCTUnwrap(endRows.filter { $0.minY < top }.max { $0.maxY < $1.maxY }, "\(name): a row above the composer")
+        print("SPLIT END \(name) last=\(last) composer=\(composer.frame)")
+        XCTAssertLessThanOrEqual(last.maxY, top + 1, "\(name): the last row is whole above the composer at the end")
+        command("capture?split-composer-" + name + "-end")
     }
 
     /// Text of the right page's transcript: not the header, composer or sidebar.
