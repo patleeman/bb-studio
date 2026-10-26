@@ -49,6 +49,8 @@ struct ThreadView: View {
     /// Rebuilds the timeline so it opens at the bottom of the server's rows.
     @State private var timelineKey = 0
     @State private var scrollPhase = ScrollPhase.idle
+    /// Ends `keepAtEnd`'s hold once an animated scroll has stopped moving.
+    @State private var animationWatch: Task<Void, Never>?
     @State private var selecting: SelectionText?
     @State private var selectedExcerpt = ""
     @State private var reactionSettings = ReactionSettings.defaults
@@ -692,12 +694,15 @@ struct ThreadView: View {
             if next.bottomInset != end.geometry.bottomInset, end.geometry.nearEnd, !end.readerScrolling {
                 end.following = true
             }
+            if next.point != end.geometry.point { end.moved = .now }
             end.geometry = next
             if pastEnd != next.distance { pastEnd = next.distance }
             keepAtEnd()
         }
         .onScrollPhaseChange { _, phase in
             scrollPhase = phase
+            end.animationOver = false
+            if phase == .animating { watchAnimation() }
             if phase == .tracking || phase == .interacting {
                 resizeRestore?.cancel()
                 resizeAnchor.cancel()
@@ -890,7 +895,7 @@ struct ThreadView: View {
     /// keyboard up, where only 168 pt of chat shows: a black screen) on
     /// every streamed update.
     private func keepAtEnd() {
-        guard scrollPhase == .idle, !resizeAnchor.restoring else {
+        guard scrollPhase == .idle || end.animationOver, !resizeAnchor.restoring else {
             if pastEnd > 0.5 || end.following { ScrollLog.request("keepAtEnd held phase=\(scrollPhase) restoring=\(resizeAnchor.restoring) past=\(pastEnd)") }
             return
         }
@@ -900,6 +905,33 @@ struct ThreadView: View {
         ScrollLog.request("keepAtEnd following=\(end.following) from \(end.geometry.point) to \(target)")
         position.scrollTo(y: target)
     }
+
+    /// SwiftUI's animated scroll can end without the phase going back to idle.
+    /// Aimed at the end of a new row's estimated height, its target is gone
+    /// once the row measures shorter: the offset snaps back to where it
+    /// started and the phase stays "animating". `keepAtEnd` then held for
+    /// good, the newest row under the composer, and under the keyboard once
+    /// it came back. So while the phase says animating, an offset that hasn't
+    /// moved for `animationStill` is an animation that is over, and the end
+    /// is `keepAtEnd`'s again. A phase change starts over.
+    private func watchAnimation() {
+        animationWatch?.cancel()
+        animationWatch = Task { @MainActor in
+            while !Task.isCancelled, scrollPhase == .animating, !end.animationOver {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled, scrollPhase == .animating else { return }
+                let still = Date.now.timeIntervalSince(end.moved)
+                if still >= Self.animationStill {
+                    end.animationOver = true
+                    ScrollLog.request(String(format: "animation over: still %.2fs, phase=animating", still))
+                    keepAtEnd()
+                }
+            }
+        }
+    }
+
+    /// An animated scroll moves every frame; this long without, it's over.
+    private static let animationStill: TimeInterval = 0.3
 
     /// Takes the reader to a row (unread, a find match, where they were):
     /// not following the end, or the next change would carry them off it.
@@ -921,6 +953,12 @@ struct ThreadView: View {
         if end.markerVisible || atBottom {
             if animated {
                 withAnimation(.snappy) { position.scrollTo(y: end.geometry.lastPoint) }
+                // Still "animating" from one that never reported its end, the
+                // phase won't change for this one: watch it from here.
+                if scrollPhase == .animating {
+                    end.animationOver = false
+                    watchAnimation()
+                }
             } else {
                 position.scrollTo(y: end.geometry.lastPoint)
             }
@@ -1520,6 +1558,11 @@ private final class TranscriptEnd {
     var following = true
     /// The reader's finger is on the transcript, or its fling is still going.
     var readerScrolling = false
+    /// When the offset last moved.
+    var moved = Date.distantPast
+    /// The phase still says "animating", but the offset has stopped
+    /// (`watchAnimation`): `keepAtEnd` no longer holds for it.
+    var animationOver = false
 }
 
 extension ScrollGeometry {
