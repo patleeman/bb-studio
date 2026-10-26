@@ -384,13 +384,11 @@ struct ThreadView: View {
         .safeAreaInset(edge: .bottom) { composer }
         // Beside two pages the transcript, jump button and composer all run
         // under the status column, so they share the page's width and centre;
-        // the header still keeps its actions inside the safe area. The Duo's
-        // inner screen also reports a 34-point home indicator inset, which held
-        // the composer 42 points up while the list beside it runs to the edge:
-        // it sits 8 points above the edge, as a phone's sits above its
-        // indicator. An iPad keeps its composer above the indicator.
-        .ignoresSafeArea(.container, edges: duoLayout.twoPages
-            ? UIDevice.current.userInterfaceIdiom == .phone ? [.trailing, .bottom] : .trailing : [])
+        // the header still keeps its actions inside the safe area. On the
+        // Duo's inner screen, in our two pages or beside another app, they
+        // also run under its 34-point home indicator inset: the composer sits
+        // 8 points above the edge, as a phone's sits above its indicator.
+        .ignoresSafeArea(.container, edges: duoLayout.chatIgnoredEdges)
         .environment(\.threadId, model.threadId)
         .environment(\.openURL, OpenURLAction { url in
             // Agents link Studio items by their BB web path, which reads like a file path.

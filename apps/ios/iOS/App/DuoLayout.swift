@@ -76,9 +76,16 @@ struct DuoLayout: Equatable {
     /// The Duo's status bar: a column on the trailing edge, with no leading
     /// inset to match (a landscape iPhone's insets are on both sides).
     let statusColumn: CGFloat
+    /// The window is on the Duo's inner screen: in our two pages, or beside
+    /// another app in iOS's own split, where it is one page wide. That screen
+    /// draws no home indicator, though iOS still reports a 34-point bottom
+    /// inset for one. Other apps and our list run to its bottom edge.
+    let innerScreen: Bool
 
-    init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0, pane: DuoPane = .even, dragWidth: CGFloat? = nil) {
+    init(size: CGSize, leadingInset: CGFloat = 0, trailingInset: CGFloat = 0, pane: DuoPane = .even, dragWidth: CGFloat? = nil,
+         innerScreen: Bool = false) {
         windowSize = size
+        self.innerScreen = innerScreen
         self.leadingInset = leadingInset
         twoPages = size.width >= 900 && size.width > size.height
         railWidth = twoPages ? 64 : 0
@@ -98,6 +105,24 @@ struct DuoLayout: Equatable {
         let limit = evenWidth + 24
         dragTarget = twoPages ? dragWidth.map { min(max(0, $0), limit) } : nil
         listWidth = twoPages ? width : 0
+    }
+
+    /// The Duo's inner screen, landscape, from the screen rather than the
+    /// window: our window there may be a page wide, beside another app. No
+    /// iPhone screen is this tall in landscape, and an iPad is not a phone.
+    static func isInnerScreen(_ screen: CGSize, phone: Bool) -> Bool {
+        phone && screen.width >= 900 && screen.height >= 600 && screen.width > screen.height
+    }
+
+    /// The safe-area edges a chat's transcript, jump button and composer run
+    /// under. This is the one place that sets how far the composer sits above
+    /// the window's bottom edge: its own 8-point padding above the bottom
+    /// inset, or above the edge itself where that inset is a home indicator
+    /// the screen doesn't draw. The keyboard's safe area always applies.
+    var chatIgnoredEdges: Edge.Set {
+        var edges: Edge.Set = twoPages ? .trailing : []
+        if innerScreen { edges.insert(.bottom) }
+        return edges
     }
 
     /// The list is on screen, at some width.
@@ -167,18 +192,19 @@ struct DuoTabRail: View {
 /// Observes the window rather than the keyboard-reduced SwiftUI proposal. It
 /// does not alter safe areas, keyboard avoidance or the transcript hierarchy.
 struct WindowGeometry: UIViewRepresentable {
-    var changed: (CGSize, CGFloat, CGFloat) -> Void
+    var changed: (CGSize, CGFloat, CGFloat, Bool) -> Void
 
     func makeUIView(context: Context) -> Probe { Probe(changed: changed) }
     func updateUIView(_ view: Probe, context: Context) { view.changed = changed }
 
     final class Probe: UIView {
-        var changed: (CGSize, CGFloat, CGFloat) -> Void
+        var changed: (CGSize, CGFloat, CGFloat, Bool) -> Void
         private var lastSize = CGSize.zero
         private var lastLeading: CGFloat = -1
         private var lastTrailing: CGFloat = -1
+        private var lastInnerScreen: Bool?
 
-        init(changed: @escaping (CGSize, CGFloat, CGFloat) -> Void) {
+        init(changed: @escaping (CGSize, CGFloat, CGFloat, Bool) -> Void) {
             self.changed = changed
             super.init(frame: .zero)
             isUserInteractionEnabled = false
@@ -201,11 +227,19 @@ struct WindowGeometry: UIViewRepresentable {
             let size = window.bounds.size
             let leading = window.safeAreaInsets.left
             let trailing = window.safeAreaInsets.right
+            var screen = window.windowScene?.screen.bounds.size ?? .zero
+            #if DEBUG
+            // The simulator's screen is the outer one; a resized window stands for the inner one.
+            if let size = DuoDemo.screenSize { screen = size }
+            #endif
+            let innerScreen = DuoLayout.isInnerScreen(screen, phone: traitCollection.userInterfaceIdiom == .phone)
             // Half a point or more, so rounding in a layout pass can't
             // report a new window, which lays out the whole app again.
             guard abs(size.width - lastSize.width) >= 0.5 || abs(size.height - lastSize.height) >= 0.5
-                || abs(leading - lastLeading) >= 0.5 || abs(trailing - lastTrailing) >= 0.5 else { return }
+                || abs(leading - lastLeading) >= 0.5 || abs(trailing - lastTrailing) >= 0.5
+                || innerScreen != lastInnerScreen else { return }
             lastSize = size
+            lastInnerScreen = innerScreen
             lastLeading = leading
             lastTrailing = trailing
             // SwiftUI's environment alone does not change UIKit navigation
@@ -216,7 +250,7 @@ struct WindowGeometry: UIViewRepresentable {
             #if DEBUG
             RenderCount.bump("write.window")
             #endif
-            DispatchQueue.main.async { [weak self] in self?.changed(size, leading, trailing) }
+            DispatchQueue.main.async { [weak self] in self?.changed(size, leading, trailing, innerScreen) }
         }
     }
 }

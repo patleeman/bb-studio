@@ -8,13 +8,33 @@ enum DuoDemo {
     nonisolated static var phone: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoPhone") }
 
     static var surfaces: [String: CGRect] = [:]
+    /// The screen the resized window stands for. The simulator's screen is
+    /// the outer one (466 × 678); nil keeps it.
+    static var screenSize: CGSize?
+    /// The keyboard's top edge in the window, from its last frame change.
+    private static var keyboardTop: CGFloat?
+    private static var keyboardObserver: NSObjectProtocol?
     private static var recorder: Timer?
     private static var configured: Set<ObjectIdentifier> = []
 
     static func configure(_ window: UIWindow) {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-qaDark") { window.overrideUserInterfaceStyle = .dark }
+        if keyboardObserver == nil {
+            keyboardObserver = NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification,
+                                                                      object: nil, queue: .main) { note in
+                guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+                MainActor.assumeIsolated {
+                    guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                        .flatMap(\.windows).first(where: \.isKeyWindow) else { return }
+                    // Off the bottom of the screen: the keyboard is down.
+                    keyboardTop = frame.minY >= window.screen.bounds.maxY - 1 ? nil
+                        : window.convert(frame, from: window.screen.coordinateSpace).minY
+                }
+            }
+        }
         guard args.contains("-qaDuoColdWide"), configured.insert(ObjectIdentifier(window)).inserted else { return }
+        screenSize = CGSize(width: 951, height: 669)
         window.frame = CGRect(x: 0, y: 0, width: 951, height: 669)
     }
 
@@ -35,6 +55,7 @@ enum DuoDemo {
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
+                "keyboardTop": keyboardTop ?? window.bounds.height,
                 "scrolls": scrolls(window),
                 "surfaces": surfaces.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }]
     }
@@ -57,14 +78,26 @@ enum DuoDemo {
         let size: CGSize
         var origin = CGPoint.zero
         switch url.lastPathComponent {
-        case "outer": size = CGSize(width: 466, height: 678)
+        case "outer":
+            size = CGSize(width: 466, height: 678)
+            screenSize = nil
         // The inner screen's two pages, shifted left so the right page is on
         // the simulator's screen (as wide as the outer one) and can be tapped.
         case "split-right":
             size = CGSize(width: 951, height: 669)
             origin.x = -476
-        case "portrait": size = CGSize(width: 669, height: 951)
-        case "landscape": size = CGSize(width: 951, height: 669)
+            screenSize = CGSize(width: 951, height: 669)
+        // Beside another app in iOS's own split of the inner screen: the
+        // right half of it, kept on the simulator's screen so it can be tapped.
+        case "split":
+            size = CGSize(width: 468, height: 669)
+            screenSize = CGSize(width: 951, height: 669)
+        case "portrait":
+            size = CGSize(width: 669, height: 951)
+            screenSize = size
+        case "landscape":
+            size = CGSize(width: 951, height: 669)
+            screenSize = size
         case "tab":
             switch url.query() {
             case "bot": AppModel.shared.tab = .bot

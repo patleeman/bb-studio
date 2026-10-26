@@ -75,6 +75,92 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         command("capture?split-composer-narrow-\(Int(layout.width))")
     }
 
+    /// The gap under the composer in every layout of the Duo, with the
+    /// keyboard down and up: 8 points from the window's bottom edge on the
+    /// inner screen (our two pages at each list width, or beside another app
+    /// in iOS's split), above the home indicator on the outer screen, and
+    /// 8 points above the keyboard everywhere.
+    func testComposerGapInEveryLayout() throws {
+        app.launchArguments = ["-skipPushPrompt", "YES",
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDark",
+            "-openURL", "bbstudio://bot"]
+        app.launchOffline()
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
+            .waitForExistence(timeout: 15))
+        let layouts: [(name: String, commands: [String], innerScreen: Bool)] = [
+            ("inner-hidden", ["landscape", "pane?hidden"], true),
+            ("inner-narrow", ["landscape", "pane?narrow"], true),
+            ("inner-even", ["landscape", "pane?even"], true),
+            ("inner-split", ["split"], true),
+            ("outer", ["outer"], false),
+        ]
+        for chat in ["bot-chat", "thread"] {
+            if chat == "thread" { try openThread() }
+            for layout in layouts {
+                layout.commands.forEach(command)
+                try measureGap("\(chat) \(layout.name)", capture: "composer-gap-\(chat)-\(layout.name)",
+                               innerScreen: layout.innerScreen)
+            }
+        }
+        command("landscape")
+        command("pane?even")
+    }
+
+    /// One page on a phone: above the home indicator (or the tab bar), and
+    /// 8 points above the keyboard. Run on an owned iPhone 18 Pro.
+    func testComposerGapOnAPhone() throws {
+        app.launchArguments = ["-skipPushPrompt", "YES",
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoWideTitles", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launchOffline()
+        XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
+            .waitForExistence(timeout: 15))
+        try measureGap("bot-chat phone", capture: "composer-gap-bot-chat-phone", innerScreen: false)
+        try openThread()
+        try measureGap("thread phone", capture: "composer-gap-thread-phone", innerScreen: false)
+    }
+
+    private func openThread() throws {
+        command("tab?threads")
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
+        conversation.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Duo message 80")).firstMatch
+            .waitForExistence(timeout: 15))
+    }
+
+    private func measureGap(_ name: String, capture: String, innerScreen: Bool) throws {
+        let composer = app.otherElements["threadComposer"].firstMatch
+        command("dismiss")
+        command("bottom")
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "\(name): composer")
+        var layout = try geometry()
+        let edge = layout.height - composer.frame.maxY
+        let aboveIndicator = edge - layout.safeBottom
+        print("COMPOSER GAP \(name) keyboard=down window=\(layout.width)x\(layout.height) safeBottom=\(layout.safeBottom) composer=\(composer.frame) edge=\(edge) aboveIndicator=\(aboveIndicator)")
+        if innerScreen {
+            XCTAssertEqual(edge, composerGap, accuracy: 1, "\(name): 8 points from the inner screen's bottom edge")
+        } else {
+            // Above the home indicator, or the tab bar where it shows.
+            XCTAssertGreaterThanOrEqual(aboveIndicator, composerGap - 1, "\(name): clear of the home indicator")
+        }
+        command("capture?\(capture)-down")
+
+        command("focus?thr_botdemo01")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "\(name): keyboard up")
+        Thread.sleep(forTimeInterval: 2)
+        layout = try geometry()
+        let aboveKeyboard = layout.keyboardTop - composer.frame.maxY
+        print("COMPOSER GAP \(name) keyboard=up keyboardTop=\(layout.keyboardTop) xcuiKeyboard=\(app.keyboards.firstMatch.frame) composer=\(composer.frame) aboveKeyboard=\(aboveKeyboard)")
+        XCTAssertLessThan(layout.keyboardTop, layout.height, "\(name): the keyboard's frame is known")
+        XCTAssertEqual(aboveKeyboard, composerGap, accuracy: 1, "\(name): 8 points above the keyboard")
+        command("capture?\(capture)-up")
+        command("dismiss")
+        Thread.sleep(forTimeInterval: 1)
+    }
+
     private func check(_ name: String, last: String) throws {
         let message = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", last)).firstMatch
         XCTAssertTrue(message.waitForExistence(timeout: 15), "\(name): transcript loads")
@@ -166,6 +252,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let height: CGFloat
         let safeRight: CGFloat
         let safeBottom: CGFloat
+        let keyboardTop: CGFloat
         let surfaces: [String: Rect]
         let scrolls: [Scroll]
     }

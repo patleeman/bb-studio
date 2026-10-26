@@ -18,6 +18,28 @@ final class DuoLayoutTests: XCTestCase {
         }
     }
 
+    /// The inner screen comes from the screen, not the window: beside another
+    /// app in iOS's split our window is a page wide.
+    func testInnerScreenAndTheEdgesAChatRunsUnder() {
+        for (screen, phone, inner) in [
+            (CGSize(width: 951, height: 669), true, true),     // Duo inner screen
+            (CGSize(width: 669, height: 951), true, false),    // inner screen, portrait
+            (CGSize(width: 466, height: 678), true, false),    // Duo outer screen
+            (CGSize(width: 402, height: 874), true, false),    // iPhone 18 Pro
+            (CGSize(width: 956, height: 440), true, false),    // iPhone Pro Max, landscape
+            (CGSize(width: 1366, height: 1024), false, false), // iPad, landscape
+        ] {
+            XCTAssertEqual(DuoLayout.isInnerScreen(screen, phone: phone), inner, "\(screen) phone \(phone)")
+        }
+        let wide = CGSize(width: 951, height: 669)
+        XCTAssertEqual(DuoLayout(size: wide, innerScreen: true).chatIgnoredEdges, [.trailing, .bottom])
+        // Beside another app on the inner screen: one page, still to the bottom edge.
+        XCTAssertEqual(DuoLayout(size: CGSize(width: 468, height: 669), innerScreen: true).chatIgnoredEdges, .bottom)
+        XCTAssertEqual(DuoLayout(size: CGSize(width: 466, height: 678)).chatIgnoredEdges, [])
+        // An iPad's two pages keep their composer above the home indicator.
+        XCTAssertEqual(DuoLayout(size: CGSize(width: 1366, height: 1024)).chatIgnoredEdges, .trailing)
+    }
+
     func testGutterCentersOnWindowIncludingAsymmetricSafeArea() {
         for leading: CGFloat in [0, 24, 84] {
             let layout = DuoLayout(size: CGSize(width: 951, height: 669), leadingInset: leading)

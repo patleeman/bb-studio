@@ -6,6 +6,7 @@ struct RootView: View {
     @State private var windowSize = CGSize.zero
     @State private var windowLeadingInset: CGFloat = 0
     @State private var windowTrailingInset: CGFloat = 0
+    @State private var innerScreen = false
     @State private var pane = DuoPaneState.shared
 
     var body: some View {
@@ -13,7 +14,7 @@ struct RootView: View {
         let _ = RenderCount.bump("root.body")
         #endif
         let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
-                               pane: pane.pane, dragWidth: pane.dragWidth)
+                               pane: pane.pane, dragWidth: pane.dragWidth, innerScreen: innerScreen)
         HStack(spacing: 0) {
             DuoTabRail(selection: $model.tab)
                 .frame(width: layout.railWidth)
@@ -33,10 +34,11 @@ struct RootView: View {
         }
         .environment(\.duoLayout, layout)
         .environment(pane)
-        .background(WindowGeometry { size, leading, trailing in
+        .background(WindowGeometry { size, leading, trailing, inner in
             windowSize = size
             windowLeadingInset = leading
             windowTrailingInset = trailing
+            innerScreen = inner
         })
     }
 

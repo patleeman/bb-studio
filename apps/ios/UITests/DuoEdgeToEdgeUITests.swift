@@ -139,7 +139,10 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
             // The composer has the transcript's margins, under the status column too.
             XCTAssertLessThanOrEqual(box.frame.maxX, layout.width - 12 + 1)
             XCTAssertGreaterThanOrEqual(box.frame.maxX, layout.width - layout.safeRight - 17, "The composer reaches past the safe edge when there is a status column")
-            XCTAssertEqual(layout.height - layout.safeBottom - box.frame.maxY, 8, accuracy: 1)
+            // 8 points from the Duo inner screen's edge, which draws no home
+            // indicator; an iPad's stays 8 points above its indicator.
+            let inset = ProcessInfo.processInfo.environment["BBGO_QA_DEVICE"] == "ipad" ? layout.safeBottom : 0
+            XCTAssertEqual(layout.height - inset - box.frame.maxY, 8, accuracy: 1)
         }
     }
 
