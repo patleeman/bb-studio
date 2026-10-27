@@ -70,6 +70,29 @@ final class TranscriptListLayout: UICollectionViewLayout {
     /// For the harness's bounds: layout passes that rebuilt something.
     private(set) var prepares = 0
     private(set) var measures = 0
+    /// Rows whose height changed: each can cost a layout pass, so the
+    /// harness bounds passes by these rather than by a fixed number.
+    private(set) var resizes = 0
+
+    /// Several rows' new heights at once, in one invalidation (one layout
+    /// pass): returns how far the rows that start above `top` moved
+    /// everything below them.
+    func applyHeights(_ sizes: [(index: Int, height: CGFloat)], above top: CGFloat) -> (aboveTop: CGFloat, total: CGFloat) {
+        var aboveTop: CGFloat = 0, total: CGFloat = 0
+        for (index, height) in sizes.sorted(by: { $0.index > $1.index }) where frames.indices.contains(index) {
+            let delta = height - frames[index].height
+            guard delta != 0 else { continue }
+            resizes += 1
+            if frames[index].minY < top - 0.5 { aboveTop += delta }
+            total += delta
+            heights[ids[index]] = height
+            stale.remove(ids[index])
+            frames[index].size.height = height
+            for below in (index + 1)..<max(index + 1, frames.count) { frames[below].origin.y += delta }
+            contentHeight += delta
+        }
+        return (aboveTop, total)
+    }
 
     func index(of id: AnyHashable) -> Int? { indices[id] }
     func frame(of id: AnyHashable) -> CGRect? { indices[id].map { frames[$0] } }
@@ -199,6 +222,7 @@ final class TranscriptListLayout: UICollectionViewLayout {
             // Only this row and the ones below it move.
             let index = resized.index
             let delta = resized.height - frames[index].height
+            if delta != 0 { resizes += 1 }
             heights[ids[index]] = resized.height
             stale.remove(ids[index])
             frames[index].size.height = resized.height

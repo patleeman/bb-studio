@@ -122,6 +122,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         /// Frames of our own animated scrolls, apart from `layouts`.
         var animationLayouts = 0
     }
+
+    /// Rows whose height changed since the layout began (for the harness's bound).
+    var resizes: Int { layout.resizes }
     private(set) var counters = Counters()
 
     /// The harness raises a keyboard this tall without one (tests can't
@@ -331,7 +334,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             guard let indexPath = dataSource.indexPath(for: id),
                   let cell = collectionView.cellForItem(at: indexPath) as? TranscriptCell else { continue }
             configure(cell, id)
-            measure(cell, at: indexPath)
+            measure([cell])
         }
     }
 
@@ -575,10 +578,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// About ten rows, only when something laid out; nothing at rest.
     private func measureStaleCells() {
         guard collectionView.bounds.width > 0 else { return }
-        for cell in collectionView.visibleCells {
-            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell) else { continue }
-            measure(cell, at: indexPath)
-        }
+        measure(collectionView.visibleCells)
         // SwiftUI can apply a new configuration after this pass; look once
         // more on the next turn. Nothing changed, nothing is written.
         guard !remeasureScheduled else { return }
@@ -586,10 +586,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.remeasureScheduled = false
-            for cell in self.collectionView.visibleCells {
-                guard let cell = cell as? TranscriptCell, let indexPath = self.collectionView.indexPath(for: cell) else { continue }
-                self.measure(cell, at: indexPath)
-            }
+            self.measure(self.collectionView.visibleCells)
         }
     }
     private var remeasureScheduled = false
@@ -604,26 +601,30 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         return collectionView.convert(rect.offsetBy(dx: 0, dy: collectionView.contentOffset.y), to: window)
     }
 
-    /// One row measured now, its height changed through the layout's own
-    /// invalidation (with the anchor's adjustment) if it moved by more than 1 pt.
-    private func measure(_ cell: TranscriptCell, at indexPath: IndexPath) {
-        guard collectionView.bounds.width > 0, layout.ids.indices.contains(indexPath.item),
-              let original = layout.layoutAttributesForItem(at: indexPath) else { return }
-        let fitted = cell.preferredLayoutAttributesFitting(original)
-        guard abs(fitted.size.height - original.size.height) > 1,
-              layout.shouldInvalidateLayout(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original) else { return }
+    /// These rows measured now. Any that changed by more than 1 pt take
+    /// their new heights together, in one invalidation: one layout pass
+    /// however many rows changed. Reading (or under the reader's finger),
+    /// the view moves by what changed above the top, so nothing on screen
+    /// moves; following, the settle after the pass keeps the end.
+    private func measure(_ cells: [UICollectionViewCell]) {
+        guard collectionView.bounds.width > 0 else { return }
+        var sizes: [(index: Int, height: CGFloat)] = []
+        for cell in cells {
+            guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell),
+                  layout.ids.indices.contains(indexPath.item),
+                  let original = layout.layoutAttributesForItem(at: indexPath), original.size.width > 0 else { continue }
+            let fitted = cell.preferredLayoutAttributesFitting(original).size.height
+            if abs(fitted - original.size.height) > 1 { sizes.append((indexPath.item, fitted)) }
+        }
+        guard !sizes.isEmpty else { return }
         measuring = true
         defer { measuring = false }
-        let context = layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original)
-        let before = collectionView.contentOffset.y
-        layout.invalidateLayout(with: context)
-        // Invalidated from here rather than from UIKit's self-sizing pass,
-        // the context's offset adjustment isn't applied for us: a row above
-        // the reader measured 24 pt taller and everything they saw moved.
-        let adjustment = context.contentOffsetAdjustment.y
-        if adjustment != 0, abs(collectionView.contentOffset.y - before) < 0.25 {
+        let top = collectionView.contentOffset.y + collectionView.contentInset.top
+        let moved = layout.applyHeights(sizes, above: top)
+        layout.invalidateLayout(with: TranscriptListLayout.Context())
+        if !holdsEnd, moved.aboveTop != 0 {
             counters.offsetWrites += 1
-            collectionView.contentOffset.y = before + adjustment
+            collectionView.contentOffset.y += moved.aboveTop
         }
     }
 

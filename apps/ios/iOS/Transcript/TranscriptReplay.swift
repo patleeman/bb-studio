@@ -309,6 +309,7 @@ final class TranscriptReplay {
         let view = controller.collectionView!
         var anchorID = controller.anchor?.id
         var anchorY = anchorID.flatMap { controller.layout.frame(of: $0) }.map { $0.minY - view.contentOffset.y }
+        let resizesBefore = controller.resizes
         controller.resetCounters()
         scrolledAnchor = nil
         change()
@@ -372,11 +373,19 @@ final class TranscriptReplay {
         let gapError = Double((controller.view.bounds.maxY - controller.composerFrame.maxY) - expectedGap)
         if abs(gapError) > 1 { failures.append(String(format: "composer gap off by %.1f pt", gapError)) }
 
-        // Rows measure again after a pass (SwiftUI applies a configuration
-        // late), so a long streamed row takes a few rounds.
-        if work.layouts > 32 { failures.append("\(work.layouts) layout passes") }
-        // Our own animation writes once a frame for 0.3 s; anything else is a handful.
-        if work.offsetWrites > (work.animationLayouts > 0 ? 40 : 4) { failures.append("\(work.offsetWrites) offset writes") }
+        // Bounds in proportion to the rows that changed height in the step,
+        // because how many rounds those take depends on timing, not on the
+        // step: SwiftUI can apply a row's configuration a turn late, more so
+        // under load (the full suite ran 51 passes where a quiet run took
+        // 11). Each resized row may cost UIKit's sizing pass, the settle after
+        // it and the next turn's re-check (3 passes), and a settle or an
+        // adjustment (2 writes). A loop lays out without anything resizing,
+        // so it can't stay under these. Our own animated scroll writes once a
+        // frame for 0.3 s on top.
+        let resized = controller.resizes - resizesBefore
+        if work.layouts > 12 + 3 * resized { failures.append("\(work.layouts) layout passes for \(resized) resized rows") }
+        let writes = 4 + 2 * resized + (work.animationLayouts > 0 ? 40 : 0)
+        if work.offsetWrites > writes { failures.append("\(work.offsetWrites) offset writes for \(resized) resized rows") }
         // At rest nothing is written. UIKit or SwiftUI may still lay out once
         // or twice late with nothing to change: counted (`restLayouts`), and a
         // loop (more than 2) fails.
