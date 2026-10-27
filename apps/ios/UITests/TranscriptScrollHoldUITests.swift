@@ -86,6 +86,65 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
         finish()
     }
 
+    /// Patrick, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
+    /// keeps pulling the chat transcript to the end", and later a blank
+    /// screen, scrolled far past the end, with "Thinking..." in the header
+    /// and a running task above the composer. A busy turn (`busy`): a reply
+    /// growing every 80 ms, "Thinking" on and off, a task card that comes
+    /// and goes. At the end the view stays at the end and never past it; a
+    /// drag up holds where it lands, and nothing streams it back down.
+    func testDragWhileBusy() {
+        // `TEST_RUNNER_TRANSCRIPT_LAYOUT=outer`: the Duo's outer screen, Patrick's.
+        let outer = ProcessInfo.processInfo.environment["TRANSCRIPT_LAYOUT"] == "outer"
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaScrollLog", "-qaBotDemo", outer ? "duo" : "chat", "-qaDemoLatency", "50",
+                               "-qaDemoMessages", "300", "-qaDark", "-openURL", "bbstudio://bot"] + (outer ? ["-qaDuoPhone", "-qaDuoLong"] : [])
+        app.launchOffline()
+        XCTAssertTrue(composerField.waitForExistence(timeout: 30))
+        if outer { command("outer") }
+        Thread.sleep(forTimeInterval: 2)
+
+        // At the end through a busy turn: kept there, never past it.
+        command("busy?30")
+        let task = app.staticTexts["Find AI-native engineering companies"]
+        if !task.waitForExistence(timeout: 5) { failures.append("the running task never showed") }
+        for index in 0..<4 {
+            Thread.sleep(forTimeInterval: 0.7)
+            guard let now = transcript() else { failures.append("at the end \(index): no transcript"); continue }
+            steps.append(String(format: "at the end, busy %d: %.0f pt from the end", index, now.distanceToEnd))
+            if now.distanceToEnd < -1 { failures.append(String(format: "at the end, busy %d: %.0f pt past the end (blank)", index, -now.distanceToEnd)) }
+            if now.distanceToEnd > 40 { failures.append(String(format: "at the end, busy %d: left the end (%.0f pt from it)", index, now.distanceToEnd)) }
+        }
+
+        // A drag up while it streams, let go with momentum, then still.
+        transcriptPoint(y: 0.3).press(forDuration: 0.05, thenDragTo: transcriptPoint(y: 0.7), withVelocity: .default, thenHoldForDuration: 0.3)
+        transcriptPoint(y: 0.3).press(forDuration: 0.01, thenDragTo: transcriptPoint(y: 0.6), withVelocity: .fast, thenHoldForDuration: 0)
+        Thread.sleep(forTimeInterval: 3)
+        guard var last = transcript() else { failures.append("after the drag: no transcript"); return finish() }
+        steps.append(String(format: "after the drag: offset %.1f, %.0f pt from the end", last.contentOffsetY, last.distanceToEnd))
+        if last.distanceToEnd < 300 { failures.append(String(format: "after the drag: pulled back to the end (%.0f pt from it)", last.distanceToEnd)) }
+        // Held while the turn goes on and ends (the task card and "Thinking" go).
+        for index in 0..<8 {
+            Thread.sleep(forTimeInterval: 1)
+            guard let now = transcript() else { continue }
+            let moved = now.contentOffsetY - last.contentOffsetY
+            steps.append(String(format: "reading, busy %d: offset %.1f (moved %.1f), %.0f pt from the end", index, now.contentOffsetY, moved, now.distanceToEnd))
+            if abs(moved) > 1 { failures.append(String(format: "reading, busy %d: the transcript moved %.1f pt", index, moved)) }
+            if now.distanceToEnd < -1 { failures.append(String(format: "reading, busy %d: %.0f pt past the end (blank)", index, -now.distanceToEnd)) }
+            last = now
+        }
+        // Back to the end with the jump, through the rest of the turn and its end.
+        command("bottom")
+        for index in 0..<16 {
+            Thread.sleep(forTimeInterval: 1)
+            guard let now = transcript() else { continue }
+            steps.append(String(format: "back at the end %d: %.0f pt from the end", index, now.distanceToEnd))
+            if now.distanceToEnd < -1 { failures.append(String(format: "back at the end %d: %.0f pt past the end (blank)", index, -now.distanceToEnd)) }
+        }
+        if task.exists { failures.append("the running task stayed after the turn") }
+        if let now = transcript(), now.distanceToEnd > 40 { failures.append(String(format: "after the turn: not at the end (%.0f pt from it)", now.distanceToEnd)) }
+        finish()
+    }
+
     // MARK: - Harness
 
     /// Waits for the transcript to settle, then checks it didn't move.

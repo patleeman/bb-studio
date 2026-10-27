@@ -192,6 +192,9 @@ enum DuoDemo {
         case "stream":
             BotDemo.Server.shared.sendAndStream(url.query()?.removingPercentEncoding ?? "From another device")
             return true
+        case "busy":
+            BotDemo.Server.shared.busy(Double(url.query() ?? "") ?? 10)
+            return true
         case "ask":
             BotDemo.Server.shared.ask()
             return true

@@ -97,6 +97,9 @@ enum BotDemo {
         private var sends = 0
         /// Questions asked with `ask`, served as pending interactions.
         private var asked: [PendingInteraction] = []
+        /// A busy turn's shelf (`busy`): its thinking and running task.
+        private var thinking: String?
+        private var background: [BackgroundWork] = []
 
         /// `-qaDemoUnread <n>`: read up to the row `n` from the end, so the
         /// chat opens at the first unread reply after it.
@@ -158,10 +161,15 @@ enum BotDemo {
                 let start = max(0, end - Self.pageSize)
                 struct Cursor: Encodable { var anchorSeq: Int; var anchorId: String }
                 struct PageInfo: Encodable { var hasOlderRows: Bool; var olderCursor: Cursor? }
-                struct Page: Encodable { var rows: [TimelineRow]; var maxSeq: Int; var timelinePage: PageInfo }
+                struct Page: Encodable {
+                    var rows: [TimelineRow]; var maxSeq: Int; var timelinePage: PageInfo
+                    var activeThinking: Thinking?; var activeBackgroundCommands: [BackgroundWork]?
+                }
                 let slice = Array(rows[start..<end])
                 let info = PageInfo(hasOlderRows: start > 0, olderCursor: start > 0 ? Cursor(anchorSeq: start, anchorId: rows[start].id) : nil)
-                return (try? JSONEncoder().encode(Page(rows: slice, maxSeq: rows.count, timelinePage: info))) ?? Data()
+                let page = Page(rows: slice, maxSeq: rows.count, timelinePage: info,
+                                activeThinking: thinking.map { Thinking(text: $0) }, activeBackgroundCommands: background.isEmpty ? nil : background)
+                return (try? JSONEncoder().encode(page)) ?? Data()
             }
         }
 
@@ -235,6 +243,42 @@ enum BotDemo {
         }
 
         static let streamChunks = 8
+
+        /// QA: a busy turn for `seconds`, as Patrick's Chief of Staff was
+        /// (Oct 27): "Thinking" on and off, a running task above the composer
+        /// that comes and goes, and a reply growing every 80 ms. Then it all ends.
+        func busy(_ seconds: Double) {
+            let at = Date().timeIntervalSince1970 * 1000
+            let id = lock.withLock {
+                sends += 1
+                running = true
+                thinking = "Thinking"
+                return "busy\(sends)"
+            }
+            notify()
+            Task {
+                let paragraph = "Looking through the companies that build with agents first. "
+                let start = Date()
+                var tick = 0
+                while Date().timeIntervalSince(start) < seconds {
+                    tick += 1
+                    let elapsed = Date().timeIntervalSince(start)
+                    lock.withLock {
+                        // Thinking for a second of every three; the task runs from 1 s to 2 s before the end.
+                        thinking = Int(elapsed) % 3 == 0 ? "Thinking" : nil
+                        background = elapsed > 1 && elapsed < seconds - 2
+                            ? [BackgroundWork(id: "bg1", taskType: "local_bash", workflowName: nil,
+                                              description: "Find AI-native engineering companies", status: "running")] : []
+                        let row = BotDemo.row(id: id, role: "assistant", text: String(repeating: paragraph, count: 1 + tick / 4), at: at)
+                        if let index = rows.firstIndex(where: { $0.id == id }) { rows[index] = row } else { rows.append(row) }
+                    }
+                    notify()
+                    try? await Task.sleep(for: .milliseconds(80))
+                }
+                lock.withLock { running = false; thinking = nil; background = [] }
+                notify()
+            }
+        }
 
         /// QA: the Bot asks a question, as a pending interaction.
         func ask() {
