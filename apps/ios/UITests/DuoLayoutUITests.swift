@@ -2,7 +2,17 @@ import XCTest
 
 /// Run on an owned 13-inch iPad simulator, which fits each Duo-sized window.
 /// The debug URL resizes the existing UIWindow; it never relaunches the app.
+/// On a smaller screen (an iPhone, or the iPhone Duo simulator, whose screen
+/// is the outer one) the tests skip.
 final class DuoLayoutUITests: ServerIsolatedUITestCase {
+    /// The windows go up to the Duo's inner screen, 951 points one way.
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        let screen = XCUIScreen.main.screenshot().image.size
+        try XCTSkipIf(min(screen.width, screen.height) < 951,
+            "DuoLayoutUITests needs a screen at least 951 points each way, such as a 13-inch iPad's, to hold the Duo's inner-screen window; this one is \(Int(screen.width)) × \(Int(screen.height)).")
+    }
+
     func testThreadAndDraftSurviveThreeWindowSizes() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES",
