@@ -19,7 +19,7 @@ final class TranscriptHandle {
 
     /// Redraws these rows' cells now, without diffing the rest: for a row
     /// that changes many times a second (a streamed answer).
-    func reconfigure<ID: Hashable>(_ ids: [ID]) { controller?.reconfigure(ids.map(AnyHashable.init)) }
+    func reconfigure<ID: Hashable>(_ ids: [ID]) { controller?.reconfigure(ids.map { AnyHashable($0) }) }
 
     /// An optimistic row confirmed under a new id: the row keeps its place
     /// and height. Call before the items with the new id go in.

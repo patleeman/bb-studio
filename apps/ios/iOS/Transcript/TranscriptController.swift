@@ -65,7 +65,7 @@ enum TranscriptRowPosition: Equatable { case top, center }
 final class TranscriptController: UIViewController, UICollectionViewDelegate, UIGestureRecognizerDelegate, TranscriptLayoutAnchoring {
     let layout = TranscriptListLayout()
     private(set) var collectionView: TranscriptCollectionView!
-    private var dataSource: UICollectionViewDiffableDataSource<Int, AnyHashable>!
+    private var dataSource: UICollectionViewDiffableDataSource<Int, TranscriptRowID>!
     private(set) var ids: [AnyHashable] = []
 
     /// A row's view. Called when a cell shows and when its row changes.
@@ -153,13 +153,14 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
 
-        let registration = UICollectionView.CellRegistration<TranscriptCell, AnyHashable> { [weak self] cell, _, id in
+        let registration = UICollectionView.CellRegistration<TranscriptCell, TranscriptRowID> { [weak self] cell, _, row in
+            let id = row.id
             self?.configure(cell, id)
         }
-        dataSource = UICollectionViewDiffableDataSource(collectionView: collectionView) { view, indexPath, id in
-            view.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: id)
+        dataSource = UICollectionViewDiffableDataSource(collectionView: collectionView) { view, indexPath, row in
+            view.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: row)
         }
-        layout.identify = { [weak self] in self?.dataSource.itemIdentifier(for: $0) }
+        layout.identify = { [weak self] in self?.dataSource.itemIdentifier(for: $0)?.id }
         layout.anchoring = self
 
         // Tap anywhere on the transcript to put the keyboard away. It never
@@ -208,7 +209,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             pillHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
         ])
         applyChrome()
-        var snapshot = NSDiffableDataSourceSnapshot<Int, AnyHashable>()
+        var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
         snapshot.appendSections([0])
         dataSource.applySnapshotUsingReloadData(snapshot)
     }
@@ -313,9 +314,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             let appended = Self.appendedCount(old: ids, new: unique)
             // The anchor's row is going: hold on to the nearest row that stays.
             if let anchor, !seen.contains(anchor.id) { rebaseAnchor(keeping: seen) }
-            var snapshot = NSDiffableDataSourceSnapshot<Int, AnyHashable>()
+            var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
             snapshot.appendSections([0])
-            snapshot.appendItems(unique, toSection: 0)
+            snapshot.appendItems(unique.map(TranscriptRowID.init), toSection: 0)
             counters.applies += 1
             ids = unique
             dataSource.apply(snapshot, animatingDifferences: false)
@@ -331,7 +332,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// pick up their content when they show.
     func reconfigure(_ changed: [AnyHashable]) {
         for id in changed {
-            guard let indexPath = dataSource.indexPath(for: id),
+            guard let indexPath = dataSource.indexPath(for: TranscriptRowID(id)),
                   let cell = collectionView.cellForItem(at: indexPath) as? TranscriptCell else { continue }
             configure(cell, id)
             measure([cell])
@@ -746,6 +747,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var composerFrame: CGRect { composerHost.view.frame }
     var isAnimating: Bool { animating }
     var pillFrame: CGRect { pillHost.view.frame }
+}
+
+/// A row's id as the diffable data source holds it. Swift 6 requires the
+/// snapshot's item identifiers to be `Sendable`, and `AnyHashable` isn't.
+/// The wrapper is `@unchecked Sendable` because the snapshot is built,
+/// applied and read only on the main actor (the controller is
+/// `@MainActor`), and the ids are the app's own values (BB's are `String`s).
+/// The rest of the API keeps `AnyHashable`; nothing else changes.
+struct TranscriptRowID: Hashable, @unchecked Sendable {
+    let id: AnyHashable
+    init(_ id: AnyHashable) { self.id = id }
 }
 
 /// A display link holds its target strongly; this breaks the cycle.
