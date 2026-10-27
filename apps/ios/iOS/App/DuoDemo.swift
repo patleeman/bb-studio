@@ -107,6 +107,12 @@ enum DuoDemo {
             size = CGSize(width: 951, height: 669)
             origin.x = -476
             screenSize = CGSize(width: 951, height: 669)
+        // The inner screen shifted left by `?points`, to bring a control
+        // anywhere in it to the middle of the simulator's screen.
+        case "shift":
+            size = CGSize(width: 951, height: 669)
+            origin.x = -(url.query().flatMap(Double.init) ?? 0)
+            screenSize = CGSize(width: 951, height: 669)
         // Beside another app in iOS's own split of the inner screen: the
         // right half of it, kept on the simulator's screen so it can be tapped.
         case "split":

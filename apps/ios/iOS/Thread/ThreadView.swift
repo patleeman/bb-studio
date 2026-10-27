@@ -504,7 +504,7 @@ struct ThreadView: View {
             }
             Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
         } label: {
-            Image(systemName: "ellipsis")
+            Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("More")
     }

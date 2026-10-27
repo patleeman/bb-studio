@@ -248,7 +248,7 @@ struct BotTab: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis")
+            Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("\(bot.name) options")
     }

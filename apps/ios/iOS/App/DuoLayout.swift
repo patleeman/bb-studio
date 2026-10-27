@@ -185,6 +185,7 @@ struct DuoTabRail: View {
             .background(selection == value ? Color.accentColor.opacity(0.15) : .clear, in: .rect(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .background { StatusBarTapMarker { selection = value } }
         .accessibilityLabel(title)
         .accessibilityAddTraits(selection == value ? .isSelected : [])
     }
@@ -246,6 +247,7 @@ struct WindowGeometry: UIViewRepresentable {
             ResizeSettling.shared.changed()
             Breadcrumbs.shared.record(String(format: "window %.0fx%.0f safe %.0f/%.0f%@", size.width, size.height, leading, trailing,
                                              DuoLayout(size: size).twoPages ? " two-pages" : ""))
+            StatusBarStrip.headersOwnStrip = DuoLayout(size: size).twoPages
             #if DEBUG
             RenderCount.bump("write.window")
             #endif
@@ -302,9 +304,15 @@ struct DuoHeader<Title: View, Actions: View>: View {
             Spacer(minLength: 8)
             HStack(spacing: 12) { actions }.fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(.borderless)
+        // Every button gets a 44-point hit area, and a tap in the status-bar
+        // strip above it runs it (`StatusBarStrip`). Menus do the same
+        // through their labels (`DuoHeaderMenuLabel`).
+        .buttonStyle(DuoHeaderButtonStyle())
         .padding(.horizontal, 16)
         .frame(minHeight: 58)
+        // The header is its own hit-testing layer: a tap between its buttons
+        // stops here rather than reaching the transcript under it.
+        .contentShape(.rect)
         .background {
             if sidebar {
                 RegularSurfaceBackground(name: "sidebarHeader", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), bottom: false)
@@ -326,6 +334,8 @@ struct DuoPaneToggle: View {
             Button { pane.toggle() } label: {
                 Image(systemName: "sidebar.left").frame(minWidth: 44, minHeight: 44)
             }
+            // Also in Studio items' own bars, outside a `DuoHeader`.
+            .buttonStyle(DuoHeaderButtonStyle())
             .accessibilityLabel(layout.showsList ? "Hide list" : "Show list")
             .accessibilityIdentifier("duoPaneToggle")
         }
@@ -456,6 +466,7 @@ struct RegularScrollingSurface: ViewModifier {
         content
             .safeAreaPadding(.trailing, Self.inset(column: layout.statusColumn, width: layout.detailWidth, readableWidth: readableWidth))
             .ignoresSafeArea(.container, edges: layout.twoPages ? .trailing : [])
+            .onAppear { StatusBarStrip.schedule() }
     }
 
     /// Centred content `readableWidth` wide leaves (width - readableWidth) / 2
@@ -521,6 +532,7 @@ struct SidebarColumn: ViewModifier {
             .frame(width: layout.listWidth, alignment: .trailing)
             .clipShape(HorizontalClip())
             .allowsHitTesting(layout.showsList)
+            .onAppear { StatusBarStrip.schedule() }
     }
 }
 

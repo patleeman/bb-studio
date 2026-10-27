@@ -756,7 +756,7 @@ struct StudioView: View {
                 }
             }
         } label: {
-            Image(systemName: "plus")
+            Image(systemName: "plus").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("New")
     }
@@ -777,7 +777,7 @@ struct StudioView: View {
                 }
             }
         } label: {
-            Image(systemName: project.isEmpty ? "folder" : "folder.fill")
+            Image(systemName: project.isEmpty ? "folder" : "folder.fill").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("Project")
     }

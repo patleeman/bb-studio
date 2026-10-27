@@ -32,6 +32,15 @@ struct RootView: View {
                 RegularSurfaceBackground(name: "root", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), fullWidth: true)
             }
         }
+        .overlay(alignment: .top) {
+            // The status-bar tap strip runs the header button under it.
+            if layout.twoPages {
+                StatusBarStripView()
+                    .frame(height: StatusBarStrip.depth)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+        }
         .environment(\.duoLayout, layout)
         .environment(pane)
         .background(WindowGeometry { size, leading, trailing, inner in
