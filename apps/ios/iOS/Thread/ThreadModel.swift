@@ -242,7 +242,7 @@ final class ThreadModel: ObservableObject {
         #if DEBUG
         if BotDemo.served != nil, threadId == BotDemo.threadId {
             client = BotDemo.Server.shared.client(serverURL)
-            BotDemo.Server.shared.changed = { [weak self] in self?.scheduleRefresh(nil) }
+            BotDemo.Server.shared.observe(self) { [weak self] in self?.scheduleRefresh(nil) }
         }
         #endif
         boundClient = client

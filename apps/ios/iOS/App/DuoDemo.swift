@@ -200,7 +200,7 @@ enum DuoDemo {
         case "inspect":
             NotificationCenter.default.post(name: Notification.Name("duo-qa-inspect"), object: nil)
             return true
-        case "mid", "bottom":
+        case "mid", "bottom", "top":
             window.endEditing(true)
             NotificationCenter.default.post(name: Notification.Name("duo-qa-scroll"), object: url.lastPathComponent)
             return true

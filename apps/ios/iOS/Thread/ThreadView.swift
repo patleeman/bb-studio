@@ -1723,7 +1723,8 @@ extension ThreadView {
                 }
             },
             pillNote: transcriptV2PillNote,
-            probe: transcriptV2Probe)
+            probe: transcriptV2Probe,
+            describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" })
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {
@@ -1791,8 +1792,10 @@ extension ThreadView {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("duo-qa-scroll"))) { event in
                     guard BotDemo.variant != nil else { return }
-                    guard event.object as? String == "mid" else { return view.transcriptV2.jumpToLatest(animated: false) }
                     let ids = view.transcriptV2Rows.map(\.id)
+                    // The first row: the top, where older pages load.
+                    if event.object as? String == "top", let first = ids.first { return view.transcriptV2.scrollTo(first, position: .top) }
+                    guard event.object as? String == "mid" else { return view.transcriptV2.jumpToLatest(animated: false) }
                     let target = ids.first { $0 == "a150" } ?? ids.dropFirst(view.botChrome != nil ? ids.count / 2 : ids.count / 4).first
                     if let target { view.transcriptV2.scrollTo(target, position: .top) }
                 }

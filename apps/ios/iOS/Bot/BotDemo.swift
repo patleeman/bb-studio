@@ -97,8 +97,23 @@ enum BotDemo {
         private var sends = 0
         /// Questions asked with `ask`, served as pending interactions.
         private var asked: [PendingInteraction] = []
-        /// Called on the main actor when the thread changes, as BB's realtime would.
-        @MainActor var changed: (() -> Void)?
+
+        /// `-qaDemoUnread <n>`: read up to the row `n` from the end, so the
+        /// chat opens at the first unread reply after it.
+        private var lastReadAt: Double? {
+            let arguments = ProcessInfo.processInfo.arguments
+            guard let at = arguments.firstIndex(of: "-qaDemoUnread"), arguments.indices.contains(at + 1),
+                  let count = Int(arguments[at + 1]), rows.count > count else { return nil }
+            return rows[rows.count - count - 1].createdAt
+        }
+        /// Each open view of the thread (the Bot chat, and the same thread
+        /// opened from the Threads list), told on the main actor when it
+        /// changes, as BB's realtime tells them all.
+        @MainActor private var observers: [ObjectIdentifier: () -> Void] = [:]
+
+        @MainActor func observe(_ owner: AnyObject, _ changed: @escaping () -> Void) {
+            observers[ObjectIdentifier(owner)] = changed
+        }
 
         static let pageSize = 24
 
@@ -113,7 +128,9 @@ enum BotDemo {
 
         private func respond(_ method: String, _ path: String, _ body: Data?) -> (Int, Data) {
             let base = "/api/v1/threads/\(BotDemo.threadId)"
-            if method == "GET", path == base { return (200, lock.withLock { BotDemo.threadJSON(running: running) }) }
+            if method == "GET", path == base {
+                return (200, lock.withLock { BotDemo.threadJSON(running: running, lastReadAt: lastReadAt) })
+            }
             if method == "GET", path.hasPrefix(base + "/timeline") { return (200, page(path)) }
             if method == "POST", path == base + "/send" {
                 let text = body.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }.flatMap(Self.text) ?? ""
@@ -240,7 +257,7 @@ enum BotDemo {
         }
 
         private func notify() {
-            Task { @MainActor in changed?() }
+            Task { @MainActor in observers.values.forEach { $0() } }
         }
     }
 
@@ -249,8 +266,10 @@ enum BotDemo {
         return decode(#"{"id":"\#(id)","kind":"conversation","role":"\#(role)","text":"\#(escaped)","createdAt":\#(at)}"#)
     }
 
-    fileprivate static func threadJSON(running: Bool) -> Data {
-        Data(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)}"#.utf8)
+    fileprivate static func threadJSON(running: Bool, lastReadAt: Double? = nil) -> Data {
+        // Unread: read up to `lastReadAt`, with attention since.
+        let read = lastReadAt.map { #","lastReadAt":\#($0),"latestAttentionAt":\#(now)"# } ?? ""
+        return Data(#"{"id":"\#(threadId)","projectId":"proj_personal","environmentId":"env_botdemo01","title":"Juniper","status":"\#(running ? "active" : "idle")","createdAt":1,"updatedAt":\#(now)\#(read)}"#.utf8)
     }
 
     static var sheet: String? {
