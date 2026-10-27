@@ -146,26 +146,42 @@ with it up, the composer sits on its top edge.
 A thread on the inner screen's split: [split](duo-split-thread.png). On the
 outer screen: [outer](duo-outer-thread.png).
 
+## Follow-ups (27 October)
+
+- **Replay green in the full suite.** The drift came from the reading
+  anchor being taken again inside layout passes while rows sized
+  themselves during a scroll; only the reader's own movement moves it now.
+  Rows on screen measure again in one batched pass. How many passes rows
+  take depends on timing (11 in a quiet run, 51 under the full suite's
+  load), so each step is held to 3 layout passes and 2 offset writes per
+  row whose height changed. A loop lays out without anything resizing, so
+  it still fails. Full `BBStudioTests` beside a parallel replay and UI run:
+  381 tests, 0 failures.
+- **Question pill.** A question or approval waiting while reading doesn't
+  move the reader. The pill turns orange and says "Question" ("Approval",
+  "N waiting"); push and the badge are as before. Sending still jumps to
+  the end.
+- **Duo.** The composer uses `DuoLayout.innerScreen`, so iOS's two-app split
+  on the inner screen rests 8 pt above the edge, as the old path does. The
+  `transcript-<id>` content probe is wired. `DuoSplitComposerUITests` passes
+  with the flag on.
+- **Flag-on tests.** `TranscriptV2UITests` adds:
+  - row actions: Copy, Quote, Select Text, Reply in Thread, Edit;
+  - find, on the split, where the demo lists its thread;
+  - the question pill;
+  - offline mini cards.
+
+  `TEST_RUNNER_TRANSCRIPT_V2=1` puts any UI suite on the new transcript,
+  including the staged mini-card and side-thread suites.
+- **Find was broken on the new path.** The hooks took the whole view, which
+  SwiftUI can't compare, so the view never moved to a match. They now take
+  the values they watch.
+
 ## Known gaps
 
-- **Replay edge cases after the row-height fix.** Some checks fail on a few
-  steps, all in the harness's instant 6,000 pt jumps through rows that
-  haven't measured yet, plus one fold:
-  - phone, 6 of 158: three rows 3 to 11 pt off their measured height, one
-    24.3 pt anchor drift, and two rest windows with 8 and 3 layout passes and
-    nothing written;
-  - Duo inner, 4: a 3.3 pt drift, one step of 41 passes, and two rest
-    windows with 3 and 4 no-op passes;
-  - Duo outer, 3: the same kinds.
-
-  Never past the end, and never off the end while following. The UI tests
-  in the real app pass. To do next.
-- Not wired on the new path yet:
-  - the Duo `transcript-<id>` content probe used by `DuoSplitComposerUITests`;
-  - the older UI suites (`TranscriptPastEndUITests` and the rest), which run
-    the old path only.
-- A question card appearing while reading doesn't jump to the end. The old
-  path did; this follows the "only the reader changes following" rule, and
-  the pill counts the card.
-- iOS's two-app split on the Duo's inner screen can't be driven in the
-  simulator. The resting-edge rule for it is untested on a device.
+- A question asked in a thread opened from the Threads list isn't tested:
+  the demo only tells the Bot chat of changes.
+- Mini cards and side threads with real content need a staged server. Run
+  `MiniCardUITests` and `BotSideThreadUITests` with `TEST_RUNNER_TRANSCRIPT_V2=1`.
+- iOS's two-app split can't be driven in the simulator. The inner-screen rule
+  is main's, and untested on a device.
