@@ -1,15 +1,9 @@
 import UIKit
 
-/// What the layout asks its controller when the content changes under the
-/// reader. The controller owns the scroll position; the layout only reports.
+/// Where the view lands after rows go in or out, or the width changes: the
+/// controller's to say (the end, if the view is at it).
 @MainActor
 protocol TranscriptLayoutAnchoring: AnyObject {
-    /// How far to move the offset when the row at `index`, whose frame was
-    /// `frame`, changes height by `delta` (self-sizing, a card resizing, a
-    /// streamed token). Applied by UIKit through the invalidation context, in
-    /// the same layout pass, so nothing shows in between.
-    func offsetAdjustment(resizing index: Int, frame: CGRect, by delta: CGFloat, in layout: TranscriptListLayout) -> CGFloat
-    /// Where to land after rows go in or out, or the width changes.
     func targetOffset(proposed: CGPoint, in layout: TranscriptListLayout) -> CGPoint
 }
 
@@ -17,9 +11,8 @@ protocol TranscriptLayoutAnchoring: AnyObject {
 ///
 /// Not inverted: VoiceOver order, context-menu previews, selection handles,
 /// the scroll indicator and interactive keyboard dismissal all stay native.
-/// Not a compositional layout: its self-sizing passes are opaque, and the
-/// anchor needs every height change, with the row it belongs to, before
-/// UIKit moves anything.
+/// Not a compositional layout: its self-sizing passes are opaque, and a
+/// row above the view that resizes must move the offset in the same pass.
 ///
 /// Heights are kept by row id, so a prepend or a reorder keeps what was
 /// measured. After a width change the old heights stay as estimates until
@@ -39,12 +32,6 @@ final class TranscriptListLayout: UICollectionViewLayout {
         var leading: CGFloat = 0
         var trailing: CGFloat = 0
     }
-
-    final class Context: UICollectionViewLayoutInvalidationContext {
-        var resized: (index: Int, height: CGFloat)?
-    }
-
-    override class var invalidationContextClass: AnyClass { Context.self }
 
     weak var anchoring: TranscriptLayoutAnchoring?
     /// The row id at an index path: the data source's, so heights follow ids.
@@ -74,24 +61,45 @@ final class TranscriptListLayout: UICollectionViewLayout {
     /// harness bounds passes by these rather than by a fixed number.
     private(set) var resizes = 0
 
+    /// The row the reader is on (the first that starts at the top of what
+    /// they see), set by their own scrolls. Rows before it grow upward.
+    var readerRow: AnyHashable?
+    /// The view is held at the end: a resize moves the offset to the new end
+    /// in the same pass. Left past the end for a moment (a row at the end
+    /// shrinking), UIKit sprang it back over 0.3 s while the controller put it
+    /// on the end each frame.
+    var holdsEnd = true
+
+    /// A row that resizes before the reader's row grows upward, as UIKit's
+    /// own self-sizing layouts do: nothing on screen moves. Without one, a
+    /// row that starts above the top. Judged by the row rather than by the
+    /// top edge, which each adjustment moves: a row shrinking across the
+    /// top stopped counting as above it halfway (the replay's drag, 15 pt).
+    private func growsUpward(_ index: Int) -> Bool {
+        if let readerRow, let reader = indices[readerRow] { return index < reader }
+        guard let collectionView else { return false }
+        return frames[index].minY < collectionView.contentOffset.y + collectionView.contentInset.top - 0.5
+    }
+
     /// Several rows' new heights at once, in one invalidation (one layout
-    /// pass): returns how far the rows that start above `top` moved
-    /// everything below them.
-    func applyHeights(_ sizes: [(index: Int, height: CGFloat)], above top: CGFloat) -> (aboveTop: CGFloat, total: CGFloat) {
-        var aboveTop: CGFloat = 0, total: CGFloat = 0
+    /// pass): returns the offset adjustment for all of them.
+    func applyHeights(_ sizes: [(index: Int, height: CGFloat)]) -> CGFloat {
+        var upward: CGFloat = 0
         for (index, height) in sizes.sorted(by: { $0.index > $1.index }) where frames.indices.contains(index) {
             let delta = height - frames[index].height
             guard delta != 0 else { continue }
-            resizes += 1
-            if frames[index].minY < top - 0.5 { aboveTop += delta }
-            total += delta
-            heights[ids[index]] = height
-            stale.remove(ids[index])
-            frames[index].size.height = height
-            for below in (index + 1)..<max(index + 1, frames.count) { frames[below].origin.y += delta }
-            contentHeight += delta
+            if growsUpward(index) { upward += delta }
+            resize(index, to: height)
         }
-        return (aboveTop, total)
+        return holdsEnd ? toEnd() : upward
+    }
+
+    /// From the offset to the end, with the content as it is now.
+    private func toEnd() -> CGFloat {
+        guard let collectionView else { return 0 }
+        let end = TranscriptGeometry.maxOffset(contentHeight: contentHeight, boundsHeight: collectionView.bounds.height,
+            topInset: collectionView.contentInset.top, bottomInset: collectionView.contentInset.bottom)
+        return end - collectionView.contentOffset.y
     }
 
     func index(of id: AnyHashable) -> Int? { indices[id] }
@@ -209,30 +217,35 @@ final class TranscriptListLayout: UICollectionViewLayout {
                                       withOriginalAttributes original: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutInvalidationContext {
         let context = super.invalidationContext(forPreferredLayoutAttributes: preferred, withOriginalAttributes: original)
         let index = preferred.indexPath.item
-        guard let context = context as? Context, frames.indices.contains(index) else { return context }
+        guard frames.indices.contains(index) else { return context }
         let height = Self.pixel(preferred.size.height)
         let delta = height - frames[index].height
-        context.resized = (index, height)
         context.contentSizeAdjustment = CGSize(width: 0, height: delta)
-        let adjustment = anchoring?.offsetAdjustment(resizing: index, frame: frames[index], by: delta, in: self) ?? 0
-        context.contentOffsetAdjustment = CGPoint(x: 0, y: adjustment)
+        let upward = growsUpward(index)
+        // Taken now: UIKit moves the offset before it invalidates with this
+        // context, and a re-measure in between saw the old height and moved
+        // the offset a second time (the replay's drag, 8 to 24 pt).
+        resize(index, to: height)
+        // Held at the end: to the new end. Else a row before the reader's grows upward.
+        let adjustment = holdsEnd ? toEnd() : upward ? delta : 0
+        if adjustment != 0 { context.contentOffsetAdjustment = CGPoint(x: 0, y: adjustment) }
         return context
     }
 
     override func invalidateLayout(with context: UICollectionViewLayoutInvalidationContext) {
-        if let resized = (context as? Context)?.resized, frames.indices.contains(resized.index) {
-            // Only this row and the ones below it move.
-            let index = resized.index
-            let delta = resized.height - frames[index].height
-            if delta != 0 { resizes += 1 }
-            heights[ids[index]] = resized.height
-            stale.remove(ids[index])
-            frames[index].size.height = resized.height
-            for below in (index + 1)..<max(index + 1, frames.count) { frames[below].origin.y += delta }
-            contentHeight += delta
-        }
         if context.invalidateEverything || context.invalidateDataSourceCounts { needsIDs = true }
         super.invalidateLayout(with: context)
+    }
+
+    /// One row's new height: only it and the rows below it move.
+    private func resize(_ index: Int, to height: CGFloat) {
+        let delta = height - frames[index].height
+        if delta != 0 { resizes += 1 }
+        heights[ids[index]] = height
+        stale.remove(ids[index])
+        frames[index].size.height = height
+        for below in (index + 1)..<max(index + 1, frames.count) { frames[below].origin.y += delta }
+        contentHeight += delta
     }
 
     // MARK: Updates

@@ -8,9 +8,10 @@ import UIKit
 /// every step it checks the rules the old transcript broke:
 ///
 /// - never past the end (offset ≤ max + 0.5);
-/// - following: the last row whole, just above the composer;
-/// - reading: the anchor row's screen y moves < 1 pt through prepends and
-///   height changes above the viewport;
+/// - at the end: the last row whole, just above the composer;
+/// - reading: the row at the top's screen y moves < 1 pt through prepends,
+///   height changes above the viewport, streaming, the keyboard and the
+///   composer's cards; a drag is never pulled toward the end;
 /// - the composer's gap is the layout's;
 /// - bounded layout passes and writes per step, and none at rest.
 ///
@@ -105,7 +106,7 @@ final class TranscriptReplay {
         controller.pillContent = { state, jump in
             AnyView(Button(state.unseen > 0 ? "\(state.unseen) new" : "Latest", action: jump).buttonStyle(.borderedProminent).padding(8))
         }
-        controller.setComposer(AnyView(ReplayComposer()))
+        controller.setComposer(AnyView(ReplayComposer(task: nil)))
         if ProcessInfo.processInfo.environment["TRANSCRIPT_LOG"] != nil {
             let started = Date()
             controller.log = { print(String(format: "TRANSCRIPT-LOG %.3f ", Date().timeIntervalSince(started)) + $0) }
@@ -157,8 +158,10 @@ final class TranscriptReplay {
         await step("and down again", expectReading: true) { setKeyboard(0) }
         await step("back to the end") { controller.jumpToLatest(animated: false) }
 
+        await busyTurn()
+
         // Reading: the reader scrolls up into the history.
-        await step("the reader scrolls up", expectReading: true) { readerScroll(by: -1600) }
+        await step("the reader scrolls up", expectReading: true, anchorAfterChange: true) { readerScroll(by: -1600) }
         // Up through the whole history: each scroll shows unmeasured rows
         // that size themselves above the reader; each time the top comes
         // near, `onNearTop` asks for the next page, which goes in above.
@@ -184,9 +187,10 @@ final class TranscriptReplay {
         }
         await step("keyboard up while reading", expectReading: true) { setKeyboard(320) }
         await step("keyboard down while reading", expectReading: true) { setKeyboard(0) }
-        await step("fold while reading", expectReading: true, drift: 1.5) { resize(Layout.duoOuter) }
-        await step("split while reading", expectReading: true, drift: 1.5) { resize(Layout.duoInner) }
-        await step("unfold while reading", expectReading: true, drift: 1.5) { resize(layout) }
+        // A fold rewraps every row: nothing holds the reader's row (only a prepend does).
+        await step("fold while reading", expectReading: true, drift: .infinity) { resize(Layout.duoOuter) }
+        await step("split while reading", expectReading: true, drift: .infinity) { resize(Layout.duoInner) }
+        await step("unfold while reading", expectReading: true, drift: .infinity) { resize(layout) }
         await step("window shorter while reading", expectReading: true) { resizeHeight(-200) }
         await step("window back while reading", expectReading: true) { resizeHeight(200) }
         await step("background and back", expectReading: true) { background() }
@@ -199,12 +203,99 @@ final class TranscriptReplay {
         await step("keyboard down on the outer screen") { setKeyboard(0) }
         await step("unfold while following") { resize(layout) }
         await step("rows replaced by a newer page") { set(Array(rows.suffix(30)) + (0..<10).map { _ in makeRow(index: 7, id: nextID("page")) }) }
-        await step("the reader scrolls a little and lets go near the end") { readerScroll(by: -40) }
+        await step("the reader scrolls a little and lets go near the end", expectReading: true, anchorAfterChange: true) { readerScroll(by: -40) }
+        await step("and back to the end") { readerScroll(to: controller.maxOffset) }
         await step("a short chat in a sheet") { set(Array(rows.suffix(2))) }
         await step("the sheet grows") { resizeHeight(-300) }
         await step("the sheet is back") { resizeHeight(300) }
 
         return Report(layout: layout.name, steps: steps)
+    }
+
+    // MARK: A busy turn
+
+    /// Patrick, Oct 27, the Chief of Staff mid-turn: "I can't scroll up. It
+    /// keeps pulling the chat transcript to the end", and a blank screen,
+    /// scrolled past the end, with "Thinking" up and a running task above the
+    /// composer. A reply growing every step, a task card that ticks, comes
+    /// and goes (the composer's height, so the bottom inset), and a
+    /// "Thinking" row that comes and goes at the end.
+    private func busyTurn() async {
+        let reply = nextID("busy")
+        var tick = 0
+        func thinking(_ on: Bool) {
+            let without = rows.filter { $0.id != "thinking" }
+            set(on ? without + [Row(id: "thinking", kind: .status("Thinking…"))] : without)
+        }
+        func streamAndTick(_ index: Int) {
+            grow(reply, by: index)
+            tick += 1
+            if task != nil { setTask("Find AI-native engineering companies · \(tick)s") }
+            if index % 4 == 1 { thinking(index % 8 == 1) }
+        }
+
+        // At the end: kept there as everything comes and goes, never past it.
+        await step("busy: Thinking at the end") { thinking(true) }
+        await step("busy: a task starts at the end") { setTask("Find AI-native engineering companies") }
+        await step("busy: the reply starts, Thinking goes") { set(rows.filter { $0.id != "thinking" } + [Row(id: reply, kind: .text("", mine: false))]) }
+        for index in 0..<12 { await step("busy: streams at the end \(index)", fast: true) { streamAndTick(index) } }
+        await step("busy: the task ends at the end") { setTask(nil) }
+        await step("busy: Thinking at the end, again") { thinking(true) }
+        await step("busy: a task again") { setTask("Find AI-native engineering companies") }
+
+        // Up a little, still near the end: the task and Thinking go. Clamped, not blank.
+        await step("busy: the reader up 60 pt", expectReading: true, anchorAfterChange: true) { readerScroll(by: -60) }
+        await step("busy: Thinking goes, near the end") { thinking(false) }
+        await step("busy: the task goes, near the end") { setTask(nil) }
+        await step("busy: Thinking and the task, near the end") { thinking(true); setTask("Find AI-native engineering companies") }
+        await step("busy: back to the end, the task running") { controller.jumpToLatest(animated: false) }
+
+        // A finger down and dragging up 800 pt while it streams, then a
+        // fling, then still for 3 s: never pulled toward the end.
+        await step("busy: touch down at the end", expectReading: true) { controller.simulateTouch(true) }
+        // The row under the finger, where the move left it, stays there
+        // through what streams in (`anchorAfterChange`).
+        for index in 0..<8 {
+            await step("busy: drag up \(index) while it streams", fast: true, expectReading: true, anchorAfterChange: true) {
+                fingerMove(by: -100)
+                streamAndTick(12 + index)
+            }
+        }
+        for index in 0..<4 {
+            await step("busy: the fling \(index)", fast: true, expectReading: true, anchorAfterChange: true) {
+                fingerMove(by: -60)
+                streamAndTick(20 + index)
+            }
+        }
+        await step("busy: the fling ends", expectReading: true) {
+            controller.simulateTouch(false)
+            controller.scrollViewDidEndDecelerating(controller.collectionView)
+        }
+        // 3 s at rest, 100 ms a step, as it goes on: Thinking on and off, the task ticking, then gone.
+        for index in 0..<30 {
+            await step("busy: still \(index)", fast: true, expectReading: true) {
+                streamAndTick(24 + index)
+                if index == 25 { setTask(nil) }
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        await step("busy: the turn ends", expectReading: true) { thinking(false); setTask(nil) }
+        await step("busy: back to the end") { controller.jumpToLatest(animated: false) }
+    }
+
+    private var task: String?
+
+    /// The finger (or its fling) moves the view; the row it leaves at the
+    /// top is the one to hold.
+    private func fingerMove(by delta: CGFloat) {
+        controller.simulateMove(to: controller.collectionView.contentOffset.y + delta) { scrolledAnchor = readingAnchor() }
+    }
+
+    /// The running-task card above the composer, or none: the composer's height.
+    private func setTask(_ text: String?) {
+        task = text
+        controller.setComposer(AnyView(ReplayComposer(task: text)))
+        controller.view.setNeedsLayout()
     }
 
     // MARK: Mutations
@@ -293,20 +384,22 @@ final class TranscriptReplay {
     }
 
     private func readerScroll(to y: CGFloat) {
-        let view = controller.collectionView!
-        controller.simulateReaderScroll(to: y) {
-            if let id = controller.anchor?.id, let frame = controller.layout.frame(of: id) {
-                scrolledAnchor = (id, frame.minY - view.contentOffset.y)
-                let top = view.contentOffset.y + view.contentInset.top
-                let index = controller.layout.index(of: id) ?? 0
-                controller.log?(String(format: "replay scrolled: top=%.1f anchor=%@ minY=%.1f measured=%@ above=%@ measured=%@", top, "\(id)", frame.minY,
-                    "\(controller.layout.isMeasured(id))", index > 0 ? "\(controller.layout.frames[index - 1])" : "-",
-                    index > 0 ? "\(controller.layout.isMeasured(controller.layout.ids[index - 1]))" : "-"))
-            }
-        }
+        controller.simulateReaderScroll(to: y) { scrolledAnchor = readingAnchor() }
     }
 
     private var scrolledAnchor: (id: AnyHashable, y: CGFloat)?
+
+    /// The row the reader is looking at: the first that starts at or below
+    /// the top of what they see (one across the top edge may grow upward),
+    /// and its screen y.
+    private func readingAnchor() -> (id: AnyHashable, y: CGFloat)? {
+        let view = controller.collectionView!
+        let frames = controller.layout.frames
+        let top = view.contentOffset.y + view.contentInset.top
+        guard let first = TranscriptGeometry.firstIndex(endingBelow: top, frames: frames) else { return nil }
+        let index = frames[first].minY >= top - 0.5 || first + 1 >= frames.count ? first : first + 1
+        return (controller.layout.ids[index], frames[index].minY - view.contentOffset.y)
+    }
 
     private var currentLayout: Layout?
 
@@ -315,31 +408,27 @@ final class TranscriptReplay {
     /// `anchorAfterChange`: the change is the reader's own scroll, so the
     /// anchor to hold is where it left the reader, through the self-sizing
     /// of the rows it showed.
-    private func step(_ name: String, quiet: Bool = false, expectReading: Bool = false, drift allowed: CGFloat = 1,
+    /// `fast`: no wait for UIKit's late pass and no check at rest (steps
+    /// 100 ms apart).
+    private func step(_ name: String, quiet: Bool = false, fast: Bool = false, expectReading: Bool = false, drift allowed: CGFloat = 1,
                       anchorAfterChange: Bool = false, _ change: () -> Void) async {
         let view = controller.collectionView!
-        var anchorID = controller.anchor?.id
-        var anchorY = anchorID.flatMap { controller.layout.frame(of: $0) }.map { $0.minY - view.contentOffset.y }
+        controller.log?("step: " + name)
+        var anchor = readingAnchor()
         let resizesBefore = controller.resizes
         controller.resetCounters()
         scrolledAnchor = nil
         change()
-        if anchorAfterChange {
-            if let scrolledAnchor {
-                (anchorID, anchorY) = (scrolledAnchor.id, scrolledAnchor.y)
-            } else {
-                anchorID = controller.anchor?.id
-                anchorY = anchorID.flatMap { controller.layout.frame(of: $0) }.map { $0.minY - view.contentOffset.y }
-            }
-        }
+        if anchorAfterChange { anchor = scrolledAnchor ?? readingAnchor() }
+        let anchorID = anchor?.id, anchorY = anchor?.y
         await settle()
         // UIKit lays out once more about 0.5 s after the offset moves (its
         // scroll indicator's timer), with nothing written: wait that out,
         // then nothing at all may happen.
-        try? await Task.sleep(for: .milliseconds(700))
+        if !fast { try? await Task.sleep(for: .milliseconds(700)) }
         let work = controller.counters
         controller.resetCounters()
-        await rest()
+        if !fast { await rest() }
         let atRest = controller.counters
 
         var failures: [String] = []
@@ -350,7 +439,7 @@ final class TranscriptReplay {
         if past > 0.5 { failures.append(String(format: "past the end by %.1f pt", past)) }
 
         var followGap: Double?
-        if controller.follow.mode == .following, let last = controller.layout.frames.last {
+        if controller.atEnd, let last = controller.layout.frames.last {
             // The last row whole and just above the composer, unless the chat is shorter than its view.
             let bottom = view.contentOffset.y + view.bounds.height - insets.bottom
             let short = view.contentSize.height + insets.top + insets.bottom <= view.bounds.height
@@ -360,14 +449,14 @@ final class TranscriptReplay {
                 failures.append("following, but the last row isn't whole")
             }
         }
-        if expectReading, controller.follow.mode != .reading { failures.append("expected reading, is \(controller.follow.mode)") }
+        if expectReading, controller.atEnd { failures.append("expected reading, is at the end") }
 
         var drift: Double?
         if expectReading, let anchorID, let anchorY, let frame = controller.layout.frame(of: anchorID) {
             let y = frame.minY - view.contentOffset.y
             // A clamp at an edge is allowed to move it; nothing else is.
             let clamped = abs(view.contentOffset.y - maxOffset) < 0.5 || abs(view.contentOffset.y + insets.top) < 0.5
-            drift = Double(y - anchorY)
+            drift = allowed.isFinite ? Double(y - anchorY) : nil
             if let drift, abs(drift) >= Double(allowed), !clamped {
                 failures.append(String(format: "the anchor row moved %.2f pt", drift))
             }
@@ -403,7 +492,7 @@ final class TranscriptReplay {
         if atRest.layouts > 2 || atRest.offsetWrites > 0 || atRest.insetWrites > 0 {
             failures.append("work at rest: \(atRest.layouts) layouts, \(atRest.offsetWrites) offset writes, \(atRest.insetWrites) inset writes")
         }
-        let result = Step(name: name, mode: "\(controller.follow.mode)", pastEnd: max(0, past), followGap: followGap, anchorDrift: drift,
+        let result = Step(name: name, mode: controller.atEnd ? "end" : "reading", pastEnd: max(0, past), followGap: followGap, anchorDrift: drift,
             composerGapError: gapError, layouts: work.layouts, offsetWrites: work.offsetWrites, insetWrites: work.insetWrites,
             restLayouts: atRest.layouts, restWrites: atRest.offsetWrites + atRest.insetWrites, failures: failures)
         if !quiet || !failures.isEmpty { steps.append(result) } else { steps.append(result) }
@@ -494,13 +583,28 @@ struct ReplayRowView: View {
     }
 }
 
+/// The composer, with a running task's card above it, as BB's shelf shows one.
 private struct ReplayComposer: View {
+    let task: String?
+
     var body: some View {
-        RoundedRectangle(cornerRadius: 22).fill(.gray.opacity(0.25))
-            .frame(height: 44)
-            .overlay(Text("Message").foregroundStyle(.secondary).padding(.leading, 14), alignment: .leading)
-            .padding(.horizontal, 12)
-            .accessibilityIdentifier("replayComposer")
+        VStack(spacing: 8) {
+            if let task {
+                HStack {
+                    Image(systemName: "apple.terminal")
+                    Text(task).lineLimit(1)
+                    Spacer()
+                    ProgressView()
+                }
+                .padding(12)
+                .background(.gray.opacity(0.2), in: .rect(cornerRadius: 16))
+            }
+            RoundedRectangle(cornerRadius: 22).fill(.gray.opacity(0.25))
+                .frame(height: 44)
+                .overlay(Text("Message").foregroundStyle(.secondary).padding(.leading, 14), alignment: .leading)
+                .accessibilityIdentifier("replayComposer")
+        }
+        .padding(.horizontal, 12)
     }
 }
 #endif

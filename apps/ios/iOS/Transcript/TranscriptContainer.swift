@@ -9,7 +9,8 @@ final class TranscriptHandle {
 
     init() {}
 
-    var follow: TranscriptFollow { controller?.follow ?? TranscriptFollow() }
+    /// At the end, and staying there as it moves.
+    var atEnd: Bool { controller?.atEnd ?? true }
 
     func jumpToLatest(animated: Bool = true) { controller?.jumpToLatest(animated: animated) }
 
@@ -28,7 +29,7 @@ final class TranscriptHandle {
 
 /// A chat transcript and its composer, on UIKit. Generic over the row: it
 /// takes rows in order and a SwiftUI view for each, and hands back the
-/// reader's state and requests (near the top, follow changes).
+/// reader's state and requests (near the top, the pill).
 ///
 /// Rows are compared by value: a changed row reconfigures only its cell,
 /// and only a change of order or membership goes through a snapshot.
@@ -47,7 +48,6 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var top: (() -> Top)?
     var pill: (TranscriptPillState, @escaping () -> Void) -> Pill
     var onNearTop: (() -> Void)?
-    var onFollowChange: ((TranscriptFollow) -> Void)?
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
     var dismissKeyboard: ((UIWindow) -> Void)?
@@ -75,7 +75,6 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         let environment = context.environment
         let coordinator = context.coordinator
         controller.onNearTop = onNearTop
-        controller.onFollowChange = onFollowChange
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }

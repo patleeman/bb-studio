@@ -19,7 +19,7 @@ struct TranscriptChrome: Equatable {
     var pill = PillPlacement.trailing
     /// Rows fade softly under the header (iOS's scroll edge effect).
     var softTopEdge = false
-    /// The reader's scroll resting this close to the end follows it.
+    /// The pill shows while the end is further than this below the view.
     var nearEnd: CGFloat = 80
     /// `onNearTop` fires when the top of what the reader sees is this close to the first row.
     var nearTop: CGFloat = 600
@@ -44,20 +44,20 @@ struct TranscriptPillState: Equatable {
 
 enum TranscriptRowPosition: Equatable { case top, center }
 
-/// The transcript and its composer, in UIKit, with one owner of scrolling.
+/// The transcript and its composer, in UIKit: a plain scroll view.
 ///
 /// - The collection view, composer, pill and header live in one view; the
-///   composer's bottom is pinned to the keyboard layout guide, so it rides
-///   the keyboard (docked, interactive dismissal) with no notification math.
+///   container ends at the keyboard's top and the composer rests on it.
 /// - The bottom content inset is the composer's frame (and the pill's band),
 ///   written only when it changes.
-/// - This controller is the only writer of `contentOffset`, and every write is
-///   clamped to the valid range: the view can't rest past the end.
-/// - Following, the anchor is the end; reading, it's the top visible row.
-///   Height changes are answered in the layout's own invalidation, prepends
-///   and width changes by `targetContentOffset`, and `settle()` after every
-///   layout pass puts the view back on its anchor if anything else moved it.
-/// - `follow` changes only on the reader's own scrolls and on "jump to latest".
+/// - Scrolling is UIKit's. The one automatic move: the view at the end when
+///   the end moves (content grows, the composer grows) stays at the end.
+///   Only "↓", the pill and sending (`jumpToLatest`) go to the end otherwise.
+/// - A touch ends "at the end" at once. While a finger is down or a fling
+///   runs nothing is written, beyond UIKit's own adjustment for a row above
+///   the view that resizes.
+/// - The view never rests past the end: one clamp, `keepInRange()`.
+/// - Older rows paged in at the top keep what the reader sees in place.
 ///
 /// Rows are `AnyHashable` ids with a SwiftUI builder; nothing here knows
 /// what a message is.
@@ -72,7 +72,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var content: (AnyHashable) -> AnyView = { _ in AnyView(EmptyView()) }
     var pillContent: (TranscriptPillState, @escaping () -> Void) -> AnyView = { _, _ in AnyView(EmptyView()) }
 
-    var onFollowChange: ((TranscriptFollow) -> Void)?
     var onNearTop: (() -> Void)?
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
@@ -92,11 +91,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         didSet { if chrome != oldValue, isViewLoaded { applyChrome() } }
     }
 
-    private(set) var follow = TranscriptFollow()
+    /// The view is at the end and stays there as the end moves. Decided
+    /// only where the reader's scroll comes to rest, by `jumpToLatest` and
+    /// by `scrollTo`; a touch clears it at once.
+    private(set) var atEnd = true {
+        didSet { layout.holdsEnd = atEnd }
+    }
+    /// Rows that came in at the end while not at it, for the pill.
+    private(set) var unseen = 0
     private(set) var pill = TranscriptPillState()
-    /// The row the reader is looking at. Moved only by the reader's scrolls
-    /// and by `scrollTo`, never by layout.
-    private(set) var anchor: TranscriptGeometry.Anchor<AnyHashable>?
+    /// Within this of the end counts as at it.
+    static let atEndSlack: CGFloat = 4
 
     private let composerHost = TranscriptHost()
     private let topHost = TranscriptHost()
@@ -109,9 +114,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var pillPlacement: [NSLayoutConstraint] = []
     private var hasTop = false
 
-    /// Our own animated scroll is running: settling waits for it.
+    /// Our own animated scroll ("↓") is running.
     private var animating = false
-    private var animationToken = 0
     private var nearTopArmed = true
     /// A row asked for before it was in the transcript.
     private var pendingScroll: (id: AnyHashable, position: TranscriptRowPosition)?
@@ -121,7 +125,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         var layouts = 0
         var offsetWrites = 0
         var insetWrites = 0
-        var followChanges = 0
         var configures = 0
         var applies = 0
         /// Frames of our own animated scrolls, apart from `layouts`.
@@ -276,7 +279,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
         applyRowMetrics()
         updateInsets()
-        settle("layout")
+        keepInRange("layout")
         logGeometry()
         if let probe, let rect = rowsFrameInWindow, rect != lastProbe {
             lastProbe = rect
@@ -303,7 +306,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let next = UIEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
         collectionView.contentInset = next
         collectionView.verticalScrollIndicatorInsets = next
-        log?(String(format: "v2 insets top=%.1f bottom=%.1f follow=%@", top, bottom, "\(follow.mode)"))
+        log?(String(format: "v2 insets top=%.1f bottom=%.1f atEnd=%@", top, bottom, "\(atEnd)"))
     }
 
     // MARK: Rows
@@ -318,8 +321,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             let unique = next.filter { seen.insert($0).inserted }
             if unique.count != next.count { log?("v2 dropped \(next.count - unique.count) duplicate ids") }
             let appended = Self.appendedCount(old: ids, new: unique)
-            // The anchor's row is going: hold on to the nearest row that stays.
-            if let anchor, !seen.contains(anchor.id) { rebaseAnchor(keeping: seen) }
+            // Older rows going in above: what the reader sees stays put.
+            let kept = Self.prepended(old: ids, new: unique) ? topRow() : nil
             var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
             snapshot.appendSections([0])
             snapshot.appendItems(unique.map(TranscriptRowID.init), toSection: 0)
@@ -327,7 +330,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             ids = unique
             dataSource.apply(snapshot, animatingDifferences: false)
             layout.forget(keeping: seen)
-            if appended > 0, follow.handle(.appended(appended)) { followChanged() }
+            if let kept {
+                collectionView.layoutIfNeeded()
+                if let frame = layout.frame(of: kept.id) { write(frame.minY - collectionView.contentInset.top - kept.distance, "prepend") }
+            }
+            if appended > 0, !atEnd { unseen += appended }
             nearTopArmed = true
             if let pending = pendingScroll, seen.contains(pending.id) {
                 collectionView.layoutIfNeeded()
@@ -349,11 +356,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
     }
 
-    /// "Row A is now row B": it keeps its measured height (and the anchor),
-    /// so the swap that follows doesn't move anything.
+    /// "Row A is now row B": it keeps its measured height, so the swap that
+    /// follows doesn't move anything.
     func carry(from old: AnyHashable, to new: AnyHashable) {
         layout.carryHeight(from: old, to: new)
-        if anchor?.id == old { anchor?.id = new }
     }
 
     private func configure(_ cell: TranscriptCell, _ id: AnyHashable) {
@@ -374,44 +380,49 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         return new.count - index - 1
     }
 
-    private func rebaseAnchor(keeping live: Set<AnyHashable>) {
-        guard let anchor, let index = layout.index(of: anchor.id) else { return }
+    /// Rows went in above the old first row: older history paged in.
+    static func prepended(old: [AnyHashable], new: [AnyHashable]) -> Bool {
+        guard let first = old.first, let index = new.firstIndex(of: first) else { return false }
+        return index > 0
+    }
+
+    /// The first row whose bottom is below the top of what the reader sees,
+    /// and how far its top is below that.
+    private func topRow() -> (id: AnyHashable, distance: CGFloat)? {
         let top = collectionView.contentOffset.y + collectionView.contentInset.top
-        let order = Array(layout.ids[index...]) + layout.ids[..<index].reversed()
-        guard let survivor = order.first(where: live.contains), let frame = layout.frame(of: survivor) else {
-            self.anchor = nil
-            return
-        }
-        self.anchor = .init(id: survivor, distance: frame.minY - top)
+        let frames = layout.frames
+        guard var index = TranscriptGeometry.firstIndex(endingBelow: top, frames: frames) else { return nil }
+        // A row across the top edge is before it: it grows upward.
+        if frames[index].minY < top - 0.5, index + 1 < frames.count { index += 1 }
+        return (layout.ids[index], frames[index].minY - top)
     }
 
     // MARK: Requests
 
-    /// Follows the end from now on, and goes there: from far up, a jump to a
-    /// screen above the end (which lays the end out), then a short animation.
+    /// Goes to the end and stays there: from far up, a jump to a screen above
+    /// the end (which lays the end out), then a short animation.
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
         pendingScroll = nil
-        // Following now: the last reading place is gone.
-        anchor = nil
-        if follow.handle(.jumpToLatest) { followChanged() }
+        atEnd = true
+        unseen = 0
+        layout.readerRow = nil
         log?("v2 jumpToLatest animated=\(animated)")
-        let target = restingOffset()
         let height = collectionView.bounds.height
         if !animated || collectionView.window == nil {
-            write(target, "jump")
+            write(maxOffset, "jump")
+            updatePill()
             return
         }
-        if target - collectionView.contentOffset.y > height * 2 {
-            write(target - height, "jump near the end")
+        if maxOffset - collectionView.contentOffset.y > height * 2 {
+            write(maxOffset - height, "jump near the end")
             collectionView.layoutIfNeeded()
         }
-        animate(to: restingOffset())
+        animate()
         updatePill()
     }
 
-    /// Takes the reader to a row (a find match, the unread row): reading from
-    /// there, with the row at the top or centred.
+    /// Takes the reader to a row (a find match, the unread row), at the top or centred.
     func scrollTo(_ id: AnyHashable, position: TranscriptRowPosition, animated: Bool = false) {
         loadViewIfNeeded()
         collectionView.layoutIfNeeded()
@@ -422,52 +433,27 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             return
         }
         pendingScroll = nil
-        if follow.handle(.readRow) { followChanged() }
+        stopAnimation()
+        atEnd = false
         let visible = collectionView.bounds.height - collectionView.contentInset.top - collectionView.contentInset.bottom
         let distance = position == .top ? 0 : max(0, (visible - frame.height) / 2)
-        anchor = .init(id: id, distance: distance)
+        let target = clamp(frame.minY - collectionView.contentInset.top - distance)
         log?("v2 scrollTo \(describe(id)) \(position)")
-        if animated { animate(to: restingOffset()) } else { write(restingOffset(), "scrollTo") }
+        if animated { collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target), animated: true) } else { write(target, "scrollTo") }
+        layout.readerRow = id
         updatePill()
     }
 
     // MARK: The one writer
 
-    private var interacting: Bool {
-        collectionView.isTracking || collectionView.isDragging || collectionView.isDecelerating || simulatedReaderScroll
+    /// A finger is down, the reader's drag runs, or its fling does.
+    private var touching: Bool {
+        collectionView.isTracking || collectionView.isDragging || collectionView.isDecelerating || simulatedTouch
     }
-    private var simulatedReaderScroll = false
+    private var simulatedTouch = false
 
-    /// The harness's stand-in for a fling that UIKit ends without telling
-    /// us: an offset written while it decelerates (a row above the reader
-    /// measuring) stops it, and no "decelerating ended" comes. The view moves
-    /// as the fling did; nothing reports its end.
-    func simulateFlingCutShort(to y: CGFloat) {
-        scrollViewWillBeginDragging(collectionView)
-        simulatedReaderScroll = true
-        collectionView.contentOffset.y = clamp(y)
-        scrollViewDidScroll(collectionView)
-        collectionView.layoutIfNeeded()
-        simulatedReaderScroll = false
-    }
-
-    /// The harness's stand-in for a reader's drag: moves the view as a
-    /// finger would, then rests, so `follow` decides as for a real one.
-    func simulateReaderScroll(to y: CGFloat, beforeLayout: () -> Void = {}) {
-        simulatedReaderScroll = true
-        collectionView.contentOffset.y = clamp(y)
-        scrollViewDidScroll(collectionView)
-        beforeLayout()
-        collectionView.layoutIfNeeded()
-        simulatedReaderScroll = false
-        readerScrollEnded()
-    }
-
-    /// The end is held: following, and no scroll of the reader's or ours in the way.
-    private var holdsEnd: Bool { follow.mode == .following && !interacting && !animating }
-
-    private func bounds(contentHeight: CGFloat? = nil) -> (content: CGFloat, height: CGFloat, top: CGFloat, bottom: CGFloat) {
-        (contentHeight ?? layout.collectionViewContentSize.height, collectionView.bounds.height,
+    private func bounds() -> (content: CGFloat, height: CGFloat, top: CGFloat, bottom: CGFloat) {
+        (layout.collectionViewContentSize.height, collectionView.bounds.height,
          collectionView.contentInset.top, collectionView.contentInset.bottom)
     }
 
@@ -481,24 +467,26 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         return TranscriptGeometry.clamp(y, contentHeight: b.content, boundsHeight: b.height, topInset: b.top, bottomInset: b.bottom)
     }
 
-    /// Where the view belongs now: the end while following, the anchor while reading.
-    func restingOffset() -> CGFloat {
-        switch follow.mode {
-        case .following:
-            return maxOffset
-        case .reading:
-            guard Self.anchorsReading, let anchor, let frame = layout.frame(of: anchor.id) else { return clamp(collectionView.contentOffset.y) }
-            return clamp(TranscriptGeometry.offset(restoring: anchor.distance, rowTop: frame.minY, topInset: collectionView.contentInset.top))
-        }
+    var distanceToEnd: CGFloat {
+        let b = bounds()
+        return TranscriptGeometry.distanceToEnd(offset: collectionView.contentOffset.y, contentHeight: b.content,
+            boundsHeight: b.height, bottomInset: b.bottom)
     }
 
-    /// Puts the view on its anchor after a layout pass, unless a scroll is under way.
-    func settle(_ why: String) {
+    /// After every layout pass, unless a finger or a fling is moving the
+    /// view (UIKit bounces it back from past either edge itself): at the end
+    /// while the view is at it, and never past it. The only place anything
+    /// automatic moves the view.
+    private func keepInRange(_ why: String) {
         guard isViewLoaded, collectionView.bounds.height > 0 else { return }
-        noticeReaderRest()
-        guard !interacting, !animating else { return }
-        let target = restingOffset()
-        if abs(target - collectionView.contentOffset.y) > 0.25 { write(target, why) }
+        if readerMoved, !touching { readerRested("unannounced") }
+        guard !touching, !animating else { return }
+        let y = collectionView.contentOffset.y
+        let target = atEnd ? maxOffset : clamp(y)
+        guard abs(target - y) > 0.25 else { return }
+        write(target, why)
+        // Clamped back from past the end: the reader is at it.
+        if !atEnd, distanceToEnd <= Self.atEndSlack { atEnd = true; unseen = 0 }
     }
 
     /// A `v2 geo` line in the scroll log, as the old transcript's `geo`
@@ -507,13 +495,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func logGeometry() {
         guard let log else { return }
         let b = bounds()
-        let past = -TranscriptGeometry.distanceToEnd(offset: collectionView.contentOffset.y, contentHeight: b.content,
-                                                     boundsHeight: b.height, bottomInset: b.bottom)
         let visible = collectionView.indexPathsForVisibleItems.map(\.item).sorted()
         let ids = [visible.first, visible.last].compactMap { $0 }.compactMap { layout.ids.indices.contains($0) ? describe(layout.ids[$0]) : nil }
         let line = String(format: "v2 geo offset=%.1f content=%.1f container=%.1f insetTop=%.1f insetBottom=%.1f past=%.1f",
-                          collectionView.contentOffset.y, b.content, b.height, b.top, b.bottom, past)
-            + " rows=\(visible.count) follow=\(follow.mode) visible=\(ids.joined(separator: "…"))"
+                          collectionView.contentOffset.y, b.content, b.height, b.top, b.bottom, -distanceToEnd)
+            + " rows=\(visible.count) atEnd=\(atEnd) touching=\(touching) visible=\(ids.joined(separator: "…"))"
         guard line != lastGeometry else { return }
         lastGeometry = line
         log(line)
@@ -523,22 +509,23 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func write(_ y: CGFloat, _ why: String) {
         let target = clamp(y)
         counters.offsetWrites += 1
-        log?(String(format: "v2 offset %@ from %.1f to %.1f follow=%@", why, collectionView.contentOffset.y, target, "\(follow.mode)"))
-        collectionView.contentOffset = CGPoint(x: collectionView.contentOffset.x, y: target)
+        log?(String(format: "v2 offset %@ from %.1f to %.1f atEnd=%@", why, collectionView.contentOffset.y, target, "\(atEnd)"))
+        // Not `contentOffset =`: that leaves UIKit's own bounce running (from
+        // past the end after a row at the end shrank), which pulled the view
+        // 3 pt off the end each frame for 0.3 s while this put it back.
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target), animated: false)
     }
 
-    /// Our own animated scroll, a frame at a time toward the live resting
-    /// offset. UIKit's animated `setContentOffset` aims at a fixed point:
-    /// worked out from estimated heights, it ran 2,400 pt past the end in
-    /// the replay when the rows measured shorter. Here each frame is the
-    /// current target less what's left of the starting distance, clamped,
-    /// so it lands on the measured end and never passes it.
-    private func animate(to y: CGFloat) {
-        let distance = clamp(y) - collectionView.contentOffset.y
+    /// "↓": a frame at a time toward the live end. UIKit's animated
+    /// `setContentOffset` aims at a fixed point: worked out from estimated
+    /// heights, it ran 2,400 pt past the end when the rows measured shorter.
+    /// Each frame here is the current end less what's left of the starting
+    /// distance, clamped, so it lands on the measured end and never passes it.
+    private func animate() {
+        let distance = maxOffset - collectionView.contentOffset.y
         guard abs(distance) > 0.5 else { return }
         animation?.invalidate()
         animating = true
-        animationToken += 1
         animationStart = CACurrentMediaTime()
         animationDistance = distance
         let link = CADisplayLink(target: TranscriptDisplayLinkTarget { [weak self] in self?.animationFrame() }, selector: #selector(TranscriptDisplayLinkTarget.tick))
@@ -555,59 +542,29 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         guard animating else { return stopAnimation() }
         let progress = min(1, (CACurrentMediaTime() - animationStart) / Self.animationDuration)
         let eased = 1 - pow(1 - progress, 3)
-        let target = restingOffset()
-        let y = clamp(target - animationDistance * (1 - eased))
         counters.offsetWrites += 1
-        collectionView.contentOffset = CGPoint(x: collectionView.contentOffset.x, y: y)
-        if progress >= 1 { animationEnded("ended") }
+        collectionView.contentOffset = CGPoint(x: collectionView.contentOffset.x, y: clamp(maxOffset - animationDistance * (1 - eased)))
+        if progress >= 1 {
+            stopAnimation()
+            log?("v2 animation ended")
+            keepInRange("after animation")
+            updatePill()
+        }
     }
 
     private func stopAnimation() {
+        animating = false
         animation?.invalidate()
         animation = nil
     }
 
-    private func animationEnded(_ why: String) {
-        stopAnimation()
-        guard animating else { return }
-        animating = false
-        log?("v2 animation ended \(why)")
-        settle("after animation")
-        updatePill()
-    }
-
     // MARK: TranscriptLayoutAnchoring
 
-    #if DEBUG
-    /// The harness's control run: no anchoring while reading, to show its checks catch the drift.
-    static var anchorsReading = ProcessInfo.processInfo.environment["TRANSCRIPT_CONTROL_NO_ANCHOR"] == nil
-    #else
-    static let anchorsReading = true
-    #endif
-
-    func offsetAdjustment(resizing index: Int, frame: CGRect, by delta: CGFloat, in layout: TranscriptListLayout) -> CGFloat {
-        guard delta != 0, let collectionView else { return 0 }
-        guard Self.anchorsReading || holdsEnd else { return 0 }
-        if holdsEnd {
-            let b = bounds(contentHeight: layout.contentHeight + delta)
-            let end = TranscriptGeometry.maxOffset(contentHeight: b.content, boundsHeight: b.height, topInset: b.top, bottomInset: b.bottom)
-            return end - collectionView.contentOffset.y
-        }
-        // Reading, or a scroll under way: a row above the anchor (wholly
-        // above what the reader sees, or across its top edge, as rows are
-        // when a drag up brings them in) grows upward, so what the reader
-        // sees stays put.
-        let top = collectionView.contentOffset.y + collectionView.contentInset.top
-        return frame.minY < top - 0.5 ? delta : 0
-    }
-
+    /// After rows go in or out, or the width changes: the end if at it,
+    /// else where it was, clamped.
     func targetOffset(proposed: CGPoint, in layout: TranscriptListLayout) -> CGPoint {
-        guard collectionView != nil, collectionView.bounds.height > 0 else { return proposed }
-        if interacting, Self.anchorsReading, let anchor, let frame = layout.frame(of: anchor.id) {
-            return CGPoint(x: proposed.x, y: TranscriptGeometry.offset(restoring: anchor.distance, rowTop: frame.minY, topInset: collectionView.contentInset.top))
-        }
-        guard Self.anchorsReading || follow.mode == .following else { return proposed }
-        return CGPoint(x: proposed.x, y: restingOffset())
+        guard collectionView != nil, collectionView.bounds.height > 0, !touching else { return proposed }
+        return CGPoint(x: proposed.x, y: atEnd ? maxOffset : clamp(proposed.y))
     }
 
     // MARK: Layout passes
@@ -615,12 +572,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func transcriptDidLayout() {
         if animating { counters.animationLayouts += 1 } else { counters.layouts += 1 }
         measureStaleCells()
-        #if DEBUG
-        log?(String(format: "v2 layout offset=%.1f content=%.1f tracking=%@ decel=%@", collectionView.contentOffset.y, collectionView.contentSize.height, "\(collectionView.isTracking)", "\(collectionView.isDecelerating)"))
-        #endif
-        settle("transcript layout")
+        keepInRange("transcript layout")
         updatePill()
         checkNearTop()
+        logGeometry()
     }
 
     /// UIKit sizes a cell when it shows and when it asks to, not when only
@@ -628,7 +583,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// configuration is the old size: rows kept heights 20 to 60 pt off
     /// (a short bubble stood 140 pt tall). After each transcript layout pass
     /// the rows on screen measure again, and any that changed by more than
-    /// 1 pt go through the layout's own invalidation, so the anchor holds.
+    /// 1 pt go through the layout's own invalidation.
     /// About ten rows, only when something laid out; nothing at rest.
     private func measureStaleCells() {
         guard collectionView.bounds.width > 0 else { return }
@@ -644,7 +599,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
     }
     private var remeasureScheduled = false
-    private var measuring = false
+    /// Inside a re-measure's offset adjustment.
+    private var adjusting = false
     private var lastProbe: CGRect?
 
     /// Where the rows' content runs, in window coordinates: their leading and
@@ -656,10 +612,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     /// These rows measured now. Any that changed by more than 1 pt take
-    /// their new heights together, in one invalidation: one layout pass
-    /// however many rows changed. Reading (or under the reader's finger),
-    /// the view moves by what changed above the top, so nothing on screen
-    /// moves; following, the settle after the pass keeps the end.
+    /// their new heights together, in one invalidation (one layout pass),
+    /// whose offset adjustment is what grew upward, as for one row.
     private func measure(_ cells: [UICollectionViewCell]) {
         guard collectionView.bounds.width > 0 else { return }
         var sizes: [(index: Int, height: CGFloat)] = []
@@ -671,15 +625,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             if abs(fitted - original.size.height) > 1 { sizes.append((indexPath.item, fitted)) }
         }
         guard !sizes.isEmpty else { return }
-        measuring = true
-        defer { measuring = false }
-        let top = collectionView.contentOffset.y + collectionView.contentInset.top
-        let moved = layout.applyHeights(sizes, above: top)
-        layout.invalidateLayout(with: TranscriptListLayout.Context())
-        if !holdsEnd, moved.aboveTop != 0 {
-            counters.offsetWrites += 1
-            collectionView.contentOffset.y += moved.aboveTop
-        }
+        let context = UICollectionViewLayoutInvalidationContext()
+        context.contentOffsetAdjustment = CGPoint(x: 0, y: layout.applyHeights(sizes))
+        adjusting = true
+        layout.invalidateLayout(with: context)
+        adjusting = false
     }
 
     /// Visible rows whose height isn't what they measure now, for the harness.
@@ -695,85 +645,51 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     // MARK: Scrolling
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        noticeReaderRest()
-        // Only the reader's own movement moves the anchor. The offset also
-        // moves inside a layout pass, where rows coming into view size
-        // themselves and the anchor is being held: taken again there, an
-        // adjustment that missed stayed for good (24 pt in the replay).
-        if interacting, !collectionView.isLayingOut, !measuring {
-            anchor = TranscriptGeometry.readingAnchor(ids: layout.ids, frames: layout.frames,
-                offset: scrollView.contentOffset.y, topInset: scrollView.contentInset.top)
-        }
+        // The reader's own movement picks their row; an adjustment for rows
+        // sizing themselves doesn't.
+        if touching, !collectionView.isLayingOut, !adjusting { layout.readerRow = topRow()?.id }
         updatePill()
         checkNearTop()
     }
 
+    /// A touch that moves the view: no longer at the end, at once, before
+    /// anything lays out.
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        if animating { animating = false; stopAnimation() }
-        readerScrolling = true
+        stopAnimation()
+        readerMoved = true
+        if atEnd { atEnd = false; log?("v2 touch: reading") }
     }
 
-    /// The reader's drag began and hasn't been seen to come to rest yet.
-    private var readerScrolling = false
-
-    /// A reader's scroll that ended without UIKit saying so is over all the
-    /// same. An offset written while a fling decelerates (a row above the
-    /// reader measuring) stops it with no "decelerating ended", and `follow`
-    /// kept what it was before the drag: a fling up from the end stayed
-    /// "following", and the next layout (a tap, the keyboard, a row) took the
-    /// reader back to the end (Patrick, Oct 27). Checked wherever the view
-    /// might settle, so the reader's rest always decides first.
-    private func noticeReaderRest() {
-        guard readerScrolling, !interacting else { return }
-        log?("v2 reader scroll ended unannounced")
-        readerScrollEnded()
-    }
+    /// The reader's scroll began and hasn't been seen to come to rest yet.
+    /// An offset written while a fling runs can stop it with no "decelerating
+    /// ended"; `keepInRange` notices the rest itself.
+    private var readerMoved = false
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if !decelerate { readerScrollEnded() }
+        if !decelerate { readerRested("drag") }
     }
 
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { readerScrollEnded() }
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { readerRested("fling") }
 
-    func scrollViewDidScrollToTop(_ scrollView: UIScrollView) { readerScrollEnded() }
+    func scrollViewDidScrollToTop(_ scrollView: UIScrollView) { readerRested("top") }
 
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) { updatePill() }
 
-    private var distanceToEnd: CGFloat {
-        let b = bounds()
-        return TranscriptGeometry.distanceToEnd(offset: collectionView.contentOffset.y, contentHeight: b.content,
-            boundsHeight: b.height, bottomInset: b.bottom)
-    }
-
-    /// The reader decides: where their scroll comes to rest, near the end
-    /// follows it, anywhere else reads from there.
-    private func readerScrollEnded() {
-        readerScrolling = false
-        let near = distanceToEnd <= chrome.nearEnd
-        log?(String(format: "v2 reader scroll ended distance=%.1f near=%@", distanceToEnd, "\(near)"))
-        if follow.handle(.readerScrollEnded(nearEnd: near)) { followChanged() }
-        defer { logGeometry() }
-        if follow.mode == .following {
-            animate(to: maxOffset)
-        } else if anchor == nil || layout.frame(of: anchor!.id) == nil {
-            anchor = TranscriptGeometry.readingAnchor(ids: layout.ids, frames: layout.frames,
-                offset: collectionView.contentOffset.y, topInset: collectionView.contentInset.top)
-        } else {
-            // Where the reader left it: back on the anchor if a layout moved it.
-            settle("reader rest")
-        }
+    /// Where the reader's scroll comes to rest decides: at the end, it stays
+    /// there as the end moves; anywhere else, nothing moves it.
+    private func readerRested(_ why: String) {
+        readerMoved = false
+        atEnd = distanceToEnd <= Self.atEndSlack
+        // At the end, the end is what's held.
+        if atEnd { unseen = 0; layout.readerRow = nil }
+        log?(String(format: "v2 reader rested (%@) distance=%.1f atEnd=%@", why, distanceToEnd, "\(atEnd)"))
         updatePill()
-    }
-
-    private func followChanged() {
-        counters.followChanges += 1
-        log?("v2 follow \(follow.mode) unseen=\(follow.unseen)")
-        onFollowChange?(follow)
+        logGeometry()
     }
 
     private func updatePill() {
         guard isViewLoaded else { return }
-        let next = TranscriptPillState(shown: follow.mode == .reading && distanceToEnd > chrome.nearEnd, unseen: follow.unseen,
-                                       note: pillNote)
+        let next = TranscriptPillState(shown: !atEnd && distanceToEnd > chrome.nearEnd, unseen: unseen, note: pillNote)
         guard next != pill else { return }
         let placementChanged = next.shown != pill.shown
         pill = next
@@ -785,7 +701,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     /// Something waiting at the end, for the pill ("Question"). It doesn't
-    /// move the reader: following changes only on what they do.
+    /// move the reader.
     var pillNote: String? {
         didSet { if pillNote != oldValue { updatePill() } }
     }
@@ -803,7 +719,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     @objc private func tappedTranscript(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
-        noticeReaderRest()
         // After the tap's own handlers: a text link acts as the touch ends,
         // and resigning in the same pass dropped it.
         guard let window = view.window else { return }
@@ -813,6 +728,42 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 
     // MARK: Harness
+
+    /// A finger down on the transcript (the harness can't touch).
+    /// Let go past either edge, UIKit bounces back (as a fling, not reported
+    /// here): the release lands in range.
+    func simulateTouch(_ down: Bool) {
+        if !down, collectionView.contentOffset.y != clamp(collectionView.contentOffset.y) {
+            collectionView.setContentOffset(CGPoint(x: 0, y: clamp(collectionView.contentOffset.y)), animated: false)
+        }
+        simulatedTouch = down
+        if down { scrollViewWillBeginDragging(collectionView) } else { scrollViewDidEndDragging(collectionView, willDecelerate: false) }
+    }
+
+    /// The finger, or a fling, moves the view to `y`.
+    func simulateMove(to y: CGFloat, beforeLayout: () -> Void = {}) {
+        collectionView.contentOffset.y = y
+        scrollViewDidScroll(collectionView)
+        beforeLayout()
+        collectionView.layoutIfNeeded()
+    }
+
+    /// A fling that UIKit ends without telling us: the view moves, and nothing reports the rest.
+    func simulateFlingCutShort(to y: CGFloat) {
+        simulateTouch(true)
+        simulateMove(to: clamp(y))
+        simulatedTouch = false
+    }
+
+    /// A drag to `y`, let go there.
+    func simulateReaderScroll(to y: CGFloat, beforeLayout: () -> Void = {}) {
+        simulateTouch(true)
+        collectionView.contentOffset.y = clamp(y)
+        scrollViewDidScroll(collectionView)
+        beforeLayout()
+        collectionView.layoutIfNeeded()
+        simulateTouch(false)
+    }
 
     func resetCounters() {
         counters = Counters()
@@ -841,7 +792,7 @@ private final class TranscriptDisplayLinkTarget: NSObject {
     @objc func tick() { frame() }
 }
 
-/// Lays out, then tells the controller, which settles the view on its anchor.
+/// Lays out, then tells the controller, which keeps the view in range.
 final class TranscriptCollectionView: UICollectionView {
     var didLayout: (() -> Void)?
     /// Inside UIKit's own layout pass (cells sizing themselves).

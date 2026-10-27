@@ -23,18 +23,21 @@ geometry back into layout.
   inverted, so VoiceOver order, context menus, text selection, the scroll
   indicator and interactive keyboard dismissal stay native. Heights are kept
   by row id. A short chat rests at the top, with no gap above it.
-- **One owner.** `TranscriptController` is the only thing that writes the
-  scroll offset, and every write is clamped to the valid range. It can't
-  rest past the end.
-- **Following or reading.** A state machine (`TranscriptFollow`) that changes
-  only where the reader's own scroll comes to rest (near the end means
-  following) and on the jump pill. A send counts as a jump. Layout, insets,
-  the keyboard and new rows never change it.
-  - Following: the anchor is the end of the content.
-  - Reading: the anchor is the first row that starts at or below the top
-    edge. Height changes above it (self-sizing, a card opening, older pages
-    going in) move the view by the same amount, in the layout's own
-    invalidation, so nothing on screen moves.
+- **Plain scrolling.** Scrolling is UIKit's. The one automatic move: a view
+  at the end (within 4 pt) when the end moves (a row grows, rows arrive, the
+  composer grows) stays at the end. Otherwise only "↓", the pill and sending
+  a message go to the end (`jumpToLatest`).
+  - A touch that moves the view stops "at the end" at once. Where the
+    reader's scroll comes to rest decides it again.
+  - While a finger is down or a fling runs, nothing is written. The only
+    adjustment is UIKit's own, for a row before the reader's row that
+    resizes (it grows upward, so nothing on screen moves).
+  - Older rows paged in at the top keep the reader's row in place.
+  - The keyboard and the composer's cards change the bottom inset only; a
+    view that isn't at the end doesn't move.
+- **Never past the end.** One clamp, `keepInRange()`, after every layout
+  pass when no finger or fling is moving the view (UIKit bounces those back
+  itself).
 - **The pill.** While reading, a jump button with a count of new rows
   ("↓ 12 new"). On a phone it sits in the corner; beside two pages it is
   centred above the composer, on its own glass, with no scrim over the rows
@@ -50,8 +53,7 @@ geometry back into layout.
     detected as a phone-idiom screen at least 900 × 600 pt.
 - **Generic.** The container takes ordered rows (any `Identifiable &
   Equatable`) and a SwiftUI view for each, and imports nothing from the
-  app. It hands back near-top (for older pages), follow changes and pill
-  state. `TranscriptHandle` takes requests: jump, scroll to a row,
+  app. It hands back near-top (for older pages) and pill state. `TranscriptHandle` takes requests: jump, scroll to a row,
   reconfigure a row, and carry a row's height to a new id (an optimistic row
   confirmed by the server).
 
@@ -111,19 +113,23 @@ outer screen and the inner screen. The steps:
 - a card opening across the top edge;
 - the window resized and backgrounded;
 - jump to latest;
-- a short chat in a sheet that grows and shrinks.
+- a short chat in a sheet that grows and shrinks;
+- a busy turn (Patrick, Oct 27): "Thinking" coming and going at the end, a
+  running-task card above the composer that ticks and comes and goes, a
+  reply growing every step, at the end, a little above it, and under a
+  finger dragging up 800 pt, a fling, and 3 s still.
 
 After every step it checks:
 
 - the view is never past the end;
-- while following, the end sits just above the composer;
-- while reading, the anchor row moves less than 1 pt;
+- at the end, the end sits just above the composer;
+- reading (and under the finger), the reader's row moves less than 1 pt;
 - the composer's gap matches the layout;
 - every visible row is as tall as it measures;
 - layout passes per step are bounded, and nothing is written at rest.
 
-With anchoring turned off (`TRANSCRIPT_CONTROL_NO_ANCHOR`), prepends drift
-about 16,500 pt and the checks fail, so they aren't blind.
+A fold or split while reading rewraps every row; nothing holds the
+reader's row there, so those steps check only the end and the clamp.
 
 **M0 gate** (2e5ba03f), all three layouts, 158 steps each: 0.00 pt past
 the end, 0.00 pt off the end while following, 0.00 pt anchor drift, 0.00 pt

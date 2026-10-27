@@ -1,29 +1,8 @@
 import XCTest
 @testable import BBStudio
 
-/// The UIKit transcript's follow state machine and anchor math.
+/// The UIKit transcript's scroll math.
 final class TranscriptFollowTests: XCTestCase {
-    func testOnlyTheReadersRestAndTheJumpChangeFollowing() {
-        var follow = TranscriptFollow()
-        XCTAssertEqual(follow.mode, .following)
-        follow.handle(.appended(3))
-        XCTAssertEqual(follow.mode, .following, "New rows don't change it")
-        XCTAssertEqual(follow.unseen, 0, "Following sees every row")
-        follow.handle(.readerScrollEnded(nearEnd: false))
-        XCTAssertEqual(follow.mode, .reading)
-        follow.handle(.appended(2))
-        follow.handle(.appended(1))
-        XCTAssertEqual(follow.unseen, 3, "Rows that came in while reading count for the pill")
-        follow.handle(.readerScrollEnded(nearEnd: true))
-        XCTAssertEqual(follow.mode, .following)
-        XCTAssertEqual(follow.unseen, 0)
-        follow.handle(.readRow)
-        XCTAssertEqual(follow.mode, .reading)
-        XCTAssertTrue(follow.handle(.jumpToLatest))
-        XCTAssertEqual(follow.mode, .following)
-        XCTAssertFalse(follow.handle(.jumpToLatest), "No change, no notice")
-    }
-
     func testMaxOffsetKeepsAShortChatAtTheTop() {
         // 300 pt of rows in a 600 pt view under an 80 pt header: rests at the top, no gap above.
         XCTAssertEqual(TranscriptGeometry.maxOffset(contentHeight: 300, boundsHeight: 600, topInset: 80, bottomInset: 100), -80)
@@ -42,17 +21,11 @@ final class TranscriptFollowTests: XCTestCase {
         XCTAssertEqual(TranscriptGeometry.distanceToEnd(offset: 1700, contentHeight: 2000, boundsHeight: 600, bottomInset: 100), -200)
     }
 
-    func testReadingAnchorIsTheFirstRowEndingBelowTheTop() {
+    func testFirstIndexEndingBelow() {
         let frames = (0..<10).map { CGRect(x: 0, y: CGFloat($0) * 100, width: 300, height: 90) }
-        let ids = (0..<10).map { "r\($0)" }
-        let anchor = TranscriptGeometry.readingAnchor(ids: ids, frames: frames, offset: 170, topInset: 80)
-        // The view's top is at 250: r2 (200–290) crosses it, so r3, 50 pt below the top, is the anchor.
-        XCTAssertEqual(anchor?.id, "r3")
-        XCTAssertEqual(anchor?.distance, 50)
-        // A row that starts right at the top is the anchor itself.
-        XCTAssertEqual(TranscriptGeometry.readingAnchor(ids: ids, frames: frames, offset: 220, topInset: 80)?.id, "r3")
-        // After 3 rows of 100 pt go in above, the same distance puts r3 where it was.
-        XCTAssertEqual(TranscriptGeometry.offset(restoring: 50, rowTop: 600, topInset: 80), 470)
+        XCTAssertEqual(TranscriptGeometry.firstIndex(endingBelow: 250, frames: frames), 2, "r2 (200–290) crosses 250")
+        XCTAssertEqual(TranscriptGeometry.firstIndex(endingBelow: 295, frames: frames), 3)
+        XCTAssertNil(TranscriptGeometry.firstIndex(endingBelow: 2000, frames: frames))
     }
 
     @MainActor
@@ -60,6 +33,14 @@ final class TranscriptFollowTests: XCTestCase {
         XCTAssertEqual(TranscriptController.appendedCount(old: ["a", "b"], new: ["z", "a", "b", "c", "d"]), 2)
         XCTAssertEqual(TranscriptController.appendedCount(old: ["a", "b"], new: ["z", "a", "b"]), 0, "A prepend isn't new")
         XCTAssertEqual(TranscriptController.appendedCount(old: [], new: ["a"]), 0)
+    }
+
+    @MainActor
+    func testPrependedOnlyWhenRowsGoInAboveTheFirst() {
+        XCTAssertTrue(TranscriptController.prepended(old: ["a", "b"], new: ["y", "z", "a", "b"]))
+        XCTAssertFalse(TranscriptController.prepended(old: ["a", "b"], new: ["a", "b", "c"]), "An append isn't")
+        XCTAssertFalse(TranscriptController.prepended(old: ["a", "b"], new: ["c", "d"]), "A newer page replacing them isn't")
+        XCTAssertFalse(TranscriptController.prepended(old: [], new: ["a"]))
     }
 }
 
