@@ -554,13 +554,37 @@ struct PushToTalkButton: View {
     private var handsFree: Bool { composer.shown.mode == .handsFree }
     private var held: Bool { composer.shown.input == .holding }
 
+    // Typed pieces, so the body stays one simple chain: as a single
+    // expression it was too slow for Xcode 26's type checker.
+    private var iconColor: Color { held ? .white : handsFree ? .red : .accentColor }
+
+    private var fillColor: Color {
+        if held { return talk.state == .cancelling ? .gray : .red }
+        return handsFree ? Color.red.opacity(0.15) : Color.accentColor.opacity(0.15)
+    }
+
+    private var holdGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.2)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .updating($holding) { value, holding, _ in
+                if case .second(true, _) = value { holding = true }
+            }
+            .onChanged { value in
+                guard case .second(true, let drag) = value else { return }
+                if composer.shown.input == .idle, !handsFree { composer.send(.pressBegan) }
+                if let drag { talk.drag(drag.translation) }
+            }
+            .onEnded { _ in
+                if talk.state == .cancelling { talk.cancel() } else { composer.send(.pressEnded) }
+            }
+    }
+
     var body: some View {
         Image(systemName: "waveform")
             .font(.body.weight(.semibold))
-            .foregroundStyle(held ? Color.white : handsFree ? Color.red : Color.accentColor)
+            .foregroundStyle(iconColor)
             .frame(width: 36, height: 36)
-            .background(held ? (talk.state == .cancelling ? Color.gray : Color.red)
-                        : handsFree ? Color.red.opacity(0.15) : Color.accentColor.opacity(0.15), in: .circle)
+            .background(fillColor, in: .circle)
             .scaleEffect(held ? 1.15 : 1)
             .animation(.snappy, value: composer.shown.input)
             .frame(minWidth: 44, minHeight: 44)
@@ -569,21 +593,7 @@ struct PushToTalkButton: View {
                 if let heldUntil, Date.now.timeIntervalSince(heldUntil) < 0.5 { return }
                 if handsFree { composer.send(.pillTapped) } else { composer.pushToTalkTapped() }
             }
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.2)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .updating($holding) { value, holding, _ in
-                        if case .second(true, _) = value { holding = true }
-                    }
-                    .onChanged { value in
-                        guard case .second(true, let drag) = value else { return }
-                        if composer.shown.input == .idle, !handsFree { composer.send(.pressBegan) }
-                        if let drag { talk.drag(drag.translation) }
-                    }
-                    .onEnded { _ in
-                        if talk.state == .cancelling { talk.cancel() } else { composer.send(.pressEnded) }
-                    }
-            )
+            .simultaneousGesture(holdGesture)
             .onChange(of: holding) { _, holding in
                 if !holding { heldUntil = .now; talk.holdLost() }
             }
