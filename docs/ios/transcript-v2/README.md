@@ -218,7 +218,8 @@ to the same `ThreadView`, so all of them get the new transcript.
 | Header buttons in the status-bar strip | Done. The transcript's scroll view gives up scroll-to-top beside two pages, as the old path's scroll views do. |
 | Voice mode and read-aloud | Same composer and rows. `NoVoiceChatUITests` passes on the new path; read-aloud has no offline test. |
 | Scroll log and breadcrumbs | `v2 geo` lines like the old `geo` lines, ids through `ScrollLog.id`; tap-to-close writes its breadcrumb. `ScrollLogUITests` passes on the new path. |
-| Mini cards and side threads with real content | Not yet: they need fixtures seeded on a staged BB (three mini apps, a Bot reply with a side thread). |
+| Mini cards with real content | Done. `MiniCardUITests` passes on the new path against a staged BB seeded by `apps/ios/scripts/seed-staged-minis.py`. |
+| Side threads with real content | Done. `BotSideThreadUITests` passes on the new path (iPhone simulator) against a staged BB: a Bot made from a seeded thread (`bot_create`), a follow-up, `bot_side_thread_open` on the newest reply and one message in it. |
 
 ### Existing suites on the new path
 
@@ -230,8 +231,20 @@ simulator to compare.
 | TranscriptPastEnd (phone, Duo) | 7 + 8 pass | — |
 | TranscriptTapDismiss (phone, outer, split) | pass; split: the links test fails | split: the same links test fails |
 | TranscriptHang, Composer, DraftAttachment, ScrollLog, NoVoiceChat (phone, Duo), KeyboardFocusAway (phone, outer, split), KeyboardFold, DuoPaneWidth, DuoPhoneRoot, DuoSplitComposer, DuoSplitWidth | pass | — |
-| HeaderTap (Duo) | the 3 thread tests fail on "find centre: the transcript moved" | the same 3 fail, on more steps ("⋯ top edge", "find top edge" too) |
-| DuoLayout, DuoLongTranscript, DuoEdgeToEdge, DuoQuickReplies, DuoRegularComparison, DuoSidebarSearch | fail | fail the same tests: they don't pass on main on these simulators either |
+| HeaderTap (Duo) | the 3 thread tests fail on "find centre: the transcript moved" | the same 3 fail, the same amounts (+17, −44, −5 pt) |
+| DuoEdgeToEdge, DuoRegularComparison, DuoSidebarSearch (with main's offline fixtures) | pass | pass |
+| DuoLayout | skips (screen too small) | skips |
+| DuoLongTranscript, DuoQuickReplies | fail | fail the same tests |
+
+**Find doesn't move the view.** When Find opens while reading, the header
+grows by the find bar (52 pt) and the offset drops by the same 52 pt, so
+the row at the top of what the reader sees stays (scroll log:
+`insets top=110`, `offset layout from 1488.3 to 1436.3`). What HeaderTap
+reports next is rows above the reader, still at estimated heights,
+measuring for real (content 6262 → 6278 → 6293 pt); the view moves with
+them, so nothing moves on screen, but the test measures in content
+coordinates. The old path shows the same numbers. Tracking the top row
+itself, rather than the content offset, would tell the two apart.
 
 ## Known gaps
 
