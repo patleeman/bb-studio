@@ -71,7 +71,21 @@ final class MiniCardUITests: StagedServerUITestCase {
         XCTAssertEqual(header.frame.minY, headerAt, accuracy: 4, "the thread didn't move")
         XCTAssertTrue(!row.exists || row.frame.minY < rowAt - 60, "the list scrolled inside its card")
 
-        // The first copy of the task counter has the last one's changes.
+        // The first copy of the task counter has the last one's changes. Only
+        // a few cards run at once: the first copy, scrolled back to, may be
+        // paused ("Tap to run here"), so run it as a person would.
+        // (The last copy, still running, has the count too; look in view.)
+        let firstCount = app.webViews.buttons.matching(identifier: "Count \(counted)")
+        for _ in 0..<12 {
+            let inView = firstCount.allElementsBoundByIndex.contains { $0.isHittable && $0.frame.minY > app.frame.height * 0.3 && $0.frame.maxY < app.frame.height * 0.75 }
+            if inView { break }
+            if let paused = app.buttons.matching(identifier: "miniCardPaused").allElementsBoundByIndex.first(where: { $0.isHittable }) {
+                paused.tap()
+                Thread.sleep(forTimeInterval: 3)
+                break
+            }
+            drag(from: app.frame.height * 0.3, by: 280, beside: true)
+        }
         _ = try XCTUnwrap(scroll(to: app.webViews.buttons.matching(identifier: "Count \(counted)")), "the first copy shows the shared count")
         XCTAssertTrue(app.webViews.staticTexts["Task \(tasks + 1)"].firstMatch.exists)
         screenshot("first")
