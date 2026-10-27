@@ -202,10 +202,39 @@ outer screen: [outer](duo-outer-thread.png).
   SwiftUI can't compare, so the view never moved to a match. They now take
   the values they watch.
 
+## M2: parity and coverage (27 October)
+
+Every screen that opens a thread (Threads, the Bot tab, item chats from
+Studio, pages and related items, automations) goes through `Route.thread`
+to the same `ThreadView`, so all of them get the new transcript.
+
+| Parity | State |
+| --- | --- |
+| Fold and unfold keep the reading position | Done. The container's anchor holds through width changes; the old `TranscriptResizeAnchor` restore isn't used on the new path. `testFoldKeepsTheReadingPosition`: the top row comes back at the same y after a fold and an unfold. |
+| Unread divider, opening at the first unread | Done. A scroll to a row that isn't in yet waits for it. `testThreadParity` (`-qaDemoUnread 8`): the divider is on screen, reading. |
+| Older history in threads | Done. The near-top callback loads pages in threads as in the Bot chat. `testThreadParity`: content 4,818 → 11,574 pt, nothing past the end. |
+| Edit, quote, select in threads | Done. `testThreadParity`. |
+| Question pill in a thread from the Threads list | Done. The demo now tells every open view of the thread (it told only the last one). |
+| Header buttons in the status-bar strip | Done. The transcript's scroll view gives up scroll-to-top beside two pages, as the old path's scroll views do. |
+| Voice mode and read-aloud | Same composer and rows. `NoVoiceChatUITests` passes on the new path; read-aloud has no offline test. |
+| Scroll log and breadcrumbs | `v2 geo` lines like the old `geo` lines, ids through `ScrollLog.id`; tap-to-close writes its breadcrumb. `ScrollLogUITests` passes on the new path. |
+| Mini cards and side threads with real content | Not yet: they need fixtures seeded on a staged BB (three mini apps, a Bot reply with a side thread). |
+
+### Existing suites on the new path
+
+`TEST_RUNNER_TRANSCRIPT_V2=1`, each also run with the flag off on the same
+simulator to compare.
+
+| Suite | New path | Old path |
+| --- | --- | --- |
+| TranscriptPastEnd (phone, Duo) | 7 + 8 pass | — |
+| TranscriptTapDismiss (phone, outer, split) | pass; split: the links test fails | split: the same links test fails |
+| TranscriptHang, Composer, DraftAttachment, ScrollLog, NoVoiceChat (phone, Duo), KeyboardFocusAway (phone, outer, split), KeyboardFold, DuoPaneWidth, DuoPhoneRoot, DuoSplitComposer, DuoSplitWidth | pass | — |
+| HeaderTap (Duo) | the 3 thread tests fail on "find centre: the transcript moved" | the same 3 fail, on more steps ("⋯ top edge", "find top edge" too) |
+| DuoLayout, DuoLongTranscript, DuoEdgeToEdge, DuoQuickReplies, DuoRegularComparison, DuoSidebarSearch | fail | fail the same tests: they don't pass on main on these simulators either |
+
 ## Known gaps
 
-- A question asked in a thread opened from the Threads list isn't tested:
-  the demo only tells the Bot chat of changes.
 - Mini cards and side threads with real content need a staged server. Run
   `MiniCardUITests` and `BotSideThreadUITests` with `TEST_RUNNER_TRANSCRIPT_V2=1`.
 - iOS's two-app split can't be driven in the simulator. The inner-screen rule
