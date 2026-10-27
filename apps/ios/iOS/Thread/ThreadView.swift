@@ -117,6 +117,66 @@ struct ThreadView: View {
         #if DEBUG
         let _ = RenderCount.bump("thread.body")
         #endif
+        withTalk
+        .focusedSceneValue(\.thread, actions)
+        .sensoryFeedback(.success, trigger: model.confirmations)
+        .task(id: botChrome?.chain) {
+            // The chain ends at this thread; until `bot_chain` answers, the thread alone.
+            if let chain = botChrome?.chain, chain.last == model.threadId { model.chainBefore = Array(chain.dropLast()) }
+        }
+        .modifier(BotThreadHooks(chrome: botChrome, threadId: model.threadId, environmentId: model.thread?.environmentId,
+                                    sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
+        .sensoryFeedback(.warning, trigger: model.interactions.count, condition: Self.grew)
+        .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
+        .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
+        .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
+    }
+
+    /// For the haptics on a count: it went up.
+    private static func grew(_ old: Int, _ new: Int) -> Bool { new > old }
+
+    /// Handoff and Spotlight: the thread's title and web link.
+    private func describeActivity(_ activity: NSUserActivity) {
+        guard let thread = model.thread else { return }
+        activity.title = thread.displayTitle
+        activity.webpageURL = client.webURL(forThread: thread).absoluteURL
+        activity.targetContentIdentifier = thread.id
+    }
+
+    /// Voice, talk and the Action button.
+    private var withTalk: some View {
+        withLoading
+        .modifier(VoiceHooks(voice: voice, talk: talk, player: player, rows: model.rows, running: model.thread?.isRunning == true,
+                             readAlongRow: $readAlongRow, editingVoice: $editingVoice))
+        .modifier(TalkDraft(talk: talk, draft: $draft, typed: $talkTyped))
+        .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
+        .modifier(TalkLifecycle(talk: talk))
+        .onAppear {
+            ScrollLog.observeKeyboard()
+            talk.send = { [model, voice] text in
+                if voice.on { return sendSpoken(text) }
+                Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
+            }
+            talk.insert = { [model] text in
+                let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
+                draft = next
+                // Saved here too: a dictation finished as the thread closes lands after its view is gone.
+                Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
+            }
+            takeActionButton()
+        }
+        .onChange(of: app.botTalkPending) { _, _ in takeActionButton() }
+        .onChange(of: talk.error) { _, error in
+            if let error { app.flash(error) }
+        }
+    }
+
+    // `body` in parts, so each type-checks in well under a second (as one
+    // chain it took 30 s, and Xcode 26 gave up on it). The same modifiers,
+    // in the same order.
+
+    /// The screen and its sheets.
+    private var withSheets: some View {
         screen
         .navigationBarBackButtonHidden(duoLayout.twoPages && app.tab == .inbox && hidesTabBar)
         .sheet(isPresented: $showingWeb) {
@@ -165,6 +225,11 @@ struct ThreadView: View {
         }
         .sheet(isPresented: $editingBotHeartbeat) { BotHeartbeatSheet() }
         .sheet(isPresented: $showingContext) { ThreadContextView(threadId: model.threadId) }
+    }
+
+    /// Alerts, dialogs and the sheets that edit the draft.
+    private var withDialogs: some View {
+        withSheets
         .alert("Rename thread", isPresented: $renaming) {
             TextField("Title", text: $newTitle)
             Button("Cancel", role: .cancel) {}
@@ -226,6 +291,11 @@ struct ThreadView: View {
             }
             .presentationDetents([.medium, .large])
         }
+    }
+
+    /// The error toast, loading, the draft and the unread row.
+    private var withLoading: some View {
+        withDialogs
         .overlay(alignment: .top) {
             // The outbox's own error shows once, on its shelf card.
             if let error = model.error, error != outbox.storageError {
@@ -294,46 +364,6 @@ struct ThreadView: View {
             resizeAnchor.cancel()
             model.detach()
             notes.detach()
-        }
-        .modifier(VoiceHooks(voice: voice, talk: talk, player: player, rows: model.rows, running: model.thread?.isRunning == true,
-                             readAlongRow: $readAlongRow, editingVoice: $editingVoice))
-        .modifier(TalkDraft(talk: talk, draft: $draft, typed: $talkTyped))
-        .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
-        .modifier(TalkLifecycle(talk: talk))
-        .onAppear {
-            ScrollLog.observeKeyboard()
-            talk.send = { [model, voice] text in
-                if voice.on { return sendSpoken(text) }
-                Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
-            }
-            talk.insert = { [model] text in
-                let next = TalkDraft.finished(text, typed: &talkTyped, draft: draft)
-                draft = next
-                // Saved here too: a dictation finished as the thread closes lands after its view is gone.
-                Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
-            }
-            takeActionButton()
-        }
-        .onChange(of: app.botTalkPending) { _, _ in takeActionButton() }
-        .onChange(of: talk.error) { _, error in
-            if let error { app.flash(error) }
-        }
-        .focusedSceneValue(\.thread, actions)
-        .sensoryFeedback(.success, trigger: model.confirmations)
-        .task(id: botChrome?.chain) {
-            // The chain ends at this thread; until `bot_chain` answers, the thread alone.
-            if let chain = botChrome?.chain, chain.last == model.threadId { model.chainBefore = Array(chain.dropLast()) }
-        }
-        .modifier(BotThreadHooks(chrome: botChrome, threadId: model.threadId, environmentId: model.thread?.environmentId,
-                                    sends: sends, running: model.thread?.isRunning == true, interactions: model.interactions.count))
-        .sensoryFeedback(.warning, trigger: model.interactions.count) { old, new in new > old }
-        .sensoryFeedback(.error, trigger: model.error) { _, new in new != nil }
-        .sensoryFeedback(.selection, trigger: attachments.count) { old, new in new > old }
-        .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil) { activity in
-            guard let thread = model.thread else { return }
-            activity.title = thread.displayTitle
-            activity.webpageURL = client.webURL(forThread: thread).absoluteURL
-            activity.targetContentIdentifier = thread.id
         }
     }
 
@@ -522,6 +552,82 @@ struct ThreadView: View {
     }
 
     private var timeline: some View {
+        timelineGeometry
+        .onScrollPhaseChange { _, phase in
+            #if DEBUG
+            RenderCount.bump("write.scrollPhase")
+            #endif
+            scrollPhase = phase
+            end.animationOver = false
+            if phase == .animating { watchAnimation() }
+            if phase == .tracking || phase == .interacting {
+                resizeRestore?.cancel()
+                resizeAnchor.cancel()
+                end.readerScrolling = true
+            }
+            // The reader decides: wherever their scroll comes to rest, the
+            // chat follows its end only if that's near the end. The app's own
+            // animated scrolls don't decide it: one cut short by a newer
+            // request rests wherever it was, short of a reply still growing,
+            // and the chat stopped following with no one having scrolled.
+            if phase == .idle, end.readerScrolling {
+                end.following = end.geometry.nearEnd
+                end.readerScrolling = false
+            }
+            keepAtEnd()
+        }
+        // The first page lands at the bottom through `defaultScrollAnchor`;
+        // scrolling by hand while lazy rows are still measuring can overshoot.
+        .onChange(of: model.shownRows.last?.id) { old, _ in
+            if old != nil, atBottom || model.shownRows.last?.isUser == true { scrollToBottom() }
+        }
+        // The Bot's typing row goes in under the message just sent.
+        .onChange(of: showsWorking) { _, shows in
+            if shows, atBottom { scrollToBottom() }
+        }
+        // Older pages load when the reader reaches the top.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < 40
+        } action: { _, isAtTop in
+            #if DEBUG
+            RenderCount.bump("write.atTop")
+            #endif
+            atTop = isAtTop
+        }
+        // Keeps loading while the reader stays at the top and a page is too
+        // short to move them off it; backs off after failures, and stops when
+        // a page brings nothing new.
+        .task(id: atTop) {
+            var failures = 0
+            while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
+                guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
+                try? await Task.sleep(for: delay)
+            }
+        }
+        .onChange(of: finding) { _, finding in
+            if finding { Task { await model.loadAll() } }
+        }
+        .onChange(of: findQuery) { _, _ in findIndex = 0 }
+        // Earlier pages going in above would carry the match off screen.
+        .onChange(of: model.rows.first?.id) { _, _ in
+            if finding, let currentMatch { read(currentMatch, anchor: .center) }
+        }
+        .onChange(of: currentMatch) { _, id in
+            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
+        }
+        .onChange(of: model.interactions.first?.id) { _, id in
+            if id != nil { scrollToBottom() }
+        }
+        .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
+        .onChange(of: outbox.messages.count) { old, new in
+            if new > old { scrollToBottom() }
+        }
+    }
+
+    // `timeline` in parts, so each type-checks quickly. The same modifiers, in order.
+
+    /// The rows, and the Debug QA commands.
+    private var timelineScroll: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 if botChrome != nil ? model.canLoadOlder : model.hasOlder {
@@ -546,34 +652,7 @@ struct ThreadView: View {
                 let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
                 ForEach(items) { item in
                     // One view per item, so scrolling to the item lands on the divider.
-                    VStack(alignment: .leading, spacing: 14) {
-                        if item.id == unread { UnreadDivider() }
-                        Group {
-                            switch item {
-                            case .message(let row):
-                                MessageBubble(
-                                    row: row,
-                                    projectId: model.thread?.projectId,
-                                    react: { draftReply($0) },
-                                    reactionItems: reactionSettings.items,
-                                    quote: { quote($0) },
-                                    select: { selecting = SelectionText(text: $0) },
-                                    sideChat: sideChat,
-                                    edit: row.id == editable ? startEditing : nil,
-                                    saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-                                    readAloud: voice.available == true ? { voice.readAloud(rowId: row.id, text: $0) } : nil,
-                                    reading: player.isReading(row.id))
-                                .environment(\.readAlongPiece, row.id == readAlongRow ? player.piece : nil)
-                            case .activity(let rows):
-                                ActivityGroup(rows: rows)
-                            }
-                        }
-                        .background {
-                            if item.id == match {
-                                RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
-                            }
-                        }
-                    }
+                    timelineItem(item, unread: unread, editable: editable, match: match, sideChat: sideChat)
                     .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
                         let isMessage: Bool
                         if case .message = item { isMessage = true } else { isMessage = false }
@@ -659,6 +738,11 @@ struct ThreadView: View {
             } else { scrollToBottom(animated: false) }
         }
         #endif
+    }
+
+    /// Where the rows are, and the one owner of the end.
+    private var timelineGeometry: some View {
+        timelineScroll
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { resizeAnchor.frame = $0 }
         .onScrollTargetVisibilityChange(idType: String.self, threshold: 0.01) { ids in
             resizeAnchor.visible(ids)
@@ -715,74 +799,38 @@ struct ThreadView: View {
             #endif
             keepAtEnd()
         }
-        .onScrollPhaseChange { _, phase in
-            #if DEBUG
-            RenderCount.bump("write.scrollPhase")
-            #endif
-            scrollPhase = phase
-            end.animationOver = false
-            if phase == .animating { watchAnimation() }
-            if phase == .tracking || phase == .interacting {
-                resizeRestore?.cancel()
-                resizeAnchor.cancel()
-                end.readerScrolling = true
+    }
+
+    /// One item of `timeline`, built apart so the timeline type-checks quickly.
+    @ViewBuilder private func timelineItem(_ item: TimelineItem, unread: String?, editable: String?, match: String?,
+                                           sideChat: ((String) -> Void)?) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if item.id == unread { UnreadDivider() }
+            Group {
+                switch item {
+                case .message(let row):
+                    MessageBubble(
+                        row: row,
+                        projectId: model.thread?.projectId,
+                        react: { draftReply($0) },
+                        reactionItems: reactionSettings.items,
+                        quote: { quote($0) },
+                        select: { selecting = SelectionText(text: $0) },
+                        sideChat: sideChat,
+                        edit: row.id == editable ? startEditing : nil,
+                        saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
+                        readAloud: voice.available == true ? { voice.readAloud(rowId: row.id, text: $0) } : nil,
+                        reading: player.isReading(row.id))
+                    .environment(\.readAlongPiece, row.id == readAlongRow ? player.piece : nil)
+                case .activity(let rows):
+                    ActivityGroup(rows: rows)
+                }
             }
-            // The reader decides: wherever their scroll comes to rest, the
-            // chat follows its end only if that's near the end. The app's own
-            // animated scrolls don't decide it: one cut short by a newer
-            // request rests wherever it was, short of a reply still growing,
-            // and the chat stopped following with no one having scrolled.
-            if phase == .idle, end.readerScrolling {
-                end.following = end.geometry.nearEnd
-                end.readerScrolling = false
+            .background {
+                if item.id == match {
+                    RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6)
+                }
             }
-            keepAtEnd()
-        }
-        // The first page lands at the bottom through `defaultScrollAnchor`;
-        // scrolling by hand while lazy rows are still measuring can overshoot.
-        .onChange(of: model.shownRows.last?.id) { old, _ in
-            if old != nil, atBottom || model.shownRows.last?.isUser == true { scrollToBottom() }
-        }
-        // The Bot's typing row goes in under the message just sent.
-        .onChange(of: showsWorking) { _, shows in
-            if shows, atBottom { scrollToBottom() }
-        }
-        // Older pages load when the reader reaches the top.
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top < 40
-        } action: { _, isAtTop in
-            #if DEBUG
-            RenderCount.bump("write.atTop")
-            #endif
-            atTop = isAtTop
-        }
-        // Keeps loading while the reader stays at the top and a page is too
-        // short to move them off it; backs off after failures, and stops when
-        // a page brings nothing new.
-        .task(id: atTop) {
-            var failures = 0
-            while atTop, botChrome != nil ? model.canLoadOlder : model.hasOlder, !Task.isCancelled {
-                guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
-                try? await Task.sleep(for: delay)
-            }
-        }
-        .onChange(of: finding) { _, finding in
-            if finding { Task { await model.loadAll() } }
-        }
-        .onChange(of: findQuery) { _, _ in findIndex = 0 }
-        // Earlier pages going in above would carry the match off screen.
-        .onChange(of: model.rows.first?.id) { _, _ in
-            if finding, let currentMatch { read(currentMatch, anchor: .center) }
-        }
-        .onChange(of: currentMatch) { _, id in
-            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
-        }
-        .onChange(of: model.interactions.first?.id) { _, id in
-            if id != nil { scrollToBottom() }
-        }
-        .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
-        .onChange(of: outbox.messages.count) { old, new in
-            if new > old { scrollToBottom() }
         }
     }
 
