@@ -122,10 +122,14 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
         menu(on: reply, "Select Text", "actions: select text")
         let done = app.navigationBars["Select Text"].buttons["Done"]
-        if done.waitForExistence(timeout: 5) { done.tap() } else { failures.append("actions: Select Text didn't open") }
+        if done.waitForExistence(timeout: 10) { done.tap(); _ = done.waitForNonExistence(timeout: 5) } else { failures.append("actions: Select Text didn't open") }
 
-        reply.press(forDuration: 1)
-        if !app.buttons["Reply in Thread"].waitForExistence(timeout: 5) { failures.append("actions: no Reply in Thread on a reply") }
+        let replyInThread = app.buttons["Reply in Thread"]
+        for _ in 0..<2 where !replyInThread.exists {
+            reply.press(forDuration: 1)
+            _ = replyInThread.waitForExistence(timeout: 4)
+        }
+        if !replyInThread.exists { failures.append("actions: no Reply in Thread on a reply") }
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
         _ = app.buttons["Reply in Thread"].waitForNonExistence(timeout: 3)
 
@@ -240,12 +244,138 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         finish()
     }
 
+    /// A thread opened from the Threads list (the demo lists one only
+    /// beside two pages), served by the demo server: it opens at the first
+    /// unread row with its divider; older pages load at the top without
+    /// moving the rows; a question asked while reading shows on the pill,
+    /// and its card is at the end; Quote, Select Text and Edit work.
+    func testThreadParity() throws {
+        guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+            "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles", "-qaDemoLatency", "300", "-qaDemoColdCache",
+            "-qaDemoUnread", "8", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launchOffline()
+        XCTAssertTrue(composerField.waitForExistence(timeout: 30))
+        command("tab?threads")
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
+        conversation.tap()
+        showRightPage()
+
+        // Opens at the first unread, under its divider, reading.
+        let divider = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'New since you last looked'")).firstMatch
+        expectation(for: NSPredicate { _, _ in divider.exists && divider.isHittable }, evaluatedWith: nil)
+        waitForExpectations(timeout: 15) { _ in }
+        if !(divider.exists && divider.isHittable) { failures.append("unread: the divider isn't on screen") }
+        expectPill(true, "unread: opened at the first unread")
+        expectAtRest("unread: open")
+        shot("thread-unread")
+
+        // Older pages at the top: content grows above, nothing past the end.
+        command("top")
+        let top = record("paging: at the top")
+        command("top")
+        let paged = record("paging: after older pages", seconds: 4)
+        if let top, let paged, paged.contentHeight <= top.contentHeight + 1 {
+            failures.append(String(format: "paging: no older page went in (%.0f → %.0f)", top.contentHeight, paged.contentHeight))
+        }
+
+        // A question while reading: the rows stay, the pill says so.
+        command("mid")
+        expectPill(true, "question: reading")
+        let before = record("question: reading")
+        command("ask")
+        expectation(for: NSPredicate { _, _ in self.pill.exists && self.pill.label.contains("Question") }, evaluatedWith: nil)
+        waitForExpectations(timeout: 15) { _ in }
+        if !pill.label.contains("Question") { failures.append("question: the pill doesn't say Question (\(pill.label))") }
+        moved(from: before, to: record("question: asked"), "question: asked while reading")
+        pill.tap()
+        let card = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Which venue should I book'")).firstMatch
+        if !card.waitForExistence(timeout: 5) { failures.append("question: the card isn't at the end") }
+        expectAtEnd("question: at the end")
+
+        // Menus on a thread's messages.
+        command("draft?0")
+        while attachment.exists { attachment.tap() }
+        composerField.tap()
+        composerField.typeText("Edit me in a thread")
+        app.buttons["Send"].firstMatch.tap()
+        command("dismiss")
+        let mine = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Edit me in a thread'")).firstMatch
+        XCTAssertTrue(mine.waitForExistence(timeout: 10))
+        let answer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'take care of'")).firstMatch
+        if !answer.waitForExistence(timeout: 10) { failures.append("menus: no answer") }
+        watch("menus: sent, and the answer", atEnd: true)
+        menu(on: answer, "Quote", "menus: quote")
+        let quoted = composerField.value as? String ?? ""
+        if !quoted.contains("> Got it.") { failures.append("menus: the quote isn't in the composer (\(quoted))") }
+        command("dismiss")
+        command("draft?0")
+        menu(on: answer, "Select Text", "menus: select text")
+        let done = app.navigationBars["Select Text"].buttons["Done"]
+        if done.waitForExistence(timeout: 10) { done.tap(); _ = done.waitForNonExistence(timeout: 5) } else { failures.append("menus: Select Text didn't open") }
+        menu(on: mine, "Edit", "menus: edit")
+        if !app.staticTexts["Editing your last message"].waitForExistence(timeout: 5) { failures.append("menus: no editing card") }
+        app.buttons["Cancel"].firstMatch.tap()
+        command("dismiss")
+        finish()
+    }
+
+    /// Up in a thread's history, a fold to the outer screen and back keeps
+    /// the row the reader was at the top of the view (no resize restore: the
+    /// container's anchor holds through the width change).
+    func testFoldKeepsTheReadingPosition() throws {
+        guard layout == "split" else { throw XCTSkip("Folds from the Duo's inner screen") }
+        open(cold: false)
+        showList()
+        command("tab?threads")
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
+        conversation.tap()
+        showRightPage()
+        command("mid")
+        expectPill(true, "fold: up in the history")
+        Thread.sleep(forTimeInterval: 1)
+        guard let (label, y) = topRow() else { return XCTFail("fold: no row at the top") }
+        steps.append(String(format: "fold: top row %@ at %.1f", label, y))
+        command("outer")
+        Thread.sleep(forTimeInterval: 2)
+        let folded = app.staticTexts[label]
+        if !(folded.exists && folded.isHittable) { failures.append("fold: \(label) isn't on the outer screen") }
+        else { steps.append(String(format: "fold: on the outer screen at %.1f", folded.frame.minY)) }
+        expectAtRest("fold: outer screen")
+        command("split-right")
+        Thread.sleep(forTimeInterval: 2)
+        let back = app.staticTexts[label]
+        if back.exists {
+            steps.append(String(format: "fold: unfolded at %.1f", back.frame.minY))
+            if abs(back.frame.minY - y) > 2 { failures.append(String(format: "fold: %@ moved %.1f pt", label, back.frame.minY - y)) }
+        } else { failures.append("fold: \(label) is gone after unfolding") }
+        expectAtRest("fold: unfolded")
+        finish()
+    }
+
+    /// The topmost "Duo message …" text on screen, below the header.
+    private func topRow() -> (String, CGFloat)? {
+        let rows = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Duo message'")).allElementsBoundByIndex
+            .filter { $0.isHittable && $0.frame.minY > 60 }
+        guard let top = rows.min(by: { $0.frame.minY < $1.frame.minY }) else { return nil }
+        return (top.label, top.frame.minY)
+    }
+
     /// Long-presses a row and picks `item` from its menu.
     private func menu(on element: XCUIElement, _ item: String, _ step: String) {
-        element.press(forDuration: 1)
+        // The last menu's dismissal can still be animating: once more if the
+        // first long-press doesn't open it.
         let button = app.buttons[item].firstMatch
-        if button.waitForExistence(timeout: 5) { button.tap() } else { failures.append("\(step): no \(item) in the menu") }
-        Thread.sleep(forTimeInterval: 0.5)
+        for _ in 0..<2 where !button.exists {
+            let until = Date().addingTimeInterval(5)
+            while !(element.exists && element.isHittable), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
+            element.press(forDuration: 1)
+            _ = button.waitForExistence(timeout: 4)
+        }
+        if button.exists { button.tap() } else { failures.append("\(step): no \(item) in the menu") }
+        Thread.sleep(forTimeInterval: 0.8)
     }
 
     /// What the app last copied (`qa-duo/pasteboard`).
@@ -342,8 +472,10 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private func showRightPage() {
         guard layout == "split" else { return }
         command("split-right")
-        expectation(for: NSPredicate { _, _ in (0..<200).contains(self.composer.frame.minX) }, evaluatedWith: nil)
-        waitForExpectations(timeout: 10) { _ in }
+        // A wait, not a check: the steps after it measure what matters, and
+        // under load the shift can land after a fixed timeout.
+        let until = Date().addingTimeInterval(15)
+        while !(0..<200).contains(composer.frame.minX), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
     }
 
     /// The split's left page, the list, back on the screen.
