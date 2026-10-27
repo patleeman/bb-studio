@@ -146,6 +146,17 @@ final class TranscriptReplay {
         await step("unfold to the inner screen") { resize(Layout.duoInner) }
         await step("back to this screen") { resize(layout) }
 
+        // A fling up from the end that UIKit cuts short without saying so,
+        // then anything that lays out (here the keyboard): the reader stays
+        // where the fling left them (Patrick, Oct 27: "I scroll up, touch
+        // something and it scrolls down").
+        await step("a fling up from the end, cut short", expectReading: true, anchorAfterChange: true) {
+            controller.simulateFlingCutShort(to: controller.collectionView.contentOffset.y - 1500)
+        }
+        await step("then the keyboard, after the cut-short fling", expectReading: true) { setKeyboard(320) }
+        await step("and down again", expectReading: true) { setKeyboard(0) }
+        await step("back to the end") { controller.jumpToLatest(animated: false) }
+
         // Reading: the reader scrolls up into the history.
         await step("the reader scrolls up", expectReading: true) { readerScroll(by: -1600) }
         // Up through the whole history: each scroll shows unmeasured rows

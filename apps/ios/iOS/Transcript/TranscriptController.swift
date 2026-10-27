@@ -392,6 +392,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
         pendingScroll = nil
+        // Following now: the last reading place is gone.
+        anchor = nil
         if follow.handle(.jumpToLatest) { followChanged() }
         log?("v2 jumpToLatest animated=\(animated)")
         let target = restingOffset()
@@ -436,6 +438,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
     private var simulatedReaderScroll = false
 
+    /// The harness's stand-in for a fling that UIKit ends without telling
+    /// us: an offset written while it decelerates (a row above the reader
+    /// measuring) stops it, and no "decelerating ended" comes. The view moves
+    /// as the fling did; nothing reports its end.
+    func simulateFlingCutShort(to y: CGFloat) {
+        scrollViewWillBeginDragging(collectionView)
+        simulatedReaderScroll = true
+        collectionView.contentOffset.y = clamp(y)
+        scrollViewDidScroll(collectionView)
+        collectionView.layoutIfNeeded()
+        simulatedReaderScroll = false
+    }
+
     /// The harness's stand-in for a reader's drag: moves the view as a
     /// finger would, then rests, so `follow` decides as for a real one.
     func simulateReaderScroll(to y: CGFloat, beforeLayout: () -> Void = {}) {
@@ -479,7 +494,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// Puts the view on its anchor after a layout pass, unless a scroll is under way.
     func settle(_ why: String) {
-        guard isViewLoaded, collectionView.bounds.height > 0, !interacting, !animating else { return }
+        guard isViewLoaded, collectionView.bounds.height > 0 else { return }
+        noticeReaderRest()
+        guard !interacting, !animating else { return }
         let target = restingOffset()
         if abs(target - collectionView.contentOffset.y) > 0.25 { write(target, why) }
     }
@@ -678,6 +695,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     // MARK: Scrolling
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        noticeReaderRest()
         // Only the reader's own movement moves the anchor. The offset also
         // moves inside a layout pass, where rows coming into view size
         // themselves and the anchor is being held: taken again there, an
@@ -692,6 +710,23 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         if animating { animating = false; stopAnimation() }
+        readerScrolling = true
+    }
+
+    /// The reader's drag began and hasn't been seen to come to rest yet.
+    private var readerScrolling = false
+
+    /// A reader's scroll that ended without UIKit saying so is over all the
+    /// same. An offset written while a fling decelerates (a row above the
+    /// reader measuring) stops it with no "decelerating ended", and `follow`
+    /// kept what it was before the drag: a fling up from the end stayed
+    /// "following", and the next layout (a tap, the keyboard, a row) took the
+    /// reader back to the end (Patrick, Oct 27). Checked wherever the view
+    /// might settle, so the reader's rest always decides first.
+    private func noticeReaderRest() {
+        guard readerScrolling, !interacting else { return }
+        log?("v2 reader scroll ended unannounced")
+        readerScrollEnded()
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -712,6 +747,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// The reader decides: where their scroll comes to rest, near the end
     /// follows it, anywhere else reads from there.
     private func readerScrollEnded() {
+        readerScrolling = false
         let near = distanceToEnd <= chrome.nearEnd
         log?(String(format: "v2 reader scroll ended distance=%.1f near=%@", distanceToEnd, "\(near)"))
         if follow.handle(.readerScrollEnded(nearEnd: near)) { followChanged() }
@@ -767,6 +803,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     @objc private func tappedTranscript(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
+        noticeReaderRest()
         // After the tap's own handlers: a text link acts as the touch ends,
         // and resigning in the same pass dropped it.
         guard let window = view.window else { return }
