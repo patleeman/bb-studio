@@ -1731,6 +1731,10 @@ extension ThreadView {
             // Nothing cached yet: the shape of a chat, not a blank screen.
             if !model.loaded { ChatSkeleton(bot: botChrome != nil).allowsHitTesting(false) }
         }
+        // Beside two pages the header owns the status-bar strip: the
+        // transcript's scroll view mustn't take its taps as scroll-to-top.
+        .onAppear { StatusBarStrip.schedule() }
+        .onChange(of: model.loaded) { _, _ in StatusBarStrip.schedule() }
         #if DEBUG
         .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
         #endif
