@@ -529,17 +529,47 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
     private func expectComposerOverKeyboard(_ step: String) {
         guard app.keyboards.firstMatch.exists else { return }
-        // Against the keyboard's real top, from the app's own keyboard frame
-        // (the `layout` probe). XCUITest's keyboard element leaves out the
-        // suggestion bar above the keys, and that bar's height differs by iOS
-        // (44 pt on iOS 27, 50 on iOS 26), so the composer's 8 pt read as 52
-        // or 58 there.
-        guard let geometry = window(), let top = geometry.keyboardTop, top < geometry.height else {
-            return failures.append("\(step): the keyboard's frame isn't known")
+        // What's on screen: the composer's card, then a black band, then the
+        // keyboard. Element frames don't say where either is drawn: XCUITest's
+        // keyboard leaves out the suggestion bar (44 pt on iOS 27, 50 on
+        // iOS 26), and on iOS 26 the keyboard frame the app is told sat 6 pt
+        // off what's drawn, so the same 8 pt read as 52, 58 or 14.
+        let probe = window()?.keyboardTop ?? .nan
+        steps.append(String(format: "%@: frames: composer bottom %.1f, keyboard frame top %.1f, XCUITest keyboard top %.1f",
+                            step, composer.frame.maxY, probe, app.keyboards.firstMatch.frame.minY))
+        guard let gap = drawnGapUnderComposer() else {
+            return failures.append("\(step): no keyboard drawn under the composer")
         }
-        let gap = top - composer.frame.maxY
-        steps.append(String(format: "%@: composer %.1f pt above the keyboard", step, gap))
+        steps.append(String(format: "%@: composer %.1f pt above the keyboard (drawn)", step, gap))
         if abs(gap - 8) > 1 { failures.append(String(format: "%@: composer %.1f pt from the keyboard, not 8", step, gap)) }
+    }
+
+    /// The black band between the composer's card and the keyboard, in
+    /// points, from a screenshot (dark mode: the band is the page's black). A
+    /// column through the middle of the composer's bottom row, clear of its
+    /// buttons and the photo: down from inside the card to where it ends,
+    /// then to where the keyboard begins.
+    private func drawnGapUnderComposer() -> CGFloat? {
+        let image = XCUIScreen.main.screenshot().image
+        guard let cg = image.cgImage else { return nil }
+        let scale = CGFloat(cg.width) / image.size.width
+        let x = Int((composer.frame.midX * scale).rounded())
+        let from = max(0, Int(((composer.frame.maxY - 24) * scale).rounded()))
+        let to = min(cg.height, Int(((composer.frame.maxY + 80) * scale).rounded()))
+        guard x >= 0, x < cg.width, to > from + 2 else { return nil }
+        var column = [UInt8](repeating: 0, count: to - from)
+        let drawn = column.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(data: bytes.baseAddress, width: 1, height: to - from, bitsPerComponent: 8,
+                                          bytesPerRow: 1, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
+                  let slice = cg.cropping(to: CGRect(x: x, y: from, width: 1, height: to - from)) else { return false }
+            context.draw(slice, in: CGRect(x: 0, y: 0, width: 1, height: to - from))
+            return true
+        }
+        guard drawn else { return nil }
+        // The card's interior and the keyboard are grey; the band is black.
+        guard let bandStart = column.firstIndex(where: { $0 <= 4 }),
+              let bandEnd = column[bandStart...].firstIndex(where: { $0 >= 12 }) else { return nil }
+        return CGFloat(bandEnd - bandStart) / scale
     }
 
     private func moved(from before: Scroll?, to after: Scroll?, _ step: String) {
