@@ -10,7 +10,7 @@ import XCTest
 /// message with the keyboard up (it goes), and the keyboard closed from the
 /// app. After each, the transcript's offset is where it was, within 1 pt.
 ///
-/// The old transcript by default; `TEST_RUNNER_TRANSCRIPT_V2=1` the new one.
+/// The new transcript by default; `TEST_RUNNER_TRANSCRIPT_V2=0` the old one.
 @MainActor
 final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -19,7 +19,7 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
     /// The old transcript moves 2 to 3 pt each time the keyboard goes up or
     /// down (its lazy stack lays out again); known, and kept visible.
     private var knownOldPathDrift: [String] = []
-    private let newTranscript = ProcessInfo.processInfo.environment["TRANSCRIPT_V2"] != nil
+    private let newTranscript = ProcessInfo.processInfo.environment["TRANSCRIPT_V2"] != "0"
 
     private var composerField: XCUIElement {
         app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
@@ -63,9 +63,11 @@ final class TranscriptScrollHoldUITests: ServerIsolatedUITestCase {
         transcriptPoint(y: 0.45, x: 6).tap()
         last = hold("a tap on empty space", from: last) ?? last
 
-        // A tool row expands below what the reader is looking at.
+        // A tool row expands below what the reader is looking at. Clear of
+        // the quick replies over the rows above the composer: one sends
+        // ("👍 Thanks"), and a send goes to the end.
         let tool = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Worked' OR label BEGINSWITH 'Thought'")).allElementsBoundByIndex
-            .first { $0.isHittable && $0.frame.minY > 140 && $0.frame.maxY < composer.frame.minY }
+            .first { $0.isHittable && $0.frame.minY > 140 && $0.frame.maxY < composer.frame.minY - 80 }
         if let tool { tool.tap(); last = hold("a tool row expanded", from: last) ?? last } else { steps.append("no tool row on screen") }
 
         // The composer: the keyboard comes up.

@@ -2,36 +2,38 @@ import SwiftUI
 import UIKit
 
 /// Settings ▸ Diagnostics ▸ New chat transcript: the Bot chat and threads
-/// on the UIKit transcript (`apps/ios/iOS/Transcript`). Off by default;
-/// off, the thread is the SwiftUI transcript, untouched.
+/// on the UIKit transcript (`apps/ios/iOS/Transcript`). On by default (a
+/// value someone set stays); turned off, the thread is the SwiftUI
+/// transcript, untouched.
 enum TranscriptV2 {
     static let key = "newChatTranscript"
 
-    /// Debug: `-qaTranscriptV2` turns it on for a launch.
-    static var launchArgument: Bool {
+    /// Debug: `-qaTranscriptV2` turns it on for a launch, `-qaTranscriptV1` off.
+    static var launchArgument: Bool? {
         #if DEBUG
-        ProcessInfo.processInfo.arguments.contains("-qaTranscriptV2")
-        #else
-        false
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-qaTranscriptV1") { return false }
+        if arguments.contains("-qaTranscriptV2") { return true }
         #endif
+        return nil
     }
 }
 
 /// The flag's switch: reads the setting live, so turning it on applies to
 /// a chat that's already open the next time it draws.
 struct TranscriptV2Switch<Legacy: View, Next: View>: View {
-    @AppStorage(TranscriptV2.key) private var on = false
+    @AppStorage(TranscriptV2.key) private var on = true
     @ViewBuilder var legacy: () -> Legacy
     @ViewBuilder var next: () -> Next
 
     var body: some View {
-        if on || TranscriptV2.launchArgument { next() } else { legacy() }
+        if TranscriptV2.launchArgument ?? on { next() } else { legacy() }
     }
 }
 
 /// The setting, in Diagnostics.
 struct TranscriptV2Toggle: View {
-    @AppStorage(TranscriptV2.key) private var on = false
+    @AppStorage(TranscriptV2.key) private var on = true
 
     var body: some View {
         Toggle("New chat transcript", isOn: $on)

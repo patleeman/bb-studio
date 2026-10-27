@@ -1,10 +1,10 @@
-# The chat transcript on UIKit (flagged)
+# The chat transcript on UIKit
 
-Settings ▸ Diagnostics ▸ **New chat transcript**, off by default. Turned
-on, the Bot chat and threads draw on a UIKit transcript and composer
-(`apps/ios/iOS/Transcript/`). Turned off, `ThreadView` is the SwiftUI
-transcript, untouched. Debug builds can turn it on for a launch with
-`-qaTranscriptV2`.
+Settings ▸ Diagnostics ▸ **New chat transcript**, on by default (a value
+already set on the phone stays). On, the Bot chat and threads draw on a
+UIKit transcript and composer (`apps/ios/iOS/Transcript/`). Turned off,
+`ThreadView` is the SwiftUI transcript, untouched. Debug builds can choose
+for a launch with `-qaTranscriptV2` (new) or `-qaTranscriptV1` (old).
 
 The SwiftUI transcript measured its geometry and then corrected it. That
 loop caused the black past the end, the hovering composer, the gaps and two

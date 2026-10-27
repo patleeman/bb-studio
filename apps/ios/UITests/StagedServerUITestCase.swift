@@ -42,9 +42,11 @@ extension XCUIApplication {
             arguments.remove(at: index)
             if index < arguments.count { arguments.remove(at: index) }
         }
-        // `TEST_RUNNER_TRANSCRIPT_V2=1`: any suite on the new chat transcript.
-        if ProcessInfo.processInfo.environment["TRANSCRIPT_V2"] != nil, !arguments.contains("-qaTranscriptV2") {
-            arguments.append("-qaTranscriptV2")
+        // The new chat transcript is the default. `TEST_RUNNER_TRANSCRIPT_V2=0`:
+        // any suite on the old one; `=1` (or anything else) on the new one.
+        if let v2 = ProcessInfo.processInfo.environment["TRANSCRIPT_V2"],
+           !arguments.contains("-qaTranscriptV2"), !arguments.contains("-qaTranscriptV1") {
+            arguments.append(v2 == "0" ? "-qaTranscriptV1" : "-qaTranscriptV2")
         }
         launchArguments = arguments + ["-serverURL", server]
         launch()

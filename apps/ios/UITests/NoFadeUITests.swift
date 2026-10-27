@@ -24,7 +24,7 @@ final class NoFadeUITests: ServerIsolatedUITestCase {
         let name = "\(layout)-\(v2 ? "new" : "old")"
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", layout == "split" ? "duo" : "chat",
             "-qaDark", "-openURL", "bbstudio://bot"]
-            + (v2 ? ["-qaTranscriptV2"] : [])
+            + [v2 ? "-qaTranscriptV2" : "-qaTranscriptV1"]
             + (layout == "split" ? ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"] : [])
         app.launchOffline()
         XCTAssertTrue(composer.waitForExistence(timeout: 30), "\(name): composer")
