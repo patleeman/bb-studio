@@ -81,14 +81,14 @@ changes.
 | Test | Inner screen (even, narrow, hidden) | Outer screen | iPhone |
 | --- | --- | --- | --- |
 | `testBotChatHeader` | toggle, bell, ⋯ | bell, ⋯ | bell, ⋯ |
-| `testThreadHeaderEven` | toggle, ⋯, Find, the list's New Thread | ⋯ | ⋯, back |
+| `testThreadHeaderEven` | toggle, ⋯, Find, the list's New Thread | ⋯, back | ⋯, back |
 | `testThreadHeaderNarrow`, `testThreadHeaderHidden` | toggle, ⋯, Find | | |
 
 Run them with `TEST_RUNNER_HEADER_LAYOUT=inner|outer|phone` (inner and outer
 on an iPhone Duo simulator).
 
-On the outer screen the test found no navigation-bar back button in the
-thread, so back is tested on the iPhone only. Studio items keep native navigation bars, and
+On the outer screen the back button floats in the status column, outside
+the navigation bar, so the test finds it as `BackButton`. Studio items keep native navigation bars, and
 the offline fixtures have no Studio items, so their bar buttons have no UI
 test. A strip tap there reaches the bar button through the UIKit path.
 

@@ -65,9 +65,9 @@ final class HeaderTapUITests: ServerIsolatedUITestCase {
             })
         }
         if layout == "inner" { checkToggle("thread \(pane)") }
-        if layout == "phone" {
-            // On the outer screen the thread showed no navigation-bar back button.
-            let back = app.navigationBars.buttons.firstMatch
+        if layout != "inner" {
+            // On the outer screen it floats in the status column, outside the navigation bar.
+            let back = app.buttons["BackButton"].firstMatch
             check("thread: back", back, opened: { conversation.isHittable }, close: {
                 conversation.tap()
                 _ = self.app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 10)
