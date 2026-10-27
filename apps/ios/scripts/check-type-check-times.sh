@@ -20,7 +20,10 @@ rm -rf "$derived"
 xcodebuild build-for-testing -scheme BBStudio -destination 'generic/platform=iOS Simulator' -derivedDataPath "$derived" \
   CODE_SIGNING_ALLOWED=NO \
   OTHER_SWIFT_FLAGS="\$(inherited) -Xfrontend -warn-long-function-bodies=$limit -Xfrontend -warn-long-expression-type-checking=$limit" \
-  > "$log" 2>&1 || { tail -40 "$log"; echo "Build failed (log: $log)"; exit 1; }
+  > "$log" 2>&1 || {
+    # The compiler's own errors first: a build that fails to type-check names the line here.
+    grep -E '^/.*: error: ' "$log" | sed 's#^.*/apps/ios/##' | sort -u
+    tail -20 "$log"; echo "Build failed (log: $log)"; exit 1; }
 slow=$(grep -E '^/.*warning: .*ms to type-check' "$log" | sed 's#^.*/apps/ios/##' | sort -u || true)
 if [ -n "$slow" ]; then
   echo "Over ${limit} ms to type-check (split these into typed subviews or properties):"

@@ -302,11 +302,21 @@ final class ArtifactRuntimeUITests: StagedServerUITestCase {
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return 0 }
             context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
             let rgba = bytes.bindMemory(to: UInt8.self)
-            return stride(from: 0, to: rgba.count, by: 16).reduce(0) { count, index in
-                count + ((18...30).contains(Int(rgba[index])) && (139...151).contains(Int(rgba[index + 1])) && (188...200).contains(Int(rgba[index + 2])) ? 1 : 0)
+            // Typed steps: as one expression Xcode 26 couldn't type-check it.
+            var count = 0
+            for index in stride(from: 0, to: rgba.count, by: 16) where Self.isFixtureBlue(rgba[index], rgba[index + 1], rgba[index + 2]) {
+                count += 1
             }
+            return count
         }
         return matches > 200
+    }
+
+    private static func isFixtureBlue(_ red: UInt8, _ green: UInt8, _ blue: UInt8) -> Bool {
+        let r = Int(red), g = Int(green), b = Int(blue)
+        guard (18...30).contains(r) else { return false }
+        guard (139...151).contains(g) else { return false }
+        return (188...200).contains(b)
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {
