@@ -30,7 +30,10 @@ jobs:
         with:
           xcode-version: latest
       - name: XcodeGen
-        run: brew install xcodegen
+        run: |
+          ls -d /Applications/Xcode*.app
+          xcodebuild -version
+          brew install xcodegen
       - name: Swift 6 check (the transcript folder alone)
         run: |
           echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
@@ -60,9 +63,16 @@ jobs:
           print(*phone, *duo)
           PY
           )
-          echo "BB_TEST_SIMULATOR_ID=$(xcrun simctl create ci-phone "$phone" "$phone_runtime")" >> "$GITHUB_ENV"
+          # Booted before the scripts write their defaults into them.
+          phone_id=$(xcrun simctl create ci-phone "$phone" "$phone_runtime")
+          xcrun simctl boot "$phone_id"
+          xcrun simctl bootstatus "$phone_id" -b
+          echo "BB_TEST_SIMULATOR_ID=$phone_id" >> "$GITHUB_ENV"
           if [ "$duo" != "-" ]; then
-            echo "BB_TEST_DUO_SIMULATOR_ID=$(xcrun simctl create ci-duo "$duo" "$duo_runtime")" >> "$GITHUB_ENV"
+            duo_id=$(xcrun simctl create ci-duo "$duo" "$duo_runtime")
+            xcrun simctl boot "$duo_id"
+            xcrun simctl bootstatus "$duo_id" -b
+            echo "BB_TEST_DUO_SIMULATOR_ID=$duo_id" >> "$GITHUB_ENV"
           fi
           echo "phone=$phone on $phone_runtime, duo=$duo on $duo_runtime"
       - name: Unit tests (with the replay harness)
