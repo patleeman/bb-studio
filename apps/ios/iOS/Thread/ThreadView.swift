@@ -1688,7 +1688,8 @@ private struct VoiceHooks: ViewModifier {
 extension ThreadView {
     fileprivate var transcriptV2Screen: some View {
         transcriptV2Body
-            .modifier(TranscriptV2Hooks(view: self))
+            .modifier(TranscriptV2Hooks(view: self, sends: sends, outboxCount: outbox.messages.count, finding: finding,
+                                        findQuery: findQuery, currentMatch: currentMatch))
             .environment(\.threadId, model.threadId)
             .environment(\.openURL, transcriptV2OpenURL)
             .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
@@ -1757,14 +1758,21 @@ extension ThreadView {
     /// takes you to its match; the Debug QA commands drive the chat.
     fileprivate struct TranscriptV2Hooks: ViewModifier {
         let view: ThreadView
+        // What the hooks watch, as values: SwiftUI can't compare the view
+        // itself, and a hook on its properties never saw find move.
+        let sends: Int
+        let outboxCount: Int
+        let finding: Bool
+        let findQuery: String
+        let currentMatch: String?
 
         func body(content: Content) -> some View {
             content
-                .onChange(of: view.sends) { _, _ in view.transcriptV2.jumpToLatest() }
-                .onChange(of: view.outbox.messages.count) { old, new in if new > old { view.transcriptV2.jumpToLatest() } }
-                .onChange(of: view.finding) { _, finding in if finding { Task { await view.model.loadAll() } } }
-                .onChange(of: view.findQuery) { _, _ in view.findIndex = 0 }
-                .onChange(of: view.currentMatch) { _, id in
+                .onChange(of: sends) { _, _ in view.transcriptV2.jumpToLatest() }
+                .onChange(of: outboxCount) { old, new in if new > old { view.transcriptV2.jumpToLatest() } }
+                .onChange(of: finding) { _, finding in if finding { Task { await view.model.loadAll() } } }
+                .onChange(of: findQuery) { _, _ in view.findIndex = 0 }
+                .onChange(of: currentMatch) { _, id in
                     if let id { view.transcriptV2.scrollTo(id, position: .center, animated: true) }
                 }
                 #if DEBUG

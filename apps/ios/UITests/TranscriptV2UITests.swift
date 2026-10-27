@@ -196,14 +196,22 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let field = app.textFields["Find in thread"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
-        field.typeText("Design review")
-        Thread.sleep(forTimeInterval: 2)
-        let match = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Design review'")).firstMatch
-        if !(match.exists && match.isHittable) { failures.append("find: the match isn't on screen") }
-        expectAtRest("find: the newest match")
+        // The split's thread is "Duo message 1" to 80: the newest match is
+        // 29, the one before it 28, both far up from the end.
+        let start = record("find: before")
+        field.typeText("Duo message 2")
+        let newest = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Duo message 29.'")).firstMatch
+        expectation(for: NSPredicate { _, _ in newest.exists && newest.isHittable }, evaluatedWith: nil)
+        waitForExpectations(timeout: 8) { _ in }
+        if !(newest.exists && newest.isHittable) { failures.append("find: message 29 isn't on screen") }
+        let found = record("find: the newest match")
+        if let start, let found, found.contentOffsetY >= start.contentOffsetY - 100 { failures.append("find: the view didn't go up to the match") }
+        shot("find")
         app.buttons["Earlier match"].firstMatch.tap()
-        Thread.sleep(forTimeInterval: 2)
-        if !(match.exists && match.isHittable) { failures.append("find: the earlier match isn't on screen") }
+        let earlier = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Duo message 28.'")).firstMatch
+        expectation(for: NSPredicate { _, _ in earlier.exists && earlier.isHittable }, evaluatedWith: nil)
+        waitForExpectations(timeout: 8) { _ in }
+        if !(earlier.exists && earlier.isHittable) { failures.append("find: message 28 isn't on screen") }
         expectAtRest("find: an earlier match")
         app.buttons["Done"].firstMatch.tap()
 
