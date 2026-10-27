@@ -36,6 +36,9 @@ TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -sc
   -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
   -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
   -only-testing:BBStudioUITests/TranscriptV2UITests
+# Taps never move the transcript (Patrick, Oct 27), on the new one.
+TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
+  -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptScrollHoldUITests
 
 if [ -n "$duo" ]; then
   isolate "$duo"
