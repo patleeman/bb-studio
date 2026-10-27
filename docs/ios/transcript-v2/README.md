@@ -37,7 +37,8 @@ geometry back into layout.
     invalidation, so nothing on screen moves.
 - **The pill.** While reading, a jump button with a count of new rows
   ("↓ 12 new"). On a phone it sits in the corner; beside two pages it is
-  centred above the composer over a scrim.
+  centred above the composer, on its own glass, with no scrim over the rows
+  ([no fade](../no-fade/README.md)).
 - **Composer and keyboard.** The composer, Duo header and find bar are in
   the same container. The container leaves the keyboard's safe area in, so
   it ends at the keyboard's top, and the composer rests on that bottom, or on

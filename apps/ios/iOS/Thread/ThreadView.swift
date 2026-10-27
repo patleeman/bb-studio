@@ -404,15 +404,14 @@ struct ThreadView: View {
             if atBottom || end.pastEnd > Self.pastEndSlack { timelineKey += 1 }
         }
         // Beside two pages, centred on the page above the composer, in the
-        // transcript's bottom inset. One soft scrim runs from above it down
-        // behind the composer, so rows fade out as they pass under both and
-        // none shows between them. A phone keeps it floating in the corner.
+        // transcript's bottom inset. No scrim: rows stay readable right up to
+        // the button's and composer's own backgrounds. A phone keeps it
+        // floating in the corner.
         .overlay(alignment: .bottomTrailing) { if !duoLayout.twoPages { jumpButton } }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if duoLayout.twoPages && !atBottom {
                 jumpButton
                     .frame(maxWidth: .infinity)
-                    .background { JumpScrim() }
                     .transition(.opacity)
             }
         }
@@ -1467,26 +1466,6 @@ struct ThreadView: View {
     private static func margin(bot: Bool) -> CGFloat { bot ? 12 : 16 }
 }
 
-/// Behind the jump button: clear above it, the page's background by its
-/// middle, and solid down behind the composer to the window's bottom edge.
-private struct JumpScrim: View {
-    var body: some View {
-        let surface = Color(uiColor: .systemBackground)
-        VStack(spacing: 0) {
-            LinearGradient(stops: [.init(color: surface.opacity(0), location: 0),
-                                   .init(color: surface.opacity(0.85), location: 0.6),
-                                   .init(color: surface, location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 64)
-            surface
-        }
-        // Starts above the band; the composer's inset below is ignored.
-        .padding(.top, -24)
-        .ignoresSafeArea(.container, edges: .bottom)
-        .allowsHitTesting(false)
-    }
-}
-
 /// The draft on a whole screen, for writing something long.
 struct FullComposer: View {
     @Binding var text: String
@@ -1947,7 +1926,7 @@ extension ThreadView {
     }
 
     /// The jump button: in the corner on a phone; beside two pages centred
-    /// in its band, over a scrim that runs down behind the composer.
+    /// in its band, on its own glass (no scrim over the rows).
     @ViewBuilder fileprivate func transcriptV2Pill(_ state: TranscriptPillState, jump: @escaping () -> Void) -> some View {
         // A question waiting: its own word, tinted, in place of the count.
         let label = state.note ?? (state.unseen > 0 ? "\(state.unseen) new" : nil)
@@ -1965,7 +1944,7 @@ extension ThreadView {
         .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
         .accessibilityIdentifier("jumpToLatest")
         if duoLayout.twoPages {
-            button.frame(maxWidth: .infinity).background { JumpScrim().padding(.bottom, -400) }
+            button.frame(maxWidth: .infinity)
         } else {
             button
         }

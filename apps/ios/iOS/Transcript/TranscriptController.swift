@@ -177,7 +177,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         tap.delegate = self
         collectionView.addGestureRecognizer(tap)
 
-        // The pill (and its scrim) under the composer, the header over all.
+        // The pill under the composer, the header over all.
         for host in [pillHost, composerHost, topHost] {
             addChild(host)
             host.view.translatesAutoresizingMaskIntoConstraints = false
@@ -243,7 +243,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         case .trailing:
             pillPlacement = [pillHost.view.trailingAnchor.constraint(equalTo: trailing)]
         case .center:
-            // The band's width is the composer's, for a scrim behind the pill.
+            // The band's width is the composer's: the pill is centred over it.
             pillPlacement = [pillHost.view.leadingAnchor.constraint(equalTo: composerHost.view.leadingAnchor),
                              pillHost.view.trailingAnchor.constraint(equalTo: composerHost.view.trailingAnchor)]
         }

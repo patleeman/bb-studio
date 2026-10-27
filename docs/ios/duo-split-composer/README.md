@@ -46,12 +46,10 @@ Beside two pages (`DuoLayout.twoPages`), in `ThreadView`:
   both edges line up with the bubbles. The header and find bar keep their
   buttons clear of the status column.
 - **Jump button.** It floats above the composer, centred on the page, in the
-  transcript's bottom inset. Behind it, one soft scrim of the page's background
-  starts 24 points above the button, is nearly opaque by its middle, and runs
-  down behind the composer to the window's bottom edge. Rows fade out as they
-  pass under the button and composer, with no hard edge, and none shows between
-  them. The button and scrim show only up in the history; at the end both go,
-  and the last row sits whole above the composer.
+  transcript's bottom inset. (A soft scrim behind it, fading rows to the page's
+  black, was removed on 27 October 2026: see [no fade](../no-fade/README.md).)
+  The button shows only up in the history; at the end it goes, and the last
+  row sits whole above the composer.
 - **Status corner.** `StatusCorner` covers the top 104 points of the status
   column with the page's background, fading out over 16 points below it.
   Rows scroll under it as they scroll under the header. It shows only when the
@@ -159,8 +157,8 @@ to the edge. Nothing added the inset twice.
   safe area as well as the trailing one. The composer keeps its 8-point
   padding, so it ends 8 points above the window's bottom edge: the gap a phone
   leaves under its composer above the home indicator, the tab bar or the
-  keyboard. The keyboard's safe area still applies. The jump button, its scrim
-  and the composer's width are unchanged. Only the phone idiom (the Duo's
+  keyboard. The keyboard's safe area still applies. The jump button and the
+  composer's width are unchanged. Only the phone idiom (the Duo's
   inner screen) drops the bottom inset: a landscape iPad also shows two pages,
   and keeps its composer above its home indicator.
 
