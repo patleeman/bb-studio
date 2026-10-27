@@ -37,6 +37,9 @@ struct TranscriptChrome: Equatable {
 struct TranscriptPillState: Equatable {
     var shown = false
     var unseen = 0
+    /// The app's word for something waiting at the end (a question), shown
+    /// on the pill in its own style.
+    var note: String?
 }
 
 enum TranscriptRowPosition: Equatable { case top, center }
@@ -74,6 +77,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
     var log: ((String) -> Void)?
+    /// The rows' content frame in window coordinates, after each layout (Debug probes).
+    var probe: ((CGRect) -> Void)?
     /// Ends editing after a tap on the transcript. The default waits a run
     /// loop turn; an app can hold it further (BB waits out window resizes).
     var dismissKeyboard: (UIWindow) -> Void = { window in
@@ -263,6 +268,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         applyRowMetrics()
         updateInsets()
         settle("layout")
+        if let probe, let rect = rowsFrameInWindow, rect != lastProbe {
+            lastProbe = rect
+            probe(rect)
+        }
     }
 
     private func applyRowMetrics() {
@@ -570,6 +579,29 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             guard let cell = cell as? TranscriptCell, let indexPath = collectionView.indexPath(for: cell) else { continue }
             measure(cell, at: indexPath)
         }
+        // SwiftUI can apply a new configuration after this pass; look once
+        // more on the next turn. Nothing changed, nothing is written.
+        guard !remeasureScheduled else { return }
+        remeasureScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.remeasureScheduled = false
+            for cell in self.collectionView.visibleCells {
+                guard let cell = cell as? TranscriptCell, let indexPath = self.collectionView.indexPath(for: cell) else { continue }
+                self.measure(cell, at: indexPath)
+            }
+        }
+    }
+    private var remeasureScheduled = false
+    private var measuring = false
+    private var lastProbe: CGRect?
+
+    /// Where the rows' content runs, in window coordinates: their leading and
+    /// trailing edges (the composer lines up with them beside two pages).
+    var rowsFrameInWindow: CGRect? {
+        guard let window = view.window, let first = layout.frames.first else { return nil }
+        let rect = CGRect(x: first.minX, y: 0, width: first.width, height: collectionView.bounds.height)
+        return collectionView.convert(rect.offsetBy(dx: 0, dy: collectionView.contentOffset.y), to: window)
     }
 
     /// One row measured now, its height changed through the layout's own
@@ -580,7 +612,19 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let fitted = cell.preferredLayoutAttributesFitting(original)
         guard abs(fitted.size.height - original.size.height) > 1,
               layout.shouldInvalidateLayout(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original) else { return }
-        layout.invalidateLayout(with: layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original))
+        measuring = true
+        defer { measuring = false }
+        let context = layout.invalidationContext(forPreferredLayoutAttributes: fitted, withOriginalAttributes: original)
+        let before = collectionView.contentOffset.y
+        layout.invalidateLayout(with: context)
+        // Invalidated from here rather than from UIKit's self-sizing pass,
+        // the context's offset adjustment isn't applied for us: a row above
+        // the reader measured 24 pt taller and everything they saw moved.
+        let adjustment = context.contentOffsetAdjustment.y
+        if adjustment != 0, abs(collectionView.contentOffset.y - before) < 0.25 {
+            counters.offsetWrites += 1
+            collectionView.contentOffset.y = before + adjustment
+        }
     }
 
     /// Visible rows whose height isn't what they measure now, for the harness.
@@ -596,7 +640,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     // MARK: Scrolling
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if interacting {
+        // Only the reader's own movement moves the anchor. The offset also
+        // moves inside a layout pass, where rows coming into view size
+        // themselves and the anchor is being held: taken again there, an
+        // adjustment that missed stayed for good (24 pt in the replay).
+        if interacting, !collectionView.isLayingOut, !measuring {
             anchor = TranscriptGeometry.readingAnchor(ids: layout.ids, frames: layout.frames,
                 offset: scrollView.contentOffset.y, topInset: scrollView.contentInset.top)
         }
@@ -631,9 +679,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         if follow.handle(.readerScrollEnded(nearEnd: near)) { followChanged() }
         if follow.mode == .following {
             animate(to: maxOffset)
-        } else {
+        } else if anchor == nil || layout.frame(of: anchor!.id) == nil {
             anchor = TranscriptGeometry.readingAnchor(ids: layout.ids, frames: layout.frames,
                 offset: collectionView.contentOffset.y, topInset: collectionView.contentInset.top)
+        } else {
+            // Where the reader left it: back on the anchor if a layout moved it.
+            settle("reader rest")
         }
         updatePill()
     }
@@ -646,7 +697,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     private func updatePill() {
         guard isViewLoaded else { return }
-        let next = TranscriptPillState(shown: follow.mode == .reading && distanceToEnd > chrome.nearEnd, unseen: follow.unseen)
+        let next = TranscriptPillState(shown: follow.mode == .reading && distanceToEnd > chrome.nearEnd, unseen: follow.unseen,
+                                       note: pillNote)
         guard next != pill else { return }
         let placementChanged = next.shown != pill.shown
         pill = next
@@ -655,6 +707,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         UIView.animate(withDuration: 0.2) { self.pillHost.view.alpha = next.shown ? 1 : 0 }
         if placementChanged, chrome.pill == .center { view.setNeedsLayout() }
         onPillChange?(next)
+    }
+
+    /// Something waiting at the end, for the pill ("Question"). It doesn't
+    /// move the reader: following changes only on what they do.
+    var pillNote: String? {
+        didSet { if pillNote != oldValue { updatePill() } }
     }
 
     private func checkNearTop() {
@@ -699,9 +757,13 @@ private final class TranscriptDisplayLinkTarget: NSObject {
 /// Lays out, then tells the controller, which settles the view on its anchor.
 final class TranscriptCollectionView: UICollectionView {
     var didLayout: (() -> Void)?
+    /// Inside UIKit's own layout pass (cells sizing themselves).
+    private(set) var isLayingOut = false
 
     override func layoutSubviews() {
+        isLayingOut = true
         super.layoutSubviews()
+        isLayingOut = false
         didLayout?()
     }
 }

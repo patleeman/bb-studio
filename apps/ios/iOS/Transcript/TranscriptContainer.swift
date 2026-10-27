@@ -51,6 +51,9 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
     var dismissKeyboard: ((UIWindow) -> Void)?
+    /// Shown on the pill while reading: something waiting at the end.
+    var pillNote: String?
+    var probe: ((CGRect) -> Void)?
 
     final class Coordinator {
         var items: [Item] = []
@@ -74,6 +77,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
+        controller.probe = probe
         controller.chrome = chrome
         let row = row
         controller.content = { id in
@@ -85,6 +89,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.setComposer(AnyView(composer().environment(\.self, environment)))
         controller.setTop(top.map { AnyView($0().environment(\.self, environment)) })
 
+        defer { controller.pillNote = pillNote }
         // Same rows (usually the very same storage): nothing to diff.
         guard items != coordinator.items else { return }
         var changed: [AnyHashable] = []
