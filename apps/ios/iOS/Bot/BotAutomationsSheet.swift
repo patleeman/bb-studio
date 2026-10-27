@@ -18,6 +18,22 @@ struct BotAutomationsSheet: View {
 
     struct Editing: Identifiable { var kind: BotAutomation.Kind; var automation: BotAutomation?; var id: String { automation?.id ?? "new-\(kind.rawValue)" } }
 
+    /// An automation, with Delete (or Turn off) and Pause or Resume. Apart
+    /// from `body`, so that type-checks quickly.
+    private func row(_ automation: BotAutomation) -> some View {
+        NavigationLink {
+            BotAutomationDetail(automation: automation, botId: botId, active: active) { editing = Editing(kind: automation.kind, automation: automation) } changed: { await load() }
+        } label: { BotAutomationRow(automation: automation) }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { deleting = automation } label: { Label(automation.original ? "Turn off" : "Delete", systemImage: "trash") }
+            if automation.state == "active" || automation.state == "paused" {
+                Button { act(automation.active ? .pause : .resume, automation) } label: {
+                    Label(automation.active ? "Pause" : "Resume", systemImage: automation.active ? "pause" : "play")
+                }.tint(.orange)
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -26,19 +42,7 @@ struct BotAutomationsSheet: View {
                     let rows = (automations ?? []).filter { $0.kind == kind }
                     if !rows.isEmpty {
                         Section(kind == .checkin ? "Check-ins" : kind.title + "s") {
-                            ForEach(rows) { automation in
-                                NavigationLink {
-                                    BotAutomationDetail(automation: automation, botId: botId, active: active) { editing = Editing(kind: automation.kind, automation: automation) } changed: { await load() }
-                                } label: { BotAutomationRow(automation: automation) }
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) { deleting = automation } label: { Label(automation.original ? "Turn off" : "Delete", systemImage: "trash") }
-                                    if automation.state == "active" || automation.state == "paused" {
-                                        Button { act(automation.active ? .pause : .resume, automation) } label: {
-                                            Label(automation.active ? "Pause" : "Resume", systemImage: automation.active ? "pause" : "play")
-                                        }.tint(.orange)
-                                    }
-                                }
-                            }
+                            ForEach(rows) { automation in row(automation) }
                         }
                     }
                 }

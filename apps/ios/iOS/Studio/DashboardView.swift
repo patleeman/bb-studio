@@ -28,6 +28,43 @@ struct DashboardView: View {
     @State private var reloadAgain = false
 
     var body: some View {
+        page
+        .refreshable { await refresh() }
+        .task(id: id) {
+            if let listener { app.realtime.removeListener(listener) }
+            listener = app.realtime.listen { event in
+                switch event {
+                // Studio publishes edits and fresh widget data on its `dashboards` channel.
+                case .pluginSignal("studio", "dashboards", let payload) where payload["dashboardId"]?.stringValue == id:
+                    if viewing.watching { Task { await reload() } }
+                case .connected:
+                    if viewing.watching { Task { await reload() } }
+                default: break
+                }
+            }
+            await reload()
+        }
+        // The heartbeat runs only while this screen is on top and the app active.
+        .task(id: viewing.watching) {
+            guard viewing.watching else { return }
+            while !Task.isCancelled {
+                now = .now
+                try? await client.viewDashboard(id)
+                try? await Task.sleep(for: DashboardViewing.interval)
+            }
+        }
+        .onAppear { setViewing(visible: true, active: scenePhase == .active) }
+        .onDisappear {
+            setViewing(visible: false, active: viewing.active)
+            if let listener { app.realtime.removeListener(listener) }
+            listener = nil
+        }
+        .onChange(of: scenePhase) { _, phase in setViewing(visible: viewing.visible, active: phase == .active) }
+        .accessibilityIdentifier("dashboardView")
+    }
+
+    /// The dashboard, its title, toolbar and sheets: apart from `body`, so that type-checks quickly.
+    private var page: some View {
         Group {
             if let dashboard {
                 content(dashboard)
@@ -62,38 +99,6 @@ struct DashboardView: View {
                     .toolbar { Button("Done") { showingWeb = false } }
             }
         }
-        .refreshable { await refresh() }
-        .task(id: id) {
-            if let listener { app.realtime.removeListener(listener) }
-            listener = app.realtime.listen { event in
-                switch event {
-                // Studio publishes edits and fresh widget data on its `dashboards` channel.
-                case .pluginSignal("studio", "dashboards", let payload) where payload["dashboardId"]?.stringValue == id:
-                    if viewing.watching { Task { await reload() } }
-                case .connected:
-                    if viewing.watching { Task { await reload() } }
-                default: break
-                }
-            }
-            await reload()
-        }
-        // The heartbeat runs only while this screen is on top and the app active.
-        .task(id: viewing.watching) {
-            guard viewing.watching else { return }
-            while !Task.isCancelled {
-                now = .now
-                try? await client.viewDashboard(id)
-                try? await Task.sleep(for: DashboardViewing.interval)
-            }
-        }
-        .onAppear { setViewing(visible: true, active: scenePhase == .active) }
-        .onDisappear {
-            setViewing(visible: false, active: viewing.active)
-            if let listener { app.realtime.removeListener(listener) }
-            listener = nil
-        }
-        .onChange(of: scenePhase) { _, phase in setViewing(visible: viewing.visible, active: phase == .active) }
-        .accessibilityIdentifier("dashboardView")
     }
 
     private func setViewing(visible: Bool, active: Bool) {

@@ -335,16 +335,7 @@ struct HoldToTalkMic: View {
     @State private var heldUntil: Date?
 
     var body: some View {
-        Image(systemName: talk.isActive ? "mic.fill" : "mic")
-            .font(.title3)
-            .foregroundStyle(talk.isActive ? Color.white : Color.secondary)
-            .frame(width: 36, height: 36)
-            .background(talk.isActive ? (talk.state == .cancelling ? Color.gray : Color.red) : .clear, in: .circle)
-            .scaleEffect(talk.isActive ? 1.15 : 1)
-            .animation(.snappy, value: talk.state)
-            // A 44pt target around the 36pt circle.
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+        icon
             // The tap on its own, beside the hold: composed with `exclusively`,
             // SwiftUI (iOS 27) never ended the tap, so the mic did nothing.
             .onTapGesture {
@@ -352,19 +343,7 @@ struct HoldToTalkMic: View {
                 if let heldUntil, Date.now.timeIntervalSince(heldUntil) < 0.5 { return }
                 talk.tap()
             }
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.25)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .updating($holding) { value, holding, _ in
-                        if case .second(true, _) = value { holding = true }
-                    }
-                    .onChanged { value in
-                        guard case .second(true, let drag) = value else { return }
-                        if talk.state == .idle { talk.press() }
-                        if let drag { talk.drag(drag.translation) }
-                    }
-                    .onEnded { _ in talk.release() }
-            )
+            .simultaneousGesture(hold)
             .onChange(of: holding) { _, holding in
                 if !holding { heldUntil = .now; talk.holdLost() }
             }
@@ -373,5 +352,40 @@ struct HoldToTalkMic: View {
             .accessibilityLabel(talk.state == .dictating ? "Finish dictation" : "Dictate")
             .accessibilityHint("Tap to dictate into the message. Hold to talk and send; slide left before letting go to cancel.")
             .accessibilityAction(named: "Talk and send") { talk.toggleHandsFree() }
+    }
+
+    // In parts, so each type-checks quickly (whole, it took a second).
+
+    private var fill: Color {
+        guard talk.isActive else { return .clear }
+        return talk.state == .cancelling ? .gray : .red
+    }
+
+    private var icon: some View {
+        Image(systemName: talk.isActive ? "mic.fill" : "mic")
+            .font(.title3)
+            .foregroundStyle(talk.isActive ? Color.white : Color.secondary)
+            .frame(width: 36, height: 36)
+            .background(fill, in: .circle)
+            .scaleEffect(talk.isActive ? 1.15 : 1)
+            .animation(.snappy, value: talk.state)
+            // A 44pt target around the 36pt circle.
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+    }
+
+    /// Hold to talk: a quarter-second press, then the drag that can cancel.
+    private var hold: some Gesture {
+        LongPressGesture(minimumDuration: 0.25)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .updating($holding) { value, holding, _ in
+                if case .second(true, _) = value { holding = true }
+            }
+            .onChanged { value in
+                guard case .second(true, let drag) = value else { return }
+                if talk.state == .idle { talk.press() }
+                if let drag { talk.drag(drag.translation) }
+            }
+            .onEnded { _ in talk.release() }
     }
 }

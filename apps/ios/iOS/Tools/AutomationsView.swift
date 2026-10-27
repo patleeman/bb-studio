@@ -23,20 +23,7 @@ struct AutomationsView: View {
             ForEach(projects, id: \.self) { project in
                 Section {
                     ForEach(entries.filter { $0.projectName == project }, id: \.automation.id) { entry in
-                        NavigationLink(value: Route.automation(entry.automation)) {
-                            AutomationRow(automation: entry.automation)
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button { running = entry.automation } label: { Label("Run now", systemImage: "play.fill") }
-                                .tint(.green)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            let enabled = entry.automation.enabled
-                            Button { Task { await setEnabled(entry.automation, !enabled) } } label: {
-                                Label(enabled ? "Pause" : "Resume", systemImage: enabled ? "pause.fill" : "play.fill")
-                            }
-                            .tint(enabled ? .orange : .blue)
-                        }
+                        row(entry.automation)
                     }
                 } header: {
                     if projects.count > 1 { Text(project) }
@@ -93,6 +80,25 @@ struct AutomationsView: View {
             self.error = BBClient.describe(error, plugin: Self.plugin, server: app.client.baseURL)
         }
         loaded = true
+    }
+
+    /// An automation, with Run now on one side and Pause or Resume on the
+    /// other. Apart from `body`, so that type-checks quickly.
+    private func row(_ automation: Automation) -> some View {
+        NavigationLink(value: Route.automation(automation)) {
+            AutomationRow(automation: automation)
+        }
+        .swipeActions(edge: .leading) {
+            Button { running = automation } label: { Label("Run now", systemImage: "play.fill") }
+                .tint(.green)
+        }
+        .swipeActions(edge: .trailing) {
+            let enabled = automation.enabled
+            Button { Task { await setEnabled(automation, !enabled) } } label: {
+                Label(enabled ? "Pause" : "Resume", systemImage: enabled ? "pause.fill" : "play.fill")
+            }
+            .tint(enabled ? .orange : .blue)
+        }
     }
 
     private func run(_ automation: Automation) async {

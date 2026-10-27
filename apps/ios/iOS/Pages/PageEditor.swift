@@ -43,92 +43,7 @@ struct PageEditor: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if let noteError {
-                    Text(noteError).font(.footnote).foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal).padding(.top, 8)
-                        .onTapGesture { self.noteError = nil }
-                }
-                if let message = model.localError ?? model.error {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(message).font(.footnote).foregroundStyle(.red)
-                        HStack {
-                            Button("Retry") { Task { await model.retry() } }
-                            Button("Copy local text") { UIPasteboard.general.string = model.text; copied = true }
-                            if model.serverMarkdown != nil {
-                                Button("View server") { Task { await model.load(); showingServer = true } }
-                            }
-                        }.font(.footnote)
-                        Button("Discard local draft…", role: .destructive) { confirmingDiscard = true }
-                            .font(.footnote).disabled(model.saving)
-                        if model.localError != nil, FileManager.default.fileExists(atPath: model.draftFile.path) {
-                            ShareLink("Export stored draft", item: model.draftFile).font(.footnote)
-                        }
-                    }.padding()
-                }
-                if model.expected != nil {
-                    PageTextView(text: Binding(get: { model.text }, set: { model.updateText($0) }), controller: controller, dictation: dictation)
-                        .safeAreaInset(edge: .bottom) { formatBar }
-                } else if model.error == nil && model.localError == nil {
-                    ProgressView()
-                } else {
-                    Spacer()
-                }
-            }
-            .navigationTitle(note == nil ? "Edit page" : "Notes")
-            .navigationSubtitle(note?.note.shortTitle ?? "")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(model.dirty && model.error != nil ? "Keep draft and close" : note == nil ? "Done" : "Close") { Task { await finish() } }
-                        .disabled(!model.canClose || noteBusy)
-                }
-                if note != nil { noteToolbar }
-            }
-            .task { await model.load() }
-            .task(id: model.text + "\(model.saving)") {
-                guard !finished, model.dirty, model.expected != nil, model.error == nil, !model.saving else { return }
-                guard (try? await Task.sleep(for: Self.autosaveDelay)) != nil else { return }
-                Task { await model.save() }
-            }
-            // Leaving the app: save now rather than after the pause.
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active, !finished { Task { await model.save() } }
-            }
-            .alert("Keep as page", isPresented: $keeping) {
-                TextField("Title", text: $keptTitle)
-                Button("Cancel", role: .cancel) {}
-                Button("Keep page") { Task { await keepNote() } }
-                    .disabled(keptTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            } message: {
-                Text("It stays in Notes as an ordinary page, no longer a temp note on this thread.")
-            }
-            .confirmationDialog("Discard these notes?", isPresented: $confirmingNoteDiscard, titleVisibility: .visible) {
-                Button("Discard", role: .destructive) { Task { await discardNote() } }
-                Button("Keep editing", role: .cancel) {}
-            } message: {
-                Text("The page is deleted, with everything typed in it. This can't be undone.")
-            }
-            .confirmationDialog("Discard this phone's draft?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-                Button("Discard and load server text", role: .destructive) { Task { await model.discardAndReload() } }
-                Button("Keep editing", role: .cancel) {}
-            } message: {
-                Text("This removes your local changes. Copy or export them first if you want to keep them. The server page is unchanged.")
-            }
-            .sheet(isPresented: $showingServer) {
-                NavigationStack {
-                    ScrollView { Text(PageEditorModel.plain(model.serverMarkdown ?? "")).textSelection(.enabled).padding() }
-                        .navigationTitle("Server text")
-                        .toolbar { Button("Done") { showingServer = false } }
-                }
-            }
-            .sensoryFeedback(.success, trigger: copied)
-            .sheet(isPresented: $dictating) {
-                DictationView(threadId: nil, autoStart: true, insertLabel: ("Insert in page", "text.insert"), gate: dictation) { spoken in
-                    controller.insert(spoken)
-                }
-            }
+            withDialogs
             #if DEBUG
             .task {
                 switch NotesDemo.variant {
@@ -140,6 +55,113 @@ struct PageEditor: View {
             #endif
         }
         .interactiveDismissDisabled(!model.canClose || note != nil)
+    }
+
+    // `body` in parts, so each type-checks quickly (whole, it took 2 s).
+
+    /// The error notes, the text and its format bar.
+    private var content: some View {
+        VStack(spacing: 0) {
+            if let noteError {
+                Text(noteError).font(.footnote).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal).padding(.top, 8)
+                    .onTapGesture { self.noteError = nil }
+            }
+            if let message = model.localError ?? model.error {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message).font(.footnote).foregroundStyle(.red)
+                    HStack {
+                        Button("Retry") { Task { await model.retry() } }
+                        Button("Copy local text") { UIPasteboard.general.string = model.text; copied = true }
+                        if model.serverMarkdown != nil {
+                            Button("View server") { Task { await model.load(); showingServer = true } }
+                        }
+                    }.font(.footnote)
+                    Button("Discard local draft…", role: .destructive) { confirmingDiscard = true }
+                        .font(.footnote).disabled(model.saving)
+                    if model.localError != nil, FileManager.default.fileExists(atPath: model.draftFile.path) {
+                        ShareLink("Export stored draft", item: model.draftFile).font(.footnote)
+                    }
+                }.padding()
+            }
+            if model.expected != nil {
+                PageTextView(text: Binding(get: { model.text }, set: { model.updateText($0) }), controller: controller, dictation: dictation)
+                    .safeAreaInset(edge: .bottom) { formatBar }
+            } else if model.error == nil && model.localError == nil {
+                ProgressView()
+            } else {
+                Spacer()
+            }
+        }
+    }
+
+    /// Title, toolbar, loading and autosave.
+    private var editor: some View {
+        content
+        .navigationTitle(note == nil ? "Edit page" : "Notes")
+        .navigationSubtitle(note?.note.shortTitle ?? "")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(closeTitle) { Task { await finish() } }
+                    .disabled(!model.canClose || noteBusy)
+            }
+            if note != nil { noteToolbar }
+        }
+        .task { await model.load() }
+        .task(id: model.text + "\(model.saving)") {
+            guard !finished, model.dirty, model.expected != nil, model.error == nil, !model.saving else { return }
+            guard (try? await Task.sleep(for: Self.autosaveDelay)) != nil else { return }
+            Task { await model.save() }
+        }
+        // Leaving the app: save now rather than after the pause.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active, !finished { Task { await model.save() } }
+        }
+    }
+
+    /// Keep, discard, the server text and dictation.
+    private var withDialogs: some View {
+        editor
+        .alert("Keep as page", isPresented: $keeping) {
+            TextField("Title", text: $keptTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Keep page") { Task { await keepNote() } }
+                .disabled(keptTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text("It stays in Notes as an ordinary page, no longer a temp note on this thread.")
+        }
+        .confirmationDialog("Discard these notes?", isPresented: $confirmingNoteDiscard, titleVisibility: .visible) {
+            Button("Discard", role: .destructive) { Task { await discardNote() } }
+            Button("Keep editing", role: .cancel) {}
+        } message: {
+            Text("The page is deleted, with everything typed in it. This can't be undone.")
+        }
+        .confirmationDialog("Discard this phone's draft?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+            Button("Discard and load server text", role: .destructive) { Task { await model.discardAndReload() } }
+            Button("Keep editing", role: .cancel) {}
+        } message: {
+            Text("This removes your local changes. Copy or export them first if you want to keep them. The server page is unchanged.")
+        }
+        .sheet(isPresented: $showingServer) {
+            NavigationStack {
+                ScrollView { Text(PageEditorModel.plain(model.serverMarkdown ?? "")).textSelection(.enabled).padding() }
+                    .navigationTitle("Server text")
+                    .toolbar { Button("Done") { showingServer = false } }
+            }
+        }
+        .sensoryFeedback(.success, trigger: copied)
+        .sheet(isPresented: $dictating) {
+            DictationView(threadId: nil, autoStart: true, insertLabel: ("Insert in page", "text.insert"), gate: dictation) { spoken in
+                controller.insert(spoken)
+            }
+        }
+    }
+
+    private var closeTitle: String {
+        if model.dirty && model.error != nil { return "Keep draft and close" }
+        return note == nil ? "Done" : "Close"
     }
 
     @ToolbarContentBuilder
