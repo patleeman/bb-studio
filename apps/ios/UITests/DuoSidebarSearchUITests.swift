@@ -4,12 +4,13 @@ import XCTest
 final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
     func testWideSidebarAlignmentAndCaptures() throws {
         let env = ProcessInfo.processInfo.environment
-        let device = try XCTUnwrap(env["BBGO_QA_DEVICE"])
+        // Only names the captures.
+        let device = env["BBGO_QA_DEVICE"] ?? "duo"
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES",
-            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark", "-openURL", "bbstudio://bot"]
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark", "-qaStudioDemo", "-openURL", "bbstudio://bot"]
         app.launchOffline()
-        XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 30))
+        XCTAssertTrue(botChatRow(app).waitForExistence(timeout: 30))
         try assertCard(app, device: device)
         capture("v5-bot-" + device)
         command("tab?studio")
@@ -44,7 +45,7 @@ final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
         }
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES",
-            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-openURL", "bbstudio://home"]
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaStudioDemo", "-openURL", "bbstudio://home"]
         app.launchOffline()
         command("tab?studio")
         let input = app.textFields["sidebarSearchInput"]
@@ -69,7 +70,7 @@ final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES",
-            "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://home"]
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaStudioDemo", "-openURL", "bbstudio://home"]
         app.launchOffline()
         for tab in ["studio", "threads"] {
             command("tab?" + tab)
@@ -83,7 +84,7 @@ final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
         guard env["BBGO_QA_DEVICE"] == "duo" else { throw XCTSkip("Phone-only native search check") }
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES",
-            "-qaBotDemo", "duo", "-qaDuoPhone", "-openURL", "bbstudio://home"]
+            "-qaBotDemo", "duo", "-qaDuoPhone", "-qaStudioDemo", "-openURL", "bbstudio://home"]
         app.launchOffline()
         for tab in ["threads", "studio"] {
             command("tab?" + tab)
@@ -93,14 +94,21 @@ final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
         }
     }
 
+    /// The Bot's chat row: "Chat", with its state after it ("Chat, Waiting for approval").
+    private static let chatRow = NSPredicate(format: "label == 'Chat' OR label BEGINSWITH 'Chat,'")
+    private func botChatRow(_ app: XCUIApplication) -> XCUIElement { app.buttons.matching(Self.chatRow).firstMatch }
+
     private func firstCard(_ app: XCUIApplication) throws -> XCUIElement {
-        let identifier: String
-        if app.buttons.matching(identifier: "studioItem").firstMatch.exists { identifier = "studioItem" }
-        else if app.buttons["inbox-thread-thr_botdemo01"].exists { identifier = "inbox-thread-thr_botdemo01" }
-        else if app.buttons["Chat"].exists { identifier = "Chat" }
-        else { identifier = "Server" }
+        func id(_ identifier: String) -> NSPredicate { NSPredicate(format: "identifier == %@ OR label == %@", identifier, identifier) }
+        let button: NSPredicate
+        if app.buttons.matching(identifier: "studioItem").firstMatch.exists { button = id("studioItem") }
+        else if app.buttons["inbox-thread-thr_botdemo01"].exists { button = id("inbox-thread-thr_botdemo01") }
+        else if botChatRow(app).exists { button = Self.chatRow }
+        else { button = id("Server") }
         // Identify a real item row, excluding pager and section-header cells.
-        let candidates = app.cells.containing(.button, identifier: identifier).allElementsBoundByIndex.filter {
+        let rows = app.cells.containing(NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "elementType == %d", XCUIElement.ElementType.button.rawValue), button]))
+        let candidates = rows.allElementsBoundByIndex.filter {
             let frame = $0.frame
             return frame.minX >= 64 && frame.maxX <= app.windows.firstMatch.frame.width / 2 + 1 && frame.width > 150 && frame.height < 200
         }

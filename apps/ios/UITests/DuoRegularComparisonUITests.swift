@@ -6,14 +6,18 @@ import XCTest
 final class DuoRegularComparisonUITests: ServerIsolatedUITestCase {
     func testDarkSidebarsAndOpenDetails() throws {
         let env = ProcessInfo.processInfo.environment
-        let device = try XCTUnwrap(env["BBGO_QA_DEVICE"])
+        // Only names the captures.
+        let device = env["BBGO_QA_DEVICE"] ?? "duo"
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-qaDark", "-openURL", "bbstudio://bot"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDuoColdWide", "-qaDark", "-qaStudioDemo", "-openURL", "bbstudio://bot"]
         app.launchOffline()
         let last = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "History turn 299.")).firstMatch
         XCTAssertTrue(last.waitForExistence(timeout: 30))
-        XCTAssertTrue(app.buttons["Chat"].exists)
-        XCTAssertTrue(app.staticTexts["Needs you"].exists)
+        // The Bot's chat row, carrying its attention (it replaced the
+        // separate Needs you group, c9a3930e).
+        let chat = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Chat,")).firstMatch
+        XCTAssertTrue(chat.exists)
+        XCTAssertTrue(chat.label.contains("Waiting for approval"), chat.label)
         XCTAssertGreaterThan(last.frame.minX, 475)
         Thread.sleep(forTimeInterval: 3)
         command("capture?v3-bot-" + device)
