@@ -95,6 +95,8 @@ enum BotDemo {
         private var rows: [TimelineRow] = BotDemo.longRows
         private var running = false
         private var sends = 0
+        /// Questions asked with `ask`, served as pending interactions.
+        private var asked: [PendingInteraction] = []
         /// Called on the main actor when the thread changes, as BB's realtime would.
         @MainActor var changed: (() -> Void)?
 
@@ -119,6 +121,9 @@ enum BotDemo {
                 return (200, Data(#"{"ok":true}"#.utf8))
             }
             if method == "POST", path == base + "/read" { return (200, Data("{}".utf8)) }
+            if method == "GET", path == base + "/interactions" {
+                return (200, lock.withLock { (try? JSONEncoder().encode(asked)) ?? Data("[]".utf8) })
+            }
             return (404, Data(#"{"error":{"message":"Not in the demo"}}"#.utf8))
         }
 
@@ -213,6 +218,12 @@ enum BotDemo {
         }
 
         static let streamChunks = 8
+
+        /// QA: the Bot asks a question, as a pending interaction.
+        func ask() {
+            lock.withLock { if asked.isEmpty { asked = BotDemo.questionInteractions } }
+            notify()
+        }
 
         /// QA: `count` rows land at once, as when the Bot works through a
         /// long turn while the phone is away: more than one page.
@@ -410,7 +421,7 @@ enum BotDemo {
         decode(#"[{"id":"int_demo1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"approval","subject":{"kind":"command","command":"git push origin release/1.4","cwd":"~/code/app"},"reason":"Push the release workflow fix","availableDecisions":["allow_once","deny"]}}]"#)
     }
 
-    private static var questionInteractions: [PendingInteraction] {
+    fileprivate static var questionInteractions: [PendingInteraction] {
         decode(#"[{"id":"int_question1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"user_question","questions":[{"id":"q1","prompt":"Which venue should I book for the Lisbon offsite?","multiSelect":false,"allowFreeText":true,"options":[{"value":"lx","label":"LX Factory","description":"Biggest room, furthest from the hotel"},{"value":"tivoli","label":"Tivoli","description":"Walkable, smaller room"},{"value":"later","label":"Decide later"}]}]}}]"#)
     }
 

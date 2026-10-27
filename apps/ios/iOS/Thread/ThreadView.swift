@@ -1718,13 +1718,18 @@ extension ThreadView {
                     Breadcrumbs.shared.focus("transcript-tap", "end-editing")
                     window?.endEditing(true)
                 }
-            })
+            },
+            pillNote: transcriptV2PillNote,
+            probe: transcriptV2Probe)
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {
             // Nothing cached yet: the shape of a chat, not a blank screen.
             if !model.loaded { ChatSkeleton(bot: botChrome != nil).allowsHitTesting(false) }
         }
+        #if DEBUG
+        .onDisappear { DuoDemo.surfaces["transcript-" + model.threadId] = nil }
+        #endif
     }
 
     /// As the SwiftUI transcript's: Studio paths and in-app thread links open here.
@@ -1816,7 +1821,8 @@ extension ThreadView {
         var chrome = TranscriptChrome()
         // The composer's own 8 pt padding is the gap above the keyboard or the edge.
         chrome.composerGap = 0
-        chrome.composerIgnoresBottomSafeArea = TranscriptV2.composerIgnoresBottomSafeArea(duoLayout)
+        // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).
+        chrome.composerIgnoresBottomSafeArea = duoLayout.innerScreen
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin(bot: botChrome != nil)
         chrome.rows.readableWidth = Self.readableWidth
@@ -1851,21 +1857,42 @@ extension ThreadView {
         }
     }
 
+    /// A question or approval waiting doesn't take the reader to the end;
+    /// the pill says so instead (with push and the badge as before).
+    fileprivate var transcriptV2PillNote: String? {
+        let waiting = model.interactions
+        guard let first = waiting.first else { return nil }
+        if waiting.count > 1 { return "\(waiting.count) waiting" }
+        return first.payload.kind == "approval" ? "Approval" : "Question"
+    }
+
+    /// Debug: the rows' content edges, which the composer lines up with beside two pages.
+    fileprivate var transcriptV2Probe: ((CGRect) -> Void)? {
+        #if DEBUG
+        let key = "transcript-" + model.threadId
+        return { DuoDemo.surfaces[key] = $0 }
+        #else
+        return nil
+        #endif
+    }
+
     /// The jump button: in the corner on a phone; beside two pages centred
     /// in its band, over a scrim that runs down behind the composer.
     @ViewBuilder fileprivate func transcriptV2Pill(_ state: TranscriptPillState, jump: @escaping () -> Void) -> some View {
+        // A question waiting: its own word, tinted, in place of the count.
+        let label = state.note ?? (state.unseen > 0 ? "\(state.unseen) new" : nil)
         let button = Button(action: jump) {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.down").font(.body.weight(.semibold))
-                if state.unseen > 0 { Text("\(state.unseen) new").font(.subheadline.weight(.semibold)).monospacedDigit() }
+                Image(systemName: state.note != nil ? "questionmark.bubble" : "arrow.down").font(.body.weight(.semibold))
+                if let label { Text(label).font(.subheadline.weight(.semibold)).monospacedDigit() }
             }
             .frame(minWidth: 40, minHeight: 40)
-            .padding(.horizontal, state.unseen > 0 ? 10 : 0)
+            .padding(.horizontal, label != nil ? 10 : 0)
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.glass(state.note != nil ? .regular.tint(.orange) : .regular))
         .clipShape(.capsule)
         .padding(12)
-        .accessibilityLabel(state.unseen > 0 ? "Jump to latest, \(state.unseen) new" : "Jump to latest")
+        .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
         .accessibilityIdentifier("jumpToLatest")
         if duoLayout.twoPages {
             button.frame(maxWidth: .infinity).background { JumpScrim().padding(.bottom, -400) }

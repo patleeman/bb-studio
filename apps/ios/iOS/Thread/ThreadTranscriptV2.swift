@@ -15,19 +15,6 @@ enum TranscriptV2 {
         false
         #endif
     }
-
-    /// The Duo's inner screen, two pages or iOS's two-app split there: the
-    /// composer rests 8 pt above the window's bottom edge, as the list beside
-    /// it runs to the edge, rather than above the 34 pt home indicator inset.
-    /// An iPhone in landscape (440 pt tall) keeps its composer clear of the
-    /// indicator; so does an iPad.
-    @MainActor
-    static func composerIgnoresBottomSafeArea(_ layout: DuoLayout) -> Bool {
-        guard UIDevice.current.userInterfaceIdiom == .phone else { return false }
-        if layout.twoPages { return true }
-        let screen = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.screen }.first?.bounds.size ?? .zero
-        return screen.width >= 900 && screen.height >= 600
-    }
 }
 
 /// The flag's switch: reads the setting live, so turning it on applies to
