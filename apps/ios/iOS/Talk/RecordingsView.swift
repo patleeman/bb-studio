@@ -27,7 +27,9 @@ struct RecordingDetailView: View {
     @State private var generatingNotes = false
     @State private var listener: UUID?
 
-    var body: some View {
+    // In parts: as one expression this body was too slow for Xcode 26's
+    // type checker (2 s on CI).
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let recording {
@@ -71,6 +73,31 @@ struct RecordingDetailView: View {
             }
             .padding()
         }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
+            StudioChatMenuButton(isPresented: $chatting)
+            Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
+            Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
+            Button {
+                newTitle = recording?.title ?? ""
+                renaming = true
+            } label: { Label("Rename", systemImage: "pencil") }
+            if let recording, recording.failedCount > 0 {
+                Button { Task { await perform { try await $0.retryRecording(id) } } } label: {
+                    Label("Retry Transcription", systemImage: "arrow.clockwise")
+                }
+            }
+            Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+    }
+
+    var body: some View {
+        content
         .overlay { if !loaded { ProgressView() } }
         .modifier(RegularScrollingSurface())
         .safeAreaInset(edge: .bottom) {
@@ -82,24 +109,7 @@ struct RecordingDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 ShareLink(item: transcript).disabled(transcript.isEmpty)
-                Menu {
-                    Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
-                    StudioChatMenuButton(isPresented: $chatting)
-                    Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
-                    Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
-                    Button {
-                        newTitle = recording?.title ?? ""
-                        renaming = true
-                    } label: { Label("Rename", systemImage: "pencil") }
-                    if let recording, recording.failedCount > 0 {
-                        Button { Task { await perform { try await $0.retryRecording(id) } } } label: {
-                            Label("Retry Transcription", systemImage: "arrow.clockwise")
-                        }
-                    }
-                    Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
-                } label: {
-                    Image(systemName: "ellipsis")
-                }
+                moreMenu
                 .disabled(recording == nil)
             }
         }
