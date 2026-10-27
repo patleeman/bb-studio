@@ -155,8 +155,10 @@ final class TranscriptListLayout: UICollectionViewLayout {
         contentHeight = y + metrics.bottom
     }
 
+    /// As wide as where rows may go: up to the trailing edge kept clear (the
+    /// Duo's status column), as the SwiftUI transcript's content was.
     override var collectionViewContentSize: CGSize {
-        CGSize(width: collectionView?.bounds.width ?? width, height: contentHeight)
+        CGSize(width: max(0, (collectionView?.bounds.width ?? width) - metrics.trailing), height: contentHeight)
     }
 
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {

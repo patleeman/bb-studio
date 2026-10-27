@@ -54,6 +54,8 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     /// Shown on the pill while reading: something waiting at the end.
     var pillNote: String?
     var probe: ((CGRect) -> Void)?
+    /// How the log writes a row id.
+    var describeID: ((AnyHashable) -> String)?
 
     final class Coordinator {
         var items: [Item] = []
@@ -78,6 +80,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
         controller.probe = probe
+        if let describeID { controller.describe = describeID }
         controller.chrome = chrome
         let row = row
         controller.content = { id in

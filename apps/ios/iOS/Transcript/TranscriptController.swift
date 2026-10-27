@@ -77,6 +77,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
     var log: ((String) -> Void)?
+    /// A row id as the log writes it. An app whose ids could carry text
+    /// passes a filter (BB: `ScrollLog.id`).
+    var describe: (AnyHashable) -> String = { "\($0)" }
     /// The rows' content frame in window coordinates, after each layout (Debug probes).
     var probe: ((CGRect) -> Void)?
     /// Ends editing after a tap on the transcript. The default waits a run
@@ -110,6 +113,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var animating = false
     private var animationToken = 0
     private var nearTopArmed = true
+    /// A row asked for before it was in the transcript.
+    private var pendingScroll: (id: AnyHashable, position: TranscriptRowPosition)?
 
     /// For the harness: how much work each step took.
     struct Counters: Equatable {
@@ -272,6 +277,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         applyRowMetrics()
         updateInsets()
         settle("layout")
+        logGeometry()
         if let probe, let rect = rowsFrameInWindow, rect != lastProbe {
             lastProbe = rect
             probe(rect)
@@ -323,6 +329,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             layout.forget(keeping: seen)
             if appended > 0, follow.handle(.appended(appended)) { followChanged() }
             nearTopArmed = true
+            if let pending = pendingScroll, seen.contains(pending.id) {
+                collectionView.layoutIfNeeded()
+                scrollTo(pending.id, position: pending.position)
+            }
         }
         reconfigure(changed)
         updatePill()
@@ -381,6 +391,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// screen above the end (which lays the end out), then a short animation.
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
+        pendingScroll = nil
         if follow.handle(.jumpToLatest) { followChanged() }
         log?("v2 jumpToLatest animated=\(animated)")
         let target = restingOffset()
@@ -402,12 +413,18 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     func scrollTo(_ id: AnyHashable, position: TranscriptRowPosition, animated: Bool = false) {
         loadViewIfNeeded()
         collectionView.layoutIfNeeded()
-        guard let frame = layout.frame(of: id) else { return }
+        guard let frame = layout.frame(of: id) else {
+            // Not in yet (the first unread, before its page lands): go there when it is.
+            pendingScroll = (id, position)
+            log?("v2 scrollTo \(describe(id)) waits for its row")
+            return
+        }
+        pendingScroll = nil
         if follow.handle(.readRow) { followChanged() }
         let visible = collectionView.bounds.height - collectionView.contentInset.top - collectionView.contentInset.bottom
         let distance = position == .top ? 0 : max(0, (visible - frame.height) / 2)
         anchor = .init(id: id, distance: distance)
-        log?("v2 scrollTo \(id) \(position)")
+        log?("v2 scrollTo \(describe(id)) \(position)")
         if animated { animate(to: restingOffset()) } else { write(restingOffset(), "scrollTo") }
         updatePill()
     }
@@ -466,6 +483,25 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let target = restingOffset()
         if abs(target - collectionView.contentOffset.y) > 0.25 { write(target, why) }
     }
+
+    /// A `v2 geo` line in the scroll log, as the old transcript's `geo`
+    /// lines: offset, content, insets, how far past the end (positive is
+    /// blank) and the rows on screen. Only when something changed.
+    private func logGeometry() {
+        guard let log else { return }
+        let b = bounds()
+        let past = -TranscriptGeometry.distanceToEnd(offset: collectionView.contentOffset.y, contentHeight: b.content,
+                                                     boundsHeight: b.height, bottomInset: b.bottom)
+        let visible = collectionView.indexPathsForVisibleItems.map(\.item).sorted()
+        let ids = [visible.first, visible.last].compactMap { $0 }.compactMap { layout.ids.indices.contains($0) ? describe(layout.ids[$0]) : nil }
+        let line = String(format: "v2 geo offset=%.1f content=%.1f container=%.1f insetTop=%.1f insetBottom=%.1f past=%.1f",
+                          collectionView.contentOffset.y, b.content, b.height, b.top, b.bottom, past)
+            + " rows=\(visible.count) follow=\(follow.mode) visible=\(ids.joined(separator: "…"))"
+        guard line != lastGeometry else { return }
+        lastGeometry = line
+        log(line)
+    }
+    private var lastGeometry = ""
 
     private func write(_ y: CGFloat, _ why: String) {
         let target = clamp(y)
@@ -679,6 +715,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let near = distanceToEnd <= chrome.nearEnd
         log?(String(format: "v2 reader scroll ended distance=%.1f near=%@", distanceToEnd, "\(near)"))
         if follow.handle(.readerScrollEnded(nearEnd: near)) { followChanged() }
+        defer { logGeometry() }
         if follow.mode == .following {
             animate(to: maxOffset)
         } else if anchor == nil || layout.frame(of: anchor!.id) == nil {
