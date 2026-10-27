@@ -535,11 +535,13 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         app.buttons["Done"].tap()
     }
 
+    /// The shelf demo replaces the shelf when a timeline page arrives. Offline,
+    /// the Bot demo's local server (`-qaDemoLatency`) serves its thread's pages.
     func testShelfDemo() {
         app.terminate()
-        app.launchArguments = ["-qaShelfDemo"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaShelfDemo", "-qaBotDemo", "chat", "-qaDemoLatency", "0"]
         app.launchOffline()
-        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
+        app.open(URL(string: "bbstudio://thread/thr_botdemo01")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
         shot("shelf-demo")
         app.buttons.matching(NSPredicate(format: "label CONTAINS 'complete'")).firstMatch.tap()
