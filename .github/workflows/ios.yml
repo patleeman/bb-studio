@@ -38,6 +38,10 @@ jobs:
         run: |
           echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$(xcode-select -p)" scripts/check-transcript-swift6.sh
+      - name: Type-check times (nothing over 1.5 s)
+        # Bodies that slow here are ones this runner's Xcode can give up on
+        # ("unable to type-check this expression in reasonable time").
+        run: scripts/check-type-check-times.sh
       - name: Simulators
         # The newest iPhone Pro on the newest iOS runtime that has one, and an
         # iPhone Duo where this Xcode has one (its outer and inner screens). Ours alone: tests
