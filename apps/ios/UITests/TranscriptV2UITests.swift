@@ -95,6 +95,157 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         finish()
     }
 
+    /// A reply's and your message's menus, on the new transcript's cells:
+    /// Copy, Quote, Select Text, Reply in Thread (the Bot's side threads)
+    /// and Edit on your last message.
+    func testRowActions() {
+        open()
+        command("draft?0")
+        // A photo left in this thread's draft by an earlier test.
+        while attachment.exists { attachment.tap() }
+        command("say?Row%20actions%20reply.")
+        let reply = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Row actions reply.'")).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: 10))
+        watch("actions: a reply came in", atEnd: true)
+
+        command("pasteboard?clear")
+        menu(on: reply, "Copy", "actions: copy")
+        expectation(for: NSPredicate { _, _ in self.copied() == "Row actions reply." }, evaluatedWith: nil)
+        waitForExpectations(timeout: 5) { _ in }
+        if copied() != "Row actions reply." { failures.append("actions: Copy copied \(copied() ?? "nothing")") }
+
+        menu(on: reply, "Quote", "actions: quote")
+        let quoted = composerField.value as? String ?? ""
+        if !quoted.contains("> Row actions reply.") { failures.append("actions: the quote isn't in the composer (\(quoted))") }
+        command("dismiss")
+        command("draft?0")
+
+        menu(on: reply, "Select Text", "actions: select text")
+        let done = app.navigationBars["Select Text"].buttons["Done"]
+        if done.waitForExistence(timeout: 5) { done.tap() } else { failures.append("actions: Select Text didn't open") }
+
+        reply.press(forDuration: 1)
+        if !app.buttons["Reply in Thread"].waitForExistence(timeout: 5) { failures.append("actions: no Reply in Thread on a reply") }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+        _ = app.buttons["Reply in Thread"].waitForNonExistence(timeout: 3)
+
+        // Your last message: Edit puts it back in the composer. Sent from
+        // here: the demo's answer is short, so it stays on screen.
+        composerField.tap()
+        composerField.typeText("Edit me please")
+        app.buttons["Send"].firstMatch.tap()
+        command("dismiss")
+        let mine = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Edit me please'")).firstMatch
+        if !mine.waitForExistence(timeout: 10) { print("V2-TREE " + app.debugDescription) }
+        XCTAssertTrue(mine.exists, "the sent message is on screen")
+        let answer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'take care of'")).firstMatch
+        _ = answer.waitForExistence(timeout: 10)
+        watch("actions: sent, and the answer", atEnd: true)
+        menu(on: mine, "Edit", "actions: edit")
+        if !app.staticTexts["Editing your last message"].waitForExistence(timeout: 5) { failures.append("actions: no editing card") }
+        let editing = composerField.value as? String ?? ""
+        if !editing.contains("Edit me please") { failures.append("actions: the message isn't in the composer (\(editing))") }
+        app.buttons["Cancel"].firstMatch.tap()
+        command("dismiss")
+        watch("actions: after edit", atEnd: false)
+        finish()
+    }
+
+    /// A question asked while reading leaves the rows where they are, and the
+    /// pill says so; it takes the reader to the end, where the question is.
+    func testQuestionPill() {
+        open()
+        command("draft?0")
+        command("mid")
+        expectPill(true, "question: up in the history")
+        let before = record("question: reading")
+        command("ask")
+        expectation(for: NSPredicate { _, _ in self.pill.exists && self.pill.label.contains("Question") }, evaluatedWith: nil)
+        waitForExpectations(timeout: 15) { _ in }
+        if !pill.label.contains("Question") { failures.append("question: the pill doesn't say Question (\(pill.label))") }
+        let after = record("question: asked while reading")
+        moved(from: before, to: after, "question: asked while reading")
+        shot("question-pill")
+        pill.tap()
+        expectPill(false, "question: jumped")
+        // In the Bot chat it waits over the composer.
+        let card = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Which venue should I book'")).firstMatch
+        if !card.waitForExistence(timeout: 5) { failures.append("question: the question isn't shown") }
+        watch("question: at the end", atEnd: true)
+        finish()
+    }
+
+    /// Find in a thread takes the reader to a match. The demo's normal
+    /// thread is listed only beside two pages. (A question asked there isn't
+    /// refetched: the demo tells only the Bot chat of changes.
+    /// `testQuestionPill` covers the pill.)
+    func testFind() throws {
+        guard layout == "split" else { throw XCTSkip("The demo lists its normal thread only on the Duo's inner screen") }
+        open(cold: false)
+        showList()
+        command("tab?threads")
+        let conversation = app.buttons["inbox-thread-thr_botdemo01"]
+        XCTAssertTrue(conversation.waitForExistence(timeout: 15))
+        conversation.tap()
+        showRightPage()
+        XCTAssertTrue(composer.waitForExistence(timeout: 15))
+        expectAtEnd("find: open")
+
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Find in thread"].firstMatch.tap()
+        let field = app.textFields["Find in thread"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Design review")
+        Thread.sleep(forTimeInterval: 2)
+        let match = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Design review'")).firstMatch
+        if !(match.exists && match.isHittable) { failures.append("find: the match isn't on screen") }
+        expectAtRest("find: the newest match")
+        app.buttons["Earlier match"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 2)
+        if !(match.exists && match.isHittable) { failures.append("find: the earlier match isn't on screen") }
+        expectAtRest("find: an earlier match")
+        app.buttons["Done"].firstMatch.tap()
+
+        finish()
+    }
+
+    /// Mini cards (`-qaDuoMinis`): offline they show their placeholder, which
+    /// resizes as it loads; the chat stays at its end.
+    func testMiniCards() {
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
+            "-qaDuoMinis", "mini_a,mini_b,mini_c", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
+        if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
+        app.launchOffline()
+        XCTAssertTrue(composerField.waitForExistence(timeout: 30))
+        if layout == "outer" { command("outer") }
+        showRightPage()
+        let footer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Mini card scrolling check 8'")).firstMatch
+        XCTAssertTrue(footer.waitForExistence(timeout: 15))
+        watch("minis: open", atEnd: true, seconds: 5)
+        steps.append("mini card frames: \(app.otherElements.matching(identifier: "miniCardFrame").count)")
+        shot("minis")
+        command("mid")
+        record("minis: up")
+        command("bottom")
+        watch("minis: back at the end", atEnd: true)
+        finish()
+    }
+
+    /// Long-presses a row and picks `item` from its menu.
+    private func menu(on element: XCUIElement, _ item: String, _ step: String) {
+        element.press(forDuration: 1)
+        let button = app.buttons[item].firstMatch
+        if button.waitForExistence(timeout: 5) { button.tap() } else { failures.append("\(step): no \(item) in the menu") }
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    /// What the app last copied (`qa-duo/pasteboard`).
+    private func copied() -> String? {
+        command("pasteboard")
+        return app.windows.firstMatch.value as? String
+    }
+
     private func checkChat(_ name: String) {
         command("draft?0")
         expectAtEnd("\(name): open")

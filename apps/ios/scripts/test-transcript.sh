@@ -7,6 +7,7 @@
 #   BB_TEST_SIMULATOR_ID=<iphone> BB_TEST_DUO_SIMULATOR_ID=<iphone duo> scripts/test-transcript.sh
 #
 # BB_TEST_DUO_SIMULATOR_ID is optional; without it only the phone runs.
+# TEST_RUNNER_TRANSCRIPT_V2=1 puts any other UI suite on the new transcript.
 # TRANSCRIPT_REPORT_DIR=<dir> keeps the replay's per-step JSON.
 set -eu
 cd "$(dirname "$0")/.."
@@ -39,4 +40,7 @@ if [ -n "$duo" ]; then
     TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
       -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests
   done
+  # The Duo's composer, pill and content-edge checks, on the new transcript.
+  TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+    -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/DuoSplitComposerUITests
 fi
