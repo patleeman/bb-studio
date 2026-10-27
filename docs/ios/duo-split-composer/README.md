@@ -88,6 +88,23 @@ instead of 721, and text lay under the clock and icons. A second test checks
 that the Duo's outer screen and an iPhone 18 Pro keep the old composer and
 corner button.
 
+### The jump button left up at the end (26 October)
+
+`testComposerJumpButtonAndBottomGapInTheRightPage` then failed most runs in
+the Bot chat: "no jump button at the end". The test was right; the app was
+wrong. After `bottom`, the chat sat at its end (its visible bottom 1 point
+short of the content's), with the button still up and its band still in the
+bottom inset. The scroll log showed why. The jump lands while rows still
+have estimated heights (content 10,521 points), so `atBottom` went true,
+then false 7 ms later when the estimate put the end 319 points away. Once
+the rows settled (10,210 points) the chat was at its end again, but the
+`onScrollGeometryChange` that wrote `atBottom` never reported again, though
+the end's own geometry observer, which computes the same test, kept firing.
+
+`atBottom` now comes from that observer (`EndGeometry.nearEnd`), with the
+separate one removed. The test passes 4 of 4 runs with the scroll log on,
+where it had failed 4 of 4.
+
 The Debug transcript probe `transcript-<thread id>` records the transcript's
 content edges. Debug `mid` now scrolls ordinary threads, not just the Bot's
 chat. The quick-reply test's Duo history fixture has one reply made longer

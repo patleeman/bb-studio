@@ -680,14 +680,6 @@ struct ThreadView: View {
         .scrollEdgeEffectStyle(botChrome != nil ? .soft : nil, for: .top)
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.unobscuredBottom >= geometry.contentSize.height - 120
-        } action: { _, isAtBottom in
-            #if DEBUG
-            RenderCount.bump("write.atBottom")
-            #endif
-            atBottom = isAtBottom
-        }
         // The one owner of the timeline's end: rows growing or shrinking,
         // the keyboard, composer or quick replies changing the bottom inset
         // all come through here as geometry, and `keepAtEnd` answers them.
@@ -708,6 +700,16 @@ struct ThreadView: View {
             }
             if next.point != end.geometry.point { end.moved = .now }
             end.geometry = next
+            // The jump button's state comes from here too. A separate
+            // observer of the same test stopped reporting once rows settled
+            // their heights after a jump to the end: the chat sat at its end
+            // with the button still up (DuoSplitComposerUITests).
+            if atBottom != next.nearEnd {
+                #if DEBUG
+                RenderCount.bump("write.atBottom")
+                #endif
+                atBottom = next.nearEnd
+            }
             #if DEBUG
             RenderCount.bump("geometry.end")
             #endif
