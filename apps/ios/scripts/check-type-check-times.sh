@@ -8,7 +8,7 @@
 #   scripts/check-type-check-times.sh            # 1500 ms
 #   TYPE_CHECK_LIMIT_MS=500 scripts/check-type-check-times.sh
 #
-# A clean build of the app scheme for the simulator; no simulator needed.
+# A clean build of the app and its test targets for the simulator; no simulator needed.
 set -eu
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
@@ -17,7 +17,7 @@ derived="${TYPE_CHECK_DERIVED_DATA:-build/type-check/DerivedData}"
 log="${TMPDIR:-/tmp}/bbstudio-type-check.log"
 xcodegen generate -q
 rm -rf "$derived"
-xcodebuild build -scheme BBStudio -destination 'generic/platform=iOS Simulator' -derivedDataPath "$derived" \
+xcodebuild build-for-testing -scheme BBStudio -destination 'generic/platform=iOS Simulator' -derivedDataPath "$derived" \
   CODE_SIGNING_ALLOWED=NO \
   OTHER_SWIFT_FLAGS="\$(inherited) -Xfrontend -warn-long-function-bodies=$limit -Xfrontend -warn-long-expression-type-checking=$limit" \
   > "$log" 2>&1 || { tail -40 "$log"; echo "Build failed (log: $log)"; exit 1; }

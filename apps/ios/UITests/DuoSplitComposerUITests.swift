@@ -219,10 +219,16 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         Thread.sleep(forTimeInterval: 2)
         XCTAssertFalse(jump.exists, "\(name): no jump button at the end")
         let top = composer.frame.minY
-        let endRows = app.staticTexts.allElementsBoundByIndex.map(\.frame).filter {
-            $0.width > 0 && $0.height > 0 && $0.minX >= pageMinX - 1 && $0.minY < 669 && !composer.frame.contains($0)
+        let composerFrame: CGRect = composer.frame
+        let minX: CGFloat = pageMinX - 1
+        // Typed steps: as one expression Xcode 26 couldn't type-check it.
+        let frames: [CGRect] = app.staticTexts.allElementsBoundByIndex.map { $0.frame }
+        let endRows: [CGRect] = frames.filter { (frame: CGRect) -> Bool in
+            guard frame.width > 0, frame.height > 0, frame.minX >= minX, frame.minY < 669 else { return false }
+            return !composerFrame.contains(frame)
         }
-        let last = try XCTUnwrap(endRows.filter { $0.minY < top }.max { $0.maxY < $1.maxY }, "\(name): a row above the composer")
+        let above: [CGRect] = endRows.filter { $0.minY < top }
+        let last = try XCTUnwrap(above.max { $0.maxY < $1.maxY }, "\(name): a row above the composer")
         print("SPLIT END \(name) last=\(last) composer=\(composer.frame)")
         XCTAssertLessThanOrEqual(last.maxY, top + 1, "\(name): the last row is whole above the composer at the end")
         command("capture?split-composer-" + name + "-end")
@@ -231,9 +237,11 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     /// Text of the right page's transcript: not the header, composer or sidebar.
     private func transcriptTexts() -> [CGRect] {
         let composer = app.otherElements["threadComposer"].firstMatch.frame
-        return app.staticTexts.allElementsBoundByIndex.map(\.frame).filter {
-            $0.width > 0 && $0.height > 0 && $0.minX >= pageMinX - 1 && $0.maxY > 0 && $0.minY < 669
-                && !$0.intersects(composer) && $0.minY >= 58
+        let minX: CGFloat = pageMinX - 1
+        let frames: [CGRect] = app.staticTexts.allElementsBoundByIndex.map { $0.frame }
+        return frames.filter { (frame: CGRect) -> Bool in
+            guard frame.width > 0, frame.height > 0, frame.minX >= minX, frame.maxY > 0, frame.minY < 669 else { return false }
+            return !frame.intersects(composer) && frame.minY >= 58
         }
     }
 
