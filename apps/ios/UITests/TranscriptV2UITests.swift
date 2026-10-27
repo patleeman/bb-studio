@@ -528,13 +528,18 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     }
 
     private func expectComposerOverKeyboard(_ step: String) {
-        let keyboard = app.keyboards.firstMatch
-        guard keyboard.exists else { return }
-        // XCUITest's keyboard frame leaves out the 44 pt suggestion bar above
-        // the keys: 8 pt above the keyboard reads as 52 here.
-        let gap = keyboard.frame.minY - composer.frame.maxY
-        steps.append(String(format: "%@: composer %.1f pt above the keys", step, gap))
-        if gap < 7 || gap > 54 { failures.append(String(format: "%@: composer %.1f pt from the keys", step, gap)) }
+        guard app.keyboards.firstMatch.exists else { return }
+        // Against the keyboard's real top, from the app's own keyboard frame
+        // (the `layout` probe). XCUITest's keyboard element leaves out the
+        // suggestion bar above the keys, and that bar's height differs by iOS
+        // (44 pt on iOS 27, 50 on iOS 26), so the composer's 8 pt read as 52
+        // or 58 there.
+        guard let geometry = window(), let top = geometry.keyboardTop, top < geometry.height else {
+            return failures.append("\(step): the keyboard's frame isn't known")
+        }
+        let gap = top - composer.frame.maxY
+        steps.append(String(format: "%@: composer %.1f pt above the keyboard", step, gap))
+        if abs(gap - 8) > 1 { failures.append(String(format: "%@: composer %.1f pt from the keyboard, not 8", step, gap)) }
     }
 
     private func moved(from before: Scroll?, to after: Scroll?, _ step: String) {
@@ -637,6 +642,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let width: CGFloat
         let height: CGFloat
         let safeBottom: CGFloat
+        /// The keyboard's top in the window, or the window's height without one.
+        let keyboardTop: CGFloat?
         let scrolls: [Scroll]
     }
 
