@@ -552,6 +552,29 @@ struct ThreadView: View {
     }
 
     private var timeline: some View {
+        timelinePaging
+        .onChange(of: finding) { _, finding in
+            if finding { Task { await model.loadAll() } }
+        }
+        .onChange(of: findQuery) { _, _ in findIndex = 0 }
+        // Earlier pages going in above would carry the match off screen.
+        .onChange(of: model.rows.first?.id) { _, _ in
+            if finding, let currentMatch { read(currentMatch, anchor: .center) }
+        }
+        .onChange(of: currentMatch) { _, id in
+            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
+        }
+        .onChange(of: model.interactions.first?.id) { _, id in
+            if id != nil { scrollToBottom() }
+        }
+        .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
+        .onChange(of: outbox.messages.count) { old, new in
+            if new > old { scrollToBottom() }
+        }
+    }
+
+    /// Scrolling by hand, rows going in at the end, and older pages at the top.
+    private var timelinePaging: some View {
         timelineGeometry
         .onScrollPhaseChange { _, phase in
             #if DEBUG
@@ -603,24 +626,6 @@ struct ThreadView: View {
                 guard let delay = await loadOlder().retryDelay(failures: &failures) else { break }
                 try? await Task.sleep(for: delay)
             }
-        }
-        .onChange(of: finding) { _, finding in
-            if finding { Task { await model.loadAll() } }
-        }
-        .onChange(of: findQuery) { _, _ in findIndex = 0 }
-        // Earlier pages going in above would carry the match off screen.
-        .onChange(of: model.rows.first?.id) { _, _ in
-            if finding, let currentMatch { read(currentMatch, anchor: .center) }
-        }
-        .onChange(of: currentMatch) { _, id in
-            if let id { withAnimation(.snappy) { read(id, anchor: .center) } }
-        }
-        .onChange(of: model.interactions.first?.id) { _, id in
-            if id != nil { scrollToBottom() }
-        }
-        .onChange(of: model.confirmations) { _, _ in scrollToBottom() }
-        .onChange(of: outbox.messages.count) { old, new in
-            if new > old { scrollToBottom() }
         }
     }
 

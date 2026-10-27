@@ -158,7 +158,16 @@ struct InboxTab: View {
 struct RouteDestination: View {
     let route: Route
 
+    // In two switches of eight, so each type-checks quickly: one of sixteen
+    // was close to what Xcode 26 gives up on.
     var body: some View {
+        switch route {
+        case .thread, .pages, .page, .automations, .automation, .usage, .archived, .drawings: threadsAndTools
+        default: studioItems
+        }
+    }
+
+    @ViewBuilder private var threadsAndTools: some View {
         switch route {
         case .thread(let id): ThreadView(threadId: id).id(id)
         case .pages: PagesView()
@@ -168,6 +177,12 @@ struct RouteDestination: View {
         case .usage: UsageView()
         case .archived: ArchivedView()
         case .drawings: DrawingsView()
+        default: EmptyView()
+        }
+    }
+
+    @ViewBuilder private var studioItems: some View {
+        switch route {
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
         case .artifact(let id): ArtifactView(id: id)
@@ -175,6 +190,7 @@ struct RouteDestination: View {
         case .dashboard(let id): DashboardView(id: id).id(id)
         case .mini(let id): MiniAppView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
+        default: EmptyView()
         }
     }
 }

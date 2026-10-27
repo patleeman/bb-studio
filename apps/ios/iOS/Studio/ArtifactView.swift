@@ -42,6 +42,37 @@ struct ArtifactView: View {
     }
 
     var body: some View {
+        page
+        .task(id: "\(version?.id ?? ""):\(textAttempt)") { await loadText() }
+        .task {
+            listener = app.realtime.listen { event in
+                // Studio sends it on its `artifacts` channel.
+                guard case .pluginSignal("studio", "artifacts", let payload) = event else { return }
+                if let changed = (payload["artifactId"] ?? payload["id"])?.stringValue, changed != id { return }
+                Task { await load() }
+            }
+            await load()
+        }
+        .onDisappear { if let listener { app.realtime.removeListener(listener) } }
+        .alert("Rename", isPresented: $renaming) {
+            TextField("Title", text: $newTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { Task { await rename() } }
+        }
+        .confirmationDialog(
+            "Delete \u{201C}\(artifact?.displayTitle ?? "")\u{201D}?", isPresented: $confirmingDelete, titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { Task { await delete() } }
+        } message: {
+            Text("Every version goes. This can't be undone.")
+        }
+        .sheet(item: $sharing) { file in
+            ActivitySheet(items: [file.url]).ignoresSafeArea()
+        }
+    }
+
+    /// The artifact, its notice, title, toolbars and chat: apart from `body`, so that type-checks quickly.
+    private var page: some View {
         Group {
             if let artifact, let version {
                 content(artifact, version)
@@ -82,32 +113,6 @@ struct ArtifactView: View {
         .studioChat(
             isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
             projectId: artifact?.projectId)
-        .task(id: "\(version?.id ?? ""):\(textAttempt)") { await loadText() }
-        .task {
-            listener = app.realtime.listen { event in
-                // Studio sends it on its `artifacts` channel.
-                guard case .pluginSignal("studio", "artifacts", let payload) = event else { return }
-                if let changed = (payload["artifactId"] ?? payload["id"])?.stringValue, changed != id { return }
-                Task { await load() }
-            }
-            await load()
-        }
-        .onDisappear { if let listener { app.realtime.removeListener(listener) } }
-        .alert("Rename", isPresented: $renaming) {
-            TextField("Title", text: $newTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") { Task { await rename() } }
-        }
-        .confirmationDialog(
-            "Delete \u{201C}\(artifact?.displayTitle ?? "")\u{201D}?", isPresented: $confirmingDelete, titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) { Task { await delete() } }
-        } message: {
-            Text("Every version goes. This can't be undone.")
-        }
-        .sheet(item: $sharing) { file in
-            ActivitySheet(items: [file.url]).ignoresSafeArea()
-        }
     }
 
     // MARK: Content

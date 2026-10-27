@@ -12,24 +12,7 @@ struct AutomationsView: View {
     static let plugin = "Automations"
 
     var body: some View {
-        List {
-            if let error {
-                if error == BBClient.missingPluginMessage(Self.plugin) {
-                    Section { MissingPluginRow(message: error) }
-                } else {
-                    Section { ConnectionBanner(message: error) { await load() } }
-                }
-            }
-            ForEach(projects, id: \.self) { project in
-                Section {
-                    ForEach(entries.filter { $0.projectName == project }, id: \.automation.id) { entry in
-                        row(entry.automation)
-                    }
-                } header: {
-                    if projects.count > 1 { Text(project) }
-                }
-            }
-        }
+        list
         .overlay {
             if !loaded {
                 ProgressView()
@@ -57,6 +40,28 @@ struct AutomationsView: View {
             Button("Run now") {
                 guard let automation = running else { return }
                 Task { await run(automation) }
+            }
+        }
+    }
+
+    /// Every automation, by project: apart from `body`, so that type-checks quickly.
+    private var list: some View {
+        List {
+            if let error {
+                if error == BBClient.missingPluginMessage(Self.plugin) {
+                    Section { MissingPluginRow(message: error) }
+                } else {
+                    Section { ConnectionBanner(message: error) { await load() } }
+                }
+            }
+            ForEach(projects, id: \.self) { project in
+                Section {
+                    ForEach(entries.filter { $0.projectName == project }, id: \.automation.id) { entry in
+                        row(entry.automation)
+                    }
+                } header: {
+                    if projects.count > 1 { Text(project) }
+                }
             }
         }
     }
