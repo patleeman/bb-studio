@@ -1,0 +1,78 @@
+name: iOS
+
+# The iOS app's transcript and unit tests, on a macOS runner (free for this
+# public repo). Separate from the ubuntu `check` job in ci.yml.
+on:
+  push:
+    paths:
+      - "apps/ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+      - name: XcodeGen
+        run: brew install xcodegen
+      - name: Swift 6 check (the transcript folder alone)
+        run: |
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$(xcode-select -p)" scripts/check-transcript-swift6.sh
+      - name: Simulators
+        # The newest iPhone Pro on the newest iOS runtime that has one, and an
+        # iPhone Duo where this Xcode has one (its outer and inner screens). Ours alone: tests
+        # never touch a shared simulator.
+        run: |
+          xcrun simctl list -j devicetypes runtimes > "$RUNNER_TEMP/sim.json"
+          read -r phone_runtime phone duo_runtime duo < <(python3 - "$RUNNER_TEMP/sim.json" <<'PY'
+          import json, re, sys
+          data = json.load(open(sys.argv[1]))
+          kinds = {d["identifier"]: d["name"] for d in data["devicetypes"]}
+          runtimes = [r for r in data["runtimes"] if r.get("isAvailable") and r["identifier"].split(".")[-1].startswith("iOS")]
+          runtimes.sort(key=lambda r: [int(p) for p in r["version"].split(".")], reverse=True)
+          def newest(match):
+              for runtime in runtimes:
+                  names = [d["identifier"] for d in runtime.get("supportedDeviceTypes", []) if match(kinds.get(d["identifier"], ""))]
+                  if names:
+                      # The newest model: the highest number in its name.
+                      model = lambda i: int(re.search(r"\d+", kinds[i]).group()) if re.search(r"\d+", kinds[i]) else 0
+                      return runtime["identifier"], max(names, key=model)
+              return "-", "-"
+          phone = newest(lambda n: n.startswith("iPhone") and n.endswith("Pro"))
+          duo = newest(lambda n: n == "iPhone Duo")
+          print(*phone, *duo)
+          PY
+          )
+          echo "BB_TEST_SIMULATOR_ID=$(xcrun simctl create ci-phone "$phone" "$phone_runtime")" >> "$GITHUB_ENV"
+          if [ "$duo" != "-" ]; then
+            echo "BB_TEST_DUO_SIMULATOR_ID=$(xcrun simctl create ci-duo "$duo" "$duo_runtime")" >> "$GITHUB_ENV"
+          fi
+          echo "phone=$phone on $phone_runtime, duo=$duo on $duo_runtime"
+      - name: Unit tests (with the replay harness)
+        run: scripts/test.sh CODE_SIGNING_ALLOWED=NO
+      - name: Transcript tests (state machine, replay, flag-on UI tests)
+        run: scripts/test-transcript.sh
+      - name: Keep the results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcresults
+          path: apps/ios/build/**/*.xcresult
+          if-no-files-found: ignore
