@@ -372,6 +372,18 @@ enum SidebarContentInsets {
     static let trailing = leading
 }
 
+extension EnvironmentValues {
+    /// Inside a sidebar list that ignores the window's trailing safe area
+    /// (`SidebarListMargins`): its rows have no status column to take back.
+    @Entry var sidebarIgnoresTrailingSafeArea = false
+}
+
+/// The sidebar list's margins. The left page inherits the window's trailing
+/// safe area (the Duo's 84-point status column, at the right page's edge), and
+/// UIKit insets a list's scroll indicator by it: it was drawn 84 points in,
+/// over the rows' trailing text ("next 12:05 PM"). Ignoring that edge puts the
+/// indicator at the list's own edge; `SidebarRowContent` then stops taking
+/// the column back from the rows, so they keep their margins.
 struct SidebarListMargins: ViewModifier {
     let enabled: Bool
     @ViewBuilder func body(content: Content) -> some View {
@@ -379,6 +391,8 @@ struct SidebarListMargins: ViewModifier {
             content
                 .contentMargins(.leading, SidebarContentInsets.leading, for: .scrollContent)
                 .contentMargins(.trailing, SidebarContentInsets.trailing, for: .scrollContent)
+                .ignoresSafeArea(.container, edges: .trailing)
+                .environment(\.sidebarIgnoresTrailingSafeArea, true)
         } else { content }
     }
 }
@@ -434,15 +448,18 @@ struct SidebarSelectionBackground: View {
 /// Rows keep the same 20-point interior padding on both sides of their card,
 /// as on the leading edge. A phone list's row inset includes the window's
 /// trailing safe area even inside the left page, less the sidebar's trailing
-/// content margin. The iPad's automatic inset is 16 points, so set it too.
+/// content margin, unless the list ignores that safe area
+/// (`SidebarListMargins`). The iPad's automatic inset is 16 points, so set it too.
 struct SidebarRowContent: ViewModifier {
     static let padding: CGFloat = 20
     @Environment(\.duoLayout) private var layout
+    @Environment(\.sidebarIgnoresTrailingSafeArea) private var ignoresTrailing
     let enabled: Bool
     @ViewBuilder func body(content: Content) -> some View {
-        if enabled && UIDevice.current.userInterfaceIdiom == .phone {
+        if enabled && UIDevice.current.userInterfaceIdiom == .phone && !ignoresTrailing {
             content.listRowInsets(.trailing, Self.padding - layout.sidebarWindowInset + SidebarContentInsets.trailing)
         } else if enabled {
+            // Also a phone list that ignores the trailing safe area: nothing to take back.
             content.listRowInsets(.trailing, Self.padding)
         } else { content }
     }

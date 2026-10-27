@@ -48,6 +48,13 @@ enum DuoDemo {
                     "contentWidth": scroll.contentSize.width, "contentHeight": scroll.contentSize.height,
                     "contentOffsetY": scroll.contentOffset.y,
                     "adjustedRight": scroll.adjustedContentInset.right,
+                    "indicator": scroll.showsVerticalScrollIndicator,
+                    "indicatorRight": scroll.verticalScrollIndicatorInsets.right,
+                    "safeRight": scroll.safeAreaInsets.right,
+                    // Where UIKit draws its indicators (shown or faded out).
+                    "indicators": scroll.subviews.filter { String(describing: type(of: $0)).contains("ScrollIndicator") }
+                        .map { $0.convert($0.bounds, to: window) }
+                        .map { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] },
                     "adjustedBottom": scroll.adjustedContentInset.bottom, "adjustedTop": scroll.adjustedContentInset.top,
                     "clips": scroll.clipsToBounds])
             }
