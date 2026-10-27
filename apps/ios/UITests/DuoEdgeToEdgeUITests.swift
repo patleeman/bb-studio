@@ -13,7 +13,7 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         let prefix = light ? "qa-v8-light-" : "v8-"
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong",
-            "-qaNotesDemo", "draft", "-qaVoice", "idle", "-openURL", "bbstudio://bot"] + (light ? [] : ["-qaDark"])
+            "-qaNotesDemo", "draft", "-qaVoice", "idle", "-qaStudioDemo", "-openURL", "bbstudio://bot"] + (light ? [] : ["-qaDark"])
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try assertEdges(composer: true)
@@ -64,7 +64,9 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         command("tab?settings")
         XCTAssertTrue(app.buttons["Server"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.textFields["settingsServerURL"].waitForExistence(timeout: 10))
-        try assertEdges(composer: false, headerActions: false)
+        // A Form's rows are inset by margins, not a narrower content size;
+        // the checks below hold its cards clear of the status column.
+        try assertEdges(composer: false, headerActions: false, list: true)
         // Form cards keep a margin inside the status column, like the header.
         command("layout")
         let settings = try JSONDecoder().decode(Geometry.self, from: Data(try XCTUnwrap(app.windows.firstMatch.value as? String).utf8))
@@ -90,7 +92,10 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         try capture("qa-v7-native-ipad")
     }
 
-    private func assertEdges(composer: Bool, headerActions: Bool = true) throws {
+    /// `headerActions`: the detail header has trailing actions (every detail
+    /// header leads with the sidebar toggle). `list`: the scroll view is a
+    /// list, whose content is always as wide as it is.
+    private func assertEdges(composer: Bool, headerActions: Bool = true, list: Bool = false) throws {
         command("layout")
         let data = Data(try XCTUnwrap(app.windows.firstMatch.value as? String).utf8)
         let layout = try JSONDecoder().decode(Geometry.self, from: data)
@@ -111,8 +116,10 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(scroll.maxY, layout.height, accuracy: 1)
         // The scroll view runs under the status column, but its content keeps
         // clear of the Duo's clock, battery and Now Playing floating there.
-        XCTAssertEqual(scroll.contentWidth, scroll.width - layout.safeRight, accuracy: 1,
-            "Scrolling content stops at the status column")
+        if !list {
+            XCTAssertEqual(scroll.contentWidth, scroll.width - layout.safeRight, accuracy: 1,
+                "Scrolling content stops at the status column")
+        }
         XCTAssertGreaterThanOrEqual(scroll.adjustedBottom, layout.safeBottom)
         let sidebar = try XCTUnwrap(layout.scrolls.first { $0.x < layout.width / 2 && $0.height >= layout.height - 1 })
         XCTAssertEqual(sidebar.maxY, layout.height, accuracy: 1)
@@ -125,11 +132,12 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         for crease in creases.values {
             XCTAssertEqual(crease.maxY, layout.height, accuracy: 1, "The crease line runs the full height")
         }
-        let actions = app.buttons.allElementsBoundByIndex.filter {
+        let controls = app.buttons.allElementsBoundByIndex.filter {
             $0.frame.minX > layout.width / 2 && $0.frame.minY >= 0 && $0.frame.minY < 100 && $0.frame.height > 0
         }
+        let actions = controls.filter { $0.identifier != "duoPaneToggle" }
         XCTAssertEqual(actions.isEmpty, !headerActions)
-        for action in actions {
+        for action in controls {
             XCTAssertLessThanOrEqual(action.frame.maxX, layout.width - layout.safeRight + 1, action.label)
         }
         XCTAssertLessThanOrEqual(app.buttons["Settings"].frame.maxY, layout.height - layout.safeBottom + 1)

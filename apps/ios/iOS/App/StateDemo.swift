@@ -87,6 +87,7 @@ struct StateDemoSheets: ViewModifier {
             .task {
                 // Before anything it opens loads.
                 StateDemo.install(AppModel.shared)
+                StudioDemo.install()
                 related = StateDemo.variant == "related"
                 chat = StateDemo.variant == "studio-chat"
                 widgets = StateDemo.variant == "widgets"
