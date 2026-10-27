@@ -1003,6 +1003,14 @@ struct ThreadView: View {
                 let still = Date.now.timeIntervalSince(end.moved)
                 if still >= Self.animationStill {
                     end.animationOver = true
+                    // A reader's scroll that ended here, without the phase
+                    // reaching idle, still decides following from where it
+                    // rested; otherwise a fling up from the end kept
+                    // "following" and keepAtEnd took the reader back down.
+                    if end.readerScrolling {
+                        end.following = end.geometry.nearEnd
+                        end.readerScrolling = false
+                    }
                     ScrollLog.request(String(format: "animation over: still %.2fs, phase=animating", still))
                     keepAtEnd()
                 }
