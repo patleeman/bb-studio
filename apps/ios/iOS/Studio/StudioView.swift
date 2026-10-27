@@ -357,83 +357,7 @@ struct StudioView: View {
     private var selected: [StudioItem] { store.items.filter { selection.contains($0.id) } }
 
     var body: some View {
-        studioPages
-        .overlay {
-            if !store.loaded { ProgressView() }
-        }
-        .overlay(alignment: .bottom) {
-            if let notice {
-                Text(notice)
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.regularMaterial, in: .capsule)
-                    .padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.snappy, value: notice)
-        .safeAreaInset(edge: .bottom) {
-            if selecting { selectionBar }
-        }
-        .containerBackground(Color(uiColor: duoLayout.twoPages ? .systemGroupedBackground : .systemBackground), for: .navigation)
-        .environment(\.editMode, $editMode)
-        .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
-        .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
-        .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
-        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if duoLayout.twoPages && selectsDetail {
-                VStack(spacing: 0) {
-                    DuoHeader(sidebar: true) {
-                        Text(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio").font(.title2.bold())
-                    } actions: {
-                        if selecting {
-                            let all = Set(visible.map(\.id))
-                            Button(all.isSubset(of: selection) && !all.isEmpty ? "Deselect All" : "Select All") {
-                                selection = all.isSubset(of: selection) ? [] : all
-                            }
-                            Button("Done") { endSelecting() }
-                        } else {
-                            if !store.creatable.isEmpty { newMenu }
-                            projectMenu
-                            if store.viaStudio, !visible.isEmpty {
-                                Button("Select") { withAnimation { editMode = .active } }
-                            }
-                        }
-                    }
-                    SidebarSearchField(prompt: "Search Studio", text: $query)
-                }.background(Color(uiColor: .systemGroupedBackground))
-                .ignoresSafeArea(.container, edges: .trailing)
-            }
-        }
-        // Keep Select reachable, so search results can be acted on together.
-        .searchPresentationToolbarBehavior(.avoidHidingContent)
-        .toolbar {
-            if !duoLayout.twoPages {
-            if selecting {
-                ToolbarItem(placement: .topBarLeading) {
-                    let all = Set(visible.map(\.id))
-                    Button(all.isSubset(of: selection) && !all.isEmpty ? "Deselect All" : "Select All") {
-                        selection = all.isSubset(of: selection) ? [] : all
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { endSelecting() }.fontWeight(.semibold)
-                }
-            } else {
-                if !store.creatable.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) { newMenu }
-                }
-                ToolbarItem(placement: .topBarTrailing) { projectMenu }
-                if store.viaStudio, !visible.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Select") { withAnimation { editMode = .active } }
-                    }
-                }
-            }
-            }
-        }
+        withChrome
         .task(id: query) { await search() }
         .refreshable { await store.load(client) }
         .task(id: app.serverURL) {
@@ -517,6 +441,101 @@ struct StudioView: View {
             }
         } message: {
             Text(deleting?.kind == "page" ? "Its sub-pages go too. This can't be undone." : "This can't be undone.")
+        }
+    }
+
+    // `body` in parts, so each type-checks quickly: whole, Xcode 26 took 15 s on it.
+
+    /// The pages, their overlays, title and the Duo header.
+    private var withChrome: some View {
+        studioPages
+        .overlay {
+            if !store.loaded { ProgressView() }
+        }
+        .overlay(alignment: .bottom) {
+            if let notice {
+                Text(notice)
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: .capsule)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: notice)
+        .safeAreaInset(edge: .bottom) {
+            if selecting { selectionBar }
+        }
+        .containerBackground(Color(uiColor: duoLayout.twoPages ? .systemGroupedBackground : .systemBackground), for: .navigation)
+        .environment(\.editMode, $editMode)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
+        .modifier(DuoSearch(query: $query, unfolded: duoLayout.twoPages, prompt: "Search Studio"))
+        .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { duoHeader }
+        // Keep Select reachable, so search results can be acted on together.
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
+        .toolbar { toolbarItems }
+    }
+
+    private var title: String {
+        if selecting { return selection.isEmpty ? "Select Items" : "\(selection.count) Selected" }
+        return showArchived ? "Archived" : "Studio"
+    }
+
+    /// Select All, or Deselect All once everything shown is selected.
+    private var selectAllButton: some View {
+        let all = Set(visible.map(\.id))
+        let everything = all.isSubset(of: selection) && !all.isEmpty
+        return Button(everything ? "Deselect All" : "Select All") {
+            selection = all.isSubset(of: selection) ? [] : all
+        }
+    }
+
+    /// Beside two pages: the sidebar's header, its actions and search.
+    @ViewBuilder private var duoHeader: some View {
+        if duoLayout.twoPages && selectsDetail {
+            VStack(spacing: 0) {
+                DuoHeader(sidebar: true) {
+                    Text(title).font(.title2.bold())
+                } actions: {
+                    if selecting {
+                        selectAllButton
+                        Button("Done") { endSelecting() }
+                    } else {
+                        if !store.creatable.isEmpty { newMenu }
+                        projectMenu
+                        if store.viaStudio, !visible.isEmpty {
+                            Button("Select") { withAnimation { editMode = .active } }
+                        }
+                    }
+                }
+                SidebarSearchField(prompt: "Search Studio", text: $query)
+            }.background(Color(uiColor: .systemGroupedBackground))
+            .ignoresSafeArea(.container, edges: .trailing)
+        }
+    }
+
+    /// On one page, the navigation bar's items.
+    @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
+        if !duoLayout.twoPages {
+            if selecting {
+                ToolbarItem(placement: .topBarLeading) { selectAllButton }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { endSelecting() }.fontWeight(.semibold)
+                }
+            } else {
+                if !store.creatable.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) { newMenu }
+                }
+                ToolbarItem(placement: .topBarTrailing) { projectMenu }
+                if store.viaStudio, !visible.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Select") { withAnimation { editMode = .active } }
+                    }
+                }
+            }
         }
     }
 

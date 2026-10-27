@@ -36,56 +36,80 @@ struct BotAutomationsSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if let error { Section { Text(error).foregroundStyle(.red).font(.callout) } }
-                ForEach(BotAutomation.Kind.allCases) { kind in
-                    let rows = (automations ?? []).filter { $0.kind == kind }
-                    if !rows.isEmpty {
-                        Section(kind == .checkin ? "Check-ins" : kind.title + "s") {
-                            ForEach(rows) { automation in row(automation) }
-                        }
-                    }
-                }
-                if let automations, automations.contains(where: { $0.kind == .checkin && $0.active }) {
-                    Section {
-                        Button("Turn off check-ins", role: .destructive) { Task { await checkinsOff() } }.disabled(busy)
-                    } footer: { Text("Pauses every check-in; \(botName) then only wakes when you write.") }
-                }
-            }
-            .overlay {
-                if automations == nil, error == nil { ProgressView() }
-                else if automations?.isEmpty == true {
-                    ContentUnavailableView("No check-ins", systemImage: "alarm", description: Text("\(botName) only wakes when you write. Add a check-in, reminder or watcher with +."))
-                }
-            }
+            list
+            .overlay { emptyState }
             .refreshable { await load() }
             .navigationTitle("Automations")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        ForEach(BotAutomation.Kind.allCases) { kind in
-                            Button { editing = Editing(kind: kind, automation: nil) } label: { Label(kind.title, systemImage: kind.symbol) }
-                        }
-                    } label: { Image(systemName: "plus") }
-                    .disabled(!active)
-                    .accessibilityLabel("New automation")
-                }
-            }
+            .toolbar { toolbarItems }
             .sheet(item: $editing) { editing in
-                BotAutomationEditor(kind: editing.kind, automation: editing.automation, botId: botId, runners: (automations ?? []).filter { $0.kind == .runner }) { await load() }
+                BotAutomationEditor(kind: editing.kind, automation: editing.automation, botId: botId, runners: runners) { await load() }
             }
-            .confirmationDialog(deleting.map { $0.original ? "Turn off the check-in?" : "Delete \($0.name)?" } ?? "", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-                if let deleting {
-                    Button(deleting.original ? "Turn off" : "Delete", role: .destructive) {
-                        Task {
-                            if deleting.original { act(.pause, deleting) } else { await run { try await app.client.deleteBotAutomation(id: deleting.id, botId: botId) } }
-                        }
+            .confirmationDialog(deleteTitle, isPresented: deletingShown, titleVisibility: .visible) { deleteButton }
+            .task { await load() }
+        }
+    }
+
+    // `body` in parts, so each type-checks quickly (Xcode 26 took 1.6 s on it whole).
+
+    /// The automations by kind, and Turn off check-ins.
+    private var list: some View {
+        List {
+            if let error { Section { Text(error).foregroundStyle(.red).font(.callout) } }
+            ForEach(BotAutomation.Kind.allCases) { kind in
+                let rows = (automations ?? []).filter { $0.kind == kind }
+                if !rows.isEmpty {
+                    Section(kind == .checkin ? "Check-ins" : kind.title + "s") {
+                        ForEach(rows) { automation in row(automation) }
                     }
                 }
             }
-            .task { await load() }
+            if let automations, automations.contains(where: { $0.kind == .checkin && $0.active }) {
+                Section {
+                    Button("Turn off check-ins", role: .destructive) { Task { await checkinsOff() } }.disabled(busy)
+                } footer: { Text("Pauses every check-in; \(botName) then only wakes when you write.") }
+            }
+        }
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        if automations == nil, error == nil { ProgressView() }
+        else if automations?.isEmpty == true {
+            ContentUnavailableView("No check-ins", systemImage: "alarm", description: Text("\(botName) only wakes when you write. Add a check-in, reminder or watcher with +."))
+        }
+    }
+
+    @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                ForEach(BotAutomation.Kind.allCases) { kind in
+                    Button { editing = Editing(kind: kind, automation: nil) } label: { Label(kind.title, systemImage: kind.symbol) }
+                }
+            } label: { Image(systemName: "plus") }
+            .disabled(!active)
+            .accessibilityLabel("New automation")
+        }
+    }
+
+    private var runners: [BotAutomation] { (automations ?? []).filter { $0.kind == .runner } }
+
+    private var deleteTitle: String {
+        guard let deleting else { return "" }
+        return deleting.original ? "Turn off the check-in?" : "Delete \(deleting.name)?"
+    }
+
+    private var deletingShown: Binding<Bool> {
+        Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })
+    }
+
+    @ViewBuilder private var deleteButton: some View {
+        if let deleting {
+            Button(deleting.original ? "Turn off" : "Delete", role: .destructive) {
+                Task {
+                    if deleting.original { act(.pause, deleting) } else { await run { try await app.client.deleteBotAutomation(id: deleting.id, botId: botId) } }
+                }
+            }
         }
     }
 
