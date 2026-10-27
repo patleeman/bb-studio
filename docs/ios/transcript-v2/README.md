@@ -54,6 +54,31 @@ geometry back into layout.
   reconfigure a row, and carry a row's height to a new id (an optimistic row
   confirmed by the server).
 
+### Using it in another app
+
+- **Tap to close the keyboard.** The container already does this. A tap
+  anywhere on the transcript ends editing. The tap recognizer never takes
+  the touch, so links, buttons and text selection in a row keep working.
+  The app chooses when editing ends (`dismissKeyboard`). The default waits
+  one run-loop turn, so a tapped link still opens; BB waits until the
+  window has stopped resizing.
+- **Swipe down to close it.** The transcript dismisses the keyboard
+  interactively (`keyboardDismissMode = .interactive`). As in any UIKit
+  scroll view, the keyboard only starts to follow once the drag reaches
+  its top edge; a swipe higher up scrolls the rows and leaves the keyboard
+  up.
+- **Accessibility identifiers.** A row's SwiftUI view is hosted in a cell.
+  An identifier set on the row is passed down to the elements inside it,
+  unless the row is an accessibility container. To find the row itself in
+  a UI test, make it one (`.accessibilityElement(children: .contain)`), or
+  set identifiers on the elements you want.
+- **Swift 6.** The folder builds in Swift 6 language mode with no warnings.
+  `apps/ios/scripts/check-transcript-swift6.sh` checks this, with and
+  without DEBUG. The diffable data source holds row ids as
+  `TranscriptRowID`, a `Sendable` wrapper. It is `@unchecked` because the
+  snapshot never leaves the main actor; the rest of the API still takes
+  any `Hashable` id.
+
 ### Deviation: no keyboard layout guide
 
 The plan pinned the composer to `keyboardLayoutGuide`. Hosted in SwiftUI,
