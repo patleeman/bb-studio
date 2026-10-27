@@ -111,8 +111,9 @@ struct SettingsTab: View {
                 // Its grouped background runs under the status column, but the
                 // cards, toggles and steppers keep the same 20-point margin
                 // from the safe edge that they have on the leading side. The
-                // surface already keeps them clear of the Duo's status column.
-                .contentMargins(.trailing, layout.twoPages ? layout.sidebarWindowInset - layout.statusColumn + 20 : 0, for: .scrollContent)
+                // surface's padding doesn't reach a Form's rows, so the margin
+                // clears the Duo's status column itself.
+                .contentMargins(.trailing, layout.twoPages ? layout.sidebarWindowInset + 20 : 0, for: .scrollContent)
                 .toolbar(layout.twoPages ? .hidden : .automatic, for: .navigationBar)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if layout.twoPages {
