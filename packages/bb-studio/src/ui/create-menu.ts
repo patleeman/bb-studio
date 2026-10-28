@@ -10,6 +10,7 @@ import { errorMessage } from "../kit/format";
 import { openAppPath } from "../kit/app/nav";
 import { openCallPicker } from "../talk/ui/call-view";
 import { appliedKinds } from "./kinds-snapshot";
+import { parseQuery, resolveValue } from "../query";
 import { KIND_ORDER } from "./studio-sidebar-model";
 
 type ProviderKind = ProviderView["kinds"][number];
@@ -40,6 +41,18 @@ export function createEntries(providers: readonly ProviderView[], { off = new Se
 /** Whether a menu draws a separator before entry `index`: between the kinds and the rest. */
 export function startsGroup(entries: readonly CreateEntry[], index: number): boolean {
   return index > 0 && entries[index]!.type !== "kind" && entries[index - 1]!.type === "kind";
+}
+
+/**
+ * Where the tab strip's New puts an item: the project BB has open, else the
+ * one project the library's Project filter picks, else nowhere (Global).
+ */
+export function newItemProject(openProjectId: string | null | undefined, libraryQuery: string, projects: readonly { id: string; name: string }[]): string | null {
+  if (openProjectId) return openProjectId;
+  const vocabulary = { kinds: [], projects, tags: [] };
+  const picked = new Set(parseQuery(libraryQuery).filters.filter((filter) => filter.field === "project" && !filter.negate).map((filter) => resolveValue(filter, vocabulary)));
+  const [only] = picked;
+  return picked.size === 1 && only ? only : null;
 }
 
 type Rpc = { call(method: string, input: unknown): Promise<unknown> };

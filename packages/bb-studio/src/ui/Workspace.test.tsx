@@ -5,9 +5,13 @@ import { afterEach, expect, it, vi } from "vitest";
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   experimental_usePluginId: () => "notes",
+  useBbContext: () => ({ projectId: null }),
+  useSdk: () => sdk,
   useRpc: () => rpc,
   useRealtime: (channel: string, handler: (payload: unknown) => void) => { if (channel === "studio-workspace") realtime.handler = handler; },
 }));
+// Stable, as BB's is; a new one each render would reload projects forever.
+const sdk = vi.hoisted(() => ({ projects: { list: async () => [] } }));
 const realtime = vi.hoisted(() => ({ handler: (_payload: unknown) => {} }));
 const reports: { method: string; input: any }[] = [];
 const rpc = { call: async (method: string, input: unknown) => {
@@ -33,6 +37,8 @@ it("keeps editor drafts while switching tabs, splitting and returning to the wor
   expect(editor).not.toBeNull(); editor.value = "Keep my draft";
   await act(() => { openWorkspaceItem({ href: other, title: "Two" }); });
   expect(host.querySelectorAll('[role="tab"]')).toHaveLength(2);
+  // + opens a tab; its own ▾ beside it, New item, makes one.
+  expect([...host.querySelectorAll('[role="group"][aria-label="New"] button')].map(button => button.getAttribute("aria-label"))).toEqual(["New tab", "New item"]);
   const target = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="two"]')!;
   const body = target.closest<HTMLElement>('[data-studio-workspace-drop]')!;
   vi.spyOn(body, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON() {} });

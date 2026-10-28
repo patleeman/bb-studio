@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderView } from "../contract";
 import { NEW_CALL_EVENT } from "../talk/shared/format";
-import { createEntries, runCreateEntry, startsGroup } from "./create-menu";
+import { createEntries, newItemProject, runCreateEntry, startsGroup } from "./create-menu";
 
 const kind = (id: string, label: string, extra: Record<string, unknown> = {}) => ({ id, label, plural: `${label}s`, icon: "File", columns: [], actions: [], create: { mode: "rpc" as const }, canArchive: true, blurb: "", ...extra });
 const provider = (pluginId: string, kinds: ReturnType<typeof kind>[], state = "ready") => ({ pluginId, name: pluginId, state, detail: null, panel: null, kinds }) as unknown as ProviderView;
@@ -50,4 +50,21 @@ it("hands a thread's own maker only the kinds made by RPC", async () => {
   expect(handled).toHaveBeenCalledOnce();
   expect(createKind).toHaveBeenCalledOnce();
   expect(rpc.call).not.toHaveBeenCalled();
+});
+
+describe("newItemProject", () => {
+  const projects = [{ id: "proj_orbit", name: "Orbit" }, { id: "proj_atlas", name: "Atlas" }];
+  it("uses the project BB has open, whatever the library filters", () => {
+    expect(newItemProject("proj_open", "project:Orbit", projects)).toBe("proj_open");
+  });
+  it("falls back to the library's Project filter when no project is open", () => {
+    expect(newItemProject(null, "project:Orbit kind:page", projects)).toBe("proj_orbit");
+    expect(newItemProject(undefined, "project:proj_atlas", projects)).toBe("proj_atlas");
+  });
+  it("is Global when nothing picks one project", () => {
+    expect(newItemProject(null, "", projects)).toBeNull();
+    expect(newItemProject(null, "project:Orbit project:Atlas", projects)).toBeNull();
+    expect(newItemProject(null, "project:global", projects)).toBeNull();
+    expect(newItemProject(null, "-project:Orbit", projects)).toBeNull();
+  });
 });

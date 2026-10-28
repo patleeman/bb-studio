@@ -8,6 +8,7 @@ import { TABS_CHANNEL, WORKSPACE_CHANNEL } from "../ids";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import type { WorkspaceCommand } from "../workspace-presence";
 import { builtinItemAt, canonicalPath } from "../builtins";
+import { NewItemMenu } from "./NewItemMenu";
 import { BROWSE, closeTab, emptyWorkspace, mapLayout, openItem, panes, parseWorkspace, type Layout, type Pane, type Tab, type Workspace } from "./workspace-state";
 
 const STORAGE = "bb:studio-workspace:v1";
@@ -317,7 +318,11 @@ function TabPane({ pane, focused, instance, titleBar }: { pane: Pane; focused: s
           <button className={`mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100 ${pane.active === tab.href ? "" : "opacity-0"}`} aria-label={`Close ${tab.title}`} onClick={() => update(current => closeTab(current, tab.href))}><Icon name="X" className="size-3" /></button>
         </div></ContextMenuTrigger><TabMenu pane={pane} tab={tab} index={index} onRename={() => setRenaming(tab.href)} /></ContextMenu>)}
       </div>
-      <button className={BUTTON} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
+      {/* + opens a new tab; ▾ beside it makes a Studio item. The row is 28 px tall, so both match +. */}
+      <div role="group" aria-label="New" className="flex shrink-0 items-center">
+        <button className={`${BUTTON} rounded-r-none`} aria-label="New tab" title="New tab" onClick={() => showBrowse(pane.id)}><Icon name="Plus" className="size-4" /></button>
+        <NewItemMenu className={`${BUTTON} w-5 rounded-l-none`} />
+      </div>
       </div>
       {pane.tabs.map(tab => <div key={tab.href} data-studio-workspace-bar={barSlot(instance, tab.href)} hidden={pane.active !== tab.href} className="flex min-w-0 shrink items-center" />)}
 

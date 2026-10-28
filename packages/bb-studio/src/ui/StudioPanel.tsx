@@ -40,13 +40,11 @@ import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type 
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { QueryBar } from "./QueryBar";
 import { FilterToolbar } from "./FilterToolbar";
+import { QUERY_CHANGED, QUERY_EVENT, QUERY_KEY } from "./library-query";
+export { useLibraryQuery } from "./library-query";
 
 const EMPTY_QUERY: Query = { filters: [], text: "" };
 
-const QUERY_KEY = "studio:query:all";
-const QUERY_EVENT = "studio:query";
-/** The list changed its own query; the sidebar follows. */
-const QUERY_CHANGED = "studio:query-changed";
 
 /** Opens the new tab page, on `kind`'s items when given, from an old address that showed the list. */
 export function openCollection(kind: string | null): void {
@@ -63,19 +61,6 @@ export function showLibrary(query: string): void {
   }
   window.dispatchEvent(new CustomEvent(QUERY_EVENT, { detail: query }));
   showBrowse();
-}
-
-/** The library's current query text, as the Studio sidebar shows it selected. */
-export function useLibraryQuery(): string {
-  const read = () => { try { return localStorage.getItem(QUERY_KEY) ?? ""; } catch { return ""; } };
-  const [query, setQuery] = useState(read);
-  useEffect(() => {
-    const onQuery = (event: Event) => setQuery((event as CustomEvent<string>).detail);
-    window.addEventListener(QUERY_EVENT, onQuery);
-    window.addEventListener(QUERY_CHANGED, onQuery);
-    return () => { window.removeEventListener(QUERY_EVENT, onQuery); window.removeEventListener(QUERY_CHANGED, onQuery); };
-  }, []);
-  return query;
 }
 
 /** The query, remembered across visits. */

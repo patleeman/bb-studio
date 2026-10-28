@@ -24,7 +24,6 @@ import {
   Badge,
   Checkbox,
   DANGER_BUTTON,
-  BAR_BUTTON,
   EmptyState,
   GHOST_BUTTON,
   ICON_BUTTON,
@@ -194,7 +193,7 @@ export function CollectionPage({
   notice?: ReactNode;
   /** Extra buttons beside New, e.g. a settings menu. */
   headerActions?: ReactNode;
-  /** New's menu, in order; `separated` draws a line above an entry. */
+  /** The empty state's New menu, in order; `separated` draws a line above an entry. */
   createItems?: readonly CreateMenuItem[];
   handlers: CollectionHandlers;
   filter?: CollectionFilter;
@@ -383,12 +382,13 @@ export function CollectionPage({
 
   // New items land in the filtered project, else the one BB has open.
   const newProject = filter || project === ALL ? defaultProjectId : project === GLOBAL ? null : project;
-  // Kind filters narrow the list, while New always offers everything it can make.
-  const newButton = (className = PRIMARY_BUTTON) =>
+  // An empty list's New; the tab strip's ▾ is New everywhere else. Kind
+  // filters narrow the list, while New always offers everything it can make.
+  const newButton = () =>
     !createItems?.length ? null : (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className={className}>
+          <button type="button" className={PRIMARY_BUTTON}>
             <Icon name="Plus" /> New <Icon name="ChevronDown" className="-mr-1 opacity-70" />
           </button>
         </DropdownMenuTrigger>
@@ -721,7 +721,6 @@ export function CollectionPage({
           {/* A host with its own filter row keeps sort and group there, by the count. */}
           {filter ? null : displayMenu}
           {headerActions}
-          {newButton(cn(BAR_BUTTON, "text-foreground"))}
         </div>
       </StudioBar>
       {splitAnchor}
