@@ -1,3 +1,4 @@
+import { dismissProblems } from "./bb-studio-bot.mjs";
 export default ({ projectId, threadId, threadId: seededThreadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => {
 // A thread on GPT-6-Luna (Codex's fast tier) whose first reply offers help,
 // then voice mode on: later replies are spoken.
@@ -38,12 +39,16 @@ return [
           }
         };
         // Studio opens on its workspace; the item list shows only as a new tab.
+        await client.waitForSelector('[data-studio-workspace]');
         const fresh = await client.evaluate(`({ tabs: document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]').length, rows: document.querySelectorAll('[data-studio-workspace] [role="row"]').length, empty: document.querySelector('[data-studio-workspace]').innerText.includes('No open tabs') })`);
         if (fresh.tabs || fresh.rows || !fresh.empty) throw new Error(`The workspace didn't open empty: ${JSON.stringify(fresh)}`);
         // An old list address opens the new tab page in the workspace.
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('[data-studio-workspace] [role="row"][aria-label="Offline mode launch"]');
         if (!(await client.evaluate(`location.pathname`)).endsWith("/plugins/studio/studio")) throw new Error("The collection's old address didn't move to the workspace");
+        // New lives beside the tab strip's +, not on the new tab page's toolbar.
+        const newControls = await client.evaluate(`({ split: [...document.querySelectorAll('[data-studio-workspace-tabs] [role="group"][aria-label="New"] button')].map(button => button.getAttribute('aria-label')), barNew: [...document.querySelectorAll('[data-studio-workspace-bar] button')].some(button => button.checkVisibility() && button.innerText.trim() === 'New') })`);
+        if (JSON.stringify(newControls.split) !== JSON.stringify(["New tab", "New item"]) || newControls.barNew) throw new Error(`The tab strip should carry + and New item, and the toolbar no New: ${JSON.stringify(newControls)}`);
         await sleep(500);
         await client.capture(new URL('../../../packages/bb-studio/assets/workspace-new-tab.png', import.meta.url).pathname);
         await openRow("Offline mode launch");
@@ -138,11 +143,22 @@ return [
       try {
         const openNew = async () => {
           await client.waitForSelector('input[aria-label="Search and filter studio"]');
-          await client.evaluate(`(() => {
-            const button = [...document.querySelectorAll('button')].find(each => each.innerText.trim() === 'New');
-            if (!button || button.getAttribute('aria-haspopup') !== 'menu') throw new Error('New must open a menu');
-            button.focus();
-          })()`);
+          // The visible ▾ beside the tab strip's +, enabled once Studio's kinds
+          // have loaded; a retained pane's hidden one doesn't count.
+          await client.evaluate(`new Promise((resolve, reject) => {
+            const started = Date.now();
+            const tick = () => {
+              const button = [...document.querySelectorAll('[data-studio-workspace-tabs] button[aria-label="New item"]')].find(each => each.checkVisibility() && !each.disabled);
+              if (button) {
+                if (button.getAttribute('aria-haspopup') !== 'menu') return reject(new Error('New item must open a menu'));
+                button.focus();
+                return resolve(true);
+              }
+              if (Date.now() - started > 15000) return reject(new Error('No enabled New item beside the tab strip'));
+              setTimeout(tick, 100);
+            };
+            tick();
+          })`, true);
           for (const type of ["rawKeyDown", "keyUp"]) {
             await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
           }
@@ -152,8 +168,10 @@ return [
         await client.navigate("/plugins/studio/studio/collection");
         await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1'); localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
         await client.navigate("/plugins/studio/studio/collection");
+        // A staged BB has no Jev key; its plugin-health card would cover the sidebar.
+        await dismissProblems(client);
         const unfiltered = await openNew();
-        for (const label of ["Page", "Drawing"]) {
+        for (const label of ["Page", "Drawing", "Record a call"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
         }
         // Bots live in Teams, not Studio.

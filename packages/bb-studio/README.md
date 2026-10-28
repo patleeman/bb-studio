@@ -98,7 +98,8 @@ viewport change.
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio
 collection as the workspace's new tab, a list with search and compact Project and
-Kind menus above it.
+Kind menus above it. The tab strip shows **+** (new tab) with **▾** (New item)
+beside it.
 Tags and Status are available under **More filters**. The rows show
 a paused Talk recording, a drawing and three Orbit pages.
 
@@ -136,11 +137,15 @@ The same controls work at phone width. Both captures check menu selection,
 a stored plural filter, text search, exclusion, project filtering, and saving
 and reopening a view.
 
-![Live BB screenshot of the New menu with a Pages filter](assets/new-menu.png)
+![Live BB screenshot of the New menu, opened from the ▾ beside the tab strip's +, with a Pages filter](assets/new-menu.png)
 
-The New menu stays open to every available kind with a Pages filter active.
-The capture checks that Drawings and Pages filters offer the same menu as the
-unfiltered collection.
+**+** in the tab strip opens a new tab; **▾** right beside it (New item) opens
+Studio's New menu from any tab. It offers every kind Studio can make, then
+Record a call and your templates, the same list as the sidebar's **+** and
+the thread's Studio tab. New items go into the project BB has open, or, with
+none open, the one the list's Project filter picks. The new tab page keeps a
+New button only when the list is empty. The capture checks that Drawings and
+Pages filters offer the same menu as the unfiltered collection.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
