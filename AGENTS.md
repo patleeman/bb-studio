@@ -22,11 +22,12 @@ Work directly on `main`. Don't create branches or pull requests.
 
 Marketplace entries install from the `stable` branch (`ref: "stable"`;
 `node scripts/check-marketplace.mjs` enforces it). Keep committing to `main`;
-never commit to `stable` or push it by hand. Move it only with
-`node scripts/release.mjs [--ref <commit>]`, which checks the commit out
-alone, runs every repo check and package test there, and then fast-forwards
-`stable`.
-Release only when Patrick asks or the project lead thread does it.
+never commit to `stable` or push it by hand. CI moves it: when the `check`
+job in `.github/workflows/ci.yml` passes on a push to `main`, the
+`promote-stable` job fast-forwards `stable` to that commit. A red `main`
+therefore never reaches users; fix `main` and the next green push releases.
+`node scripts/release.mjs [--ref <commit>]` stays as a manual fallback (it
+also runs BB-identical clean installs and builds) if CI is down.
 
 ## Marketplace maintenance
 

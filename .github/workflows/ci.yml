@@ -24,3 +24,28 @@ jobs:
       - run: pnpm check:docs
       - run: pnpm check:marketplace
       - run: pnpm check:contracts
+
+  # stable follows main: once every check passes on a push to main, move
+  # stable to that commit. A plain fast-forward push, never a force; if stable
+  # already has a newer main commit (a later run finished first), skip.
+  promote-stable:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: promote-stable
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward stable to this commit
+        run: |
+          git fetch origin stable
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/stable; then
+            echo "stable already includes $GITHUB_SHA"; exit 0
+          fi
+          git merge-base --is-ancestor origin/stable "$GITHUB_SHA" || { echo "stable is not an ancestor of $GITHUB_SHA; not forcing"; exit 1; }
+          git push origin "$GITHUB_SHA:refs/heads/stable"

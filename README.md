@@ -56,9 +56,10 @@ the same IDs. Without it, BB refuses the install and lists the choices.
 ### Releases
 
 Plugins install from the `stable` branch, not `main`. Work lands on `main`
-all day; `stable` moves forward only after every check and test passes on a
-clean copy of the commit (`node scripts/release.mjs`). `bb plugin update`
-gets the latest release.
+all day; CI fast-forwards `stable` to each `main` commit whose checks and
+tests pass (the `promote-stable` job in `.github/workflows/ci.yml`), so
+`stable` is the newest green `main`. `bb plugin update` gets it.
+`node scripts/release.mjs` is the manual fallback.
 
 An install made before 7 October 2026 follows `main`, because BB updates a
 plugin from the branch it was installed from. To switch one to releases,
