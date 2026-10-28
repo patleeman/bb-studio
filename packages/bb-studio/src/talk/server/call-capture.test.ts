@@ -6,11 +6,11 @@ import type { CallLive, CallStt } from "../shared/contract";
 import { memoryStore } from "../test/db";
 import { installStub, piece, waitFor, type StubPlan } from "../test/tap-fixture";
 import { AudioFiles } from "./audio-files";
-import { CallCaptures, LOCAL_UNFINISHED } from "./call-capture";
+import { CallCaptures } from "./call-capture";
 import { echoSegments } from "./call-echo";
 import { TapHelper } from "./tap-helper";
 
-function setup(plan: StubPlan, options: { stt?: CallStt; consented?: boolean } = {}) {
+function setup(plan: StubPlan, options: { stt?: CallStt; consented?: boolean; testStt?: boolean } = {}) {
   const stub = installStub(plan);
   const { store } = memoryStore();
   const root = mkdtempSync(join(tmpdir(), "talk-call-"));
@@ -26,6 +26,7 @@ function setup(plan: StubPlan, options: { stt?: CallStt; consented?: boolean } =
     incomingRoot: join(root, "incoming"),
     modelDir: join(root, "whisperkit"),
     settings: () => ({ stt: options.stt ?? "whisperkit", localModel: "tiny" }),
+    testStt: options.testStt,
     kv: { get: async <T,>(key: string) => kv.get(key) as T | undefined, set: async (key, value) => void kv.set(key, value) },
     changed: () => {},
     publish: (live) => published.push(live),
@@ -122,17 +123,46 @@ describe("call capture", () => {
     expect(JSON.parse(stub.log()[0]!.argv![2]!).stt).toEqual({ kind: "none" });
   });
 
-  it("holds local pieces from the queue, and fails the ones the helper never finished so Retry can send them", async () => {
-    const { calls, store } = setup({ steps: [started, ...piece("them", 0, 0, 5_000, null, 10)] });
+  it("holds local pieces from the queue, and queues the ones the helper never finished", async () => {
+    const { calls, store, wakes } = setup({ steps: [started, ...piece("them", 0, 0, 5_000, null, 10)] });
     const { id } = await calls.start({ target: { all: true }, app: "x", mic: true });
     await waitFor(() => store.segments(id).length === 1);
     expect(store.due(5)).toEqual([]);
     expect(store.nextDueAt()).toBeNull();
     await calls.stop(id);
-    expect(store.segments(id)[0]).toMatchObject({ status: "failed", error: LOCAL_UNFINISHED });
-    expect(store.recording(id)?.status).toBe("done");
-    store.retryFailed(id);
+    expect(store.recording(id)?.status).toBe("finishing");
     expect(store.due(5).map((segment) => segment.id)).toEqual(["them-0"]);
+    expect(wakes()).toBe(1);
+  });
+
+  it("shows the model's progress, and falls back to the voice service when it fails", async () => {
+    const { calls, store, published, wakes } = setup({
+      steps: [
+        started,
+        { at: 5, event: "model", progress: 0.25, stage: "download" },
+        ...piece("them", 0, 0, 5_000, null, 300),
+        { at: 600, event: "error", code: "model", message: "no space left" },
+        ...piece("me", 0, 5_500, 9_000, null, 650),
+      ],
+    });
+    const { id } = await calls.start({ target: { all: true }, app: "x", mic: true });
+    await waitFor(() => published.some((live) => live?.model?.stage === "download" && live.model.progress === 0.25));
+    await waitFor(() => store.segments(id).length === 2);
+    expect(calls.live()).toMatchObject({ fallback: true, model: null, error: null });
+    // Both pieces wait in the queue now, in time order.
+    expect(store.due(5).map((segment) => segment.id)).toEqual(["them-0"]);
+    expect(store.segments(id).every((segment) => segment.status === "pending")).toBe(true);
+    expect(wakes()).toBeGreaterThanOrEqual(2);
+    await calls.stop(id);
+  });
+
+  it("asks the helper for test finals in fake mode", async () => {
+    const { calls, store, stub } = setup({ steps: [started, ...piece("them", 0, 0, 4_000, "replaced", 10)] }, { testStt: true });
+    const { id } = await calls.start({ target: { all: true }, app: "x", mic: false });
+    await waitFor(() => store.segments(id)[0]?.status === "done");
+    expect(store.segments(id)[0]?.text).toBe("4000 ms of audio");
+    expect(JSON.parse(stub.log()[0]!.argv![2]!).stt).toEqual({ kind: "test" });
+    await calls.stop(id);
   });
 
   it("stops by itself when the tapped app quits", async () => {
@@ -184,8 +214,8 @@ describe("call capture", () => {
     const recording = store.create({ id: "rec_orphan0001", kind: "recording", projectId: null, threadId: null, call: { app: "zoom.us", bundleIds: [], mic: true, stt: "whisperkit" } });
     store.addSegment({ recordingId: recording.id, sessionId: "them", index: 0, startedAt: 1, durationMs: 1000, mimeType: "audio/wav", bytes: 10, file: `${recording.id}/them-0.wav`, speaker: "them", held: true });
     await calls.recover();
-    expect(store.recording(recording.id)?.status).toBe("done");
-    expect(store.segments(recording.id)[0]?.status).toBe("failed");
+    expect(store.recording(recording.id)?.status).toBe("finishing");
+    expect(store.due(5).map((segment) => segment.id)).toEqual(["them-0"]);
     expect(ended).toEqual([recording.id]);
   });
 

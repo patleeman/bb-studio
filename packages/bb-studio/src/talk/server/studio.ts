@@ -66,7 +66,7 @@ export function toStudioItem(recording: Recording, transcript: string): StudioIt
       { id: "length", value: formatLength(recording.durationMs), sort: recording.durationMs },
       { id: "words", value: recording.wordCount.toLocaleString("en-US"), sort: recording.wordCount },
     ],
-    badge: recordingBadge(recording),
+    badge: recordingBadge(recording) ?? (recording.call ? { label: "Call", tone: "neutral" } : null),
     thumbnailUrl: null,
     href: recordingHref(recording.id),
     archived: recording.archived,

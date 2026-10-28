@@ -14,6 +14,8 @@ export const tapEventSchema = z.discriminatedUnion("event", [
   z.object({ event: z.literal("partial"), source: speakerSchema, index, text: z.string() }),
   z.object({ event: z.literal("final"), source: speakerSchema, index, text: z.string(), startMs: ms, endMs: ms }),
   z.object({ event: z.literal("appGone"), bundleId: z.string() }),
+  // WhisperKit's model: "download" with progress, then "ready". The first load can take minutes; pieces keep coming.
+  z.object({ event: z.literal("model"), progress: z.number().min(0).max(1), stage: z.string().max(40) }),
   z.object({ event: z.literal("error"), code: z.enum(["permission", "device", "model", "internal"]), message: z.string() }),
   z.object({ event: z.literal("stopped") }),
 ]);
@@ -36,6 +38,8 @@ export const permissionOutputSchema = z.object({ audioCapture: z.enum(["granted"
 
 export type TapStt =
   | { kind: "whisperkit"; model: string; modelDir: string }
+  // Fake mode only: finals say "<n> ms of audio", with no model.
+  | { kind: "test" }
   | { kind: "none" };
 
 export interface CaptureArgs {
@@ -51,10 +55,13 @@ export interface CaptureArgs {
 export const CALL_SEGMENT_TARGET_MS = 8_000;
 export const CALL_SEGMENT_MAX_MS = 15_000;
 
-/** argv for `capture`; `fake` replays two WAV files instead of tapping (tests and staged captures). */
-export function captureArgv(args: CaptureArgs, fake?: { them: string; me: string }): string[] {
+export interface FakeAudio { them: string; me: string; speed?: number }
+
+/** argv for `capture`; `fake` replays two WAV files instead of tapping (tests and staged captures), `speed` times faster. */
+export function captureArgv(args: CaptureArgs, fake?: FakeAudio): string[] {
   const argv = ["capture", "--json-args", JSON.stringify(args)];
   if (fake) argv.push("--fake", fake.them, fake.me);
+  if (fake?.speed && fake.speed !== 1) argv.push("--fake-speed", String(fake.speed));
   return argv;
 }
 

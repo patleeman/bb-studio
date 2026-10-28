@@ -23,7 +23,8 @@ export const ALL_SYSTEM_AUDIO = "All system audio";
 /** Live updates (levels, partials) go out at most this often. */
 const PUBLISH_EVERY_MS = 250;
 const HEARTBEAT_MS = 20_000;
-export const LOCAL_UNFINISHED = "Local transcription stopped before this piece. Retry sends it to BB's voice service.";
+/** WhisperKit's large-v3 turbo (v20240930), 626 MB. */
+export const DEFAULT_LOCAL_MODEL = "openai_whisper-large-v3-v20240930_626MB";
 
 export interface CallCaptureDeps {
   store: TalkStore;
@@ -34,6 +35,8 @@ export interface CallCaptureDeps {
   /** WhisperKit's models: <talk>/whisperkit. */
   modelDir: string;
   settings(): { stt: CallStt; localModel: string };
+  /** Fake mode: ask for the helper's test finals instead of loading WhisperKit. */
+  testStt?: boolean;
   kv: { get<T>(key: string): Promise<T | undefined>; set(key: string, value: unknown): Promise<void> };
   /** The recording changed (Studio, open pages). */
   changed(id: string): void;
@@ -60,6 +63,9 @@ interface Session {
   partials: Map<string, CallLive["partials"][number]>;
   levels: CallLive["levels"];
   error: string | null;
+  model: CallLive["model"];
+  /** Local transcription failed: pieces go to the queue. */
+  fallback: boolean;
   gone: Set<string>;
   /** Pieces and finals in the order the helper sent them. */
   queue: Promise<void>;
@@ -75,7 +81,6 @@ function errorText(event: Extract<TapEvent, { event: "error" }>): string {
   if (event.code === "permission") {
     return "macOS hasn't allowed BB to record other apps' audio. Allow BB in System Settings › Privacy & Security › Screen & System Audio Recording, then start again.";
   }
-  if (event.code === "model") return `Local transcription couldn't start: ${event.message}`;
   if (event.code === "device") return `The audio device failed: ${event.message}`;
   return event.message;
 }
@@ -123,6 +128,8 @@ export class CallCaptures {
       partials: [...session.partials.values()].sort((a, b) => a.startMs - b.startMs),
       levels: { ...session.levels },
       error: session.error,
+      model: session.model,
+      fallback: session.fallback,
     };
   }
 
@@ -158,6 +165,8 @@ export class CallCaptures {
       partials: new Map(),
       levels: { me: 0, them: 0 },
       error: null,
+      model: null,
+      fallback: false,
       gone: new Set(),
       queue: Promise.resolve(),
       early: new Map(),
@@ -165,7 +174,9 @@ export class CallCaptures {
       ended: new Promise<void>((resolve) => { markEnded = resolve; }),
     };
     this.session = session;
-    const tapStt: TapStt = stt === "whisperkit" ? { kind: "whisperkit", model: localModel, modelDir: this.deps.modelDir } : { kind: "none" };
+    const tapStt: TapStt = stt !== "whisperkit" ? { kind: "none" }
+      : this.deps.testStt ? { kind: "test" }
+      : { kind: "whisperkit", model: localModel, modelDir: this.deps.modelDir };
     try {
       await mkdir(dir, { recursive: true });
       if (stt === "whisperkit") await mkdir(this.deps.modelDir, { recursive: true });
@@ -229,7 +240,7 @@ export class CallCaptures {
     if (!store.call(id)) return;
     const status = store.recording(id)?.status;
     if (status !== "recording" && status !== "paused" && status !== "interrupted") return;
-    store.releaseHeld(id, LOCAL_UNFINISHED);
+    if (store.releaseHeld(id)) this.deps.wake();
     store.setStatus(id, "finishing");
     this.deps.changed(id);
     this.deps.onEnded(id);
@@ -278,9 +289,23 @@ export class CallCaptures {
         }
         return;
       }
+      case "model":
+        session.model = event.stage === "ready" ? null : { stage: event.stage, progress: event.progress };
+        this.publishSoon();
+        return;
       case "error":
-        session.error = errorText(event);
         this.deps.log(`Talk call capture: ${event.code}: ${event.message}`);
+        if (event.code === "model") {
+          // No finals will come: what's stored and what's still to come goes to BB's voice service.
+          session.fallback = true;
+          session.model = null;
+          session.partials.clear();
+          this.enqueue(session, async () => {
+            if (store.releaseHeld(session.recordingId)) this.deps.wake();
+          });
+        } else {
+          session.error = errorText(event);
+        }
         this.publishNow();
         return;
       case "stopped":
@@ -316,7 +341,7 @@ export class CallCaptures {
     const recordingId = session.recordingId;
     const file = await files.write(recordingId, id, "audio/wav", bytes, () => store.recording(recordingId) !== null);
     await rm(source, { force: true });
-    const held = session.info.stt === "whisperkit";
+    const held = session.info.stt === "whisperkit" && !session.fallback;
     store.addSegment({
       recordingId,
       sessionId: event.source,
@@ -349,7 +374,8 @@ export class CallCaptures {
     this.publishTimer = null;
     const id = session.recordingId;
     if (store.recording(id)) {
-      store.releaseHeld(id, LOCAL_UNFINISHED);
+      // Normally none: the helper finishes every piece. After a crash, BB's voice service does.
+      if (store.releaseHeld(id)) this.deps.wake();
       store.setStatus(id, "finishing");
       this.deps.changed(id);
     }
@@ -369,6 +395,8 @@ export class CallCaptures {
       partials: [],
       levels: { me: 0, them: 0 },
       error: session.error,
+      model: null,
+      fallback: session.fallback,
     };
   }
 

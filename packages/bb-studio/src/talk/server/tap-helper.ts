@@ -10,7 +10,7 @@ import { release } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { z } from "zod";
-import { LineSplitter, STOP_COMMAND, appsOutputSchema, captureArgv, parseTapLine, permissionOutputSchema, type CaptureArgs, type TapEvent } from "./tap-protocol";
+import { LineSplitter, STOP_COMMAND, appsOutputSchema, captureArgv, parseTapLine, permissionOutputSchema, type CaptureArgs, type FakeAudio, type TapEvent } from "./tap-protocol";
 
 export const HELPER_NAME = "bb-talk-tap";
 
@@ -53,13 +53,13 @@ export interface CaptureHandle {
 export interface TapHelperOptions {
   path?: string;
   /** Replays these WAV files instead of tapping (`--fake`); no permission or prompt. */
-  fake?: { them: string; me: string } | null;
+  fake?: FakeAudio | null;
   log?: (message: string) => void;
 }
 
 export class TapHelper {
   readonly path: string;
-  readonly fake: { them: string; me: string } | null;
+  readonly fake: FakeAudio | null;
   private readonly log: (message: string) => void;
 
   constructor(options: TapHelperOptions = {}) {

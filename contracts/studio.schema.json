@@ -24261,6 +24261,32 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "stage": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "stage",
+                          "progress"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fallback": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -24271,7 +24297,9 @@
                   "phase",
                   "partials",
                   "levels",
-                  "error"
+                  "error",
+                  "model",
+                  "fallback"
                 ],
                 "additionalProperties": false
               },

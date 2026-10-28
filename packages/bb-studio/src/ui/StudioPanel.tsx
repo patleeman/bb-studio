@@ -7,6 +7,7 @@ import { ContentSearchStatus } from "../kit/app/content-search-status";
 // on a kind, so /plugins/studio/studio/recording opens it on recordings.
 import { showBrowse } from "./Workspace";
 import { UnsentNotice } from "../talk/ui/unsent-notice";
+import { openCallPicker } from "../talk/ui/call-view";
 import {
   CollectionPage,
   createStudioItem,
@@ -318,6 +319,7 @@ export function StudioPanel() {
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
   const unavailable = providers.filter((provider) => provider.state !== "ready");
   const extraCreateItems = [
+    { id: "talk:call", label: "Record a call", icon: "studio/call", onSelect: () => openCallPicker() },
     ...templates.map((item) => ({ id: `template:${item.pluginId}:${item.id}`, label: `From template: ${item.title || "Untitled"}`, icon: "Copy", onSelect: (projectId: string | null) => {
       const name = window.prompt("Name for this template (optional)", "");
       if (name === null) return;

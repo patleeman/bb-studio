@@ -548,20 +548,14 @@ export class TalkStore {
   }
 
   /**
-   * Pieces the helper never transcribed (it stopped first) go to the queue,
-   * failed, so Retry can send them on. Returns how many.
+   * Pieces the helper's local transcription won't finish (its model failed,
+   * or it stopped first) go to the transcription queue. Returns how many.
    */
-  releaseHeld(recordingId: string, error: string): number {
+  releaseHeld(recordingId: string): number {
     const result = this.db
-      .prepare(
-        `UPDATE segments SET status = 'failed', error = ?, next_attempt_at = 0
-         WHERE recording_id = ? AND status = 'pending' AND next_attempt_at >= ?`,
-      )
-      .run(error, recordingId, HELD_UNTIL);
-    if (result.changes) {
-      this.touch(recordingId);
-      this.settle(recordingId);
-    }
+      .prepare(`UPDATE segments SET next_attempt_at = 0 WHERE recording_id = ? AND status = 'pending' AND next_attempt_at >= ?`)
+      .run(recordingId, HELD_UNTIL);
+    if (result.changes) this.touch(recordingId);
     return result.changes;
   }
 

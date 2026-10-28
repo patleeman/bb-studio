@@ -37,7 +37,7 @@ import { talkModels } from "./server/models";
 import { NotesMaker, generateNotes, notesPagePath, type PagesClient } from "./server/notes";
 import { talkBackupHandlers } from "./server/backup";
 import { abortableWait } from "./server/abortable-wait";
-import { CallCaptures } from "./server/call-capture";
+import { CallCaptures, DEFAULT_LOCAL_MODEL } from "./server/call-capture";
 import { echoSegments } from "./server/call-echo";
 import { CallFinisher, callContext } from "./server/call-finish";
 import { transcribeOnServer } from "./server/call-stt";
@@ -229,17 +229,20 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   };
   // Tests and staged captures replay two WAV files (them.wav, me.wav) instead of tapping.
   const fakeDir = process.env.BB_STUDIO_TALK_TAP_FAKE;
+  const fakeSpeed = Number(process.env.BB_STUDIO_TALK_TAP_FAKE_SPEED) || undefined;
   const calls = new CallCaptures({
     store,
     files,
     helper: new TapHelper({
       path: process.env.BB_STUDIO_TALK_TAP || undefined,
-      fake: fakeDir ? { them: join(fakeDir, "them.wav"), me: join(fakeDir, "me.wav") } : null,
+      fake: fakeDir ? { them: join(fakeDir, "them.wav"), me: join(fakeDir, "me.wav"), speed: fakeSpeed } : null,
       log: (message) => bb.log.info(message),
     }),
     incomingRoot: join(talkDirectory, "incoming"),
     modelDir: join(talkDirectory, "whisperkit"),
-    settings: () => ({ stt: callSttFor(config.callTranscription), localModel: config.callLocalModel?.trim() || "large-v3-v20240930_turbo" }),
+    settings: () => ({ stt: callSttFor(config.callTranscription), localModel: config.callLocalModel?.trim() || DEFAULT_LOCAL_MODEL }),
+    // Fake mode can ask the helper for "<n> ms of audio" finals, so no model is needed.
+    testStt: Boolean(fakeDir) && process.env.BB_STUDIO_TALK_TAP_STT === "test",
     kv: bb.storage.kv,
     changed,
     publish: publishCall,

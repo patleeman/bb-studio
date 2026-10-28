@@ -6,7 +6,7 @@
 //   STUB_TAP_PLAN   JSON file: { apps?, permission?, steps: [{ at, ...event }], exitAfterSteps?, exitCode? }
 //                   A step { at, event: "segment", source, index, startMs, endMs } writes a small WAV
 //                   into segmentDir and fills in its path.
-//   STUB_TAP_SPEED  multiplies every step's `at` (default 1).
+//   STUB_TAP_SPEED  multiplies every step's `at` (default 1); --fake-speed divides it.
 //   STUB_TAP_LOG    a file that gets each run's argv and stdin lines (for tests).
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,7 +17,9 @@ const log = (entry) => {
 };
 log({ argv: process.argv.slice(2) });
 const plan = process.env.STUB_TAP_PLAN ? JSON.parse(readFileSync(process.env.STUB_TAP_PLAN, "utf8")) : DEFAULT_PLAN();
-const speed = Number(process.env.STUB_TAP_SPEED ?? 1) || 1;
+const fakeSpeedAt = process.argv.indexOf("--fake-speed");
+// --fake-speed 4 plays four times faster, as the real helper does.
+const speed = (Number(process.env.STUB_TAP_SPEED ?? 1) || 1) / (fakeSpeedAt > 0 ? Number(process.argv[fakeSpeedAt + 1]) || 1 : 1);
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
 
 function wav(ms) {
@@ -89,13 +91,14 @@ for (const step of plan.steps) {
   timers.push(setTimeout(() => {
     const { at: _at, ...event } = step;
     if (event.event === "segment") {
-      const path = join(args.segmentDir, `${event.source}-${event.index}.wav`);
+      const path = join(args.segmentDir, `${event.source}-${String(event.index).padStart(5, "0")}.wav`);
       writeFileSync(path, wav(event.endMs - event.startMs));
       event.path = path;
     }
     if (event.event === "segment" || event.event === "partial" || event.event === "final" || event.event === "level") {
       if (event.source === "me" && !args.mic) return;
       if ((event.event === "partial" || event.event === "final") && args.stt.kind === "none") return;
+      if (event.event === "final" && args.stt.kind === "test") event.text = `${event.endMs - event.startMs} ms of audio`;
     }
     emit(event);
   }, step.at * speed));

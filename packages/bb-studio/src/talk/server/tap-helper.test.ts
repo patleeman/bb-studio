@@ -12,6 +12,7 @@ describe("the helper's protocol", () => {
     expect(parseTapLine('{"event":"segment","source":"me","index":3,"path":"/tmp/a.wav","startMs":100,"endMs":8100}')).toMatchObject({ event: "segment", index: 3 });
     expect(parseTapLine('{"event":"final","source":"them","index":0,"text":"Hi","startMs":0,"endMs":5}')).toMatchObject({ text: "Hi" });
     expect(parseTapLine('{"event":"error","code":"permission","message":"no"}')).toMatchObject({ code: "permission" });
+    expect(parseTapLine('{"event":"model","progress":0.4,"stage":"download"}')).toEqual({ event: "model", progress: 0.4, stage: "download" });
     expect(parseTapLine('{"event":"level","source":"them","rms":2}')).toBeNull();
     expect(parseTapLine('{"event":"segment","source":"left","index":0}')).toBeNull();
     expect(parseTapLine("not json")).toBeNull();
@@ -22,6 +23,7 @@ describe("the helper's protocol", () => {
     const args = { target: { all: true as const }, mic: true, segmentDir: "/x", segmentTargetMs: 8000, segmentMaxMs: 15000, stt: { kind: "none" as const } };
     expect(captureArgv(args)).toEqual(["capture", "--json-args", JSON.stringify(args)]);
     expect(captureArgv(args, { them: "/t.wav", me: "/m.wav" }).slice(3)).toEqual(["--fake", "/t.wav", "/m.wav"]);
+    expect(captureArgv(args, { them: "/t.wav", me: "/m.wav", speed: 4 }).slice(3)).toEqual(["--fake", "/t.wav", "/m.wav", "--fake-speed", "4"]);
   });
 
   it("splits a stream into lines across chunks", () => {
@@ -109,7 +111,7 @@ describe("capture", () => {
     await handle.stop();
     expect(events.map((event) => event.event)).toEqual(["started", "level", "segment", "final", "stopped"]);
     const segment = events[2] as Extract<TapEvent, { event: "segment" }>;
-    expect(segment.path).toBe(join(dir, "them-0.wav"));
+    expect(segment.path).toBe(join(dir, "them-00000.wav"));
     const [run, stop] = stub.log();
     expect(run!.argv!.slice(0, 2)).toEqual(["capture", "--json-args"]);
     expect(JSON.parse(run!.argv![2]!)).toMatchObject({ target: { bundleIds: ["us.zoom.xos"] }, stt: { kind: "whisperkit" } });

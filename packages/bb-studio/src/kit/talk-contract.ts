@@ -141,6 +141,10 @@ export const callLiveSchema = z.object({
   partials: z.array(z.object({ speaker: speakerSchema, index: z.number(), text: z.string(), startMs: z.number() })),
   levels: z.object({ me: z.number(), them: z.number() }),
   error: z.string().nullable(),
+  /** Local transcription's model while it downloads or loads; null once ready, or without local STT. */
+  model: z.object({ stage: z.string(), progress: z.number() }).nullable(),
+  /** Local transcription failed; the pieces go to BB's voice service instead. */
+  fallback: z.boolean(),
 });
 export type CallLive = z.infer<typeof callLiveSchema>;
 const clientId = z.string().regex(/^[a-z0-9]{6,32}$/);
@@ -349,7 +353,7 @@ export const TALK_SETTINGS = {
     type: "string" as const,
     label: "Call transcription: local model",
     description: "The WhisperKit model the helper runs on this Mac. It is downloaded the first time a call uses it.",
-    default: "large-v3-v20240930_turbo",
+    default: "openai_whisper-large-v3-v20240930_626MB",
   },
   callAudioRetention: {
     type: "select" as const,

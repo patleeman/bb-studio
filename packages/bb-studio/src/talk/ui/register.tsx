@@ -5,6 +5,8 @@
 // - A content script hands presses on the composer's microphone to Talk, and
 //   lets other plugins' fields ask for dictation (fields.ts).
 // - Another watches the hold-to-talk key (hold-to-talk.ts).
+// - A second overlay shows the red bar while a call is recorded, and the
+//   call source picker (call-ui.tsx).
 // - Each recording's page is a Studio tab (route.tsx, loaded on demand); the
 //   list is Studio's library filtered to recordings.
 // - `::recording{id="rec_…"}` in a reply shows the recording inline.
@@ -23,6 +25,7 @@ import { ComposerBridge } from "./ComposerBridge";
 import { linkRecordingMentions } from "./recording-mentions";
 import { RecordingCard } from "./recording-card";
 import { ModelSettings } from "./model-settings";
+import { CallOverlay, openCallPicker } from "./call-ui";
 
 export function registerTalkApp(app: PluginAppBuilder): void {
   app.slots.settingsSection({ id: "models", title: "Talk models", component: ModelSettings });
@@ -36,6 +39,8 @@ export function registerTalkApp(app: PluginAppBuilder): void {
   });
   app.slots.messageDirective({ id: "recording", component: RecordingCard });
   app.slots.experimental_appOverlay({ id: "recorder", component: TalkOverlay });
+  // The red "Recording call" bar, on every screen, and the call source picker.
+  app.slots.experimental_appOverlay({ id: "call", component: CallOverlay });
 
   app.contentScripts.register({
     id: "composer-mic",
@@ -120,6 +125,11 @@ export function registerTalkApp(app: PluginAppBuilder): void {
     id: "toggle-recording",
     title: "Talk: Start or stop a recording",
     run: () => (talk.isActive() ? talk.stop() : talk.startRecording("recording")),
+  });
+  app.commands.register({
+    id: "record-call",
+    title: "Talk: Record a call",
+    run: () => openCallPicker(),
   });
   app.commands.register({
     id: "pause-recording",

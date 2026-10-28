@@ -33,6 +33,7 @@
         "draw": "./icons/draw.svg",
         "design": "./icons/design.svg",
         "talk": "./icons/talk.svg",
+        "call": "./icons/call.svg",
         "pages": "./icons/pages.svg",
         "explore": "./icons/explore.svg",
         "dashboard": "./icons/dashboard.svg",

@@ -17881,6 +17881,16 @@ public enum Studio {
     }
   }
 
+  public struct RecordingsCallStatusOutputActiveModel: Sendable, Hashable, Codable {
+    public var stage: String?
+    public var progress: Double?
+
+    public init(stage: String? = nil, progress: Double? = nil) {
+      self.stage = stage
+      self.progress = progress
+    }
+  }
+
   public struct RecordingsCallStatusOutputActive: Sendable, Hashable, Codable {
     public var recordingId: String?
     public var app: String?
@@ -17890,8 +17900,10 @@ public enum Studio {
     public var partials: [RecordingsCallStatusOutputActivePartialsItem]?
     public var levels: RecordingsCallStatusOutputActiveLevels?
     public var error: String?
+    public var model: RecordingsCallStatusOutputActiveModel?
+    public var fallback: Bool?
 
-    public init(recordingId: String? = nil, app: String? = nil, mic: Bool? = nil, startedAt: Double? = nil, phase: RecordingsCallStatusOutputActivePhase? = nil, partials: [RecordingsCallStatusOutputActivePartialsItem]? = nil, levels: RecordingsCallStatusOutputActiveLevels? = nil, error: String? = nil) {
+    public init(recordingId: String? = nil, app: String? = nil, mic: Bool? = nil, startedAt: Double? = nil, phase: RecordingsCallStatusOutputActivePhase? = nil, partials: [RecordingsCallStatusOutputActivePartialsItem]? = nil, levels: RecordingsCallStatusOutputActiveLevels? = nil, error: String? = nil, model: RecordingsCallStatusOutputActiveModel? = nil, fallback: Bool? = nil) {
       self.recordingId = recordingId
       self.app = app
       self.mic = mic
@@ -17900,6 +17912,8 @@ public enum Studio {
       self.partials = partials
       self.levels = levels
       self.error = error
+      self.model = model
+      self.fallback = fallback
     }
   }
 

@@ -52,6 +52,7 @@ import { UnsentNotice } from "./unsent-notice";
 import { useRecordingProvider } from "./provider";
 import { openCollection } from "../../ui/StudioPanel";
 import { unsentAudioState } from "./unsent-state";
+import { CallTranscript, useCallLive } from "./call-ui";
 
 function useChangedSignal(onChange: (id: string) => void): void {
   useRealtime(RECORDING_CHANGED, (payload) => {
@@ -306,6 +307,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
   const [cleaning, setCleaning] = useState<string | null>(null);
   const cleanupRun = useRef(0);
   const notes = useNotes(id, refetch);
+  const { live: callLive } = useCallLive();
   useEffect(() => { setVersion("cleaned"); setCleaning(null); return () => { cleanupRun.current++; }; }, [id]);
   const spoken = segments.filter((segment) => segment.status !== "empty");
   const hasCleaned = spoken.length > 0 && spoken.every((segment) => segment.status === "done" && segment.cleanedText != null);
@@ -378,6 +380,8 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
   }
   const { recording } = data;
   const activeHere = state.recordingId === id && state.phase !== "idle";
+  const call = recording.call ?? null;
+  const callHere = callLive?.recordingId === id ? callLive : null;
   const badge = recordingBadge(recording, activeHere && state.phase === "recording");
   const run = (work: () => Promise<unknown>) => {
     void work().then(refetch, (cause) => toast.error(errorMessage(cause)));
@@ -466,11 +470,17 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
               <span>Dictation</span>
             </>
           ) : null}
+          {call ? (
+            <>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1"><Icon name="studio/call" className="size-3.5" /> Call · {call.app}{call.mic ? "" : " · without your mic"}</span>
+            </>
+          ) : null}
         </div>
 
         {recording.audioRemoved ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Talk deleted this dictation's audio to save space. The transcript is kept.
+            {call ? "Talk deleted this call's audio after the time set in Keep call audio. The transcript and notes are kept." : "Talk deleted this dictation's audio to save space. The transcript is kept."}
           </p>
         ) : null}
 
@@ -507,7 +517,18 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
-          {activeHere ? (
+          {call ? (
+            callHere ? (
+              <button
+                type="button"
+                className={DANGER_BUTTON}
+                disabled={callHere.phase === "stopping"}
+                onClick={() => run(() => rpc.call("recordings.call_stop", { id }))}
+              >
+                <Icon name="Square" /> {callHere.phase === "stopping" ? "Stopping…" : "Stop recording the call"}
+              </button>
+            ) : null
+          ) : activeHere ? (
             <>
               {state.phase === "recording" ? (
                 <button type="button" className={OUTLINE_BUTTON} onClick={() => void talk.pause()}>
@@ -582,7 +603,9 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
             <span className="text-xs text-muted-foreground">Original text and audio kept</span>
           </div>
         ) : null}
-        {segments.length === 0 ? (
+        {call ? (
+          <CallTranscript recording={recording} segments={shownSegments} live={callLive} onPlay={recording.audioRemoved ? undefined : (offsetMs) => player.seek(offsetMs, true)} />
+        ) : segments.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">{activeHere ? "Text appears here as each piece is transcribed." : "This recording has no audio."}</p>
         ) : (
           <div ref={transcriptRows} className="mt-4 flex flex-col gap-3">
