@@ -1,8 +1,15 @@
 // Pure helpers shared by the server and the frontend. Nothing here may import
 // a runtime value from the SDK: the frontend bundle loads this file directly.
+export type { CallLive } from "./contract";
 
 /** Realtime channel: payload `{ id }` of the recording that changed. */
 export const RECORDING_CHANGED = "recording-changed";
+
+/** Realtime channel: payload `{ live }`, the call being captured (CallLive) or null once it ended. */
+export const CALL_LIVE = "call-live";
+
+/** Talk's "Record a call" opens the source picker; dispatched on window. */
+export const NEW_CALL_EVENT = "bb-studio:talk:new-call";
 
 /** Studio's "New recording" dispatches this on window; Talk's overlay starts one. */
 export const NEW_RECORDING_EVENT = "bb-studio:talk:new-recording";
@@ -76,18 +83,26 @@ export function countWords(text: string): number {
  * (pause, reload, resume) starts a new paragraph.
  */
 export function joinTranscript(
-  segments: readonly { sessionId: string; text: string | null }[],
+  segments: readonly { sessionId: string; text: string | null; speaker?: string | null }[],
 ): string {
   let out = "";
   let session: string | null = null;
   for (const segment of segments) {
     const text = segment.text?.trim();
     if (!text) continue;
-    if (out === "") out = text;
-    else out += (segment.sessionId === session ? " " : "\n\n") + text;
-    session = segment.sessionId;
+    // A call's turns: each change of side is a paragraph, labelled.
+    const turn = segment.speaker ? `speaker:${segment.speaker}` : segment.sessionId;
+    const piece = segment.speaker && turn !== session ? `${speakerLabel(segment.speaker)}: ${text}` : text;
+    if (out === "") out = piece;
+    else out += (turn === session ? " " : "\n\n") + piece;
+    session = turn;
   }
   return out;
+}
+
+/** "Me" for the mic, "Them" for the call. */
+export function speakerLabel(speaker: string): string {
+  return speaker === "me" ? "Me" : "Them";
 }
 
 /**
@@ -118,6 +133,11 @@ export function defaultTitle(createdAt: number, kind: "recording" | "dictation")
     minute: "2-digit",
   });
   return `${kind === "dictation" ? "Dictation" : "Recording"} · ${when}`;
+}
+
+export function callTitle(createdAt: number, app: string): string {
+  const when = new Date(createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return `Call · ${app} · ${when}`;
 }
 
 /**

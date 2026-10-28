@@ -5,7 +5,7 @@ import { errorMessage } from "../../kit/format";
 import type { AudioFiles } from "./audio-files";
 import type { PendingSegment, TalkStore } from "./store";
 
-export type Transcribe = (audio: File, hint: string, signal: AbortSignal) => Promise<string>;
+export type Transcribe = (audio: File, hint: string, signal: AbortSignal, segment: PendingSegment) => Promise<string>;
 
 export interface TranscriberDeps {
   store: TalkStore;
@@ -82,7 +82,7 @@ export class Transcriber {
       const audio = new File([new Uint8Array(bytes)], segment.file.split("/").pop()!, {
         type: segment.mimeType.split(";")[0],
       });
-      const text = await transcribe(audio, segment.hint, signal);
+      const text = await transcribe(audio, segment.hint, signal, segment);
       store.markTranscribed(segment.recordingId, segment.id, text);
     } catch (cause) {
       if (signal.aborted) return;

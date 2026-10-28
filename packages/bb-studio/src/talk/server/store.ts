@@ -3,14 +3,16 @@
 // each segment's transcript.
 import type Database from "better-sqlite3";
 import type {
+  CallInfo,
   Recording,
   RecordingKind,
   RecordingStatus,
   Segment,
   SegmentStatus,
   MeetingNotes,
+  Speaker,
 } from "../shared/contract";
-import { countWords, defaultTitle, joinTranscript, tail } from "../shared/format";
+import { callTitle, countWords, defaultTitle, joinTranscript, tail } from "../shared/format";
 
 // Historical schema for standalone store tests; Studio freezes its own copy.
 // Append schema changes only at the END of MIGRATIONS in src/migrations.ts.
@@ -52,6 +54,10 @@ export const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS recordings_updated ON recordings(updated_at)`,
   `ALTER TABLE recordings ADD COLUMN notes_page_id TEXT`,
   `ALTER TABLE recordings ADD COLUMN notes_items TEXT`,
+  // Call recordings (call-capture.ts): the app and STT, each piece's side, and echoes the mic heard.
+  `ALTER TABLE recordings ADD COLUMN call TEXT;
+   ALTER TABLE segments ADD COLUMN speaker TEXT;
+   ALTER TABLE segments ADD COLUMN echo INTEGER NOT NULL DEFAULT 0`,
 ];
 /** Historical statements; Studio's applied sequence is frozen in src/migrations.ts. */
 export const TALK_MIGRATIONS = MIGRATIONS;
@@ -74,6 +80,7 @@ interface RecordingRow {
   audio_removed_at: number | null;
   notes_page_id: string | null;
   notes_items: string | null;
+  call: string | null;
 }
 
 interface SegmentRow {
@@ -92,6 +99,8 @@ interface SegmentRow {
   error: string | null;
   attempts: number;
   next_attempt_at: number;
+  speaker: Speaker | null;
+  echo: number;
 }
 
 export interface PendingSegment {
@@ -113,7 +122,14 @@ export interface NewSegment {
   mimeType: string;
   bytes: number;
   file: string;
+  /** A call's side. */
+  speaker?: Speaker;
+  /** Transcribed elsewhere (the helper's local WhisperKit): the queue leaves it alone. */
+  held?: boolean;
 }
+
+/** A held piece's next attempt: never, until it's released. */
+export const HELD_UNTIL = 8_640_000_000_000_000;
 
 const ORDER = "ORDER BY started_at, session_id, idx";
 
@@ -128,24 +144,26 @@ export class TalkStore {
     kind: RecordingKind;
     projectId: string | null;
     threadId: string | null;
+    call?: CallInfo;
   }): Recording {
     const at = this.now();
     this.db
       .prepare(
         `INSERT INTO recordings
            (id, title, title_source, kind, status, project_id, thread_id,
-            created_at, updated_at, heartbeat_at)
-         VALUES (?, ?, 'pending', ?, 'recording', ?, ?, ?, ?, ?)`,
+            created_at, updated_at, heartbeat_at, call)
+         VALUES (?, ?, 'pending', ?, 'recording', ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.id,
-        defaultTitle(at, input.kind),
+        input.call ? callTitle(at, input.call.app) : defaultTitle(at, input.kind),
         input.kind,
         input.projectId,
         input.threadId,
         at,
         at,
         at,
+        input.call ? JSON.stringify(input.call) : null,
       );
     return this.recording(input.id)!;
   }
@@ -180,8 +198,12 @@ export class TalkStore {
     const rows = this.db
       .prepare(`SELECT * FROM segments WHERE recording_id = ? ${ORDER}`)
       .all(recordingId) as SegmentRow[];
+    // A call's two sides overlap in time, so its pieces sit where they were spoken.
+    const call = rows.some((row) => row.speaker !== null);
+    const first = rows[0]?.started_at ?? 0;
     let offset = 0;
     return rows.map((row) => {
+      if (call) offset = row.started_at - first;
       const segment: Segment = {
         id: row.id,
         sessionId: row.session_id,
@@ -195,6 +217,7 @@ export class TalkStore {
         cleanedText: row.cleaned_text,
         error: row.error,
         attempts: row.attempts,
+        ...(row.speaker ? { speaker: row.speaker, echo: row.echo === 1 } : {}),
       };
       offset += row.duration_ms;
       return segment;
@@ -203,7 +226,7 @@ export class TalkStore {
 
   /** Only expose a complete cleaned version, including after Record more. */
   cleanedTranscript(recordingId: string): string | null {
-    const segments = this.segments(recordingId).filter((segment) => segment.status !== "empty");
+    const segments = this.segments(recordingId).filter((segment) => segment.status !== "empty" && !segment.echo);
     if (!segments.length || segments.some((segment) => segment.status !== "done" || segment.cleanedText == null)) return null;
     return joinTranscript(segments.map((segment) => ({ ...segment, text: segment.cleanedText ?? segment.text })));
   }
@@ -236,10 +259,10 @@ export class TalkStore {
     return joinTranscript(
       this.db
         .prepare(
-          `SELECT session_id AS sessionId, text FROM segments
-           WHERE recording_id = ? AND status = 'done' ${ORDER}`,
+          `SELECT session_id AS sessionId, text, speaker FROM segments
+           WHERE recording_id = ? AND status = 'done' AND echo = 0 ${ORDER}`,
         )
-        .all(recordingId) as { sessionId: string; text: string | null }[],
+        .all(recordingId) as { sessionId: string; text: string | null; speaker: Speaker | null }[],
     );
   }
 
@@ -274,8 +297,8 @@ export class TalkStore {
       .prepare(
         `INSERT OR IGNORE INTO segments
            (recording_id, id, session_id, idx, started_at, duration_ms,
-            mime_type, bytes, file, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+            mime_type, bytes, file, status, created_at, speaker, next_attempt_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       )
       .run(
         segment.recordingId,
@@ -288,6 +311,8 @@ export class TalkStore {
         segment.bytes,
         segment.file,
         this.now(),
+        segment.speaker ?? null,
+        segment.held ? HELD_UNTIL : 0,
       );
     if (result.changes === 0) return false;
     this.db.prepare(`UPDATE recordings SET meeting_notes = NULL WHERE id = ?`).run(segment.recordingId);
@@ -325,8 +350,8 @@ export class TalkStore {
   /** When the next pending segment becomes due, or null when none waits. */
   nextDueAt(): number | null {
     const row = this.db
-      .prepare(`SELECT MIN(next_attempt_at) AS at FROM segments WHERE status = 'pending'`)
-      .get() as { at: number | null };
+      .prepare(`SELECT MIN(next_attempt_at) AS at FROM segments WHERE status = 'pending' AND next_attempt_at < ?`)
+      .get(HELD_UNTIL) as { at: number | null };
     return row.at;
   }
 
@@ -485,6 +510,73 @@ export class TalkStore {
     return rows.map((row) => row.id);
   }
 
+  /** Finished calls older than `before` that still have audio and nothing left to transcribe. */
+  callAudioExpired(before: number): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM recordings r
+         WHERE call IS NOT NULL AND status = 'done' AND audio_removed_at IS NULL
+           AND COALESCE(ended_at, updated_at) < ?
+           AND NOT EXISTS (SELECT 1 FROM segments s
+                           WHERE s.recording_id = r.id AND s.status IN ('pending', 'failed'))`,
+      )
+      .all(before) as { id: string }[];
+    return rows.map((row) => row.id);
+  }
+
+  /** Calls still marked as capturing: after a restart, their helper is gone. */
+  capturingCalls(): string[] {
+    const rows = this.db
+      .prepare(`SELECT id FROM recordings WHERE call IS NOT NULL AND status IN ('recording', 'paused', 'interrupted')`)
+      .all() as { id: string }[];
+    return rows.map((row) => row.id);
+  }
+
+  call(id: string): CallInfo | null {
+    const raw = this.row(id)?.call;
+    return raw ? (JSON.parse(raw) as CallInfo) : null;
+  }
+
+  /** A piece the helper finished transcribing; false when it isn't waiting for that (already done, or unknown). */
+  saveFinal(recordingId: string, segmentId: string, text: string): boolean {
+    const row = this.db
+      .prepare(`SELECT status FROM segments WHERE recording_id = ? AND id = ?`)
+      .get(recordingId, segmentId) as { status: SegmentStatus } | undefined;
+    if (!row || row.status !== "pending") return false;
+    this.markTranscribed(recordingId, segmentId, text);
+    return true;
+  }
+
+  /**
+   * Pieces the helper never transcribed (it stopped first) go to the queue,
+   * failed, so Retry can send them on. Returns how many.
+   */
+  releaseHeld(recordingId: string, error: string): number {
+    const result = this.db
+      .prepare(
+        `UPDATE segments SET status = 'failed', error = ?, next_attempt_at = 0
+         WHERE recording_id = ? AND status = 'pending' AND next_attempt_at >= ?`,
+      )
+      .run(error, recordingId, HELD_UNTIL);
+    if (result.changes) {
+      this.touch(recordingId);
+      this.settle(recordingId);
+    }
+    return result.changes;
+  }
+
+  /** Hides "me" pieces that only repeated the other side. */
+  markEcho(recordingId: string, segmentIds: readonly string[]): number {
+    const update = this.db.prepare(`UPDATE segments SET echo = 1 WHERE recording_id = ? AND id = ? AND speaker = 'me' AND echo = 0`);
+    let changes = 0;
+    for (const id of segmentIds) changes += update.run(recordingId, id).changes;
+    if (changes) {
+      this.db.prepare(`UPDATE recordings SET meeting_notes = NULL WHERE id = ?`).run(recordingId);
+      this.touch(recordingId);
+    }
+    return changes;
+  }
+
   markAudioRemoved(id: string): boolean {
     return this.db.prepare(`UPDATE recordings SET audio_removed_at = ? WHERE id = ?`).run(this.now(), id).changes > 0;
   }
@@ -571,11 +663,12 @@ export class TalkStore {
       .prepare(
         `SELECT COUNT(*) AS count,
                 COALESCE(SUM(duration_ms), 0) AS duration,
+                COALESCE(MAX(started_at + duration_ms) - MIN(started_at), 0) AS span,
                 COALESCE(SUM(status = 'pending'), 0) AS pending,
                 COALESCE(SUM(status = 'failed'), 0) AS failed
          FROM segments WHERE recording_id = ?`,
       )
-      .get(row.id) as { count: number; duration: number; pending: number; failed: number };
+      .get(row.id) as { count: number; duration: number; span: number; pending: number; failed: number };
     const transcript = this.transcript(row.id);
     return {
       id: row.id,
@@ -588,16 +681,19 @@ export class TalkStore {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       endedAt: row.ended_at,
-      durationMs: stats.duration,
+      // A call's sides overlap: its length is the time it ran.
+      durationMs: row.call ? stats.span : stats.duration,
       segmentCount: stats.count,
       pendingCount: stats.pending,
       failedCount: stats.failed,
-      wordCount: countWords(transcript),
+      // A call's "Me:" and "Them:" labels aren't words anyone said.
+      wordCount: countWords(row.call ? transcript.replace(/(^|\n\n)(?:Me|Them): /g, "$1") : transcript),
       preview: tail(transcript, 240),
       archived: row.archived_at !== null,
       audioRemoved: row.audio_removed_at !== null,
       meetingNotes: row.meeting_notes ? JSON.parse(row.meeting_notes) as MeetingNotes : null,
       notesPageId: row.notes_page_id ?? null,
+      call: row.call ? JSON.parse(row.call) as CallInfo : null,
     };
   }
 }

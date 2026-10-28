@@ -15,7 +15,7 @@ import type Database from "better-sqlite3";
 import { mapProject, restoreDecision } from "../../kit/backup";
 import { fileSafeId, fileSafeIdMatches, type BackupHandlers, type BackupReader, type BackupWriter } from "../../kit/server/index";
 import { z } from "zod";
-import { meetingNotesSchema, recordingKindSchema, recordingStatusSchema, segmentStatusSchema } from "../shared/contract";
+import { callInfoSchema, meetingNotesSchema, recordingKindSchema, recordingStatusSchema, segmentStatusSchema, speakerSchema } from "../shared/contract";
 import { extensionFor, type AudioFiles } from "./audio-files";
 
 export const TALK_BACKUP_VERSION = 1;
@@ -41,6 +41,9 @@ const segmentSchema = z.object({
   createdAt: time,
   /** The audio file's name under `audio/<recordingId>/`, or null when it wasn't saved. */
   audio: z.string().regex(AUDIO_NAME).nullable(),
+  /** A call's side (older backups have none). */
+  speaker: speakerSchema.nullable().default(null),
+  echo: z.boolean().default(false),
 });
 
 export const backupItemSchema = z.object({
@@ -62,6 +65,8 @@ export const backupItemSchema = z.object({
   notesPageId: z.string().min(1).max(200).nullable(),
   /** Keys of the action items the last notes run wrote (older backups have none). */
   notesItems: z.array(z.string().max(2000)).max(200).nullable().default(null),
+  /** Set on a call recording (older backups have none). */
+  call: callInfoSchema.nullable().default(null),
   segments: z.array(segmentSchema),
 });
 export type TalkBackupItem = z.infer<typeof backupItemSchema>;
@@ -84,6 +89,7 @@ interface RecordingRow {
   audio_removed_at: number | null;
   notes_page_id: string | null;
   notes_items: string | null;
+  call: string | null;
 }
 
 interface SegmentRow {
@@ -101,6 +107,8 @@ interface SegmentRow {
   error: string | null;
   attempts: number;
   created_at: number;
+  speaker: "me" | "them" | null;
+  echo: number;
 }
 
 export interface TalkBackupDeps {
@@ -195,6 +203,7 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
           meetingNotes: row.meeting_notes ? (JSON.parse(row.meeting_notes) as TalkBackupItem["meetingNotes"]) : null,
           notesPageId: row.notes_page_id,
           notesItems: row.notes_items ? (JSON.parse(row.notes_items) as string[]) : null,
+          call: row.call ? (JSON.parse(row.call) as TalkBackupItem["call"]) : null,
           segments: [],
         };
         for (const segment of segments) {
@@ -226,6 +235,8 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
             attempts: segment.attempts,
             createdAt: segment.created_at,
             audio,
+            speaker: segment.speaker ?? null,
+            echo: segment.echo === 1,
           });
         }
         // Deleted while its audio was being copied: saving it would restore a recording without audio.
@@ -340,23 +351,23 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
         const upsert = db.prepare(
           `INSERT INTO recordings
              (id, title, title_source, title_chars, kind, status, project_id, thread_id, created_at, updated_at,
-              ended_at, heartbeat_at, archived_at, meeting_notes, audio_removed_at, notes_page_id, notes_items)
+              ended_at, heartbeat_at, archived_at, meeting_notes, audio_removed_at, notes_page_id, notes_items, call)
            VALUES (@id, @title, @titleSource, @titleChars, @kind, @status, @projectId, NULL, @createdAt, @updatedAt,
-              @endedAt, @heartbeatAt, @archivedAt, @meetingNotes, @audioRemovedAt, @notesPageId, @notesItems)
+              @endedAt, @heartbeatAt, @archivedAt, @meetingNotes, @audioRemovedAt, @notesPageId, @notesItems, @call)
            ON CONFLICT(id) DO UPDATE SET
              title = excluded.title, title_source = excluded.title_source, title_chars = excluded.title_chars,
              kind = excluded.kind, status = excluded.status, project_id = excluded.project_id, thread_id = NULL,
              created_at = excluded.created_at, updated_at = excluded.updated_at, ended_at = excluded.ended_at,
              heartbeat_at = excluded.heartbeat_at, archived_at = excluded.archived_at,
              meeting_notes = excluded.meeting_notes, audio_removed_at = excluded.audio_removed_at,
-             notes_page_id = excluded.notes_page_id, notes_items = excluded.notes_items`,
+             notes_page_id = excluded.notes_page_id, notes_items = excluded.notes_items, call = excluded.call`,
         );
         const insertSegment = db.prepare(
           `INSERT INTO segments
              (recording_id, id, session_id, idx, started_at, duration_ms, mime_type, bytes, file, status,
-              text, error, attempts, next_attempt_at, created_at, cleaned_text)
+              text, error, attempts, next_attempt_at, created_at, cleaned_text, speaker, echo)
            VALUES (@recordingId, @id, @sessionId, @index, @startedAt, @durationMs, @mimeType, @bytes, @file, @status,
-              @text, @error, @attempts, 0, @createdAt, @cleanedText)`,
+              @text, @error, @attempts, 0, @createdAt, @cleanedText, @speaker, @echo)`,
         );
         const write = db.transaction((items: Planned[]) => {
           for (const entry of items) {
@@ -366,11 +377,12 @@ export function talkBackupHandlers(deps: TalkBackupDeps): BackupHandlers {
               continue;
             }
             entry.accepted = true;
-            upsert.run({ ...item, meetingNotes: item.meetingNotes ? JSON.stringify(item.meetingNotes) : null, notesItems: item.notesItems ? JSON.stringify(item.notesItems) : null });
+            upsert.run({ ...item, meetingNotes: item.meetingNotes ? JSON.stringify(item.meetingNotes) : null, notesItems: item.notesItems ? JSON.stringify(item.notesItems) : null, call: item.call ? JSON.stringify(item.call) : null });
             deleteSegments.run(item.id);
             for (const segment of item.segments) {
               insertSegment.run({
                 ...segment,
+                echo: segment.echo ? 1 : 0,
                 recordingId: item.id,
                 // A segment whose audio wasn't saved keeps a path; the player reports it missing.
                 file: segment.audio ? entry.audioPaths.get(segment.audio)! : `${item.id}/${segment.id}.${extensionFor(segment.mimeType)}`,

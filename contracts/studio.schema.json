@@ -22169,6 +22169,45 @@
                     "string",
                     "null"
                   ]
+                },
+                "call": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "app": {
+                          "type": "string"
+                        },
+                        "bundleIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "mic": {
+                          "type": "boolean"
+                        },
+                        "stt": {
+                          "type": "string",
+                          "enum": [
+                            "whisperkit",
+                            "red4",
+                            "voice-service"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "app",
+                        "bundleIds",
+                        "mic",
+                        "stt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -22325,6 +22364,45 @@
                   "string",
                   "null"
                 ]
+              },
+              "call": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "app": {
+                        "type": "string"
+                      },
+                      "bundleIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "mic": {
+                        "type": "boolean"
+                      },
+                      "stt": {
+                        "type": "string",
+                        "enum": [
+                          "whisperkit",
+                          "red4",
+                          "voice-service"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "app",
+                      "bundleIds",
+                      "mic",
+                      "stt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -22404,6 +22482,23 @@
                 },
                 "attempts": {
                   "type": "number"
+                },
+                "speaker": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "me",
+                        "them"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "echo": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -22578,6 +22673,45 @@
               "string",
               "null"
             ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -22729,6 +22863,45 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -22884,6 +23057,45 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -23136,6 +23348,45 @@
               "string",
               "null"
             ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -23284,6 +23535,45 @@
                 "type": [
                   "string",
                   "null"
+                ]
+              },
+              "call": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "app": {
+                        "type": "string"
+                      },
+                      "bundleIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "mic": {
+                        "type": "boolean"
+                      },
+                      "stt": {
+                        "type": "string",
+                        "enum": [
+                          "whisperkit",
+                          "red4",
+                          "voice-service"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "app",
+                      "bundleIds",
+                      "mic",
+                      "stt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -23458,6 +23748,45 @@
                 "type": [
                   "string",
                   "null"
+                ]
+              },
+              "call": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "app": {
+                        "type": "string"
+                      },
+                      "bundleIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "mic": {
+                        "type": "boolean"
+                      },
+                      "stt": {
+                        "type": "string",
+                        "enum": [
+                          "whisperkit",
+                          "red4",
+                          "voice-service"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "app",
+                      "bundleIds",
+                      "mic",
+                      "stt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -23684,6 +24013,45 @@
               "string",
               "null"
             ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -23733,6 +24101,624 @@
         },
         "required": [
           "deleted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recordings.call_sources": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "granted",
+                  "denied",
+                  "undetermined"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bundleId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "number"
+                },
+                "playing": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "bundleId",
+                "name",
+                "pid",
+                "playing"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "supported",
+          "reason",
+          "permission",
+          "apps"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recordings.call_status": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "recordingId": {
+                    "type": "string"
+                  },
+                  "app": {
+                    "type": "string"
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "startedAt": {
+                    "type": "number"
+                  },
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "starting",
+                      "recording",
+                      "stopping"
+                    ]
+                  },
+                  "partials": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "speaker": {
+                          "type": "string",
+                          "enum": [
+                            "me",
+                            "them"
+                          ]
+                        },
+                        "index": {
+                          "type": "number"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "startMs": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "speaker",
+                        "index",
+                        "text",
+                        "startMs"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "levels": {
+                    "type": "object",
+                    "properties": {
+                      "me": {
+                        "type": "number"
+                      },
+                      "them": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "me",
+                      "them"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "recordingId",
+                  "app",
+                  "mic",
+                  "startedAt",
+                  "phase",
+                  "partials",
+                  "levels",
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consented": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "consented"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recordings.call_consent": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "consented": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "consented"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recordings.call_start": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "target": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "bundleIds": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  }
+                },
+                "required": [
+                  "bundleIds"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "all": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "all"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "mic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target",
+          "app",
+          "mic"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recordings.call_stop": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "titleSource": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "auto",
+              "user"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "dictation"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recording",
+              "paused",
+              "interrupted",
+              "finishing",
+              "done"
+            ]
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "endedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "segmentCount": {
+            "type": "number"
+          },
+          "pendingCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "wordCount": {
+            "type": "number"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "audioRemoved": {
+            "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notesPageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "call": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "app": {
+                    "type": "string"
+                  },
+                  "bundleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mic": {
+                    "type": "boolean"
+                  },
+                  "stt": {
+                    "type": "string",
+                    "enum": [
+                      "whisperkit",
+                      "red4",
+                      "voice-service"
+                    ]
+                  }
+                },
+                "required": [
+                  "app",
+                  "bundleIds",
+                  "mic",
+                  "stt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "titleSource",
+          "kind",
+          "status",
+          "projectId",
+          "threadId",
+          "createdAt",
+          "updatedAt",
+          "endedAt",
+          "durationMs",
+          "segmentCount",
+          "pendingCount",
+          "failedCount",
+          "wordCount",
+          "preview",
+          "archived",
+          "audioRemoved"
         ],
         "additionalProperties": false
       }

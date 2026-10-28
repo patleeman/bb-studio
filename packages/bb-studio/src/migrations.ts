@@ -809,4 +809,9 @@ export const MIGRATIONS = [
   `UPDATE bot_runners SET urgent = 0;`,
   // Threads Studio nudged their Bot about while they wait on an answer (src/bot-nudge.ts).
   `CREATE TABLE bot_nudges (thread_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, at INTEGER NOT NULL);`,
+  // Talk's call recordings (src/talk/server/call-capture.ts): the app and STT,
+  // each piece's side ("me" or "them"), and "me" pieces that echoed the call.
+  `ALTER TABLE recordings ADD COLUMN call TEXT;
+   ALTER TABLE segments ADD COLUMN speaker TEXT;
+   ALTER TABLE segments ADD COLUMN echo INTEGER NOT NULL DEFAULT 0;`,
 ];

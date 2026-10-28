@@ -37,6 +37,13 @@ import { talkModels } from "./server/models";
 import { NotesMaker, generateNotes, notesPagePath, type PagesClient } from "./server/notes";
 import { talkBackupHandlers } from "./server/backup";
 import { abortableWait } from "./server/abortable-wait";
+import { CallCaptures } from "./server/call-capture";
+import { echoSegments } from "./server/call-echo";
+import { CallFinisher, callContext } from "./server/call-finish";
+import { transcribeOnServer } from "./server/call-stt";
+import { TapHelper } from "./server/tap-helper";
+import { CALL_LIVE, type CallLive } from "./shared/format";
+import { callRetentionDays, callSttFor } from "./shared/contract";
 
 export { TALK_SETTINGS } from "./shared/contract";
 
@@ -82,7 +89,8 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   db.pragma("foreign_keys = ON");
   const store = new TalkStore(db);
   // Beside Studio's database; the Talk plugin kept it beside its own.
-  const files = new AudioFiles(join(pluginDataDirectory(db), "talk"));
+  const talkDirectory = join(pluginDataDirectory(db), "talk");
+  const files = new AudioFiles(talkDirectory);
 
   const lifetime = new AbortController();
   const studio = studioSchemas(z);
@@ -134,7 +142,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
 
   const summaries = new Summaries({
     store,
-    summarize: async (id, transcript) => generateRecordingSummary(bb, id, transcript, lifetime.signal, await models.get("summary")),
+    summarize: async (id, transcript) => generateRecordingSummary(bb, id, withCallContext(id, transcript), lifetime.signal, await models.get("summary")),
     changed,
   });
   const meetingNotes = (id: string, regenerate = false) => summaries.run(id, regenerate);
@@ -145,11 +153,16 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     });
   }
 
+  function withCallContext(id: string, transcript: string): string {
+    const call = store.call(id);
+    return call ? callContext(call.app) + transcript : transcript;
+  }
+
   // ── Notes pages ────────────────────────────────────────────────────────
   const notes = new NotesMaker({
     store,
     pages,
-    generate: async (id, transcript) => generateNotes(bb, id, transcript, lifetime.signal, await models.get("summary")),
+    generate: async (id, transcript) => generateNotes(bb, id, withCallContext(id, transcript), lifetime.signal, await models.get("summary")),
     changed,
   });
 
@@ -166,7 +179,11 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   const transcriber = new Transcriber({
     store,
     files,
-    async transcribe(audio, hint, signal) {
+    async transcribe(audio, hint, signal, segment) {
+      // A call set to the home server; a local (WhisperKit) piece retried by hand goes to the voice service.
+      if (store.call(segment.recordingId)?.stt === "red4") {
+        return transcribeOnServer({ url: config.callServerUrl ?? "", model: config.callServerModel, audio, prompt: hint || undefined, signal });
+      }
       const result = await bb.sdk.system.transcribeVoice({
         file: audio,
         ...(hint ? { prompt: hint } : {}),
@@ -175,20 +192,80 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
       return result.text;
     },
     onSegment(id) {
+      dedupeEcho(id);
       changed(id);
       maybeTitle(id);
       discardEmptyLater(id);
       maybeSummarize(id);
+      callFinisher.maybeRun(id);
     },
     warn: (message) => bb.log.warn(message),
   });
   bb.background.service("talk-transcriber", { start: (signal) => transcriber.run(signal) });
 
+  // ── Calls ───────────────────────────────────────────────────────────────
+  // The mic heard the call through the speakers: hide "me" pieces that only repeat "them".
+  function dedupeEcho(id: string): void {
+    if (!store.call(id)?.mic) return;
+    const echoes = echoSegments(store.segments(id));
+    if (echoes.length && store.markEcho(id, echoes)) changed(id);
+  }
+  const callFinisher = new CallFinisher({
+    store,
+    title: (id) => maybeTitle(id),
+    summarize: (id) => meetingNotes(id),
+    makeNotes: (id) => notes.run(id),
+    clean: async (id, transcript, segmentId) =>
+      cleanTranscript(bb, { recordingId: id, transcript, segmentId, modelSelection: await models.get("cleanup") }, lifetime.signal),
+    changed,
+    warn: (message) => bb.log.warn(message),
+  });
+  const publishCall = (live: CallLive | null) => {
+    try {
+      bb.realtime.publish(CALL_LIVE, { live });
+    } catch {
+      // The bar asks again when it reconnects.
+    }
+  };
+  // Tests and staged captures replay two WAV files (them.wav, me.wav) instead of tapping.
+  const fakeDir = process.env.BB_STUDIO_TALK_TAP_FAKE;
+  const calls = new CallCaptures({
+    store,
+    files,
+    helper: new TapHelper({
+      path: process.env.BB_STUDIO_TALK_TAP || undefined,
+      fake: fakeDir ? { them: join(fakeDir, "them.wav"), me: join(fakeDir, "me.wav") } : null,
+      log: (message) => bb.log.info(message),
+    }),
+    incomingRoot: join(talkDirectory, "incoming"),
+    modelDir: join(talkDirectory, "whisperkit"),
+    settings: () => ({ stt: callSttFor(config.callTranscription), localModel: config.callLocalModel?.trim() || "large-v3-v20240930_turbo" }),
+    kv: bb.storage.kv,
+    changed,
+    publish: publishCall,
+    wake: () => transcriber.wake(),
+    onText: (id) => {
+      dedupeEcho(id);
+      maybeTitle(id);
+    },
+    onEnded: (id) => {
+      changed(id);
+      maybeTitle(id);
+      discardEmptyLater(id);
+      callFinisher.maybeRun(id);
+    },
+    log: (message) => bb.log.warn(message),
+  });
+  await calls.recover();
+
   // Dictations are a safety net: after a while their audio goes, their text stays.
   async function expireDictationAudio(): Promise<void> {
     const days = config.dictationAudioDays;
-    if (typeof days !== "number" || !(days > 0)) return;
-    for (const id of store.audioExpired(Date.now() - days * DAY_MS)) {
+    const expired = typeof days === "number" && days > 0 ? store.audioExpired(Date.now() - days * DAY_MS) : [];
+    // Calls keep their audio 7 or 30 days, or forever; their transcript and notes stay.
+    const callDays = callRetentionDays(config.callAudioRetention);
+    if (callDays !== null) expired.push(...store.callAudioExpired(Date.now() - callDays * DAY_MS));
+    for (const id of expired) {
       await files.removeRecording(id);
       store.markAudioRemoved(id);
       changed(id);
@@ -337,6 +414,14 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     "recordings.recording_delete": async ({ id }) => {
       return { deleted: await deleteRecording({ store, removeAudio: (recordingId) => files.removeRecording(recordingId), changed }, id) };
     },
+    "recordings.call_sources": () => calls.sources(),
+    "recordings.call_status": async () => ({ active: calls.live(), consented: await calls.consented() }),
+    "recordings.call_consent": async () => {
+      await calls.consent();
+      return { consented: true };
+    },
+    "recordings.call_start": (input) => calls.start(input),
+    "recordings.call_stop": ({ id }) => calls.stop(id),
   });
 
   function resolveMention(id: string): string {
@@ -546,6 +631,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     backup: talkBackupHandlers({ db, files, changed }),
     cli,
     dispose: () => {
+      calls.dispose();
       lifetime.abort();
       changeBus.dispose();
     },
