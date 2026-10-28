@@ -1,6 +1,6 @@
 // Talk, built into Studio: its Models settings, dictation at the composer, a
-// dictated message's saved source, a recording page as a Studio tab,
-// and the unsent-audio banner in the library.
+// dictated message's saved source, a recording page as a Studio tab, a call
+// being recorded, and the unsent-audio banner in the library.
 import { resolve } from "node:path";
 
 const scrollToTop = `(() => {
@@ -331,6 +331,83 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, seedPages, plug
         // Keep the title and full player in the published frame after follow-scroll.
         await client.evaluate(scrollToTop);
         await sleep(350);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
+    // Recording a call: the picker (after the one-time notice), then the red
+    // bar over the recording's page while the Me / Them transcript fills in.
+    // The staged BB's helper is the stub (scripts/staged-bb.mjs), which plays
+    // a short made-up call in fake mode: no tap, no mic, no prompt.
+    id: "talk-call",
+    packageDir: "bb-studio",
+    fileName: "recordings-call.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      let recordingId = null;
+      const cleanup = async () => {
+        const { active } = await talkRpc("call_status", null).catch(() => ({ active: null }));
+        if (active) await talkRpc("call_stop", { id: active.recordingId }).catch(() => {});
+        if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
+      };
+      try {
+        const sources = await talkRpc("call_sources", null);
+        if (!sources.supported || !sources.apps.some((app) => app.name === "zoom.us")) {
+          throw new Error(`The staged BB has no fake call helper: ${JSON.stringify(sources)}. Start it with scripts/staged-bb.mjs.`);
+        }
+        await client.navigate("/plugins/studio/studio");
+        await client.waitForSelector("[data-studio-bar]", 30000);
+        await client.evaluate(`window.dispatchEvent(new CustomEvent("bb-studio:talk:new-call"))`);
+        if ((await talkRpc("call_status", null)).consented === false) {
+          await client.waitForText("Before you record a call");
+          await client.waitForText("Heads up: I'm recording this call");
+          await client.clickButtonText("I understand");
+        }
+        await client.waitForText("Record a call");
+        await client.waitForText("All system audio");
+        await client.waitForText("Record my microphone");
+        const picker = await client.evaluate(`document.querySelector('[role="radiogroup"][aria-label="Call audio source"]')?.innerText ?? ""`);
+        for (const label of ["zoom.us", "Google Chrome", "Playing", "FaceTime"]) {
+          if (!picker.includes(label)) throw new Error(`The call picker is missing ${label}: ${picker}`);
+        }
+        await client.evaluate(`[...document.querySelectorAll('[role="radiogroup"] label')].find((row) => row.textContent.includes('zoom.us'))?.querySelector('input').click()`);
+        await sleep(300);
+        await client.capture(resolve("packages/bb-studio/assets/recordings-call-picker.png"));
+        await client.clickButtonText("Start recording");
+        await client.waitForSelector("[data-call-bar]", 20000);
+        recordingId = (await talkRpc("call_status", null)).active?.recordingId ?? null;
+        if (!recordingId) throw new Error("Start recording didn't start a call.");
+        await client.waitForText("Recording call: zoom.us");
+        // The stub's call takes about 8 seconds; wait for its last turn.
+        await client.waitForText("book a follow-up for the week after launch", 30000);
+        await client.waitForText("where your mic picked up the others");
+        const transcript = await client.evaluate(`[...document.querySelectorAll('[aria-label="Call transcript"] section')].map((turn) => turn.innerText.replace(/\\s+/g, " ").trim())`);
+        const expected = [
+          ["Them", "launch date for the iOS app"],
+          ["Me", "ship on the twelfth"],
+          ["Them", "release notes by Friday"],
+          ["Me", "share the page with you"],
+          ["Them", "follow-up for the week after launch"],
+        ];
+        if (transcript.length !== expected.length || expected.some(([who, words], index) => !transcript[index]?.startsWith(who) || !transcript[index].includes(words))) {
+          throw new Error(`The call transcript isn't the expected Me / Them turns: ${JSON.stringify(transcript)}`);
+        }
+        const bar = await client.evaluate(`document.querySelector('[data-call-bar]').innerText`);
+        if (!/Recording call: zoom\.us · 0:\d\d/.test(bar) || !bar.includes("Stop")) throw new Error(`The recording bar is wrong: ${bar}`);
+        const { recording } = await talkRpc("recording_get", { id: recordingId });
+        if (recording.call?.app !== "zoom.us" || recording.status !== "recording") throw new Error(`The call recording is wrong: ${JSON.stringify(recording)}`);
+        // The bar stays on other screens too.
+        await client.navigate("/settings/plugins/studio");
+        await client.waitForSelector("[data-call-bar]");
+        await client.waitForText("Call transcription");
+        await client.navigate(`/plugins/studio/studio/recordings/${recordingId}`);
+        await client.waitForText("follow-up for the week after launch", 30000);
+        await client.evaluate(scrollToTop);
+        await sleep(500);
       } catch (error) {
         await cleanup();
         throw error;

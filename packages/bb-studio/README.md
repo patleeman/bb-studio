@@ -1131,6 +1131,11 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
 | Summaries model | Studio Decisions | Model for automatic and on-demand summaries, and for notes pages. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
 | Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
+| Call transcription | Local (WhisperKit) | Where a recorded call becomes text: WhisperKit on this Mac, Home server (red4), or BB voice service. |
+| Call transcription: home server URL | empty | An OpenAI-compatible `/v1/audio/transcriptions` server, such as `http://red4:8000`. |
+| Call transcription: home server model | empty | The model name the server expects; empty sends `whisper-1`. |
+| Call transcription: local model | `openai_whisper-large-v3-v20240930_626MB` | The WhisperKit model, downloaded on first use. |
+| Keep call audio | 30 days | 7 days, 30 days or Forever. The transcript and notes stay until you delete the recording. |
 
 They are on Studio's settings page: **Settings → Studio**, with **Talk models** below them. Open **Talk models** for the three model choices. Each job can follow Studio Decisions
 or use **A specific model**, selected with BB's provider and model picker.
@@ -1138,6 +1143,55 @@ Choices apply to the next request and persist across devices and restarts.
 Studio Decisions must be enabled to run either choice. Existing cleaned text,
 titles, and summaries stay as saved. Voice transcription is configured in
 **Settings → AI services**.
+
+### Recording a call
+
+Talk can record a Zoom, Meet or FaceTime call on macOS 14.2 or later. The
+call plays as normal. Open **Record a call** from Studio's **New** menu or the
+command palette (**Talk: Record a call**).
+
+- **The first time**, a notice explains that recording laws differ and that
+  others on the call may need to agree. It offers a note you can copy into the
+  call's chat. Talk doesn't enforce consent.
+- **The picker** lists apps playing audio first, plus **All system audio**,
+  and a toggle for your microphone. The app's sound is "Them" and your mic is
+  "Me". Talk remembers your last choice. The first capture shows macOS's own
+  prompt to let BB record other apps' audio.
+- **While it records**, a red **Recording call: <App> · mm:ss** bar with
+  **Stop** stays on top of every BB screen, with each side's level and the
+  model's download progress. The recording's page fills in as Me / Them turns
+  a few seconds after each person speaks.
+- **Echo:** without headphones, the mic hears the others. The helper cancels
+  most of it, and Talk hides any "Me" piece that repeats an overlapping "Them"
+  piece.
+- **When it ends** (Stop, or the app quits), Talk titles the call, summarizes
+  it, makes its notes page and cleans the transcript turn by turn. The
+  transcript keeps its "Me:" and "Them:" labels, so the notes say who said
+  what.
+- **Storage:** call audio stays in Talk's local store for **Keep call audio**
+  (30 days by default). The transcript and notes stay until you delete the
+  recording, which removes both. With local transcription the audio never
+  leaves the Mac. With the home server or BB's voice service, each piece is
+  sent there.
+
+Capture runs in `bin/bb-talk-tap`, a native helper Studio's server starts.
+It is built from `native/talk-tap` and uses a Core Audio
+process tap plus the voice-processing mic. Studio refuses to run it unless it
+matches `bin/bb-talk-tap.sha256`. If local transcription can't load its model,
+the pieces go to BB's voice service instead.
+
+![Live BB screenshot of a call being recorded: the red Recording call bar for zoom.us over the recording, with Me and Them turns](assets/recordings-call.png)
+
+A staged BB plays a short made-up product call through the stub helper
+(`src/talk/test/stub-tap.mjs`) in fake mode, with no tap, mic or prompt. The
+capture reads the notice, picks zoom.us in the picker, and starts recording.
+It then checks the five Me / Them turns, the hidden echo, and that the bar
+stays on the settings page.
+
+![Live BB screenshot of the Record a call picker with Google Chrome and zoom.us playing, FaceTime, All system audio and the microphone toggle](assets/recordings-call-picker.png)
+
+Recapture both with `BB_CAPTURE_ONLY=talk-call`. `scripts/staged-bb.mjs`
+gives every staged BB that stub as its helper.
 
 ### Dictation fields for other plugins
 

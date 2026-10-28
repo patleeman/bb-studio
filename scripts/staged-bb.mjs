@@ -23,6 +23,7 @@
  * saves to ~/.bb/pi-bridge-sessions, so don't use Pi in fixtures.
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import { chmod, cp, mkdir, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -190,11 +191,12 @@ async function start() {
   process.stdout.write(`Installing bb-app ${version} in ${stagedDir}\n`);
   await run("npm", ["install", "--prefix", join(stagedDir, "bb-app"), `bb-app@${version}`, "--no-audit", "--no-fund"]);
 
+  const talkTap = await useStubTalkTap();
   const log = await open(join(stagedDir, "launcher.log"), "a");
   const launcher = spawn(
     join(binDir, "bb-app"),
     ["--bundled", "--data-dir", dataDir, "--server-port", String(port), "--host-daemon-port", String(port + 1)],
-    { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0" }) },
+    { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0", ...talkTap }) },
   );
   await new Promise((resolve, reject) => {
     launcher.once("spawn", resolve);
@@ -295,6 +297,23 @@ async function seed({ plugins, capturePlugin, ref, version }) {
     ].join("\n"),
   );
   process.stdout.write(`\nSeeded project Orbit (${project.id}). Point captures at it with:\n  . "${envFile}"\n`);
+}
+
+// Talk's call capture runs the stub helper in fake mode: it plays a short
+// made-up call, so a staged BB never taps this Mac's audio or mic, and never
+// shows a permission prompt. Studio checks it against its checksum like the
+// real helper.
+async function useStubTalkTap() {
+  const dir = join(stagedDir, "talk-tap");
+  const helper = join(dir, "bb-talk-tap");
+  await mkdir(join(dir, "fake"), { recursive: true });
+  await cp(join(repoRoot, "packages/bb-studio/src/talk/test/stub-tap.mjs"), helper);
+  await chmod(helper, 0o755);
+  const hash = createHash("sha256").update(await readFile(helper)).digest("hex");
+  await writeFile(`${helper}.sha256`, `${hash}  bb-talk-tap\n`);
+  await writeFile(join(dir, "fake", "them.wav"), "");
+  await writeFile(join(dir, "fake", "me.wav"), "");
+  return { BB_STUDIO_TALK_TAP: helper, BB_STUDIO_TALK_TAP_FAKE: join(dir, "fake") };
 }
 
 // Agents save every session to their home folder, and those folders are
