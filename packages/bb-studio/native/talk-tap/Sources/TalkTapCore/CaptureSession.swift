@@ -45,6 +45,7 @@ public final class CaptureSession: @unchecked Sendable {
     public var stopWhenInputsEnd = false
 
     public func start() throws {
+        CaptureClock.reset()
         try FileManager.default.createDirectory(atPath: args.segmentDir, withIntermediateDirectories: true)
         if let scheduler, let modelLoader {
             let sink = self.sink

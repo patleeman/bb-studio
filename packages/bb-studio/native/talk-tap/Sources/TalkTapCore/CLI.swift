@@ -94,7 +94,7 @@ public enum CLI {
                 if args.mic { list.append(try FakeFileInput(source: .me, path: fake.me, speed: options.fakeSpeed)) }
                 inputs = list
             } else {
-                inputs = try LiveInputs.make(args)
+                inputs = try LiveInputs.make(args, sink: sink)
             }
         } catch let error as CaptureError {
             sink.emit(.error(code: error.code, message: error.message))

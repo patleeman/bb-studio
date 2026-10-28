@@ -77,6 +77,45 @@ Details:
   can't load, an `error` with code `model` is sent and no finals follow.
   Studio can transcribe the segment files itself.
 
+## Live capture
+
+This path is built and unit-tested, but it has never run on the development
+Mac. The first real tap shows a macOS prompt, so Patrick runs it when he
+first uses the feature.
+
+- **Them (process tap):**
+  - `CATapDescription` is a stereo mixdown of the target's processes: the app
+    itself, helpers whose bundle ID starts with the app's
+    (`com.google.Chrome.helper`), and processes the app is responsible for
+    (Safari's WebKit processes).
+  - `{"all": true}` is a global tap, excluding the helper itself.
+  - The tap is private and passes audio through (`.unmuted`), so the call
+    plays as normal.
+  - It feeds a private aggregate device clocked by the default output
+    device. The device is rebuilt if the output device changes, for example
+    when headphones are plugged in.
+  - If the app has no audio process yet, the tap is created once it opens
+    one. Helper processes that appear later are added to the tap.
+  - The audio is mixed to mono and resampled to 16 kHz with
+    `AVAudioConverter`.
+  - `appGone` is sent once for each target app that quits. Checks run every
+    second.
+- **Me (mic):**
+  - Captured through `AVAudioEngine` with voice processing turned on for the
+    input node. This adds echo cancellation and noise suppression.
+  - Ducking of other audio is set to the minimum, so the call isn't turned
+    down.
+  - Channel 0 (the processed voice) is used.
+- **Permissions:**
+  - BB is the responsible app, so macOS asks on BB's behalf (see the spike in
+    `docs/talk/call-capture-spike.md` on main).
+  - Before tapping, the helper reads the "System Audio Recording Only" status
+    without prompting. If it's denied, it sends `error` code `permission`.
+    If it hasn't been asked yet, creating the tap shows the prompt.
+  - The mic works the same way, using `AVCaptureDevice`'s status.
+- **Timing:** the first buffer of each source carries its host time. That
+  places it on the capture clock. From then on, time is counted in samples.
+
 ## Fake mode (tests)
 
 ```sh
