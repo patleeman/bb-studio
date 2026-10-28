@@ -143,7 +143,7 @@ public enum Event: Equatable, Sendable {
         case let .started(sources):
             return ["event": "started", "sources": sources.map(\.rawValue)]
         case let .level(source, rms):
-            return ["event": "level", "source": source.rawValue, "rms": (min(max(rms, 0), 1) * 10000).rounded() / 10000]
+            return ["event": "level", "source": source.rawValue, "rms": rounded(rms, places: 4)]
         case let .segment(source, index, path, startMs, endMs):
             return ["event": "segment", "source": source.rawValue, "index": index, "path": path, "startMs": startMs, "endMs": endMs]
         case let .partial(source, index, text):
@@ -151,7 +151,7 @@ public enum Event: Equatable, Sendable {
         case let .final(source, index, text, startMs, endMs):
             return ["event": "final", "source": source.rawValue, "index": index, "text": text, "startMs": startMs, "endMs": endMs]
         case let .model(progress, stage):
-            return ["event": "model", "progress": (min(max(progress, 0), 1) * 1000).rounded() / 1000, "stage": stage]
+            return ["event": "model", "progress": rounded(progress, places: 3), "stage": stage]
         case let .appGone(bundleId):
             return ["event": "appGone", "bundleId": bundleId]
         case let .error(code, message):
@@ -162,6 +162,11 @@ public enum Event: Equatable, Sendable {
     }
 
     public var line: String { jsonLine(json) }
+}
+
+/// A 0...1 value with a short decimal form in JSON (0.1189, not 0.11890000000000001).
+func rounded(_ value: Double, places: Int) -> NSDecimalNumber {
+    NSDecimalNumber(string: String(format: "%.\(places)f", min(max(value, 0), 1)), locale: Locale(identifier: "en_US_POSIX"))
 }
 
 public func jsonLine(_ object: [String: Any]) -> String {

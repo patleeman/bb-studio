@@ -9,7 +9,7 @@ final class SlowTranscriber: Transcriber, @unchecked Sendable {
     init(delayMs: UInt64) { self.delayMs = delayMs }
     var calls: [Int] { lock.lock(); defer { lock.unlock() }; return seen }
     func transcribe(_ samples: [Float]) async throws -> String {
-        lock.lock(); seen.append(samples.count); lock.unlock()
+        lock.withLock { seen.append(samples.count) }
         try await Task.sleep(nanoseconds: delayMs * 1_000_000)
         return "n=\(samples.count)"
     }
@@ -82,6 +82,28 @@ final class SchedulerTests: XCTestCase {
         scheduler.offerPartial(job(.them, 1, count: 9, final: false))
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(sink.events.last, .partial(source: .them, index: 1, text: "n=9"))
+    }
+
+    func testDrainWaitsForALoadingModelButNotADownload() async throws {
+        let sink = MemorySink()
+        let scheduler = TranscriptionScheduler(sink: sink)
+        scheduler.enqueueFinal(job(.them, 0, count: 100))
+        await scheduler.drain() // still downloading: returns at once, nothing transcribed
+        XCTAssertTrue(sink.events.isEmpty)
+
+        scheduler.markLoading()
+        let drained = Task { await scheduler.drain() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        scheduler.setTranscriber(SlowTranscriber(delayMs: 1))
+        await drained.value
+        XCTAssertEqual(sink.events, [.final(source: .them, index: 0, text: "n=100", startMs: 0, endMs: 1000)])
+
+        // Loading with nothing queued: drain returns once the model is ready.
+        let idle = TranscriptionScheduler(sink: sink)
+        idle.markLoading()
+        let waiting = Task { await idle.drain() }
+        idle.setTranscriber(SlowTranscriber(delayMs: 1))
+        await waiting.value
     }
 
     func testUnavailableDropsWorkAndDrainReturns() async {

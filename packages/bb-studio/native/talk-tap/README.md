@@ -116,6 +116,45 @@ first uses the feature.
 - **Timing:** the first buffer of each source carries its host time. That
   places it on the capture clock. From then on, time is counted in samples.
 
+## Local transcription (WhisperKit)
+
+With `"stt": {"kind": "whisperkit", …}`, the helper transcribes segments
+itself with [WhisperKit](https://github.com/argmaxinc/WhisperKit) 1.1.1,
+which runs Core ML models on the Neural Engine.
+
+- **Model download:** on first use, the model is downloaded from
+  `argmaxinc/whisperkit-coreml` into `modelDir`, with `model` events
+  (`stage` `download`). The tokenizer goes beside it. A finished download is
+  marked with a `.bb-talk-tap-complete` file, so later runs need no network.
+- **Loading:** the first load compiles the model for this Mac's Neural
+  Engine. That took 45 s here; later loads take about 1 s. Segments keep
+  coming during the download and load, and their finals follow once the
+  model is ready (`model` with `stage` `ready`).
+- **On stop:** if the model is still downloading, the helper doesn't wait
+  for it, so those segments get no finals. If the model is on disk and
+  loading, the helper waits for it.
+- **Order:** one transcription runs at a time. Finals go in the order the
+  segments closed. A partial is the open segment's text so far, offered
+  every 1.5 s of new audio, and only while no final is waiting. A slow Mac
+  skips partials rather than falling behind.
+- **Language:** detected per segment. An optional `"language": "en"` in
+  `stt` fixes it.
+
+**Recommended model: `openai_whisper-large-v3-v20240930_626MB`.**
+
+- It is OpenAI's Whisper large-v3 turbo (the 2024-09-30 release), with
+  near-large-v3 accuracy and a 4-layer decoder, so it is fast.
+- Argmax compressed it to 626 MB with little accuracy loss. It is
+  WhisperKit's default for M1-class Macs and is supported on all Apple
+  Silicon Macs.
+- Argmax's `…_turbo` variants are a different thing: their streaming
+  encoder, at 1.6 GB.
+- On an M5 Max it transcribed an 8 s segment in 1.0 s and a 15 s segment
+  in 1.3 s (8–11× real time), with both sources sharing one model.
+- I haven't measured an M1. Published figures put the M1 at several times
+  real time, which is still enough for two sources.
+- On a Mac too slow for it, `openai_whisper-small.en` is the fallback.
+
 ## Fake mode (tests)
 
 ```sh
@@ -157,3 +196,13 @@ swift test
   JSON protocol and the transcription queue.
 - Integration tests run the built helper in fake mode, as Studio's server
   does, and check the events and the segment files.
+- WhisperKit tests are skipped unless `TALK_TAP_WHISPER_MODEL_DIR` is set,
+  because they download the 626 MB model. They are too big for CI.
+  - One renders speech with macOS `say` into files (nothing plays), runs a
+    fake capture, and checks the final transcripts for both sources.
+  - The other times 8 s and 15 s segments.
+  - `TALK_TAP_WHISPER_MODEL` picks another model.
+
+  ```sh
+  TALK_TAP_WHISPER_MODEL_DIR=/tmp/talk-tap-models swift test --filter WhisperKitTests
+  ```

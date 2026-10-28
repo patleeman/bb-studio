@@ -40,6 +40,8 @@ final class ProtocolTests: XCTestCase {
     func testEventLines() {
         XCTAssertEqual(Event.started(sources: [.them, .me]).line, #"{"event":"started","sources":["them","me"]}"#)
         XCTAssertEqual(Event.level(source: .me, rms: 0.123456).line, #"{"event":"level","rms":0.1235,"source":"me"}"#)
+        XCTAssertEqual(Event.level(source: .me, rms: 0.1189).line, #"{"event":"level","rms":0.1189,"source":"me"}"#)
+        XCTAssertEqual(Event.level(source: .me, rms: 0).line, #"{"event":"level","rms":0,"source":"me"}"#)
         XCTAssertEqual(Event.level(source: .me, rms: 3).line, #"{"event":"level","rms":1,"source":"me"}"#)
         XCTAssertEqual(
             Event.segment(source: .them, index: 3, path: "/a/them-00003.wav", startMs: 100, endMs: 8200).line,

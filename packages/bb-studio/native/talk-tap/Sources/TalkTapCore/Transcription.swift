@@ -30,6 +30,8 @@ public final class TranscriptionScheduler: @unchecked Sendable {
     private var partials: [Source: TranscriptionJob] = [:]
     private var finalIndex: [Source: Int] = [:]
     private var running = false
+    /// The model is on disk and loading: stop waits for it rather than dropping finals.
+    private var loading = false
     private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
     public init(sink: EventSink) {
@@ -45,13 +47,23 @@ public final class TranscriptionScheduler: @unchecked Sendable {
     public var isReady: Bool { locked { transcriber != nil } }
 
     public func setTranscriber(_ transcriber: Transcriber) {
-        locked { self.transcriber = transcriber }
+        locked {
+            self.transcriber = transcriber
+            loading = false
+        }
         kick()
+        resumeIfIdle()
+    }
+
+    /// The model is downloaded and loading (seconds, or a minute or more on its first compile).
+    public func markLoading() {
+        locked { loading = true }
     }
 
     public func markUnavailable() {
         let waiters: [CheckedContinuation<Void, Never>] = locked {
             unavailable = true
+            loading = false
             finals.removeAll()
             partials.removeAll()
             return running ? [] : takeWaiters()
@@ -84,17 +96,25 @@ public final class TranscriptionScheduler: @unchecked Sendable {
     }
 
     /// Waits until every queued final has been transcribed. Partials are discarded.
-    /// Returns at once when no transcriber is loaded yet (the model is still downloading).
+    /// Returns at once while the model is still downloading (that can take minutes).
     public func drain() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let done: Bool = locked {
                 partials.removeAll()
-                if transcriber == nil || unavailable || (finals.isEmpty && !running) { return true }
+                if unavailable || (transcriber == nil && !loading) || (finals.isEmpty && !running) { return true }
                 idleWaiters.append(continuation)
                 return false
             }
             if done { continuation.resume() }
         }
+    }
+
+    private func resumeIfIdle() {
+        let waiters: [CheckedContinuation<Void, Never>] = locked {
+            guard finals.isEmpty, !running else { return [] }
+            return takeWaiters()
+        }
+        waiters.forEach { $0.resume() }
     }
 
     private func kick() {
