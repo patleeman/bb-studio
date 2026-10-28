@@ -28,7 +28,7 @@ const passthrough = ({ children }: { children?: React.ReactNode }) => React.crea
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useSdk: () => sdk, useRpc: () => rpc, useRealtime: (channel: string, callback: () => void) => { state.realtime[channel] = callback; }, useBbContext: () => ({ projectId: null }) }));
 vi.mock("../kit/contract", () => ({ STUDIO_REALTIME_CHANNEL: "x" }));
 vi.mock("../kit/app/index", () => ({
-  createStudioItem: vi.fn(), DropdownMenu: passthrough, DropdownMenuContent: passthrough, DropdownMenuItem: passthrough,
+  DropdownMenu: passthrough, DropdownMenuContent: passthrough, DropdownMenuItem: ({ children }: { children?: React.ReactNode }) => React.createElement("div", { "data-testid": "menu-item" }, children), DropdownMenuSeparator: () => null,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children, Icon: () => null, TagDot: () => null,
   openAppPath: state.openAppPath, usePathname: () => state.pathname, useProjects: () => [],
 }));
@@ -36,6 +36,7 @@ vi.mock("./StudioPanel", () => ({ showLibrary: state.showLibrary, useLibraryQuer
 vi.mock("./Workspace", () => ({ useWorkspace: () => ({ focused: "p1", layout: { kind: "pane", id: "p1", tabs: [], active: "/plugins/studio/studio/browse" } }) }));
 
 const { StudioThreadList } = await import("./StudioSidebar");
+const { createEntries } = await import("./create-menu");
 const props = { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => {}, searchQuery: "" };
 
 let root: Root, container: HTMLDivElement;
@@ -73,6 +74,17 @@ test("on the Studio page it lists kinds, views, tags and recent items, with the 
   expect(state.setPref).not.toHaveBeenCalled();
 });
 
+test("New offers the shared create list, Record a call and templates included", async () => {
+  const withTalk = { ...overview, providers: [...overview.providers, { pluginId: "talk", name: "Talk", state: "ready", detail: null, panel: null, kinds: [{ ...kind("recording", "Recordings"), label: "Recording", create: { mode: "event", event: "talk:new" } }] }] };
+  const templates = [{ pluginId: "studio", id: "pg_t", title: "Weekly" }];
+  rpc.call.mockImplementation((async (method: string) => method === "overview" ? withTalk : method === "templates" ? { items: templates } : { tabs: [] }) as never);
+  await show();
+  await act(async () => {});
+  const menu = [...container.querySelectorAll('[data-testid="menu-item"]')].map((each) => each.textContent?.trim());
+  expect(menu).toEqual(createEntries(withTalk.providers as never, { templates }).map((entry) => entry.label));
+  expect(menu).toEqual(["page", "drawing", "Recording", "Record a call", "From template: Weekly"]);
+});
+
 test("off the Studio page it switches to the Bots list and shows a placeholder", async () => {
   state.pathname = "/threads/thr_1";
   await show();
@@ -89,7 +101,8 @@ test("a slower sidebar refresh cannot replace a newer result", async () => {
   const newTabs = deferred<{ tabs: [] }>();
   const responses = [oldOverview, oldTabs, newOverview, newTabs];
   let call = 0;
-  rpc.call.mockImplementation(() => responses[call++]!.promise as never);
+  // New's templates load on their own; only the refreshes race.
+  rpc.call.mockImplementation((method: string) => (method === "templates" ? Promise.resolve({ items: [] }) : responses[call++]!.promise) as never);
   const refresh = Object.values(state.realtime)[0]!;
 
   act(() => refresh());

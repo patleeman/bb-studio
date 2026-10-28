@@ -4,10 +4,10 @@
 // pinned items and recent ones (studio-sidebar-model.ts). A kind, view or tag
 // filters the library on the new tab page; an item opens as a Studio tab.
 import {
-  createStudioItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icon,
   openAppPath,
@@ -18,7 +18,7 @@ import {
 } from "../kit/app/index";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { useBbContext, useRealtime, useRpc, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ProviderView, rpcContract, SavedViewView, TabView, TagView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { canonicalPath } from "../builtins";
@@ -28,9 +28,11 @@ import { useWorkspace } from "./Workspace";
 import { BROWSE, panes } from "./workspace-state";
 import { isStudioPath, syncThreadList } from "./bot/threadListSwitch";
 import { studioSidebarModel, type SidebarItem } from "./studio-sidebar-model";
+import { runCreateEntry, startsGroup, useCreateEntries } from "./create-menu";
 
 type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] };
 const CLOSED_KEY = "studio.sidebar.closed";
+const NO_PROVIDERS: readonly ProviderView[] = [];
 const ROW = "flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 const ACTIVE = "bg-state-active text-foreground";
 
@@ -118,8 +120,7 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
   const filterSelected = (each: string) => onLibrary && query.trim() === each;
   const filter = (each: string) => { showLibrary(each); openAppPath("/plugins/studio/studio"); onNavigate(); };
   const open = (item: SidebarItem) => { openAppPath(item.href); onNavigate(); };
-  const creatable = (data?.overview.providers ?? []).filter((provider) => provider.state === "ready")
-    .flatMap((provider) => provider.kinds.filter((kind) => kind.create && model?.kinds.some((each) => each.pluginId === provider.pluginId && each.id === kind.id)).map((kind) => ({ provider, kind })));
+  const creatable = useCreateEntries(rpc, data?.overview.providers ?? NO_PROVIDERS, data?.overview.items);
   const projectId = context.projectId ?? projects[0]?.id ?? null;
 
   const itemRow = (item: SidebarItem) => {
@@ -143,15 +144,12 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
               className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground disabled:opacity-40"><Icon name="Plus" className="size-3.5" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            {creatable.map(({ provider, kind }) => (
-              <DropdownMenuItem key={`${provider.pluginId}:${kind.id}`} onSelect={() => void createStudioItem(kind, {
-                projectId,
-                addOn: provider.name,
-                create: async () => (await rpc.call("create", { pluginId: provider.pluginId, kind: kind.id, projectId })).item.href,
-              })}>
-                <Icon name={kind.icon} className="size-4" /> {kind.label}
+            {creatable.map((entry, index) => <Fragment key={entry.key}>
+              {startsGroup(creatable, index) ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem onSelect={() => void runCreateEntry(entry, { rpc, projectId })}>
+                <Icon name={entry.icon} className="size-4" /> {entry.label}
               </DropdownMenuItem>
-            ))}
+            </Fragment>)}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

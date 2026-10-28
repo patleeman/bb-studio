@@ -3,7 +3,7 @@ import { ContentSearchStatus } from "./content-search-status";
 // The Studio collection: one searchable, filterable list of items of any
 // kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on that
 // keeps its own page renders it alone for its own kind.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { StudioAction } from "../contract";
 import { errorMessage, plural, relativeTime, untitled } from "../format";
@@ -66,9 +66,10 @@ import { STUDIO_ITEM_CLICKS_OFF, studioItemProps } from "./studio-item";
 export type { CollectionTag } from "./tags";
 export { groupItems, itemKey, type ActionResults, type CollectionItem, type CollectionKind, type GroupBy, type Sort } from "./selection";
 
+export interface CreateMenuItem { id: string; label: string; icon: string; separated?: boolean; onSelect(projectId: string | null): void }
+
 export interface CollectionHandlers {
   onOpen(item: CollectionItem): void;
-  onCreate(kind: CollectionKind, projectId: string | null): Promise<void> | void;
   onNewThread(items: CollectionItem[]): void;
   onMove(items: CollectionItem[], projectId: string | null): Promise<ActionResults>;
   onArchive(items: CollectionItem[], archived: boolean): Promise<ActionResults>;
@@ -167,7 +168,7 @@ export function CollectionPage({
   isSelectable,
   notice,
   headerActions,
-  extraCreateItems,
+  createItems,
   handlers,
   filter,
   defaultGroupBy = "none",
@@ -193,7 +194,8 @@ export function CollectionPage({
   notice?: ReactNode;
   /** Extra buttons beside New, e.g. a settings menu. */
   headerActions?: ReactNode;
-  extraCreateItems?: readonly { id: string; label: string; icon: string; onSelect(projectId: string | null): void }[];
+  /** New's menu, in order; `separated` draws a line above an entry. */
+  createItems?: readonly CreateMenuItem[];
   handlers: CollectionHandlers;
   filter?: CollectionFilter;
   /** The grouping until the user picks one. */
@@ -381,10 +383,9 @@ export function CollectionPage({
 
   // New items land in the filtered project, else the one BB has open.
   const newProject = filter || project === ALL ? defaultProjectId : project === GLOBAL ? null : project;
-  // Kind filters narrow the list, while New always offers every available kind.
-  const createTargets = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
+  // Kind filters narrow the list, while New always offers everything it can make.
   const newButton = (className = PRIMARY_BUTTON) =>
-    createTargets.length === 0 && !extraCreateItems?.length ? null : (
+    !createItems?.length ? null : (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className={className}>
@@ -392,15 +393,12 @@ export function CollectionPage({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          {createTargets.map((kind) => (
-            <DropdownMenuItem key={`${kind.pluginId}:${kind.id}`} onSelect={() => void handlers.onCreate(kind, newProject)}>
-              <Icon name={kind.icon} className="size-4" /> {kind.label}
+          {createItems.map((item) => <Fragment key={item.id}>
+            {item.separated ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem onSelect={() => item.onSelect(newProject)}>
+              <Icon name={item.icon} className="size-4" /> {item.label}
             </DropdownMenuItem>
-          ))}
-          {extraCreateItems?.length && createTargets.length ? <DropdownMenuSeparator /> : null}
-          {extraCreateItems?.map((item) => <DropdownMenuItem key={item.id} onSelect={() => item.onSelect(newProject)}>
-            <Icon name={item.icon} className="size-4" /> {item.label}
-          </DropdownMenuItem>)}
+          </Fragment>)}
         </DropdownMenuContent>
       </DropdownMenu>
     );

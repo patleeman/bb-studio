@@ -7,10 +7,9 @@ import { ContentSearchStatus } from "../kit/app/content-search-status";
 // on a kind, so /plugins/studio/studio/recording opens it on recordings.
 import { showBrowse } from "./Workspace";
 import { UnsentNotice } from "../talk/ui/unsent-notice";
-import { openCallPicker } from "../talk/ui/call-view";
+import { runCreateEntry, startsGroup, useCreateEntries } from "./create-menu";
 import {
   CollectionPage,
-  createStudioItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,6 +28,7 @@ import {
   type CollectionItem,
   type CollectionKind,
   type CollectionTag,
+  type CreateMenuItem,
 } from "../kit/app/index";
 import { mentionPrompt } from "../kit/contract";
 import { errorMessage, untitled } from "../kit/format";
@@ -175,11 +175,8 @@ export function StudioPanel() {
   const projects = useProjects();
   const { data, error, refetch, setData } = useOverview(rpc);
   const { sidebar, setVisible } = useSidebar(rpc);
-  const [templates, setTemplates] = useState<{ pluginId: string; id: string; title: string }[]>([]);
-  useEffect(() => {
-    rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
-  }, [rpc, data?.items]);
   const providers = useMemo(() => data?.providers ?? [], [data]);
+  const createEntries = useCreateEntries(rpc, providers, data?.items);
   const kinds = useMemo<CollectionKind[]>(
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
@@ -215,16 +212,10 @@ export function StudioPanel() {
   };
   const onlyKind = only("kind");
   const onlyProject = only("project");
-  const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(
     () => ({
       onOpen: (item) => openAppPath(item.href),
-      onCreate: (target, projectId) => createStudioItem(target, {
-        projectId,
-        addOn: nameOf(target.pluginId),
-        create: async () => (await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId })).item.href,
-      }),
       onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
       onDuplicate: async (item) => {
         try {
@@ -313,19 +304,15 @@ export function StudioPanel() {
         refetch();
       },
     }),
-    [nameOf, navigate, refetch, rpc, setData],
+    [navigate, refetch, rpc, setData],
   );
 
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
   const unavailable = providers.filter((provider) => provider.state !== "ready");
-  const extraCreateItems = [
-    { id: "talk:call", label: "Record a call", icon: "studio/call", onSelect: () => openCallPicker() },
-    ...templates.map((item) => ({ id: `template:${item.pluginId}:${item.id}`, label: `From template: ${item.title || "Untitled"}`, icon: "Copy", onSelect: (projectId: string | null) => {
-      const name = window.prompt("Name for this template (optional)", "");
-      if (name === null) return;
-      void rpc.call("instantiateTemplate", { pluginId: item.pluginId, id: item.id, projectId, variables: { name } }).then(({ item: created }) => { refetch(); openAppPath(created.href); }, (cause: unknown) => toast.error(`Couldn't use template: ${errorMessage(cause)}`));
-    } })),
-  ];
+  const createItems = createEntries.map((entry, index): CreateMenuItem => ({
+    id: entry.key, label: entry.label, icon: entry.icon, separated: startsGroup(createEntries, index),
+    onSelect: (projectId) => void runCreateEntry(entry, { rpc, projectId, onCreated: refetch }),
+  }));
 
   const notice = (
     <>
@@ -435,7 +422,7 @@ export function StudioPanel() {
         storageKey="studio:collection"
         defaultGroupBy="thread"
         tags={data?.tags ?? []}
-        extraCreateItems={extraCreateItems}
+        createItems={createItems}
         kind={onlyKind?.id ?? "all"}
         onKindChange={setKind}
         notice={notice}

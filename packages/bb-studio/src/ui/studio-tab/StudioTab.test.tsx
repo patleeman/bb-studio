@@ -55,6 +55,7 @@ vi.mock("../../artifacts/ui/artifact-viewer", () => view("ArtifactViewer", "arti
 vi.mock("../../artifacts/ui/save-picker", () => ({ SavePicker: ({ params }: { params: unknown }) => <p data-view="SavePicker">{JSON.stringify(params)}</p> }));
 
 const { StudioTab } = await import("./StudioTab");
+const { createEntries } = await import("../create-menu");
 
 let root: Root;
 let container: HTMLDivElement;
@@ -160,6 +161,27 @@ it("shows thread-link read failures and retries loading instead of showing an em
   expect(container.textContent).toContain("Plan");
 });
 
+it("New offers the shared create list, Record a call and templates included", async () => {
+  const original = rpcCall.getMockImplementation()!;
+  const providers = [
+    { pluginId: "pages", name: "Pages", state: "ready", kinds: [{ id: "page", label: "Page", plural: "Pages", icon: "studio/pages", create: { mode: "rpc" } }] },
+    { pluginId: "talk", name: "Talk", state: "ready", kinds: [{ id: "recording", label: "Recording", plural: "Recordings", icon: "talk/talk", create: { mode: "event", event: "talk:new" } }] },
+  ];
+  const templates = [{ pluginId: "pages", id: "pg_t", title: "Weekly" }];
+  rpcCall.mockImplementation(async (method, input) => {
+    if (method === "overview") return { ...(await original(method, input) as object), providers };
+    if (method === "templates") return { items: templates };
+    return original(method, input);
+  });
+  try {
+    await render(<StudioTab threadId="thr_1" params={{}} />);
+    await act(async () => (container.querySelector("button[aria-haspopup=menu]") as HTMLButtonElement).click());
+    const menu = [...container.querySelectorAll("[role=menuitem]")].map((each) => each.textContent);
+    expect(menu).toEqual(createEntries(providers as never, { templates }).map((entry) => entry.label));
+    expect(menu).toEqual(["Page", "Recording", "Record a call", "From template: Weekly"]);
+  } finally { rpcCall.mockImplementation(original); }
+});
+
 it("opens a created item and retries only its failed association", async () => {
   const original = rpcCall.getMockImplementation()!;
   let links = 0;
@@ -167,7 +189,7 @@ it("opens a created item and retries only its failed association", async () => {
   rpcCall.mockImplementation(async (method, input) => {
     if (method === "overview") {
       const result = await original(method, input) as { providers: unknown[] };
-      return { ...result, providers: [...result.providers, { pluginId: "pages", name: "Pages", state: "ready", kinds: [{ id: "page", create: { mode: "rpc" } }] }] };
+      return { ...result, providers: [...result.providers, { pluginId: "pages", name: "Pages", state: "ready", kinds: [{ id: "page", label: "Page", plural: "Pages", icon: "studio/pages", create: { mode: "rpc" } }] }] };
     }
     if (method === "create") return { item: { id: "pg_created" } };
     if (method === "linkItemThread" && ++links === 1) throw new Error("link unavailable");

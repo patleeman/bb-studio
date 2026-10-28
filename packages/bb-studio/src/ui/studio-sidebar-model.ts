@@ -17,7 +17,7 @@ export interface StudioSidebarModel {
 }
 
 /** The built-in kinds first, in this order; others follow as their add-ons list them. */
-const KIND_ORDER = ["page", "drawing", "recording", "artifact", "design"];
+export const KIND_ORDER = ["page", "drawing", "recording", "artifact", "design"];
 export const RECENT_LIMIT = 15;
 
 const kindQuery = (id: string) => formatQuery({ filters: [{ field: "kind", value: id }], text: "" });

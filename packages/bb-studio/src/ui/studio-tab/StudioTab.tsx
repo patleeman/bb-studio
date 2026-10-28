@@ -21,6 +21,7 @@ import { REALTIME_CHANNEL as DRAW_CHANNEL } from "../../draw/shared";
 import { REALTIME_CHANNEL as PAGES_CHANNEL } from "../../pages/constants";
 import { RECORDING_CHANGED } from "../../talk/shared/format";
 import { appliedKinds } from "../kinds-snapshot";
+import { runCreateEntry, startsGroup, useCreateEntries, type CreateEntry } from "../create-menu";
 import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, type CollectionKind, type TabKind, type TabKindInfo, type TabTarget } from "./model";
 
 const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => ({ default: module.PageTab })));
@@ -173,7 +174,7 @@ function Collection({
   const projectId = thread?.projectId ?? null;
   const kinds = useMemo(() => collectionKinds(enabled, providers), [enabled, providers]);
   const sections = useMemo(() => tabSections(items ?? [], { kinds, filter, query, linked, projectId }), [items, kinds, filter, query, linked, projectId]);
-  const creatable = kinds.flatMap((each) => (each.creatable && each.tab ? [each.tab] : []));
+  const creatable = useCreateEntries(rpc, providers, refreshKey);
   const open = (item: Item) => {
     const opening = itemOpening(item, kinds);
     if (opening?.open === "tab") onOpen(opening.kind, opening.id);
@@ -193,19 +194,25 @@ function Collection({
     }
   };
 
-  const create = async (info: TabKindInfo) => {
-    setMenu(false);
+  // Made for this thread: linked to it, then opened in place, or on its page for a kind the tab can't show.
+  const createKind = async (entry: Extract<CreateEntry, { type: "kind" }>) => {
     setCreating(true);
     try {
-      const { item } = await rpc.call("create", { pluginId: info.pluginId, kind: info.kind, projectId });
+      const { item } = await rpc.call("create", { pluginId: entry.pluginId, kind: entry.kind.id, projectId });
       const now = Date.now();
-      await linkCreated({ thread: { threadId, ref: { pluginId: info.pluginId, id: item.id }, role: "created", state: thread?.status ?? "idle", createdAt: now, updatedAt: now, metadata: {} } });
-      onOpen(info.kind, item.id);
+      await linkCreated({ thread: { threadId, ref: { pluginId: entry.pluginId, id: item.id }, role: "created", state: thread?.status ?? "idle", createdAt: now, updatedAt: now, metadata: {} } });
+      const opening = itemOpening({ pluginId: entry.pluginId, kind: entry.kind.id, id: item.id, href: item.href }, kinds);
+      if (opening?.open === "tab") onOpen(opening.kind, opening.id);
+      else openAppPath(item.href);
     } catch (cause) {
-      toast.error(`Couldn't create a ${info.label.toLowerCase()}: ${errorMessage(cause)}`);
+      toast.error(`Couldn't create a ${entry.label.toLowerCase()}: ${errorMessage(cause)}`);
     } finally {
       setCreating(false);
     }
+  };
+  const create = (entry: CreateEntry) => {
+    setMenu(false);
+    void runCreateEntry(entry, { rpc, projectId, createKind });
   };
 
   const shown = filter ? (kinds.find((each) => each.key === filter) ?? null) : null;
@@ -235,11 +242,11 @@ function Collection({
             </button>
             {menu ? (
               <ul role="menu" className="absolute top-full right-0 z-10 mt-1 min-w-40 rounded-md border border-border bg-background p-1 shadow-md">
-                {creatable.map((each) => (
-                  <li key={each.kind}>
-                    <button type="button" role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void create(each)}>
-                      <Icon name={each.icon} fallback="GridView" className="size-4 text-muted-foreground" />
-                      {each.label}
+                {creatable.map((entry, index) => (
+                  <li key={entry.key} className={startsGroup(creatable, index) ? "mt-1 border-t border-border pt-1" : undefined}>
+                    <button type="button" role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => create(entry)}>
+                      <Icon name={entry.icon} fallback="GridView" className="size-4 text-muted-foreground" />
+                      {entry.label}
                     </button>
                   </li>
                 ))}

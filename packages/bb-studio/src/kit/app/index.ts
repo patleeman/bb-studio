@@ -10,6 +10,7 @@ export {
   type CollectionItem,
   type CollectionKind,
   type CollectionTag,
+  type CreateMenuItem,
 } from "./collection";
 export type { ProviderCall } from "./provider-call";
 export { BarCrumb, BarSeparator, BarTitle, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, openNewItemThread, useInTabRow, type ItemThread } from "./item-header";
