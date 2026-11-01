@@ -113,15 +113,17 @@ export function focusDiscussed(botThreadId: string | null): void {
   if (botThreadId) threadComposer(botThreadId)?.focus();
 }
 
-/** A row's drag: the loop's reference as plain text, which BB's composer inserts where it's dropped. */
+/** A row's drag: the loop's reference as plain text, which BB's composer inserts where it's dropped. The row is marked `data-dragging` meanwhile. */
 export function loopDragProps(loop: Pick<Loop, "id" | "title">) {
   return {
     draggable: true,
-    onDragStart: (event: { dataTransfer: DataTransfer | null }) => {
+    onDragStart: (event: { currentTarget: HTMLElement; dataTransfer: DataTransfer | null }) => {
       if (!event.dataTransfer) return;
       event.dataTransfer.setData("text/plain", loopReference(loop));
       event.dataTransfer.effectAllowed = "copy";
+      event.currentTarget.dataset.dragging = "";
     },
+    onDragEnd: (event: { currentTarget: HTMLElement }) => { delete event.currentTarget.dataset.dragging; },
   };
 }
 

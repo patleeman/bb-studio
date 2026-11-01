@@ -251,4 +251,7 @@ it("drags a row as its ::loop line and title, as plain text", async () => {
   await act(async () => { dragged.dispatchEvent(event); });
   expect(Object.fromEntries(data)).toEqual({ "text/plain": '::loop{id="loop_n"}\nAbout: Reply to Yassine about the FDE referral\n' });
   expect(event.dataTransfer!.effectAllowed).toBe("copy");
+  expect(dragged.hasAttribute("data-dragging")).toBe(true);
+  await act(async () => { dragged.dispatchEvent(new Event("dragend", { bubbles: true })); });
+  expect(dragged.hasAttribute("data-dragging")).toBe(false);
 });

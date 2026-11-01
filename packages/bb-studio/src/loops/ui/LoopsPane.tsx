@@ -157,7 +157,7 @@ function PaneSection({ title, count, aside, children }: { title: string; count: 
 
 function PaneRow({ icon, iconClass, lead, title, meta, trailing, below, testId, muted, drag }: { icon: string; iconClass?: string; lead?: ReactNode; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean; drag?: ReturnType<typeof loopDragProps> }) {
   return (
-    <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40" data-testid={testId} {...drag}>
+    <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40 data-[dragging]:opacity-50" data-testid={testId} {...drag}>
       <div className="flex min-w-0 items-start gap-2.5 py-1.5 pr-1 pl-2">
         {lead ?? <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
