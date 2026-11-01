@@ -6,9 +6,9 @@ import { LoopStore } from './store';
 import { LoopScheduler, defaults, snooze } from './scheduler';
 export const LOOP_TOOLS=['loops_add','loops_list','loops_update','loops_act','loops_fire','loops_morning'];
 export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3]){
- const store=new LoopStore(db);const settings=bb.settings.define({loopTimeZone:{type:'string',label:'Attention time zone',default:defaults.timeZone},loopDailyBudget:{type:'number',label:'Daily attention budget',default:5},loopQuietStart:{type:'number',label:'Quiet hours start',default:22},loopQuietEnd:{type:'number',label:'Quiet hours end',default:7}});
+ const store=new LoopStore(db);const settings=bb.settings.define({'loops.enabled':{type:'boolean',label:'Attention Router',default:false},loopTimeZone:{type:'string',label:'Attention time zone',default:defaults.timeZone},loopDailyBudget:{type:'number',label:'Daily attention budget',default:5},loopQuietStart:{type:'number',label:'Quiet hours start',default:22},loopQuietEnd:{type:'number',label:'Quiet hours end',default:7}});
  let config=defaults;
- const refresh=(v:Record<string,unknown>)=>{const zone=String(v.loopTimeZone??defaults.timeZone);try{localCheck(zone);config={timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};}catch(e){bb.log.warn(String(e));}};
+ const refresh=(v:Record<string,unknown>)=>{const zone=String(v.loopTimeZone??defaults.timeZone);try{localCheck(zone);config={enabled:v['loops.enabled']===true,timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};}catch(e){bb.log.warn(String(e));}};
  function localCheck(zone:string){new Intl.DateTimeFormat('en',{timeZone:zone}).format();}
  void settings.get().then(refresh);settings.onChange(refresh);
  const scheduler=new LoopScheduler(store,()=>config,post,notify);
@@ -26,5 +26,5 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  bb.agents.registerTool({name:'loops_fire',description:'Signal a named event such as reply:yassine to release loops waiting on it.',parameters:z.object({event:z.string().min(1)}),execute:({event})=>JSON.stringify(scheduler.fire(event))});
  bb.agents.registerTool({name:'loops_morning',description:'Get the top five due items or decisions and the remaining count for the morning message. Add calendar and good-to-know lines yourself.',parameters:z.object({}),execute:()=>JSON.stringify(scheduler.morning())});
  const timer=setInterval(()=>void scheduler.tick().catch(e=>bb.log.warn(String(e))),60_000);bb.onDispose(()=>clearInterval(timer));
- return {store,scheduler,setSettings:(value:typeof defaults)=>{config=value;}};
+ return {store,scheduler,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
 }

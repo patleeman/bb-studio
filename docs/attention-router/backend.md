@@ -67,7 +67,11 @@ Snooze values: later_today = +3h; tonight = next 19:00; tomorrow_morning = next
 07:45 (phase 2 placeholder, no Mac presence detection). Wall times use the configured
 time zone, including DST.
 
-Settings: loopTimeZone (America/New_York), loopDailyBudget (5), loopQuietStart
+Settings: `loops.enabled` (label **Attention Router**, default **OFF**) gates all
+scheduled releases, cards, stale messages, pushes and loop badge counts. Tools and
+RPC remain usable for testing while disabled. Enable only after the UI is ready.
+
+Other settings: loopTimeZone (America/New_York), loopDailyBudget (5), loopQuietStart
 (22), loopQuietEnd (7). Budget is server-side and shared by all release paths.
 
 Mobile notify remains backward compatible. Optional category BB_LOOP, loopId and

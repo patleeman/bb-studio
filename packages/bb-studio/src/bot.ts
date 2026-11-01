@@ -332,6 +332,7 @@ export interface BotMemoryPages {
 }
 
 export interface BotDeps {
+  loopsEnabled?: () => boolean;
   db: Database.Database;
   sdk: Sdk;
   leads: ProjectLeads;
@@ -1159,7 +1160,7 @@ export class Bots {
       Promise.resolve().then(() => this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "40", types: ["item/completed"] })).catch(() => []) as Promise<{ createdAt?: number; data?: { item?: { type?: string; text?: string } } }[]>,
     ]);
     const replies = events.flatMap((event) => event.data?.item?.type === "agentMessage" && typeof event.data.item.text === "string" && event.createdAt ? [{ createdAt: event.createdAt, text: event.data.item.text }] : []);
-    return botAttention({ loops: this.stored()?.threadId === threadId ? new LoopStore(this.deps.db).all().filter(l=>l.status==='surfaced'&&l.owner==='patrick'&&l.kind!=='waiting') : [], lastReadAt: thread?.lastReadAt ?? null, interactions: pendingInteractions(interactions), replies });
+    return botAttention({ loopsEnabled: this.deps.loopsEnabled?.() ?? false, loops: this.deps.loopsEnabled?.() && this.stored()?.threadId === threadId ? new LoopStore(this.deps.db).all().filter(l=>l.status==='surfaced'&&l.owner==='patrick'&&l.kind!=='waiting') : [], lastReadAt: thread?.lastReadAt ?? null, interactions: pendingInteractions(interactions), replies });
   }
 
   /** A Bot's attention alone (bot_attention): its chat, nothing else. */

@@ -2,8 +2,9 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MIGRATIONS } from '../migrations';
 import { LoopStore } from './store';
-import { LoopScheduler, defaults, snooze } from './scheduler';
+import { LoopScheduler, defaults as baseDefaults, snooze } from './scheduler';
 import { rpcContract } from './contract';
+const defaults={...baseDefaults,enabled:true};
 let db:Database.Database,store:LoopStore,scheduler:LoopScheduler,post:ReturnType<typeof vi.fn<(text:string)=>Promise<void>>>,notify:ReturnType<typeof vi.fn<(loop:import('./contract').Loop)=>Promise<void>>>;
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));db=new Database(':memory:');db.exec(MIGRATIONS.at(-1)!);store=new LoopStore(db);post=vi.fn(async(_text:string)=>{});notify=vi.fn(async(_loop:import('./contract').Loop)=>{});scheduler=new LoopScheduler(store,()=>defaults,post,notify);});
 afterEach(()=>{db.close();vi.useRealTimers();});
@@ -18,3 +19,5 @@ it('validates wire inputs and output',()=>{expect(()=>rpcContract['loops.act'].i
 it.each(['later_today','tonight','tomorrow_morning','this_weekend','home','mac'])('resolves %s snooze',preset=>{const t=snooze(preset,defaults);expect(t.type==='place'||t.at!>Date.now()).toBe(true);});
 it('releases snoozed time loops and repeats overdue pushes only the next day',async()=>{const l=store.add({title:'Late',push:true,due:Date.now()-1});await scheduler.tick();expect(notify).toHaveBeenCalledTimes(1);store.act({id:l.id,action:'snooze',snooze:'later_today'},p=>snooze(p,defaults));await scheduler.tick();expect(store.get(l.id).status).toBe('snoozed');vi.advanceTimersByTime(3*3600000);await scheduler.tick();expect(store.get(l.id).status).toBe('surfaced');expect(notify).toHaveBeenCalledTimes(1);vi.advanceTimersByTime(24*3600000);await scheduler.tick();expect(notify).toHaveBeenCalledTimes(2);});
 it('keeps a latched event across scheduler recreation and quiet hours',async()=>{vi.setSystemTime(new Date('2026-11-03T04:00:00Z'));const l=store.add({title:'Reply',trigger:{type:'event',event:'reply'}});scheduler.fire('reply');await scheduler.tick();expect(store.get(l.id).status).toBe('queued');vi.setSystemTime(new Date('2026-11-03T13:00:00Z'));const restarted=new LoopScheduler(store,()=>defaults,post,notify);await restarted.tick();expect(store.get(l.id).status).toBe('surfaced');});
+
+it('defaults OFF: releases no cards, urgent pushes or stale cards while store and events still work',async()=>{expect(baseDefaults.enabled).toBe(false);const l=store.add({title:'Urgent',priority:'urgent',push:true,trigger:{type:'event',event:'reply'}});const off=new LoopScheduler(store,()=>baseDefaults,post,notify);expect(off.fire('reply').matched).toBe(1);store.add({title:'Already surfaced',status:'surfaced',priority:'urgent',push:true});await off.tick();expect(store.get(l.id).status).toBe('queued');expect(post).not.toHaveBeenCalled();expect(notify).not.toHaveBeenCalled();expect(off.morning()).toBeDefined();});

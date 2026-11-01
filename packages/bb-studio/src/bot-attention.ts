@@ -42,9 +42,9 @@ export type BotAttention = { reason: string; count: number; since: number };
  * `replies` are the Bot's recent messages (agentMessage items) with when
  * they finished; `lastReadAt` is when the user last read the chat.
  */
-export function botAttention(input: { loops?: readonly {id:string;createdAt:number;source?:{kind:string;ref:string}|null}[]; lastReadAt: number | null | undefined; interactions: readonly (Interaction & { createdAt?: number })[]; replies: readonly { createdAt: number; text: string }[] }): BotAttention | null {
+export function botAttention(input: { loopsEnabled?: boolean; loops?: readonly {id:string;createdAt:number;source?:{kind:string;ref:string}|null}[]; lastReadAt: number | null | undefined; interactions: readonly (Interaction & { createdAt?: number })[]; replies: readonly { createdAt: number; text: string }[] }): BotAttention | null {
   const pending = pendingInteractions(input.interactions);
-  const loops = (input.loops ?? []).filter(l=>!pending.some(p=>l.source?.kind==='interaction'&&l.source.ref===p.id));
+  const loops = (input.loopsEnabled ? input.loops ?? [] : []).filter(l=>!pending.some(p=>l.source?.kind==='interaction'&&l.source.ref===p.id));
   const unread = input.replies.filter((reply) => reply.createdAt > (input.lastReadAt ?? 0) && visibleReply(reply.text) && !loops.some(l=>reply.text.includes(`::loop{id="${l.id}"}`)));
   const count = pending.length + unread.length + loops.length;
   if (!count) return null;

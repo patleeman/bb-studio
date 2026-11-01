@@ -505,7 +505,9 @@ export default async function plugin(bb: BbPluginApi) {
   const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key) });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
   // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
+  let loopsEnabled = () => false;
   const bots: Bots = new Bots({
+    loopsEnabled: () => loopsEnabled(),
     db, sdk: bb.sdk, leads: projectLeads, changed: tagsChanged,
     memory: {
       exists: (pageId) => { const page = pages.store.meta(pageId); return !!page && !page.archived_at; },
@@ -523,7 +525,7 @@ export default async function plugin(bb: BbPluginApi) {
       follow: async (botId) => { const bot = automationBot(botId); if (bot) await automations.follow(bot); },
     },
   });
-  registerLoops(bb, db, async (text) => {
+  const loops = registerLoops(bb, db, async (text) => {
     const bot = bots.stored();
     if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
@@ -532,6 +534,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,actions:['done','snooze','got_it'],coalesceKey:loop.id} as never});
   });
+  loopsEnabled = loops.enabled;
   // Voice sessions: a fast-model thread the user talks to, which hands work to the Bot or threads.
   voice = await registerVoice(bb, { speech: speech.service, botThread: () => bots.stored()?.threadId ?? null });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
