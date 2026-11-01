@@ -166,3 +166,10 @@ it("links +N more to the Loops tab, and draws nothing for 0", async () => {
   await act(async () => root.render(<LoopsMoreDirective attributes={{ more: "0" }} source="" message={message} openWorkspaceFile={null} />));
   expect(container.innerHTML).toBe("");
 });
+
+it("offers Keep or Drop on a loop with no update in three days (the weekly review)", async () => {
+  await render(undefined, { owner: "cos", status: "in_progress", updatedAt: NOW - 4 * 86_400_000 });
+  expect(container.querySelector("[data-testid=loop-stale]")?.textContent).toContain("No update in 4 d");
+  await click("Keep");
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_1", action: "keep" });
+});

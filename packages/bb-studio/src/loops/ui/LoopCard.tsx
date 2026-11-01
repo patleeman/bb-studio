@@ -77,6 +77,7 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
         {loop.owner === "patrick"
           ? <OpenCard loop={loop} people={people} refresh={refresh} now={now} />
           : <HandedOff loop={loop} history={history} people={people} refresh={refresh} now={now} />}
+        {now - loop.updatedAt > STALE_MS ? <Stale loop={loop} refresh={refresh} now={now} /> : null}
       </div>
     </div>
   );
@@ -146,6 +147,23 @@ function OpenCard({ loop, people, refresh, now }: { loop: Loop; people: LoopPeop
     {note ? <p className="mt-2 text-xs text-muted-foreground">{note}</p> : null}
     {error ? <p role="alert" className="mt-2 text-xs text-destructive">{error}</p> : null}
   </>;
+}
+
+const STALE_MS = 3 * 86_400_000;
+
+/** The weekly stale review (src/loops/scheduler.ts): no update in three days, Keep or Drop. */
+function Stale({ loop, refresh, now }: { loop: Loop; refresh(): void; now: number }) {
+  const { act, busy, error } = useLoopActions(refresh);
+  return (
+    <div data-testid="loop-stale" className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
+      <Icon name="TimeSchedule" className="size-3.5" />No update in {elapsed(loop.updatedAt, now)}. Still on it?
+      <span className="ml-auto flex gap-1.5">
+        <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: loop.id, action: "keep" })}><Icon name="Check" />Keep</button>
+        <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</button>
+      </span>
+      {error ? <p role="alert" className="w-full text-destructive">{error}</p> : null}
+    </div>
+  );
 }
 
 /** A loop an agent works on: who, since when, live; Open thread and Take it back. */
