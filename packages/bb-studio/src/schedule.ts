@@ -166,11 +166,11 @@ export function daysLabel(days: readonly number[]): string {
 
 // --- A cron in plain English ------------------------------------------------
 
-const DAY_WORDS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+export const DAY_WORDS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 const PLURAL_DAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 /** A cron field's values in [min, max] (*, n, a-b, lists, /steps, day names), or null if it isn't one. */
-function cronValues(field: string, min: number, max: number, names?: Record<string, number>): number[] | null {
+export function cronValues(field: string, min: number, max: number, names?: Record<string, number>): number[] | null {
   const values = new Set<number>();
   const value = (text: string) => {
     const named = names?.[text.toLowerCase()];
