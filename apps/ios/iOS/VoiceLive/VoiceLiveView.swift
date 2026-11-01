@@ -73,14 +73,14 @@ private struct VoiceLiveHeader: View {
     }
 }
 
-/// Rings and bars that move while someone talks: warm for you, the accent for the voice.
+/// Rings and bars that move while someone talks: teal for you, the accent for the voice.
 struct TalkingIcon: View {
     let speaker: LiveSpeaker?
     let phase: LivePhase
 
     private var tint: Color {
         switch speaker {
-        case .user: .orange
+        case .user: .teal
         case .agent: .accentColor
         case nil: phase == .thinking ? .purple : .secondary
         }
@@ -270,7 +270,7 @@ private struct VoiceLiveBackground: View {
 
     private var tint: Color {
         switch speaker {
-        case .user: .orange
+        case .user: .teal
         case .agent: .accentColor
         case nil: .clear
         }
