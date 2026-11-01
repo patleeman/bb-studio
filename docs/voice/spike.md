@@ -120,13 +120,21 @@ and [`live.ts`](../../packages/bb-studio/src/voice/live/live.ts), with tests in
 ## The voice thread
 
 Each session opens a BB thread in the personal project ("🎙 Voice · Nov 1, 5:35
-PM"). Studio posts the transcript in batches: at each relay, at each reply and
-at hang-up. The recorded mock session's thread is saved as
-`mock-voice-thread.md` in the deliverables folder.
+PM"). Each post there is a `threads.send` with an agent-only "[PASS]" note,
+because the SDK can't append a message without starting a turn, so posts are
+kept to the minimum:
 
-Each post is a `threads.send` with an agent-only "[PASS]" note, because the SDK
-can't append a message without starting a turn. Every post costs one short
-turn on that thread's model. See Risks.
+- **Every relay, as it happens:** one line, "→ Sent to the Kensico lead: …".
+- **The full transcript once, at hang-up:** a summary line, then both sides'
+  words in order, interruptions, what was sent and what came back.
+- **A reply that arrives after hang-up:** one line, plus the phone push.
+
+Nothing else is posted while the session runs: no transcript batches, and
+replies during the session go into the end transcript (`live.test.ts`, "the
+voice thread"). A session with one relay costs two short turns there. The
+voice thread from the recorded mock session (before this change, with
+per-batch posts) is saved as `mock-voice-thread.md` in the deliverables
+folder.
 
 ## Barge-in and the subtitle UI
 
@@ -226,9 +234,10 @@ shares:
   hedged speech isn't a yes.
 - **Tool calls go through the phone.** If iOS throttles the app's networking,
   tools stall. Studio receiving them over the server sideband is the fix.
-- **Voice thread cost and noise.** Each batch posted to the voice thread runs
-  one "[PASS]" turn. An SDK "append without a turn" would remove it, but nothing
-  goes upstream for now.
+- **Voice thread cost.** Each relay and the end transcript each run one
+  "[PASS]" turn there. An SDK "append without a turn" would remove them, but
+  nothing goes upstream for now. If the app dies before End, the transcript
+  isn't posted (the lines are still in Studio's tables).
 - **Reply matching.** The first finished turn on a target thread after a send
   counts as its reply, even if the thread was already busy with something else.
   Voice mode's `client/turn/requested` check is the fix.

@@ -185,10 +185,9 @@ describe("eyes-free rules in the tool layer", () => {
     expect(relay).toMatchObject({ senderThreadId: "thr_voice", mode: "auto", text: "🎙 From voice: Pause the eBay fetcher until Monday" });
     expect(relay.note).toMatch(/said yes out loud/);
     expect(relay.note).toMatch(/don't spend money, email or message people, post or publish, delete anything or approve/);
-    // Visible in the voice thread too.
+    // Visible in the voice thread at once: the relay line alone, not the transcript so far.
     const record = send.mock.calls.find(([input]) => input.threadId === "thr_voice")![0];
-    expect(record.text).toContain("**You:** Yes, send it");
-    expect(record.text).toContain("→ **Sent to the Kensico lead:** Pause the eBay fetcher until Monday");
+    expect(record.text).toBe("→ **Sent to the Kensico lead:** Pause the eBay fetcher until Monday");
     expect(record.note).toContain("[PASS]");
     // Once only.
     expect(await live.tool(sessionId, "confirm_send", JSON.stringify({ draft_id: id }), [said("yes")])).toBe("That draft was already sent.");
@@ -281,7 +280,8 @@ describe("replies, interruptions and hang-up", () => {
     expect(await live.idle(KENSICO.threadId, "[PASS]")).toEqual([]);
     expect(await live.idle(KENSICO.threadId, "**Paused.** It resumes Monday at 9.")).toEqual([sessionId]);
     expect(publish).toHaveBeenCalledWith({ sessionId, kind: "reply" });
-    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "thr_voice", text: "← **the Kensico lead answered:** Paused. It resumes Monday at 9." }));
+    // During the session a reply goes in the end transcript, not its own post.
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ text: expect.stringContaining("answered") }));
     const polled = live.poll(sessionId);
     expect(polled.replies).toEqual([expect.objectContaining({ title: "the Kensico lead", summary: "Paused. It resumes Monday at 9." })]);
     expect(polled.replies[0]!.note).toMatch(/^\(Studio, not the user:\) the Kensico lead answered/);
@@ -293,8 +293,13 @@ describe("replies, interruptions and hang-up", () => {
     expect(ended.endedAt).not.toBeNull();
     expect(ended.sent).toEqual([expect.objectContaining({ title: "the Kensico lead", message: "Pause the eBay fetcher" })]);
     const last = send.mock.calls.at(-1)![0];
+    expect(last.threadId).toBe("thr_voice");
+    expect(last.text).toMatch(/^🎙 \*\*Voice session · \d+ s\*\* · ≈\$0\.00 · sent 1 message/);
+    expect(last.text).toContain("**You:** yep");
+    expect(last.text).toContain("→ **Sent to the Kensico lead:** Pause the eBay fetcher");
+    expect(last.text).toContain("← **the Kensico lead answered:** Paused. It resumes Monday at 9.");
     expect(last.text).toContain("_(interrupted)_");
-    expect(last.text).toMatch(/🎙 \*\*Voice session · \d+ s\*\* · ≈\$0\.00 · sent 1 message/);
+    expect(last.text.indexOf("_(interrupted)_")).toBeLessThan(last.text.indexOf("**Voice:** Bye."));
     await expect(live.tool(sessionId, "loops_list", "{}")).rejects.toThrow(/has ended/);
     // A later answer goes to the phone.
     const second = setup();
@@ -303,6 +308,44 @@ describe("replies, interruptions and hang-up", () => {
     await second.live.end(s2.sessionId);
     await second.live.idle(COS.threadId, "Backups are fine.");
     expect(second.push).toHaveBeenCalledWith(expect.objectContaining({ title: "Dot answered", body: "Backups are fine." }));
+    expect(second.send).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "thr_voice", text: "← **Dot answered** (after the session): Backups are fine." }));
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("the voice thread", () => {
+  it("gets each relay as it happens and the whole transcript once, at hang-up: no posting turns in between", async () => {
+    const { live, send } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    const posts = () => send.mock.calls.filter(([input]) => input.threadId === "thr_voice").map(([input]) => input.text);
+    // Talk, reads, a loop action, usage and a reply: nothing posted.
+    live.record(sessionId, [said("What's waiting?"), { type: "transcript", role: "assistant", text: "Two things." }, { type: "live_usage", seconds: 30 }]);
+    await live.tool(sessionId, "loops_list", "{}");
+    await live.tool(sessionId, "loops_act", JSON.stringify({ loop_id: "loop_1", action: "done" }));
+    live.record(sessionId, [said("Tell Dot to book the car")]);
+    const id = draftId(await live.tool(sessionId, "send_to_cos", JSON.stringify({ message: "Book the car service for Friday" })));
+    expect(posts()).toEqual([]);
+    // The relay: one post, right away.
+    await live.tool(sessionId, "confirm_send", JSON.stringify({ draft_id: id }), [said("yes")]);
+    expect(posts()).toEqual(["→ **Sent to Dot:** Book the car service for Friday"]);
+    await live.idle(COS.threadId, "Booked for Friday at 8.");
+    live.record(sessionId, [{ type: "transcript", role: "assistant", text: "Dot booked it for Friday at eight." }, { type: "live_usage", seconds: 90 }]);
+    expect(posts()).toHaveLength(1);
+    // Hang-up: one more post with everything, in order.
+    await live.end(sessionId);
+    expect(posts()).toHaveLength(2);
+    expect(posts()[1]!.split("\n\n")).toEqual([
+      expect.stringMatching(/^🎙 \*\*Voice session · /),
+      "**You:** What's waiting?",
+      "**Voice:** Two things.",
+      "**You:** Tell Dot to book the car",
+      "**You:** yes",
+      "→ **Sent to Dot:** Book the car service for Friday",
+      "← **Dot answered:** Booked for Friday at 8.",
+      "**Voice:** Dot booked it for Friday at eight.",
+    ]);
+    // Ending twice posts nothing more.
+    await live.end(sessionId);
+    expect(posts()).toHaveLength(2);
   });
 });

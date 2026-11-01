@@ -9,9 +9,12 @@
 //   Studio hears the user's own yes; done and snooze can be undone for a few
 //   seconds; nothing else is a tool.
 // - Relays are visible: the message lands in the target thread from the
-//   voice thread (senderThreadId), with an agent-only note of the rules. When
-//   the target finishes, its reply is kept for the session to pick up (poll)
-//   and posted in the voice thread; after hang-up it goes to the phone.
+//   voice thread (senderThreadId), with an agent-only note of the rules, and
+//   a line in the voice thread at once. When the target finishes, its reply
+//   is kept for the session to pick up (poll); after hang-up it goes to the
+//   phone and the voice thread.
+// - The voice thread gets the full transcript once, at hang-up: each post is
+//   a turn there, so nothing else is posted while the session runs.
 // - Cost: Realtime by token, GPT-Live by voice second plus its backend's
 //   tokens (bot-prices.ts). Over the cap, voiceLive.event tells the phone to stop.
 //
@@ -390,7 +393,7 @@ export class VoiceLive {
       note: relayNote(draft.kinds),
     });
     this.append(row.id, "sent", { text: draft.message, data: { draftId, threadId: draft.threadId, title: draft.title, kinds: draft.kinds } });
-    await this.flush(row, `→ **Sent to ${draft.title}:** ${draft.message}`);
+    await this.postToVoiceThread(row, `→ **Sent to ${draft.title}:** ${draft.message}`);
     return `Sent to ${draft.title}. Say "Sent." Its answer will come back here when it's ready.`;
   }
 
@@ -470,7 +473,8 @@ export class VoiceLive {
   /**
    * A thread went idle. Sessions that sent it something it hasn't answered
    * get its reply: a live one picks it up; after hang-up it goes to the phone.
-   * Either way it's posted in the voice thread. Returns the sessions answered.
+   * A live session's replies go in the transcript at hang-up; a later one is
+   * posted in the voice thread on its own. Returns the sessions answered.
    */
   async idle(threadId: string, lastAssistantText: string | null | undefined): Promise<string[]> {
     if (!answered(lastAssistantText)) return [];
@@ -486,28 +490,37 @@ export class VoiceLive {
       const summary = replySummary(lastAssistantText!);
       this.append(row.id, "reply", { text: clip(lastAssistantText!.trim(), 20_000), data: { threadId, title, summary } });
       done.push(row.id);
-      await this.flush(row, `← **${title} answered:** ${summary}`);
-      if (!this.ended(events)) this.deps.publish({ sessionId: row.id, kind: "reply" });
-      else await this.deps.push({ title: `${title} answered`, body: summary, threadId, coalesceKey: `voice-live:${row.id}` }).catch((error) => this.deps.warn?.(`Voice reply push failed: ${String(error)}`));
+      if (!this.ended(events)) {
+        this.deps.publish({ sessionId: row.id, kind: "reply" });
+        continue;
+      }
+      await this.postToVoiceThread(row, `← **${title} answered** (after the session): ${summary}`);
+      await this.deps.push({ title: `${title} answered`, body: summary, threadId, coalesceKey: `voice-live:${row.id}` }).catch((error) => this.deps.warn?.(`Voice reply push failed: ${String(error)}`));
     }
     return done;
   }
 
-  /** Posts the transcript since the last post to the voice thread, with an extra line. */
-  private async flush(row: SessionRow, extra?: string): Promise<void> {
+  /** One message in the voice thread: a relay as it happens, or the transcript at hang-up. */
+  private async postToVoiceThread(row: SessionRow, text: string): Promise<void> {
     const threadId = await this.voiceThread(row.id);
     if (!threadId) return;
-    const events = this.events(row.id);
-    const after = events.filter((event) => event.kind === "posted").at(-1)?.id ?? 0;
-    const lines = events.filter((event) => event.id > after && (event.kind === "transcript" || event.kind === "interrupted"))
-      .map((event) => event.kind === "interrupted" ? "_(interrupted)_" : `**${event.role === "user" ? "You" : "Voice"}:** ${event.text}`);
-    if (extra) lines.push(extra);
-    if (!lines.length) return;
-    this.append(row.id, "posted");
     await this.deps.send({
-      threadId, mode: "queue-if-active", text: lines.join("\n\n"),
+      threadId, mode: "queue-if-active", text,
       note: "Studio's record of the voice session, already shown to the user. Don't reply to it: reply exactly [PASS].",
     }).catch((error) => this.deps.warn?.(`Couldn't post to the voice thread: ${String(error)}`));
+  }
+
+  /** The whole session, in order: both sides' words, interruptions, what was sent and what came back. */
+  private transcript(events: readonly EventRow[]): string[] {
+    return events.flatMap((event) => {
+      switch (event.kind) {
+        case "transcript": return [`**${event.role === "user" ? "You" : "Voice"}:** ${event.text}`];
+        case "interrupted": return ["_(interrupted)_"];
+        case "sent": return [`→ **Sent to ${data<{ title: string }>(event).title}:** ${event.text}`];
+        case "reply": return [`← **${data<{ title: string }>(event).title} answered:** ${data<{ summary: string }>(event).summary}`];
+        default: return [];
+      }
+    });
   }
 
   async end(sessionId: string, events: readonly LiveEvent[] = []): Promise<VoiceLiveView> {
@@ -518,7 +531,8 @@ export class VoiceLive {
     const parts = [`🎙 **Voice session · ${sessionLength(draft.durationMs)}**`];
     if (draft.costUsd != null) parts.push(`≈${usd(draft.costUsd)}`);
     if (draft.sent.length) parts.push(`sent ${draft.sent.length} message${draft.sent.length === 1 ? "" : "s"}`);
-    await this.flush(row, draft.transcript.length || draft.sent.length ? parts.join(" · ") : undefined);
+    const lines = this.transcript(this.events(sessionId));
+    if (lines.length) await this.postToVoiceThread(row, [parts.join(" · "), ...lines].join("\n\n"));
     this.append(sessionId, "ended");
     this.deps.publish({ sessionId, kind: "ended" });
     return this.view(sessionId);
