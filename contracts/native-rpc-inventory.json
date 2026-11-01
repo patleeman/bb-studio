@@ -824,6 +824,60 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "request",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.add",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.place",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.setPlaces",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.morning",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/iOS/Studio/MiniAppView.swift",
       "plugin": "studio",
       "method": "minis.live.close",
