@@ -4,7 +4,8 @@
 // viewer's time zone. A past run opens its thread and a failed one is outlined
 // red with its error in the tooltip; a run going on now grows to the red
 // current-time line. A job that runs more than eight times a day is a thin
-// band with a tick per run. Paused jobs aren't drawn: they're listed under
+// band with a tick per run; in a narrow day a block drops its kind icon for
+// the name. Paused jobs aren't drawn: they're listed under
 // Paused, beside the grid (under it in a narrow pane), with Resume.
 import { GHOST_BUTTON, ICON_BUTTON } from "../../kit/app/index";
 import { Icon, Tooltip } from "../../kit/ui/index";
@@ -19,7 +20,7 @@ import { calendarDays, lanes, minuteOfDay, pausedSources, windowDays, type Calen
 const HOUR = 36;
 /** A block is this many minutes tall: one line. */
 const SPAN = 30;
-const BAND = 8;
+const BAND = 6;
 const KIND_ICON: Record<CalendarSource["kind"], string> = { checkin: "MessageSquare", reminder: "Clock", watcher: "Eye", runner: "Repeat", heartbeat: "MessageSquare", automation: "Zap" };
 const KIND_LABEL: Record<CalendarSource["kind"], string> = { checkin: "Check-in", reminder: "Reminder", watcher: "Watcher", runner: "Runner", heartbeat: "Check-in", automation: "Automation" };
 // Red stays for failures.
@@ -128,7 +129,7 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
                 ))}
               </div>
               {days.map((day) => (
-                <div key={day.start} data-day={new Date(day.start).toDateString()} className="relative border-l border-border"
+                <div key={day.start} data-day={new Date(day.start).toDateString()} className="@container/day relative border-l border-border"
                   style={{ backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR - 1}px, color-mix(in oklab, var(--border) 60%, transparent) ${HOUR - 1}px, color-mix(in oklab, var(--border) 60%, transparent) ${HOUR}px)` }}>
                   {day.bands.map((band) => <Band key={band.sourceId} band={band} lane={bandIds.indexOf(band.sourceId)} source={byId.get(band.sourceId)!} now={now} tz={tz} onOpen={open} />)}
                   {lanes(day.singles, tz, SPAN).map(({ event, lane, of }) => (
@@ -207,7 +208,8 @@ function Block({ event, source, now, tz, style, onOpen }: { event: CalendarEvent
         style={{ ...style, height, background: `color-mix(in oklab, ${color} ${past ? 12 : 24}%, var(--background))`, borderLeft: `2px solid ${failed ? "var(--destructive)" : color}` } as CSSProperties}>
         {failed ? <Icon name="AlertCircle" className="size-3 shrink-0 text-destructive" aria-hidden />
           : running ? <span className="size-1.5 shrink-0 animate-pulse rounded-full" style={{ background: color }} />
-            : <Icon name={KIND_ICON[source.kind]} className="size-3 shrink-0 opacity-70" aria-hidden />}
+            // Narrow days leave the room to the name.
+            : <Icon name={KIND_ICON[source.kind]} className="hidden size-3 shrink-0 opacity-70 @min-[120px]/day:block" aria-hidden />}
         <span className="min-w-0 truncate font-medium">{source.name}</span>
       </button>
     </Tooltip>
@@ -232,7 +234,7 @@ function Band({ band, lane, source, now, tz, onOpen }: { band: CalendarBand; lan
       </span>
     )}>
       <button type="button" data-band={source.id} aria-label={`${source.name}, ${band.every}, ${band.events.length} runs`} onClick={() => onOpen(failed.at(-1) ?? latest)}
-        className="absolute z-10 rounded-full hover:brightness-125" style={{ top: top - 2, height: Math.max(8, bottom - top + 4), left: 2 + lane * BAND, width: BAND - 3, background: `color-mix(in oklab, ${color} 30%, transparent)` }}>
+        className="absolute z-10 rounded-full hover:brightness-125" style={{ top: top - 2, height: Math.max(8, bottom - top + 4), left: 2 + lane * BAND, width: BAND - 2, background: `color-mix(in oklab, ${color} 30%, transparent)` }}>
         {band.events.map((event) => (
           <span key={event.key} data-tick={event.status}
             className={`absolute left-1/2 -translate-x-1/2 rounded-full ${event.status === "failed" ? "size-2 bg-destructive ring-1 ring-background" : event.status === "running" ? "size-2 animate-pulse" : "h-0.5 w-full"}`}
