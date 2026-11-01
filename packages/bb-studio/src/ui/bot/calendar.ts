@@ -218,19 +218,29 @@ export function cadenceLabel(times: number[]): string {
   return hours === 1 ? "hourly" : `every ${hours} h`;
 }
 
-/** The days of a window: each day's blocks, and its bands for jobs that run more than DENSE_PER_DAY times that day. */
+/**
+ * The days of a window: each day's blocks, and a band for each dense job: one
+ * whose schedule runs more than DENSE_PER_DAY times on some day of the window,
+ * or that ran that often. A dense job is a band on every day, however few of
+ * its runs that day shows, so it reads the same all week.
+ */
 export function calendarDays(sources: CalendarSource[], days: { start: number; end: number }[], now: number, zone: string): CalendarDay[] {
   if (!days.length) return [];
   const from = days[0]!.start, to = days.at(-1)!.end;
-  const all = sources.map((source) => ({ source, events: sourceEvents(source, from, to, now, zone) }));
+  const perDay = (times: number[]) => Math.max(0, ...days.map(({ start, end }) => times.filter((at) => at >= start && at < end).length));
+  const all = sources.map((source) => {
+    const events = sourceEvents(source, from, to, now, zone);
+    const due = occurrences(source, from, to, zone);
+    const dense = perDay(due) > DENSE_PER_DAY || perDay(events.map((event) => event.at)) > DENSE_PER_DAY;
+    return { source, events, dense, every: cadenceLabel(due.length > 1 ? due : events.filter((event) => !event.manual).map((event) => event.at)) };
+  });
   return days.map(({ start, end }) => {
     const day: CalendarDay = { start, end, singles: [], bands: [] };
-    for (const { source, events } of all) {
+    for (const { source, events, dense, every } of all) {
       const today = events.filter((event) => event.at >= start && event.at < end);
-      if (today.length > DENSE_PER_DAY) {
-        const regular = today.filter((event) => !event.manual);
-        day.bands.push({ sourceId: source.id, events: today, from: today[0]!.at, to: today.at(-1)!.at, every: cadenceLabel((regular.length > 1 ? regular : today).map((event) => event.at)) });
-      } else day.singles.push(...today);
+      if (!today.length) continue;
+      if (dense) day.bands.push({ sourceId: source.id, events: today, from: today[0]!.at, to: today.at(-1)!.at, every });
+      else day.singles.push(...today);
     }
     day.singles.sort((a, b) => a.at - b.at || a.sourceId.localeCompare(b.sourceId));
     return day;

@@ -16,9 +16,9 @@ import { sidebarAgenda } from "./sidebarAgenda";
 import { BOT_COLORS } from "./BotAvatar";
 import { calendarDays, lanes, minuteOfDay, pausedSources, windowDays, type CalendarBand, type CalendarEvent, type CalendarSource } from "./calendar";
 
-const HOUR = 32;
-/** A block is this many minutes tall, so a name fits. */
-const SPAN = 40;
+const HOUR = 36;
+/** A block is this many minutes tall: one line. */
+const SPAN = 30;
 const BAND = 8;
 const KIND_ICON: Record<CalendarSource["kind"], string> = { checkin: "MessageSquare", reminder: "Clock", watcher: "Eye", runner: "Repeat", heartbeat: "MessageSquare", automation: "Zap" };
 const KIND_LABEL: Record<CalendarSource["kind"], string> = { checkin: "Check-in", reminder: "Reminder", watcher: "Watcher", runner: "Runner", heartbeat: "Check-in", automation: "Automation" };
@@ -107,7 +107,8 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
         {week ? <button type="button" className={GHOST_BUTTON} onClick={() => setWeek(0)}>Today</button> : null}
       </div>
       <div className={side ? "flex items-start gap-3" : "flex flex-col gap-3"}>
-        <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-border">
+        <div className="min-w-0 flex-1">
+        <div className="overflow-hidden rounded-md border border-border">
           <div className="grid border-b border-border bg-background text-[11px]" style={{ gridTemplateColumns: `36px repeat(${count}, minmax(0, 1fr))` }}>
             <span />
             {days.map((day) => {
@@ -144,6 +145,15 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
             </div>
           </div>
         </div>
+        {bandIds.length ? (
+          <p className="flex flex-wrap gap-x-3 gap-y-0.5 px-2 pt-1.5 text-[11px] text-muted-foreground">
+            {bandIds.map((id) => {
+              const band = days.flatMap((day) => day.bands).find((each) => each.sourceId === id)!;
+              return <span key={id} className="flex items-center gap-1"><span className="inline-block h-3 w-1.5 rounded-full" style={{ background: colorFor(byId.get(id)!.name) }} />{byId.get(id)!.name} · {band.every}</span>;
+            })}
+          </p>
+        ) : null}
+        </div>
         {paused.length ? (
           <section aria-label="Paused" data-testid="calendar-paused" className={side ? "w-48 shrink-0" : ""}>
             <h4 className="pb-1 text-[11px] font-medium text-muted-foreground">Paused</h4>
@@ -162,14 +172,6 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
           </section>
         ) : null}
       </div>
-      {bandIds.length ? (
-        <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-          {bandIds.map((id) => {
-            const band = days.flatMap((day) => day.bands).find((each) => each.sourceId === id)!;
-            return <span key={id} className="flex items-center gap-1"><span className="inline-block h-3 w-1.5 rounded-full" style={{ background: colorFor(byId.get(id)!.name) }} />{byId.get(id)!.name} · {band.every}</span>;
-          })}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -201,15 +203,12 @@ function Block({ event, source, now, tz, style, onOpen }: { event: CalendarEvent
     <Tooltip label={tip(source, event, now)} side="right">
       <button type="button" data-event={event.key} data-source={source.id} data-status={event.status} onClick={() => onOpen(event)}
         aria-label={`${source.name}, ${dayTime(event.at)}, ${event.status === "scheduled" ? "due" : event.status}`}
-        className={`absolute z-10 flex min-w-0 items-start gap-1 overflow-hidden rounded px-1 py-0.5 text-left text-[11px] leading-tight hover:z-30 hover:brightness-110 focus-visible:z-30 ${failed ? "ring-1 ring-destructive" : running ? "ring-1 ring-foreground/40" : ""} ${past && !failed ? "text-muted-foreground" : "text-foreground"}`}
+        className={`absolute z-10 flex min-w-0 items-center gap-1 overflow-hidden rounded px-1 text-left text-[11px] leading-none hover:z-30 hover:brightness-110 focus-visible:z-30 ${failed ? "ring-1 ring-destructive" : running ? "ring-1 ring-foreground/40" : ""} ${past && !failed ? "text-muted-foreground" : "text-foreground"}`}
         style={{ ...style, height, background: `color-mix(in oklab, ${color} ${past ? 12 : 24}%, var(--background))`, borderLeft: `2px solid ${failed ? "var(--destructive)" : color}` } as CSSProperties}>
-        {failed ? <Icon name="AlertCircle" className="mt-px size-3 shrink-0 text-destructive" aria-hidden />
-          : running ? <span className="mt-1 size-1.5 shrink-0 animate-pulse rounded-full" style={{ background: color }} />
-            : <Icon name={KIND_ICON[source.kind]} className="mt-px size-3 shrink-0 opacity-70" aria-hidden />}
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate font-medium">{source.name}</span>
-          <span className="truncate text-[10px] opacity-80 tabular-nums">{clock(event.at)}{running ? " · now" : ""}</span>
-        </span>
+        {failed ? <Icon name="AlertCircle" className="size-3 shrink-0 text-destructive" aria-hidden />
+          : running ? <span className="size-1.5 shrink-0 animate-pulse rounded-full" style={{ background: color }} />
+            : <Icon name={KIND_ICON[source.kind]} className="size-3 shrink-0 opacity-70" aria-hidden />}
+        <span className="min-w-0 truncate font-medium">{source.name}</span>
       </button>
     </Tooltip>
   );

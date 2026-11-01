@@ -125,6 +125,10 @@ describe("days", () => {
     const [mon] = calendarDays(sources, days, MON - H, NY);
     expect(mon!.bands.map((band) => [band.sourceId, band.events.length, band.every])).toEqual([["hb", 12, "every 2 h"]]);
     expect(mon!.singles.map((event) => event.sourceId)).toEqual(["lunch"]);
+    // Late in the day only a few runs are left, but its schedule is dense: still a band.
+    const [late] = calendarDays(sources, days, MON + 17 * H, NY);
+    expect(late!.bands.map((band) => [band.sourceId, band.events.length, band.every])).toEqual([["hb", 3, "every 2 h"]]);
+    expect(late!.singles).toEqual([]);
     expect(cadenceLabel([0, 5 * M, 10 * M])).toBe("every 5 min");
     expect(cadenceLabel([0, H, 2 * H])).toBe("hourly");
   });
