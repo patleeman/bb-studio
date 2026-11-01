@@ -3,10 +3,11 @@ import { errorMessage } from "../kit/format";
 import { requestGeneration } from "../kit/ui/request-generation";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import type { rpcContract } from "../contract";
+import type { rpcContract as loopsContract } from "../loops/contract";
 import { useRealtime, useRealtimeConnectionState, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
-type Contract = typeof rpcContract;
+type Contract = typeof rpcContract & typeof loopsContract;
 export type Method = keyof Contract;
 export type RpcInput<M extends Method> = PluginRpcCallArgs<Contract[M]>[0];
 type Call = <M extends Method>(method: M, input: RpcInput<M>) => Promise<PluginRpcResult<Contract[M]>>;

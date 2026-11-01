@@ -16,7 +16,7 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  function localCheck(zone:string){new Intl.DateTimeFormat('en',{timeZone:zone}).format();}
  void settings.get().then(refresh);settings.onChange(refresh);
  const scheduler=new LoopScheduler(store,()=>config,post,notify);
- const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(['hand_off','nudge','choose'].includes(x.action))await post(`Loop ${l.id}: ${x.action}. ${x.option??''} Owner: ${l.owner}. Use loops_list to review and carry out the next step.`);return l;};
+ const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Loop ${l.id}: nudge. Draft the nudge message and show it to Patrick in this chat for approval. Do not send it until he approves.`);else if(['hand_off','choose'].includes(x.action))await post(`Loop ${l.id}: ${x.action}. ${x.option??''} Owner: ${l.owner}. Use loops_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
  bb.rpc.register(rpcContract,{
  'loops.list':x=>store.groups(x),'loops.get':({id})=>({loop:store.get(id),history:store.history(id)}),

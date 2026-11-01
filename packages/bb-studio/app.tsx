@@ -51,6 +51,7 @@ import { StudioThreadList } from "./src/ui/StudioSidebar";
 import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
+import { LoopDirective, LoopsMoreDirective } from "./src/loops/ui/LoopCard";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -162,6 +163,11 @@ export default definePluginApp((app) => {
   // in a tab beside the chat. Replies the Bot wrote before Studio drew the rows
   // itself may end with the directive, which now draws nothing.
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
+  // The Attention Router (docs/attention-router/backend.md): `::loop{id="loop_…"}`
+  // is a loop's card, `row="1"` its morning row; `::loops{more="3"}` links to
+  // the Loops tab. Quiet placeholders while the loopsEnabled setting is off.
+  app.slots.messageDirective({ id: "loop", component: LoopDirective });
+  app.slots.messageDirective({ id: "loops", component: LoopsMoreDirective });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
   // opens them through: a header action, since only components inside the thread
