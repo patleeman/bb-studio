@@ -32,6 +32,11 @@ export function composerFor(threadId: string): PluginComposerApi | null {
   return pickComposer(mounted, threadId);
 }
 
+/** The mounted composer of the thread `threadId` itself, never a new-thread or queued-message one, or null. */
+export function threadComposer(threadId: string): PluginComposerApi | null {
+  return pickThreadComposer(mounted, threadId);
+}
+
 /** The thread a composer scope sends to, or null for a new thread. */
 function scopeThread(scope: PluginComposerScope): string | null {
   switch (scope.kind) {
@@ -50,6 +55,15 @@ export function pickComposer<T extends { scope: PluginComposerScope }>(mounted: 
   }
   for (let index = mounted.length - 1; index >= 0; index -= 1) {
     if (mounted[index].scope.kind === "new-thread") return mounted[index];
+  }
+  return null;
+}
+
+/** From `mounted` (oldest first), the newest composer of the thread `threadId` itself, else null. */
+export function pickThreadComposer<T extends { scope: PluginComposerScope }>(mounted: readonly T[], threadId: string): T | null {
+  for (let index = mounted.length - 1; index >= 0; index -= 1) {
+    const { scope } = mounted[index];
+    if (scope.kind === "thread" && scope.threadId === threadId) return mounted[index];
   }
   return null;
 }

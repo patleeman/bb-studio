@@ -14,7 +14,12 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn(),
   interactions: [] as unknown[],
   attention: null as unknown,
+  chatOpen: false,
+  composer: { insert: vi.fn(), focus: vi.fn() },
 }));
+// The Bot chat's composer mounts once the chat opens.
+vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSettings: () => ({ values: { loopsEnabled: true } }),
   useBbNavigate: () => ({ toThread: state.toThread }),
@@ -41,6 +46,7 @@ let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  state.chatOpen = false; state.composer.insert.mockClear(); state.composer.focus.mockClear(); state.toThread.mockImplementation(() => { state.chatOpen = true; });
   state.call.mockClear(); state.toThread.mockClear(); state.inputs = []; state.interactions = []; state.attention = null;
   state.groups = {
     ...empty,
@@ -202,4 +208,14 @@ it("shows the same items as the Bot row's badge: an unread reply counts in Needs
   expect(needs.querySelector("[data-testid=loop-unread]")?.textContent).toContain("A reply from Chief of Staff");
   await act(async () => buttonIn(needs, "Open chat").click());
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+});
+
+it("Discuss on the page opens the Bot chat, then puts the loop in its draft", async () => {
+  await render();
+  const row = [...container.querySelectorAll("[data-testid=loop-coming]")].find((each) => each.textContent?.includes("Call the plumber"))!;
+  await act(async () => buttonIn(row, "Discuss").click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+  await vi.waitFor(() => expect(state.composer.insert).toHaveBeenCalledWith([{ provider: "loop", id: "loop_c", label: "Call the plumber about the slow drain" }, " "], { at: "end" }));
+  expect(state.composer.focus).toHaveBeenCalled();
+  for (const testId of ["loop-needs", "loop-agent", "loop-waiting"]) expect(buttonIn(container.querySelector(`[data-testid=${testId}]`)!, "Discuss")).toBeTruthy();
 });

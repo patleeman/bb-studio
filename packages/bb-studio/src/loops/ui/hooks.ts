@@ -6,6 +6,10 @@ import { errorMessage } from "../../kit/format";
 import { openAppPath } from "../../kit/app/index";
 import { useCall, useLive, type RpcInput } from "../../ui/live";
 import { botPath } from "../../ui/bot/selection";
+import { toast } from "sonner";
+import { threadComposer } from "../../kit/composer";
+import type { Loop } from "../contract";
+import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
@@ -66,6 +70,52 @@ export function useOpenLoopsPane(): (botId: string | null | undefined) => boolea
     openLoops(botId);
     return false;
   }, [navigate]);
+}
+
+const CHIP_LENGTH = 60;
+const chipLabel = (title: string) => { const line = title.replace(/\s+/g, " ").trim(); return line.length > CHIP_LENGTH ? `${line.slice(0, CHIP_LENGTH - 1).trimEnd()}…` : line; };
+
+/**
+ * Discuss: the loop as an `@loop` chip at the end of the Bot chat's draft,
+ * not sent, with the caret after it, so Patrick types his question. The Bot
+ * gets the loop's id, title, why and trigger when he sends (reference.ts).
+ * Away from the chat (the Loops tab), it opens the chat first and waits for
+ * its composer. True when the chip went in.
+ */
+export function useDiscussLoop(botThreadId: string | null, botName: string): (loop: Pick<Loop, "id" | "title">) => Promise<boolean> {
+  const navigate = useBbNavigate();
+  return useCallback(async (loop) => {
+    if (!botThreadId) { toast.error(`Start a chat with ${botName} to discuss a loop.`); return false; }
+    let composer = threadComposer(botThreadId);
+    if (!composer) {
+      navigate.toThread(botThreadId);
+      for (let tries = 0; !composer && tries < 30; tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        composer = threadComposer(botThreadId);
+      }
+    }
+    if (!composer) { toast.error(`Couldn’t reach the chat with ${botName}. Open it and try again.`); return false; }
+    try {
+      composer.insert([{ provider: LOOP_MENTION, id: loop.id, label: chipLabel(loop.title) }, " "], { at: "end" });
+      composer.focus();
+      return true;
+    } catch (error) {
+      toast.error(`Couldn’t add it to the chat: ${errorMessage(error)}`);
+      return false;
+    }
+  }, [navigate, botThreadId, botName]);
+}
+
+/** A row's drag: the loop's reference as plain text, which BB's composer inserts where it's dropped. */
+export function loopDragProps(loop: Pick<Loop, "id" | "title">) {
+  return {
+    draggable: true,
+    onDragStart: (event: { dataTransfer: DataTransfer | null }) => {
+      if (!event.dataTransfer) return;
+      event.dataTransfer.setData("text/plain", loopReference(loop));
+      event.dataTransfer.effectAllowed = "copy";
+    },
+  };
 }
 
 let projectNames: Promise<Map<string, string>> | null = null;

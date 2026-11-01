@@ -17,7 +17,11 @@ const state = vi.hoisted(() => ({
   open: vi.fn(),
   interactions: [] as unknown[],
   attention: null as unknown,
+  composer: null as null | { insert: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> },
+  composerAsked: [] as string[],
 }));
+vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => { state.composerAsked.push(threadId); return state.composer; } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSettings: () => ({ values: { loopsEnabled: state.enabled } }),
   useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openPanel }),
@@ -45,7 +49,7 @@ let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  Object.assign(state, { enabled: true, inputs: [], interactions: [], attention: null });
+  Object.assign(state, { enabled: true, inputs: [], interactions: [], attention: null, composer: { insert: vi.fn(), focus: vi.fn() }, composerAsked: [] });
   state.call.mockClear(); state.toThread.mockClear(); state.open.mockClear(); state.openPanel.mockClear();
   state.groups = {
     ...empty,
@@ -90,7 +94,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   await render();
   const actions = (title: string) => [...row(title).querySelectorAll("[role=menuitem]")].map((each) => each.textContent);
   expect(row("Reply to Yassine").querySelector("[aria-label='Actions: Reply to Yassine about the FDE referral']")).not.toBeNull();
-  expect(actions("Reply to Yassine")).toEqual(["Done", "Later today", "Tonight", "Tomorrow", "This weekend", "When I’m home", "Pick a time…", "Chief of Staff", "Kensico lead", "Change trigger…", "Drop"].map((label) => expect.stringContaining(label)));
+  expect(actions("Reply to Yassine")).toEqual(["Discuss", "Done", "Later today", "Tonight", "Tomorrow", "This weekend", "When I’m home", "Pick a time…", "Chief of Staff", "Kensico lead", "Change trigger…", "Drop"].map((label) => expect.stringContaining(label)));
   await click(row("Reply to Yassine"), "Done");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "done" });
   await click(row("Reply to Yassine"), "Kensico lead");
@@ -102,7 +106,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   await click(row("Call the plumber"), "Surface now");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
   // Not Patrick's: no Surface now.
-  expect(actions("Book the car service")).toEqual(["Change trigger…"]);
+  expect(actions("Book the car service")).toEqual(["Discuss", "Change trigger…"]);
   await click(row("Draft the Kensico"), "Take it back");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
   await click(row("Draft the Kensico"), "Open thread");
@@ -224,4 +228,26 @@ it("keeps a just-closed loop at its place after the refetch moves it to Done", (
   expect(closesFromCircle(loop("x", "X", { kind: "decide" }))).toBe(false);
   expect(closesFromCircle(loop("x", "X", { kind: "read" }))).toBe(true);
   expect(closesFromCircle(loop("x", "X", { owner: "cos" }))).toBe(false);
+});
+
+it("Discuss puts the loop in the Bot chat's draft as an @loop chip, not sent, and focuses it", async () => {
+  await render();
+  await click(row("Reply to Yassine"), "Discuss");
+  expect(state.composerAsked).toEqual(["thr_bot"]);
+  expect(state.composer!.insert).toHaveBeenCalledWith([{ provider: "loop", id: "loop_n", label: "Reply to Yassine about the FDE referral" }, " "], { at: "end" });
+  expect(state.composer!.focus).toHaveBeenCalled();
+  expect(state.toThread).not.toHaveBeenCalled();
+  expect(state.call).not.toHaveBeenCalled();
+});
+
+it("drags a row as its ::loop line and title, as plain text", async () => {
+  await render();
+  const dragged = row("Reply to Yassine");
+  expect(dragged.getAttribute("draggable")).toBe("true");
+  const data = new Map<string, string>();
+  const event = new Event("dragstart", { bubbles: true }) as DragEvent;
+  Object.defineProperty(event, "dataTransfer", { value: { setData: (type: string, value: string) => data.set(type, value), effectAllowed: "" } });
+  await act(async () => { dragged.dispatchEvent(event); });
+  expect(Object.fromEntries(data)).toEqual({ "text/plain": '::loop{id="loop_n"}\nAbout: Reply to Yassine about the FDE referral\n' });
+  expect(event.dataTransfer!.effectAllowed).toBe("copy");
 });

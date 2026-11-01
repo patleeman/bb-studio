@@ -4,7 +4,9 @@
 // header, a `::loops{open="pane"}` card, "N more in Loops", the sidebar's All
 // loops row and the panel launcher. Rows are compact: a title, one line of
 // detail and a ⋯ menu with the row's actions, as on the phone. Change trigger
-// opens in place under its row. It refetches on Studio's realtime signal,
+// opens in place under its row. Discuss, first in each menu, puts the loop in
+// the chat's draft as an `@loop` chip; dragging a row into the composer drops
+// its `::loop` line (reference.ts). It refetches on Studio's realtime signal,
 // like the tab and the cards (useLive).
 import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useState, type ReactNode } from "react";
@@ -18,7 +20,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, useNeedsYou, type RowProps } from "./LoopsTab";
 import { AREAS, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { LOOPS_PANE, openLoops, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
+import { LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -153,9 +155,9 @@ function PaneSection({ title, count, aside, children }: { title: string; count: 
   );
 }
 
-function PaneRow({ icon, iconClass, lead, title, meta, trailing, below, testId, muted }: { icon: string; iconClass?: string; lead?: ReactNode; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean }) {
+function PaneRow({ icon, iconClass, lead, title, meta, trailing, below, testId, muted, drag }: { icon: string; iconClass?: string; lead?: ReactNode; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean; drag?: ReturnType<typeof loopDragProps> }) {
   return (
-    <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40" data-testid={testId}>
+    <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40" data-testid={testId} {...drag}>
       <div className="flex min-w-0 items-start gap-2.5 py-1.5 pr-1 pl-2">
         {lead ?? <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
@@ -225,6 +227,7 @@ function Dotted({ parts, area }: { parts: ReactNode[]; area: string | null }) {
 function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed }: RowProps & { place: Place; onClosed(action: "done" | "got_it"): void }) {
   const navigate = useBbNavigate();
   const { act, update, busy, error } = useLoopActions(refresh);
+  const discuss = useDiscussLoop(people.botThreadId, people.botName);
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
   const [note, setNote] = useState(false);
@@ -329,14 +332,18 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
   const icon = place === "agents" || (place === "coming" && !mine) ? "Bot" : KIND[loop.kind].icon;
   const circle = (place === "needs" || place === "coming") && closesFromCircle(loop) ? (loop.kind === "read" ? "got_it" : "done") : null;
   return <>
-    <PaneRow testId={testId} icon={icon} iconClass={place === "agents" && working ? "text-success" : undefined} title={loop.title} meta={meta}
+    <PaneRow testId={testId} drag={loopDragProps(loop)} icon={icon} iconClass={place === "agents" && working ? "text-success" : undefined} title={loop.title} meta={meta}
       lead={circle ? <DoneCircle loop={loop} disabled={busy} onDone={() => void act({ id: loop.id, action: circle }).then((ok) => ok && onClosed(circle))} /> : undefined}
       trailing={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className={MENU_BUTTON} disabled={busy} aria-label={`Actions: ${loop.title}`} title="Actions"><Icon name="MoreHorizontal" /></button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48">{items}</DropdownMenuContent>
+          <DropdownMenuContent align="end" className="min-w-48">
+            <DropdownMenuItem onSelect={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {items}
+          </DropdownMenuContent>
         </DropdownMenu>
       }
       below={<>

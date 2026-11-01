@@ -193,6 +193,13 @@ check on hover), and the row stays put with Undo. Each row's actions are in
 its ⋯ menu, and Change trigger
 opens under the row. Its header opens the full Loops tab.
 
+To talk a loop through, pick **Discuss** in its ⋯ menu (on the Loops tab,
+its Discuss button). It puts the loop in the Bot chat's draft as an `@loop`
+chip without sending, so you type your question; the Bot gets the loop's
+title, why and trigger when you send. You can also drag a row from the pane
+into the composer: it drops the loop's `::loop` line and title as text,
+which the Bot reads the same way.
+
 ![The Bot's chat with the Loops pane open on the right: the chat's header has a Loops button badged 4; the pane has Add a loop, area chips and Anyone, then Needs you now (Choose the deck contractor, Reply to Yassine, Pay the property tax installment, the recruiter call), Coming up with each trigger, and Agents on it. In the chat, the Bot's "Loops" card reads 4 need you · 5 coming up · 2 with agents · 2 waiting on others, with Open Loops beside the chat](assets/loops-pane.png)
 
 ![A row's kind circle hovered in the pane: it shows a check, Mark done](assets/loops-pane-row-hover.png)

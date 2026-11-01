@@ -74,7 +74,7 @@ it('names a thread owner by its title, marks it archived, and drops the link onc
  expect(threadOwner('thread:thr_a',null)).toEqual({owner:'thread:thr_a',name:'A thread that was removed',threadId:null});});
 it('serves loops.list with held reasons and thread owners, and ticks when the Attention Router turns on',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
- const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:false}),onChange:(f:typeof onChange)=>{onChange=f;}})},
   sdk:{threads:{get:async({threadId}:{threadId:string})=>{if(threadId==='thr_egv6yq7mbp')return {title:'AI power Long read'};throw Error('Not found');}}}};
  const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
@@ -88,7 +88,7 @@ it('serves loops.list with held reasons and thread owners, and ticks when the At
 
 it('releases Patrick\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
- const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
  const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
  const low=loops.store.add({title:'Tailscale node',priority:'low'});const later=loops.store.add({title:'Later',trigger:{type:'time',at:Date.now()+86400000}});
@@ -106,3 +106,22 @@ it('releases Patrick\'s own Surface now at once, past the morning hold and the b
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
  const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
  expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});
+
+it('gives the Bot a mentioned or referenced loop: the @loop provider, loops_get, and the hint in the tool descriptions',async()=>{
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:vi.fn()},
+  settings:{define:()=>({get:async()=>({loopsEnabled:true}),onChange:()=>{}})},sdk:{threads:{get:async()=>null}}};
+ const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
+ const l=loops.store.add({title:'Reply to Yassine\nabout the referral',why:'The posting closes Friday.',trigger:{type:'event',event:'reply:yassine',label:'when Yassine replies'}});
+ loops.store.add({title:'Pay the tax'});
+ const provider=(bb.ui.registerMentionProvider as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+ expect(provider.id).toBe('loop');
+ expect((await provider.search({query:'yassine'})).map((i:{id:string})=>i.id)).toEqual([l.id]);
+ const {context}=await provider.resolve(l.id);
+ for(const part of [`id: ${l.id}`,'title: Reply to Yassine about the referral','why: The posting closes Friday.','trigger: event reply:yassine (when Yassine replies)','it is the topic'])expect(context).toContain(part);
+ // A loop deleted since doesn't block the send.
+ expect((await provider.resolve('loop_gone')).context).toContain('no longer exists');
+ const tools=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]);
+ const get=tools.find((t:{name:string})=>t.name==='loops_get');
+ expect(JSON.parse(await get.execute({id:l.id})).loop.id).toBe(l.id);
+ for(const name of ['loops_get','loops_list'])expect(tools.find((t:{name:string})=>t.name===name).description).toContain('::loop{id="…"} line');
+});

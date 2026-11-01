@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickComposer } from "./composer";
+import { pickComposer, pickThreadComposer } from "./composer";
 
 const main = { name: "main", scope: { kind: "new-thread", projectId: null } } as const;
 const floated = { name: "floated", scope: { kind: "thread", threadId: "thr_a" } } as const;
@@ -27,5 +27,13 @@ describe("pickComposer", () => {
 
   it("returns null when no composer is mounted", () => {
     expect(pickComposer([], "thr_a")).toBeNull();
+  });
+});
+
+describe("pickThreadComposer", () => {
+  it("takes only the thread's own composer: no new-thread or queued-message fallback", () => {
+    expect(pickThreadComposer([floated, main], "thr_a")).toBe(floated);
+    expect(pickThreadComposer([main, other], "thr_z")).toBeNull();
+    expect(pickThreadComposer([queued], "thr_c")).toBeNull();
   });
 });

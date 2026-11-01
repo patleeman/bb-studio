@@ -46,11 +46,30 @@ The public Studio contract exports these method names verbatim, including dots:
 An event trigger takes an optional `label` in words ("when Unraid fixes the
 PHP CVE"); without one the UI prettifies the event key.
 
-Agent tools: loops_add accepts structured fields; loops_list, loops_update,
-loops_act, loops_fire and loops_morning mirror the APIs above. These are included
+Agent tools: loops_add accepts structured fields; loops_list, loops_get,
+loops_update, loops_act, loops_fire and loops_morning mirror the APIs above. These are included
 in Studio's agent configuration. Capture tools should avoid duplicating pending
 Bot questions; a source `{kind: 'interaction', ref: '<interaction id>'}` also lets
 the badge deduplicate an explicitly tracked interaction.
+
+### Discussing a loop in the chat
+
+Patrick brings a loop into the Bot chat to talk about it (`src/loops/reference.ts`):
+
+- **Discuss**, first in each row's ⋯ menu in the pane and a row action on the
+  Loops tab, puts an `@loop` mention chip at the end of the Bot chat's draft
+  with `composer.insert` and focuses it; nothing is sent. On the tab it opens
+  the chat first and waits for its composer. Studio registers the `loop`
+  mention provider (`@loop` works in any composer too); at send time it
+  resolves to the loop's id, title, why and trigger, agent-only.
+- **Dragging a pane row** into the composer drops `::loop{id="…"}` and
+  "About: <title>" as `text/plain`. BB's composer (ProseMirror) inserts plain
+  text where it's dropped. It can't take a chip: BB's own thread drag into
+  the composer is a pointer drag with an in-memory registry, not HTML5 drag
+  data, and SDK 0.6.37 has no drop API for plugin mentions.
+- loops_get reads one loop by id. Its description and loops_list's say a
+  `::loop{id="…"}` line or a Loop mention in Patrick's message makes that
+  loop the topic.
 
 ## Directives for the UI worker
 
@@ -161,7 +180,8 @@ side panel, a `threadPanelAction` with id `loops`, so it stays up beside the
 Bot's chat. It has the tab's sections, area chips, Owner and Add a loop; each
 row is a title, one line of detail and a ⋯ menu with the row's actions (Done,
 Snooze, Hand off, a decision's options, Got it, Surface now, Take it back,
-Open thread, Nudge them, Change trigger…, Drop), and Done rows keep Undo.
+Open thread, Nudge them, Change trigger…, Drop) after Discuss, and Done rows
+keep Undo. Open rows drag into the composer as their `::loop` line.
 Change trigger opens under its row, with Send to iPhone. On Patrick's do and read
 loops the kind circle is the Done checkbox (a check on hover, Mark done;
 read closes as Got it): one click closes it, and the row stays in place, done

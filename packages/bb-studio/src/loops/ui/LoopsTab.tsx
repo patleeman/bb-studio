@@ -4,6 +4,7 @@
 // items as the Bot row's badge), Coming up (whoever will do it), Agents on it,
 // Waiting on others and Done in the last seven days. Area chips and an Owner
 // menu filter it; "Add a loop" hands a typed line to the Bot to fill in.
+// Each open row's Discuss opens the Bot chat with the loop in its draft.
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState, type ReactNode } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Icon, cn } from "../../kit/ui/index";
@@ -12,7 +13,7 @@ import { errorMessage } from "../../kit/format";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { AREAS, dueLabel, elapsed, fullWhen, INLINE_OPTIONS, KIND, ownerName, ownerThread, shortWhen, sourceText, triggerLabel, type Hold, type OwnerInfo } from "./model";
-import { useLoopActions, useLoopPeople, usePlaceNames, type LoopPeople } from "./hooks";
+import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, type LoopPeople } from "./hooks";
 
 // A row's actions show on hover or keyboard focus (and always on touch), and
 // stay while one of their menus is open; hidden, they take no room.
@@ -251,6 +252,12 @@ function TriggerButton({ loop, places, onSave }: { loop: Loop; places: string[];
   return <ChangeTrigger loop={loop} places={places} onSave={onSave} />;
 }
 
+/** Discuss: opens the Bot chat with the loop in its draft (useDiscussLoop). */
+function DiscussButton({ loop, people }: { loop: Loop; people: LoopPeople }) {
+  const discuss = useDiscussLoop(people.botThreadId, people.botName);
+  return <button type="button" className={CARD_GHOST} onClick={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</button>;
+}
+
 function NeedsYouRow({ loop, people, places, refresh }: RowProps) {
   const { act, update, busy, error } = useLoopActions(refresh);
   const due = dueLabel(loop.due);
@@ -273,7 +280,7 @@ function NeedsYouRow({ loop, people, places, refresh }: RowProps) {
   return <>
     <Row testId="loop-needs" icon={KIND[loop.kind].icon} title={loop.title} subtitle={<Subtitle loop={loop} />}
       right={due ? <span className={due.urgent ? "text-warning" : undefined}>{due.text}</span> : null}
-      actions={<>{actions}<span className="ml-auto" /><TriggerButton loop={loop} places={places} onSave={retrigger} /></>} />
+      actions={<>{actions}<span className="ml-auto" /><DiscussButton loop={loop} people={people} /><TriggerButton loop={loop} places={places} onSave={retrigger} /></>} />
     {error ? <p role="alert" className="px-9 pb-2 text-xs text-destructive">{error}</p> : null}
   </>;
 }
@@ -287,6 +294,7 @@ function ComingUpRow({ loop, people, places, refresh, held, owners }: RowProps) 
       subtitle={mine ? undefined : <span className="truncate">{ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner))} will do it</span>}
       right={<>
         <span className={ROW_ACTIONS}>
+          <DiscussButton loop={loop} people={people} />
           {mine ? <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button> : null}
           <TriggerButton loop={loop} places={places} onSave={(changes) => void update({ id: loop.id, changes })} />
         </span>
@@ -312,7 +320,7 @@ function AgentRow({ loop, people, refresh, owners }: RowProps) {
         <AreaChip area={loop.area} />
       </>}
       right={<>
-        <span className={ROW_ACTIONS}><button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button></span>
+        <span className={ROW_ACTIONS}><DiscussButton loop={loop} people={people} /><button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button></span>
         {thread ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</button> : null}
       </>} />
   );
@@ -328,6 +336,7 @@ function WaitingRow({ loop, people, places, refresh }: RowProps) {
         <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: loop.id, action: "nudge" }).then((ok) => setNote(ok))}><Icon name="BellDot" />Nudge them</button>
       </>}
       actions={<>
+        <DiscussButton loop={loop} people={people} />
         <TriggerButton loop={loop} places={places} onSave={(changes) => void update({ id: loop.id, changes })} />
         <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</button>
       </>} />
