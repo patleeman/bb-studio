@@ -492,8 +492,19 @@ enum BotDemo {
         decode(#"[{"id":"int_demo1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"approval","subject":{"kind":"command","command":"git push origin release/1.4","cwd":"~/code/app"},"reason":"Push the release workflow fix","availableDecisions":["allow_once","deny"]}}]"#)
     }
 
+    /// `-qaDemoQuestion secret`: a secrets request (fake key names only);
+    /// `plugin`: the ask-user-question plugin's form; else a core question.
     fileprivate static var questionInteractions: [PendingInteraction] {
-        decode(#"[{"id":"int_question1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"user_question","questions":[{"id":"q1","prompt":"Which venue should I book for the Lisbon offsite?","multiSelect":false,"allowFreeText":true,"options":[{"value":"lx","label":"LX Factory","description":"Biggest room, furthest from the hotel"},{"value":"tivoli","label":"Tivoli","description":"Walkable, smaller room"},{"value":"later","label":"Decide later"}]}]}}]"#)
+        let arguments = ProcessInfo.processInfo.arguments
+        let at = arguments.firstIndex(of: "-qaDemoQuestion").map { $0 + 1 }
+        let kind = at.flatMap { arguments.indices.contains($0) ? arguments[$0] : nil }
+        if kind == "secret" {
+            return decode(#"[{"id":"int_secret1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"origin":{"kind":"plugin","pluginId":"secrets","rendererId":"secret-request"},"payload":{"kind":"plugin","title":"Credentials","data":{"purpose":"The demo needs an API key.","destination":{"kind":"dotenv","path":"~/code/app/.env"},"fields":[{"name":"DEMO_API_KEY","description":"A fake key for the demo"}]}}}]"#)
+        }
+        if kind == "plugin" {
+            return decode(#"[{"id":"int_plugin1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"origin":{"kind":"plugin","pluginId":"ask-user-question","rendererId":"ask-user-question"},"payload":{"kind":"plugin","title":"Offsite","data":{"questions":[{"id":"q1","prompt":"What should the offsite be called?","multiSelect":false,"allowFreeText":true,"options":[]}]}}}]"#)
+        }
+        return decode(#"[{"id":"int_question1","threadId":"\#(threadId)","status":"pending","createdAt":\#(now),"payload":{"kind":"user_question","questions":[{"id":"q1","prompt":"Which venue should I book for the Lisbon offsite?","multiSelect":false,"allowFreeText":true,"options":[{"value":"lx","label":"LX Factory","description":"Biggest room, furthest from the hotel"},{"value":"tivoli","label":"Tivoli","description":"Walkable, smaller room"},{"value":"later","label":"Decide later"}]}]}}]"#)
     }
 
     private static var qaAttention: Bool { ProcessInfo.processInfo.arguments.contains("-qaBotAttention") }

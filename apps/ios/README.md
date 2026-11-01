@@ -150,6 +150,17 @@ while the Duo folds, splits, resizes its list and comes back from the
 background with the keyboard up; `TEST_RUNNER_HANG_MESSAGES` sets the
 chat's length.
 
+A tap on the transcript puts the keyboard away, but not a tap on a row's
+text field. On TestFlight 2144, a tap on a pending secret request's field
+took the keyboard from the composer and ended editing straight after, so
+nothing could be typed there. `InteractionFieldUITests` types fake values
+into a secret request's field, a question's answer field and the
+ask-user-question plugin's field (`-qaDemoQuestion secret|plugin|question`),
+both in the Bot chat and as a transcript row, then taps the transcript to
+check that it still closes the keyboard. Set `TEST_RUNNER_TRANSCRIPT_V2=0`
+for the old transcript and `TEST_RUNNER_INTERACTION_LAYOUT=outer` for the
+Duo's outer screen.
+
 Nothing of ours reloads the keyboard while the window resizes under it. A
 third crash on the Duo (TestFlight 1421) was the keyboard itself, in the
 split transition it runs around the fold, removing a constraint Auto Layout
