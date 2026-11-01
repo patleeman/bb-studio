@@ -6,7 +6,7 @@
 // current-time line. A job that runs more than eight times a day is a thin
 // band with a tick per run; in a narrow day a block drops its kind icon for
 // the name, and blocks that overlap sit side by side while each keeps 64 px,
-// the rest folding into a "+N" chip that lists them (a failure keeps its
+// the rest folding into a "+N" chip under them that lists them (a failure keeps its
 // block; a live run folded away pulses on the chip). Paused jobs aren't drawn: they're listed under
 // Paused, beside the grid (under it in a narrow pane), with Resume.
 import { GHOST_BUTTON, ICON_BUTTON } from "../../kit/app/index";
@@ -143,12 +143,12 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
                     const { blocks, chips } = placeBlocks(day.singles, tz, SPAN, maxLanes);
                     const top = (at: number) => Math.min(minuteOfDay(at, tz), 24 * 60 - SPAN) * HOUR / 60;
                     return <>
-                      {blocks.map(({ event, lane, of, folded }) => {
-                        const room = `(100% - ${inset + 2 + (folded ? CHIP : 0)}px)`;
+                      {blocks.map(({ event, lane, of }) => {
+                        const room = `(100% - ${inset + 2}px)`;
                         return <Block key={event.key} event={event} source={byId.get(event.sourceId)!} now={now} tz={tz} onOpen={open}
                           style={{ top: top(event.at), left: `calc(${inset}px + ${room} * ${lane / of})`, width: `calc(${room} / ${of} - 2px)` }} />;
                       })}
-                      {chips.map((chip) => <FoldChipButton key={chip.at} chip={chip} byId={byId} now={now} onOpen={open} style={{ top: top(chip.at), right: 2, width: CHIP - 2, height: SPAN * HOUR / 60 - 2 }} />)}
+                      {chips.map((chip) => <FoldChipButton key={chip.at} chip={chip} byId={byId} now={now} onOpen={open} style={{ top: top(chip.at) + SPAN * HOUR / 60, left: inset, minWidth: CHIP, height: 14 }} />)}
                     </>;
                   })()}
                   {day.start <= now && now < day.end ? (
@@ -250,7 +250,7 @@ function FoldChipButton({ chip, byId, now, style, onOpen }: { chip: FoldChip; by
       </span>
     )}>
       <button type="button" data-fold={chip.events.length} aria-label={`${chip.events.length} more: ${chip.events.map((event) => byId.get(event.sourceId)!.name).join(", ")}`} onClick={() => onOpen(chip.events[0]!)}
-        className={`absolute z-10 flex items-center justify-center rounded bg-muted text-[10px] font-medium tabular-nums text-foreground hover:z-30 hover:brightness-110 ${failed ? "ring-1 ring-destructive" : "ring-1 ring-border"}`} style={style}>
+        className={`absolute z-10 flex items-center justify-center rounded px-1 bg-muted text-[10px] font-medium tabular-nums text-foreground hover:z-30 hover:brightness-110 ${failed ? "ring-1 ring-destructive" : "ring-1 ring-border"}`} style={style}>
         {live ? <span data-fold-live className="mr-0.5 size-1.5 shrink-0 animate-pulse rounded-full bg-foreground" /> : null}+{chip.events.length}
       </button>
     </Tooltip>

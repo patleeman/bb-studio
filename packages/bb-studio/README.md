@@ -1748,7 +1748,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   run (failures as red dots), named with its cadence under the grid ("Inbox
   triage · every 2 h"). Blocks that overlap sit side by side while each
   keeps 64 px; past that a failure, then a live run, keep the room and the
-  rest fold into a "+N" chip that lists them (pulsing when it holds the
+  rest fold into a "+N" chip under them that lists them (pulsing when it holds the
   live run). ‹ › page by as many days as
   show. Paused jobs aren't drawn; they're listed under
   **Paused** beside the grid (under it in a narrow pane) with **Resume**. A

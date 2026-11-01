@@ -257,7 +257,7 @@ const PRIORITY: Record<EventStatus, number> = { failed: 0, running: 1, scheduled
  * Blocks `span` minutes tall that would overlap go side by side, at most
  * `maxLanes` across. A cluster that needs more shows its most telling blocks
  * (a failure, then a live run, then the earliest) and folds the rest into a
- * "+N" chip at the cluster's top; its blocks leave room for the chip.
+ * "+N" chip at the cluster's top, which the view draws under them.
  */
 export function placeBlocks(events: CalendarEvent[], zone: string, span: number, maxLanes = Infinity): { blocks: PlacedBlock[]; chips: FoldChip[] } {
   const blocks: PlacedBlock[] = [];
