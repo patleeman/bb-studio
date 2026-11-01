@@ -64,6 +64,29 @@
             "type": "string",
             "maxLength": 500
           },
+          "category": {
+            "type": "string",
+            "const": "BB_LOOP"
+          },
+          "loopId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "done",
+                "snooze",
+                "got_it",
+                "drop",
+                "choose",
+                "hand_off",
+                "nudge"
+              ]
+            }
+          },
           "coalesceKey": {
             "type": "string",
             "maxLength": 300

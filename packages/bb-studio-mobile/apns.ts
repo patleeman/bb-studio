@@ -101,6 +101,7 @@ export class ProviderToken {
  * `enrichInteraction` in server.ts.
  */
 export function notificationCategory(data: Record<string, unknown>): string | undefined {
+  if (data.category === 'BB_LOOP' && typeof data.loopId === 'string') return 'BB_LOOP';
   switch (data.kind) {
     case "pending-interaction": {
       if (typeof data.interactionId !== "string") return undefined;

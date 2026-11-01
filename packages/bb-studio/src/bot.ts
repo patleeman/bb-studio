@@ -1,3 +1,4 @@
+import { LoopStore } from './loops/store';
 // The user's Bot: an always-on agent with a name, an avatar and a state
 // (active, paused, stopped), modelled on ChatGPT's dots. It replaces the
 // Chief of Staff. Its thread is an implementation detail: it is the personal
@@ -1158,7 +1159,7 @@ export class Bots {
       Promise.resolve().then(() => this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "40", types: ["item/completed"] })).catch(() => []) as Promise<{ createdAt?: number; data?: { item?: { type?: string; text?: string } } }[]>,
     ]);
     const replies = events.flatMap((event) => event.data?.item?.type === "agentMessage" && typeof event.data.item.text === "string" && event.createdAt ? [{ createdAt: event.createdAt, text: event.data.item.text }] : []);
-    return botAttention({ lastReadAt: thread?.lastReadAt ?? null, interactions: pendingInteractions(interactions), replies });
+    return botAttention({ loops: this.stored()?.threadId === threadId ? new LoopStore(this.deps.db).all().filter(l=>l.status==='surfaced'&&l.owner==='patrick'&&l.kind!=='waiting') : [], lastReadAt: thread?.lastReadAt ?? null, interactions: pendingInteractions(interactions), replies });
   }
 
   /** A Bot's attention alone (bot_attention): its chat, nothing else. */

@@ -66,6 +66,9 @@ export const mobileContract = defineRpcContract({
       threadId: z.string().min(1).nullable(),
       projectId: z.string().min(1),
       path: z.string().max(500).optional(),
+      category: z.literal('BB_LOOP').optional(),
+      loopId: z.string().min(1).optional(),
+      actions: z.array(z.enum(['done','snooze','got_it','drop','choose','hand_off','nudge'])).optional(),
       coalesceKey: z.string().max(300).optional(),
     }),
     output: z.object({ ok: z.literal(true), sent: z.number() }),
@@ -433,7 +436,7 @@ export default async function plugin(bb: BbPluginApi) {
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}) };
       const tickets = devices.length > 0
         ? await deliver(devices.map((to) => ({
-            to, title: input.title, body: input.body, sound: "default", data,
+            to, title: input.title, body: input.body, sound: "default", data: {...data, ...(input.category ? {category:input.category,loopId:input.loopId,actions:input.actions} : {})},
             ...(input.coalesceKey ? { collapseId: input.coalesceKey } : {}),
           })))
         : [];

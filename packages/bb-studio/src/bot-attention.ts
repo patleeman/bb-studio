@@ -42,12 +42,13 @@ export type BotAttention = { reason: string; count: number; since: number };
  * `replies` are the Bot's recent messages (agentMessage items) with when
  * they finished; `lastReadAt` is when the user last read the chat.
  */
-export function botAttention(input: { lastReadAt: number | null | undefined; interactions: readonly (Interaction & { createdAt?: number })[]; replies: readonly { createdAt: number; text: string }[] }): BotAttention | null {
+export function botAttention(input: { loops?: readonly {id:string;createdAt:number;source?:{kind:string;ref:string}|null}[]; lastReadAt: number | null | undefined; interactions: readonly (Interaction & { createdAt?: number })[]; replies: readonly { createdAt: number; text: string }[] }): BotAttention | null {
   const pending = pendingInteractions(input.interactions);
-  const unread = input.replies.filter((reply) => reply.createdAt > (input.lastReadAt ?? 0) && visibleReply(reply.text));
-  const count = pending.length + unread.length;
+  const loops = (input.loops ?? []).filter(l=>!pending.some(p=>l.source?.kind==='interaction'&&l.source.ref===p.id));
+  const unread = input.replies.filter((reply) => reply.createdAt > (input.lastReadAt ?? 0) && visibleReply(reply.text) && !loops.some(l=>reply.text.includes(`::loop{id="${l.id}"}`)));
+  const count = pending.length + unread.length + loops.length;
   if (!count) return null;
-  const since = Math.min(...[...pending.map((each) => each.createdAt ?? Infinity), ...unread.map((each) => each.createdAt)].filter(Number.isFinite), Date.now());
+  const since = Math.min(...[...loops.map(l=>l.createdAt), ...pending.map((each) => each.createdAt ?? Infinity), ...unread.map((each) => each.createdAt)].filter(Number.isFinite), Date.now());
   const reason = pending.length ? interactionReason(pending) : `${count} ${count === 1 ? "thing" : "things"} for you`;
   return { reason, count, since };
 }

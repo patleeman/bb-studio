@@ -55,6 +55,45 @@ public enum Mobile {
     }
   }
 
+  public enum NotifyInputActionsItem: Sendable, Hashable, Codable {
+    case done
+    case snooze
+    case got_it
+    case drop
+    case choose
+    case hand_off
+    case nudge
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "done": self = .done
+      case "snooze": self = .snooze
+      case "got_it": self = .got_it
+      case "drop": self = .drop
+      case "choose": self = .choose
+      case "hand_off": self = .hand_off
+      case "nudge": self = .nudge
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .done: try container.encode("done")
+      case .snooze: try container.encode("snooze")
+      case .got_it: try container.encode("got_it")
+      case .drop: try container.encode("drop")
+      case .choose: try container.encode("choose")
+      case .hand_off: try container.encode("hand_off")
+      case .nudge: try container.encode("nudge")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct NotifyInput: Sendable, Hashable, Codable {
     public var title: String?
     public var body: String?
@@ -62,15 +101,21 @@ public enum Mobile {
     public var threadId: String?
     public var projectId: String?
     public var path: String?
+    public var category: String?
+    public var loopId: String?
+    public var actions: [NotifyInputActionsItem]?
     public var coalesceKey: String?
 
-    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, coalesceKey: String? = nil) {
+    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, category: String? = nil, loopId: String? = nil, actions: [NotifyInputActionsItem]? = nil, coalesceKey: String? = nil) {
       self.title = title
       self.body = body
       self.kind = kind
       self.threadId = threadId
       self.projectId = projectId
       self.path = path
+      self.category = category
+      self.loopId = loopId
+      self.actions = actions
       self.coalesceKey = coalesceKey
     }
   }

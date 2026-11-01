@@ -247,3 +247,11 @@ it("returns individual results over a local HTTP/2 transport", async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+it('preserves loop notification actions and selects BB_LOOP', () => {
+  const data = {category:'BB_LOOP',loopId:'loop_123',actions:['done','snooze','got_it'],threadId:'thr_bot',kind:'turn-finished'};
+  expect(notificationCategory(data)).toBe('BB_LOOP');
+  const payload = apnsPayload({to:'apns:abc',title:'Call plumber',body:'Home repair',data});
+  expect(JSON.parse(payload)).toMatchObject({...data,aps:{category:'BB_LOOP'}});
+  expect(notificationCategory({category:'BB_LOOP'})).toBeUndefined();
+});

@@ -26,3 +26,8 @@ it("a thread the Bot started says what it's waiting for, not that it needs you",
   expect(threadWaitingFor([approval])).toBe("Waiting for approval");
   expect(interactionReason([{ status: "pending", payload: { kind: "plugin" } }])).toBe("Waiting for your answer");
 });
+
+it('counts surfaced loops once alongside pending interactions and card replies', () => {
+  expect(botAttention({lastReadAt:0, interactions:[], replies:[{createdAt:120,text:'::loop{id="loop_a"}'}], loops:[{id:'loop_a',createdAt:100}]})).toMatchObject({count:1});
+  expect(botAttention({lastReadAt:0, interactions:[{id:'q',status:'pending',createdAt:50}], replies:[], loops:[{id:'loop_b',createdAt:100,source:{kind:'interaction',ref:'q'}}]})).toMatchObject({count:1});
+});
