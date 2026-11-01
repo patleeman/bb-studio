@@ -1753,7 +1753,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   show. Paused jobs aren't drawn; they're listed under
   **Paused** beside the grid (under it in a narrow pane) with **Resume**. A
   due block opens its job in the list.
-  ![Dot's Automations week in a staged BB, dark: Today and Mon 2 to Sat 7 across, 7 AM to 7 PM down; the Daily digest runner at 8:00, Weekly review on Monday at 9:00, Status probe at 10:00 and 16:00, Lunch check at 13:00 and the Call Dana back reminder Monday at 15:30 as blocks; the Check-in and Inbox triage runner (every 2 h) as thin bands named under the grid; today the Status probe run that failed at 4:14 PM outlined red with ⚠ and the Daily digest run going on at the red current-time line; Maintenance and Release watch listed under Paused with Resume; the sidebar's Dot group has Runners and no Schedule](assets/bot-automations-week.png)
+  ![Dot's Automations week in a staged BB, dark: Today and Mon 2 to Sat 7 across, 7 AM to 7 PM down; the Daily digest runner at 8:00, Weekly review on Monday at 9:00, Status probe at 10:00 and 16:00, Lunch check at 13:00 and the Call Dana back reminder Monday at 15:30 as blocks; the Check-in and Inbox triage runner (every 2 h) as thin bands named under the grid; today, at the red current-time line, the Status probe run that failed outlined red with ⚠, and under it a pulsing “+4” chip holding that slot's other runs, the Daily digest run going on among them; Maintenance and Release watch listed under Paused with Resume; the sidebar's Dot group has Runners and no Schedule](assets/bot-automations-week.png)
 
   **List**: each row shows its newest failed run in red when it was the
   last run ("Last run failed …: the error"), muted when a later run went
