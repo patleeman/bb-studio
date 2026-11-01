@@ -2,11 +2,14 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { add, loop, type Loop, act } from './contract';
 import type { z } from 'zod';
+/** A place trigger's key: the place name in lower case, as `place:<key>:arrive` events carry it. */
+export const placeKey=(name:string)=>name.trim().toLowerCase();
 export class LoopStore {
  constructor(readonly db:Database.Database) {}
  all():Loop[] { return this.db.prepare('SELECT record FROM bot_loops').all().map((r:any)=>loop.parse(JSON.parse(r.record))); }
  get(id:string):Loop { const r=this.db.prepare('SELECT record FROM bot_loops WHERE id=?').get(id) as any; if(!r)throw Error('Loop not found'); return loop.parse(JSON.parse(r.record)); }
  save(l:Loop):Loop { l=loop.parse(l);
+ if(l.trigger.type==='place'&&l.trigger.place)l={...l,trigger:{...l.trigger,place:placeKey(l.trigger.place)}};
  const t=l.trigger;if(t.type==='time'&&!Number.isFinite(t.at)||t.type==='event'&&!t.event||t.type==='place'&&(!t.place||!t.direction))throw Error('Trigger fields are incomplete');
  if(['done','dropped'].includes(l.status)&&!l.closedAt)l={...l,closedAt:Date.now(),closedBy:'cos'};
   this.db.prepare('INSERT OR REPLACE INTO bot_loops VALUES (?,?)').run(l.id,JSON.stringify(l)); return l; }
@@ -20,5 +23,8 @@ export class LoopStore {
  else if(x.action==='snooze'){if(!x.snooze)throw Error('Choose a snooze preset');l={...l,status:'snoozed',trigger:snooze(x.snooze)};this.event(l.id,'snoozed',{until:l.trigger});}
  else if(x.action==='hand_off'){l={...l,status:'in_progress',owner:x.owner??'cos'};this.event(l.id,'handed_off',{owner:l.owner});}
  this.event(l.id,'acted',{action:x.action,option:x.option});return this.save({...l,updatedAt:Date.now()});})(); }
+ // The phone's place names replace the list; one per name, ignoring case.
+ places():string[] { const r=this.db.prepare("SELECT value FROM loop_scheduler WHERE key='places'").get() as {value:string}|undefined; return r?JSON.parse(r.value):[]; }
+ setPlaces(names:string[]):string[] { const seen=new Set<string>(),kept:string[]=[]; for(const n of names.map(n=>n.trim()).filter(Boolean)){if(seen.has(placeKey(n)))continue;seen.add(placeKey(n));kept.push(n);} const list=kept.slice(0,20); this.db.prepare("INSERT OR REPLACE INTO loop_scheduler VALUES ('places',?)").run(JSON.stringify(list)); return list; }
  groups(filters:{area?:string;owner?:string}={}) {const g={needsYouNow:[] as Loop[],comingUp:[] as Loop[],agentsOnIt:[] as Loop[],waitingOnOthers:[] as Loop[],done:[] as Loop[]}; for(const l of this.all()){if(filters.area&&l.area!==filters.area||filters.owner&&l.owner!==filters.owner)continue; if(l.closedAt){if(l.closedAt>Date.now()-7*86400000)g.done.push(l);}else if(l.kind==='waiting')g.waitingOnOthers.push(l);else if(l.owner!=='patrick')g.agentsOnIt.push(l);else if(l.status==='surfaced')g.needsYouNow.push(l);else g.comingUp.push(l);}return g;}
 }

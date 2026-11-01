@@ -24,7 +24,13 @@ The public Studio contract exports these method names verbatim, including dots:
   Closed actions are idempotent. hand_off defaults to cos; a thread owner is
   `thread:<id>`. Handoffs, nudges and choices tell the Bot to take the next step.
 - `loops.fire({event})`: match a named event and latch eligible triggers as due.
-- `loops.place({place,direction})`: fire `place:<name>:arrive|leave`.
+- `loops.place({place,direction})`: fire `place:<name>:arrive|leave`. A place
+  key is its name in lower case, so `Home` fires `place:home:arrive`, which
+  the `home` snooze waits on. Saved place triggers are lower-cased too.
+- `loops.setPlaces({names})`: the phone replaces its list of saved place names
+  whenever its places change (at most 20, 60 characters each, deduplicated
+  ignoring case). Names only, never coordinates. `loops.places({})` returns
+  `{names}` for Change trigger on the desktop.
 - `loops.morning({})`: date in the configured zone, top five Patrick-owned due
   or decide items ranked urgent/normal/low then due, `more` count, and
   `lowPriority` queued items. The CoS supplies calendar and good-to-know lines.

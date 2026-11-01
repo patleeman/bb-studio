@@ -10,6 +10,8 @@ public enum Studio {
     public static let loops_act = "loops.act"
     public static let loops_fire = "loops.fire"
     public static let loops_place = "loops.place"
+    public static let loops_setPlaces = "loops.setPlaces"
+    public static let loops_places = "loops.places"
     public static let loops_morning = "loops.morning"
     public static let code_get = "code.get"
     public static let code_update = "code.update"
@@ -329,6 +331,10 @@ public enum Studio {
   public typealias LoopsFire = LoopsFireOutput
 
   public typealias LoopsPlace = LoopsPlaceOutput
+
+  public typealias LoopsSetPlaces = LoopsSetPlacesOutput
+
+  public typealias LoopsPlaces = LoopsPlacesOutput
 
   public typealias LoopsMorning = LoopsMorningOutput
 
@@ -3367,6 +3373,36 @@ public enum Studio {
 
     public init(matched: Double? = nil) {
       self.matched = matched
+    }
+  }
+
+  public struct LoopsSetPlacesInput: Sendable, Hashable, Codable {
+    public var names: [String]?
+
+    public init(names: [String]? = nil) {
+      self.names = names
+    }
+  }
+
+  public struct LoopsSetPlacesOutput: Sendable, Hashable, Codable {
+    public var names: [String]?
+
+    public init(names: [String]? = nil) {
+      self.names = names
+    }
+  }
+
+  public struct LoopsPlacesInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct LoopsPlacesOutput: Sendable, Hashable, Codable {
+    public var names: [String]?
+
+    public init(names: [String]? = nil) {
+      self.names = names
     }
   }
 

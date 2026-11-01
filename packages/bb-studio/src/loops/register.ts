@@ -2,7 +2,7 @@ import type { BbPluginApi } from '@get-bb/plugin-sdk';
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { rpcContract, add, act, update, filters } from './contract';
-import { LoopStore } from './store';
+import { LoopStore, placeKey } from './store';
 import { LoopScheduler, defaults, snooze } from './scheduler';
 export const LOOP_TOOLS=['loops_add','loops_list','loops_update','loops_act','loops_fire','loops_morning'];
 export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3]){
@@ -17,7 +17,7 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  bb.rpc.register(rpcContract,{
  'loops.list':x=>store.groups(x),'loops.get':({id})=>({loop:store.get(id),history:store.history(id)}),
  'loops.add':async({text})=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft loop ${l.id} from this typed line using loops_update, then queue it: ${JSON.stringify(text)}`);return l;},
- 'loops.update':change,'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${place}:${direction}`),'loops.morning':()=>scheduler.morning(),
+ 'loops.update':change,'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${placeKey(place)}:${direction}`),'loops.setPlaces':({names})=>({names:store.setPlaces(names)}),'loops.places':()=>({names:store.places()}),'loops.morning':()=>scheduler.morning(),
  });
  bb.agents.registerTool({name:'loops_add',description:'Track an open obligation, decision or item to read. Set its owner and release trigger; avoid duplicating pending chat questions.',parameters:add,execute:x=>JSON.stringify(store.add(x))});
  bb.agents.registerTool({name:'loops_list',description:'Review tracked loops, grouped by who needs to act. Filter by area or owner.',parameters:filters,execute:x=>JSON.stringify(store.groups(x))});
