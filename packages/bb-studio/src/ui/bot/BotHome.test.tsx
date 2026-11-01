@@ -354,6 +354,7 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
   const runs: Record<string, { runs: unknown[] }> = {
     probe: { runs: [{ id: "run_f", at: at(10, 0), status: "failed", manual: false, outcome: "Failed: exit 2: status page unreachable", threadId: null }] },
     triage: { runs: [0, 2, 4, 6, 8, 10].map((hour) => ({ id: `run_t${hour}`, at: at(hour, 0), status: "succeeded", manual: false, outcome: "Ran", threadId: "thr_triage" })) },
+    backup: { runs: [{ id: "run_b", at: at(10, 5), status: "succeeded", manual: false, outcome: "Ran", threadId: "thr_bot" }] },
     none: { runs: [] },
   };
   state.data = {
@@ -364,6 +365,7 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
       job("lunch", "checkin", "Lunch check", { type: "times", days: all, times: ["13:00"] }, { threadId: "thr_bot" }),
       job("probe", "watcher", "Status probe", { type: "times", days: all, times: ["10:00"] }, { threadId: "thr_bot" }),
       job("remind", "reminder", "Call Dana", { type: "once", at: at(15, 30) }),
+      job("backup", "watcher", "Backup check", { type: "times", days: all, times: ["10:05"] }, { threadId: "thr_bot" }),
       job("watch", "watcher", "Release watch", { type: "interval", every: 15, unit: "minutes", days: all }, { state: "paused" }),
     ] },
     bot_automation_runs: (input: { id: string }) => runs[input.id] ?? runs.none,
@@ -386,6 +388,12 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
     expect(failed.nextElementSibling?.textContent).toContain("Failed: exit 2: status page unreachable");
     await act(async () => click(failed));
     expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+    // Overlapping it in a narrow day, Backup check folds into "+1"; the failure keeps the room.
+    const today = failed.closest("[data-day]")!;
+    expect(today.querySelector('[data-source="backup"]')).toBeNull();
+    const chip = today.querySelector("[data-fold]")!;
+    expect(chip.textContent).toBe("+1");
+    expect(chip.nextElementSibling?.textContent).toContain("Backup check");
     // The one-off reminder and the paused watcher: one block; none, but listed under Paused.
     expect(calendar.querySelectorAll('[data-source="remind"]')).toHaveLength(1);
     expect(calendar.querySelector('[data-source="watch"]')).toBeNull();
@@ -400,6 +408,10 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
     await act(async () => click(due));
     expect(container.querySelector("[data-testid=automations-calendar]")).toBeNull();
     expect(container.querySelector('[data-automation="lunch"] > button')?.getAttribute("aria-expanded")).toBe("true");
+    // The list row shows the last failure too.
+    expect(container.querySelector('[data-automation="probe"] [data-testid=automation-last-failure]')?.textContent).toContain("Last run failed");
+    expect(container.querySelector('[data-automation="probe"] [data-testid=automation-last-failure]')?.textContent).toContain("exit 2: status page unreachable");
+    expect(container.querySelector('[data-automation="lunch"] [data-testid=automation-last-failure]')).toBeNull();
   } finally {
     vi.useRealTimers();
   }

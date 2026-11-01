@@ -1746,12 +1746,17 @@ of Staff", with the same thread and check-ins; rename it from its page.
   A run going on now grows down to the red current-time line. A job that
   runs more than eight times in a day draws as a thin band with a tick per
   run (failures as red dots), named with its cadence under the grid ("Inbox
-  triage · every 2 h"). Paused jobs aren't drawn; they're listed under
+  triage · every 2 h"). Blocks that overlap sit side by side while each
+  keeps 64 px; past that a live run, then a failure, keep the room and the
+  rest fold into a "+N" chip that lists them. ‹ › page by as many days as
+  show. Paused jobs aren't drawn; they're listed under
   **Paused** beside the grid (under it in a narrow pane) with **Resume**. A
   due block opens its job in the list.
   ![Dot's Automations week in a staged BB, dark: Today and Mon 2 to Sat 7 across, 7 AM to 7 PM down; the Daily digest runner at 8:00, Weekly review on Monday at 9:00, Status probe at 10:00 and 16:00, Lunch check at 13:00 and the Call Dana back reminder Monday at 15:30 as blocks; the Check-in and Inbox triage runner (every 2 h) as thin bands named under the grid; today the Status probe run that failed at 4:14 PM outlined red with ⚠ and the Daily digest run going on at the red current-time line; Maintenance and Release watch listed under Paused with Resume; the sidebar's Dot group has Runners and no Schedule](assets/bot-automations-week.png)
 
-  **List**: each row shows the schedule in
+  **List**: each row shows its newest failed run in red when it was the
+  last run ("Last run failed …: the error"), muted when a later run went
+  fine; and the schedule in
   words, the next run and its state; open it for the instruction or script,
   recent runs with what came of each (BB's `automations_runs`), Pause /
   Resume, Run now, Edit and Delete. A bot with none only wakes when you

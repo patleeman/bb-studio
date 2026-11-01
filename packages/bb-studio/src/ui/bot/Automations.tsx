@@ -16,6 +16,7 @@ import { WEEKDAYS, type Schedule } from "../../schedule";
 import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { ScheduleEditor, schedulePreview } from "./ScheduleEditor";
 import { AutomationsCalendar } from "./AutomationsCalendar";
+import { RUNS_LIMIT } from "./calendar";
 
 type Kind = BotAutomationView["kind"];
 export const KIND: Record<Kind, { label: string; icon: string; blurb: string }> = {
@@ -112,6 +113,10 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
   onToggle(): void; onOpen(threadId: string): void; onAction(method: "bot_automation_pause" | "bot_automation_resume" | "bot_automation_run_now" | "bot_maintenance_dry_run"): void; onEdit(): void; onDelete(): void;
 }) {
   const off = automation.state !== "active";
+  // The calendar reads the same runs (one shared request); the newest failure shows here too.
+  const runs = useLive("bot_automation_runs", { botId, id: automation.id, limit: RUNS_LIMIT }, { pollMs: 30_000 });
+  const failure = runs.data?.runs.find((run) => run.status === "failed") ?? null;
+  const latest = runs.data?.runs.find((run) => run.status !== "resumed" && run.outcome !== "Running") ?? null;
   const when = off ? STATE[automation.state] : automation.nextRunAt ? at(automation.nextRunAt) : automation.scheduleText;
   return (
     <li data-automation={automation.id} data-kind={automation.kind} className="flex flex-col gap-1 py-2">
@@ -120,7 +125,13 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
         <span className={`min-w-0 flex-1 truncate text-sm font-medium ${off ? "text-muted-foreground" : ""}`}>{automation.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground" title={automation.nextRunAt ? `Next run ${new Date(automation.nextRunAt).toLocaleString()}` : undefined}>{when}</span>
       </button>
-      <p className="truncate pl-5.5 text-xs text-muted-foreground" title={automation.lastOutcome ?? undefined}>{automation.scheduleText}{automation.kind === "watcher" && automation.target !== "main" ? ` · wakes ${automation.targetName}` : ""}{automation.lastOutcome && !/^(succeeded|skipped)$/.test(automation.lastOutcome) ? <> · <span className="text-foreground/80">{automation.lastOutcome}</span></> : null}</p>
+      <p className="truncate pl-5.5 text-xs text-muted-foreground" title={automation.lastOutcome ?? undefined}>{automation.scheduleText}{automation.kind === "watcher" && automation.target !== "main" ? ` · wakes ${automation.targetName}` : ""}{automation.lastOutcome && !/^(succeeded|skipped)$/.test(automation.lastOutcome) && !(failure && automation.lastOutcome === failure.outcome) ? <> · <span className="text-foreground/80">{automation.lastOutcome}</span></> : null}</p>
+      {failure ? (
+        <p data-testid="automation-last-failure" className={`flex min-w-0 items-center gap-1 pl-5.5 text-xs ${latest?.id === failure.id ? "text-destructive" : "text-muted-foreground"}`} title={failure.outcome}>
+          <Icon name="AlertCircle" className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">{latest?.id === failure.id ? "Last run failed" : "Last failed"} {at(failure.at)}: {failure.outcome.replace(/^Failed:?\s*/i, "") || "Failed"}</span>
+        </p>
+      ) : null}
       {expanded ? (
         <div className="flex flex-col gap-2 pl-5.5 pt-1">
           {automation.kind === "watcher" && automation.script
@@ -146,8 +157,8 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
 }
 
 function RecentRuns({ botId, id, onOpen }: { botId: string; id: string; onOpen(threadId: string): void }) {
-  const runs = useLive("bot_automation_runs", { botId, id, limit: 6 }, { pollMs: 30_000 });
-  const list = runs.data?.runs ?? [];
+  const runs = useLive("bot_automation_runs", { botId, id, limit: RUNS_LIMIT }, { pollMs: 30_000 });
+  const list = runs.data?.runs.slice(0, 6) ?? [];
   if (!list.length) return <p className="text-xs text-muted-foreground">{runs.loading ? "Loading runs…" : "No runs yet."}</p>;
   return (
     <ol aria-label="Recent runs" className="flex flex-col gap-0.5 text-xs">

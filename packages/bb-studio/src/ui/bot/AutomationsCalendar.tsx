@@ -5,7 +5,8 @@
 // red with its error in the tooltip; a run going on now grows to the red
 // current-time line. A job that runs more than eight times a day is a thin
 // band with a tick per run; in a narrow day a block drops its kind icon for
-// the name. Paused jobs aren't drawn: they're listed under
+// the name, and blocks that overlap sit side by side while each keeps 64 px,
+// the rest folding into a "+N" chip that lists them. Paused jobs aren't drawn: they're listed under
 // Paused, beside the grid (under it in a narrow pane), with Resume.
 import { GHOST_BUTTON, ICON_BUTTON } from "../../kit/app/index";
 import { Icon, Tooltip } from "../../kit/ui/index";
@@ -15,12 +16,15 @@ import { useLive } from "../live";
 import { useRunners } from "./Runners";
 import { sidebarAgenda } from "./sidebarAgenda";
 import { BOT_COLORS } from "./BotAvatar";
-import { calendarDays, lanes, minuteOfDay, pausedSources, windowDays, type CalendarBand, type CalendarEvent, type CalendarSource } from "./calendar";
+import { calendarDays, minuteOfDay, pausedSources, placeBlocks, windowDays, windowStart, type CalendarBand, type CalendarEvent, type CalendarSource, type FoldChip, RUNS_LIMIT } from "./calendar";
 
 const HOUR = 36;
 /** A block is this many minutes tall: one line. */
 const SPAN = 30;
 const BAND = 6;
+/** Overlapping blocks narrower than this fold into a "+N" chip. */
+const MIN_LANE = 64;
+const CHIP = 26;
 const KIND_ICON: Record<CalendarSource["kind"], string> = { checkin: "MessageSquare", reminder: "Clock", watcher: "Eye", runner: "Repeat", heartbeat: "MessageSquare", automation: "Zap" };
 const KIND_LABEL: Record<CalendarSource["kind"], string> = { checkin: "Check-in", reminder: "Reminder", watcher: "Watcher", runner: "Runner", heartbeat: "Check-in", automation: "Automation" };
 // Red stays for failures.
@@ -54,7 +58,7 @@ export function calendarSources(automations: BotAutomationView[], scheduled: Par
 
 /** Reads one automation's recent runs into the calendar. */
 function RunsFeed({ botId, id, onRuns }: { botId: string; id: string; onRuns(id: string, runs: BotAutomationRunView[]): void }) {
-  const runs = useLive("bot_automation_runs", { botId, id, limit: 50 }, { pollMs: 30_000 });
+  const runs = useLive("bot_automation_runs", { botId, id, limit: RUNS_LIMIT }, { pollMs: 30_000 });
   useEffect(() => { if (runs.data) onRuns(id, runs.data.runs); }, [runs.data, id, onRuns]);
   return null;
 }
@@ -89,9 +93,11 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
   const paused = pausedSources(sources);
   const side = paused.length > 0 && width >= 760;
   const count = (side ? width - 200 : width) >= 600 ? 7 : 5;
-  const days = calendarDays(sources, windowDays(now + week * count * 86_400_000, count, tz), now, tz);
+  const days = calendarDays(sources, windowDays(windowStart(now, week, count), count, tz), now, tz);
   const byId = new Map(sources.map((source) => [source.id, source]));
   const bandIds = [...new Set(days.flatMap((day) => day.bands.map((band) => band.sourceId)))];
+  const inset = bandIds.length * BAND + 2;
+  const maxLanes = Math.max(1, Math.floor((((side ? width - 204 : width) - 38) / count - inset - 2) / MIN_LANE));
   const scroller = useRef<HTMLDivElement>(null);
   // Opens on the hours around now.
   useLayoutEffect(() => { if (scroller.current) scroller.current.scrollTop = Math.max(0, (minuteOfDay(Date.now(), tz) / 60 - 2) * HOUR); }, [tz]);
@@ -132,10 +138,18 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
                 <div key={day.start} data-day={new Date(day.start).toDateString()} className="@container/day relative border-l border-border"
                   style={{ backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR - 1}px, color-mix(in oklab, var(--border) 60%, transparent) ${HOUR - 1}px, color-mix(in oklab, var(--border) 60%, transparent) ${HOUR}px)` }}>
                   {day.bands.map((band) => <Band key={band.sourceId} band={band} lane={bandIds.indexOf(band.sourceId)} source={byId.get(band.sourceId)!} now={now} tz={tz} onOpen={open} />)}
-                  {lanes(day.singles, tz, SPAN).map(({ event, lane, of }) => (
-                    <Block key={event.key} event={event} source={byId.get(event.sourceId)!} now={now} tz={tz} onOpen={open}
-                      style={{ top: Math.min(minuteOfDay(event.at, tz), 24 * 60 - SPAN) * HOUR / 60, left: `calc(${bandIds.length * BAND + 2}px + (100% - ${bandIds.length * BAND + 4}px) * ${lane / of})`, width: `calc((100% - ${bandIds.length * BAND + 4}px) / ${of} - 2px)` }} />
-                  ))}
+                  {(() => {
+                    const { blocks, chips } = placeBlocks(day.singles, tz, SPAN, maxLanes);
+                    const top = (at: number) => Math.min(minuteOfDay(at, tz), 24 * 60 - SPAN) * HOUR / 60;
+                    return <>
+                      {blocks.map(({ event, lane, of, folded }) => {
+                        const room = `(100% - ${inset + 2 + (folded ? CHIP : 0)}px)`;
+                        return <Block key={event.key} event={event} source={byId.get(event.sourceId)!} now={now} tz={tz} onOpen={open}
+                          style={{ top: top(event.at), left: `calc(${inset}px + ${room} * ${lane / of})`, width: `calc(${room} / ${of} - 2px)` }} />;
+                      })}
+                      {chips.map((chip) => <FoldChipButton key={chip.at} chip={chip} byId={byId} now={now} onOpen={open} style={{ top: top(chip.at), right: 2, width: CHIP - 2, height: SPAN * HOUR / 60 - 2 }} />)}
+                    </>;
+                  })()}
                   {day.start <= now && now < day.end ? (
                     <div data-testid="calendar-now" aria-hidden className="pointer-events-none absolute inset-x-0 z-20 h-0.5 bg-destructive" style={{ top: minuteOfDay(now, tz) * HOUR / 60 }}>
                       <span className="absolute -top-[3px] -left-1 size-2 rounded-full bg-destructive" />
@@ -211,6 +225,31 @@ function Block({ event, source, now, tz, style, onOpen }: { event: CalendarEvent
             // Narrow days leave the room to the name.
             : <Icon name={KIND_ICON[source.kind]} className="hidden size-3 shrink-0 opacity-70 @min-[120px]/day:block" aria-hidden />}
         <span className="min-w-0 truncate font-medium">{source.name}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
+/** The blocks a crowded cluster folded away: "+N", each listed in the tooltip; it opens the first. */
+function FoldChipButton({ chip, byId, now, style, onOpen }: { chip: FoldChip; byId: Map<string, CalendarSource>; now: number; style: CSSProperties; onOpen(event: CalendarEvent): void }) {
+  const failed = chip.events.some((event) => event.status === "failed");
+  return (
+    <Tooltip side="right" label={(
+      <span className="flex flex-col gap-1">
+        {chip.events.map((event) => {
+          const source = byId.get(event.sourceId)!;
+          return (
+            <span key={event.key} className="flex flex-col">
+              <span className="font-medium">{source.name} · {clock(event.at)}</span>
+              <span>{event.status === "failed" ? `Failed: ${event.error}` : event.status === "running" ? "Running" : event.status === "scheduled" ? (event.at > now ? "Due" : "Was due") : event.outcome ?? "Ran"}</span>
+            </span>
+          );
+        })}
+      </span>
+    )}>
+      <button type="button" data-fold={chip.events.length} aria-label={`${chip.events.length} more: ${chip.events.map((event) => byId.get(event.sourceId)!.name).join(", ")}`} onClick={() => onOpen(chip.events[0]!)}
+        className={`absolute z-10 flex items-center justify-center rounded bg-muted text-[10px] font-medium tabular-nums text-foreground hover:z-30 hover:brightness-110 ${failed ? "ring-1 ring-destructive" : "ring-1 ring-border"}`} style={style}>
+        +{chip.events.length}
       </button>
     </Tooltip>
   );

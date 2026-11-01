@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Schedule } from "../../schedule";
-import { cadenceLabel, calendarDays, lanes, minuteOfDay, occurrences, pausedSources, sourceEvents, windowDays, zonedTime, type CalendarSource } from "./calendar";
+import { cadenceLabel, calendarDays, placeBlocks, windowStart, minuteOfDay, occurrences, pausedSources, sourceEvents, windowDays, zonedTime, type CalendarSource } from "./calendar";
 
 const NY = "America/New_York";
 const H = 3_600_000, M = 60_000;
@@ -133,9 +133,24 @@ describe("days", () => {
     expect(cadenceLabel([0, H, 2 * H])).toBe("hourly");
   });
 
+  const block = (minute: number, id: string, status: "scheduled" | "failed" | "running" | "ok" = "scheduled") => ({ key: id, sourceId: id, at: MON + minute * M, status, outcome: null, error: null, threadId: null, manual: false });
   it("puts blocks that would overlap side by side", () => {
-    const at = (minute: number, id: string) => ({ key: id, sourceId: id, at: MON + minute * M, status: "scheduled" as const, outcome: null, error: null, threadId: null, manual: false });
-    const placed = lanes([at(540, "a"), at(560, "b"), at(700, "c")], NY, 45);
-    expect(placed.map((each) => [each.event.sourceId, each.lane, each.of])).toEqual([["a", 0, 2], ["b", 1, 2], ["c", 0, 1]]);
+    const { blocks, chips } = placeBlocks([block(540, "a"), block(560, "b"), block(700, "c")], NY, 45);
+    expect(blocks.map((each) => [each.event.sourceId, each.lane, each.of, each.folded])).toEqual([["a", 0, 2, false], ["b", 1, 2, false], ["c", 0, 1, false]]);
+    expect(chips).toEqual([]);
+  });
+
+  it("folds a cluster wider than the day into a +N chip, keeping the live run and the failure", () => {
+    const { blocks, chips } = placeBlocks([block(960, "digest", "ok"), block(974, "probe", "failed"), block(985, "live", "running")], NY, 30, 1);
+    expect(blocks.map((each) => [each.event.sourceId, each.lane, each.of, each.folded])).toEqual([["live", 0, 1, true]]);
+    expect(chips.map((chip) => [chip.at, chip.events.map((each) => each.sourceId)])).toEqual([[MON + 960 * M, ["digest", "probe"]]]);
+    const two = placeBlocks([block(960, "digest", "ok"), block(974, "probe", "failed"), block(985, "live", "running")], NY, 30, 2);
+    expect(two.blocks.map((each) => each.event.sourceId)).toEqual(["probe", "live"]);
+    expect(two.chips[0]!.events.map((each) => each.sourceId)).toEqual(["digest"]);
+  });
+
+  it("pages by as many days as show", () => {
+    expect(windowStart(MON, 1, 5) - MON).toBe(5 * 24 * H);
+    expect(windowStart(MON, -1, 7) - MON).toBe(-7 * 24 * H);
   });
 });

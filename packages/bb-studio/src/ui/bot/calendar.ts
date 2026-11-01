@@ -40,6 +40,8 @@ export type CalendarBand = { sourceId: string; events: CalendarEvent[]; from: nu
 export type CalendarDay = { start: number; end: number; singles: CalendarEvent[]; bands: CalendarBand[] };
 
 const MINUTE = 60_000;
+/** Runs read per automation; the List row, its recent runs and the calendar share the request. */
+export const RUNS_LIMIT = 50;
 /** More runs than this in a day draw as a band, not blocks. */
 export const DENSE_PER_DAY = 8;
 /** Occurrences one job may add to a window, so a every-minute cron stays cheap. */
@@ -247,13 +249,34 @@ export function calendarDays(sources: CalendarSource[], days: { start: number; e
   });
 }
 
-/** Side-by-side lanes for blocks `span` minutes tall that would overlap: each block's lane and how many its cluster has. */
-export function lanes(events: CalendarEvent[], zone: string, span: number): { event: CalendarEvent; lane: number; of: number }[] {
-  const out: { event: CalendarEvent; lane: number; of: number }[] = [];
-  let group: typeof out = [];
+export type PlacedBlock = { event: CalendarEvent; lane: number; of: number; folded: boolean };
+export type FoldChip = { at: number; events: CalendarEvent[] };
+const PRIORITY: Record<EventStatus, number> = { running: 0, failed: 1, scheduled: 2, ok: 3, skipped: 4 };
+
+/**
+ * Blocks `span` minutes tall that would overlap go side by side, at most
+ * `maxLanes` across. A cluster that needs more shows its most telling blocks
+ * (a live run, then a failure, then the earliest) and folds the rest into a
+ * "+N" chip at the cluster's top; its blocks leave room for the chip.
+ */
+export function placeBlocks(events: CalendarEvent[], zone: string, span: number, maxLanes = Infinity): { blocks: PlacedBlock[]; chips: FoldChip[] } {
+  const blocks: PlacedBlock[] = [];
+  const chips: FoldChip[] = [];
+  let group: { event: CalendarEvent; lane: number }[] = [];
   let ends: number[] = [];
   let groupEnd = -Infinity;
-  const finish = () => { const of = ends.length || 1; for (const each of group) each.of = of; out.push(...group); group = []; ends = []; };
+  const finish = () => {
+    if (!group.length) return;
+    const of = ends.length;
+    if (of <= maxLanes) blocks.push(...group.map((each) => ({ ...each, of, folded: false })));
+    else {
+      const ranked = [...group].sort((a, b) => PRIORITY[a.event.status] - PRIORITY[b.event.status] || a.event.at - b.event.at);
+      const shown = ranked.slice(0, Math.max(1, maxLanes)).sort((a, b) => a.event.at - b.event.at);
+      blocks.push(...shown.map((each, lane) => ({ event: each.event, lane, of: shown.length, folded: true })));
+      chips.push({ at: group[0]!.event.at, events: ranked.slice(shown.length).map((each) => each.event).sort((a, b) => a.at - b.at) });
+    }
+    group = []; ends = [];
+  };
   for (const event of [...events].sort((a, b) => a.at - b.at)) {
     const top = minuteOfDay(event.at, zone);
     if (top >= groupEnd) { finish(); groupEnd = -Infinity; }
@@ -261,11 +284,14 @@ export function lanes(events: CalendarEvent[], zone: string, span: number): { ev
     if (lane < 0) lane = ends.push(0) - 1;
     ends[lane] = top + span;
     groupEnd = Math.max(groupEnd, top + span);
-    group.push({ event, lane, of: 1 });
+    group.push({ event, lane });
   }
   finish();
-  return out;
+  return { blocks, chips };
 }
+
+/** Where the window `week` pages from today starts: a page is as many days as show. */
+export const windowStart = (now: number, week: number, count: number) => now + week * count * 86_400_000;
 
 /** The jobs that are paused, for the calendar's Paused list. */
 export const pausedSources = (sources: CalendarSource[]) => sources.filter((source) => source.state === "paused").sort((a, b) => a.name.localeCompare(b.name));
