@@ -113,7 +113,8 @@ export default ({ pluginRpc, bbCli, sleep }) => {
   }));
   const week = async (client, mode) => {
     await liveRun(); await botPage(client, mode); await toWeek(client);
-    await client.waitForSelector('[data-testid=automations-calendar] [data-status="running"]', 30000);
+    // A live block, or a "+N" chip pulsing with it in a crowded slot.
+    await client.waitForSelector('[data-testid=automations-calendar] [data-status="running"], [data-testid=automations-calendar] [data-fold-live]', 30000);
     await sleep(500);
   };
   return [
@@ -125,6 +126,13 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     ...both("after-week", week),
     ...both("after-hover", async (client, mode) => { await botPage(client, mode); await toWeek(client); await hover(client, '[data-testid=automations-calendar] [data-source][data-status="scheduled"][aria-label^="Lunch check"]'); }),
     ...both("after-failed", async (client, mode) => { await botPage(client, mode); await toWeek(client); await hover(client, '[data-testid=automations-calendar] [data-status="failed"]'); await client.waitForText("connection refused", 5000); }),
+    ...both("after-list", async (client, mode) => {
+      await botPage(client, mode); await toWeek(client);
+      await client.evaluate(`(() => { [...document.querySelectorAll('[role=tab]')].find((each) => each.textContent.trim() === "List").click(); return true; })()`);
+      await client.waitForSelector("[data-testid=automation-last-failure]", 30000);
+      await client.waitForText("connection refused", 10000);
+      await toAutomations(client);
+    }),
     ...both("after-paused", async (client, mode) => {
       await botPage(client, mode); await toWeek(client);
       await client.evaluate(`(() => { document.querySelector("[data-testid=calendar-paused]").scrollIntoView({ block: "center" }); return true; })()`);

@@ -140,10 +140,10 @@ describe("days", () => {
     expect(chips).toEqual([]);
   });
 
-  it("folds a cluster wider than the day into a +N chip, keeping the live run and the failure", () => {
+  it("folds a cluster wider than the day into a +N chip, keeping the failure, then the live run", () => {
     const { blocks, chips } = placeBlocks([block(960, "digest", "ok"), block(974, "probe", "failed"), block(985, "live", "running")], NY, 30, 1);
-    expect(blocks.map((each) => [each.event.sourceId, each.lane, each.of, each.folded])).toEqual([["live", 0, 1, true]]);
-    expect(chips.map((chip) => [chip.at, chip.events.map((each) => each.sourceId)])).toEqual([[MON + 960 * M, ["digest", "probe"]]]);
+    expect(blocks.map((each) => [each.event.sourceId, each.lane, each.of, each.folded])).toEqual([["probe", 0, 1, true]]);
+    expect(chips.map((chip) => [chip.at, chip.events.map((each) => each.sourceId)])).toEqual([[MON + 960 * M, ["digest", "live"]]]);
     const two = placeBlocks([block(960, "digest", "ok"), block(974, "probe", "failed"), block(985, "live", "running")], NY, 30, 2);
     expect(two.blocks.map((each) => each.event.sourceId)).toEqual(["probe", "live"]);
     expect(two.chips[0]!.events.map((each) => each.sourceId)).toEqual(["digest"]);

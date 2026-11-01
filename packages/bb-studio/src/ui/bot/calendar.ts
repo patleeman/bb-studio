@@ -251,12 +251,12 @@ export function calendarDays(sources: CalendarSource[], days: { start: number; e
 
 export type PlacedBlock = { event: CalendarEvent; lane: number; of: number; folded: boolean };
 export type FoldChip = { at: number; events: CalendarEvent[] };
-const PRIORITY: Record<EventStatus, number> = { running: 0, failed: 1, scheduled: 2, ok: 3, skipped: 4 };
+const PRIORITY: Record<EventStatus, number> = { failed: 0, running: 1, scheduled: 2, ok: 3, skipped: 4 };
 
 /**
  * Blocks `span` minutes tall that would overlap go side by side, at most
  * `maxLanes` across. A cluster that needs more shows its most telling blocks
- * (a live run, then a failure, then the earliest) and folds the rest into a
+ * (a failure, then a live run, then the earliest) and folds the rest into a
  * "+N" chip at the cluster's top; its blocks leave room for the chip.
  */
 export function placeBlocks(events: CalendarEvent[], zone: string, span: number, maxLanes = Infinity): { blocks: PlacedBlock[]; chips: FoldChip[] } {

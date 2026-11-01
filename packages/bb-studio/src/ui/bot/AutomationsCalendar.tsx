@@ -6,7 +6,8 @@
 // current-time line. A job that runs more than eight times a day is a thin
 // band with a tick per run; in a narrow day a block drops its kind icon for
 // the name, and blocks that overlap sit side by side while each keeps 64 px,
-// the rest folding into a "+N" chip that lists them. Paused jobs aren't drawn: they're listed under
+// the rest folding into a "+N" chip that lists them (a failure keeps its
+// block; a live run folded away pulses on the chip). Paused jobs aren't drawn: they're listed under
 // Paused, beside the grid (under it in a narrow pane), with Resume.
 import { GHOST_BUTTON, ICON_BUTTON } from "../../kit/app/index";
 import { Icon, Tooltip } from "../../kit/ui/index";
@@ -233,6 +234,7 @@ function Block({ event, source, now, tz, style, onOpen }: { event: CalendarEvent
 /** The blocks a crowded cluster folded away: "+N", each listed in the tooltip; it opens the first. */
 function FoldChipButton({ chip, byId, now, style, onOpen }: { chip: FoldChip; byId: Map<string, CalendarSource>; now: number; style: CSSProperties; onOpen(event: CalendarEvent): void }) {
   const failed = chip.events.some((event) => event.status === "failed");
+  const live = chip.events.some((event) => event.status === "running");
   return (
     <Tooltip side="right" label={(
       <span className="flex flex-col gap-1">
@@ -249,7 +251,7 @@ function FoldChipButton({ chip, byId, now, style, onOpen }: { chip: FoldChip; by
     )}>
       <button type="button" data-fold={chip.events.length} aria-label={`${chip.events.length} more: ${chip.events.map((event) => byId.get(event.sourceId)!.name).join(", ")}`} onClick={() => onOpen(chip.events[0]!)}
         className={`absolute z-10 flex items-center justify-center rounded bg-muted text-[10px] font-medium tabular-nums text-foreground hover:z-30 hover:brightness-110 ${failed ? "ring-1 ring-destructive" : "ring-1 ring-border"}`} style={style}>
-        +{chip.events.length}
+        {live ? <span data-fold-live className="mr-0.5 size-1.5 shrink-0 animate-pulse rounded-full bg-foreground" /> : null}+{chip.events.length}
       </button>
     </Tooltip>
   );
