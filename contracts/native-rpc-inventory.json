@@ -930,6 +930,42 @@
       "plugin": "mobile",
       "method": "mute_set",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.start",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.tool",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.event",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.poll",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.end",
+      "coverage": "generated method"
     }
   ]
 }
