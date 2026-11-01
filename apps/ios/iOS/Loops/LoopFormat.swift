@@ -132,6 +132,14 @@ enum LoopFormat {
         return "\(minutes / (24 * 60)) d"
     }
 
+    /// Discuss: the loop's card line and title, drafted in the Bot chat for
+    /// your question. The Bot reads the line as "this loop is the topic" and
+    /// looks it up with loops_get; the same text a desktop row drags in.
+    static func discussDraft(_ loop: LoopItem) -> String {
+        let title = loop.title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return "::loop{id=\"\(loop.id)\"}\nAbout: \(title)\n"
+    }
+
     /// The nudge drafted for the Chief of Staff, for you to send.
     static func nudgeDraft(_ loop: LoopItem) -> String {
         "Draft a nudge about “\(loop.title)” for me to approve. Don't send it yet."

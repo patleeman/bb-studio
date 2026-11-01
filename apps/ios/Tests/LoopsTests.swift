@@ -60,6 +60,13 @@ final class LoopsTests: XCTestCase {
         return LoopItem(try JSONDecoder().decode(Studio.LoopsGetOutputLoop.self, from: data))
     }
 
+    func testDiscussDraftsTheLoopsLineAndTitle() throws {
+        var item = try loop()
+        item.title = "Reply to Yassine\n about the  referral"
+        XCTAssertEqual(LoopFormat.discussDraft(item), "::loop{id=\"loop_t\"}\nAbout: Reply to Yassine about the referral\n")
+        XCTAssertEqual(Directive(line: "::loop{id=\"loop_t\"}").flatMap(LoopDirective.init), .card(id: "loop_t"))
+    }
+
     func testPhasesFollowTheSettingAndTheLoop() throws {
         XCTAssertEqual(LoopCardState(enabled: false, loop: try loop()).phase, .off)
         XCTAssertEqual(LoopCardState(enabled: nil, loop: nil).phase, .loading)

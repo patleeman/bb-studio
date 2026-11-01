@@ -152,7 +152,14 @@ struct LoopsView: View {
     private func row(_ loop: LoopItem, section: LoopRowSection) -> some View {
         LoopsRow(loop: loop, section: section, expanded: expanded == loop.id,
                  toggle: { withAnimation(.smooth(duration: 0.2)) { expanded = expanded == loop.id ? nil : loop.id } },
-                 act: { act(loop, $0) }, sheet: { sheet = $0 })
+                 act: { act(loop, $0) }, sheet: { sheet = $0 }, discuss: { discuss(loop) })
+    }
+
+    /// Discuss: the loop in the Bot chat's draft, not sent, and the chat.
+    private func discuss(_ loop: LoopItem) {
+        sheet = nil
+        app.draftForBot(LoopFormat.discussDraft(loop))
+        openChat()
     }
 
     private func act(_ loop: LoopItem, _ action: LoopAction) {
@@ -232,6 +239,7 @@ private struct LoopsRow: View {
     let toggle: () -> Void
     let act: (LoopAction) -> Void
     let sheet: (LoopsSheet) -> Void
+    let discuss: () -> Void
     @State private var model = LoopsModel.shared
     @EnvironmentObject private var app: AppModel
 
@@ -313,6 +321,7 @@ private struct LoopsRow: View {
 
     private var more: some View {
         Menu {
+            Button(action: discuss) { Label("Discuss", systemImage: "bubble.left.and.text.bubble.right") }
             Button { sheet(.trigger(loop)) } label: { Label("Change trigger", systemImage: "calendar.badge.clock") }
             Button { surfaceNow() } label: { Label("Surface now", systemImage: "arrow.up.to.line") }
             Menu {

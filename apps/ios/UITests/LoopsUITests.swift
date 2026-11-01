@@ -94,6 +94,27 @@ final class LoopsUITests: ServerIsolatedUITestCase {
         composer.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (composer.value as? String ?? "").count + 2))
     }
 
+    func testDiscussPhone() throws {
+        try launchPhone()
+        app.buttons["bot-switch-loops"].tap()
+        XCTAssertTrue(header("Needs you now").waitForExistence(timeout: 10))
+        loopsScreen.staticTexts["Reply to Yassine about the FDE referral"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Hand off"].waitForExistence(timeout: 5))
+        app.buttons["More actions"].firstMatch.tap()
+        let discuss = app.buttons["Discuss"]
+        XCTAssertTrue(discuss.waitForExistence(timeout: 5), "Discuss is in the row's ⋯ menu")
+        shot("iphone-row-discuss")
+        // It switches to the chat and drafts the loop's line and title; it never sends.
+        discuss.tap()
+        let composer = app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        let draft = { composer.value as? String ?? "" }
+        XCTAssertTrue(draft().contains("::loop{id=\"loop_yassine\"}\nAbout: Reply to Yassine about the FDE referral"), draft())
+        shot("iphone-discuss-draft")
+        // Leave no draft behind for the next launch's renders.
+        composer.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: draft().count + 2))
+    }
+
     func testMorningCardPhone() throws {
         try launchPhone()
         let morning = app.descendants(matching: .any)["morning-card"]

@@ -43,6 +43,7 @@ bubble and the morning card loses its list. There is no Loops and no Places.
 | --- | --- | --- | --- |
 | Chat \| Loops switch and the Loops list (Add a loop, area chips, owner menu, sections) | [png](after/iphone-loops.png) | [png](after/duo-folded-loops.png) | [png](after/duo-unfolded-loops.png) (All loops in the left pane, the chat on the right) |
 | A row's buttons and its ⋯ menu (Change trigger, Surface now, Hand off…, Drop) | [png](after/iphone-row.png) | [png](after/duo-folded-row.png) | [png](after/duo-unfolded-row.png) |
+| Discuss, first in a row's ⋯ menu: it switches to Chat and drafts the loop's `::loop{id}` line and "About: <title>", unsent (dark; `LoopsUITests.testDiscussPhone` saves `iphone-row-discuss` and `iphone-discuss-draft`) | not committed | | |
 | Change trigger: Place selected, Arrive, Send to iPhone on | [png](after/iphone-trigger.png) | | |
 | Empty | [png](after/iphone-loops-empty.png) | | |
 
