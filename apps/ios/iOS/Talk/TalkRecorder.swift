@@ -97,9 +97,11 @@ final class TalkRecorder: ObservableObject {
             }
             guard !abandoned, !Task.isCancelled else { return }
             let session = AVAudioSession.sharedInstance()
-            // The iPhone mic: switching to AirPods' hands-free mic mid-start stalls the engine and sends silence.
-            // Voice chat cancels echo; without the Bluetooth HFP option it keeps the iPhone mic too.
-            try session.setCategory(.playAndRecord, mode: echoCancelling ? .voiceChat : .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
+            // A car's or headset's mic over Bluetooth HFP when one is connected (VoiceAudioConfig): the
+            // input is chosen here, before the engine starts, since switching to it mid-start stalled the
+            // engine. A route change later restarts capture on the new input (SegmentCapture.restart).
+            // Voice chat cancels echo.
+            try VoiceAudioConfig.dictation(echoCancelling: echoCancelling).apply(to: session)
             try session.setActive(true)
 
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
@@ -411,6 +413,14 @@ final class SegmentCapture: @unchecked Sendable {
                     .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
                 log.info("capture: interruption \(type == .began ? "began" : "ended", privacy: .public)")
                 if type == .ended { self?.restart() }
+            },
+            // A headset or the car connecting: record from its mic. The engine's configuration change
+            // above restarts capture on it.
+            center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { note in
+                let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
+                guard let reason = AVAudioSession.RouteChangeReason(rawValue: raw), VoiceRouteAction.forReason(reason) == .reroute else { return }
+                log.info("capture: route changed (\(raw, privacy: .public))")
+                try? VoiceAudioConfig.preferBluetoothInput(AVAudioSession.sharedInstance())
             },
         ]
     }
