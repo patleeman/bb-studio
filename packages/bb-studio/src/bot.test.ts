@@ -279,7 +279,7 @@ it("the Bot's attention: its replies the user hasn't read, not [PASS], until the
   x.add({ id: "bot1", status: "idle", lastReadAt: 100 });
   await x.bots.setThread("bot1");
   x.replies.set("bot1", [{ at: 90, text: "Morning: nothing new." }, { at: 150, text: "[PASS]" }, { at: 200, text: "Deploy watch: staging is down since build 419. Roll back?" }]);
-  expect((await x.bots.activity()).attention).toEqual({ reason: "1 thing for you", count: 1, since: 200 });
+  expect((await x.bots.activity()).attention).toEqual({ reason: "1 thing for you", count: 1, since: 200, unread: 1 });
   x.replies.set("bot1", [...x.replies.get("bot1")!, { at: 300, text: "Also: the lease payment failed." }]);
   expect((await x.bots.activity()).attention).toMatchObject({ reason: "2 things for you", count: 2 });
   // An approval in its chat comes first.

@@ -6,10 +6,10 @@ const approval = { id: "a", status: "pending", payload: { kind: "approval" }, cr
 
 it("says why the Bot needs you, in a few words", () => {
   expect(botAttention({ lastReadAt: 100, interactions: [], replies: [] })).toBeNull();
-  expect(botAttention({ lastReadAt: 100, interactions: [question], replies: [] })).toEqual({ reason: "Asked you a question", count: 1, since: 50 });
+  expect(botAttention({ lastReadAt: 100, interactions: [question], replies: [] })).toEqual({ reason: "Asked you a question", count: 1, since: 50, unread: 0 });
   expect(botAttention({ lastReadAt: 100, interactions: [question, approval], replies: [] })?.reason).toBe("Waiting for approval");
   expect(botAttention({ lastReadAt: 100, interactions: [{ ...question, status: "resolved" }], replies: [] })).toBeNull();
-  expect(botAttention({ lastReadAt: 100, interactions: [], replies: [{ createdAt: 120, text: "Staging is down. Roll back?" }] })).toEqual({ reason: "1 thing for you", count: 1, since: 120 });
+  expect(botAttention({ lastReadAt: 100, interactions: [], replies: [{ createdAt: 120, text: "Staging is down. Roll back?" }] })).toEqual({ reason: "1 thing for you", count: 1, since: 120, unread: 1 });
   expect(botAttention({ lastReadAt: 100, interactions: [], replies: [{ createdAt: 120, text: "One" }, { createdAt: 130, text: "Two" }] })?.reason).toBe("2 things for you");
 });
 

@@ -1120,13 +1120,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsListOutputNeedsYouNowItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsListOutputNeedsYouNowItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputNeedsYouNowItemTriggerDirection? = nil) {
+    public init(type: LoopsListOutputNeedsYouNowItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputNeedsYouNowItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -1335,13 +1337,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsListOutputComingUpItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsListOutputComingUpItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputComingUpItemTriggerDirection? = nil) {
+    public init(type: LoopsListOutputComingUpItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputComingUpItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -1550,13 +1554,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsListOutputAgentsOnItItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsListOutputAgentsOnItItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputAgentsOnItItemTriggerDirection? = nil) {
+    public init(type: LoopsListOutputAgentsOnItItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputAgentsOnItItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -1765,13 +1771,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsListOutputWaitingOnOthersItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsListOutputWaitingOnOthersItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputWaitingOnOthersItemTriggerDirection? = nil) {
+    public init(type: LoopsListOutputWaitingOnOthersItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputWaitingOnOthersItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -1980,13 +1988,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsListOutputDoneItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsListOutputDoneItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputDoneItemTriggerDirection? = nil) {
+    public init(type: LoopsListOutputDoneItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputDoneItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -2093,19 +2103,69 @@ public enum Studio {
     }
   }
 
+  public enum LoopsListOutputHeldItemReason: Sendable, Hashable, Codable {
+    case budget
+    case morning
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "budget": self = .budget
+      case "morning": self = .morning
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .budget: try container.encode("budget")
+      case .morning: try container.encode("morning")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputHeldItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var reason: LoopsListOutputHeldItemReason?
+
+    public init(id: String? = nil, reason: LoopsListOutputHeldItemReason? = nil) {
+      self.id = id
+      self.reason = reason
+    }
+  }
+
+  public struct LoopsListOutputOwnersItem: Sendable, Hashable, Codable {
+    public var owner: String?
+    public var name: String?
+    public var threadId: String?
+
+    public init(owner: String? = nil, name: String? = nil, threadId: String? = nil) {
+      self.owner = owner
+      self.name = name
+      self.threadId = threadId
+    }
+  }
+
   public struct LoopsListOutput: Sendable, Hashable, Codable {
     public var needsYouNow: [LoopsListOutputNeedsYouNowItem]?
     public var comingUp: [LoopsListOutputComingUpItem]?
     public var agentsOnIt: [LoopsListOutputAgentsOnItItem]?
     public var waitingOnOthers: [LoopsListOutputWaitingOnOthersItem]?
     public var done: [LoopsListOutputDoneItem]?
+    public var held: [LoopsListOutputHeldItem]?
+    public var owners: [LoopsListOutputOwnersItem]?
 
-    public init(needsYouNow: [LoopsListOutputNeedsYouNowItem]? = nil, comingUp: [LoopsListOutputComingUpItem]? = nil, agentsOnIt: [LoopsListOutputAgentsOnItItem]? = nil, waitingOnOthers: [LoopsListOutputWaitingOnOthersItem]? = nil, done: [LoopsListOutputDoneItem]? = nil) {
+    public init(needsYouNow: [LoopsListOutputNeedsYouNowItem]? = nil, comingUp: [LoopsListOutputComingUpItem]? = nil, agentsOnIt: [LoopsListOutputAgentsOnItItem]? = nil, waitingOnOthers: [LoopsListOutputWaitingOnOthersItem]? = nil, done: [LoopsListOutputDoneItem]? = nil, held: [LoopsListOutputHeldItem]? = nil, owners: [LoopsListOutputOwnersItem]? = nil) {
       self.needsYouNow = needsYouNow
       self.comingUp = comingUp
       self.agentsOnIt = agentsOnIt
       self.waitingOnOthers = waitingOnOthers
       self.done = done
+      self.held = held
+      self.owners = owners
     }
   }
 
@@ -2219,13 +2279,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsGetOutputLoopTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsGetOutputLoopTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsGetOutputLoopTriggerDirection? = nil) {
+    public init(type: LoopsGetOutputLoopTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsGetOutputLoopTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -2344,13 +2406,27 @@ public enum Studio {
     }
   }
 
+  public struct LoopsGetOutputOwner: Sendable, Hashable, Codable {
+    public var owner: String?
+    public var name: String?
+    public var threadId: String?
+
+    public init(owner: String? = nil, name: String? = nil, threadId: String? = nil) {
+      self.owner = owner
+      self.name = name
+      self.threadId = threadId
+    }
+  }
+
   public struct LoopsGetOutput: Sendable, Hashable, Codable {
     public var loop: LoopsGetOutputLoop?
     public var history: [LoopsGetOutputHistoryItem]?
+    public var owner: LoopsGetOutputOwner?
 
-    public init(loop: LoopsGetOutputLoop? = nil, history: [LoopsGetOutputHistoryItem]? = nil) {
+    public init(loop: LoopsGetOutputLoop? = nil, history: [LoopsGetOutputHistoryItem]? = nil, owner: LoopsGetOutputOwner? = nil) {
       self.loop = loop
       self.history = history
+      self.owner = owner
     }
   }
 
@@ -2464,13 +2540,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsAddOutputTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsAddOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsAddOutputTriggerDirection? = nil) {
+    public init(type: LoopsAddOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsAddOutputTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -2679,13 +2757,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsUpdateInputChangesTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsUpdateInputChangesTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateInputChangesTriggerDirection? = nil) {
+    public init(type: LoopsUpdateInputChangesTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateInputChangesTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -2896,13 +2976,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsUpdateOutputTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsUpdateOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateOutputTriggerDirection? = nil) {
+    public init(type: LoopsUpdateOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateOutputTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -3205,13 +3287,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsActOutputTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsActOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsActOutputTriggerDirection? = nil) {
+    public init(type: LoopsActOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsActOutputTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -3514,13 +3598,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsMorningOutputItemsItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsMorningOutputItemsItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputItemsItemTriggerDirection? = nil) {
+    public init(type: LoopsMorningOutputItemsItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputItemsItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -3729,13 +3815,15 @@ public enum Studio {
     public var event: String?
     public var place: String?
     public var direction: LoopsMorningOutputLowPriorityItemTriggerDirection?
+    public var label: String?
 
-    public init(type: LoopsMorningOutputLowPriorityItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputLowPriorityItemTriggerDirection? = nil) {
+    public init(type: LoopsMorningOutputLowPriorityItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputLowPriorityItemTriggerDirection? = nil, label: String? = nil) {
       self.type = type
       self.at = at
       self.event = event
       self.place = place
       self.direction = direction
+      self.label = label
     }
   }
 
@@ -10165,11 +10253,13 @@ public enum Studio {
     public var reason: String?
     public var count: Double?
     public var since: Double?
+    public var unread: Double?
 
-    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil) {
+    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil, unread: Double? = nil) {
       self.reason = reason
       self.count = count
       self.since = since
+      self.unread = unread
     }
   }
 
@@ -10411,11 +10501,13 @@ public enum Studio {
     public var reason: String?
     public var count: Double?
     public var since: Double?
+    public var unread: Double?
 
-    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil) {
+    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil, unread: Double? = nil) {
       self.reason = reason
       self.count = count
       self.since = since
+      self.unread = unread
     }
   }
 

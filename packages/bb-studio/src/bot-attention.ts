@@ -35,7 +35,7 @@ export function visibleReply(text: string): boolean {
   return !!trimmed && trimmed !== "[PASS]";
 }
 
-export type BotAttention = { reason: string; count: number; since: number };
+export type BotAttention = { reason: string; count: number; since: number; unread: number };
 
 /**
  * What waits on the user in the Bot's chat, or null when nothing does.
@@ -50,5 +50,5 @@ export function botAttention(input: { loopsEnabled?: boolean; loops?: readonly {
   if (!count) return null;
   const since = Math.min(...[...loops.map(l=>l.createdAt), ...pending.map((each) => each.createdAt ?? Infinity), ...unread.map((each) => each.createdAt)].filter(Number.isFinite), Date.now());
   const reason = pending.length ? interactionReason(pending) : `${count} ${count === 1 ? "thing" : "things"} for you`;
-  return { reason, count, since };
+  return { reason, count, since, unread: unread.length };
 }

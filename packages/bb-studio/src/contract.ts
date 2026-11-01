@@ -288,7 +288,8 @@ export const maintenanceRun = z.object({ at: z.number(), dryRun: z.boolean(), su
 const maintenanceRulesSchema = z.object({ threads: z.boolean(), workers: z.boolean(), automations: z.boolean(), memory: z.boolean(), skills: z.boolean(), adopt: z.boolean() });
 const maintenanceView = z.object({ settings: z.object({ enabled: z.boolean(), enabledAt: z.number().nullable(), memoryWords: z.number(), rules: maintenanceRulesSchema }), liveAt: z.number().nullable(), runs: z.array(maintenanceRun) });
 /** What waits on the user in a Bot's chat: why ("Asked you a question", "2 things for you"), how many, and since when. */
-const botAttention = z.object({ reason: z.string(), count: z.number(), since: z.number() });
+/** `unread`: how many of `count` are Bot replies the user hasn't read (the rest are pending questions and released loops). */
+const botAttention = z.object({ reason: z.string(), count: z.number(), since: z.number(), unread: z.number().optional() });
 const botActivity = z.object({
   maintenance: z.array(maintenanceRun).optional(),
   /** The Bot's one "needs you" signal: its own chat has a pending question or approval, or replies the user hasn't read (src/bot-attention.ts). */

@@ -106,6 +106,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -276,6 +280,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -446,6 +454,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -616,6 +628,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -786,6 +802,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -864,6 +884,55 @@
                 "updatedAt",
                 "closedAt",
                 "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "budget",
+                    "morning"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "owners": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "owner",
+                "name",
+                "threadId"
               ],
               "additionalProperties": false
             }
@@ -982,6 +1051,10 @@
                       "arrive",
                       "leave"
                     ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 120
                   }
                 },
                 "required": [
@@ -1085,6 +1158,29 @@
               ],
               "additionalProperties": false
             }
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "owner",
+              "name",
+              "threadId"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1196,6 +1292,10 @@
                   "arrive",
                   "leave"
                 ]
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
               }
             },
             "required": [
@@ -1368,6 +1468,10 @@
                       "arrive",
                       "leave"
                     ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 120
                   }
                 },
                 "required": [
@@ -1505,6 +1609,10 @@
                   "arrive",
                   "leave"
                 ]
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
               }
             },
             "required": [
@@ -1719,6 +1827,10 @@
                   "arrive",
                   "leave"
                 ]
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
               }
             },
             "required": [
@@ -2031,6 +2143,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -2204,6 +2320,10 @@
                         "arrive",
                         "leave"
                       ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
                     }
                   },
                   "required": [
@@ -10817,6 +10937,9 @@
                   },
                   "since": {
                     "type": "number"
+                  },
+                  "unread": {
+                    "type": "number"
                   }
                 },
                 "required": [
@@ -11153,6 +11276,9 @@
                     "type": "number"
                   },
                   "since": {
+                    "type": "number"
+                  },
+                  "unread": {
                     "type": "number"
                   }
                 },

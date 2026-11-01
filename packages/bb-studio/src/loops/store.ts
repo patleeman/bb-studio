@@ -4,6 +4,8 @@ import { add, loop, type Loop, act } from './contract';
 import type { z } from 'zod';
 /** A place trigger's key: the place name in lower case, as `place:<key>:arrive` events carry it. */
 export const placeKey=(name:string)=>name.trim().toLowerCase();
+/** Queued or snoozed: the loop waits for its trigger, whoever owns it. */
+export const waitsForTrigger=(l:Pick<Loop,'status'|'closedAt'>)=>!l.closedAt&&(l.status==='queued'||l.status==='snoozed');
 export class LoopStore {
  constructor(readonly db:Database.Database,readonly changed:()=>void=()=>{}) {}
  all():Loop[] { return this.db.prepare('SELECT record FROM bot_loops').all().map((r:any)=>loop.parse(JSON.parse(r.record))); }
@@ -27,5 +29,6 @@ export class LoopStore {
  // The phone's place names replace the list; one per name, ignoring case.
  places():string[] { const r=this.db.prepare("SELECT value FROM loop_scheduler WHERE key='places'").get() as {value:string}|undefined; return r?JSON.parse(r.value):[]; }
  setPlaces(names:string[]):string[] { const seen=new Set<string>(),kept:string[]=[]; for(const n of names.map(n=>n.trim()).filter(Boolean)){if(seen.has(placeKey(n)))continue;seen.add(placeKey(n));kept.push(n);} const list=kept.slice(0,20); this.db.prepare("INSERT OR REPLACE INTO loop_scheduler VALUES ('places',?)").run(JSON.stringify(list)); return list; }
- groups(filters:{area?:string;owner?:string}={}) {const g={needsYouNow:[] as Loop[],comingUp:[] as Loop[],agentsOnIt:[] as Loop[],waitingOnOthers:[] as Loop[],done:[] as Loop[]}; for(const l of this.all()){if(filters.area&&l.area!==filters.area||filters.owner&&l.owner!==filters.owner)continue; if(l.closedAt){if(l.closedAt>Date.now()-7*86400000)g.done.push(l);}else if(l.kind==='waiting')g.waitingOnOthers.push(l);else if(l.owner!=='patrick')g.agentsOnIt.push(l);else if(l.status==='surfaced')g.needsYouNow.push(l);else g.comingUp.push(l);}return g;}
+ // Agents on it: started work (in progress, handed off). A loop anyone owns that waits for its trigger is Coming up.
+ groups(filters:{area?:string;owner?:string}={}) {const g={needsYouNow:[] as Loop[],comingUp:[] as Loop[],agentsOnIt:[] as Loop[],waitingOnOthers:[] as Loop[],done:[] as Loop[]}; for(const l of this.all()){if(filters.area&&l.area!==filters.area||filters.owner&&l.owner!==filters.owner)continue; if(l.closedAt){if(l.closedAt>Date.now()-7*86400000)g.done.push(l);}else if(l.kind==='waiting')g.waitingOnOthers.push(l);else if(l.owner!=='patrick'&&!waitsForTrigger(l))g.agentsOnIt.push(l);else if(l.owner==='patrick'&&l.status==='surfaced')g.needsYouNow.push(l);else g.comingUp.push(l);}return g;}
 }
