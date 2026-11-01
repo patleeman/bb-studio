@@ -3,6 +3,14 @@ import Foundation
 
 public enum Studio {
   public enum Method {
+    public static let loops_list = "loops.list"
+    public static let loops_get = "loops.get"
+    public static let loops_add = "loops.add"
+    public static let loops_update = "loops.update"
+    public static let loops_act = "loops.act"
+    public static let loops_fire = "loops.fire"
+    public static let loops_place = "loops.place"
+    public static let loops_morning = "loops.morning"
     public static let code_get = "code.get"
     public static let code_update = "code.update"
     public static let code_open = "code.open"
@@ -307,6 +315,22 @@ public enum Studio {
     public static let voice_conversational = "voice.conversational"
     public static let voice_turnNote = "voice.turnNote"
   }
+
+  public typealias LoopsList = LoopsListOutput
+
+  public typealias LoopsGet = LoopsGetOutput
+
+  public typealias LoopsAdd = LoopsAddOutput
+
+  public typealias LoopsUpdate = LoopsUpdateOutput
+
+  public typealias LoopsAct = LoopsActOutput
+
+  public typealias LoopsFire = LoopsFireOutput
+
+  public typealias LoopsPlace = LoopsPlaceOutput
+
+  public typealias LoopsMorning = LoopsMorningOutput
 
   public typealias CodeGet = CodeGetOutput
 
@@ -977,6 +1001,2824 @@ public enum Studio {
   public typealias VoiceConversational = VoiceConversationalOutput
 
   public typealias VoiceTurnNote = VoiceTurnNoteOutput
+
+  public struct LoopsListInput: Sendable, Hashable, Codable {
+    public var area: String?
+    public var owner: String?
+
+    public init(area: String? = nil, owner: String? = nil) {
+      self.area = area
+      self.owner = owner
+    }
+  }
+
+  public struct LoopsListOutputNeedsYouNowItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsListOutputNeedsYouNowItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputNeedsYouNowItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputNeedsYouNowItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputNeedsYouNowItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsListOutputNeedsYouNowItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsListOutputNeedsYouNowItemTriggerDirection?
+
+    public init(type: LoopsListOutputNeedsYouNowItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputNeedsYouNowItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsListOutputNeedsYouNowItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputNeedsYouNowItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputNeedsYouNowItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsListOutputNeedsYouNowItemSource?
+    public var kind: LoopsListOutputNeedsYouNowItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsListOutputNeedsYouNowItemTrigger?
+    public var priority: LoopsListOutputNeedsYouNowItemPriority?
+    public var push: Bool?
+    public var status: LoopsListOutputNeedsYouNowItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsListOutputNeedsYouNowItemSource? = nil, kind: LoopsListOutputNeedsYouNowItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsListOutputNeedsYouNowItemTrigger? = nil, priority: LoopsListOutputNeedsYouNowItemPriority? = nil, push: Bool? = nil, status: LoopsListOutputNeedsYouNowItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsListOutputComingUpItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsListOutputComingUpItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputComingUpItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputComingUpItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputComingUpItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsListOutputComingUpItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsListOutputComingUpItemTriggerDirection?
+
+    public init(type: LoopsListOutputComingUpItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputComingUpItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsListOutputComingUpItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputComingUpItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputComingUpItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsListOutputComingUpItemSource?
+    public var kind: LoopsListOutputComingUpItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsListOutputComingUpItemTrigger?
+    public var priority: LoopsListOutputComingUpItemPriority?
+    public var push: Bool?
+    public var status: LoopsListOutputComingUpItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsListOutputComingUpItemSource? = nil, kind: LoopsListOutputComingUpItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsListOutputComingUpItemTrigger? = nil, priority: LoopsListOutputComingUpItemPriority? = nil, push: Bool? = nil, status: LoopsListOutputComingUpItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsListOutputAgentsOnItItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsListOutputAgentsOnItItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputAgentsOnItItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputAgentsOnItItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputAgentsOnItItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsListOutputAgentsOnItItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsListOutputAgentsOnItItemTriggerDirection?
+
+    public init(type: LoopsListOutputAgentsOnItItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputAgentsOnItItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsListOutputAgentsOnItItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputAgentsOnItItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputAgentsOnItItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsListOutputAgentsOnItItemSource?
+    public var kind: LoopsListOutputAgentsOnItItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsListOutputAgentsOnItItemTrigger?
+    public var priority: LoopsListOutputAgentsOnItItemPriority?
+    public var push: Bool?
+    public var status: LoopsListOutputAgentsOnItItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsListOutputAgentsOnItItemSource? = nil, kind: LoopsListOutputAgentsOnItItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsListOutputAgentsOnItItemTrigger? = nil, priority: LoopsListOutputAgentsOnItItemPriority? = nil, push: Bool? = nil, status: LoopsListOutputAgentsOnItItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsListOutputWaitingOnOthersItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsListOutputWaitingOnOthersItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputWaitingOnOthersItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputWaitingOnOthersItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputWaitingOnOthersItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsListOutputWaitingOnOthersItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsListOutputWaitingOnOthersItemTriggerDirection?
+
+    public init(type: LoopsListOutputWaitingOnOthersItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputWaitingOnOthersItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsListOutputWaitingOnOthersItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputWaitingOnOthersItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputWaitingOnOthersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsListOutputWaitingOnOthersItemSource?
+    public var kind: LoopsListOutputWaitingOnOthersItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsListOutputWaitingOnOthersItemTrigger?
+    public var priority: LoopsListOutputWaitingOnOthersItemPriority?
+    public var push: Bool?
+    public var status: LoopsListOutputWaitingOnOthersItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsListOutputWaitingOnOthersItemSource? = nil, kind: LoopsListOutputWaitingOnOthersItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsListOutputWaitingOnOthersItemTrigger? = nil, priority: LoopsListOutputWaitingOnOthersItemPriority? = nil, push: Bool? = nil, status: LoopsListOutputWaitingOnOthersItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsListOutputDoneItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsListOutputDoneItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputDoneItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputDoneItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputDoneItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsListOutputDoneItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsListOutputDoneItemTriggerDirection?
+
+    public init(type: LoopsListOutputDoneItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsListOutputDoneItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsListOutputDoneItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsListOutputDoneItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsListOutputDoneItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsListOutputDoneItemSource?
+    public var kind: LoopsListOutputDoneItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsListOutputDoneItemTrigger?
+    public var priority: LoopsListOutputDoneItemPriority?
+    public var push: Bool?
+    public var status: LoopsListOutputDoneItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsListOutputDoneItemSource? = nil, kind: LoopsListOutputDoneItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsListOutputDoneItemTrigger? = nil, priority: LoopsListOutputDoneItemPriority? = nil, push: Bool? = nil, status: LoopsListOutputDoneItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsListOutput: Sendable, Hashable, Codable {
+    public var needsYouNow: [LoopsListOutputNeedsYouNowItem]?
+    public var comingUp: [LoopsListOutputComingUpItem]?
+    public var agentsOnIt: [LoopsListOutputAgentsOnItItem]?
+    public var waitingOnOthers: [LoopsListOutputWaitingOnOthersItem]?
+    public var done: [LoopsListOutputDoneItem]?
+
+    public init(needsYouNow: [LoopsListOutputNeedsYouNowItem]? = nil, comingUp: [LoopsListOutputComingUpItem]? = nil, agentsOnIt: [LoopsListOutputAgentsOnItItem]? = nil, waitingOnOthers: [LoopsListOutputWaitingOnOthersItem]? = nil, done: [LoopsListOutputDoneItem]? = nil) {
+      self.needsYouNow = needsYouNow
+      self.comingUp = comingUp
+      self.agentsOnIt = agentsOnIt
+      self.waitingOnOthers = waitingOnOthers
+      self.done = done
+    }
+  }
+
+  public struct LoopsGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct LoopsGetOutputLoopSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsGetOutputLoopKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsGetOutputLoopTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsGetOutputLoopTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsGetOutputLoopTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsGetOutputLoopTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsGetOutputLoopTriggerDirection?
+
+    public init(type: LoopsGetOutputLoopTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsGetOutputLoopTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsGetOutputLoopPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsGetOutputLoopStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsGetOutputLoop: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsGetOutputLoopSource?
+    public var kind: LoopsGetOutputLoopKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsGetOutputLoopTrigger?
+    public var priority: LoopsGetOutputLoopPriority?
+    public var push: Bool?
+    public var status: LoopsGetOutputLoopStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsGetOutputLoopSource? = nil, kind: LoopsGetOutputLoopKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsGetOutputLoopTrigger? = nil, priority: LoopsGetOutputLoopPriority? = nil, push: Bool? = nil, status: LoopsGetOutputLoopStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsGetOutputHistoryItem: Sendable, Hashable, Codable {
+    public var type: String?
+    public var at: Double?
+    public var data: String?
+
+    public init(type: String? = nil, at: Double? = nil, data: String? = nil) {
+      self.type = type
+      self.at = at
+      self.data = data
+    }
+  }
+
+  public struct LoopsGetOutput: Sendable, Hashable, Codable {
+    public var loop: LoopsGetOutputLoop?
+    public var history: [LoopsGetOutputHistoryItem]?
+
+    public init(loop: LoopsGetOutputLoop? = nil, history: [LoopsGetOutputHistoryItem]? = nil) {
+      self.loop = loop
+      self.history = history
+    }
+  }
+
+  public struct LoopsAddInput: Sendable, Hashable, Codable {
+    public var text: String?
+
+    public init(text: String? = nil) {
+      self.text = text
+    }
+  }
+
+  public struct LoopsAddOutputSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsAddOutputKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsAddOutputTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsAddOutputTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsAddOutputTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsAddOutputTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsAddOutputTriggerDirection?
+
+    public init(type: LoopsAddOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsAddOutputTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsAddOutputPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsAddOutputStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsAddOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsAddOutputSource?
+    public var kind: LoopsAddOutputKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsAddOutputTrigger?
+    public var priority: LoopsAddOutputPriority?
+    public var push: Bool?
+    public var status: LoopsAddOutputStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsAddOutputSource? = nil, kind: LoopsAddOutputKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsAddOutputTrigger? = nil, priority: LoopsAddOutputPriority? = nil, push: Bool? = nil, status: LoopsAddOutputStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsUpdateInputChangesSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsUpdateInputChangesKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateInputChangesTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateInputChangesTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsUpdateInputChangesTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsUpdateInputChangesTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsUpdateInputChangesTriggerDirection?
+
+    public init(type: LoopsUpdateInputChangesTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateInputChangesTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsUpdateInputChangesPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateInputChangesStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsUpdateInputChanges: Sendable, Hashable, Codable {
+    public var title: String?
+    public var why: String?
+    public var source: LoopsUpdateInputChangesSource?
+    public var kind: LoopsUpdateInputChangesKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsUpdateInputChangesTrigger?
+    public var priority: LoopsUpdateInputChangesPriority?
+    public var push: Bool?
+    public var status: LoopsUpdateInputChangesStatus?
+    public var due: Double?
+    public var area: String?
+
+    public init(title: String? = nil, why: String? = nil, source: LoopsUpdateInputChangesSource? = nil, kind: LoopsUpdateInputChangesKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsUpdateInputChangesTrigger? = nil, priority: LoopsUpdateInputChangesPriority? = nil, push: Bool? = nil, status: LoopsUpdateInputChangesStatus? = nil, due: Double? = nil, area: String? = nil) {
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+    }
+  }
+
+  public struct LoopsUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var changes: LoopsUpdateInputChanges?
+    public var surfaceNow: Bool?
+
+    public init(id: String? = nil, changes: LoopsUpdateInputChanges? = nil, surfaceNow: Bool? = nil) {
+      self.id = id
+      self.changes = changes
+      self.surfaceNow = surfaceNow
+    }
+  }
+
+  public struct LoopsUpdateOutputSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsUpdateOutputKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateOutputTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateOutputTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsUpdateOutputTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsUpdateOutputTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsUpdateOutputTriggerDirection?
+
+    public init(type: LoopsUpdateOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsUpdateOutputTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsUpdateOutputPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsUpdateOutputStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsUpdateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsUpdateOutputSource?
+    public var kind: LoopsUpdateOutputKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsUpdateOutputTrigger?
+    public var priority: LoopsUpdateOutputPriority?
+    public var push: Bool?
+    public var status: LoopsUpdateOutputStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsUpdateOutputSource? = nil, kind: LoopsUpdateOutputKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsUpdateOutputTrigger? = nil, priority: LoopsUpdateOutputPriority? = nil, push: Bool? = nil, status: LoopsUpdateOutputStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public enum LoopsActInputAction: Sendable, Hashable, Codable {
+    case done
+    case drop
+    case got_it
+    case choose
+    case snooze
+    case hand_off
+    case nudge
+    case keep
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "done": self = .done
+      case "drop": self = .drop
+      case "got_it": self = .got_it
+      case "choose": self = .choose
+      case "snooze": self = .snooze
+      case "hand_off": self = .hand_off
+      case "nudge": self = .nudge
+      case "keep": self = .keep
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .done: try container.encode("done")
+      case .drop: try container.encode("drop")
+      case .got_it: try container.encode("got_it")
+      case .choose: try container.encode("choose")
+      case .snooze: try container.encode("snooze")
+      case .hand_off: try container.encode("hand_off")
+      case .nudge: try container.encode("nudge")
+      case .keep: try container.encode("keep")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsActInputSnooze: Sendable, Hashable, Codable {
+    case later_today
+    case tonight
+    case tomorrow_morning
+    case this_weekend
+    case home
+    case mac
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "later_today": self = .later_today
+      case "tonight": self = .tonight
+      case "tomorrow_morning": self = .tomorrow_morning
+      case "this_weekend": self = .this_weekend
+      case "home": self = .home
+      case "mac": self = .mac
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .later_today: try container.encode("later_today")
+      case .tonight: try container.encode("tonight")
+      case .tomorrow_morning: try container.encode("tomorrow_morning")
+      case .this_weekend: try container.encode("this_weekend")
+      case .home: try container.encode("home")
+      case .mac: try container.encode("mac")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsActInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var action: LoopsActInputAction?
+    public var option: String?
+    public var owner: String?
+    public var snooze: LoopsActInputSnooze?
+
+    public init(id: String? = nil, action: LoopsActInputAction? = nil, option: String? = nil, owner: String? = nil, snooze: LoopsActInputSnooze? = nil) {
+      self.id = id
+      self.action = action
+      self.option = option
+      self.owner = owner
+      self.snooze = snooze
+    }
+  }
+
+  public struct LoopsActOutputSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsActOutputKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsActOutputTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsActOutputTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsActOutputTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsActOutputTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsActOutputTriggerDirection?
+
+    public init(type: LoopsActOutputTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsActOutputTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsActOutputPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsActOutputStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsActOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsActOutputSource?
+    public var kind: LoopsActOutputKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsActOutputTrigger?
+    public var priority: LoopsActOutputPriority?
+    public var push: Bool?
+    public var status: LoopsActOutputStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsActOutputSource? = nil, kind: LoopsActOutputKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsActOutputTrigger? = nil, priority: LoopsActOutputPriority? = nil, push: Bool? = nil, status: LoopsActOutputStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsFireInput: Sendable, Hashable, Codable {
+    public var event: String?
+
+    public init(event: String? = nil) {
+      self.event = event
+    }
+  }
+
+  public struct LoopsFireOutput: Sendable, Hashable, Codable {
+    public var matched: Double?
+
+    public init(matched: Double? = nil) {
+      self.matched = matched
+    }
+  }
+
+  public enum LoopsPlaceInputDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsPlaceInput: Sendable, Hashable, Codable {
+    public var place: String?
+    public var direction: LoopsPlaceInputDirection?
+
+    public init(place: String? = nil, direction: LoopsPlaceInputDirection? = nil) {
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public struct LoopsPlaceOutput: Sendable, Hashable, Codable {
+    public var matched: Double?
+
+    public init(matched: Double? = nil) {
+      self.matched = matched
+    }
+  }
+
+  public struct LoopsMorningInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct LoopsMorningOutputItemsItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsMorningOutputItemsItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputItemsItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputItemsItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsMorningOutputItemsItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsMorningOutputItemsItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsMorningOutputItemsItemTriggerDirection?
+
+    public init(type: LoopsMorningOutputItemsItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputItemsItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsMorningOutputItemsItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputItemsItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsMorningOutputItemsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsMorningOutputItemsItemSource?
+    public var kind: LoopsMorningOutputItemsItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsMorningOutputItemsItemTrigger?
+    public var priority: LoopsMorningOutputItemsItemPriority?
+    public var push: Bool?
+    public var status: LoopsMorningOutputItemsItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsMorningOutputItemsItemSource? = nil, kind: LoopsMorningOutputItemsItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsMorningOutputItemsItemTrigger? = nil, priority: LoopsMorningOutputItemsItemPriority? = nil, push: Bool? = nil, status: LoopsMorningOutputItemsItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsMorningOutputLowPriorityItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public enum LoopsMorningOutputLowPriorityItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputLowPriorityItemTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputLowPriorityItemTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsMorningOutputLowPriorityItemTrigger: Sendable, Hashable, Codable {
+    public var type: LoopsMorningOutputLowPriorityItemTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: LoopsMorningOutputLowPriorityItemTriggerDirection?
+
+    public init(type: LoopsMorningOutputLowPriorityItemTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: LoopsMorningOutputLowPriorityItemTriggerDirection? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+    }
+  }
+
+  public enum LoopsMorningOutputLowPriorityItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsMorningOutputLowPriorityItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case snoozed
+    case in_progress
+    case done
+    case dropped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      case "snoozed": self = .snoozed
+      case "in_progress": self = .in_progress
+      case "done": self = .done
+      case "dropped": self = .dropped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .snoozed: try container.encode("snoozed")
+      case .in_progress: try container.encode("in_progress")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsMorningOutputLowPriorityItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var source: LoopsMorningOutputLowPriorityItemSource?
+    public var kind: LoopsMorningOutputLowPriorityItemKind?
+    public var options: [String]?
+    public var owner: String?
+    public var trigger: LoopsMorningOutputLowPriorityItemTrigger?
+    public var priority: LoopsMorningOutputLowPriorityItemPriority?
+    public var push: Bool?
+    public var status: LoopsMorningOutputLowPriorityItemStatus?
+    public var due: Double?
+    public var area: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, source: LoopsMorningOutputLowPriorityItemSource? = nil, kind: LoopsMorningOutputLowPriorityItemKind? = nil, options: [String]? = nil, owner: String? = nil, trigger: LoopsMorningOutputLowPriorityItemTrigger? = nil, priority: LoopsMorningOutputLowPriorityItemPriority? = nil, push: Bool? = nil, status: LoopsMorningOutputLowPriorityItemStatus? = nil, due: Double? = nil, area: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.source = source
+      self.kind = kind
+      self.options = options
+      self.owner = owner
+      self.trigger = trigger
+      self.priority = priority
+      self.push = push
+      self.status = status
+      self.due = due
+      self.area = area
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct LoopsMorningOutput: Sendable, Hashable, Codable {
+    public var date: String?
+    public var items: [LoopsMorningOutputItemsItem]?
+    public var more: Double?
+    public var lowPriority: [LoopsMorningOutputLowPriorityItem]?
+
+    public init(date: String? = nil, items: [LoopsMorningOutputItemsItem]? = nil, more: Double? = nil, lowPriority: [LoopsMorningOutputLowPriorityItem]? = nil) {
+      self.date = date
+      self.items = items
+      self.more = more
+      self.lowPriority = lowPriority
+    }
+  }
 
   public struct CodeGetInput: Sendable, Hashable, Codable {
     public var id: String?

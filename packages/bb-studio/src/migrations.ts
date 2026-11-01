@@ -814,4 +814,8 @@ export const MIGRATIONS = [
   `ALTER TABLE recordings ADD COLUMN call TEXT;
    ALTER TABLE segments ADD COLUMN speaker TEXT;
    ALTER TABLE segments ADD COLUMN echo INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE TABLE bot_loops (id TEXT PRIMARY KEY, record TEXT NOT NULL);
+   CREATE TABLE loop_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, loop_id TEXT NOT NULL, type TEXT NOT NULL, at INTEGER NOT NULL, data TEXT NOT NULL);
+   CREATE INDEX loop_events_loop ON loop_events(loop_id, at);
+   CREATE TABLE loop_scheduler (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
 ];

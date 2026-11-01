@@ -1,6 +1,2236 @@
 {
   "pluginId": "studio",
   "methods": {
+    "loops.list": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "needsYouNow": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "comingUp": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "agentsOnIt": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "waitingOnOthers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "done": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "needsYouNow",
+          "comingUp",
+          "agentsOnIt",
+          "waitingOnOthers",
+          "done"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "loop": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "why": {
+                "type": "string"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "ref"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "do",
+                  "decide",
+                  "read",
+                  "waiting"
+                ]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "owner": {
+                "type": "string",
+                "pattern": "^(patrick|cos|thread:.+)$"
+              },
+              "trigger": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "time",
+                      "event",
+                      "place"
+                    ]
+                  },
+                  "at": {
+                    "type": "number"
+                  },
+                  "event": {
+                    "type": "string"
+                  },
+                  "place": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "arrive",
+                      "leave"
+                    ]
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "normal",
+                  "low"
+                ]
+              },
+              "push": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "surfaced",
+                  "snoozed",
+                  "in_progress",
+                  "done",
+                  "dropped"
+                ]
+              },
+              "due": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "area": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "closedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "closedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "why",
+              "source",
+              "kind",
+              "options",
+              "owner",
+              "trigger",
+              "priority",
+              "push",
+              "status",
+              "due",
+              "area",
+              "createdAt",
+              "updatedAt",
+              "closedAt",
+              "closedBy"
+            ],
+            "additionalProperties": false
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "number"
+                },
+                "data": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "at",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "loop",
+          "history"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.add": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "why": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ref"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "do",
+              "decide",
+              "read",
+              "waiting"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^(patrick|cos|thread:.+)$"
+          },
+          "trigger": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "time",
+                  "event",
+                  "place"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "event": {
+                "type": "string"
+              },
+              "place": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "arrive",
+                  "leave"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "normal",
+              "low"
+            ]
+          },
+          "push": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "surfaced",
+              "snoozed",
+              "in_progress",
+              "done",
+              "dropped"
+            ]
+          },
+          "due": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "closedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "closedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "why",
+          "source",
+          "kind",
+          "options",
+          "owner",
+          "trigger",
+          "priority",
+          "push",
+          "status",
+          "due",
+          "area",
+          "createdAt",
+          "updatedAt",
+          "closedAt",
+          "closedBy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.update": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "why": {
+                "type": "string"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "ref"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "do",
+                  "decide",
+                  "read",
+                  "waiting"
+                ]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "owner": {
+                "type": "string",
+                "pattern": "^(patrick|cos|thread:.+)$"
+              },
+              "trigger": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "time",
+                      "event",
+                      "place"
+                    ]
+                  },
+                  "at": {
+                    "type": "number"
+                  },
+                  "event": {
+                    "type": "string"
+                  },
+                  "place": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "arrive",
+                      "leave"
+                    ]
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "urgent",
+                  "normal",
+                  "low"
+                ]
+              },
+              "push": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "surfaced",
+                  "snoozed",
+                  "in_progress",
+                  "done",
+                  "dropped"
+                ]
+              },
+              "due": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "area": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "surfaceNow": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "why": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ref"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "do",
+              "decide",
+              "read",
+              "waiting"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^(patrick|cos|thread:.+)$"
+          },
+          "trigger": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "time",
+                  "event",
+                  "place"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "event": {
+                "type": "string"
+              },
+              "place": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "arrive",
+                  "leave"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "normal",
+              "low"
+            ]
+          },
+          "push": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "surfaced",
+              "snoozed",
+              "in_progress",
+              "done",
+              "dropped"
+            ]
+          },
+          "due": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "closedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "closedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "why",
+          "source",
+          "kind",
+          "options",
+          "owner",
+          "trigger",
+          "priority",
+          "push",
+          "status",
+          "due",
+          "area",
+          "createdAt",
+          "updatedAt",
+          "closedAt",
+          "closedBy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.act": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "done",
+              "drop",
+              "got_it",
+              "choose",
+              "snooze",
+              "hand_off",
+              "nudge",
+              "keep"
+            ]
+          },
+          "option": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^(patrick|cos|thread:.+)$"
+          },
+          "snooze": {
+            "type": "string",
+            "enum": [
+              "later_today",
+              "tonight",
+              "tomorrow_morning",
+              "this_weekend",
+              "home",
+              "mac"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "why": {
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "ref"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "do",
+              "decide",
+              "read",
+              "waiting"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string",
+            "pattern": "^(patrick|cos|thread:.+)$"
+          },
+          "trigger": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "time",
+                  "event",
+                  "place"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "event": {
+                "type": "string"
+              },
+              "place": {
+                "type": "string"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "arrive",
+                  "leave"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "normal",
+              "low"
+            ]
+          },
+          "push": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "surfaced",
+              "snoozed",
+              "in_progress",
+              "done",
+              "dropped"
+            ]
+          },
+          "due": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "number"
+          },
+          "closedAt": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "closedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "why",
+          "source",
+          "kind",
+          "options",
+          "owner",
+          "trigger",
+          "priority",
+          "push",
+          "status",
+          "due",
+          "area",
+          "createdAt",
+          "updatedAt",
+          "closedAt",
+          "closedBy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.fire": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "event"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "matched"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.place": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "string",
+            "minLength": 1
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "arrive",
+              "leave"
+            ]
+          }
+        },
+        "required": [
+          "place",
+          "direction"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "matched"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "loops.morning": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "more": {
+            "type": "number"
+          },
+          "lowPriority": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "why": {
+                  "type": "string"
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "ref": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "ref"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "do",
+                    "decide",
+                    "read",
+                    "waiting"
+                  ]
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "owner": {
+                  "type": "string",
+                  "pattern": "^(patrick|cos|thread:.+)$"
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "time",
+                        "event",
+                        "place"
+                      ]
+                    },
+                    "at": {
+                      "type": "number"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "place": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "arrive",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "urgent",
+                    "normal",
+                    "low"
+                  ]
+                },
+                "push": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "surfaced",
+                    "snoozed",
+                    "in_progress",
+                    "done",
+                    "dropped"
+                  ]
+                },
+                "due": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "area": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "closedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "closedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "why",
+                "source",
+                "kind",
+                "options",
+                "owner",
+                "trigger",
+                "priority",
+                "push",
+                "status",
+                "due",
+                "area",
+                "createdAt",
+                "updatedAt",
+                "closedAt",
+                "closedBy"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "date",
+          "items",
+          "more",
+          "lowPriority"
+        ],
+        "additionalProperties": false
+      }
+    },
     "code.get": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
