@@ -9,6 +9,8 @@ export const kitUi = {
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
   Icon: ({ name }: { name: string }) => <i data-icon={name} />,
   DropdownMenu: box, DropdownMenuContent: box, DropdownMenuTrigger: box, DropdownMenuSeparator: () => <hr />,
+  DropdownMenuSub: box, DropdownMenuSubContent: box,
+  DropdownMenuSubTrigger: ({ children }: { children?: ReactNode }) => <div role="group">{children}</div>,
   DropdownMenuLabel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DropdownMenuItem: ({ children, onSelect }: { children?: ReactNode; onSelect?(): void }) => <button type="button" role="menuitem" onClick={() => onSelect?.()}>{children}</button>,
   Dialog: box, DialogContent: box, DialogHeader: box, DialogFooter: box, DialogTitle: box,

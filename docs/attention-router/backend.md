@@ -148,11 +148,31 @@ by `cos` or a lead shows "<owner> is on it" with Open thread and Take it back
 (`loops.update` owner patrick, status surfaced). A closed loop collapses to a
 line with Undo (`loops.update` status surfaced). A loop with no update in three
 days adds Keep and Drop for the weekly review. `row="1"` is the morning row and
-`::loops{more}` the link to the Loops tab. Leave a blank line before each bold
+`::loops{more}` the link to the Loops list. `::loops{open="pane"}` is a card
+with "Open Loops beside the chat"; the Bot posts it when Patrick wants to go
+through his loops (the loops_list tool says so). Leave a blank line before each bold
 section label: without one, Markdown runs the label into the list above it.
 
 The Bot page has Info | Loops at `bot/<botId>/loops` for the primary Bot, and
-the sidebar has an All loops row under it. Every saved loop change publishes
+the sidebar has an All loops row under it.
+
+The Loops pane (`src/loops/ui/LoopsPane.tsx`) is the same list in the thread's
+side panel, a `threadPanelAction` with id `loops`, so it stays up beside the
+Bot's chat. It has the tab's sections, area chips, Owner and Add a loop; each
+row is a title, one line of detail and a ⋯ menu with the row's actions (Done,
+Snooze, Hand off, a decision's options, Got it, Surface now, Take it back,
+Open thread, Nudge them, Change trigger…, Drop), and Done rows keep Undo.
+Change trigger opens under its row, with Send to iPhone. Its header opens the
+full Loops tab. It opens from:
+
+- the Loops button in the Bot chat's header (`experimental_threadHeaderAction`,
+  only on the primary Bot's chat), badged with what needs Patrick now;
+- `::loops{open="pane"}` and `::loops{more}` in the chat (`openThreadPanel`;
+  where there is no side panel they open the Loops tab);
+- All loops in the sidebar, which opens the Bot's chat with the pane beside it;
+- the Bot row: opening the chat opens Loops beside it instead of Bot info
+  while the badge counts something, since Needs you now lists the same items;
+- the side panel's launcher (Loops), on any thread. Every saved loop change publishes
 Studio's realtime signal, so cards, the tab and badges refetch. With
 `loopsEnabled` off there's no tab or row, and cards are one quiet line (one per
 morning message).

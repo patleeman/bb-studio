@@ -1,6 +1,6 @@
 // What the loop UI reads besides the loops: whether the Attention Router is
 // on, the people a loop can belong to, and the actions it takes.
-import { useSdk, useSettings } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useSdk, useSettings } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { errorMessage } from "../../kit/format";
 import { openAppPath } from "../../kit/app/index";
@@ -19,6 +19,22 @@ export function useLoopsEnabled(): boolean {
 export const loopsPath = (botId: string) => `${botPath(botId)}/loops`;
 export const isLoopsPath = (pathname: string) => /^\/plugins\/studio\/studio\/bot\/[^/]+\/loops\/?$/.test(pathname);
 export const openLoops = (botId: string | null | undefined) => openAppPath(botId ? loopsPath(botId) : botPath());
+
+/** The Loops pane's thread panel action (app.tsx): the loop list beside a chat. */
+export const LOOPS_PANE = "loops";
+
+/**
+ * Opens Loops beside the chat (the Loops pane) from inside a thread view, and
+ * the Loops tab where there's no side panel. True when the pane opened.
+ */
+export function useOpenLoopsPane(): (botId: string | null | undefined) => boolean {
+  const navigate = useBbNavigate();
+  return useCallback((botId) => {
+    if (navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" })) return true;
+    openLoops(botId);
+    return false;
+  }, [navigate]);
+}
 
 let projectNames: Promise<Map<string, string>> | null = null;
 

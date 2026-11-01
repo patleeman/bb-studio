@@ -47,7 +47,7 @@ export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON
   );
 }
 
-function PickTime({ onClose, onPick }: { onClose(): void; onPick(at: number): void }) {
+export function PickTime({ onClose, onPick }: { onClose(): void; onPick(at: number): void }) {
   const [value, setValue] = useState(() => toLocalInput(Date.now() + 3_600_000));
   const at = fromLocalInput(value);
   return (

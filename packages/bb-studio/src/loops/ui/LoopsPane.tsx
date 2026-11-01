@@ -1,0 +1,332 @@
+// The Loops pane: the Loops tab's sections in the thread's side panel, so the
+// list stays up while Patrick talks loops through with the Chief of Staff. It
+// is the "Loops" thread panel action (app.tsx), opened from the Bot chat's
+// header, a `::loops{open="pane"}` card, "N more in Loops", the sidebar's All
+// loops row and the panel launcher. Rows are compact: a title, one line of
+// detail and a ⋯ menu with the row's actions, as on the phone. Change trigger
+// opens in place under its row. It refetches on Studio's realtime signal,
+// like the tab and the cards (useLive).
+import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useState, type ReactNode } from "react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Icon, cn,
+} from "../../kit/ui/index";
+import { ICON_BUTTON } from "../../kit/app/index";
+import { useLive } from "../../ui/live";
+import type { Loop } from "../contract";
+import { PickTime, TriggerForm } from "./LoopMenus";
+import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, useNeedsYou, type RowProps } from "./LoopsTab";
+import { AREAS, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
+import { LOOPS_PANE, openLoops, useLoopActions, useLoopsEnabled } from "./hooks";
+
+export { LOOPS_PANE };
+
+const DONE_SHOWN = 3;
+const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground disabled:opacity-50 [&_svg]:size-4";
+
+/** The "Loops" thread panel tab. `threadId` is the chat it's beside. */
+export function LoopsPane({ threadId }: PluginThreadPanelProps) {
+  const enabled = useLoopsEnabled();
+  return (
+    <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-testid="loops-pane">
+      {enabled ? <Board threadId={threadId} /> : (
+        <div className="flex flex-col items-center gap-1.5 px-6 py-10 text-center">
+          <Icon name="Unavailable" className="size-5 text-muted-foreground" />
+          <div className="text-sm font-medium">Attention Router is off</div>
+          <p className="text-sm text-muted-foreground">Turn on Attention Router in Studio’s settings to track loops here.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Board({ threadId }: { threadId: string }) {
+  const navigate = useBbNavigate();
+  const [showAllDone, setShowAllDone] = useState(false);
+  const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, unread, open, chat, needs, nextAt, row, add, filtered } = useLoopsBoard();
+  // Beside the Bot's own chat, its questions and replies are right there.
+  const besideChat = !!people.botThreadId && people.botThreadId === threadId;
+  const openChat = people.botThreadId && !besideChat
+    ? <button type="button" className={MENU_BUTTON} aria-label={`Open your chat with ${people.botName}`} title="Open chat" onClick={() => navigate.toThread(people.botThreadId!)}><Icon name="MessageSquare" /></button>
+    : null;
+  const where = besideChat ? "In this chat" : `In your chat with ${people.botName}`;
+  return <>
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+      <Icon name="ListTodo" className="size-4 text-muted-foreground" />
+      <h2 className="text-sm font-medium">Loops</h2>
+      {needs ? <span className="rounded-full bg-warning px-1.5 text-xs font-medium leading-4 text-background tabular-nums" aria-label={`${needs} need you now`}>{needs}</span> : null}
+      <button type="button" className={cn(ICON_BUTTON, "ml-auto")} aria-label="Open the full Loops page" title="Open the full Loops page" onClick={() => openLoops(people.botId)}>
+        <Icon name="Maximize2" className="size-4" />
+      </button>
+    </header>
+    <div className="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2">
+      <AddLoop onAdd={add} botName={people.botName} compact />
+      <div className="flex min-w-0 items-center gap-1">
+        <div role="group" aria-label="Area" className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+          {[null, ...AREAS].map((each) => (
+            <button key={each ?? "all"} type="button" aria-pressed={area === each} onClick={() => setArea(each)}
+              className="h-7 shrink-0 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground aria-pressed:bg-state-active aria-pressed:text-foreground">
+              {each ?? "All"}
+            </button>
+          ))}
+        </div>
+        <OwnerMenu owner={owner} label={ownerLabel} people={people} onOwner={setOwner}>
+          <button type="button" aria-label={`Owner: ${ownerLabel}`} title={`Owner: ${ownerLabel}`}
+            className={cn("inline-flex h-7 max-w-32 shrink-0 items-center gap-1 rounded-md px-2 text-xs hover:bg-state-hover data-[state=open]:bg-state-active", owner ? "bg-state-active text-foreground" : "text-muted-foreground")}>
+            <Icon name="UserRound" className="size-3.5 shrink-0" /><span className="truncate">{ownerLabel}</span><Icon name="ChevronDown" className="size-3 shrink-0 opacity-60" />
+          </button>
+        </OwnerMenu>
+      </div>
+    </div>
+    <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-6">
+      {list.error ? <p role="alert" className="px-3 pt-2 text-xs text-destructive">{list.error}</p> : null}
+      {!groups ? <div className="m-3 h-40 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none" /> : <>
+        {open === 0 && !chat ? (
+          <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center" data-testid="loops-empty">
+            <Icon name="ListTodo" className="size-5 text-muted-foreground" />
+            <div className="text-sm font-medium">{filtered ? "No open loops match" : "No open loops"}</div>
+            <p className="text-sm text-muted-foreground">When email, calls or chats need you, {people.botName} adds a loop here. You can also add one above.</p>
+          </div>
+        ) : <>
+          {needs ? (
+            <PaneSection title="Needs you now" count={needs}>
+              {pending.map((question) => (
+                <PaneRow key={question.id} testId="loop-pending" icon="MessageQuestion" title={question.reason}
+                  meta={<span>{where} · {shortWhen(question.createdAt)}</span>} trailing={openChat} />
+              ))}
+              {unread ? (
+                <PaneRow testId="loop-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`}
+                  meta={<span>{where} · not read yet</span>} trailing={openChat} />
+              ) : null}
+              {groups.needsYouNow.map((loop) => <LoopLine key={loop.id} loop={loop} place="needs" {...row} />)}
+            </PaneSection>
+          ) : null}
+          {groups.comingUp.length ? (
+            <PaneSection title="Coming up" count={groups.comingUp.length} aside={Number.isFinite(nextAt) ? `Next: ${fullWhen(nextAt)}` : undefined}>
+              {groups.comingUp.map((loop) => <LoopLine key={loop.id} loop={loop} place="coming" {...row} />)}
+            </PaneSection>
+          ) : null}
+          {groups.agentsOnIt.length ? (
+            <PaneSection title="Agents on it" count={groups.agentsOnIt.length}>
+              {groups.agentsOnIt.map((loop) => <LoopLine key={loop.id} loop={loop} place="agents" {...row} />)}
+            </PaneSection>
+          ) : null}
+          {groups.waitingOnOthers.length ? (
+            <PaneSection title="Waiting on others" count={groups.waitingOnOthers.length}>
+              {groups.waitingOnOthers.map((loop) => <LoopLine key={loop.id} loop={loop} place="waiting" {...row} />)}
+            </PaneSection>
+          ) : null}
+        </>}
+        {groups.done.length ? (
+          <PaneSection title="Done · last 7 days" count={groups.done.length}
+            aside={groups.done.length > DONE_SHOWN ? <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowAllDone(!showAllDone)}>{showAllDone ? "Show less" : "Show all"}</button> : undefined}>
+            {[...groups.done].sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)).slice(0, showAllDone ? undefined : DONE_SHOWN).map((loop) => <DoneLine key={loop.id} loop={loop} {...row} />)}
+          </PaneSection>
+        ) : null}
+      </>}
+    </div>
+  </>;
+}
+
+function PaneSection({ title, count, aside, children }: { title: string; count: number; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="flex flex-col pt-3">
+      <div className="flex items-center gap-2 px-2 pb-1 text-xs">
+        <h3 className="font-medium text-muted-foreground">{title}</h3>
+        <span className="text-muted-foreground/70 tabular-nums">{count}</span>
+        {aside ? <span className="ml-auto truncate text-muted-foreground">{aside}</span> : null}
+      </div>
+      <div className="flex flex-col">{children}</div>
+    </section>
+  );
+}
+
+function PaneRow({ icon, iconClass, title, meta, trailing, below, testId, muted }: { icon: string; iconClass?: string; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean }) {
+  return (
+    <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40" data-testid={testId}>
+      <div className="flex min-w-0 items-start gap-2.5 py-1.5 pr-1 pl-2">
+        <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
+          <div className={cn("line-clamp-2 text-sm leading-snug", muted ? "text-muted-foreground" : "text-foreground")}>{title}</div>
+          {meta ? <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">{meta}</div> : null}
+        </div>
+        {trailing}
+      </div>
+      {below}
+    </div>
+  );
+}
+
+type Place = "needs" | "coming" | "agents" | "waiting";
+
+/** One open loop: its line and its ⋯ menu, with what its section allows. */
+function LoopLine({ loop, place, people, places, refresh, held, owners }: RowProps & { place: Place }) {
+  const navigate = useBbNavigate();
+  const { act, update, busy, error } = useLoopActions(refresh);
+  const [editing, setEditing] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [note, setNote] = useState(false);
+  const mine = loop.owner === "patrick";
+  const owner = owners.get(loop.owner);
+  const who = ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner);
+  const thread = ownerThread(loop.owner, people.botThreadId, owner);
+  const due = dueLabel(loop.due);
+  const trigger = triggerLabel(loop.trigger, Date.now(), held.get(loop.id));
+  const source = sourceText(loop.source);
+  const working = loop.status === "in_progress";
+
+  // A released loop goes back to waiting on its new trigger, as on the tab.
+  const saveTrigger = (changes: { trigger: Loop["trigger"]; push: boolean }) => {
+    setEditing(false);
+    void update({ id: loop.id, changes: place === "needs" ? { ...changes, status: "queued" } : changes });
+  };
+  const changeTrigger = <DropdownMenuItem onSelect={() => setEditing(true)}><Icon name="DateTime" />Change trigger…</DropdownMenuItem>;
+  const drop = <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</DropdownMenuItem>;
+  const snooze = (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger><Icon name="Clock" />Snooze</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-56">
+        {SNOOZE.map((preset) => (
+          <DropdownMenuItem key={preset.id} onSelect={() => void act({ id: loop.id, action: "snooze", snooze: preset.id })}>
+            <Icon name={preset.icon} /><span className="flex-1">{preset.label}</span><span className="text-xs text-muted-foreground">{snoozeHint(preset.id)}</span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => setPicking(true)}><Icon name="Calendar" />Pick a time…</DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+
+  let items: ReactNode;
+  let meta: ReactNode;
+  if (place === "needs") {
+    items = loop.kind === "decide" ? <>
+      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Choose</DropdownMenuLabel>
+      {loop.options.map((option) => (
+        <DropdownMenuItem key={option} title={option} onSelect={() => void act({ id: loop.id, action: "choose", option })}>
+          <Icon name="Fork" /><span className="truncate">{optionParts(option).label}</span>
+        </DropdownMenuItem>
+      ))}
+      <DropdownMenuSeparator />{snooze}{changeTrigger}
+    </> : loop.kind === "read" ? <>
+      <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "got_it" })}><Icon name="CircleCheck" />Got it</DropdownMenuItem>
+      {snooze}{changeTrigger}
+    </> : <>
+      <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "done" })}><Icon name="CircleCheck" />Done</DropdownMenuItem>
+      {snooze}
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Hand off</DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="min-w-48">
+          {people.targets.map((target) => <DropdownMenuItem key={target.owner} onSelect={() => void act({ id: loop.id, action: "hand_off", owner: target.owner })}><Icon name="Bot" />{target.name}</DropdownMenuItem>)}
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+      {changeTrigger}<DropdownMenuSeparator />{drop}
+    </>;
+    meta = <>
+      {due ? <span className={due.urgent ? "text-warning" : undefined}>{due.text}</span> : null}
+      {loop.kind === "decide" ? <span>{loop.options.length} option{loop.options.length === 1 ? "" : "s"}</span> : null}
+      {loop.why ? <span className="min-w-0 truncate">{loop.why}</span> : source ? <span className="min-w-0 truncate">{source}</span> : null}
+      <AreaChip area={loop.area} />
+    </>;
+  } else if (place === "coming") {
+    items = <>
+      {mine ? <DropdownMenuItem onSelect={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</DropdownMenuItem> : null}
+      {changeTrigger}
+    </>;
+    meta = <>
+      <span className="inline-flex items-center gap-1 text-foreground/80" title={loop.push ? "Sends to iPhone when it fires" : undefined}>
+        <Icon name={trigger.icon} className="size-3" />{trigger.text}{loop.push ? <Icon name="Smartphone" className="size-3" aria-label="Sends to iPhone" /> : null}
+      </span>
+      {mine ? null : <span className="min-w-0 truncate">· {who} will do it</span>}
+      <AreaChip area={loop.area} />
+    </>;
+  } else if (place === "agents") {
+    items = <>
+      {thread ? <DropdownMenuItem onSelect={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</DropdownMenuItem> : null}
+      <DropdownMenuItem onSelect={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</DropdownMenuItem>
+    </>;
+    meta = <>
+      {working ? <span className="size-1.5 rounded-full bg-success" aria-hidden /> : null}
+      <span className="min-w-0 truncate font-medium text-foreground/80">{who}</span>
+      <span className="shrink-0">· On it · {elapsed(loop.updatedAt)}</span>
+      <AreaChip area={loop.area} />
+    </>;
+  } else {
+    items = <>
+      <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "nudge" }).then((ok) => setNote(ok))}><Icon name="BellDot" />Nudge them</DropdownMenuItem>
+      {changeTrigger}<DropdownMenuSeparator />{drop}
+    </>;
+    meta = <>
+      <span className="shrink-0">Since {shortWhen(loop.createdAt)}</span>
+      {source ? <span className="min-w-0 truncate">· {source}</span> : null}
+      <AreaChip area={loop.area} />
+    </>;
+  }
+
+  const testId = { needs: "loop-needs", coming: "loop-coming", agents: "loop-agent", waiting: "loop-waiting" }[place];
+  const icon = place === "agents" || (place === "coming" && !mine) ? "Bot" : KIND[loop.kind].icon;
+  return <>
+    <PaneRow testId={testId} icon={icon} iconClass={place === "agents" && working ? "text-success" : undefined} title={loop.title} meta={meta}
+      trailing={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className={MENU_BUTTON} disabled={busy} aria-label={`Actions: ${loop.title}`} title="Actions"><Icon name="MoreHorizontal" /></button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">{items}</DropdownMenuContent>
+        </DropdownMenu>
+      }
+      below={<>
+        {editing ? (
+          <div className="mx-2 mb-2 rounded-lg border border-border bg-background p-3" data-testid="loop-trigger-inline">
+            <TriggerForm loop={loop} places={places} onCancel={() => setEditing(false)} onSave={saveTrigger} />
+          </div>
+        ) : null}
+        {note ? <p role="status" className="px-8 pb-2 text-xs text-muted-foreground">{people.botName} is drafting a nudge for you to approve in the chat.</p> : null}
+        {error ? <p role="alert" className="px-8 pb-2 text-xs text-destructive">{error}</p> : null}
+      </>} />
+    {picking ? <PickTime onClose={() => setPicking(false)} onPick={(at) => { setPicking(false); void update({ id: loop.id, changes: { status: "snoozed", trigger: { type: "time", at } } }); }} /> : null}
+  </>;
+}
+
+function DoneLine({ loop, people, refresh }: RowProps) {
+  const { update, busy } = useLoopActions(refresh);
+  const dropped = loop.status === "dropped";
+  const by = loop.closedBy === "patrick" ? "You" : loop.closedBy === "cos" ? people.botName : loop.closedBy ?? "";
+  return (
+    <PaneRow testId="loop-done" muted icon={dropped ? "X" : "CircleCheck"} iconClass={dropped ? undefined : "text-success"} title={loop.title}
+      meta={<span>{by}{by ? " · " : ""}{loop.closedAt ? fullWhen(loop.closedAt) : ""}</span>}
+      trailing={
+        <button type="button" aria-label={`Undo: ${loop.title}`} title="Undo" disabled={busy} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } })} className={MENU_BUTTON}>
+          <Icon name="ArrowTurnBackward" />
+        </button>
+      } />
+  );
+}
+
+/**
+ * The Loops button in the Bot chat's header (experimental_threadHeaderAction):
+ * opens the pane beside the chat, with what needs Patrick now as its badge.
+ * Only on the primary Bot's chat, while the Attention Router is on.
+ */
+export function LoopsHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
+  const enabled = useLoopsEnabled();
+  const bot = useLive("bot_get", {}, { enabled, pollMs: 120_000 }).data?.bot ?? null;
+  const onChat = enabled && !!bot?.threadId && bot.threadId === threadId;
+  if (!onChat) return null;
+  return <HeaderButton botId={bot!.id} threadId={threadId} />;
+}
+
+function HeaderButton({ botId, threadId }: { botId: string; threadId: string }) {
+  const navigate = useBbNavigate();
+  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const needs = useNeedsYou(botId, threadId, list.data?.needsYouNow).count;
+  const label = needs ? `Loops beside the chat, ${needs} need you now` : "Loops beside the chat";
+  return (
+    <button type="button" data-testid="loops-header" aria-label={label} title={label} className={cn(ICON_BUTTON, "relative")}
+      onClick={() => { if (!navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" })) openLoops(botId); }}>
+      <Icon name="ListTodo" aria-hidden />
+      {needs ? <span aria-hidden className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-warning px-1 text-[10px] font-medium leading-3.5 text-background tabular-nums">{needs}</span> : null}
+    </button>
+  );
+}

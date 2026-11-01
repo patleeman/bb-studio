@@ -13,11 +13,13 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async (_method: string, _input: unknown) => ({})),
   toThread: vi.fn(),
   open: vi.fn(),
+  openPanel: vi.fn((_options: unknown) => false),
   live: [] as string[],
+  groups: null as unknown,
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSettings: () => ({ values: { loopsEnabled: state.enabled } }),
-  useBbNavigate: () => ({ toThread: state.toThread }),
+  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openPanel }),
   useSdk: () => ({ projects: { list: async () => [{ id: "proj_k", name: "Kensico" }] } }),
 }));
 vi.mock("../../ui/live", () => ({
@@ -28,20 +30,22 @@ vi.mock("../../ui/live", () => ({
     const data = method === "loops.get" ? state.view
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
-          : null;
+          : method === "loops.list" ? state.groups
+            : null;
     return { data, loading: false, error: method === "loops.get" ? state.error : null, refresh: () => {} };
   },
 }));
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({ remember: (_key: string, value: unknown) => value, openAppPath: state.open }));
 
-const { LoopDirective, LoopsMoreDirective } = await import("./LoopCard");
+const { LoopDirective, LoopsDirective, loopsSummary } = await import("./LoopCard");
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   Object.assign(state, { enabled: true, view: { loop: base, history: [] }, error: null, live: [] });
   state.call.mockClear(); state.toThread.mockClear(); state.open.mockClear();
+  state.openPanel.mockReset(); state.openPanel.mockReturnValue(false); state.groups = null;
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); });
@@ -158,12 +162,45 @@ it("draws a morning row that opens the full card", async () => {
   expect(container.querySelector("[data-testid=loop-card]")).not.toBeNull();
 });
 
-it("links +N more to the Loops tab, and draws nothing for 0", async () => {
-  await act(async () => root.render(<LoopsMoreDirective attributes={{ more: "3" }} source="" message={message} openWorkspaceFile={null} />));
+it("opens +N more beside the chat as the Loops pane when the thread has a side panel", async () => {
+  state.openPanel.mockReturnValue(true);
+  await act(async () => root.render(<LoopsDirective attributes={{ more: "3" }} source="" message={message} openWorkspaceFile={null} />));
+  await act(async () => (container.querySelector("[data-testid=loops-more]") as HTMLButtonElement).click());
+  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Loops" });
+  expect(state.open).not.toHaveBeenCalled();
+});
+
+it("posts ::loops{open=pane} as a card that opens Loops beside the chat", async () => {
+  const one = (id: string) => ({ ...base, id });
+  state.groups = { needsYouNow: [one("a"), one("b")], comingUp: [one("c")], agentsOnIt: [], waitingOnOthers: [one("d")], done: [] };
+  state.openPanel.mockReturnValue(true);
+  await act(async () => root.render(<LoopsDirective attributes={{ open: "pane" }} source="" message={message} openWorkspaceFile={null} />));
+  const card = container.querySelector("[data-testid=loops-open]")!;
+  expect(card.textContent).toContain("2 need you · 1 coming up · 1 waiting on others");
+  await click("Open Loops beside the chat");
+  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Loops" });
+  // No side panel (a plugin page): the Loops tab instead.
+  state.openPanel.mockReturnValue(false);
+  await click("Open Loops beside the chat");
+  expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
+  // Off, the card is the quiet line.
+  state.enabled = false;
+  await act(async () => root.render(<LoopsDirective attributes={{ open: "pane" }} source="" message={message} openWorkspaceFile={null} />));
+  expect(container.querySelector("[data-testid=loop-off]")).not.toBeNull();
+});
+
+it("summarizes open loops for the card", () => {
+  expect(loopsSummary({ needsYouNow: [1], comingUp: [], agentsOnIt: [1, 2], waitingOnOthers: [] })).toBe("1 needs you · 2 with agents");
+  expect(loopsSummary({ needsYouNow: [], comingUp: [], agentsOnIt: [], waitingOnOthers: [] })).toBe("No open loops");
+  expect(loopsSummary(null)).toBe("");
+});
+
+it("links +N more to the Loops tab without a side panel, and draws nothing for 0", async () => {
+  await act(async () => root.render(<LoopsDirective attributes={{ more: "3" }} source="" message={message} openWorkspaceFile={null} />));
   expect(container.textContent).toBe("3 more in Loops");
   await act(async () => (container.querySelector("button") as HTMLButtonElement).click());
   expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
-  await act(async () => root.render(<LoopsMoreDirective attributes={{ more: "0" }} source="" message={message} openWorkspaceFile={null} />));
+  await act(async () => root.render(<LoopsDirective attributes={{ more: "0" }} source="" message={message} openWorkspaceFile={null} />));
   expect(container.innerHTML).toBe("");
 });
 
@@ -179,7 +216,7 @@ it("shows one placeholder per morning card while off: its first row, not every r
   const rows = ["loop_a", "loop_b", "loop_c"];
   await act(async () => root.render(<>
     {rows.map((id) => <LoopDirective key={id} attributes={{ id, row: "1" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />)}
-    <LoopsMoreDirective attributes={{ more: "3" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />
+    <LoopsDirective attributes={{ more: "3" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />
   </>));
   expect(container.querySelectorAll("[data-testid=loop-off]")).toHaveLength(1);
   expect(container.querySelector("[data-testid=loops-more]")).toBeNull();

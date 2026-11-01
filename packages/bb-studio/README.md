@@ -184,6 +184,13 @@ Light mode:
 
 ![The Loops tab in light mode](assets/loops-tab-light.png)
 
+The Loops pane is the same list beside the chat, in the thread's side panel,
+so it stays up while you talk loops through with the Bot. Open it from the
+Loops button in the Bot chat's header, from a `::loops{open="pane"}` card or
+"N more in Loops" in the chat, from All loops in the sidebar, or from the side
+panel's launcher. Each row's actions are in its ⋯ menu, and Change trigger
+opens under the row. Its header opens the full Loops tab.
+
 With the setting off, there's no Loops tab or All loops row, and every card
 is a quiet line (one per morning message):
 

@@ -5,7 +5,8 @@
 // on it, live; a closed one collapses to a line with Undo.
 //
 // The morning card's rows are `::loop{id row="1"}`, a compact line that opens
-// the full card, and `::loops{more="3"}`, a link to the Loops tab.
+// the full card, and `::loops{more="3"}`, a link to the Loops list. The Bot
+// posts `::loops{open="pane"}` to offer the Loops list beside the chat.
 //
 // With the Attention Router off (the loopsEnabled setting), every card is a
 // quiet placeholder.
@@ -17,7 +18,7 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
-import { openLoops, useLoopActions, useLoopPeople, useLoopsEnabled, type LoopPeople } from "./hooks";
+import { useLoopActions, useLoopPeople, useLoopsEnabled, useOpenLoopsPane, type LoopPeople } from "./hooks";
 
 export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
 
@@ -248,19 +249,61 @@ export function LoopRow({ view, people, refresh }: { view: LoopView; people: Loo
   );
 }
 
-/** `::loops{more="3"}`: "3 more in Loops ›", opening the Loops tab. Nothing when more is 0. */
-export function LoopsMoreDirective({ attributes }: PluginMessageDirectiveProps) {
+/**
+ * `::loops{…}`, the Loops list from the chat:
+ * - `more="3"`: "3 more in Loops ›", nothing when more is 0;
+ * - `open="pane"`: a card whose button opens Loops beside the chat.
+ * Both open the Loops pane beside the chat, or the Loops tab where there is
+ * no side panel.
+ */
+export function LoopsDirective({ attributes }: PluginMessageDirectiveProps) {
   const enabled = useLoopsEnabled();
-  const people = useLoopPeople();
+  // Off, the morning card's first row already says so; a lone card says it itself.
+  if (attributes.open !== undefined) return enabled ? <LoopsOpenCard /> : <LoopsOff />;
+  if (!enabled) return null;
   const more = Number.parseInt(attributes.more ?? "", 10);
-  // Off, the morning card's first row already says so.
-  if (!enabled || !Number.isFinite(more) || more <= 0) return null;
+  if (!Number.isFinite(more) || more <= 0) return null;
+  return <LoopsMore more={more} />;
+}
+
+function LoopsMore({ more }: { more: number }) {
+  const people = useLoopPeople();
+  const openPane = useOpenLoopsPane();
   return (
-    <button type="button" data-testid="loops-more" onClick={() => openLoops(people.botId)}
+    <button type="button" data-testid="loops-more" onClick={() => openPane(people.botId)}
       className="group flex h-8 w-full max-w-3xl items-center gap-2.5 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground">
       <Icon name="ListTodo" className="size-4 shrink-0" />
       <span className="flex-1">{more} more in Loops</span>
       <Icon name="ChevronRight" className="size-3.5" />
     </button>
+  );
+}
+
+/** What's open, by section, for the card's one line: "2 need you · 3 coming up". */
+export function loopsSummary(groups: { needsYouNow: unknown[]; comingUp: unknown[]; agentsOnIt: unknown[]; waitingOnOthers: unknown[] } | null | undefined): string {
+  if (!groups) return "";
+  const parts = [
+    groups.needsYouNow.length ? `${groups.needsYouNow.length} need${groups.needsYouNow.length === 1 ? "s" : ""} you` : "",
+    groups.comingUp.length ? `${groups.comingUp.length} coming up` : "",
+    groups.agentsOnIt.length ? `${groups.agentsOnIt.length} with agents` : "",
+    groups.waitingOnOthers.length ? `${groups.waitingOnOthers.length} waiting on others` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "No open loops";
+}
+
+function LoopsOpenCard() {
+  const people = useLoopPeople();
+  const openPane = useOpenLoopsPane();
+  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const summary = loopsSummary(list.data);
+  return (
+    <div data-testid="loops-open" className="my-2 flex w-full max-w-xl flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/70 bg-background px-4 py-3">
+      <Icon name="ListTodo" className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-medium text-foreground">Loops</span>
+        <span className="truncate text-xs text-muted-foreground">{summary || "\u00a0"}</span>
+      </div>
+      <button type="button" className={CARD_PRIMARY} onClick={() => openPane(people.botId)}><Icon name="PanelRight" />Open Loops beside the chat</button>
+    </div>
   );
 }

@@ -54,10 +54,13 @@ export function useNeedsYou(botId: string | null, botThreadId: string | null, ne
   return { pending, unread, count: (needsYouNow?.length ?? 0) + pending.length + unread };
 }
 
-export function LoopsTab() {
+/**
+ * What the Loops tab and the Loops pane show: the filtered sections, the Bot
+ * chat's items that count as needing Patrick, and the filters' state.
+ */
+export function useLoopsBoard() {
   const people = useLoopPeople();
   const call = useCall();
-  const navigate = useBbNavigate();
   const [area, setArea] = useState<string | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const filters = { ...(area ? { area } : {}), ...(owner ? { owner } : {}) };
@@ -66,7 +69,6 @@ export function LoopsTab() {
   const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
   const showPending = !owner || owner === "patrick";
   const groups = list.data;
-  const [showAllDone, setShowAllDone] = useState(false);
   const open = groups ? groups.needsYouNow.length + groups.comingUp.length + groups.agentsOnIt.length + groups.waitingOnOthers.length : 0;
   const chat = showPending ? pending.length + unread : 0;
   const needs = (groups?.needsYouNow.length ?? 0) + chat;
@@ -74,10 +76,18 @@ export function LoopsTab() {
   const owners = new Map((groups?.owners ?? []).map((each) => [each.owner, each] as const));
   const nextAt = groups?.comingUp.map((loop) => loop.trigger.type === "time" && !held.has(loop.id) ? loop.trigger.at ?? Infinity : Infinity).reduce((a, b) => Math.min(a, b), Infinity) ?? Infinity;
   const ownerLabel = owner === null ? "Anyone" : owner === "patrick" ? "Me" : ownerName(owner, { bot: people.botName, leads: people.leads }, owners.get(owner));
-  const row = { people, places, refresh: list.refresh, held, owners };
+  const row: Omit<RowProps, "loop"> = { people, places, refresh: list.refresh, held, owners };
+  const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
+  return { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending: showPending ? pending : [], unread: showPending ? unread : 0, open, chat, needs, nextAt, row, add, filtered: !!(area || owner) };
+}
+
+export function LoopsTab() {
+  const navigate = useBbNavigate();
+  const [showAllDone, setShowAllDone] = useState(false);
+  const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, unread, open, chat, needs, nextAt, row, add } = useLoopsBoard();
   return (
     <div className="flex flex-col gap-4 px-4 pb-8" data-testid="loops-tab">
-      <AddLoop onAdd={(text) => call("loops.add", { text }).then(() => list.refresh())} botName={people.botName} />
+      <AddLoop onAdd={add} botName={people.botName} />
       <div className="flex flex-wrap items-center gap-1">
         {[null, ...AREAS].map((each) => (
           <button key={each ?? "all"} type="button" aria-pressed={area === each} onClick={() => setArea(each)}
@@ -85,25 +95,9 @@ export function LoopsTab() {
             {each ?? "All"}
           </button>
         ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className={cn(CARD_BUTTON, "ml-auto h-8 px-3 text-sm")} aria-label={`Owner: ${ownerLabel}`}><Icon name="UserRound" />Owner: {ownerLabel}<Icon name="ChevronDown" className="opacity-60" /></button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-52">
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Owner</DropdownMenuLabel>
-            {[{ owner: null, name: "Anyone" }, { owner: "patrick", name: "Me" }, people.targets[0]!].map((each) => (
-              <DropdownMenuItem key={each.owner ?? "anyone"} onSelect={() => setOwner(each.owner)}>
-                <Icon name="Check" className={owner === each.owner ? "" : "invisible"} />{each.name}
-              </DropdownMenuItem>
-            ))}
-            {people.targets.length > 1 ? <DropdownMenuSeparator /> : null}
-            {people.targets.slice(1).map((each) => (
-              <DropdownMenuItem key={each.owner} onSelect={() => setOwner(each.owner)}>
-                <Icon name="Check" className={owner === each.owner ? "" : "invisible"} />{each.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <OwnerMenu owner={owner} label={ownerLabel} people={people} onOwner={setOwner}>
+          <button type="button" className={cn(CARD_BUTTON, "ml-auto h-8 px-3 text-sm")} aria-label={`Owner: ${ownerLabel}`}><Icon name="UserRound" />Owner: {ownerLabel}<Icon name="ChevronDown" className="opacity-60" /></button>
+        </OwnerMenu>
       </div>
       {list.error ? <p role="alert" className="text-xs text-destructive">{list.error}</p> : null}
       {!groups ? <div className="h-40 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none" /> : <>
@@ -116,12 +110,12 @@ export function LoopsTab() {
         ) : <>
           {needs ? (
             <Section title="Needs you now" count={needs}>
-              {showPending ? pending.map((question) => (
+              {pending.map((question) => (
                 <Row key={question.id} icon="MessageQuestion" title={question.reason} testId="loop-pending"
                   subtitle={<>In your chat with {people.botName} · {shortWhen(question.createdAt)}</>}
                   right={people.botThreadId ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(people.botThreadId!)}><Icon name="MessageSquare" />Open chat</button> : null} />
-              )) : null}
-              {showPending && unread ? (
+              ))}
+              {unread ? (
                 <Row icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`} testId="loop-unread"
                   subtitle={<>In your chat with {people.botName} · not read yet</>}
                   right={people.botThreadId ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(people.botThreadId!)}><Icon name="MessageSquare" />Open chat</button> : null} />
@@ -156,7 +150,31 @@ export function LoopsTab() {
   );
 }
 
-function AddLoop({ onAdd, botName }: { onAdd(text: string): Promise<unknown>; botName: string }) {
+/** The Owner filter's menu: Anyone, Me, the Bot, then each project's lead. */
+export function OwnerMenu({ owner, label, people, onOwner, children }: { owner: string | null; label: string; people: LoopPeople; onOwner(owner: string | null): void; children: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52" aria-label={`Owner: ${label}`}>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Owner</DropdownMenuLabel>
+        {[{ owner: null, name: "Anyone" }, { owner: "patrick", name: "Me" }, people.targets[0]!].map((each) => (
+          <DropdownMenuItem key={each.owner ?? "anyone"} onSelect={() => onOwner(each.owner)}>
+            <Icon name="Check" className={owner === each.owner ? "" : "invisible"} />{each.name}
+          </DropdownMenuItem>
+        ))}
+        {people.targets.length > 1 ? <DropdownMenuSeparator /> : null}
+        {people.targets.slice(1).map((each) => (
+          <DropdownMenuItem key={each.owner} onSelect={() => onOwner(each.owner)}>
+            <Icon name="Check" className={owner === each.owner ? "" : "invisible"} />{each.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** "Add a loop": a typed line the Bot fills in. `compact` for the narrow pane. */
+export function AddLoop({ onAdd, botName, compact = false }: { onAdd(text: string): Promise<unknown>; botName: string; compact?: boolean }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
@@ -170,10 +188,10 @@ function AddLoop({ onAdd, botName }: { onAdd(text: string): Promise<unknown>; bo
   };
   return (
     <div className="flex flex-col gap-1">
-      <form className="flex h-11 items-center gap-2 rounded-lg border border-border px-3 focus-within:border-ring" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+      <form className={cn("flex items-center gap-2 rounded-lg border border-border px-3 focus-within:border-ring", compact ? "h-9" : "h-11")} onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <Icon name="Plus" className="size-4 shrink-0 text-muted-foreground" />
         <input aria-label="Add a loop" value={text} disabled={busy} maxLength={500} onChange={(e) => setText(e.target.value)}
-          placeholder="Add a loop: “call the plumber when I’m home”" className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+          placeholder={compact ? "Add a loop" : "Add a loop: “call the plumber when I’m home”"} className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
         <button type="submit" aria-label="Add" disabled={!text.trim() || busy}
           className="inline-flex h-6 items-center rounded border border-border px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50">
           <Icon name="CornerDownLeft" className="size-3.5" />
@@ -184,7 +202,7 @@ function AddLoop({ onAdd, botName }: { onAdd(text: string): Promise<unknown>; bo
   );
 }
 
-function Section({ title, count, aside, children }: { title: string; count: number; aside?: ReactNode; children: ReactNode }) {
+export function Section({ title, count, aside, children }: { title: string; count: number; aside?: ReactNode; children: ReactNode }) {
   return (
     <section aria-label={title} className="flex flex-col">
       <div className="flex items-center gap-2 border-b border-border pb-2 text-sm">
@@ -197,7 +215,7 @@ function Section({ title, count, aside, children }: { title: string; count: numb
   );
 }
 
-function AreaChip({ area }: { area: string | null }) {
+export function AreaChip({ area }: { area: string | null }) {
   return area ? <span className="shrink-0 rounded border border-border px-1.5 text-xs leading-5 text-muted-foreground">{area}</span> : null;
 }
 
@@ -217,7 +235,7 @@ function Row({ icon, iconClass, title, subtitle, right, actions, testId, muted }
   );
 }
 
-function Subtitle({ loop, extra }: { loop: Loop; extra?: ReactNode }) {
+export function Subtitle({ loop, extra }: { loop: Loop; extra?: ReactNode }) {
   const source = sourceText(loop.source);
   return <>
     {extra}
@@ -227,7 +245,7 @@ function Subtitle({ loop, extra }: { loop: Loop; extra?: ReactNode }) {
   </>;
 }
 
-type RowProps = { loop: Loop; people: LoopPeople; places: string[]; refresh(): void; held: ReadonlyMap<string, Hold>; owners: ReadonlyMap<string, OwnerInfo> };
+export type RowProps = { loop: Loop; people: LoopPeople; places: string[]; refresh(): void; held: ReadonlyMap<string, Hold>; owners: ReadonlyMap<string, OwnerInfo> };
 
 function TriggerButton({ loop, places, onSave }: { loop: Loop; places: string[]; onSave(changes: { trigger: Loop["trigger"]; push: boolean }): void }) {
   return <ChangeTrigger loop={loop} places={places} onSave={onSave} />;
