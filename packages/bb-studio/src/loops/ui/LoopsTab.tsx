@@ -252,10 +252,14 @@ function TriggerButton({ loop, places, onSave }: { loop: Loop; places: string[];
   return <ChangeTrigger loop={loop} places={places} onSave={onSave} />;
 }
 
-/** Discuss: opens the Bot chat with the loop in its draft (useDiscussLoop). */
-function DiscussButton({ loop, people }: { loop: Loop; people: LoopPeople }) {
+/** Discuss: opens the Bot chat with the loop in its draft (useDiscussLoop). Icon only on the one-line rows, where the title needs the room. */
+function DiscussButton({ loop, people, iconOnly = false }: { loop: Loop; people: LoopPeople; iconOnly?: boolean }) {
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
-  return <button type="button" className={CARD_GHOST} onClick={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</button>;
+  return (
+    <button type="button" className={CARD_GHOST} aria-label={`Discuss: ${loop.title}`} title={`Discuss with ${people.botName}`} onClick={() => void discuss(loop)}>
+      <Icon name="MessageCirclePlus" />{iconOnly ? null : "Discuss"}
+    </button>
+  );
 }
 
 function NeedsYouRow({ loop, people, places, refresh }: RowProps) {
@@ -294,7 +298,7 @@ function ComingUpRow({ loop, people, places, refresh, held, owners }: RowProps) 
       subtitle={mine ? undefined : <span className="truncate">{ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner))} will do it</span>}
       right={<>
         <span className={ROW_ACTIONS}>
-          <DiscussButton loop={loop} people={people} />
+          <DiscussButton loop={loop} people={people} iconOnly />
           {mine ? <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button> : null}
           <TriggerButton loop={loop} places={places} onSave={(changes) => void update({ id: loop.id, changes })} />
         </span>
@@ -320,7 +324,7 @@ function AgentRow({ loop, people, refresh, owners }: RowProps) {
         <AreaChip area={loop.area} />
       </>}
       right={<>
-        <span className={ROW_ACTIONS}><DiscussButton loop={loop} people={people} /><button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button></span>
+        <span className={ROW_ACTIONS}><DiscussButton loop={loop} people={people} iconOnly /><button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button></span>
         {thread ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</button> : null}
       </>} />
   );

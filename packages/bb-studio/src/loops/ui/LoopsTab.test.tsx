@@ -213,9 +213,11 @@ it("shows the same items as the Bot row's badge: an unread reply counts in Needs
 it("Discuss on the page opens the Bot chat, then puts the loop in its draft", async () => {
   await render();
   const row = [...container.querySelectorAll("[data-testid=loop-coming]")].find((each) => each.textContent?.includes("Call the plumber"))!;
-  await act(async () => buttonIn(row, "Discuss").click());
+  await act(async () => (row.querySelector("[aria-label='Discuss: Call the plumber about the slow drain']") as HTMLButtonElement).click());
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   await vi.waitFor(() => expect(state.composer.insert).toHaveBeenCalledWith([{ provider: "loop", id: "loop_c", label: "Call the plumber about the slow drain" }, " "], { at: "end" }));
   expect(state.composer.focus).toHaveBeenCalled();
-  for (const testId of ["loop-needs", "loop-agent", "loop-waiting"]) expect(buttonIn(container.querySelector(`[data-testid=${testId}]`)!, "Discuss")).toBeTruthy();
+  // A text button where the row has an actions line; icon only on the one-line rows.
+  for (const testId of ["loop-needs", "loop-waiting"]) expect(buttonIn(container.querySelector(`[data-testid=${testId}]`)!, "Discuss")).toBeTruthy();
+  expect(container.querySelector("[data-testid=loop-agent] [aria-label^='Discuss: ']")!.textContent).toBe("");
 });
