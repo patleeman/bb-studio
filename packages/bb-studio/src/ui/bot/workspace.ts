@@ -7,6 +7,7 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 import { botPath } from "./selection";
+import { LOOPS_PANE } from "../../loops/ui/hooks";
 
 /** The thread panel action that shows a Bot thread's Info (app.tsx). */
 export const BOT_INFO_ACTION = "bot-info";
@@ -45,8 +46,15 @@ export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBot
   }, [navigate]);
 }
 
-/** The thread open in the main pane, and whether Bot info was opened beside it yet. */
+/** A tab beside the Bot's chat: Bot info, or the Loops pane (src/loops/ui/LoopsPane.tsx). */
+export interface ChatPanel { actionId: string; title: string }
+export const BOT_INFO_PANEL: ChatPanel = { actionId: BOT_INFO_ACTION, title: "Bot info" };
+export const LOOPS_PANEL: ChatPanel = { actionId: LOOPS_PANE, title: "Loops" };
+
+/** The thread open in the main pane, and whether a panel was opened beside it yet. */
 let visit: { threadId: string | null; infoOpened: boolean } = { threadId: null, infoOpened: false };
+/** The panel asked for when the chat next opens (All loops), instead of the usual one. */
+let wanted: ChatPanel | null = null;
 
 /** Notes the thread now open (null: none); a different one starts a new visit. */
 export function noteOpenThread(threadId: string | null): void {
@@ -54,12 +62,30 @@ export function noteOpenThread(threadId: string | null): void {
 }
 
 /**
- * Opens Bot info beside a Bot's own chat (`chatIds`: its chain) once each
- * time that thread opens. Closing it sticks until the user opens the thread
- * again. The thread view may mount after the sidebar, so a declined open is
- * retried briefly.
+ * Opens `panel` beside the Bot's chat: at once when the chat is the open
+ * thread, else by opening the chat, which then opens `panel` instead of Bot
+ * info (useOpenBotInfoOnChat). False when there's no chat, or the open
+ * thread's side panel declined.
  */
-export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: readonly string[]): void {
+export function useOpenBesideChat(): (chatId: string | null, activeThreadId: string | null, panel: ChatPanel) => boolean {
+  const navigate = useBbNavigate();
+  return useCallback((chatId, activeThreadId, panel) => {
+    if (!chatId) return false;
+    if (activeThreadId === chatId) return navigate.openThreadPanel(panel);
+    wanted = panel;
+    navigate.toThread(chatId);
+    return true;
+  }, [navigate]);
+}
+
+/**
+ * Opens a panel beside a Bot's own chat (`chatIds`: its chain) once each
+ * time that thread opens: `panel` (Bot info unless the caller says, e.g. the
+ * Loops pane while something needs the user), or the one All loops asked
+ * for. Closing it sticks until the user opens the thread again. The thread
+ * view may mount after the sidebar, so a declined open is retried briefly.
+ */
+export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: readonly string[], panel: ChatPanel = BOT_INFO_PANEL): void {
   const navigate = useBbNavigate();
   const onChat = !!activeThreadId && chatIds.includes(activeThreadId);
   useEffect(() => {
@@ -68,13 +94,17 @@ export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: rea
     if (visit.infoOpened) return;
     visit.infoOpened = true;
     const current = visit;
+    const open = wanted ?? panel;
+    wanted = null;
     let tries = 0;
     const attempt = () => {
       if (visit !== current) return;
-      if (navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
+      if (navigate.openThreadPanel(open)) return;
       if (++tries < 6) setTimeout(attempt, 500);
     };
     attempt();
+    // The panel is chosen when the chat opens; a later change waits for the next visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId, onChat, navigate]);
 }
 

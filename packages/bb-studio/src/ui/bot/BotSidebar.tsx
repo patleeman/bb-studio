@@ -27,7 +27,7 @@ import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./thre
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { KIND } from "./Automations";
-import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
+import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sidebarGroups, useOpenBesideChat, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
@@ -251,8 +251,11 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const ids = chain.data?.threadIds ?? [];
   const chatOpen = active !== null && (active === bot.threadId || ids.includes(active));
   const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
-  // Bot info opens beside the Bot's own chat when it opens.
-  useOpenBotInfoOnChat(active, bot.threadId ? [...ids, bot.threadId] : ids);
+  // Bot info opens beside the Bot's own chat when it opens; Loops does
+  // instead while the badge counts something, since its Needs you now lists
+  // the same items.
+  const loopsFirst = useLoopsEnabled() && bot.primary !== false && !!activity.data?.attention;
+  useOpenBotInfoOnChat(active, bot.threadId ? [...ids, bot.threadId] : ids, loopsFirst ? LOOPS_PANEL : BOT_INFO_PANEL);
   // Chain threads are hidden, so BB's ThreadTitle shows nothing for them; bot_chain reads their titles.
   const titles = new Map((chain.data?.threads ?? []).map((thread) => [thread.id, thread.title]));
   const color = bot.color ?? colorForName(bot.name);
@@ -302,7 +305,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
       </div>
 
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
-        {bot.primary !== false ? <AllLoopsRow botId={bot.id} onNavigate={onNavigate} /> : null}
+        {bot.primary !== false ? <AllLoopsRow botId={bot.id} chatId={bot.threadId} active={active} onNavigate={onNavigate} /> : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
         {groups.waiting.length ? <Group id="waiting" title="Waiting to start" closed={layout.closed} onToggle={toggle}>{tree(groups.waiting)}</Group> : null}
         {runners.data?.runners.length ? (
@@ -365,18 +368,21 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
 }
 
 /**
- * "All loops", the Bot's Loops tab, while the Attention Router is on. There is
- * no "Needs you" list here (decision 7): the Bot row's badge counts what waits.
+ * "All loops", while the Attention Router is on: the Bot's chat with the Loops
+ * pane beside it, to talk loops through with the Bot; the Loops tab when the
+ * Bot has no chat. There is no "Needs you" list here (decision 7): the Bot
+ * row's badge counts what waits.
  */
-function AllLoopsRow({ botId, onNavigate }: { botId: string; onNavigate(): void }) {
+function AllLoopsRow({ botId, chatId, active, onNavigate }: { botId: string; chatId: string | null; active: string | null; onNavigate(): void }) {
   const enabled = useLoopsEnabled();
+  const openBeside = useOpenBesideChat();
   const pathname = usePathname();
   const list = useLive("loops.list", {}, { enabled, pollMs: 60_000 });
   if (!enabled) return null;
   const open = list.data ? list.data.needsYouNow.length + list.data.comingUp.length + list.data.agentsOnIt.length + list.data.waitingOnOthers.length : 0;
   const current = isLoopsPath(pathname) && pathname.includes(`/${encodeURIComponent(botId)}/`);
   return (
-    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { openAppPath(loopsPath(botId)); onNavigate(); }}
+    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { if (!openBeside(chatId, active, LOOPS_PANEL)) openAppPath(loopsPath(botId)); onNavigate(); }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
       <Icon name="ListTodo" className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">All loops</span>
