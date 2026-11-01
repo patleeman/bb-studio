@@ -40,12 +40,20 @@ function useNow(): number {
   return now;
 }
 
-export function LoopDirective({ attributes }: PluginMessageDirectiveProps) {
+/** While off, a morning card shows one placeholder: its first row's. Message id → that row's loop id. */
+const offRows = new Map<string, string>();
+
+export function LoopDirective({ attributes, message }: PluginMessageDirectiveProps) {
   const enabled = useLoopsEnabled();
   const id = attributes.id ?? "";
+  const row = attributes.row === "1" || attributes.row === "true";
   if (!isLoopId(id)) return null;
-  if (!enabled) return <LoopsOff />;
-  return <LiveLoop id={id} row={attributes.row === "1" || attributes.row === "true"} />;
+  if (!enabled) {
+    if (!row) return <LoopsOff />;
+    if (!offRows.has(message.id)) offRows.set(message.id, id);
+    return offRows.get(message.id) === id ? <LoopsOff /> : null;
+  }
+  return <LiveLoop id={id} row={row} />;
 }
 
 function LiveLoop({ id, row }: { id: string; row: boolean }) {
@@ -97,7 +105,7 @@ function Header({ loop, now, label }: { loop: Loop; now: number; label?: string 
         <span aria-hidden>·</span>
         {url ? <a href={url} target="_blank" rel="noreferrer" className="truncate underline decoration-muted-foreground/50 underline-offset-2 hover:text-foreground">{source}</a> : <span className="truncate">{source}</span>}
       </> : null}
-      {loop.priority === "urgent" ? <span className="rounded bg-destructive/15 px-1 text-[10px] font-medium text-destructive">Urgent</span> : null}
+      {loop.priority === "urgent" ? <span className="rounded bg-destructive/15 px-1 text-xs font-medium text-destructive">Urgent</span> : null}
       {right ? <span className={cn("ml-auto shrink-0", right.urgent && "text-warning")}>{right.text}</span> : null}
     </div>
   );
@@ -105,7 +113,7 @@ function Header({ loop, now, label }: { loop: Loop; now: number; label?: string 
 
 function Body({ loop }: { loop: Loop }) {
   return <>
-    <div className="mt-1 text-[15px] font-semibold leading-snug text-foreground">{loop.title}</div>
+    <div className="mt-1 text-base font-semibold leading-snug text-foreground">{loop.title}</div>
     {loop.why ? <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{loop.why}</p> : null}
   </>;
 }
@@ -245,8 +253,8 @@ export function LoopsMoreDirective({ attributes }: PluginMessageDirectiveProps) 
   const enabled = useLoopsEnabled();
   const people = useLoopPeople();
   const more = Number.parseInt(attributes.more ?? "", 10);
-  if (!enabled) return <LoopsOff />;
-  if (!Number.isFinite(more) || more <= 0) return null;
+  // Off, the morning card's first row already says so.
+  if (!enabled || !Number.isFinite(more) || more <= 0) return null;
   return (
     <button type="button" data-testid="loops-more" onClick={() => openLoops(people.botId)}
       className="group flex h-8 w-full max-w-3xl items-center gap-2.5 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground">

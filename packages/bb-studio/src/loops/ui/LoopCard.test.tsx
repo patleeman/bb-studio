@@ -173,3 +173,14 @@ it("offers Keep or Drop on a loop with no update in three days (the weekly revie
   await click("Keep");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_1", action: "keep" });
 });
+
+it("shows one placeholder per morning card while off: its first row, not every row or the more link", async () => {
+  state.enabled = false;
+  const rows = ["loop_a", "loop_b", "loop_c"];
+  await act(async () => root.render(<>
+    {rows.map((id) => <LoopDirective key={id} attributes={{ id, row: "1" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />)}
+    <LoopsMoreDirective attributes={{ more: "3" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />
+  </>));
+  expect(container.querySelectorAll("[data-testid=loop-off]")).toHaveLength(1);
+  expect(container.querySelector("[data-testid=loops-more]")).toBeNull();
+});

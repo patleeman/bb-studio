@@ -169,7 +169,7 @@ function PageTabs({ botId, threadId, loops }: { botId: string; threadId: string 
     <div role="tablist" aria-label="Bot page" className="flex items-center gap-1 px-4 pb-3">
       <button type="button" role="tab" aria-selected={!loops} className={tab} onClick={() => openAppPath(botPath(botId))}>Info</button>
       <button type="button" role="tab" aria-selected={loops} className={tab} data-testid="bot-loops-tab" onClick={() => openAppPath(loopsPath(botId))}>
-        Loops{needs ? <span className="rounded-full bg-warning px-1.5 text-[11px] font-medium leading-4 text-background tabular-nums">{needs}</span> : null}
+        Loops{needs ? <span className="rounded-full bg-warning px-1.5 text-xs font-medium leading-4 text-background tabular-nums">{needs}</span> : null}
       </button>
     </div>
   );

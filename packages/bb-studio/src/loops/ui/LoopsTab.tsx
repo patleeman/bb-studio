@@ -251,7 +251,7 @@ function ComingUpRow({ loop, places, refresh }: RowProps) {
           <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button>
           <TriggerButton loop={loop} places={places} onSave={(changes) => void update({ id: loop.id, changes })} />
         </span>
-        <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-[13px] text-foreground" title={loop.push ? "Sends to iPhone when it fires" : undefined}>
+        <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-foreground" title={loop.push ? "Sends to iPhone when it fires" : undefined}>
           <Icon name={trigger.icon} className="size-3.5 text-muted-foreground" />{trigger.text}{loop.push ? <Icon name="Smartphone" className="size-3 text-muted-foreground" /> : null}
         </span>
       </>} />

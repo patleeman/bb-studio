@@ -10,9 +10,9 @@ import {
 import type { Loop } from "../contract";
 import { optionParts, placeLabel, SNOOZE, snoozeHint, type SnoozePreset, type Trigger } from "./model";
 
-export const CARD_BUTTON = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-[13px] text-foreground hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
-export const CARD_PRIMARY = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-2.5 text-[13px] font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5";
-export const CARD_GHOST = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
+export const CARD_BUTTON = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-sm text-foreground hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
+export const CARD_PRIMARY = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-2.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5";
+export const CARD_GHOST = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
 
 const fromLocalInput = (value: string): number | null => { const at = new Date(value).getTime(); return Number.isFinite(at) ? at : null; };
 const toLocalInput = (at: number) => { const d = new Date(at - new Date(at).getTimezoneOffset() * 60_000); return d.toISOString().slice(0, 16); };
@@ -90,7 +90,7 @@ export function OptionButton({ option, disabled, onChoose }: { option: string; d
   return (
     <button type="button" disabled={disabled} onClick={onChoose} title={option}
       className="flex min-w-0 flex-1 basis-40 flex-col items-start rounded-md border border-border px-3 py-1.5 text-left hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 sm:max-w-64">
-      <span className="w-full truncate text-[13px] font-medium text-foreground">{label}</span>
+      <span className="w-full truncate text-sm font-medium text-foreground">{label}</span>
       {detail ? <span className="w-full truncate text-xs text-muted-foreground">{detail}</span> : null}
     </button>
   );
@@ -126,7 +126,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
     <div role="radiogroup" aria-label={label} className="flex flex-1 rounded-md bg-muted p-0.5">
       {options.map((option) => (
         <button key={option.value} type="button" role="radio" aria-checked={value === option.value} onClick={() => onChange(option.value)}
-          className={cn("h-7 flex-1 rounded px-2 text-[13px] text-muted-foreground hover:text-foreground", value === option.value && "bg-background text-foreground shadow-sm")}>
+          className={cn("h-7 flex-1 rounded px-2 text-sm text-muted-foreground hover:text-foreground", value === option.value && "bg-background text-foreground shadow-sm")}>
           {option.label}
         </button>
       ))}
