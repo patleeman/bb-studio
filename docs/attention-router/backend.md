@@ -162,7 +162,10 @@ Bot's chat. It has the tab's sections, area chips, Owner and Add a loop; each
 row is a title, one line of detail and a ⋯ menu with the row's actions (Done,
 Snooze, Hand off, a decision's options, Got it, Surface now, Take it back,
 Open thread, Nudge them, Change trigger…, Drop), and Done rows keep Undo.
-Change trigger opens under its row, with Send to iPhone. Its header opens the
+Change trigger opens under its row, with Send to iPhone. On Patrick's do and read
+loops the kind circle is the Done checkbox (a check on hover, Mark done;
+read closes as Got it): one click closes it, and the row stays in place, done
+with Undo, until the pane closes. Decide and waiting rows keep their icon. Its header opens the
 full Loops tab. It opens from:
 
 - the Loops button in the Bot chat's header (`experimental_threadHeaderAction`,

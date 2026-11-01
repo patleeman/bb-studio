@@ -270,6 +270,28 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await client.evaluate(`(() => { document.querySelector("[data-testid=loop-trigger-inline]").scrollIntoView({ block: "center" }); return true; })()`);
       await sleep(500);
     }),
+    paneCapture("studio-loops-pane-row-hover", "loops-pane-row-hover.png", "dark", async (client) => {
+      await openPane(client);
+      const circle = `[data-testid=loops-pane] [role=checkbox][aria-label=${JSON.stringify("Mark done: Reply to Yassine about the FDE referral")}]`;
+      await client.waitForSelector(circle, 10000);
+      const point = await client.evaluate(`(() => { const r = document.querySelector(${JSON.stringify(circle)}).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+      await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y, buttons: 0 });
+      await sleep(500);
+      // The kind icon hides and the check shows.
+      const shown = await client.evaluate(`[...document.querySelector(${JSON.stringify(circle)}).children].map((each) => getComputedStyle(each).display !== "none")`);
+      if (JSON.stringify(shown) !== "[false,true]") throw new Error("The circle shows no check on hover: " + JSON.stringify(shown));
+    }),
+    paneCapture("studio-loops-pane-row-done", "loops-pane-row-done.png", "dark", async (client) => {
+      await openPane(client);
+      await pressAt(client, `[data-testid=loops-pane] [role=checkbox][aria-label=${JSON.stringify("Mark done: Reply to Yassine about the FDE referral")}]`);
+      await client.waitForSelector("[data-testid=loops-pane] [data-testid=loop-just-done]", 10000);
+      for (const text of ["Done · just now", "Undo"]) await client.waitForText(text);
+      // After the refetch it stays in place.
+      await sleep(2500);
+      await client.waitForSelector("[data-testid=loops-pane] section[aria-label='Needs you now'] [data-testid=loop-just-done]", 5000);
+      await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 900, buttons: 0 });
+      await sleep(400);
+    }),
     paneCapture("studio-loops-pane-card", "loops-pane-card.png", "dark", async (client) => {
       await client.waitForText("Open Loops beside the chat", 30000);
       if (!/\d+ need/.test(await client.evaluate(`document.querySelector("[data-testid=loops-open]").textContent`))) throw new Error("The Loops card has no summary");

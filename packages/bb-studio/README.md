@@ -188,10 +188,16 @@ The Loops pane is the same list beside the chat, in the thread's side panel,
 so it stays up while you talk loops through with the Bot. Open it from the
 Loops button in the Bot chat's header, from a `::loops{open="pane"}` card or
 "N more in Loops" in the chat, from All loops in the sidebar, or from the side
-panel's launcher. Each row's actions are in its ⋯ menu, and Change trigger
+panel's launcher. A do or read row's circle marks it done in one click (a
+check on hover), and the row stays put with Undo. Each row's actions are in
+its ⋯ menu, and Change trigger
 opens under the row. Its header opens the full Loops tab.
 
 ![The Bot's chat with the Loops pane open on the right: the chat's header has a Loops button badged 4; the pane has Add a loop, area chips and Anyone, then Needs you now (Choose the deck contractor, Reply to Yassine, Pay the property tax installment, the recruiter call), Coming up with each trigger, and Agents on it. In the chat, the Bot's "Loops" card reads 4 need you · 5 coming up · 2 with agents · 2 waiting on others, with Open Loops beside the chat](assets/loops-pane.png)
+
+![A row's kind circle hovered in the pane: it shows a check, Mark done](assets/loops-pane-row-hover.png)
+
+![Reply to Yassine just closed from its circle: struck through, Done · just now, with Undo, still first in Needs you now, which now counts 3](assets/loops-pane-row-done.png)
 
 ![The Yassine row's ⋯ menu in the pane: Done, Snooze ›, Hand off ›, Change trigger… and Drop](assets/loops-pane-menu.png)
 
