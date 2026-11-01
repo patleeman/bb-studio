@@ -4,6 +4,10 @@
 // database with fixed ids, so every run shows the same records; the Bot posts
 // the `::loop` lines itself, as it does when the scheduler releases a loop.
 //
+// The Loops pane (src/loops/ui/LoopsPane.tsx) is captured beside the Bot's
+// chat: opened from the chat header's Loops button, a row's ⋯ menu, Change
+// trigger under its row, and the `::loops{open="pane"}` card that opens it.
+//
 // BB_CAPTURE_LOOPS_BEFORE=1 captures the same surfaces without asserting the
 // new UI, for before-and-after renders against an older Studio.
 import { createRequire } from "node:module";
@@ -197,7 +201,88 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     },
   });
 
+  /** Press the first element matching `selector` with the pointer, inside `within` when given. */
+  const pressAt = async (client, selector) => {
+    const point = await client.evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) throw new Error("Nothing to press: ${selector.replace(/"/g, "'")}");
+      el.scrollIntoView({ block: "nearest" });
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+      await client.command("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: type === "mouseMoved" ? "none" : "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: type === "mouseMoved" ? 0 : 1 });
+    }
+    await sleep(400);
+  };
+  const PANE_TEXTS = ["Needs you now", "Coming up", "Reply to Yassine about the FDE referral", "Choose the deck contractor", "When you get home", "Agents on it"];
+  const OPEN_CARD = "Sure. Here’s everything open, beside our chat so we can go through it.\n\n::loops{open=\"pane\"}";
+  let paneChat = null;
+  /** The Bot's chat with the `::loops{open="pane"}` card as its newest reply, posted once per run. */
+  const openPaneChat = async (client) => {
+    const { bot } = await seed();
+    await setEnabled(true);
+    if (paneChat !== bot.threadId) { await post(bot, "loops pane", OPEN_CARD); paneChat = bot.threadId; }
+    await client.navigate(chatPath(bot));
+    await dismissProblems(client);
+    await client.waitForSelector("[data-testid=loops-open]", 60000);
+    await scrollTo(client, "[data-testid=loops-open]");
+    return bot;
+  };
+  /** The pane open beside the chat, from the header's Loops button. */
+  const openPane = async (client) => {
+    await client.waitForSelector("[data-testid=loops-header]", 30000);
+    await client.evaluate(`(() => { document.querySelector("[data-testid=loops-header]").click(); return true; })()`);
+    await client.waitForSelector("[data-testid=loops-pane]", 30000);
+    for (const text of PANE_TEXTS) await client.waitForText(text, 30000);
+    await sleep(800);
+  };
+  const paneCapture = (captureId, fileName, color, after = async () => {}) => ({
+    id: captureId,
+    packageDir: "bb-studio",
+    fileName,
+    showSidebar: true,
+    setup: async (client) => {
+      await scheme(client, color);
+      await openPaneChat(client);
+      await after(client);
+      return async () => { await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape" }).catch(() => {}); await scheme(client, ""); };
+    },
+  });
+  const rowMenu = (title) => `[data-testid=loops-pane] button[aria-label=${JSON.stringify(`Actions: ${title}`)}]`;
+
+  const panes = BEFORE ? [] : [
+    paneCapture("studio-loops-pane", "loops-pane.png", "dark", openPane),
+    paneCapture("studio-loops-pane-light", "loops-pane-light.png", "light", openPane),
+    paneCapture("studio-loops-pane-menu", "loops-pane-menu.png", "dark", async (client) => {
+      await openPane(client);
+      await pressAt(client, rowMenu("Reply to Yassine about the FDE referral"));
+      for (const text of ["Done", "Snooze", "Hand off", "Change trigger…", "Drop"]) await client.waitForText(text);
+      await client.evaluate(`(() => { const sub = [...document.querySelectorAll("[role=menuitem]")].find((e) => e.textContent.trim() === "Snooze"); if (!sub) throw new Error("No Snooze submenu"); return true; })()`);
+    }),
+    paneCapture("studio-loops-pane-trigger", "loops-pane-trigger.png", "dark", async (client) => {
+      await openPane(client);
+      await pressAt(client, rowMenu("Call the plumber about the slow drain"));
+      await client.waitForText("Change trigger…");
+      await press(client, "[role=menuitem]", "Change trigger…");
+      await client.waitForSelector("[data-testid=loops-pane] [data-testid=loop-trigger-inline]", 10000);
+      for (const text of ["Time", "Event", "Place", "Anytime", "Office", "Mom’s", "Send to iPhone when it fires"]) await client.waitForText(text);
+      await client.evaluate(`(() => { document.querySelector("[data-testid=loop-trigger-inline]").scrollIntoView({ block: "center" }); return true; })()`);
+      await sleep(500);
+    }),
+    paneCapture("studio-loops-pane-card", "loops-pane-card.png", "dark", async (client) => {
+      await client.waitForText("Open Loops beside the chat", 30000);
+      if (!/\d+ need/.test(await client.evaluate(`document.querySelector("[data-testid=loops-open]").textContent`))) throw new Error("The Loops card has no summary");
+      await press(client, "[data-testid=loops-open] button", "Open Loops beside the chat");
+      await client.waitForSelector("[data-testid=loops-pane]", 30000);
+      for (const text of PANE_TEXTS) await client.waitForText(text, 30000);
+      await scrollTo(client, "[data-testid=loops-open]");
+      await sleep(800);
+    }),
+  ];
+
   return [
+    ...panes,
     chatCapture("studio-loops-cards", "loops-cards.png", "dark", ["cards", CARDS], async (client) => {
       await client.waitForSelector("[data-testid=loop-card][data-kind=decide]", 60000);
       for (const text of ["Choose the deck contractor", "Hudson Carpentry", "Reply to Yassine about the FDE referral", "Hand off", "Got it", "Nudge them"]) await client.waitForText(text, 30000);

@@ -191,6 +191,16 @@ Loops button in the Bot chat's header, from a `::loops{open="pane"}` card or
 panel's launcher. Each row's actions are in its ⋯ menu, and Change trigger
 opens under the row. Its header opens the full Loops tab.
 
+![The Bot's chat with the Loops pane open on the right: the chat's header has a Loops button badged 4; the pane has Add a loop, area chips and Anyone, then Needs you now (Choose the deck contractor, Reply to Yassine, Pay the property tax installment, the recruiter call), Coming up with each trigger, and Agents on it. In the chat, the Bot's "Loops" card reads 4 need you · 5 coming up · 2 with agents · 2 waiting on others, with Open Loops beside the chat](assets/loops-pane.png)
+
+![The Yassine row's ⋯ menu in the pane: Done, Snooze ›, Hand off ›, Change trigger… and Drop](assets/loops-pane-menu.png)
+
+![Change trigger open under "Call the plumber about the slow drain" in the pane: Time, Event, Place and Anytime, Place selected with Home, Office, Mom’s and Gym, Arrive or Leave, and Send to iPhone when it fires checked](assets/loops-pane-trigger.png)
+
+![The Bot's ::loops{open="pane"} card in the chat after its Open Loops beside the chat button opened the pane](assets/loops-pane-card.png)
+
+![The Loops pane beside the chat in light mode](assets/loops-pane-light.png)
+
 With the setting off, there's no Loops tab or All loops row, and every card
 is a quiet line (one per morning message):
 
