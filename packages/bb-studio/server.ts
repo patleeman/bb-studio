@@ -1,3 +1,4 @@
+import { registerLoops, LOOP_TOOLS } from './src/loops/register';
 import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
@@ -324,7 +325,7 @@ export default async function plugin(bb: BbPluginApi) {
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
     const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, off.has("mini") ? "" : MINI_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return withVoice({ tools: [...tools, ...BOT_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions });
+    return withVoice({ tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions });
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
@@ -521,6 +522,15 @@ export default async function plugin(bb: BbPluginApi) {
       restore: (id) => automations.restore(id),
       follow: async (botId) => { const bot = automationBot(botId); if (bot) await automations.follow(bot); },
     },
+  });
+  registerLoops(bb, db, async (text) => {
+    const bot = bots.stored();
+    if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
+    await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
+  }, async (loop) => {
+    const bot = bots.stored();
+    if (!bot?.threadId) throw new Error('A Bot chat is required');
+    await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,actions:['done','snooze','got_it'],coalesceKey:loop.id} as never});
   });
   // Voice sessions: a fast-model thread the user talks to, which hands work to the Bot or threads.
   voice = await registerVoice(bb, { speech: speech.service, botThread: () => bots.stored()?.threadId ?? null });
