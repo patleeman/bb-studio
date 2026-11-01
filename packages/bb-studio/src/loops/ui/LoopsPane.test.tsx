@@ -175,3 +175,17 @@ it("puts a Loops button in the Bot chat's header only, opening the pane", async 
   await act(async () => root.render(<LoopsHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />));
   expect(container.querySelector("[data-testid=loops-header]")).toBeNull();
 });
+
+it("opens the pane when the sidebar asks the Bot chat's header, now or once the chat opens", async () => {
+  const { requestLoopsPane } = await import("./hooks");
+  // Asked before the chat is open: its header opens the pane when it mounts.
+  requestLoopsPane("thr_bot");
+  await act(async () => root.render(<LoopsHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />));
+  expect(state.openPanel).toHaveBeenCalledTimes(1);
+  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Loops" });
+  // Asked while the chat is open; another thread's request isn't its.
+  await act(async () => requestLoopsPane("thr_other"));
+  expect(state.openPanel).toHaveBeenCalledTimes(1);
+  await act(async () => requestLoopsPane("thr_bot"));
+  expect(state.openPanel).toHaveBeenCalledTimes(2);
+});

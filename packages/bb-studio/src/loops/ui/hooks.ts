@@ -23,6 +23,38 @@ export const openLoops = (botId: string | null | undefined) => openAppPath(botId
 /** The Loops pane's thread panel action (app.tsx): the loop list beside a chat. */
 export const LOOPS_PANE = "loops";
 
+const PANE_EVENT = "studio:loops-pane";
+/** The chat asked to open the Loops pane, until its header action does. */
+let paneWanted: string | null = null;
+
+/**
+ * Asks the Bot chat `threadId` to open the Loops pane beside it, from outside
+ * its thread view (the sidebar): openThreadPanel only works reliably from
+ * inside it, so the chat's Loops header button opens it, now or when the
+ * chat opens (useLoopsPaneRequests).
+ */
+export function requestLoopsPane(threadId: string): void {
+  paneWanted = threadId;
+  window.dispatchEvent(new Event(PANE_EVENT));
+}
+
+/** In the chat `threadId`'s header: runs `open` for each request for it. A declined open is retried briefly while the view mounts. */
+export function useLoopsPaneRequests(threadId: string, open: () => boolean): void {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const take = () => {
+      if (paneWanted !== threadId) return;
+      paneWanted = null;
+      let tries = 0;
+      const attempt = () => { if (!open() && ++tries < 6) timer = setTimeout(attempt, 300); };
+      attempt();
+    };
+    take();
+    window.addEventListener(PANE_EVENT, take);
+    return () => { window.removeEventListener(PANE_EVENT, take); clearTimeout(timer); };
+  }, [threadId, open]);
+}
+
 /**
  * Opens Loops beside the chat (the Loops pane) from inside a thread view, and
  * the Loops tab where there's no side panel. True when the pane opened.

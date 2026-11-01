@@ -7,7 +7,7 @@
 // opens in place under its row. It refetches on Studio's realtime signal,
 // like the tab and the cards (useLive).
 import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Icon, cn,
@@ -18,7 +18,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, useNeedsYou, type RowProps } from "./LoopsTab";
 import { AREAS, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { LOOPS_PANE, openLoops, useLoopActions, useLoopsEnabled } from "./hooks";
+import { LOOPS_PANE, openLoops, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -316,7 +316,8 @@ function DoneLine({ loop, people, refresh }: RowProps) {
 /**
  * The Loops button in the Bot chat's header (experimental_threadHeaderAction):
  * opens the pane beside the chat, with what needs Patrick now as its badge.
- * Only on the primary Bot's chat, while the Attention Router is on.
+ * Only on the primary Bot's chat, while the Attention Router is on. It also
+ * opens the pane when the sidebar asks (requestLoopsPane).
  */
 export function LoopsHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
   const enabled = useLoopsEnabled();
@@ -328,12 +329,15 @@ export function LoopsHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
 
 function HeaderButton({ botId, threadId }: { botId: string; threadId: string }) {
   const navigate = useBbNavigate();
+  const openPane = useCallback(() => navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" }), [navigate]);
+  // The sidebar's All loops and badge ask from outside the thread view.
+  useLoopsPaneRequests(threadId, openPane);
   const list = useLive("loops.list", {}, { pollMs: 60_000 });
   const needs = useNeedsYou(botId, threadId, list.data?.needsYouNow).count;
   const label = needs ? `Loops beside the chat, ${needs} need you now` : "Loops beside the chat";
   return (
     <button type="button" data-testid="loops-header" aria-label={label} title={label} className={cn(ICON_BUTTON, "relative")}
-      onClick={() => { if (!navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" })) openLoops(botId); }}>
+      onClick={() => { if (!openPane()) openLoops(botId); }}>
       <Icon name="ListTodo" aria-hidden />
       {needs ? <span aria-hidden className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-warning px-1 text-[10px] font-medium leading-3.5 text-background tabular-nums">{needs}</span> : null}
     </button>

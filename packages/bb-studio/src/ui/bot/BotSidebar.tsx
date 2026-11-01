@@ -27,7 +27,7 @@ import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./thre
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { KIND } from "./Automations";
-import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sidebarGroups, useOpenBesideChat, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
+import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenLoopsBesideChat, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
@@ -375,14 +375,14 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
  */
 function AllLoopsRow({ botId, chatId, active, onNavigate }: { botId: string; chatId: string | null; active: string | null; onNavigate(): void }) {
   const enabled = useLoopsEnabled();
-  const openBeside = useOpenBesideChat();
+  const openBeside = useOpenLoopsBesideChat();
   const pathname = usePathname();
   const list = useLive("loops.list", {}, { enabled, pollMs: 60_000 });
   if (!enabled) return null;
   const open = list.data ? list.data.needsYouNow.length + list.data.comingUp.length + list.data.agentsOnIt.length + list.data.waitingOnOthers.length : 0;
   const current = isLoopsPath(pathname) && pathname.includes(`/${encodeURIComponent(botId)}/`);
   return (
-    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { if (!openBeside(chatId, active, LOOPS_PANEL)) openAppPath(loopsPath(botId)); onNavigate(); }}
+    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { if (!openBeside(chatId, active)) openAppPath(loopsPath(botId)); onNavigate(); }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
       <Icon name="ListTodo" className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">All loops</span>

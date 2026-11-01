@@ -7,7 +7,7 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 import { botPath } from "./selection";
-import { LOOPS_PANE } from "../../loops/ui/hooks";
+import { LOOPS_PANE, requestLoopsPane } from "../../loops/ui/hooks";
 
 /** The thread panel action that shows a Bot thread's Info (app.tsx). */
 export const BOT_INFO_ACTION = "bot-info";
@@ -62,18 +62,19 @@ export function noteOpenThread(threadId: string | null): void {
 }
 
 /**
- * Opens `panel` beside the Bot's chat: at once when the chat is the open
- * thread, else by opening the chat, which then opens `panel` instead of Bot
- * info (useOpenBotInfoOnChat). False when there's no chat, or the open
- * thread's side panel declined.
+ * Opens the Loops pane beside the Bot's chat: the chat's header opens it, at
+ * once when the chat is the open thread, else when the chat opens (and
+ * instead of Bot info). False when the Bot has no chat.
  */
-export function useOpenBesideChat(): (chatId: string | null, activeThreadId: string | null, panel: ChatPanel) => boolean {
+export function useOpenLoopsBesideChat(): (chatId: string | null, activeThreadId: string | null) => boolean {
   const navigate = useBbNavigate();
-  return useCallback((chatId, activeThreadId, panel) => {
+  return useCallback((chatId, activeThreadId) => {
     if (!chatId) return false;
-    if (activeThreadId === chatId) return navigate.openThreadPanel(panel);
-    wanted = panel;
-    navigate.toThread(chatId);
+    requestLoopsPane(chatId);
+    if (activeThreadId !== chatId) {
+      wanted = LOOPS_PANEL;
+      navigate.toThread(chatId);
+    }
     return true;
   }, [navigate]);
 }
@@ -96,6 +97,8 @@ export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: rea
     const current = visit;
     const open = wanted ?? panel;
     wanted = null;
+    // Only the chat's own header opens the pane reliably (requestLoopsPane).
+    if (open.actionId === LOOPS_PANE) { requestLoopsPane(activeThreadId); return; }
     let tries = 0;
     const attempt = () => {
       if (visit !== current) return;
