@@ -5,14 +5,14 @@ import type { z } from 'zod';
 /** A place trigger's key: the place name in lower case, as `place:<key>:arrive` events carry it. */
 export const placeKey=(name:string)=>name.trim().toLowerCase();
 export class LoopStore {
- constructor(readonly db:Database.Database) {}
+ constructor(readonly db:Database.Database,readonly changed:()=>void=()=>{}) {}
  all():Loop[] { return this.db.prepare('SELECT record FROM bot_loops').all().map((r:any)=>loop.parse(JSON.parse(r.record))); }
  get(id:string):Loop { const r=this.db.prepare('SELECT record FROM bot_loops WHERE id=?').get(id) as any; if(!r)throw Error('Loop not found'); return loop.parse(JSON.parse(r.record)); }
  save(l:Loop):Loop { l=loop.parse(l);
  if(l.trigger.type==='place'&&l.trigger.place)l={...l,trigger:{...l.trigger,place:placeKey(l.trigger.place)}};
  const t=l.trigger;if(t.type==='time'&&!Number.isFinite(t.at)||t.type==='event'&&!t.event||t.type==='place'&&(!t.place||!t.direction))throw Error('Trigger fields are incomplete');
  if(['done','dropped'].includes(l.status)&&!l.closedAt)l={...l,closedAt:Date.now(),closedBy:'cos'};
-  this.db.prepare('INSERT OR REPLACE INTO bot_loops VALUES (?,?)').run(l.id,JSON.stringify(l)); return l; }
+  this.db.prepare('INSERT OR REPLACE INTO bot_loops VALUES (?,?)').run(l.id,JSON.stringify(l)); this.changed(); return l; }
  add(input:z.infer<typeof add>):Loop { const x=add.parse(input), now=Date.now(); return this.save({why:'',source:null,kind:'do',options:[],owner:'patrick',trigger:{type:'none'},priority:'normal',push:false,status:'queued',due:null,area:null,...x,id:`loop_${randomUUID()}`,createdAt:now,updatedAt:now,closedAt:null,closedBy:null}); }
  event(id:string,type:string,data:unknown={}) { this.db.prepare('INSERT INTO loop_events(loop_id,type,at,data) VALUES (?,?,?,?)').run(id,type,Date.now(),JSON.stringify(data)); }
  history(id:string) { return this.db.prepare('SELECT type,at,data FROM loop_events WHERE loop_id=? ORDER BY seq').all(id) as {type:string;at:number;data:string}[]; }
