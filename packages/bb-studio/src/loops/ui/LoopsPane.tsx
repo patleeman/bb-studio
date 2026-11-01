@@ -149,7 +149,7 @@ function PaneRow({ icon, iconClass, title, meta, trailing, below, testId, muted 
         <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
           <div className={cn("line-clamp-2 text-sm leading-snug", muted ? "text-muted-foreground" : "text-foreground")}>{title}</div>
-          {meta ? <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">{meta}</div> : null}
+          {meta ? <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">{meta}</div> : null}
         </div>
         {trailing}
       </div>
@@ -159,6 +159,15 @@ function PaneRow({ icon, iconClass, title, meta, trailing, below, testId, muted 
 }
 
 type Place = "needs" | "coming" | "agents" | "waiting";
+
+/** A row's detail line: its parts with a "·" between them, then the area chip. */
+function Dotted({ parts, area }: { parts: ReactNode[]; area: string | null }) {
+  const shown = parts.filter(Boolean);
+  return <>
+    {shown.map((part, index) => <span key={index} className="contents">{index ? <span aria-hidden>·</span> : null}{part}</span>)}
+    <AreaChip area={area} />
+  </>;
+}
 
 /** One open loop: its line and its ⋯ menu, with what its section allows. */
 function LoopLine({ loop, place, people, places, refresh, held, owners }: RowProps & { place: Place }) {
@@ -223,12 +232,12 @@ function LoopLine({ loop, place, people, places, refresh, held, owners }: RowPro
       </DropdownMenuSub>
       {changeTrigger}<DropdownMenuSeparator />{drop}
     </>;
-    meta = <>
-      {due ? <span className={due.urgent ? "text-warning" : undefined}>{due.text}</span> : null}
-      {loop.kind === "decide" ? <span>{loop.options.length} option{loop.options.length === 1 ? "" : "s"}</span> : null}
-      {loop.why ? <span className="min-w-0 truncate">{loop.why}</span> : source ? <span className="min-w-0 truncate">{source}</span> : null}
-      <AreaChip area={loop.area} />
-    </>;
+    const detail = loop.why || source;
+    meta = <Dotted area={loop.area} parts={[
+      due ? <span className={due.urgent ? "text-warning" : undefined}>{due.text}</span> : null,
+      loop.kind === "decide" ? <span>{loop.options.length} option{loop.options.length === 1 ? "" : "s"}</span> : null,
+      detail ? <span className="min-w-0 truncate" title={detail}>{detail}</span> : null,
+    ]} />;
   } else if (place === "coming") {
     items = <>
       {mine ? <DropdownMenuItem onSelect={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</DropdownMenuItem> : null}
@@ -238,7 +247,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners }: RowPro
       <span className="inline-flex items-center gap-1 text-foreground/80" title={loop.push ? "Sends to iPhone when it fires" : undefined}>
         <Icon name={trigger.icon} className="size-3" />{trigger.text}{loop.push ? <Icon name="Smartphone" className="size-3" aria-label="Sends to iPhone" /> : null}
       </span>
-      {mine ? null : <span className="min-w-0 truncate">· {who} will do it</span>}
+      {mine ? null : <><span aria-hidden>·</span><span className="min-w-0 truncate">{who} will do it</span></>}
       <AreaChip area={loop.area} />
     </>;
   } else if (place === "agents") {
@@ -258,8 +267,8 @@ function LoopLine({ loop, place, people, places, refresh, held, owners }: RowPro
       {changeTrigger}<DropdownMenuSeparator />{drop}
     </>;
     meta = <>
-      <span className="shrink-0">Since {shortWhen(loop.createdAt)}</span>
-      {source ? <span className="min-w-0 truncate">· {source}</span> : null}
+      <span>Since {shortWhen(loop.createdAt)}</span>
+      {source ? <><span aria-hidden>·</span><span className="min-w-0 truncate">{source}</span></> : null}
       <AreaChip area={loop.area} />
     </>;
   }

@@ -301,7 +301,7 @@ function LoopsOpenCard() {
       <Icon name="ListTodo" className="size-4 shrink-0 text-muted-foreground" />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="text-sm font-medium text-foreground">Loops</span>
-        <span className="truncate text-xs text-muted-foreground">{summary || "\u00a0"}</span>
+        <span className="text-xs text-muted-foreground">{summary || "\u00a0"}</span>
       </div>
       <button type="button" className={CARD_PRIMARY} onClick={() => openPane(people.botId)}><Icon name="PanelRight" />Open Loops beside the chat</button>
     </div>
