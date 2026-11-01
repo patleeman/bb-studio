@@ -118,3 +118,22 @@ home, and one button per option). Payloads retain the Bot thread and personal pr
 Delivery is at-least-once across a crash between an external send and its history
 write. There is no distributed transaction with BB or APNs. A successful relay
 call with zero registered devices is recorded, avoiding repeated futile pushes.
+
+## Desktop UI
+
+Studio registers two directives (`src/loops/ui`). `::loop{id}` is the card:
+do (Done, Snooze, Hand off, Drop), decide (up to three options inline, else
+Choose…, plus Snooze), read (Got it) and waiting (Nudge them, Drop). Nudge
+asks the Bot for a draft to approve in the chat; it never sends. A loop owned
+by `cos` or a lead shows "<owner> is on it" with Open thread and Take it back
+(`loops.update` owner patrick, status surfaced). A closed loop collapses to a
+line with Undo (`loops.update` status surfaced). A loop with no update in three
+days adds Keep and Drop for the weekly review. `row="1"` is the morning row and
+`::loops{more}` the link to the Loops tab. Leave a blank line before each bold
+section label: without one, Markdown runs the label into the list above it.
+
+The Bot page has Info | Loops at `bot/<botId>/loops` for the primary Bot, and
+the sidebar has an All loops row under it. Every saved loop change publishes
+Studio's realtime signal, so cards, the tab and badges refetch. With
+`loopsEnabled` off there's no tab or row, and cards are one quiet line (one per
+morning message).

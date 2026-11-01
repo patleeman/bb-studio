@@ -153,6 +153,42 @@ Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
 
+### Attention Router: loop cards and the Loops tab
+
+The Attention Router (setting **Attention Router**, `loopsEnabled`, off by
+default) is how the Bot tracks what Patrick owes, decides, reads or waits on
+([backend](../../docs/attention-router/backend.md)). Captured from a staged BB
+with fixed loops written to its Studio database
+(`scripts/capture/captures/bb-studio-loops.mjs`); the Bot posted the
+`::loop` lines itself, as it does when the scheduler releases a loop.
+
+![The Bot's chat with four loop cards: Decide "Choose the deck contractor" with Bayside Decks and Hudson Carpentry as two-line options and Snooze; Do "Reply to Yassine about the FDE referral" with Done, Snooze, Hand off and Drop; Read "Your recruiter call moved to Thu 2:00 PM" with Got it; Waiting on others "Signed lease addendum" with Nudge them and Drop. Each card has what released it above it and its due date at the right; the sidebar shows All loops 13 under the Bot](assets/loops-cards.png)
+
+![The Snooze menu open on the Yassine card: Later today, Tonight 7:00 PM, Tomorrow, This weekend, When I’m home, and Pick a time…](assets/loops-snooze.png)
+
+![A handed-off card, "Draft the Kensico Q4 lead summary": Kensico lead is on it · 13 min, a live progress line, Open thread and Take it back; below it two closed loops collapsed to one line each with Undo: Done · Cancel the Vercel Pro trial, and Café Grumpy · Pick a caterer for Mom’s birthday](assets/loops-progress.png)
+
+![The morning message: the date, Calendar, then On today's list as compact rows (Pay the property tax installment, Due today; Choose the deck contractor, 2 options; Reply to Yassine, Due Fri; the recruiter call, Read) and "3 more in Loops", then Good to know](assets/loops-morning.png)
+
+![The Bot page's Loops tab beside Info, Loops 4: Add a loop, area chips (All, Job, Home, Kensico, Systems) and Owner: Anyone; Needs you now with the hovered Yassine row showing Done, Snooze, Hand off, Drop and Change trigger; Coming up with each loop's trigger (When you get home, Fri 3:00 PM, When Yassine replies, When you leave the office, Mon Nov 9)](assets/loops-tab.png)
+
+![Lower on the Loops tab: Agents on it (Kensico lead and Chief of Staff, each with Open thread), Waiting on others with Since and Nudge them, and Done · last 7 days with Undo](assets/loops-tab-lower.png)
+
+![Change trigger on "Call the plumber": Time, Event, Place and Anytime, Place selected with the iPhone's saved places (Home, Office, Mom’s, Gym), Arrive or Leave, and Send to iPhone when it fires checked](assets/loops-trigger.png)
+
+![The Owner menu: Anyone, Me, Chief of Staff, then each project lead (Kensico lead)](assets/loops-owner.png)
+
+Light mode:
+
+![The loop cards in light mode](assets/loops-cards-light.png)
+
+![The Loops tab in light mode](assets/loops-tab-light.png)
+
+With the setting off, there's no Loops tab or All loops row, and every card
+is a quiet line (one per morning message):
+
+![The morning message with the Attention Router off: one "Attention Router is off" line under On today's list, and no All loops row under the Bot](assets/loops-off.png)
+
 ## Pages
 
 Pages are built into Studio: collaborative documents you write together with

@@ -1,0 +1,270 @@
+// The Attention Router's README captures (docs/attention-router/backend.md):
+// loop cards in the Bot's chat, the morning card, and the Bot page's Loops tab,
+// in dark and light. Loops are written straight into the staged Studio
+// database with fixed ids, so every run shows the same records; the Bot posts
+// the `::loop` lines itself, as it does when the scheduler releases a loop.
+//
+// BB_CAPTURE_LOOPS_BEFORE=1 captures the same surfaces without asserting the
+// new UI, for before-and-after renders against an older Studio.
+import { createRequire } from "node:module";
+import { join } from "node:path";
+import { mkdir } from "node:fs/promises";
+
+import { readStagedInstance } from "../../staged-instance.mjs";
+import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
+
+const require = createRequire(import.meta.url);
+const BEFORE = process.env.BB_CAPTURE_LOOPS_BEFORE === "1";
+const DAY = 86_400_000;
+const MIN = 60_000;
+const scheme = (client, value) => client.command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value }] });
+
+const at = (dayOffset, hour, minute = 0) => { const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(hour, minute, 0, 0); return d.getTime(); };
+/** The next given weekday (0 = Sunday) at a time, at least tomorrow. */
+const next = (weekday, hour, minute = 0) => { const d = new Date(); d.setDate(d.getDate() + (((weekday - d.getDay() + 7) % 7) || 7)); d.setHours(hour, minute, 0, 0); return d.getTime(); };
+
+function loops({ kensicoLead }) {
+  const now = Date.now();
+  const base = { why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: null, createdAt: now - DAY, updatedAt: now - 10 * MIN, closedAt: null, closedBy: null };
+  const l = (id, fields) => ({ ...base, id: `loop_capture-${id}`, ...fields });
+  return [
+    l("deck", { kind: "decide", title: "Choose the deck contractor", why: "Both are licensed and insured. Bayside can start sooner; Hudson is cheaper and has the better reviews.", options: ["Bayside Decks · $4,200 · starts Nov 9", "Hudson Carpentry · $3,650 · starts Dec 1"], source: { kind: "Inbox watch", ref: "2 quotes in email" }, area: "Home", due: next(5, 17) }),
+    l("yassine", { title: "Reply to Yassine about the FDE referral", why: "He offered to refer you for the FDE role; the posting closes Friday. A two-line yes or no is enough.", source: { kind: "email", ref: "Email from Yassine B." }, area: "Job", due: next(5, 17), trigger: { type: "time", at: now - 30 * MIN } }),
+    l("tax", { title: "Pay the property tax installment", why: "$2,140 on the county portal", area: "Home", due: at(0, 23, 0) }),
+    l("recruiter", { kind: "read", title: "Your recruiter call moved to Thu 2:00 PM", why: "Same Zoom link. Nothing else changed.", source: { kind: "Calendar watch", ref: "Calendar" }, area: "Job" }),
+    l("plumber", { status: "queued", title: "Call the plumber about the slow drain", trigger: { type: "place", place: "home", direction: "arrive" }, push: true, area: "Home" }),
+    l("expense", { status: "snoozed", title: "Send the October expense report", trigger: { type: "time", at: next(5, 15) }, area: "Job" }),
+    l("resume", { status: "queued", title: "Send Yassine your updated résumé", trigger: { type: "event", event: "reply:yassine" }, area: "Job" }),
+    l("cleaning", { status: "queued", title: "Pick up the dry cleaning", trigger: { type: "place", place: "office", direction: "leave" }, area: "Home" }),
+    l("benefits", { status: "queued", title: "Benefits enrollment opens", trigger: { type: "time", at: next(1, 9) + 7 * DAY }, area: "Job" }),
+    l("kensico", { status: "in_progress", owner: `thread:${kensicoLead}`, title: "Draft the Kensico Q4 lead summary", why: "Pull the four Q4 threads into one page for Monday.", source: { kind: "thread", ref: kensicoLead }, area: "Kensico", updatedAt: now - 12 * MIN }),
+    l("lisbon", { status: "in_progress", owner: "cos", title: "Find three Lisbon hotels under €250", area: "Job", updatedAt: now - 3 * MIN }),
+    l("lease", { kind: "waiting", status: "queued", title: "Signed lease addendum", why: "Dana said she’d send it by Friday. Nothing yet.", source: { kind: "email", ref: "Email" }, area: "Home", createdAt: now - 4 * DAY }),
+    l("railing", { kind: "waiting", status: "queued", title: "Revised quote with railing", why: "Asked Hudson Carpentry for a quote with the railing.", area: "Home", createdAt: now - 2 * 3_600_000 }),
+    l("vercel", { status: "done", title: "Cancel the Vercel Pro trial before it bills", area: "Systems", closedAt: now - 40 * MIN, closedBy: "patrick" }),
+    l("caterer", { status: "done", kind: "decide", title: "Pick a caterer for Mom’s birthday", options: ["Café Grumpy", "Sam’s Deli"], area: "Home", closedAt: now - 3 * 3_600_000, closedBy: "patrick" }),
+  ];
+}
+const HISTORY = {
+  kensico: [["handed_off", 12 * MIN, {}]],
+  yassine: [["surfaced", 30 * MIN, {}]],
+  deck: [["surfaced", 50 * MIN, {}]],
+  recruiter: [["surfaced", 20 * MIN, {}]],
+  lease: [["surfaced", 15 * MIN, {}]],
+  vercel: [["closed", 40 * MIN, { action: "done" }]],
+  caterer: [["closed", 3 * 60 * MIN, { action: "choose", option: "Café Grumpy" }]],
+};
+
+/** Replace the fixture loops in the staged Studio database. */
+function writeLoops(records) {
+  const { dataDir } = readStagedInstance();
+  const Database = require("../../../packages/bb-studio/node_modules/better-sqlite3");
+  const db = new Database(join(dataDir, "plugins/studio/data.db"), { timeout: 5000 });
+  try {
+    db.transaction(() => {
+      db.prepare("DELETE FROM loop_events WHERE loop_id LIKE 'loop_capture-%'").run();
+      db.prepare("DELETE FROM bot_loops WHERE id LIKE 'loop_capture-%'").run();
+      for (const loop of records) db.prepare("INSERT INTO bot_loops VALUES (?, ?)").run(loop.id, JSON.stringify(loop));
+      for (const [key, events] of Object.entries(HISTORY)) {
+        for (const [type, ago, data] of events) db.prepare("INSERT INTO loop_events (loop_id, type, at, data) VALUES (?, ?, ?, ?)").run(`loop_capture-${key}`, type, Date.now() - ago, JSON.stringify(data));
+      }
+    })();
+  } finally {
+    db.close();
+  }
+}
+
+const id = (key) => `loop_capture-${key}`;
+const CARDS = ["deck", "yassine", "recruiter", "lease"].map((key) => `::loop{id="${id(key)}"}`).join("\n\n");
+const PROGRESS = ["kensico", "vercel", "caterer"].map((key) => `::loop{id="${id(key)}"}`).join("\n\n");
+const morning = () => [
+  `## ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`,
+  "",
+  "**Calendar**",
+  "- 9:30 AM · Standup · Zoom",
+  "- 12:30 PM · Lunch with Sam · Café Grumpy",
+  "- 4:00 PM · Dentist · Dr. Patel",
+  "",
+  "**On today's list**",
+  "",
+  ...["tax", "deck", "yassine", "recruiter"].map((key) => `::loop{id="${id(key)}" row="1"}`),
+  '::loops{more="3"}',
+  "",
+  "**Good to know**",
+  "- Rain from 3 PM. Take an umbrella to the dentist.",
+  "- Mom’s birthday is Saturday. The gift you saved is still in stock.",
+].join("\n");
+
+export default ({ pluginRpc, bbCli, sleep }) => {
+  const json = async (args) => JSON.parse(await bbCli([...args, "--json"]));
+  let fixture = null;
+
+  /** The Bot, a Kensico project with a lead, the phone's places, the loops, and the Bot's posts. */
+  async function seed() {
+    if (fixture) return fixture;
+    let { bot } = await pluginRpc("studio", "bot_get", {});
+    if (!bot) {
+      ({ bot } = await pluginRpc("studio", "bot_create", { name: "Chief of Staff", avatar: "🟢", shape: "blob", color: "#2ba59a", prompt: "Hi. In one short sentence, say you'll keep track of what needs me." }));
+    }
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "180"]).catch(() => {});
+    // A Kensico project whose lead takes handed-off loops.
+    const projects = await json(["project", "list"]);
+    let kensico = (Array.isArray(projects) ? projects : projects.projects ?? []).find((project) => project.name === "Kensico");
+    if (!kensico) {
+      const { instance } = { instance: readStagedInstance() };
+      const root = join(instance.directory, "kensico");
+      await mkdir(root, { recursive: true });
+      const [machine] = await json(["machine", "list"]);
+      kensico = await json(["project", "create", "--name", "Kensico", "--root", root, "--machine", machine.id]);
+    }
+    let lead = (await pluginRpc("studio", "project_lead", { projectId: kensico.id })).leadThreadId;
+    if (!lead) {
+      const thread = await json(["thread", "spawn", "--project", kensico.id, "--title", "Kensico lead", "--prompt", "Kensico lead.", "--send-at", "30d"]);
+      lead = (await pluginRpc("studio", "project_set_lead", { projectId: kensico.id, threadId: thread.id })).leadThreadId;
+    }
+    if (!BEFORE) await pluginRpc("studio", "loops.setPlaces", { names: ["Home", "Office", "Mom’s", "Gym"] });
+    writeLoops(loops({ kensicoLead: lead }));
+    fixture = { bot, lead };
+    return fixture;
+  }
+
+  /** The Bot posts `text` as its newest reply, as it does when the scheduler asks it to. */
+  const post = async (bot, label, text) => {
+    await bbCli(["thread", "tell", bot.threadId, `Capture fixture (${label}). Don't call any tools. Reply with exactly the text between the markers, unchanged, and nothing else.\n<<<\n${text}\n>>>`]);
+    await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+  };
+  const setEnabled = (on) => bbCli(["plugin", "config", "studio", "set", "loopsEnabled", on ? "true" : "false"]);
+  const chatPath = (bot) => `/threads/${bot.threadId}`;
+  /** Scroll the chat so `selector`'s first match is near the top. */
+  /** The newest reply's text: the last element holding `text`, scrolled to the top of the chat. */
+  const scrollToText = (client, text) => client.evaluate(`(() => { const all = [...document.querySelectorAll("p, h2, li, div")].filter((e) => e.children.length === 0 && e.textContent.includes(${JSON.stringify(text)})); const el = all.at(-1); if (!el) return false; el.scrollIntoView({ block: "start" }); return true; })()`);
+  const scrollTo = (client, selector, index = -1) => client.evaluate(`(() => { const list = document.querySelectorAll(${JSON.stringify(selector)}); const el = list[${index} < 0 ? list.length + ${index} : ${index}]; if (!el) throw new Error("Nothing matches ${selector.replace(/"/g, "'")}"); el.scrollIntoView({ block: "start" }); for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollHeight > p.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(p).overflowY)) { p.scrollTop -= 60; break; } return true; })()`);
+  const hover = async (client, selector, index = 0) => {
+    const point = await client.evaluate(`(() => { const r = [...document.querySelectorAll(${JSON.stringify(selector)})].at(${index}).getBoundingClientRect(); return { x: r.left + 40, y: r.top + 14 }; })()`);
+    await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y, buttons: 0 });
+    await sleep(300);
+  };
+  /** Click the newest `selector` with `text` with the pointer (Radix menus open on pointerdown). */
+  const press = async (client, selector, text, within = null) => {
+    const point = await client.evaluate(`(() => {
+      const root = ${JSON.stringify(within)} ? document.querySelectorAll(${JSON.stringify(within?.[0] ?? "")})[${within?.[1] ?? 0}] : document;
+      const el = [...root.querySelectorAll(${JSON.stringify(selector)})].filter((e) => e.textContent?.trim() === ${JSON.stringify(text)}).at(-1);
+      if (!el) throw new Error("Nothing to press: ${text}");
+      el.scrollIntoView({ block: "nearest" });
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+      await client.command("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: type === "mouseMoved" ? "none" : "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: type === "mouseMoved" ? 0 : 1 });
+    }
+    await sleep(400);
+  };
+
+  const chatCapture = (captureId, fileName, color, [label, text], after) => ({
+    id: captureId,
+    packageDir: "bb-studio",
+    fileName,
+    showSidebar: true,
+    setup: async (client) => {
+      await scheme(client, color);
+      const { bot } = await seed();
+      await setEnabled(true);
+      await post(bot, label, typeof text === "function" ? text() : text);
+      await client.navigate(chatPath(bot));
+      await dismissProblems(client);
+      if (BEFORE) { await client.waitForText("Capture fixture", 60000); await scrollToText(client, text === CARDS || text === PROGRESS ? 'loop_capture' : "On today's list"); await sleep(1500); }
+      else await after(client, bot);
+      return async () => { await scheme(client, ""); };
+    },
+  });
+
+  const loopsTab = (captureId, fileName, color, after = async () => {}) => ({
+    id: captureId,
+    packageDir: "bb-studio",
+    fileName,
+    showSidebar: true,
+    setup: async (client) => {
+      await scheme(client, color);
+      const { bot } = await seed();
+      await setEnabled(true);
+      await client.navigate(`${BOT_PATH}/${bot.id}/loops`);
+      await dismissProblems(client);
+      if (BEFORE) { await client.waitForText("Activity", 30000); await sleep(1000); return async () => { await scheme(client, ""); }; }
+      await client.waitForSelector("[data-testid=loops-tab]", 30000);
+      for (const text of ["Needs you now", "Coming up", "Agents on it", "Waiting on others", "Done · last 7 days", "Reply to Yassine about the FDE referral", "When you get home", "When Yassine replies", "Kensico lead", "Nudge them", "All loops"]) await client.waitForText(text, 30000);
+      await after(client);
+      return async () => { await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape" }).catch(() => {}); await scheme(client, ""); };
+    },
+  });
+
+  return [
+    chatCapture("studio-loops-cards", "loops-cards.png", "dark", ["cards", CARDS], async (client) => {
+      await client.waitForSelector("[data-testid=loop-card][data-kind=decide]", 60000);
+      for (const text of ["Choose the deck contractor", "Hudson Carpentry", "Reply to Yassine about the FDE referral", "Hand off", "Got it", "Nudge them"]) await client.waitForText(text, 30000);
+      await scrollTo(client, "[data-testid=loop-card][data-kind=decide]");
+      await sleep(800);
+    }),
+    chatCapture("studio-loops-cards-light", "loops-cards-light.png", "light", ["cards", CARDS], async (client) => {
+      await client.waitForSelector("[data-testid=loop-card][data-kind=decide]", 60000);
+      await scrollTo(client, "[data-testid=loop-card][data-kind=decide]");
+      await sleep(800);
+    }),
+    chatCapture("studio-loops-snooze", "loops-snooze.png", "dark", ["cards", CARDS], async (client) => {
+      await client.waitForSelector("[data-testid=loop-card][data-kind=do]", 60000);
+      await scrollTo(client, "[data-testid=loop-card][data-kind=do]");
+      await sleep(500);
+      await press(client, "[data-testid=loop-card][data-kind=do] button", "Snooze");
+      for (const text of ["Snooze until", "Later today", "Tonight", "Tomorrow", "This weekend", "When I’m home", "Pick a time…"]) await client.waitForText(text);
+    }),
+    chatCapture("studio-loops-progress", "loops-progress.png", "dark", ["progress", PROGRESS], async (client) => {
+      await client.waitForSelector("[data-testid=loop-progress]", 60000);
+      for (const text of ["Kensico lead is on it", "Take it back", "Cancel the Vercel Pro trial", "Café Grumpy"]) await client.waitForText(text, 30000);
+      await scrollTo(client, "[data-testid=loop-progress]");
+      await client.evaluate(`window.scrollBy(0, -120)`);
+      await sleep(800);
+    }),
+    chatCapture("studio-loops-morning", "loops-morning.png", "dark", ["morning", morning], async (client) => {
+      await client.waitForSelector("[data-testid=loops-more]", 60000);
+      for (const text of ["On today's list", "Pay the property tax installment", "Due today", "2 options", "3 more in Loops", "Good to know"]) await client.waitForText(text, 30000);
+      await scrollTo(client, "[data-testid=loop-row]");
+      await client.evaluate(`(() => { const h = [...document.querySelectorAll("h2")].filter((e) => /day,/.test(e.textContent)).at(-1); h?.scrollIntoView({ block: "start" }); return true; })()`);
+      await sleep(800);
+    }),
+    loopsTab("studio-loops-tab", "loops-tab.png", "dark", async (client) => { await hover(client, "[data-testid=loop-needs]", 1); }),
+    loopsTab("studio-loops-tab-light", "loops-tab-light.png", "light"),
+    loopsTab("studio-loops-tab-lower", "loops-tab-lower.png", "dark", async (client) => {
+      await client.evaluate(`(() => { document.querySelector('section[aria-label="Agents on it"]').scrollIntoView({ block: "start" }); return true; })()`);
+      await sleep(500);
+    }),
+    loopsTab("studio-loops-trigger", "loops-trigger.png", "dark", async (client) => {
+      await hover(client, "[data-testid=loop-coming]", 0);
+      await press(client, "button", "Change trigger", ["[data-testid=loop-coming]", 0]);
+      for (const text of ["Time", "Event", "Place", "Anytime", "Office", "Mom’s", "Send to iPhone when it fires"]) await client.waitForText(text);
+    }),
+    loopsTab("studio-loops-owner", "loops-owner.png", "dark", async (client) => {
+      await press(client, "[data-testid=loops-tab] button", "Owner: Anyone");
+      for (const text of ["Anyone", "Me", "Chief of Staff", "Kensico lead"]) await client.waitForText(text);
+    }),
+    {
+      id: "studio-loops-off",
+      packageDir: "bb-studio",
+      fileName: "loops-off.png",
+      showSidebar: true,
+      setup: async (client) => {
+        await scheme(client, "dark");
+        const { bot } = await seed();
+        await setEnabled(false);
+        await client.navigate(chatPath(bot));
+        await dismissProblems(client);
+        if (!BEFORE) {
+          await client.waitForSelector("[data-testid=loop-off]", 60000);
+          await client.waitForText("Attention Router is off");
+          if (await client.hasText("All loops", 1500)) throw new Error("All loops shows with the Attention Router off");
+          await scrollTo(client, "[data-testid=loop-off]");
+        }
+        await sleep(800);
+        return async () => { await setEnabled(true); await scheme(client, ""); };
+      },
+    },
+  ];
+};
