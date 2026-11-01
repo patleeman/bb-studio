@@ -172,7 +172,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         layout.anchoring = self
 
         // Tap anywhere on the transcript to put the keyboard away. It never
-        // takes the touch, so links, buttons and text selection keep it.
+        // takes the touch, so links, buttons and text selection keep it,
+        // and it ignores taps on a row's text field.
         let tap = UITapGestureRecognizer(target: self, action: #selector(tappedTranscript(_:)))
         tap.cancelsTouchesInView = false
         tap.delaysTouchesBegan = false
@@ -726,6 +727,25 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     }
 
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+    /// A tap on a row's text field (a secret request's, a question's answer)
+    /// gives it the keyboard: ending editing after it took the focus away at
+    /// once, and nothing could be typed there (Nov 1).
+    func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !Self.landsOnTextInput(touch, below: collectionView)
+    }
+
+    /// The touch is on an editable text field or view, or inside one,
+    /// short of `container`.
+    static func landsOnTextInput(_ touch: UITouch, below container: UIView?) -> Bool {
+        var view = touch.view
+        while let current = view, current !== container {
+            if current is UITextField { return true }
+            if let text = current as? UITextView, text.isEditable { return true }
+            view = current.superview
+        }
+        return false
+    }
 
     // MARK: Harness
 
