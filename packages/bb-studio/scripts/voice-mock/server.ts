@@ -14,6 +14,13 @@
 // - It writes timings.json and voice-thread.md (what the voice thread got) to --out.
 //
 // The iOS app: -qaVoiceLive script -qaVoiceLiveStudio http://127.0.0.1:8790 -qaVoiceLiveAutostart
+//
+// --live (staged only, with OPENAI_API_KEY in the environment): instead of the
+// script, the app's socket is bridged to the real GPT-Live over its WebSocket
+// transport, opened here on the host with the key. The user's side is macOS
+// `say` speech streamed as the mic (a simulator mic would mean a macOS mic
+// prompt), and the bridge measures turn and barge-in latency and writes
+// live-audio.wav (both sides on one timeline) and live-timings.json.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -25,6 +32,7 @@ import Database from "better-sqlite3";
 import { MIGRATIONS } from "../../src/migrations";
 import { voiceLiveContract } from "../../src/voice/live/contract";
 import { VoiceLive, type VoiceLoop } from "../../src/voice/live/live";
+import { liveSessionRequest } from "../../src/voice/live/session";
 import { resolveTarget } from "../../src/voice/live/targets";
 
 const arg = (name: string, fallback: string) => {
@@ -294,6 +302,222 @@ function runScript(socket: Duplex) {
 }
 
 // ---------------------------------------------------------------------------
+// --live: the app's socket bridged to the real GPT-Live (WebSocket transport)
+// ---------------------------------------------------------------------------
+
+const RATE = 24_000;
+const CHUNK = 4800; // 100 ms of PCM16
+
+/** Where speech starts in a clip: the first 10 ms above a small level. */
+function onsetMs(pcm: Buffer): number {
+  for (let at = 0; at + 480 <= pcm.length / 2; at += 240) {
+    let peak = 0;
+    for (let i = at; i < at + 240; i++) peak = Math.max(peak, Math.abs(pcm.readInt16LE(i * 2)));
+    if (peak > 1200) return Math.round((at / RATE) * 1000);
+  }
+  return 0;
+}
+
+function runLiveBridge(app: Duplex) {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  const toApp = (event: Record<string, unknown>) => app.write(frame(JSON.stringify(event)));
+  if (!key) { toApp({ type: "error", error: { message: "The live bridge has no OPENAI_API_KEY." } }); return; }
+  const t0 = Date.now();
+  const now = () => Date.now() - t0;
+  const openai = new WebSocket("wss://api.openai.com/v1/live/sessions", { headers: { Authorization: `Bearer ${key}` } } as never);
+  const toOpenAI = (event: Record<string, unknown>) => openai.readyState === WebSocket.OPEN && openai.send(JSON.stringify(event));
+  // Both sides on one timeline, for the recording's sound.
+  const track: { at: number; pcm: Buffer }[] = [];
+  const toolCalls = new Map<string, number>();
+  let closed = false;
+  // The app plays the voice in order; this is when its queued audio ends.
+  let playbackEnd = 0;
+  let agentSpeaking = false;
+  let agentStartedAt = 0;
+  let muted = false;
+  let mutedAt = 0;
+  let lastFirstInputDelta = 0;
+  let readBack = false;
+  let commentary = false;
+  let utterance: { pcm: Buffer; offset: number; startedAt: number; onset: number; resolve: () => void } | null = null;
+  const utterances: { text: string; startedAt: number; wordAt: number; endedAt: number; firstInputDelta?: number; firstAgentAudio?: number }[] = [];
+  let barge: { wordAt: number; firstInputDelta?: number; muted?: number; serverAudioStopped?: number } | null = null;
+  const types: Record<string, number> = {};
+
+  openai.onopen = () => {
+    say("live: connected to GPT-Live");
+    toOpenAI({ type: "session.start", session: liveSessionRequest({ cosName: COS.name, sdp: "" }).session });
+  };
+  openai.onerror = () => say("live: socket error");
+  openai.onclose = (event) => { say(`live: GPT-Live socket closed (${event.code} ${event.reason})`); if (!closed) toApp({ type: "session.closed", reason: "connection_lost" }); closed = true; };
+  openai.onmessage = (message) => {
+    const event = JSON.parse(String(message.data)) as Record<string, unknown> & { type: string };
+    types[event.type] = (types[event.type] ?? 0) + 1;
+    const at = now();
+    if (event.type === "session.output_audio.delta") {
+      const pcm = Buffer.from(String(event.delta), "base64");
+      if (muted) {
+        // Still the cut-off reply, which the app drops.
+        if (barge && !barge.serverAudioStopped) barge.serverAudioStopped = at;
+        return;
+      }
+      const start = Math.max(at, playbackEnd);
+      track.push({ at: start, pcm });
+      playbackEnd = start + (pcm.length / 2 / RATE) * 1000;
+      if (!agentSpeaking) {
+        agentSpeaking = true;
+        agentStartedAt = at;
+        const last = utterances.at(-1);
+        if (last && last.firstAgentAudio === undefined && at > last.endedAt) last.firstAgentAudio = at;
+        toApp({ type: "mock.audio.started" });
+      }
+      toApp({ type: "mock.audio.delta", audio: event.delta });
+      return;
+    }
+    if (event.type === "session.input_transcript.delta") {
+      const last = utterances.at(-1);
+      if (last && last.firstInputDelta === undefined && at >= last.startedAt) { last.firstInputDelta = at; lastFirstInputDelta = at; }
+      if (barge && barge.firstInputDelta === undefined) barge.firstInputDelta = at;
+    }
+    if (event.type === "session.output_transcript.delta" && muted && utterance === null && at - mutedAt > 1500) muted = false;
+    const call = (event.event as { type?: string; item?: { type?: string; call_id?: string; name?: string } } | undefined);
+    if (event.type === "response.event" && call?.type === "response.output_item.done" && call.item?.type === "function_call" && call.item.call_id) {
+      toolCalls.set(call.item.call_id, at);
+      say(`live: tool call ${call.item.name}`);
+    }
+    if (event.type === "error") say("live: error", JSON.stringify(event).slice(0, 300));
+    if (event.type === "session.started") { say("live: session started"); startMic(); void script(); }
+    if (event.type === "session.closed") { closed = true; say("live: closed", JSON.stringify(event).slice(0, 200)); finish(); }
+    toApp(event);
+  };
+
+  frames(app, (text) => {
+    const event = JSON.parse(text) as { type: string; content?: string; item?: { output?: string; call_id?: string } };
+    const at = now();
+    const asked = event.item?.call_id ? toolCalls.get(event.item.call_id) : undefined;
+    if (event.type === "response.item.create" && asked !== undefined) time("toolRoundTripMs", at - asked);
+    if (event.type === "session.thinking.append" && event.content?.includes("interrupted")) {
+      // The app mutes the voice first, then sends this.
+      muted = true;
+      mutedAt = at;
+      playbackEnd = at;
+      agentSpeaking = false;
+      if (barge && barge.muted === undefined) barge.muted = at;
+      say("live: app muted the voice (barge-in)");
+    }
+    if (event.type === "response.item.create" && event.item?.output?.includes("Say yes to send")) readBack = true;
+    if (event.type === "session.commentary.append") commentary = true;
+    if (["response.item.create", "response.create", "session.commentary.append", "session.thinking.append", "session.instructions.append", "session.close"].includes(event.type)) toOpenAI(event as never);
+  }, () => { if (!closed) toOpenAI({ type: "session.close" }); closed = true; });
+
+  let mic: NodeJS.Timeout | undefined;
+  function startMic() {
+    // A mic never stops: speech when the script talks, silence otherwise.
+    mic = setInterval(() => {
+      if (closed) return clearInterval(mic);
+      let chunk = Buffer.alloc(CHUNK);
+      if (utterance) {
+        chunk = Buffer.from(utterance.pcm.subarray(utterance.offset, utterance.offset + CHUNK));
+        if (chunk.length < CHUNK) chunk = Buffer.concat([chunk, Buffer.alloc(CHUNK - chunk.length)]);
+        utterance.offset += CHUNK;
+        if (utterance.offset >= utterance.pcm.length) { const done = utterance.resolve; utterance = null; done(); }
+      }
+      track.push({ at: now(), pcm: chunk });
+      toOpenAI({ type: "session.input_audio.append", audio: chunk.toString("base64") });
+    }, 100);
+  }
+
+  const quiet = () => !agentSpeaking || now() > playbackEnd + 300;
+  setInterval(() => { if (agentSpeaking && now() > playbackEnd + 300) { agentSpeaking = false; toApp({ type: "mock.audio.done" }); } }, 100);
+
+  async function utter(text: string) {
+    const pcm = speech(text);
+    const startedAt = now();
+    const onset = onsetMs(pcm);
+    const record = { text, startedAt, wordAt: startedAt + onset, endedAt: 0 };
+    utterances.push(record);
+    say(`live: user says "${text}"`);
+    await new Promise<void>((resolve) => { utterance = { pcm, offset: 0, startedAt, onset, resolve }; });
+    record.endedAt = now();
+    return record;
+  }
+
+  async function until(check: () => boolean, ms: number) {
+    const end = Date.now() + ms;
+    while (!check() && Date.now() < end && !closed) await sleep(50);
+    return check();
+  }
+
+  /** The voice answered what the user just said, and has finished. */
+  async function turn(ms = 30_000) {
+    const last = utterances.at(-1)!;
+    await until(() => last.firstAgentAudio !== undefined, ms);
+    await sleep(300);
+    // Quiet for 1.5 s: the turn (and any tool call in it) is over.
+    let quietSince = 0;
+    await until(() => { if (!quiet()) { quietSince = 0; return false; } quietSince ||= Date.now(); return Date.now() - quietSince > 1500; }, ms);
+  }
+
+  async function script() {
+    await sleep(1500);
+    await utter("What's waiting on me?");
+    await turn();
+    await utter("Tell the Kensico lead to pause the eBay fetcher until Monday.");
+    await turn();
+    if (!(await until(() => readBack, 2000))) say("live: no read-back seen yet");
+    await utter("Yes.");
+    await turn();
+    // The Kensico lead answers (2.5 s), the app picks it up (poll), the voice says it: cut in.
+    if (await until(() => commentary, 25_000)) {
+      await until(() => agentSpeaking, 15_000);
+      await sleep(1400);
+      const pcm = speech("Okay, stop there. That's all, thanks.");
+      barge = { wordAt: now() + onsetMs(pcm) };
+      await utter("Okay, stop there. That's all, thanks.");
+      await turn(15_000);
+    } else say("live: the reply never reached the voice");
+    toOpenAI({ type: "session.close" });
+    await until(() => closed, 8000);
+    finish();
+  }
+
+  let finished = false;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearInterval(mic);
+    const total = Math.max(...track.map((part) => part.at + (part.pcm.length / 2 / RATE) * 1000), 0);
+    const mix = new Int32Array(Math.ceil((total / 1000) * RATE) + 1);
+    for (const part of track) {
+      const start = Math.round((part.at / 1000) * RATE);
+      for (let i = 0; i < part.pcm.length / 2 && start + i < mix.length; i++) mix[start + i] += part.pcm.readInt16LE(i * 2);
+    }
+    const pcm = Buffer.alloc(mix.length * 2);
+    mix.forEach((value, i) => pcm.writeInt16LE(Math.max(-32768, Math.min(32767, value)), i * 2));
+    const header = Buffer.alloc(44);
+    header.write("RIFF", 0); header.writeUInt32LE(36 + pcm.length, 4); header.write("WAVEfmt ", 8); header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20); header.writeUInt16LE(1, 22); header.writeUInt32LE(RATE, 24); header.writeUInt32LE(RATE * 2, 28);
+    header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34); header.write("data", 36); header.writeUInt32LE(pcm.length, 40);
+    writeFileSync(join(OUT, "live-audio.wav"), Buffer.concat([header, pcm]));
+    const turns = utterances.map((each) => ({
+      user: each.text,
+      firstWordToFirstTranscriptMs: each.firstInputDelta === undefined ? null : each.firstInputDelta - each.wordAt,
+      endOfSpeechToFirstAudioMs: each.firstAgentAudio === undefined ? null : each.firstAgentAudio - each.endedAt,
+    }));
+    const bargeIn = barge ? {
+      firstWordToTranscriptMs: barge.firstInputDelta === undefined ? null : barge.firstInputDelta - barge.wordAt,
+      firstWordToVoiceMutedMs: barge.muted === undefined ? null : barge.muted - barge.wordAt,
+      transcriptToMutedMs: barge.muted === undefined || barge.firstInputDelta === undefined ? null : barge.muted - barge.firstInputDelta,
+      voiceStartedBeforeCutMs: barge.muted === undefined ? null : barge.muted - agentStartedAt,
+    } : null;
+    const result = { t0Epoch: t0, turns, bargeIn, toolRoundTripMs: timings.toolRoundTripMs ?? [], studioToolMs: timings.studioToolMs ?? [], events: types, lastFirstInputDelta };
+    writeFileSync(join(OUT, "live-timings.json"), JSON.stringify(result, null, 2));
+    say("live: done", JSON.stringify({ turns, bargeIn }));
+    setTimeout(() => { writeFileSync(join(OUT, "voice-thread.md"), voiceThread.join("\n")); say("voice thread saved"); }, 2000);
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 const server = createServer(async (req, res) => {
   const method = req.url?.match(/^\/api\/v1\/plugins\/studio\/rpc\/(voiceLive\.[a-z]+)$/i)?.[1];
@@ -316,7 +540,8 @@ server.on("upgrade", (req: IncomingMessage, socket: Duplex) => {
   const accept = createHash("sha1").update(`${req.headers["sec-websocket-key"]}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest("base64");
   socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
   say("voice connected");
-  runScript(socket);
+  if (process.argv.includes("--live")) runLiveBridge(socket);
+  else runScript(socket);
 });
 
 server.listen(PORT, "127.0.0.1", () => say(`voice mock on http://127.0.0.1:${PORT} (out: ${OUT})`));
