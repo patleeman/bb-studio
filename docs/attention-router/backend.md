@@ -51,6 +51,31 @@ Studio cannot append an assistant message directly: it sends an agent-only
 request to the Bot, asking it to post the directive once through its normal reply.
 The UI worker must implement directive rendering and iOS category/action handlers.
 
+## Morning card
+
+The Bot writes the morning card as one normal message in exactly this shape
+(the loops_morning tool description says so). Desktop and iOS draw a message
+holding a `row="1"` loop or `::loops{more}` as one card:
+
+```text
+## Monday, Nov 2
+**Calendar**
+- 9:30 AM · Standup · Zoom
+**On today's list**
+::loop{id="loop_…" row="1"}
+::loops{more="3"}
+**Good to know**
+- Rain from 3 PM. Take an umbrella.
+```
+
+- One `::loop{id="…" row="1"}` line per `morning.items`, in order: a compact
+  row (icon, title, due) that opens the full card.
+- `::loops{more="N"}` is "N more in Loops", opening the Loops tab. Leave it
+  out when `more` is 0.
+- At most three "Good to know" lines, personal only (no Kensico or tech news).
+  Leave out any empty section.
+- A plain `::loop{id="…"}` stays a full card.
+
 ## Release policy
 
 One server scheduler ticks every minute. Event and place matching is durable:
