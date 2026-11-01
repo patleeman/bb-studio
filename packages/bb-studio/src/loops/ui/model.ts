@@ -62,19 +62,32 @@ export function placeLabel(place: string, direction: "arrive" | "leave" = "arriv
   return direction === "arrive" ? (key === "home" ? "When you get home" : `When you get to ${where}`) : `When you leave ${where}`;
 }
 
-/** What releases a loop, in words, with its chip icon. */
-export function triggerLabel(trigger: Trigger, now = Date.now()): { text: string; icon: string } {
+/** Why a due loop still waits (loops.list `held`): the day's budget is spent, or it's low priority. */
+export type Hold = "budget" | "morning";
+
+/** What releases a loop, in words, with its chip icon. A held loop says what it waits for instead. */
+export function triggerLabel(trigger: Trigger, now = Date.now(), held?: Hold | null): { text: string; icon: string } {
+  if (held === "budget") return { text: "Next free slot", icon: "TimeSchedule" };
+  if (held === "morning") return { text: "Tomorrow morning card", icon: "Calendar" };
   if (trigger.type === "time" && trigger.at !== undefined) return { text: fullWhen(trigger.at, now), icon: "Clock" };
-  if (trigger.type === "event" && trigger.event) return { text: eventLabel(trigger.event), icon: "Zap" };
+  if (trigger.type === "event" && trigger.event) return { text: eventLabel(trigger.event, trigger.label), icon: "Zap" };
   if (trigger.type === "place" && trigger.place) return { text: placeLabel(trigger.place, trigger.direction), icon: "Pin" };
   return { text: "Anytime", icon: "Circle" };
 }
 
-/** `reply:yassine` reads "When Yassine replies"; other keys show as they are. */
-export function eventLabel(event: string): string {
+/**
+ * An event trigger in words: its label ("When Unraid fixes the PHP CVE"),
+ * `reply:yassine` as "When Yassine replies", else the key prettified:
+ * `unraid:php-cve-fixed` reads "Unraid: php cve fixed".
+ */
+export function eventLabel(event: string, label?: string): string {
+  if (label?.trim()) return label.trim().replace(/^\S/, (c) => c.toUpperCase());
   const reply = /^reply:(.+)$/.exec(event);
   if (reply) return `When ${titleCase(reply[1]!.replace(/[-_]/g, " "))} replies`;
-  return `On ${event}`;
+  const [source, ...rest] = event.split(":").map((part) => part.replace(/[-_]+/g, " ").trim()).filter(Boolean);
+  if (!source) return event;
+  const head = source.replace(/^\S/, (c) => c.toUpperCase());
+  return rest.length ? `${head}: ${rest.join(" ")}` : head;
 }
 
 /** A decide option, "Bayside Decks · $4,200 · starts Nov 9": its name and the rest. */
@@ -107,17 +120,22 @@ export function snoozeHint(preset: SnoozePreset, now = Date.now()): string {
 
 export const isClosed = (loop: Pick<Loop, "closedAt">) => loop.closedAt !== null;
 
-/** The owner's name: "You", the Bot, a lead by its project, or "An agent". */
-export function ownerName(owner: string, names: { bot: string; leads: ReadonlyMap<string, string> }): string {
+/** A thread owner as the server resolved it (loops.list `owners`, loops.get `owner`). */
+export type OwnerInfo = { owner: string; name: string; threadId: string | null };
+
+/** The owner's name: "You", the Bot, a lead by its project, the thread's title, or "An agent". */
+export function ownerName(owner: string, names: { bot: string; leads: ReadonlyMap<string, string> }, resolved?: OwnerInfo | null): string {
   if (owner === "patrick") return "You";
   if (owner === "cos") return names.bot;
-  return names.leads.get(owner.slice("thread:".length)) ?? "An agent";
+  return names.leads.get(owner.slice("thread:".length)) ?? resolved?.name ?? "An agent";
 }
 
-/** The thread an owner works in: a lead's thread, or the Bot's chat. */
-export function ownerThread(owner: string, botThreadId: string | null): string | null {
-  if (owner.startsWith("thread:")) return owner.slice("thread:".length);
-  return owner === "cos" ? botThreadId : null;
+/** The thread an owner works in: the Bot's chat, or the owner's thread while it exists. */
+export function ownerThread(owner: string, botThreadId: string | null, resolved?: OwnerInfo | null): string | null {
+  if (owner === "cos") return botThreadId;
+  if (!owner.startsWith("thread:")) return null;
+  // The server drops the link once the thread is gone; before it answers, link the id.
+  return resolved ? resolved.threadId : owner.slice("thread:".length);
 }
 
 type History = { type: string; at: number; data: string }[];
@@ -153,7 +171,7 @@ export function releaseLabel(loop: Loop, history: History): { text: string; icon
   const at = lastEvent(history, "surfaced") ?? loop.updatedAt;
   const when = time(at);
   if (loop.trigger.type === "place" && loop.trigger.place) return { text: `${loop.trigger.direction === "leave" ? "Left" : "Arrived at"} ${loop.trigger.place} · ${when}`, icon: "Pin" };
-  if (loop.trigger.type === "event" && loop.trigger.event) return { text: `${eventLabel(loop.trigger.event)} · ${when}`, icon: "Zap" };
+  if (loop.trigger.type === "event" && loop.trigger.event) return { text: `${eventLabel(loop.trigger.event, loop.trigger.label)} · ${when}`, icon: "Zap" };
   if (loop.trigger.type === "time" && loop.trigger.at !== undefined && Math.abs(loop.trigger.at - at) < 5 * 60_000) return { text: `${weekday(loop.trigger.at)} ${time(loop.trigger.at)} trigger · ${when}`, icon: "Clock" };
   if (loop.source && loop.source.kind !== "interaction") return { text: `from ${loop.source.kind} · ${when}`, icon: "Mail" };
   return { text: when, icon: "Clock" };

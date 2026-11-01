@@ -1,6 +1,7 @@
 // The Bot page's Loops tab (bot/<botId>/loops): everything the Chief of Staff
 // tracks for Patrick, in five sections: Needs you now (with the Bot chat's
-// pending questions, read-only and counted once), Coming up, Agents on it,
+// pending questions and unread replies, read-only and counted once, the same
+// items as the Bot row's badge), Coming up (whoever will do it), Agents on it,
 // Waiting on others and Done in the last seven days. Area chips and an Owner
 // menu filter it; "Add a loop" hands a typed line to the Bot to fill in.
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
@@ -10,7 +11,7 @@ import { useCall, useLive } from "../../ui/live";
 import { errorMessage } from "../../kit/format";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
-import { AREAS, dueLabel, elapsed, fullWhen, INLINE_OPTIONS, KIND, ownerName, ownerThread, shortWhen, sourceText, triggerLabel } from "./model";
+import { AREAS, dueLabel, elapsed, fullWhen, INLINE_OPTIONS, KIND, ownerName, ownerThread, shortWhen, sourceText, triggerLabel, type Hold, type OwnerInfo } from "./model";
 import { useLoopActions, useLoopPeople, usePlaceNames, type LoopPeople } from "./hooks";
 
 // A row's actions show on hover or keyboard focus (and always on touch), and
@@ -41,6 +42,18 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
   return pending;
 }
 
+/**
+ * What needs Patrick now, as the Bot row's badge counts it: released loops,
+ * the Bot chat's pending questions (a tracked question once, as its loop)
+ * and the Bot's replies he hasn't read.
+ */
+export function useNeedsYou(botId: string | null, botThreadId: string | null, needsYouNow: readonly Loop[] | undefined) {
+  const pending = usePendingQuestions(botThreadId)
+    .filter((question) => !(needsYouNow ?? []).some((loop) => loop.source?.kind === "interaction" && loop.source.ref === question.id));
+  const unread = useLive("bot_attention", botId ? { botId } : {}, { enabled: !!botThreadId, pollMs: 30_000 }).data?.attention?.unread ?? 0;
+  return { pending, unread, count: (needsYouNow?.length ?? 0) + pending.length + unread };
+}
+
 export function LoopsTab() {
   const people = useLoopPeople();
   const call = useCall();
@@ -50,17 +63,18 @@ export function LoopsTab() {
   const filters = { ...(area ? { area } : {}), ...(owner ? { owner } : {}) };
   const list = useLive("loops.list", filters, { pollMs: 60_000 });
   const places = usePlaceNames(true);
-  const pending = usePendingQuestions(people.botThreadId)
-    // A question the Bot tracks as a loop shows once, as the loop.
-    .filter((question) => !(list.data?.needsYouNow ?? []).some((loop) => loop.source?.kind === "interaction" && loop.source.ref === question.id));
+  const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
   const showPending = !owner || owner === "patrick";
   const groups = list.data;
   const [showAllDone, setShowAllDone] = useState(false);
   const open = groups ? groups.needsYouNow.length + groups.comingUp.length + groups.agentsOnIt.length + groups.waitingOnOthers.length : 0;
-  const needs = (groups?.needsYouNow.length ?? 0) + (showPending ? pending.length : 0);
-  const nextAt = groups?.comingUp.map((loop) => loop.trigger.type === "time" ? loop.trigger.at ?? Infinity : Infinity).reduce((a, b) => Math.min(a, b), Infinity) ?? Infinity;
-  const ownerLabel = owner === null ? "Anyone" : owner === "patrick" ? "Me" : ownerName(owner, { bot: people.botName, leads: people.leads });
-  const row = { people, places, refresh: list.refresh };
+  const chat = showPending ? pending.length + unread : 0;
+  const needs = (groups?.needsYouNow.length ?? 0) + chat;
+  const held = new Map((groups?.held ?? []).map((each) => [each.id, each.reason] as const));
+  const owners = new Map((groups?.owners ?? []).map((each) => [each.owner, each] as const));
+  const nextAt = groups?.comingUp.map((loop) => loop.trigger.type === "time" && !held.has(loop.id) ? loop.trigger.at ?? Infinity : Infinity).reduce((a, b) => Math.min(a, b), Infinity) ?? Infinity;
+  const ownerLabel = owner === null ? "Anyone" : owner === "patrick" ? "Me" : ownerName(owner, { bot: people.botName, leads: people.leads }, owners.get(owner));
+  const row = { people, places, refresh: list.refresh, held, owners };
   return (
     <div className="flex flex-col gap-4 px-4 pb-8" data-testid="loops-tab">
       <AddLoop onAdd={(text) => call("loops.add", { text }).then(() => list.refresh())} botName={people.botName} />
@@ -93,7 +107,7 @@ export function LoopsTab() {
       </div>
       {list.error ? <p role="alert" className="text-xs text-destructive">{list.error}</p> : null}
       {!groups ? <div className="h-40 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none" /> : <>
-        {open === 0 && !(showPending && pending.length) ? (
+        {open === 0 && !chat ? (
           <div className="flex flex-col items-center gap-1.5 py-10 text-center" data-testid="loops-empty">
             <Icon name="ListTodo" className="size-5 text-muted-foreground" />
             <div className="text-sm font-medium text-foreground">{area || owner ? "No open loops match" : "No open loops"}</div>
@@ -107,6 +121,11 @@ export function LoopsTab() {
                   subtitle={<>In your chat with {people.botName} · {shortWhen(question.createdAt)}</>}
                   right={people.botThreadId ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(people.botThreadId!)}><Icon name="MessageSquare" />Open chat</button> : null} />
               )) : null}
+              {showPending && unread ? (
+                <Row icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`} testId="loop-unread"
+                  subtitle={<>In your chat with {people.botName} · not read yet</>}
+                  right={people.botThreadId ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(people.botThreadId!)}><Icon name="MessageSquare" />Open chat</button> : null} />
+              ) : null}
               {groups.needsYouNow.map((loop) => <NeedsYouRow key={loop.id} loop={loop} {...row} />)}
             </Section>
           ) : null}
@@ -208,7 +227,7 @@ function Subtitle({ loop, extra }: { loop: Loop; extra?: ReactNode }) {
   </>;
 }
 
-type RowProps = { loop: Loop; people: LoopPeople; places: string[]; refresh(): void };
+type RowProps = { loop: Loop; people: LoopPeople; places: string[]; refresh(): void; held: ReadonlyMap<string, Hold>; owners: ReadonlyMap<string, OwnerInfo> };
 
 function TriggerButton({ loop, places, onSave }: { loop: Loop; places: string[]; onSave(changes: { trigger: Loop["trigger"]; push: boolean }): void }) {
   return <ChangeTrigger loop={loop} places={places} onSave={onSave} />;
@@ -241,14 +260,16 @@ function NeedsYouRow({ loop, people, places, refresh }: RowProps) {
   </>;
 }
 
-function ComingUpRow({ loop, places, refresh }: RowProps) {
+function ComingUpRow({ loop, people, places, refresh, held, owners }: RowProps) {
   const { update, busy, error } = useLoopActions(refresh);
-  const trigger = triggerLabel(loop.trigger);
+  const trigger = triggerLabel(loop.trigger, Date.now(), held.get(loop.id));
+  const mine = loop.owner === "patrick";
   return <>
-    <Row testId="loop-coming" icon={KIND[loop.kind].icon} title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{loop.title}</span><AreaChip area={loop.area} /></span>}
+    <Row testId="loop-coming" icon={mine ? KIND[loop.kind].icon : "Bot"} title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{loop.title}</span><AreaChip area={loop.area} /></span>}
+      subtitle={mine ? undefined : <span className="truncate">{ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner))} will do it</span>}
       right={<>
         <span className={ROW_ACTIONS}>
-          <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button>
+          {mine ? <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button> : null}
           <TriggerButton loop={loop} places={places} onSave={(changes) => void update({ id: loop.id, changes })} />
         </span>
         <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-foreground" title={loop.push ? "Sends to iPhone when it fires" : undefined}>
@@ -259,22 +280,22 @@ function ComingUpRow({ loop, places, refresh }: RowProps) {
   </>;
 }
 
-function AgentRow({ loop, people, refresh }: RowProps) {
+function AgentRow({ loop, people, refresh, owners }: RowProps) {
   const navigate = useBbNavigate();
   const { update, busy } = useLoopActions(refresh);
-  const thread = ownerThread(loop.owner, people.botThreadId);
+  const thread = ownerThread(loop.owner, people.botThreadId, owners.get(loop.owner));
   const working = loop.status === "in_progress";
   return (
     <Row testId="loop-agent" icon="Bot" iconClass={working ? "text-success" : undefined} title={loop.title}
       subtitle={<>
         {working ? <span className="size-1.5 rounded-full bg-success" aria-hidden /> : null}
-        <span className="font-medium text-foreground">{ownerName(loop.owner, { bot: people.botName, leads: people.leads })}</span>
-        <span aria-hidden>·</span><span>{working ? `On it · ${elapsed(loop.updatedAt)}` : "Waiting to start"}</span>
+        <span className="min-w-0 truncate font-medium text-foreground">{ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner))}</span>
+        <span aria-hidden>·</span><span className="shrink-0">On it · {elapsed(loop.updatedAt)}</span>
         <AreaChip area={loop.area} />
       </>}
       right={<>
         <span className={ROW_ACTIONS}><button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button></span>
-        {thread ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />Open thread</button> : null}
+        {thread ? <button type="button" className={CARD_GHOST} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</button> : null}
       </>} />
   );
 }

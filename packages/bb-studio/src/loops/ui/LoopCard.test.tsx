@@ -8,7 +8,7 @@ const NOW = new Date("2026-11-02T15:00:00").getTime();
 const base: Loop = { id: "loop_1", title: "Reply to Yassine about the FDE referral", why: "He offered to refer you; the posting closes Friday.", source: { kind: "email", ref: "Email from Yassine B." }, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: "Job", createdAt: NOW - 86_400_000, updatedAt: NOW, closedAt: null, closedBy: null };
 const state = vi.hoisted(() => ({
   enabled: true,
-  view: null as { loop: Loop; history: { type: string; at: number; data: string }[] } | null,
+  view: null as { loop: Loop; history: { type: string; at: number; data: string }[]; owner?: { owner: string; name: string; threadId: string | null } } | null,
   error: null as string | null,
   call: vi.fn(async (_method: string, _input: unknown) => ({})),
   toThread: vi.fn(),
@@ -183,4 +183,19 @@ it("shows one placeholder per morning card while off: its first row, not every r
   </>));
   expect(container.querySelectorAll("[data-testid=loop-off]")).toHaveLength(1);
   expect(container.querySelector("[data-testid=loops-more]")).toBeNull();
+});
+
+it("names a thread owner by the thread's title and links it", async () => {
+  state.view = { loop: { ...base, owner: "thread:thr_egv6yq7mbp", status: "in_progress", title: "Add the remaining utilities to the AI power Long read" }, history: [], owner: { owner: "thread:thr_egv6yq7mbp", name: "AI power Long read", threadId: "thr_egv6yq7mbp" } };
+  await render();
+  await act(async () => { await Promise.resolve(); });
+  expect(container.querySelector("[data-testid=loop-progress]")?.textContent).toContain("AI power Long read is on it");
+  await click("Open thread");
+  expect(state.toThread).toHaveBeenCalledWith("thr_egv6yq7mbp");
+});
+
+it("opens the Bot's chat for a loop the CoS has", async () => {
+  await render(undefined, { owner: "cos", status: "in_progress" });
+  await click("Open chat");
+  expect(state.toThread).toHaveBeenCalledWith("thr_bot");
 });

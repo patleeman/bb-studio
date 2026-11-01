@@ -4,7 +4,7 @@
 // the Bot page itself (/plugins/studio/studio/bot[/<botId>], BotPanel), and the
 // "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
 // chat and the threads it lists open as BB threads.
-import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
+import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON } from "../../kit/app/index";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { useState } from "react";
 import { experimental_useProviders as useProviders, useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
@@ -21,7 +21,7 @@ import { BotMaintenance } from "./BotMaintenance";
 import { BotCacheSection } from "./BotCache";
 import { BOT_INFO_ACTION, useOpenThread } from "./workspace";
 import { usePathname, openAppPath } from "../../kit/app/index";
-import { LoopsTab, usePendingQuestions } from "../../loops/ui/LoopsTab";
+import { LoopsTab, useNeedsYou } from "../../loops/ui/LoopsTab";
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botPath } from "./selection";
 
@@ -32,14 +32,13 @@ export function BotPanel() {
   return <BotHome Info={InfoPage} />;
 }
 
+// The page scrolls as a whole, its bar at the pane's edge, like every Studio page.
 function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
   return (
-    <div className="studio-root h-full min-h-0 bg-background">
+    <PageColumn className="max-w-2xl px-0 pt-0 pb-0 @max-3xl/page:px-0 @max-3xl/page:pt-0">
       <style>{BOT_STYLES}</style>
-      <div className="mx-auto h-full w-full max-w-2xl">
-        <Info view={view} refresh={refresh} page />
-      </div>
-    </div>
+      <Info view={view} refresh={refresh} page />
+    </PageColumn>
   );
 }
 
@@ -103,7 +102,7 @@ function Info({ view, refresh, threadId, page = false }: { view: BotView; refres
     </DropdownMenu>
   );
   return (
-    <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" aria-label={`${bot.name} info`}>
+    <div className={page ? "flex flex-col" : "studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground"} aria-label={`${bot.name} info`}>
       <BotProfileEditor bot={bot} value={profile} status={statusLabel(view.run, bot.state, running)} statusDot={STATE_DOT[bot.state]} working={running > 0} busy={!!busy}
         onChanged={profileChanged} onSave={saveProfile} actions={menu}>
         <ProfileChanges botId={bot.id} onChanged={profileChanged} />
@@ -159,11 +158,10 @@ function InfoRow({ label, value, action }: { label: string; value: string; actio
   );
 }
 
-/** Info | Loops under the Bot's header; Loops counts what needs Patrick now. */
+/** Info | Loops under the Bot's header; Loops counts what needs Patrick now, as the Bot row's badge does. */
 function PageTabs({ botId, threadId, loops }: { botId: string; threadId: string | null; loops: boolean }) {
   const list = useLive("loops.list", {}, { pollMs: 60_000 });
-  const pending = usePendingQuestions(threadId);
-  const needs = list.data ? list.data.needsYouNow.length + pending.filter((question) => !list.data!.needsYouNow.some((loop) => loop.source?.kind === "interaction" && loop.source.ref === question.id)).length : 0;
+  const needs = useNeedsYou(botId, threadId, list.data?.needsYouNow).count;
   const tab = "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground";
   return (
     <div role="tablist" aria-label="Bot page" className="flex items-center gap-1 px-4 pb-3">

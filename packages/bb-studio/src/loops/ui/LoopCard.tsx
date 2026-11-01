@@ -16,13 +16,13 @@ import { remember } from "../../kit/app/index";
 import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
-import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText } from "./model";
+import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
 import { openLoops, useLoopActions, useLoopPeople, useLoopsEnabled, type LoopPeople } from "./hooks";
 
 export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
 
 type History = { type: string; at: number; data: string }[];
-type LoopView = { loop: Loop; history: History };
+type LoopView = { loop: Loop; history: History; owner?: OwnerInfo };
 
 /** A quiet line in place of a card while the Attention Router is off. */
 export function LoopsOff() {
@@ -84,7 +84,7 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
       <div className="rounded-lg border border-border/70 bg-background px-4 py-3">
         {loop.owner === "patrick"
           ? <OpenCard loop={loop} people={people} refresh={refresh} now={now} />
-          : <HandedOff loop={loop} history={history} people={people} refresh={refresh} now={now} />}
+          : <HandedOff loop={loop} history={history} owner={view.owner} people={people} refresh={refresh} now={now} />}
         {now - loop.updatedAt > STALE_MS ? <Stale loop={loop} refresh={refresh} now={now} /> : null}
       </div>
     </div>
@@ -175,12 +175,12 @@ function Stale({ loop, refresh, now }: { loop: Loop; refresh(): void; now: numbe
 }
 
 /** A loop an agent works on: who, since when, live; Open thread and Take it back. */
-function HandedOff({ loop, history, people, refresh, now }: { loop: Loop; history: History; people: LoopPeople; refresh(): void; now: number }) {
+function HandedOff({ loop, history, owner, people, refresh, now }: { loop: Loop; history: History; owner?: OwnerInfo; people: LoopPeople; refresh(): void; now: number }) {
   const navigate = useBbNavigate();
   const { update, busy, error } = useLoopActions(refresh);
-  const name = ownerName(loop.owner, { bot: people.botName, leads: people.leads });
+  const name = ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner);
   const since = lastEvent(history, "handed_off") ?? loop.updatedAt;
-  const thread = ownerThread(loop.owner, people.botThreadId);
+  const thread = ownerThread(loop.owner, people.botThreadId, owner);
   return <>
     <Header loop={loop} now={now} label={`${KIND[loop.kind].label} · handed off`} />
     <Body loop={loop} />
@@ -194,7 +194,7 @@ function HandedOff({ loop, history, people, refresh, now }: { loop: Loop; histor
     </div>
     <style>{"@keyframes loop-progress{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}"}</style>
     <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-      {thread ? <button type="button" className={CARD_BUTTON} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />Open thread</button> : null}
+      {thread ? <button type="button" className={CARD_BUTTON} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</button> : null}
       <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button>
     </div>
     {error ? <p role="alert" className="mt-2 text-xs text-destructive">{error}</p> : null}

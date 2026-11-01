@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async (_method: string, _input: unknown) => ({})),
   toThread: vi.fn(),
   interactions: [] as unknown[],
+  attention: null as unknown,
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSettings: () => ({ values: { loopsEnabled: true } }),
@@ -27,7 +28,8 @@ vi.mock("../../ui/live", () => ({
     const data = method === "loops.list" ? state.groups
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
-          : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] } : null;
+          : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] }
+            : method === "bot_attention" ? { attention: state.attention } : null;
     return { data, loading: false, error: null, refresh: () => {} };
   },
 }));
@@ -39,7 +41,7 @@ let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  state.call.mockClear(); state.toThread.mockClear(); state.inputs = []; state.interactions = [];
+  state.call.mockClear(); state.toThread.mockClear(); state.inputs = []; state.interactions = []; state.attention = null;
   state.groups = {
     ...empty,
     needsYouNow: [loop("loop_n", "Reply to Yassine about the FDE referral", { why: "He offered to refer you", area: "Job", due: NOW + 4 * 86_400_000 }), loop("loop_d", "Choose the deck contractor", { kind: "decide", options: ["Bayside", "Hudson"], area: "Home" })],
@@ -149,4 +151,55 @@ it("shows the empty state with Done still listed", async () => {
   expect(container.querySelector("[data-testid=loops-empty]")?.textContent).toContain("No open loops");
   expect(section("Done · last 7 days")!.textContent).toContain("Cancel the Vercel Pro trial");
   expect(section("Done · last 7 days")!.textContent).toContain("You · Today 3:00 PM");
+});
+
+it("puts the CoS's queued loops in Coming up with their trigger, and names a thread owner by its title", async () => {
+  state.groups = {
+    ...empty,
+    comingUp: [
+      loop("loop_g", "Check whether GitHub resumed security advisories (GHSA)", { owner: "cos", status: "queued", trigger: { type: "time", at: new Date("2026-11-04T10:00:00").getTime() }, area: "Kensico" }),
+      loop("loop_p", "Remove red4's PHP upload-progress mitigation once Unraid ships a fix", { owner: "cos", status: "queued", priority: "low", trigger: { type: "event", event: "unraid:php-cve-2026-115560-fixed", label: "when Unraid fixes the PHP CVE" } }),
+      loop("loop_r", "Review the OpenAI FDE resume, then send it to Yassine", { status: "queued" }),
+      loop("loop_s", "Silent-speech Long read on other form factors?", { status: "queued", priority: "low" }),
+    ],
+    agentsOnIt: [loop("loop_u", "Add the remaining utilities to the AI power Long read", { owner: "thread:thr_egv6yq7mbp", status: "in_progress" }), loop("loop_c2", "Fill in the draft", { owner: "cos", status: "in_progress" })],
+    held: [{ id: "loop_r", reason: "budget" }, { id: "loop_s", reason: "morning" }],
+    owners: [{ owner: "thread:thr_egv6yq7mbp", name: "AI power Long read", threadId: "thr_egv6yq7mbp" }],
+  };
+  await render();
+  const coming = section("Coming up")!;
+  const rows = [...coming.querySelectorAll("[data-testid=loop-coming]")].map((row) => row.textContent);
+  expect(rows[0]).toContain("Chief of Staff will do it");
+  expect(rows[0]).toContain("Wed 10:00 AM");
+  expect(rows[1]).toContain("When Unraid fixes the PHP CVE");
+  expect(rows[2]).toContain("Next free slot");
+  expect(rows[3]).toContain("Tomorrow morning card");
+  expect(rows.join(" ")).not.toContain("Anytime");
+  expect(coming.textContent).toContain("Next: Wed 10:00 AM");
+  const agents = section("Agents on it")!;
+  expect(agents.textContent).not.toContain("Waiting to start");
+  expect(agents.textContent).toContain("AI power Long read");
+  expect(agents.textContent).not.toContain("An agent");
+  await act(async () => buttonIn(agents, "Open thread").click());
+  expect(state.toThread).toHaveBeenLastCalledWith("thr_egv6yq7mbp");
+  await act(async () => buttonIn(agents, "Open chat").click());
+  expect(state.toThread).toHaveBeenLastCalledWith("thr_bot");
+});
+
+it("drops Open thread when the owner's thread is gone", async () => {
+  state.groups = { ...empty, agentsOnIt: [loop("loop_u", "Utilities", { owner: "thread:thr_gone", status: "in_progress" })], owners: [{ owner: "thread:thr_gone", name: "A thread that was removed", threadId: null }] };
+  await render();
+  expect(section("Agents on it")!.textContent).toContain("A thread that was removed");
+  expect([...section("Agents on it")!.querySelectorAll("button")].map((b) => b.textContent)).not.toContain("Open thread");
+});
+
+it("shows the same items as the Bot row's badge: an unread reply counts in Needs you now", async () => {
+  state.groups = { ...empty, comingUp: [loop("loop_r", "Review the resume", { status: "queued" })] };
+  state.attention = { reason: "1 thing for you", count: 1, since: NOW, unread: 1 };
+  await render();
+  const needs = section("Needs you now")!;
+  expect(needs.textContent).toContain("Needs you now1");
+  expect(needs.querySelector("[data-testid=loop-unread]")?.textContent).toContain("A reply from Chief of Staff");
+  await act(async () => buttonIn(needs, "Open chat").click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_bot");
 });

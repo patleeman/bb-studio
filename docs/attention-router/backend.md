@@ -11,8 +11,14 @@ and arrive/leave events; it never stores location history.
 The public Studio contract exports these method names verbatim, including dots:
 
 - `loops.list({area?,owner?})`: needsYouNow, comingUp, agentsOnIt,
-  waitingOnOthers and done (closed in the past seven days).
-- `loops.get({id})`: loop and chronological history.
+  waitingOnOthers and done (closed in the past seven days). A queued or
+  snoozed loop is Coming up whoever owns it, waiting for its trigger; Agents
+  on it is started work (in progress or handed off). `held` says why a due
+  loop of Patrick's waits: `budget` (the day's cards are spent) or `morning`
+  (low priority, for the morning card). `owners` names each `thread:<id>`
+  owner by the thread's title ("(archived)" once archived), with `threadId`
+  null once the thread is gone.
+- `loops.get({id})`: loop, chronological history, and `owner` for a thread owner.
 - `loops.add({text})`: create a draft owned by cos, then send the Bot an
   agent-only message through `threads.send` to interpret it with loops_update.
   The server makes no LLM calls. An active Bot chat is required for delivery.
@@ -36,6 +42,9 @@ The public Studio contract exports these method names verbatim, including dots:
 - `loops.morning({})`: date in the configured zone, top five Patrick-owned due
   or decide items ranked urgent/normal/low then due, `more` count, and
   `lowPriority` queued items. The CoS supplies calendar and good-to-know lines.
+
+An event trigger takes an optional `label` in words ("when Unraid fixes the
+PHP CVE"); without one the UI prettifies the event key.
 
 Agent tools: loops_add accepts structured fields; loops_list, loops_update,
 loops_act, loops_fire and loops_morning mirror the APIs above. These are included
@@ -82,10 +91,15 @@ holding a `row="1"` loop or `::loops{more}` as one card:
 
 One server scheduler ticks every minute. Event and place matching is durable:
 a match becomes a due time trigger, so quiet hours do not lose the event.
-Time and none triggers release when eligible. Only Patrick-owned loops release;
-low priority waits for the morning list. The daily cap counts surfaced history
-in the configured zone. Urgent bypasses quiet hours and budget. Surface now uses
-this same policy. A successful Bot request records surfaced; failed requests retry.
+Time and none triggers release when eligible, at any hour. Only Patrick-owned
+loops release as cards; low priority waits for the morning list. The daily cap
+counts surfaced history in the configured zone, cards released at night
+included. Quiet hours hold pushes only, never cards. Urgent bypasses quiet
+hours and budget. Surface now uses this same policy. A loop the CoS or a thread
+owns starts when its time trigger comes (a fired event latches as one): the
+Bot is told to carry it out and the loop turns in_progress, with no card and
+no budget. Turning `loopsEnabled` on ticks the scheduler at once, so loops that
+queued while it was off release without waiting. A successful Bot request records surfaced; failed requests retry.
 The surfaced state prevents duplicate cards on subsequent ticks and restarts.
 Push failure retries independently. A successful notify records notified; an
 overdue loop may notify again on a later local day. Urgent or push:true loops
@@ -121,7 +135,12 @@ call with zero registered devices is recorded, avoiding repeated futile pushes.
 
 ## Desktop UI
 
-Studio registers two directives (`src/loops/ui`). `::loop{id}` is the card:
+Studio registers two directives (`src/loops/ui`). Coming up shows who will do a
+loop that isn't Patrick's ("Chief of Staff will do it"), and a held loop's chip
+says "Next free slot" or "Tomorrow morning card" instead of "Anytime". A thread
+owner shows by its title; Open thread shows only while the thread exists, and a
+CoS loop opens the Bot's chat. Needs you now lists the same items as the Bot
+row's badge: released loops, pending Bot questions and unread Bot replies. `::loop{id}` is the card:
 do (Done, Snooze, Hand off, Drop), decide (up to three options inline, else
 Choose…, plus Snooze), read (Got it) and waiting (Nudge them, Drop). Nudge
 asks the Bot for a draft to approve in the chat; it never sends. A loop owned
