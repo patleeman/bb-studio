@@ -235,7 +235,8 @@ it("Discuss puts the loop in the Bot chat's draft as an @loop chip, not sent, an
   await click(row("Reply to Yassine"), "Discuss");
   expect(state.composerAsked).toEqual(["thr_bot"]);
   expect(state.composer!.insert).toHaveBeenCalledWith([{ provider: "loop", id: "loop_n", label: "Reply to Yassine about the FDE referral" }, " "], { at: "end" });
-  expect(state.composer!.focus).toHaveBeenCalled();
+  // The menu focuses it as it closes (onCloseAutoFocus), past its focus trap.
+  expect(state.composer!.focus).not.toHaveBeenCalled();
   expect(state.toThread).not.toHaveBeenCalled();
   expect(state.call).not.toHaveBeenCalled();
 });

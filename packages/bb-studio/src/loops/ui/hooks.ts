@@ -80,11 +80,13 @@ const chipLabel = (title: string) => { const line = title.replace(/\s+/g, " ").t
  * not sent, with the caret after it, so Patrick types his question. The Bot
  * gets the loop's id, title, why and trigger when he sends (reference.ts).
  * Away from the chat (the Loops tab), it opens the chat first and waits for
- * its composer. True when the chip went in.
+ * its composer. True when the chip went in. From a menu, pass `focus: false`
+ * and focus the composer (focusDiscussed) once the menu has closed, or the
+ * menu's focus trap takes it back.
  */
-export function useDiscussLoop(botThreadId: string | null, botName: string): (loop: Pick<Loop, "id" | "title">) => Promise<boolean> {
+export function useDiscussLoop(botThreadId: string | null, botName: string): (loop: Pick<Loop, "id" | "title">, options?: { focus?: boolean }) => Promise<boolean> {
   const navigate = useBbNavigate();
-  return useCallback(async (loop) => {
+  return useCallback(async (loop, { focus = true } = {}) => {
     if (!botThreadId) { toast.error(`Start a chat with ${botName} to discuss a loop.`); return false; }
     let composer = threadComposer(botThreadId);
     if (!composer) {
@@ -97,13 +99,18 @@ export function useDiscussLoop(botThreadId: string | null, botName: string): (lo
     if (!composer) { toast.error(`Couldn’t reach the chat with ${botName}. Open it and try again.`); return false; }
     try {
       composer.insert([{ provider: LOOP_MENTION, id: loop.id, label: chipLabel(loop.title) }, " "], { at: "end" });
-      composer.focus();
+      if (focus) composer.focus();
       return true;
     } catch (error) {
       toast.error(`Couldn’t add it to the chat: ${errorMessage(error)}`);
       return false;
     }
   }, [navigate, botThreadId, botName]);
+}
+
+/** The caret at the end of the Bot chat's draft, after Discuss from a menu. */
+export function focusDiscussed(botThreadId: string | null): void {
+  if (botThreadId) threadComposer(botThreadId)?.focus();
 }
 
 /** A row's drag: the loop's reference as plain text, which BB's composer inserts where it's dropped. */

@@ -9,7 +9,7 @@
 // its `::loop` line (reference.ts). It refetches on Studio's realtime signal,
 // like the tab and the cards (useLive).
 import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Icon, cn,
@@ -20,7 +20,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, useNeedsYou, type RowProps } from "./LoopsTab";
 import { AREAS, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
+import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -228,6 +228,8 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
   const navigate = useBbNavigate();
   const { act, update, busy, error } = useLoopActions(refresh);
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
+  // After Discuss the caret goes to the composer once the menu has closed, not back to ⋯.
+  const discussing = useRef(false);
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState(false);
   const [note, setNote] = useState(false);
@@ -339,8 +341,8 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
           <DropdownMenuTrigger asChild>
             <button type="button" className={MENU_BUTTON} disabled={busy} aria-label={`Actions: ${loop.title}`} title="Actions"><Icon name="MoreHorizontal" /></button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48">
-            <DropdownMenuItem onSelect={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="min-w-48" onCloseAutoFocus={(event) => { if (discussing.current) { discussing.current = false; event.preventDefault(); focusDiscussed(people.botThreadId); } }}>
+            <DropdownMenuItem onSelect={() => { discussing.current = true; void discuss(loop, { focus: false }); }}><Icon name="MessageCirclePlus" />Discuss</DropdownMenuItem>
             <DropdownMenuSeparator />
             {items}
           </DropdownMenuContent>
