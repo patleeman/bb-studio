@@ -13,7 +13,9 @@ import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChangeTrigger, ChooseSheet, Hand
 import { AREAS, dueLabel, elapsed, fullWhen, INLINE_OPTIONS, KIND, ownerName, ownerThread, shortWhen, sourceText, triggerLabel } from "./model";
 import { useLoopActions, useLoopPeople, usePlaceNames, type LoopPeople } from "./hooks";
 
-const ROW_ACTIONS = "flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+// A row's actions show on hover or keyboard focus (and always on touch), and
+// stay while one of their menus is open; hidden, they take no room.
+const ROW_ACTIONS = "hidden items-center gap-1.5 group-hover:flex group-focus-within:flex group-has-[[data-state=open]]:flex [@media(hover:none)]:flex";
 const DONE_SHOWN = 3;
 
 type Pending = { id: string; reason: string; createdAt: number };
@@ -182,7 +184,7 @@ function AreaChip({ area }: { area: string | null }) {
 
 function Row({ icon, iconClass, title, subtitle, right, actions, testId, muted }: { icon: string; iconClass?: string; title: ReactNode; subtitle?: ReactNode; right?: ReactNode; actions?: ReactNode; testId?: string; muted?: boolean }) {
   return (
-    <div className="group flex flex-col gap-1.5 py-2.5 hover:bg-state-hover/40 focus-within:bg-state-hover/40" data-testid={testId}>
+    <div tabIndex={actions ? 0 : undefined} className="group flex flex-col gap-1.5 py-2.5 outline-none hover:bg-state-hover/40 focus-within:bg-state-hover/40" data-testid={testId}>
       <div className="flex min-w-0 items-start gap-3 px-2">
         <Icon name={icon} className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground", iconClass)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -191,17 +193,17 @@ function Row({ icon, iconClass, title, subtitle, right, actions, testId, muted }
         </div>
         {right ? <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">{right}</div> : null}
       </div>
-      {actions ? <div className={cn("flex flex-wrap items-center gap-1.5 pl-9 pr-2", ROW_ACTIONS)}>{actions}</div> : null}
+      {actions ? <div className={cn("flex-wrap pl-9 pr-2", ROW_ACTIONS)}>{actions}</div> : null}
     </div>
   );
 }
 
 function Subtitle({ loop, extra }: { loop: Loop; extra?: ReactNode }) {
   const source = sourceText(loop.source);
-  const bits = [loop.why ? <span key="why" className="truncate">{loop.why}</span> : null, source ? <span key="src" className="shrink-0">{source}</span> : null].filter(Boolean);
   return <>
     {extra}
-    {bits.map((bit, index) => <span key={index} className="flex min-w-0 items-center gap-1.5">{index || extra ? <span aria-hidden>·</span> : null}{bit}</span>)}
+    {loop.why ? <span className="min-w-0 truncate">{loop.why}</span> : null}
+    {source ? <span className="flex shrink-0 items-center gap-1.5">{loop.why || extra ? <span aria-hidden>·</span> : null}{source}</span> : null}
     <AreaChip area={loop.area} />
   </>;
 }

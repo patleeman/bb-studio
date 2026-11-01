@@ -95,7 +95,7 @@ export const SNOOZE: { id: SnoozePreset; label: string; icon: string }[] = [
 /** When a preset fires, for the menu's right column. */
 export function snoozeHint(preset: SnoozePreset, now = Date.now()): string {
   if (preset === "home") return "Home";
-  if (preset === "later_today") return time(now + 3 * 3_600_000);
+  if (preset === "later_today") { const later = now + 3 * 3_600_000; return startOfDay(later) === startOfDay(now) ? time(later) : `${weekday(later)} ${time(later)}`; }
   const at = new Date(now);
   if (preset === "tonight") { if (at.getHours() >= 19) at.setDate(at.getDate() + 1); at.setHours(19, 0, 0, 0); return at.getTime() - now < DAY ? time(at.getTime()) : `${weekday(at.getTime())} ${time(at.getTime())}`; }
   if (preset === "tomorrow_morning") { at.setDate(at.getDate() + 1); at.setHours(8, 0, 0, 0); return `${weekday(at.getTime())} ${time(at.getTime())}`; }
@@ -147,12 +147,14 @@ export function elapsed(since: number, now = Date.now()): string {
 }
 
 /** The label above a released card: what released it, and when. */
-export function releaseLabel(loop: Loop, history: History, now = Date.now()): { text: string; icon: string } {
+export function releaseLabel(loop: Loop, history: History): { text: string; icon: string } {
+  const handedOff = loop.owner !== "patrick" ? lastEvent(history, "handed_off") : null;
+  if (handedOff !== null) return { text: `Handed off · ${time(handedOff)}`, icon: "ArrowTurnForward" };
   const at = lastEvent(history, "surfaced") ?? loop.updatedAt;
   const when = time(at);
   if (loop.trigger.type === "place" && loop.trigger.place) return { text: `${loop.trigger.direction === "leave" ? "Left" : "Arrived at"} ${loop.trigger.place} · ${when}`, icon: "Pin" };
   if (loop.trigger.type === "event" && loop.trigger.event) return { text: `${eventLabel(loop.trigger.event)} · ${when}`, icon: "Zap" };
-  if (loop.trigger.type === "time" && loop.trigger.at !== undefined && Math.abs(loop.trigger.at - at) < 5 * 60_000) return { text: `${shortWhen(loop.trigger.at, now)} trigger · ${when}`, icon: "Clock" };
+  if (loop.trigger.type === "time" && loop.trigger.at !== undefined && Math.abs(loop.trigger.at - at) < 5 * 60_000) return { text: `${weekday(loop.trigger.at)} ${time(loop.trigger.at)} trigger · ${when}`, icon: "Clock" };
   if (loop.source && loop.source.kind !== "interaction") return { text: `from ${loop.source.kind} · ${when}`, icon: "Mail" };
   return { text: when, icon: "Clock" };
 }

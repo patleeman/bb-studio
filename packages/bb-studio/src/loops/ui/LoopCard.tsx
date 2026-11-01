@@ -65,7 +65,7 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
   const { loop, history } = view;
   const now = useNow();
   if (loop.closedAt !== null) return <ClosedLine view={view} refresh={refresh} />;
-  const release = releaseLabel(loop, history, now);
+  const release = releaseLabel(loop, history);
   return (
     <div className={cn("w-full max-w-3xl", !bare && "my-2")} data-testid="loop-card" data-kind={loop.kind}>
       {bare ? null : (
