@@ -26,7 +26,9 @@ vi.mock("../live", () => ({
     state.inputs.push([method, input]);
     const bot = (state.data.bot_get as { bot: unknown } | undefined)?.bot;
     const fallback = method === "bot_list" && bot ? { bots: [bot] } : null;
-    return { data: state.data[method] ?? fallback, error: null, loading: false, refresh: () => {} };
+    // A function answers by input (bot_automation_runs by id); it must return the same object each time.
+    const value = state.data[method];
+    return { data: (typeof value === "function" ? value(input) : value) ?? fallback, error: null, loading: false, refresh: () => {} };
   },
 }));
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
@@ -86,6 +88,7 @@ vi.mock("../../kit/ui/index", () => ({
   PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
   PopoverContent: () => null,
   Checkbox: () => null,
+  Tooltip: ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => React.createElement(React.Fragment, null, children, React.createElement("span", { hidden: true, "data-tooltip": true }, label)),
 }));
 
 const { ActivityPanel, BOT_PATH } = await import("./BotHome");
@@ -188,7 +191,7 @@ test("the Bots list: the bot on top saying what waits on you, no Needs you, star
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
   const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
-  expect(groups).toEqual(["Running", "Schedule", "Recent", "Earlier conversations"]);
+  expect(groups).toEqual(["Running", "Recent", "Earlier conversations"]);
   // The Bot's row is the one "needs you" signal: a dot, its count, and why.
   const main = nav.querySelector("[data-testid=bot-main]")!;
   expect(main.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("Asked you a question");
@@ -204,7 +207,9 @@ test("the Bots list: the bot on top saying what waits on you, no Needs you, star
   const running = nav.querySelector('section[aria-label="Running"]')!;
   expect(running.querySelector('li > button[data-thread="t2"] + ul button[data-thread="t3"]')).not.toBeNull();
   expect(nav.querySelector('section[aria-label="Recent"]')?.textContent).toContain("Weekly digest");
-  expect(nav.querySelector('section[aria-label="Schedule"]')?.textContent).toContain("Inbox sweep");
+  // No Schedule: when jobs run is the Automations calendar's.
+  expect(nav.querySelector('section[aria-label="Schedule"]')).toBeNull();
+  expect(nav.textContent).not.toContain("Inbox sweep");
   // Earlier conversations start closed.
   expect(nav.textContent).not.toContain("Relay");
   // Opened, each shows the title bot_chain read: chain threads are hidden, so BB's ThreadTitle has none.
@@ -328,12 +333,76 @@ test("Info tab: profile, controls, automations, and activity whose rows open as 
   await act(async () => button("Edit").click());
   expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
   expect((container.querySelector('textarea[aria-label="Description"]') as HTMLTextAreaElement)?.value).toBe("You are my chief of staff.");
+  // Automations open as the week; List has the rows.
+  expect(container.querySelector("[data-testid=automations-calendar]")).not.toBeNull();
+  expect(container.querySelector('[data-testid=calendar-paused] [data-paused="aut_w"]')).not.toBeNull();
+  await act(async () => [...container.querySelectorAll("[role=tab]")].find((each) => each.textContent === "List")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   expect(container.querySelector("[data-automation=heartbeat]")?.textContent).toContain("Weekdays 8:00");
   expect(container.querySelector("[data-automation=aut_w]")?.textContent).toContain("Paused");
   await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
   expect(state.toThread).toHaveBeenCalledWith("t1");
   await act(async () => button("Pause").click());
   expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_main" });
+});
+
+test("Automations as a week: today first, dense jobs as a band, a failed past run outlined with its error and opening its thread, a live run, the paused list, and a due block opening its job", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 2, 12, 0));
+  const at = (hour: number, minute = 0) => new Date(2026, 10, 2, hour, minute).getTime();
+  const job = (id: string, kind: string, name: string, schedule: unknown, extra: Record<string, unknown> = {}) => ({ id, kind, name, original: false, instruction: "Do it", schedule, scheduleText: `${name} schedule`, state: "active", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: null, target: "main", targetName: "Dot", threadId: null, ...extra });
+  const all = [0, 1, 2, 3, 4, 5, 6];
+  const runs: Record<string, { runs: unknown[] }> = {
+    probe: { runs: [{ id: "run_f", at: at(10, 0), status: "failed", manual: false, outcome: "Failed: exit 2: status page unreachable", threadId: null }] },
+    triage: { runs: [0, 2, 4, 6, 8, 10].map((hour) => ({ id: `run_t${hour}`, at: at(hour, 0), status: "succeeded", manual: false, outcome: "Ran", threadId: "thr_triage" })) },
+    none: { runs: [] },
+  };
+  state.data = {
+    bot_get: { bot: dot, run: null }, bot_activity: empty,
+    bot_runners: { runners: [{ id: "triage", name: "Inbox triage", threadId: "thr_triage", state: "active", running: true, runningSince: at(11, 50), lastRunAt: at(10, 0), lastRunStatus: "succeeded", schedule: { cadence: "every2hours", time: "00:00" }, nextRunAt: at(14) }], adoptable: [] },
+    bot_automations: { automations: [
+      job("triage", "runner", "Inbox triage", { type: "interval", every: 2, unit: "hours", days: all, from: "00:00", to: "23:59" }, { threadId: "thr_triage" }),
+      job("lunch", "checkin", "Lunch check", { type: "times", days: all, times: ["13:00"] }, { threadId: "thr_bot" }),
+      job("probe", "watcher", "Status probe", { type: "times", days: all, times: ["10:00"] }, { threadId: "thr_bot" }),
+      job("remind", "reminder", "Call Dana", { type: "once", at: at(15, 30) }),
+      job("watch", "watcher", "Release watch", { type: "interval", every: 15, unit: "minutes", days: all }, { state: "paused" }),
+    ] },
+    bot_automation_runs: (input: { id: string }) => runs[input.id] ?? runs.none,
+  };
+  try {
+    await show(<BotPanel />);
+    const calendar = container.querySelector("[data-testid=automations-calendar]")!;
+    expect(calendar).not.toBeNull();
+    const headers = [...calendar.querySelectorAll(".grid.border-b > span")].map((each) => each.textContent).filter(Boolean);
+    expect(headers).toHaveLength(7);
+    expect(headers[0]).toBe("Today");
+    // Every 2 h is a band with a tick per run; its legend names the cadence.
+    const band = calendar.querySelector('[data-band="triage"]')!;
+    expect(band.querySelectorAll("[data-tick]").length).toBeGreaterThan(8);
+    expect(band.querySelector('[data-tick="running"]')).not.toBeNull();
+    expect(calendar.textContent).toContain("Inbox triage · every 2 h");
+    // The failed run: outlined red, its error in the tooltip; it opens its thread.
+    const failed = calendar.querySelector('[data-source="probe"][data-status="failed"]')!;
+    expect(failed.className).toContain("ring-destructive");
+    expect(failed.nextElementSibling?.textContent).toContain("Failed: exit 2: status page unreachable");
+    await act(async () => click(failed));
+    expect(state.toThread).toHaveBeenCalledWith("thr_bot");
+    // The one-off reminder and the paused watcher: one block; none, but listed under Paused.
+    expect(calendar.querySelectorAll('[data-source="remind"]')).toHaveLength(1);
+    expect(calendar.querySelector('[data-source="watch"]')).toBeNull();
+    const paused = calendar.querySelector('section[aria-label="Paused"]')!;
+    expect(paused.textContent).toContain("Release watch");
+    await act(async () => button("Resume").click());
+    expect(state.call).toHaveBeenCalledWith("bot_automation_resume", { id: "watch", botId: "bot_main" });
+    expect(calendar.querySelector("[data-testid=calendar-now]")).not.toBeNull();
+    // A due block has no thread yet: it opens its job in the list.
+    const due = calendar.querySelector('[data-source="lunch"][data-status="scheduled"]')!;
+    expect(due.nextElementSibling?.textContent).toContain("Due");
+    await act(async () => click(due));
+    expect(container.querySelector("[data-testid=automations-calendar]")).toBeNull();
+    expect(container.querySelector('[data-automation="lunch"] > button')?.getAttribute("aria-expanded")).toBe("true");
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("the Bot page shows its status and confirms Stop", async () => {
@@ -779,78 +848,35 @@ test("Recent hides old idle threads and Show archived reveals them in one click"
 });
 
 
-test("the sidebar agenda sorts all Bot jobs, collapses done reminders, and opens runner threads from either section", async () => {
+test("the sidebar has Runners but no Schedule: jobs, BB schedules and done reminders stay in the Automations calendar; a runner row opens its thread", async () => {
   const now = Date.now();
-  const runner = { id: "security", name: "Dot · Security", threadId: "thr_security", providerId: "codex", state: "active",
+  const runner = { id: "security", name: "Dot · Security", threadId: "thr_security", providerId: "codex", state: "active", machineName: "red4", machineOffline: true,
     schedule: { cadence: "hourly", time: "09:00" }, nextRunAt: now + 120_000, lastRunAt: now - 60_000, lastReportAt: now - 60_000, lastLevel: "tell" };
   const automation = (id: string, kind: string, name: string, nextRunAt: number | null, status = "active") => ({ id, kind, name, nextRunAt, state: status, schedule: { type: "once" }, scheduleText: "Once" });
   state.data = {
-    bot_get: { bot: dot, run: null }, bot_activity: empty, bot_runners: { runners: [runner], adoptable: [] },
+    bot_get: { bot: dot, run: null }, bot_runners: { runners: [runner], adoptable: [] },
     bot_automations: { automations: [automation("security", "runner", runner.name, runner.nextRunAt), automation("check", "checkin", "Dot · Check-in", now + 60_000),
-      automation("watch", "watcher", "Scout · Watch", now + 180_000), automation("remind", "reminder", "Dot · Remind me", now + 90_000),
-      automation("done", "reminder", "Dot · Finished", null, "done"), automation("off", "reminder", "Dot · Off", null, "paused"),
-      automation("paused", "watcher", "Dot · Paused watch", null, "paused")] },
+      automation("remind", "reminder", "Dot · Remind me", now + 90_000), automation("done", "reminder", "Dot · Finished", null, "done"), automation("paused", "watcher", "Dot · Paused watch", null, "paused")] },
+    bot_activity: { ...empty, completed: [thread("t4", "Weekly digest")], scheduled: [{ id: "bb-inbox", kind: "automation", name: "Dot · Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: now + 150_000 }] },
   };
-  state.data.bot_activity = { ...empty, scheduled: [
-    { id: "bb-inbox", kind: "automation", name: "Dot · Inbox sweep", cron: "0 * * * *", enabled: true, nextRunAt: now + 150_000 },
-    { id: "bb-off", kind: "automation", name: "Dot · Off BB job", cron: "0 * * * *", enabled: false, nextRunAt: null },
-  ] };
   await show(<BotThreadList {...listProps} />);
-  const schedule = container.querySelector('section[aria-label="Schedule"]')!;
-  const runners = container.querySelector('section[aria-label="Runners"]')!;
-  expect([...schedule.querySelectorAll("[data-agenda]")].map(row => row.getAttribute("data-agenda"))).toEqual(["check", "remind", "security", "bb-inbox", "watch", "bb-off", "paused"]);
-  expect(schedule.textContent).toContain("Inbox sweep");
-  expect(schedule.querySelector('[data-agenda="bb-off"]')?.textContent).toContain("paused");
-  expect(schedule.textContent).toContain("Check-in");
-  expect(schedule.textContent).not.toContain("Dot · ");
-  expect(schedule.textContent).toContain("Scout · Watch");
-  expect(schedule.textContent).toContain("paused");
-  expect(schedule.textContent).not.toContain("Finished");
-  expect(button("2 done").getAttribute("aria-expanded")).toBe("false");
-  act(() => button("2 done").click());
-  expect(schedule.querySelector('[data-agenda="done"]')?.className).toContain("opacity-50");
-  expect(schedule.querySelector('[data-agenda="off"]')?.textContent).toContain("paused");
-  expect(runners.textContent).toContain("reported");
+  const nav = container.querySelector('nav[aria-label="Bots"]')!;
+  expect([...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"))).toEqual(["Runners", "Recent"]);
+  expect(nav.querySelector('section[aria-label="Schedule"]')).toBeNull();
+  expect(nav.querySelector("[data-agenda]")).toBeNull();
+  for (const text of ["Schedule", "Check-in", "Remind me", "Inbox sweep", "Paused watch", "done"]) expect(nav.textContent).not.toContain(text);
+  const runners = nav.querySelector('section[aria-label="Runners"]')!;
+  expect(runners.querySelectorAll("[data-runner]")).toHaveLength(1);
+  expect(runners.textContent).toContain("Security · red4");
+  expect(runners.textContent).toContain("offline");
   expect(runners.textContent).not.toContain("Dot · ");
-  expect(schedule.querySelector('[data-runner] [data-logo="codex"]')).not.toBeNull();
-  expect(schedule.querySelector('[data-runner]')?.className).toContain("h-7");
-  await act(async () => click(schedule.querySelector('[data-runner]')));
-  expect(state.toThread).toHaveBeenCalledWith("thr_security");
-  state.toThread.mockClear();
+  expect(runners.querySelector('[data-runner] [data-logo="codex"]')).not.toBeNull();
   await act(async () => click(runners.querySelector('[data-runner]')));
   expect(state.toThread).toHaveBeenCalledWith("thr_security");
-  Object.assign(runner, { lastRunStatus: "failed" });
+  Object.assign(runner, { lastRunStatus: "failed", machineOffline: false });
   await show(<BotThreadList {...listProps} />);
   expect([...runners.querySelectorAll(".text-destructive")].some((each) => each.textContent?.includes("failed"))).toBe(true);
   expect(runners.querySelector('[data-runner] [data-tone="failed"]')).not.toBeNull();
-});
-
-
-test("Schedule runner rows show machine and offline metadata even without runner details", async () => {
-  const remote = { id: "remote", kind: "runner", name: "Dot · Security", state: "active", nextRunAt: Date.now() + 60_000,
-    schedule: { type: "times" }, scheduleText: "Hourly", machineName: "red4", machineOffline: true };
-  const server = { ...remote, id: "server", name: "Dot · Inbox", machineName: null, machineOffline: false };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, bot_runners: null,
-    bot_automations: { automations: [remote, server] } };
-  await show(<BotThreadList {...listProps} />);
-  const schedule = container.querySelector('section[aria-label="Schedule"]')!;
-  const remoteRow = schedule.querySelector('[data-agenda="remote"]')!;
-  const serverRow = schedule.querySelector('[data-agenda="server"]')!;
-  expect(remoteRow.textContent).toContain("Security · red4");
-  expect(remoteRow.textContent).toContain("offline");
-  expect(remoteRow.querySelector(".truncate .text-muted-foreground")?.textContent).toBe(" · red4");
-  expect(serverRow.textContent).toContain("Inbox");
-  expect(serverRow.textContent).not.toContain(" · ");
-  expect(serverRow.textContent).not.toContain("offline");
-
-  // The full runner renderer presents the same machine and state in Schedule.
-  state.data.bot_runners = { runners: [{ ...remote, threadId: "thr_remote",
-    schedule: { cadence: "hourly", time: "09:00" } }], adoptable: [] };
-  await show(<BotThreadList {...listProps} />);
-  const matched = schedule.querySelector('[data-agenda="remote"]')!;
-  expect(matched.tagName).toBe("BUTTON");
-  expect(matched.textContent).toContain("Security · red4");
-  expect(matched.textContent).toContain("offline");
 });
 
 const loop = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, title, why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: null, createdAt: 1, updatedAt: 1, closedAt: null, closedBy: null, ...extra });

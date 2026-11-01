@@ -3,8 +3,7 @@
 // Threads on top, under BB's New thread (ThreadsSection.tsx), then Bots.
 // A "Bots" list: every Bot (the primary first), the selected one (the Bot
 // page's route, selection.ts; on a thread, the thread's owner) expanded under
-// it into the threads it started: Running, Runners, Recurring,
-// Recent (each nested under the thread that started it) and its earlier
+// it into the threads it started: Running, Runners, Recent (each nested under the thread that started it) and its earlier
 // conversations. A thread opens as a BB thread in the main pane, as from BB's
 // own list; so does a Bot's row, which opens its chat, with the Bot info
 // panel action open beside it. Each Bot's ⓘ opens its Info: beside the chat
@@ -26,11 +25,10 @@ import { Elapsed, ProviderStatusMark, runningLabel, threadStatusTone, type Provi
 import { isBotPath, isStudioPath, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
-import { KIND } from "./Automations";
 import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenLoopsBesideChat, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
-import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
+import { botItemName } from "./sidebarAgenda";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -264,9 +262,6 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const onOpen = (threadId: string) => { openThread(threadId); onNavigate(); };
   const sideThreads = useLive("bot_side_threads_for_bot", { botId: bot.id }, { pollMs: 60_000 });
   const runners = useRunners(bot.id);
-  const automations = useLive("bot_automations", { botId: bot.id }, { pollMs: 15_000 });
-  const agenda = sidebarAgenda(automations.data?.automations ?? [], activity.data?.scheduled ?? []);
-  const [showDone, setShowDone] = useState(false);
   const openRunner = useOpenRunner(onOpen);
   const attention = activity.data?.attention ?? null;
   const sdk = useSdk();
@@ -311,22 +306,6 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
         {runners.data?.runners.length ? (
           <Group id="runners" title="Runners" closed={layout.closed} onToggle={toggle}>
             {runners.data.runners.map((runner) => <RunnerSidebarRow botName={bot.name} key={runner.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />)}
-          </Group>
-        ) : null}
-        {agenda.upcoming.length || agenda.done.length ? (
-          <Group id="recurring" title="Schedule" closed={layout.closed} onToggle={toggle}>
-            {agenda.upcoming.map((item) => {
-              const runner = item.kind === "runner" ? runners.data?.runners.find(runner => runner.id === item.id) : null;
-              return runner
-                ? <RunnerSidebarRow agenda botName={bot.name} key={item.id} runner={runner} active={!!runner.threadId && active === runner.threadId} onOpen={openRunner} providers={providers} fallbackProviderId={bot.providerId} />
-                : <RecurringRow key={item.id} item={item} botName={bot.name} />;
-            })}
-            {agenda.done.length ? <>
-              <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className={QUIET_ROW}>
-                <span className="flex size-4 shrink-0 items-center justify-center"><Icon name={showDone ? "ChevronDown" : "ChevronRight"} className="size-3.5" /></span>{agenda.done.length} done
-              </button>
-              {showDone ? agenda.done.map(item => <RecurringRow key={item.id} item={item} botName={bot.name} done />) : null}
-            </> : null}
           </Group>
         ) : null}
         {groups.recent.length ? <Group id="recent" title="Recent" closed={layout.closed} onToggle={toggle}>{tree(groups.recent)}</Group> : null}
@@ -481,20 +460,5 @@ function SideThreadRow({ botName, thread, active, onOpen }: { botName: string; t
         </span>
       </div>
     </ThreadActionsContextMenu>
-  );
-}
-
-/** The agenda's icon for a job that isn't a runner: its kind's, as in Info's Automations. */
-const AGENDA_ICON: Partial<Record<SidebarAgendaItem["kind"], string>> = { checkin: KIND.checkin.icon, reminder: KIND.reminder.icon, watcher: KIND.watcher.icon, heartbeat: KIND.checkin.icon };
-
-function RecurringRow({ item, botName, done = false }: { item: SidebarAgendaItem; botName: string; done?: boolean }) {
-  const next = item.nextRunAt ? sidebarTime(item.nextRunAt) : null;
-  const offline = item.kind === "runner" && item.machineOffline;
-  return (
-    <div data-agenda={item.id} className={`flex h-7 min-w-0 items-center gap-2 px-2 text-[13px] ${done ? "opacity-50" : ""}`} title={item.scheduleText}>
-      <span className="flex size-4 shrink-0 items-center justify-center"><Icon name={AGENDA_ICON[item.kind] ?? "Repeat"} className="size-3.5 text-muted-foreground" /></span>
-      <span className={`min-w-0 flex-1 truncate ${item.state !== "active" ? "text-muted-foreground" : ""}`}>{botItemName(item.name, botName)}{item.kind === "runner" && item.machineName ? <span className="text-muted-foreground"> · {item.machineName}</span> : null}</span>
-      <span className={`shrink-0 text-[11px] tabular-nums ${offline ? "text-warning" : "text-muted-foreground"}`}>{offline ? "offline" : item.state === "paused" ? "paused" : done ? "done" : next}</span>
-    </div>
   );
 }

@@ -73,15 +73,15 @@ function RunnerState({ runner, running }: { runner: RunnerView; running: boolean
 }
 
 /**
- * A runner in the Bots sidebar, under Runners or in the Schedule agenda.
+ * A runner in the Bots sidebar, under Runners.
  * Between runs: a dimmed logo and "next 5:15 PM · quiet". Mid-run it looks
  * like a running thread: the turning ring and a ticking clock.
  */
-export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackProviderId, botName, agenda = false }: { botName: string; agenda?: boolean; runner: RunnerView; active: boolean; onOpen(runner: RunnerView): void; providers: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null }) {
+export function RunnerSidebarRow({ runner, active, onOpen, providers, fallbackProviderId, botName }: { botName: string; runner: RunnerView; active: boolean; onOpen(runner: RunnerView): void; providers: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null }) {
   const tone = runnerTone(runner);
   const running = tone === "running";
   return (
-    <button type="button" data-runner={runner.id} data-agenda={agenda ? runner.id : undefined} aria-current={active ? "true" : undefined} title={runnerTitle(runner)} disabled={!runner.threadId} onClick={() => onOpen(runner)}
+    <button type="button" data-runner={runner.id} aria-current={active ? "true" : undefined} title={runnerTitle(runner)} disabled={!runner.threadId} onClick={() => onOpen(runner)}
       className="@container/runner flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-state-hover disabled:hover:bg-transparent aria-[current]:bg-state-active">
       <ProviderStatusMark providerId={runner.providerId ?? fallbackProviderId} tone={tone} providers={providers} label={running ? runningLabel(runner.runningSince) : runnerSummary(runner).label} />
       <span className={`min-w-0 flex-1 truncate ${tone === "idle" || tone === "waiting" ? "text-muted-foreground" : ""}`}>{botItemName(runner.name, botName)}{runner.machineName ? <span className="text-muted-foreground"> · {runner.machineName}</span> : null}</span>

@@ -1535,7 +1535,7 @@ assertion fails.
 ![Staged Bot info → Maintenance: the one-day dry run proposes archiving the clean finished thread and places the dirty thread under Needs your call.](assets/bot-maintenance.png)
 
 
-![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
+![The Bot's chat in a staged BB: BB's own thread page for Dot, with its first exchange, a finished-thread notice and its two-bullet answer on what's left before Friday's ORBIT-42 release; in BB's sidebar Studio's list: Threads on top (the Orbit project's threads as two-line rows, the sort and group menu beside the heading), then Bots with Dot tinted while its chat is open (Working on 1 thread, its ⓘ beside it) and the threads it started under Needs you, Running, Schedule (an Inbox sweep automation; Schedule has since been removed from the sidebar) and Recent, a follow-up nested under the thread that started it](assets/bot.png)
 
 ![Leaving the Bot page: Home on the rail, then Plan the ORBIT-42 retro, a thread no bot owns, opened from the Threads section; the sidebar keeps Studio's list, Threads on top with the retro selected above the project's other threads, and Bots below with the threads Dot started under Dot, not repeated in Threads](assets/bot-leave.png)
 
@@ -1598,10 +1598,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   Settings → Appearance). Under **Bots**, every bot (the primary first) with
   its avatar, tinted in its color; the selected one opens into the
   threads it started: **Running** (a thread that is running, waiting on an
-  answer, or queued, or has one below it), **Runners**, **Schedule** (automations
-  that wake it, other than its check-in), **Recent**, **Side threads** (on
+  answer, or queued, or has one below it), **Runners**, **Recent**, **Side threads** (on
   its replies), and **Earlier conversations** (its
-  handoff chain, closed by default). A thread another of its threads started
+  handoff chain, closed by default). When its automations run is Info's
+  Automations week, not the sidebar. A thread another of its threads started
   nests under that one, at any depth (`bot_activity` returns each thread's
   `parentId`). A row opens the thread as a BB thread in the main pane; a
   bot's row opens its chat the same way, and the Bots list stays. On a
@@ -1717,7 +1717,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   question, **What should your Bot help with?** (ideas fill it in), and
   **Create Bot**. See No Bot yet below.
 - **Automations** (`src/automations.ts`, table `bot_automations`; Info,
-  iOS ⋯ → Automations): one list of what wakes a Bot, four kinds.
+  iOS ⋯ → Automations): what wakes a Bot, four kinds, as a week or a list.
   - **Check-in**: wakes the Bot's own thread with a short instruction on a
     schedule; have several (Morning brief 8:00, Evening wrap-up 18:00). The
     Bot's original check-in (its project heartbeat) is listed first as
@@ -1732,7 +1732,25 @@ of Staff", with the same thread and check-ins; rename it from its page.
 
   Check-ins and reminders may pick a cheaper model and reasoning on the
   Bot's provider for routine runs. Every wake-up prompt ends with the
-  `[PASS]` rule (docs/silent-output.md). Each row shows the schedule in
+  `[PASS]` rule (docs/silent-output.md).
+
+  **Week** (the default; `src/ui/bot/AutomationsCalendar.tsx`, model in
+  `calendar.ts`): a calendar of today and the next 6 days (5 in a narrow
+  pane), time of day down, in your time zone, with ‹ › for other weeks.
+  Each check-in, reminder, watcher, runner and plain BB schedule of the Bot
+  is expanded from its schedule or cron in its own time zone (quiet hours,
+  end dates and DST kept: a skipped time runs an hour later, a repeated one
+  once); a one-off is a single block. Past blocks are real runs from run
+  history (`bot_automation_runs`, and a runner's last run) and open their
+  thread; a failed one is outlined red with ⚠ and its error in the tooltip.
+  A run going on now grows down to the red current-time line. A job that
+  runs more than eight times in a day draws as a thin band with a tick per
+  run (failures as red dots), named with its cadence under the grid ("Inbox
+  triage · every 2 h"). Paused jobs aren't drawn; they're listed under
+  **Paused** beside the grid (under it in a narrow pane) with **Resume**. A
+  due block opens its job in the list.
+
+  **List**: each row shows the schedule in
   words, the next run and its state; open it for the instruction or script,
   recent runs with what came of each (BB's `automations_runs`), Pause /
   Resume, Run now, Edit and Delete. A bot with none only wakes when you
@@ -2055,7 +2073,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     `machine` (host id or unique host name); Studio stores the resolved id.
     Empty or null keeps the server's Personal project and `project-default`
     environment. Bot Info → Runners has a machine picker and **Move to machine…**;
-    remote machine names also appear beside runners in Schedule.
+    remote machine names also appear beside runners in the sidebar's Runners.
     On another machine Studio requests the installed `personal-workspace`
     environment provider when available there. That provider creates a directory
     on the selected host, without using the Mac's Personal folder. If unavailable,

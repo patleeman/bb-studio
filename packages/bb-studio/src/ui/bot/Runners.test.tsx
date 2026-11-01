@@ -58,10 +58,10 @@ it("includes a machine picker in Edit and sends the target with the edits", asyn
   expect(state.call).toHaveBeenCalledWith("bot_runner_update", expect.objectContaining({ botId: "bot", id: "r1", machine: "red" }));
 });
 
-it("shows the remote machine and offline state on agenda rows, without a server suffix", () => {
-  act(() => root.render(<RunnerSidebarRow agenda botName="Dot" runner={{ ...runner, machineName: "red4", machineOffline: true }} active={false} onOpen={() => {}} providers={[]} />));
+it("shows the remote machine and offline state on sidebar rows, without a server suffix", () => {
+  act(() => root.render(<RunnerSidebarRow botName="Dot" runner={{ ...runner, machineName: "red4", machineOffline: true }} active={false} onOpen={() => {}} providers={[]} />));
   expect(container.textContent).toContain("Files · red4");
   expect(container.textContent).toContain("offline");
-  act(() => root.render(<RunnerSidebarRow agenda botName="Dot" runner={runner} active={false} onOpen={() => {}} providers={[]} />));
+  act(() => root.render(<RunnerSidebarRow botName="Dot" runner={runner} active={false} onOpen={() => {}} providers={[]} />));
   expect(container.textContent).toBe("Files");
 });
