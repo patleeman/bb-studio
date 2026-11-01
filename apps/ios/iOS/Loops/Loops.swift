@@ -99,7 +99,7 @@ extension Date {
 
 /// `loops.list`: the Loops screen's five sections. The items have the same
 /// shape as `Studio.LoopsGetOutputLoop`, so they decode as it.
-struct LoopGroups: Decodable, Sendable {
+struct LoopGroups: Decodable, Equatable, Sendable {
     var needsYouNow: [LoopItem]
     var comingUp: [LoopItem]
     var agentsOnIt: [LoopItem]

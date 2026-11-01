@@ -192,6 +192,8 @@ struct LoopRowLine: View {
                 Spacer(minLength: 8)
                 if let loop, let trailing = Self.trailing(loop) {
                     Text(trailing).foregroundStyle(trailing == "Today" ? Color.accentColor : .secondary)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
             }
             .contentShape(.rect)

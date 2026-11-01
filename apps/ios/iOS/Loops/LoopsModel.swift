@@ -18,8 +18,6 @@ final class LoopsModel {
     var botName = BotInfo.defaultName
     /// Leads the Bot started that are still working: Hand off targets after the Chief of Staff.
     var leads: [(id: String, title: String)] = []
-    /// Bumped after every change, so cards on screen read their loop again.
-    private(set) var revision = 0
     private var server: URL?
     private var enabledCheckedAt: Date?
 
@@ -101,14 +99,13 @@ final class LoopsModel {
         do {
             let groups = try await client.loops(area: area, owner: owner)
             guard client.baseURL == server else { return }
+            if listError != nil { listError = nil }
+            // An unchanged list redraws nothing: a redraw closes a card's open menu.
+            guard groups != self.groups else { return }
             self.groups = groups
-            listError = nil
-            for loop in groups.all where details[loop.id]?.loop != loop {
-                var detail = details[loop.id]
-                detail?.loop = loop
-                if let detail { details[loop.id] = detail }
+            for loop in groups.all where details[loop.id].map({ $0.loop != loop }) == true {
+                details[loop.id]?.loop = loop
             }
-            revision += 1
         } catch where BBClient.isCancellation(error) {
         } catch {
             listError = BBClient.describe(error)
@@ -123,7 +120,6 @@ final class LoopsModel {
         if case .handOff? = action { detail.handedOffAt = .now }
         details[loop.id] = detail
         failures[loop.id] = nil
-        revision += 1
     }
 
     /// Who an owner is, in words: "You", the Bot's name, or the lead's title.

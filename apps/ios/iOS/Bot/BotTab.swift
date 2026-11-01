@@ -129,12 +129,14 @@ struct BotTab: View {
         // Each Activity refresh brings the Loops along, and who can take a hand-off.
         .task(id: activity) {
             guard botId == nil, let bot else { return }
-            loops.botName = bot.name
-            loops.leads = BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain)
-                .filter { $0.status == .running }.map { ($0.id, $0.title) }
+            if loops.botName != bot.name { loops.botName = bot.name }
+            var leads = BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain)
+                .filter { $0.status == .running }.map { (id: $0.id, title: $0.title) }
             #if DEBUG
-            if LoopsDemo.mode != nil { loops.leads.insert((LoopsDemo.leadId, "Kensico lead"), at: 0) }
+            if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Kensico lead"), at: 0) }
             #endif
+            // Only a change redraws the cards: a redraw closes a card's open menu.
+            if leads.map({ $0.id + "\u{1F}" + $0.title }) != loops.leads.map({ $0.id + "\u{1F}" + $0.title }) { loops.leads = leads }
             if loops.enabled == true { await loops.refreshList() }
         }
         .task(id: model.serverURL) {
