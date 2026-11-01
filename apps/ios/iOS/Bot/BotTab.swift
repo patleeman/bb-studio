@@ -27,6 +27,9 @@ struct BotTab: View {
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Each chat thread's environment, as its ThreadView loads it, for Terminals.
     @State private var chatEnvironments: [String: String] = [:]
+    /// Chat | Loops: the Loops instead of the chat (the left pane, beside it, on the unfolded Duo).
+    @State private var showsLoops = false
+    @State private var loops = LoopsModel.shared
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
@@ -54,10 +57,29 @@ struct BotTab: View {
         #endif
         RegularPages {
             if duoLayout.twoPages {
-                BotThreadsSheet(bot: bot, botId: botId, activity: activity, open: { id in
-                    if id == bot?.lead.threadId { path = [] }
-                    else { path = [.thread(id: id)] }
-                }, refresh: { await loadActivity() }, embedded: true)
+                if showsLoops && loopsOn {
+                    NavigationStack {
+                        LoopsView(attention: activity?.attention, openChat: { path = [] }, sidebar: true)
+                            .toolbar(.hidden, for: .navigationBar)
+                            .safeAreaInset(edge: .top, spacing: 0) {
+                                DuoHeader(sidebar: true) {
+                                    HStack(spacing: 8) {
+                                        Button { showsLoops = false } label: { Image(systemName: "chevron.backward") }
+                                            .accessibilityLabel("Back to \(bot?.name ?? BotInfo.defaultName)")
+                                            .accessibilityIdentifier("loops-back")
+                                        Text("Loops").font(.title2.bold())
+                                    }
+                                } actions: { EmptyView() }
+                                .ignoresSafeArea(.container, edges: .trailing)
+                            }
+                    }
+                } else {
+                    BotThreadsSheet(bot: bot, botId: botId, activity: activity, open: { id in
+                        if id == bot?.lead.threadId { path = [] }
+                        else { path = [.thread(id: id)] }
+                    }, refresh: { await loadActivity() }, embedded: true,
+                    openLoops: loopsOn ? { showsLoops = true } : nil, loopsCount: loopsCount)
+                }
             }
         } detail: {
             NavigationStack(path: $path) {
@@ -97,6 +119,28 @@ struct BotTab: View {
             guard model.tab == .bot else { return }
             await load()
         }
+        // The morning card's "N more" and `bbstudio://loops` land here.
+        .onChange(of: model.botShowsLoops, initial: true) { _, show in
+            guard show, botId == nil else { return }
+            model.botShowsLoops = false
+            showsLoops = true
+        }
+        .onChange(of: model.botDraft) { _, text in if text != nil { showsLoops = false } }
+        // Each Activity refresh brings the Loops along, and who can take a hand-off.
+        .task(id: activity) {
+            guard botId == nil, let bot else { return }
+            loops.botName = bot.name
+            loops.leads = BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain)
+                .filter { $0.status == .running }.map { ($0.id, $0.title) }
+            #if DEBUG
+            if LoopsDemo.mode != nil { loops.leads.insert((LoopsDemo.leadId, "Kensico lead"), at: 0) }
+            #endif
+            if loops.enabled == true { await loops.refreshList() }
+        }
+        .task(id: model.serverURL) {
+            await loops.checkEnabled(force: true)
+            if loops.enabled == true { await loops.refreshList() }
+        }
         // Live status for the threads it started: on BB's thread changes, with
         // a slow poll behind them for the rest of the Activity.
         .task(id: PollKey(interval: pollInterval, server: model.serverURL, botId: botId)) {
@@ -129,6 +173,15 @@ struct BotTab: View {
         }
     }
 
+    /// Studio's Attention Router setting: off hides Loops (and cards are placeholders).
+    private var loopsOn: Bool { loops.enabled == true && botId == nil }
+
+    /// Needs you now, with a pending question in the chat counted once.
+    private var loopsCount: Int {
+        let question = ["Asked you a question", "Waiting for approval", "Waiting for your answer"].contains(activity?.attention?.reason ?? "")
+        return (loops.groups?.needsYouNow.count ?? 0) + (question ? 1 : 0)
+    }
+
     private var pollInterval: Duration? {
         BotActivityPoll.interval(visible: model.tab == .bot, sceneActive: scenePhase == .active, running: activity?.running == true)
     }
@@ -138,9 +191,23 @@ struct BotTab: View {
         switch lead {
         case .bot(let bot):
             if let id = bot.lead.threadId {
-                ThreadView(threadId: id, hidesTabBar: false, answersActionButton: botId == nil, botChrome: chrome(bot))
-                    .id("\(model.serverURL.absoluteString)|\(id)")
-                    .safeAreaInset(edge: .top, spacing: 0) { banner(bot) }
+                ZStack {
+                    ThreadView(threadId: id, hidesTabBar: false, answersActionButton: botId == nil, botChrome: chrome(bot))
+                        .id("\(model.serverURL.absoluteString)|\(id)")
+                        // Under the Loops, the chat is out of reach for VoiceOver too.
+                        .accessibilityHidden(showsLoops && loopsOn && !duoLayout.twoPages)
+                    if showsLoops && loopsOn && !duoLayout.twoPages {
+                        LoopsView(attention: activity?.attention, openChat: { showsLoops = false })
+                            .background(Color(uiColor: .systemGroupedBackground))
+                            .transition(.opacity)
+                    }
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 6) {
+                        if loopsOn && !duoLayout.twoPages { BotChatLoopsSwitch(showsLoops: $showsLoops, count: loopsCount) }
+                        banner(bot)
+                    }
+                }
             } else {
                 ContentUnavailableView {
                     Label { Text("\(bot.name) has no chat") } icon: { BotAvatar(bot.look, size: 56) }
@@ -474,4 +541,48 @@ enum BotActivityPoll {
 extension BotActivity {
     /// Something of the Bot's is running or queued.
     var running: Bool { !inProgress.isEmpty || !(waiting ?? []).isEmpty }
+}
+
+/// Chat | Loops, under the Bot's header on the phone and the folded Duo.
+/// Loops carries its count: Needs you now, a pending question counted once.
+struct BotChatLoopsSwitch: View {
+    @Binding var showsLoops: Bool
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            segment("Chat", selected: !showsLoops) { showsLoops = false }
+            segment("Loops", selected: showsLoops, badge: count) { showsLoops = true }
+        }
+        .padding(3)
+        .background(.fill.tertiary, in: .rect(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        // Frosted like the header above it, so the chat blurs under both.
+        .background(.ultraThinMaterial)
+        .animation(.smooth(duration: 0.2), value: showsLoops)
+    }
+
+    private func segment(_ title: String, selected: Bool, badge: Int = 0, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.caption2.weight(.bold)).foregroundStyle(.black)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Color.accentColor, in: .circle)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .background {
+                if selected { RoundedRectangle(cornerRadius: 11, style: .continuous).fill(.fill.secondary) }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityLabel(badge > 0 ? "\(title), \(badge)" : title)
+        .accessibilityIdentifier("bot-switch-\(title.lowercased())")
+    }
 }

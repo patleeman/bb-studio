@@ -15,6 +15,10 @@ struct BotThreadsSheet: View {
     var open: (String) -> Void
     var refresh: () async -> Void
     var embedded = false
+    /// Beside the chat (the unfolded Duo): opens the Loops in this pane; nil while the Attention Router is off.
+    var openLoops: (() -> Void)? = nil
+    /// The Loops' count: Needs you now, with a pending question counted once.
+    var loopsCount = 0
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     /// Its runners (`bot_runners`); external bots have none.
@@ -35,7 +39,10 @@ struct BotThreadsSheet: View {
             List {
                 // The chat leads the sidebar; in the sheet it shows only while the Bot needs you.
                 if let id = bot?.lead.threadId, embedded || activity?.attention != nil {
-                    Section { chatRow(id, attention: activity?.attention) }
+                    Section {
+                        chatRow(id, attention: activity?.attention)
+                        if embedded, let openLoops { loopsRow(openLoops) }
+                    }
                 }
                 if !groups.running.isEmpty {
                     group("running", "Running") {
@@ -118,6 +125,29 @@ struct BotThreadsSheet: View {
     }
 
     // MARK: Rows
+
+    /// All loops: the Bot's Loops, in this pane.
+    private func loopsRow(_ open: @escaping () -> Void) -> some View {
+        Button(action: open) {
+            HStack(spacing: 10) {
+                Image(systemName: "checklist").foregroundStyle(.tint)
+                Text("All loops").foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                if loopsCount > 0 {
+                    Text("\(loopsCount)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(.orange, in: .capsule)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .modifier(SidebarRowContent(enabled: embedded))
+        .accessibilityIdentifier("bot-all-loops")
+        .accessibilityLabel(loopsCount > 0 ? "All loops, \(loopsCount)" : "All loops")
+    }
 
     /// The Bot's chat. While the Bot needs you, why ("Asked you a question")
     /// in a muted line under it and how many things, in an orange badge.
