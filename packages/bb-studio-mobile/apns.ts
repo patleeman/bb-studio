@@ -96,8 +96,8 @@ export class ProviderToken {
  * answer box for questions, and a Reply box on finished turns (the Bot's
  * messages among them) so the user can answer from the lock screen. Errors
  * are plain alerts.
- * `BB_CHOICE` questions also get `mutable-content`, so the app's notification
- * extension can add a button per option. Interaction details come from
+ * `BB_CHOICE` questions and `BB_LOOP` loops also get `mutable-content`, so the
+ * app's notification extension can add a button per option. Interaction details come from
  * `enrichInteraction` in server.ts.
  */
 export function notificationCategory(data: Record<string, unknown>): string | undefined {
@@ -156,7 +156,8 @@ function renderPayload(message: ExpoMessage, body: string): string {
       sound: message.sound ?? "default",
       ...(threadId ? { "thread-id": threadId } : {}),
       ...(category ? { category } : {}),
-      ...(category === "BB_CHOICE" ? { "mutable-content": 1 } : {}),
+      // The app's extension gives loops per-kind buttons (and one per decision option).
+      ...(category === "BB_CHOICE" || category === "BB_LOOP" ? { "mutable-content": 1 } : {}),
     },
     ...data,
   });

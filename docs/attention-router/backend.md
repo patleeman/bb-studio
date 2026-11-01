@@ -18,6 +18,8 @@ The public Studio contract exports these method names verbatim, including dots:
   The server makes no LLM calls. An active Bot chat is required for delivery.
 - `loops.update({id,changes?,surfaceNow?})`: update fields; surfaceNow queues
   immediate release through the same budget and quiet-hour policy.
+  Setting an open status (such as `surfaced`) on a closed loop reopens it,
+  clearing closedAt and recording `reopened`: Undo on a Done card.
 - `loops.act({id,action,option?,owner?,snooze?})`: done, drop, got_it and choose
   close; snooze changes the trigger; hand_off changes owner and starts work;
   nudge and keep record an action. choose requires an existing decision option.
@@ -108,7 +110,10 @@ Other settings: loopTimeZone (America/New_York), loopDailyBudget (5), loopQuietS
 Mobile notify remains backward compatible. Optional category BB_LOOP, loopId and
 actions are carried in notification data. APNs selects category BB_LOOP. Action
 IDs use the loops.act vocabulary; the iOS worker registers the category and sends
-taps to Studio. Payloads retain the Bot thread and personal project for routing.
+taps to Studio. The push also carries `loopKind` and, for a decision, up to
+four `options`, with `mutable-content`, so the app's notification extension
+picks per-kind buttons (Done or Got it, Snooze until tonight, Snooze until I'm
+home, and one button per option). Payloads retain the Bot thread and personal project for routing.
 
 Delivery is at-least-once across a crash between an external send and its history
 write. There is no distributed transaction with BB or APNs. A successful relay

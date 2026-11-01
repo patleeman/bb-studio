@@ -69,6 +69,9 @@ export const mobileContract = defineRpcContract({
       category: z.literal('BB_LOOP').optional(),
       loopId: z.string().min(1).optional(),
       actions: z.array(z.enum(['done','snooze','got_it','drop','choose','hand_off','nudge'])).optional(),
+      // The loop's kind and a decision's options, so the app shows one button per option.
+      loopKind: z.enum(['do','decide','read','waiting']).optional(),
+      options: z.array(z.string().max(120)).max(4).optional(),
       coalesceKey: z.string().max(300).optional(),
     }),
     output: z.object({ ok: z.literal(true), sent: z.number() }),
@@ -436,7 +439,7 @@ export default async function plugin(bb: BbPluginApi) {
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}) };
       const tickets = devices.length > 0
         ? await deliver(devices.map((to) => ({
-            to, title: input.title, body: input.body, sound: "default", data: {...data, ...(input.category ? {category:input.category,loopId:input.loopId,actions:input.actions} : {})},
+            to, title: input.title, body: input.body, sound: "default", data: {...data, ...(input.category ? {category:input.category,loopId:input.loopId,actions:input.actions,...(input.loopKind?{loopKind:input.loopKind}:{}),...(input.options?.length?{options:input.options}:{})} : {})},
             ...(input.coalesceKey ? { collapseId: input.coalesceKey } : {}),
           })))
         : [];

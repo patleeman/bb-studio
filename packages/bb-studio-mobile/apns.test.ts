@@ -252,6 +252,10 @@ it('preserves loop notification actions and selects BB_LOOP', () => {
   const data = {category:'BB_LOOP',loopId:'loop_123',actions:['done','snooze','got_it'],threadId:'thr_bot',kind:'turn-finished'};
   expect(notificationCategory(data)).toBe('BB_LOOP');
   const payload = apnsPayload({to:'apns:abc',title:'Call plumber',body:'Home repair',data});
-  expect(JSON.parse(payload)).toMatchObject({...data,aps:{category:'BB_LOOP'}});
+  expect(JSON.parse(payload)).toMatchObject({...data,aps:{category:'BB_LOOP','mutable-content':1}});
   expect(notificationCategory({category:'BB_LOOP'})).toBeUndefined();
+});
+it('carries a loop kind and decision options for the app extension', () => {
+  const data = {category:'BB_LOOP',loopId:'loop_1',loopKind:'decide',options:['Bayside','Hudson'],actions:['choose','snooze'],threadId:'thr_bot',kind:'turn-finished'};
+  expect(JSON.parse(apnsPayload({to:'apns:abc',title:'Choose',body:'',data}))).toMatchObject({loopKind:'decide',options:['Bayside','Hudson'],aps:{category:'BB_LOOP','mutable-content':1}});
 });

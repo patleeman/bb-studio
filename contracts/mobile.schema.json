@@ -87,6 +87,23 @@
               ]
             }
           },
+          "loopKind": {
+            "type": "string",
+            "enum": [
+              "do",
+              "decide",
+              "read",
+              "waiting"
+            ]
+          },
+          "options": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
           "coalesceKey": {
             "type": "string",
             "maxLength": 300

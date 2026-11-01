@@ -1,4 +1,4 @@
-import { registerLoops, LOOP_TOOLS } from './src/loops/register';
+import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
 import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
@@ -532,7 +532,7 @@ export default async function plugin(bb: BbPluginApi) {
   }, async (loop) => {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
-    await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,actions:['done','snooze','got_it'],coalesceKey:loop.id} as never});
+    await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
   });
   loopsEnabled = loops.enabled;
   // Voice sessions: a fast-model thread the user talks to, which hands work to the Bot or threads.

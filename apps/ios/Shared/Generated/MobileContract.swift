@@ -94,6 +94,36 @@ public enum Mobile {
     }
   }
 
+  public enum NotifyInputLoopKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting": self = .waiting
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting: try container.encode("waiting")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct NotifyInput: Sendable, Hashable, Codable {
     public var title: String?
     public var body: String?
@@ -104,9 +134,11 @@ public enum Mobile {
     public var category: String?
     public var loopId: String?
     public var actions: [NotifyInputActionsItem]?
+    public var loopKind: NotifyInputLoopKind?
+    public var options: [String]?
     public var coalesceKey: String?
 
-    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, category: String? = nil, loopId: String? = nil, actions: [NotifyInputActionsItem]? = nil, coalesceKey: String? = nil) {
+    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, category: String? = nil, loopId: String? = nil, actions: [NotifyInputActionsItem]? = nil, loopKind: NotifyInputLoopKind? = nil, options: [String]? = nil, coalesceKey: String? = nil) {
       self.title = title
       self.body = body
       self.kind = kind
@@ -116,6 +148,8 @@ public enum Mobile {
       self.category = category
       self.loopId = loopId
       self.actions = actions
+      self.loopKind = loopKind
+      self.options = options
       self.coalesceKey = coalesceKey
     }
   }

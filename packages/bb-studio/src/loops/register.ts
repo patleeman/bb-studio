@@ -1,9 +1,11 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
-import { rpcContract, add, act, update, filters } from './contract';
+import { rpcContract, add, act, update, filters, type Loop } from './contract';
 import { LoopStore, placeKey } from './store';
 import { LoopScheduler, defaults, snooze } from './scheduler';
+/** The lock-screen actions a loop's push offers, by kind (the app's BB_LOOP categories). */
+export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
 export const LOOP_TOOLS=['loops_add','loops_list','loops_update','loops_act','loops_fire','loops_morning'];
 export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3]){
  const store=new LoopStore(db);const settings=bb.settings.define({loopsEnabled:{type:'boolean',label:'Attention Router',default:false},loopTimeZone:{type:'string',label:'Attention time zone',default:defaults.timeZone},loopDailyBudget:{type:'number',label:'Daily attention budget',default:5},loopQuietStart:{type:'number',label:'Quiet hours start',default:22},loopQuietEnd:{type:'number',label:'Quiet hours end',default:7}});

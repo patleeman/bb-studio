@@ -16,7 +16,8 @@ export class LoopStore {
  add(input:z.infer<typeof add>):Loop { const x=add.parse(input), now=Date.now(); return this.save({why:'',source:null,kind:'do',options:[],owner:'patrick',trigger:{type:'none'},priority:'normal',push:false,status:'queued',due:null,area:null,...x,id:`loop_${randomUUID()}`,createdAt:now,updatedAt:now,closedAt:null,closedBy:null}); }
  event(id:string,type:string,data:unknown={}) { this.db.prepare('INSERT INTO loop_events(loop_id,type,at,data) VALUES (?,?,?,?)').run(id,type,Date.now(),JSON.stringify(data)); }
  history(id:string) { return this.db.prepare('SELECT type,at,data FROM loop_events WHERE loop_id=? ORDER BY seq').all(id) as {type:string;at:number;data:string}[]; }
- update(id:string,changes:Partial<z.infer<typeof add>>) { return this.save({...this.get(id),...add.partial().parse(changes),updatedAt:Date.now()}); }
+ // An open status on a closed loop reopens it (Undo on Done).
+ update(id:string,changes:Partial<z.infer<typeof add>>) { const cur=this.get(id),x=add.partial().parse(changes); const reopen=!!cur.closedAt&&!!x.status&&!['done','dropped'].includes(x.status); if(reopen)this.event(id,'reopened',{status:x.status}); return this.save({...cur,...x,...(reopen?{closedAt:null,closedBy:null}:{}),updatedAt:Date.now()}); }
  act(input:z.infer<typeof act>,snooze:(preset:string)=>Loop['trigger']):Loop { const x=act.parse(input); return this.db.transaction(()=>{let l=this.get(x.id); if(l.closedAt)return l;
  if(x.action==='choose' && (l.kind!=='decide'||!x.option||!l.options.includes(x.option)))throw Error('Choose an existing option');
  if(['done','drop','got_it','choose'].includes(x.action)){l={...l,status:x.action==='drop'?'dropped':'done',closedAt:Date.now(),closedBy:'patrick'};this.event(l.id,'closed',{action:x.action,option:x.option});}
