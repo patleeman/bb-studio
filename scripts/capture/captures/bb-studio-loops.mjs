@@ -7,6 +7,9 @@
 // The Loops pane (src/loops/ui/LoopsPane.tsx) is captured beside the Bot's
 // chat: opened from the chat header's Loops button, a row's ⋯ menu, Change
 // trigger under its row, and the `::loops{open="pane"}` card that opens it.
+// Discuss (src/loops/reference.ts): the menu item, the `@loop` chip it puts
+// in the composer, a row dragged over the composer and dropped, the Bot's
+// real reply to the chip, and Discuss on the Loops tab.
 //
 // BB_CAPTURE_LOOPS_BEFORE=1 captures the same surfaces without asserting the
 // new UI, for before-and-after renders against an older Studio.
@@ -191,6 +194,8 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await scheme(client, color);
       const { bot } = await seed();
       await setEnabled(true);
+      // The Discuss capture's real reply would otherwise count as unread in Needs you now.
+      await bbCli(["thread", "read", bot.threadId]).catch(() => {});
       await client.navigate(`${BOT_PATH}/${bot.id}/loops`);
       await dismissProblems(client);
       if (BEFORE) { await client.waitForText("Activity", 30000); await sleep(1000); return async () => { await scheme(client, ""); }; }
@@ -223,6 +228,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     const { bot } = await seed();
     await setEnabled(true);
     if (paneChat !== bot.threadId) { await post(bot, "loops pane", OPEN_CARD); paneChat = bot.threadId; }
+    await bbCli(["thread", "read", bot.threadId]).catch(() => {});
     await client.navigate(chatPath(bot));
     await dismissProblems(client);
     await client.waitForSelector("[data-testid=loops-open]", 60000);
@@ -250,6 +256,56 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     },
   });
   const rowMenu = (title) => `[data-testid=loops-pane] button[aria-label=${JSON.stringify(`Actions: ${title}`)}]`;
+  const EDITOR = "[data-promptbox] [contenteditable=true]";
+  /** Waits until `expression` is true in the page. */
+  const until = async (client, expression, what, timeoutMs = 15000) => {
+    const started = Date.now();
+    while (!(await client.poll(expression))) {
+      if (Date.now() - started > timeoutMs) throw new Error(`Timed out waiting for ${what}`);
+      await sleep(250);
+    }
+  };
+  /** Empties the Bot chat's draft, which BB keeps across reloads. */
+  const clearComposer = async (client) => {
+    await client.waitForSelector(EDITOR, 30000);
+    await client.evaluate(`(() => { const editor = document.querySelector(${JSON.stringify(EDITOR)}); editor.focus(); document.execCommand("selectAll"); document.execCommand("delete"); return true; })()`);
+    await until(client, `document.querySelector(${JSON.stringify(EDITOR)}).textContent.trim() === ""`, "an empty composer");
+  };
+  const composerHas = (client, text) => until(client, `!!document.querySelector(${JSON.stringify(EDITOR)})?.textContent.includes(${JSON.stringify(text)})`, `the composer to hold ${text}`);
+  const YASSINE = "Reply to Yassine about the FDE referral";
+  /** Discuss on the Yassine row: the chip in the draft. */
+  const discussYassine = async (client) => {
+    await openPane(client);
+    await clearComposer(client);
+    await pressAt(client, rowMenu(YASSINE));
+    await client.waitForText("Discuss");
+    await press(client, "[role=menuitem]", "Discuss");
+    await composerHas(client, YASSINE);
+    const chip = await client.evaluate(`!!document.querySelector(${JSON.stringify(EDITOR)}).querySelector("[data-prompt-mention], .prompt-mention-pill, [data-type=mention]")`);
+    if (!chip) throw new Error("Discuss put no mention chip in the composer");
+  };
+  /**
+   * Drags the row titled `title` onto the composer: the row's own dragstart
+   * fills a DataTransfer in the page, and CDP delivers that data to the
+   * composer through the browser's drop path. Stops before the drop unless `drop`.
+   */
+  const dragRowToComposer = async (client, title, drop) => {
+    const plan = await client.evaluate(`(() => {
+      const row = [...document.querySelectorAll("[data-testid=loops-pane] [draggable=true]")].find((each) => each.textContent.includes(${JSON.stringify(title)}));
+      if (!row) throw new Error("No draggable row: ${title}");
+      const transfer = new DataTransfer();
+      row.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      const editor = document.querySelector(${JSON.stringify(EDITOR)}).getBoundingClientRect();
+      return { text: transfer.getData("text/plain"), x: editor.left + 40, y: editor.top + editor.height / 2 };
+    })()`);
+    if (!plan.text.startsWith('::loop{id="')) throw new Error("The row's drag carries no ::loop line: " + JSON.stringify(plan.text));
+    const data = { items: [{ mimeType: "text/plain", data: plan.text }], dragOperationsMask: 1 };
+    for (const type of drop ? ["dragEnter", "dragOver", "drop"] : ["dragEnter", "dragOver"]) {
+      await client.command("Input.dispatchDragEvent", { type, x: plan.x, y: plan.y, data });
+      await sleep(150);
+    }
+    return plan;
+  };
 
   const panes = BEFORE ? [] : [
     paneCapture("studio-loops-pane", "loops-pane.png", "dark", openPane),
@@ -257,8 +313,42 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     paneCapture("studio-loops-pane-menu", "loops-pane-menu.png", "dark", async (client) => {
       await openPane(client);
       await pressAt(client, rowMenu("Reply to Yassine about the FDE referral"));
-      for (const text of ["Done", "Snooze", "Hand off", "Change trigger…", "Drop"]) await client.waitForText(text);
+      for (const text of ["Discuss", "Done", "Snooze", "Hand off", "Change trigger…", "Drop"]) await client.waitForText(text);
       await client.evaluate(`(() => { const sub = [...document.querySelectorAll("[role=menuitem]")].find((e) => e.textContent.trim() === "Snooze"); if (!sub) throw new Error("No Snooze submenu"); return true; })()`);
+    }),
+    paneCapture("studio-loops-pane-discuss", "loops-pane-discuss.png", "dark", async (client) => {
+      await discussYassine(client);
+      await client.command("Input.insertText", { text: "Is a two-line yes enough here, or should I ask about the team first?" });
+      await composerHas(client, "two-line yes");
+      await sleep(500);
+    }),
+    paneCapture("studio-loops-pane-drag", "loops-pane-drag.png", "dark", async (client) => {
+      await openPane(client);
+      await clearComposer(client);
+      await dragRowToComposer(client, "Choose the deck contractor", false);
+      await sleep(400);
+    }),
+    paneCapture("studio-loops-pane-dropped", "loops-pane-dropped.png", "dark", async (client) => {
+      await openPane(client);
+      await clearComposer(client);
+      await dragRowToComposer(client, "Choose the deck contractor", true);
+      await composerHas(client, 'About: Choose the deck contractor');
+      await composerHas(client, '::loop{id="loop_capture-deck"}');
+      await sleep(400);
+    }),
+    paneCapture("studio-loops-pane-discuss-reply", "loops-pane-discuss-reply.png", "dark", async (client) => {
+      const bot = await openPaneChat(client);
+      await discussYassine(client);
+      await client.command("Input.insertText", { text: "Is a two-line yes enough here? Say why in one sentence." });
+      await composerHas(client, "two-line yes");
+      await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+      await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+      await sleep(2000);
+      await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
+      await client.waitForText("Say why in one sentence.", 30000);
+      await sleep(1500);
+      await scrollToText(client, "Say why in one sentence.");
+      await sleep(800);
     }),
     paneCapture("studio-loops-pane-trigger", "loops-pane-trigger.png", "dark", async (client) => {
       await openPane(client);
@@ -337,8 +427,21 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await client.evaluate(`(() => { const h = [...document.querySelectorAll("h2")].filter((e) => /day,/.test(e.textContent)).at(-1); h?.scrollIntoView({ block: "start" }); return true; })()`);
       await sleep(800);
     }),
-    loopsTab("studio-loops-tab", "loops-tab.png", "dark", async (client) => { await hover(client, "[data-testid=loop-needs]", 1); }),
+    loopsTab("studio-loops-tab", "loops-tab.png", "dark", async (client) => { await hover(client, "[data-testid=loop-needs]", 1); await client.waitForText("Discuss"); }),
     loopsTab("studio-loops-tab-light", "loops-tab-light.png", "light"),
+    loopsTab("studio-loops-tab-discussed", "loops-tab-discussed.png", "dark", async (client) => {
+      // Start from an empty draft in the Bot chat, then come back to the tab.
+      const { bot } = await seed();
+      await client.navigate(chatPath(bot));
+      await clearComposer(client);
+      await client.navigate(`${BOT_PATH}/${bot.id}/loops`);
+      await client.waitForSelector("[data-testid=loops-tab] [data-testid=loop-needs]", 30000);
+      await hover(client, "[data-testid=loop-needs]", 1);
+      await press(client, "button", "Discuss", ["[data-testid=loop-needs]", 1]);
+      await client.waitForSelector("[data-promptbox]", 30000);
+      await composerHas(client, "Reply to Yassine about the FDE referral");
+      await sleep(800);
+    }),
     loopsTab("studio-loops-tab-lower", "loops-tab-lower.png", "dark", async (client) => {
       await client.evaluate(`(() => { document.querySelector('section[aria-label="Agents on it"]').scrollIntoView({ block: "start" }); return true; })()`);
       await sleep(500);

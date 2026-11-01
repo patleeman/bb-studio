@@ -170,7 +170,7 @@ with fixed loops written to its Studio database
 
 ![The morning message: the date, Calendar, then On today's list as compact rows (Pay the property tax installment, Due today; Choose the deck contractor, 2 options; Reply to Yassine, Due Fri; the recruiter call, Read) and "3 more in Loops", then Good to know](assets/loops-morning.png)
 
-![The Bot page's Loops tab beside Info, Loops 4: Add a loop, area chips (All, Job, Home, Kensico, Systems) and Owner: Anyone; Needs you now with the hovered Yassine row showing Done, Snooze, Hand off, Drop and Change trigger; Coming up with each loop's trigger (When you get home, Fri 3:00 PM, When Yassine replies, When you leave the office, Mon Nov 9)](assets/loops-tab.png)
+![The Bot page's Loops tab beside Info, Loops 4: Add a loop, area chips (All, Job, Home, Kensico, Systems) and Owner: Anyone; Needs you now with the hovered Yassine row showing Done, Snooze, Hand off, Drop, Discuss and Change trigger; Coming up with each loop's trigger (When you get home, Fri 3:00 PM, When Yassine replies, When you leave the office, Mon Nov 9)](assets/loops-tab.png)
 
 ![Lower on the Loops tab: Agents on it (Kensico lead and Chief of Staff, each with Open thread), Waiting on others with Since and Nudge them, and Done · last 7 days with Undo](assets/loops-tab-lower.png)
 
@@ -200,13 +200,23 @@ title, why and trigger when you send. You can also drag a row from the pane
 into the composer: it drops the loop's `::loop` line and title as text,
 which the Bot reads the same way.
 
+![Discuss on Reply to Yassine: the Bot chat's composer holds a "Reply to Yassine about the FDE referral" chip, then the question typed after it: Is a two-line yes enough here, or should I ask about the team first?](assets/loops-pane-discuss.png)
+
+![The Bot's real reply in a staged BB to that chip and "Is a two-line yes enough here? Say why in one sentence.": Yes, a two-line yes accepts Yassine's offer and lets him move the referral forward before Friday's deadline. The offer and Friday came from the loop, not the question](assets/loops-pane-discuss-reply.png)
+
+![Choose the deck contractor dragged from the pane over the composer: the row is dimmed while it's dragged. The capture has no drag image](assets/loops-pane-drag.png)
+
+![The same row dropped in the composer: ::loop{id="loop_capture-deck"} and About: Choose the deck contractor, as text](assets/loops-pane-dropped.png)
+
+![Discuss on the Loops tab's Yassine row opened the Bot chat, with Loops beside it, and put the loop's chip in the empty composer](assets/loops-tab-discussed.png)
+
 ![The Bot's chat with the Loops pane open on the right: the chat's header has a Loops button badged 4; the pane has Add a loop, area chips and Anyone, then Needs you now (Choose the deck contractor, Reply to Yassine, Pay the property tax installment, the recruiter call), Coming up with each trigger, and Agents on it. In the chat, the Bot's "Loops" card reads 4 need you · 5 coming up · 2 with agents · 2 waiting on others, with Open Loops beside the chat](assets/loops-pane.png)
 
 ![A row's kind circle hovered in the pane: it shows a check, Mark done](assets/loops-pane-row-hover.png)
 
 ![Reply to Yassine just closed from its circle: struck through, Done · just now, with Undo, still first in Needs you now, which now counts 3](assets/loops-pane-row-done.png)
 
-![The Yassine row's ⋯ menu in the pane: Done, Snooze ›, Hand off ›, Change trigger… and Drop](assets/loops-pane-menu.png)
+![The Yassine row's ⋯ menu in the pane: Discuss, then Done, Snooze ›, Hand off ›, Change trigger… and Drop](assets/loops-pane-menu.png)
 
 ![Change trigger open under "Call the plumber about the slow drain" in the pane: Time, Event, Place and Anytime, Place selected with Home, Office, Mom’s and Gym, Arrive or Leave, and Send to iPhone when it fires checked](assets/loops-pane-trigger.png)
 
