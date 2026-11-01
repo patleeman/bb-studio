@@ -260,6 +260,9 @@ struct BotTab: View {
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
+            Button { model.sheet = .handsFree } label: { Image(systemName: "waveform") }
+                .accessibilityLabel("Hands-free")
+                .accessibilityHint("Talk with your voice assistant without looking")
             Button { sheet = .activity } label: {
                 Image(systemName: needsYou > 0 ? "bell.badge.fill" : "bell")
                     .symbolRenderingMode(needsYou > 0 ? .multicolor : .monochrome)

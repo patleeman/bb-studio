@@ -62,6 +62,8 @@ enum Sheet: Identifiable, Hashable {
     case dictation(threadId: String?, autoStart: Bool)
     case recording
     case write
+    /// Hands-free voice (iOS/VoiceLive).
+    case handsFree
 
     var id: String {
         switch self {
@@ -69,6 +71,7 @@ enum Sheet: Identifiable, Hashable {
         case .dictation(let threadId, _): "dictation:\(threadId ?? "")"
         case .recording: "recording"
         case .write: "write"
+        case .handsFree: "hands-free"
         }
     }
 }
@@ -227,6 +230,7 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
+        case "handsfree", "hands-free": sheet = .handsFree
         case "voice": if let id { openWithVoice(id) }
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)

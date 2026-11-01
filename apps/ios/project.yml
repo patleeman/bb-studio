@@ -9,6 +9,10 @@ packages:
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     exactVersion: 1.11.2
+  # Hands-free voice (iOS/VoiceLive): WebRTC to OpenAI's GPT-Live and Realtime APIs.
+  WebRTC:
+    url: https://github.com/stasel/WebRTC
+    exactVersion: 156.0.0
 settings:
   base:
     DEVELOPMENT_TEAM: 3753DAN98U
@@ -46,6 +50,7 @@ targets:
         - BBStudioUITests
     dependencies:
       - package: SwiftTerm
+      - package: WebRTC
       - target: BBStudioWatch
       - target: BBStudioWidgets
       - target: BBStudioShare
