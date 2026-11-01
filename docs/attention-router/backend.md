@@ -67,7 +67,7 @@ Snooze values: later_today = +3h; tonight = next 19:00; tomorrow_morning = next
 07:45 (phase 2 placeholder, no Mac presence detection). Wall times use the configured
 time zone, including DST.
 
-Settings: `loops.enabled` (label **Attention Router**, default **OFF**) gates all
+Settings: `loopsEnabled` (label **Attention Router**, default **OFF**) gates all
 scheduled releases, cards, stale messages, pushes and loop badge counts. Tools and
 RPC remain usable for testing while disabled. Enable only after the UI is ready.
 
