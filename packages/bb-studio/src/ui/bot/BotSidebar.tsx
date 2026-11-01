@@ -29,6 +29,7 @@ import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
 import { KIND } from "./Automations";
 import { forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
+import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName, sidebarAgenda, sidebarTime, type SidebarAgendaItem } from "./sidebarAgenda";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
@@ -301,6 +302,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
       </div>
 
       <div className="mt-2 ml-3 flex flex-col gap-2.5 border-l pl-1.5" style={{ borderColor: "color-mix(in oklab, var(--bot-accent) 35%, transparent)" }}>
+        {bot.primary !== false ? <AllLoopsRow botId={bot.id} onNavigate={onNavigate} /> : null}
         {groups.running.length ? <Group id="running" title="Running" closed={layout.closed} onToggle={toggle}>{tree(groups.running)}</Group> : null}
         {groups.waiting.length ? <Group id="waiting" title="Waiting to start" closed={layout.closed} onToggle={toggle}>{tree(groups.waiting)}</Group> : null}
         {runners.data?.runners.length ? (
@@ -359,6 +361,27 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * "All loops", the Bot's Loops tab, while the Attention Router is on. There is
+ * no "Needs you" list here (decision 7): the Bot row's badge counts what waits.
+ */
+function AllLoopsRow({ botId, onNavigate }: { botId: string; onNavigate(): void }) {
+  const enabled = useLoopsEnabled();
+  const pathname = usePathname();
+  const list = useLive("loops.list", {}, { enabled, pollMs: 60_000 });
+  if (!enabled) return null;
+  const open = list.data ? list.data.needsYouNow.length + list.data.comingUp.length + list.data.agentsOnIt.length + list.data.waitingOnOthers.length : 0;
+  const current = isLoopsPath(pathname) && pathname.includes(`/${encodeURIComponent(botId)}/`);
+  return (
+    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { openAppPath(loopsPath(botId)); onNavigate(); }}
+      className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
+      <Icon name="ListTodo" className="size-3.5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">All loops</span>
+      {open ? <span className="shrink-0 text-[11px] tabular-nums">{open}</span> : null}
+    </button>
   );
 }
 

@@ -20,6 +20,10 @@ import { ProfileChanges } from "./ProfileChanges";
 import { BotMaintenance } from "./BotMaintenance";
 import { BotCacheSection } from "./BotCache";
 import { BOT_INFO_ACTION, useOpenThread } from "./workspace";
+import { usePathname, openAppPath } from "../../kit/app/index";
+import { LoopsTab, usePendingQuestions } from "../../loops/ui/LoopsTab";
+import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
+import { botPath } from "./selection";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 
@@ -33,7 +37,7 @@ function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
     <div className="studio-root h-full min-h-0 bg-background">
       <style>{BOT_STYLES}</style>
       <div className="mx-auto h-full w-full max-w-2xl">
-        <Info view={view} refresh={refresh} />
+        <Info view={view} refresh={refresh} page />
       </div>
     </div>
   );
@@ -69,7 +73,11 @@ export function BotInfo({ botId, threadId }: { botId: string; threadId?: string 
 }
 
 /** `threadId`: the thread it shows beside, if any (Open chat hides on the chat itself). */
-function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; threadId?: string }) {
+function Info({ view, refresh, threadId, page = false }: { view: BotView; refresh(): void; threadId?: string; page?: boolean }) {
+  // The Bot page has Info | Loops for the primary Bot while the Attention Router is on.
+  const pathname = usePathname();
+  const loopsOn = useLoopsEnabled() && page && view.bot!.primary !== false;
+  const onLoops = loopsOn && isLoopsPath(pathname);
   const activity = useLive("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, toggleSkills, skills, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
@@ -115,6 +123,8 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
       </div>
       {error ? <p role="alert" className="px-4 pb-2 text-xs text-destructive">{error}</p> : null}
       {!bot.threadId ? <p className="px-4 pb-2 text-xs text-muted-foreground">{bot.name} has no chat.{bot.primary === false ? "" : " Make a thread your Bot from its ⋯ menu."}</p> : null}
+      {loopsOn ? <PageTabs botId={bot.id} threadId={bot.threadId} loops={onLoops} /> : null}
+      {onLoops ? <LoopsTab /> : <>
 
       <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
         {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
@@ -133,6 +143,7 @@ function Info({ view, refresh, threadId }: { view: BotView; refresh(): void; thr
 
       <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
       <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} providers={providers} />
+      </>}
       {sheets}
     </div>
   );
@@ -144,6 +155,22 @@ function InfoRow({ label, value, action }: { label: string; value: string; actio
       <dt className="w-20 shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 flex-1 truncate">{value}</dd>
       {action ? <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={action.run} aria-label={`${action.label} ${label.toLowerCase()}`}>{action.label}</button> : null}
+    </div>
+  );
+}
+
+/** Info | Loops under the Bot's header; Loops counts what needs Patrick now. */
+function PageTabs({ botId, threadId, loops }: { botId: string; threadId: string | null; loops: boolean }) {
+  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const pending = usePendingQuestions(threadId);
+  const needs = list.data ? list.data.needsYouNow.length + pending.filter((question) => !list.data!.needsYouNow.some((loop) => loop.source?.kind === "interaction" && loop.source.ref === question.id)).length : 0;
+  const tab = "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground";
+  return (
+    <div role="tablist" aria-label="Bot page" className="flex items-center gap-1 px-4 pb-3">
+      <button type="button" role="tab" aria-selected={!loops} className={tab} onClick={() => openAppPath(botPath(botId))}>Info</button>
+      <button type="button" role="tab" aria-selected={loops} className={tab} data-testid="bot-loops-tab" onClick={() => openAppPath(loopsPath(botId))}>
+        Loops{needs ? <span className="rounded-full bg-warning px-1.5 text-[11px] font-medium leading-4 text-background tabular-nums">{needs}</span> : null}
+      </button>
     </div>
   );
 }

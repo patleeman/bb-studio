@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn((_threadId: string) => {}),
   openThreadPanel: vi.fn((_options: unknown) => true),
   pathname: "/plugins/studio/studio/bot",
+  settings: {} as Record<string, unknown>,
   prefs: { value: "studio/bot", revision: 1 },
   setPref: vi.fn(async (_args: unknown) => ({})),
   /** BB's threads: id → project (missing: gone). Empty: sdk.threads.get fails, as before it was mocked. */
@@ -33,6 +34,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
   useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel, toCompose: state.toCompose }),
   useSdk: () => sdk,
+  useSettings: () => ({ values: state.settings }),
   experimental_useSidebarThreads: () => state.sidebarThreads,
   experimental_ThreadActionsContextMenu: ({ children, requestRename, thread }: { children: React.ReactNode; requestRename(id: string): void; thread: { id: string } }) =>
     React.createElement("div", { "data-menu-for": thread.id }, children, React.createElement("button", { type: "button", "data-rename": thread.id, onClick: () => requestRename(thread.id) }, "rename")),
@@ -47,7 +49,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
   experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
-const sdk = { threads: { update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
+const sdk = { projects: { list: async () => [] }, threads: { interactions: { list: async () => [] }, update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };
 } }, system: { uiPreferences: {
@@ -80,6 +82,10 @@ vi.mock("../../kit/ui/index", () => ({
   DialogFooter: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => React.createElement("h2", null, children),
   DialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement("p", null, children),
+  Popover: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
+  PopoverContent: () => null,
+  Checkbox: () => null,
 }));
 
 const { ActivityPanel, BOT_PATH } = await import("./BotHome");
@@ -95,6 +101,7 @@ beforeEach(() => {
   state.toThread.mockClear();
   state.openThreadPanel.mockClear();
   state.pathname = "/plugins/studio/studio/bot";
+  state.settings = {};
   state.setPref.mockClear();
   state.activate.mockClear();
   state.inputs = [];
@@ -844,4 +851,47 @@ test("Schedule runner rows show machine and offline metadata even without runner
   expect(matched.tagName).toBe("BUTTON");
   expect(matched.textContent).toContain("Security · red4");
   expect(matched.textContent).toContain("offline");
+});
+
+const loop = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, title, why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: null, createdAt: 1, updatedAt: 1, closedAt: null, closedBy: null, ...extra });
+const loopGroups = { needsYouNow: [loop("loop_a", "Pay the property tax")], comingUp: [loop("loop_b", "Call the plumber", { status: "queued", trigger: { type: "place", place: "home", direction: "arrive" } })], agentsOnIt: [], waitingOnOthers: [], done: [] };
+
+test("Attention Router off: no Loops tab on the Bot page and no All loops row", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups };
+  state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
+  await show(<BotPanel />);
+  expect(container.querySelector("[role=tablist]")).toBeNull();
+  expect(container.querySelector("[data-testid=loops-tab]")).toBeNull();
+  await show(<BotThreadList {...listProps} />);
+  expect(container.querySelector("[data-testid=bot-all-loops]")).toBeNull();
+});
+
+test("Attention Router on: Info | Loops on the Bot page, the count of what needs you, and Loops at its own address", async () => {
+  state.settings = { loopsEnabled: true };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups };
+  await show(<BotPanel />);
+  const tabs = [...container.querySelectorAll("[role=tab]")];
+  expect(tabs.map((tab) => tab.textContent)).toEqual(["Info", "Loops1"]);
+  expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
+  expect(container.textContent).toContain("Activity");
+  const { openAppPath } = await import("../../kit/app/index");
+  act(() => click(tabs[1]));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main/loops");
+  state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
+  await show(<BotPanel />);
+  expect(container.querySelector("[data-testid=loops-tab]")?.textContent).toContain("Pay the property tax");
+  expect(container.textContent).not.toContain("Activity");
+});
+
+test("the sidebar has an All loops row under the primary Bot, with its open count, and no Needs you list", async () => {
+  state.settings = { loopsEnabled: true };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, attention: { reason: "1 loop needs you", count: 1, since: Date.now() } }, "loops.list": loopGroups };
+  await show(<BotThreadList {...listProps} />);
+  const row = container.querySelector("[data-testid=bot-all-loops]")!;
+  expect(row.textContent).toBe("All loops2");
+  expect(container.querySelector('section[aria-label="Needs you"]')).toBeNull();
+  expect(container.querySelector("[data-testid=bot-main] [data-testid=bot-attention]")).not.toBeNull();
+  const { openAppPath } = await import("../../kit/app/index");
+  act(() => click(row));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main/loops");
 });
