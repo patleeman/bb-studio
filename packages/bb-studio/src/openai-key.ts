@@ -1,6 +1,7 @@
-// Studio's one OpenAI API key for Bot avatars (gpt-image). It stays secret on
-// the server and falls back to OPENAI_API_KEY on the BB host. Never log it,
-// and never put it in an RPC answer.
+// Studio's one OpenAI API key: Bot avatars (gpt-image) and hands-free voice
+// (GPT-Live and the Realtime API) use it. It stays secret on the server and
+// falls back to OPENAI_API_KEY on the BB host. Never log it, and never put it
+// in an RPC answer: voice clients get at most a 2-minute Realtime secret.
 //
 // It replaces "Bot avatars: OpenAI API key" (botAvatarOpenaiApiKey). That
 // setting stays defined so its stored value can still be read: while the new
@@ -11,7 +12,7 @@ export const OPENAI_KEY_SETTING = "openaiApiKey";
 export const LEGACY_OPENAI_KEY_SETTING = "botAvatarOpenaiApiKey";
 
 export const OPENAI_KEY_SETTINGS = {
-  [OPENAI_KEY_SETTING]: { type: "string", label: "OpenAI API key", description: "Used for Bot avatars (gpt-image, about 1¢ an image). Stays on the BB server. Falls back to OPENAI_API_KEY on the BB host.", secret: true, default: "" },
+  [OPENAI_KEY_SETTING]: { type: "string", label: "OpenAI API key", description: "Used for Bot avatars (gpt-image, about 1¢ an image) and hands-free voice (GPT-Live or the Realtime API). Stays on the BB server. Falls back to OPENAI_API_KEY on the BB host.", secret: true, default: "" },
   [LEGACY_OPENAI_KEY_SETTING]: { type: "string", label: "Bot avatars: OpenAI API key (moved)", description: "Replaced by OpenAI API key above. Studio copies a key from here into it and clears this one.", secret: true, default: "" },
 } as const;
 

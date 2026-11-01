@@ -25,7 +25,11 @@ import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { SPEECH_SETTINGS } from "./src/speech/settings";
 import { registerSpeech } from "./src/speech/register";
 import { registerVoice, type BuiltinVoice } from "./src/voice/register";
-import { migrateOpenaiKey } from "./src/openai-key";
+import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
+import { VOICE_LIVE_SETTINGS, VoiceLive } from "./src/voice/live/live";
+import { registerVoiceLive } from "./src/voice/live/register";
+import { resolveTarget } from "./src/voice/live/targets";
+import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
 import { subcommand, usage } from "./src/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -174,7 +178,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
   // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread
   // resume's, plus Decisions under namespaced keys.
-  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS });
+  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS, ...VOICE_LIVE_SETTINGS });
   const code = registerCode(bb, db);
   // BB allows one message.dispatch hook per plugin; Decisions owns it and asks
   // the runner guard (assigned below, once runners exist) first.
@@ -1256,6 +1260,53 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   registerBotProfileTools(bb, { bots, acting, imageProvider: () => pickImageProvider({ settings: settingValues }) });
+  // Hands-free voice (src/voice/live): a speech-to-speech voice agent on the
+  // phone whose tools run here, relaying visibly to the Bot and threads.
+  const voiceLive = new VoiceLive({
+    db,
+    key: () => openaiKey(settingValues),
+    settings: () => settingValues,
+    cos: () => { const bot = bots.stored(); return bot ? { name: bot.name, threadId: bot.threadId ?? null } : null; },
+    resolve: async (name) => {
+      const bot = bots.stored();
+      const projects = new Map(((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).map((project) => [project.id, project.name]));
+      const leads = projectLeads.list().filter((lead) => lead.projectId !== PERSONAL_PROJECT_ID && lead.leadThreadId).map((lead) => ({ project: projects.get(lead.projectId) ?? lead.projectId, threadId: lead.leadThreadId! }));
+      const threads = ((await bb.sdk.threads.list({ archived: false, limit: 100 }).catch(() => [])) as { id: string; title?: string | null; titleFallback?: string | null; latestAttentionAt?: number }[])
+        .sort((a, b) => (b.latestAttentionAt ?? 0) - (a.latestAttentionAt ?? 0)).map((thread) => ({ id: thread.id, title: thread.title || thread.titleFallback || "" })).filter((thread) => thread.title);
+      return resolveTarget(name, { cos: bot ? { name: bot.name, threadId: bot.threadId ?? null } : null, leads, threads });
+    },
+    latestReply: async (threadId) => {
+      const [thread, output] = await Promise.all([bb.sdk.threads.get({ threadId }), bb.sdk.threads.output({ threadId })]);
+      return { title: (thread as { title?: string | null }).title || threadId, text: output.output ?? "" };
+    },
+    loops: {
+      groups: () => loops.store.groups(),
+      get: (id) => loops.store.get(id),
+      act: (id, action, snooze) => loops.act({ id, action, ...(snooze ? { snooze: snooze as never } : {}) }),
+      restore: (id, before) => loops.store.update(id, before as never),
+    },
+    openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
+      projectId: PERSONAL_PROJECT_ID, title,
+      environment: { type: "host", workspace: { type: "unmanaged", path: null } },
+      pluginMetadata: { voiceLive: true },
+      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
+    } as never)).id,
+    send: ({ threadId, senderThreadId, text, note, mode }) => bb.sdk.threads.send({
+      threadId, mode, ...(senderThreadId ? { senderThreadId } : {}),
+      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
+    } as never).then(() => undefined),
+    push: async ({ title, body, threadId, coalesceKey }) => {
+      await bb.sdk.plugins.callRpc({
+        pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
+        input: { title, body: body.slice(0, 4000), kind: "turn-finished", threadId, projectId: PERSONAL_PROJECT_ID, coalesceKey } as never,
+      });
+    },
+    publish: (signal) => bb.realtime.publish(VOICE_LIVE_CHANNEL, signal),
+    // Staged BBs only: a scripted mock server stands in for OpenAI (scripts/voice-mock).
+    mockUrl: () => process.env.STUDIO_VOICE_MOCK_URL?.trim() || null,
+    warn: (message) => bb.log.warn(message),
+  });
+  registerVoiceLive(bb, voiceLive);
   // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.
   bb.http.route("GET", AVATAR_ROUTE, (context) => {
     const image = bots.avatarImage(context.req.query("bot") ?? "", context.req.query("image") ?? "");

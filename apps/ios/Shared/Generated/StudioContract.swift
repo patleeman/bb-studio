@@ -316,6 +316,12 @@ public enum Studio {
     public static let voice_set = "voice.set"
     public static let voice_conversational = "voice.conversational"
     public static let voice_turnNote = "voice.turnNote"
+    public static let voiceLive_state = "voiceLive.state"
+    public static let voiceLive_start = "voiceLive.start"
+    public static let voiceLive_tool = "voiceLive.tool"
+    public static let voiceLive_event = "voiceLive.event"
+    public static let voiceLive_poll = "voiceLive.poll"
+    public static let voiceLive_end = "voiceLive.end"
   }
 
   public typealias LoopsList = LoopsListOutput
@@ -1007,6 +1013,18 @@ public enum Studio {
   public typealias VoiceConversational = VoiceConversationalOutput
 
   public typealias VoiceTurnNote = VoiceTurnNoteOutput
+
+  public typealias VoiceLiveState = VoiceLiveStateOutput
+
+  public typealias VoiceLiveStart = VoiceLiveStartOutput
+
+  public typealias VoiceLiveTool = VoiceLiveToolOutput
+
+  public typealias VoiceLiveEvent = VoiceLiveEventOutput
+
+  public typealias VoiceLivePoll = VoiceLivePollOutput
+
+  public typealias VoiceLiveEnd = VoiceLiveEndOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -27051,6 +27069,339 @@ public enum Studio {
 
     public init(note: String? = nil) {
       self.note = note
+    }
+  }
+
+  public struct VoiceLiveStateInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public enum VoiceLiveStateOutputModel: Sendable, Hashable, Codable {
+    case gpt_live_1
+    case gpt_realtime_2_1
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-live-1": self = .gpt_live_1
+      case "gpt-realtime-2.1": self = .gpt_realtime_2_1
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_live_1: try container.encode("gpt-live-1")
+      case .gpt_realtime_2_1: try container.encode("gpt-realtime-2.1")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveStateOutput: Sendable, Hashable, Codable {
+    public var ready: Bool?
+    public var problem: String?
+    public var cosName: String?
+    public var monthUsd: Double?
+    public var capUsd: Double?
+    public var model: VoiceLiveStateOutputModel?
+
+    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveStateOutputModel? = nil) {
+      self.ready = ready
+      self.problem = problem
+      self.cosName = cosName
+      self.monthUsd = monthUsd
+      self.capUsd = capUsd
+      self.model = model
+    }
+  }
+
+  public enum VoiceLiveStartInputModel: Sendable, Hashable, Codable {
+    case gpt_live_1
+    case gpt_realtime_2_1
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-live-1": self = .gpt_live_1
+      case "gpt-realtime-2.1": self = .gpt_realtime_2_1
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_live_1: try container.encode("gpt-live-1")
+      case .gpt_realtime_2_1: try container.encode("gpt-realtime-2.1")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveStartInput: Sendable, Hashable, Codable {
+    public var model: VoiceLiveStartInputModel?
+    public var sdp: String?
+
+    public init(model: VoiceLiveStartInputModel? = nil, sdp: String? = nil) {
+      self.model = model
+      self.sdp = sdp
+    }
+  }
+
+  public enum VoiceLiveStartOutputModel: Sendable, Hashable, Codable {
+    case gpt_live_1
+    case gpt_realtime_2_1
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-live-1": self = .gpt_live_1
+      case "gpt-realtime-2.1": self = .gpt_realtime_2_1
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_live_1: try container.encode("gpt-live-1")
+      case .gpt_realtime_2_1: try container.encode("gpt-realtime-2.1")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum VoiceLiveStartOutputTransport: Sendable, Hashable, Codable {
+    case live_webrtc
+    case realtime_webrtc
+    case mock
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "live-webrtc": self = .live_webrtc
+      case "realtime-webrtc": self = .realtime_webrtc
+      case "mock": self = .mock
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .live_webrtc: try container.encode("live-webrtc")
+      case .realtime_webrtc: try container.encode("realtime-webrtc")
+      case .mock: try container.encode("mock")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveStartOutput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var model: VoiceLiveStartOutputModel?
+    public var transport: VoiceLiveStartOutputTransport?
+    public var answerSdp: String?
+    public var clientSecret: String?
+    public var expiresAt: Double?
+    public var callsUrl: String?
+    public var mockUrl: String?
+    public var voiceThreadId: String?
+    public var cosName: String?
+
+    public init(sessionId: String? = nil, model: VoiceLiveStartOutputModel? = nil, transport: VoiceLiveStartOutputTransport? = nil, answerSdp: String? = nil, clientSecret: String? = nil, expiresAt: Double? = nil, callsUrl: String? = nil, mockUrl: String? = nil, voiceThreadId: String? = nil, cosName: String? = nil) {
+      self.sessionId = sessionId
+      self.model = model
+      self.transport = transport
+      self.answerSdp = answerSdp
+      self.clientSecret = clientSecret
+      self.expiresAt = expiresAt
+      self.callsUrl = callsUrl
+      self.mockUrl = mockUrl
+      self.voiceThreadId = voiceThreadId
+      self.cosName = cosName
+    }
+  }
+
+  public struct VoiceLiveToolInput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var name: String?
+    public var args: String?
+    public var events: [StudioJSONValue]?
+
+    public init(sessionId: String? = nil, name: String? = nil, args: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.sessionId = sessionId
+      self.name = name
+      self.args = args
+      self.events = events
+    }
+  }
+
+  public struct VoiceLiveToolOutput: Sendable, Hashable, Codable {
+    public var output: String?
+
+    public init(output: String? = nil) {
+      self.output = output
+    }
+  }
+
+  public struct VoiceLiveEventInput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var events: [StudioJSONValue]?
+
+    public init(sessionId: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.sessionId = sessionId
+      self.events = events
+    }
+  }
+
+  public struct VoiceLiveEventOutput: Sendable, Hashable, Codable {
+    public var costUsd: Double?
+    public var replies: Int?
+    public var stop: String?
+
+    public init(costUsd: Double? = nil, replies: Int? = nil, stop: String? = nil) {
+      self.costUsd = costUsd
+      self.replies = replies
+      self.stop = stop
+    }
+  }
+
+  public struct VoiceLivePollInput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+
+    public init(sessionId: String? = nil) {
+      self.sessionId = sessionId
+    }
+  }
+
+  public struct VoiceLivePollOutputRepliesItem: Sendable, Hashable, Codable {
+    public var id: Int?
+    public var title: String?
+    public var summary: String?
+    public var note: String?
+
+    public init(id: Int? = nil, title: String? = nil, summary: String? = nil, note: String? = nil) {
+      self.id = id
+      self.title = title
+      self.summary = summary
+      self.note = note
+    }
+  }
+
+  public struct VoiceLivePollOutput: Sendable, Hashable, Codable {
+    public var replies: [VoiceLivePollOutputRepliesItem]?
+
+    public init(replies: [VoiceLivePollOutputRepliesItem]? = nil) {
+      self.replies = replies
+    }
+  }
+
+  public struct VoiceLiveEndInput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var events: [StudioJSONValue]?
+
+    public init(sessionId: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.sessionId = sessionId
+      self.events = events
+    }
+  }
+
+  public enum VoiceLiveEndOutputTranscriptItemRole: Sendable, Hashable, Codable {
+    case user
+    case assistant
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "assistant": self = .assistant
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .assistant: try container.encode("assistant")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveEndOutputTranscriptItem: Sendable, Hashable, Codable {
+    public var role: VoiceLiveEndOutputTranscriptItemRole?
+    public var text: String?
+    public var at: Double?
+
+    public init(role: VoiceLiveEndOutputTranscriptItemRole? = nil, text: String? = nil, at: Double? = nil) {
+      self.role = role
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceLiveEndOutputSentItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var message: String?
+    public var at: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, message: String? = nil, at: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.message = message
+      self.at = at
+    }
+  }
+
+  public struct VoiceLiveEndOutputRepliesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var text: String?
+    public var at: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, text: String? = nil, at: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.text = text
+      self.at = at
+    }
+  }
+
+  public struct VoiceLiveEndOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var model: String?
+    public var voiceThreadId: String?
+    public var startedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var costUsd: Double?
+    public var transcript: [VoiceLiveEndOutputTranscriptItem]?
+    public var sent: [VoiceLiveEndOutputSentItem]?
+    public var replies: [VoiceLiveEndOutputRepliesItem]?
+
+    public init(id: String? = nil, model: String? = nil, voiceThreadId: String? = nil, startedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, costUsd: Double? = nil, transcript: [VoiceLiveEndOutputTranscriptItem]? = nil, sent: [VoiceLiveEndOutputSentItem]? = nil, replies: [VoiceLiveEndOutputRepliesItem]? = nil) {
+      self.id = id
+      self.model = model
+      self.voiceThreadId = voiceThreadId
+      self.startedAt = startedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.costUsd = costUsd
+      self.transcript = transcript
+      self.sent = sent
+      self.replies = replies
     }
   }
 

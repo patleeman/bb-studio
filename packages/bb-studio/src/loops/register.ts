@@ -50,5 +50,5 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
   search:({query})=>{const q=query.trim().toLowerCase();const g=store.groups();return [...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].filter(l=>!q||l.title.toLowerCase().includes(q)).map(l=>({id:l.id,title:l.title,subtitle:l.closedAt?'Done':KIND[l.kind].label,icon:KIND[l.kind].icon}));},
   resolve:(id)=>{try{return {context:loopContext(store.get(id))};}catch{return {context:`Patrick mentioned loop ${id}, which no longer exists.`};}}}));
  const timer=setInterval(tick,60_000);bb.onDispose(()=>clearInterval(timer));
- return {store,scheduler,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
+ return {store,scheduler,act:action,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
 }
