@@ -68,6 +68,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         NotificationActions.register()
+        // iOS relaunches the app in the background for a place's region event.
+        PlaceMonitor.shared.start()
         #if targetEnvironment(simulator)
         return true
         #else

@@ -80,6 +80,7 @@ are unchanged, and old `bbgo://` links still open.
 | Capture to BB opens one sheet for voice, dictation, a note, a photo or file, or a new thread. Add it in Settings → Action Button → Controls; it is also available in Control Center, Shortcuts, and Siri. | `iOS/Capture/CaptureSheet.swift`, `Widgets/Controls.swift` |
 | Control Center and lock screen controls: Dictate, New thread | `Widgets/Controls.swift` |
 | The BB Studio theme's coral accent (#c7431a light, #ff7a45 dark, from the Silk S icon) on buttons, chips, your messages and unread dots, across the app, widgets, share sheet and watch. BB web views follow the server's theme | `*/Assets.xcassets/AccentColor.colorset`, `project.yml` |
+| Attention Router (Studio's `loopsEnabled`, off by default): `::loop{id}` lines in the Bot's chat are native cards outside the bubbles, by kind: do (Done and Snooze; Hand off and Drop behind ⋯ on the phone, all four on the unfolded Duo), decide (up to 3 options inline, more open a Choose… sheet), read (Got it) and waiting (Nudge them drafts a message for you to send; it never sends). Snooze offers Later today, Tonight, Tomorrow, This weekend, When I'm home and Pick a time…. Cards update in place: handed off they say who is on it with Open thread and Take back; snoozed or closed they collapse to one line, closed ones with Undo. The morning card (one message with `row="1"` loops and `::loops{more}`, docs/attention-router/backend.md) is one card: Calendar, On today's list and Good to know, "N more in Loops" opening Loops. Chat \| Loops under the Bot header (iPhone and folded Duo; on the unfolded Duo, All loops in the left pane, the chat on the right): Add a loop, area chips and an owner menu, Needs you now (with a question the Bot asked in its chat, read-only, counted once), Coming up, Agents on it, Waiting on others and Done; each row's buttons plus Change trigger (Time, Event, Place or Anytime, and Send to iPhone) and Surface now. Off: no Loops, and cards are a quiet "Attention Router is off". `BB_LOOP` pushes get buttons by kind (Done or Got it, Snooze until tonight, Snooze until I'm home, and up to 3 decide options, from the notification extension) that call `loops.act` in the background. Settings ▸ Places: Home, Office and saved places (a map pin or the current location, with a radius) kept on the phone; region monitoring (at most 20) sends Studio only "arrived at/left <name>" (`loops.place`) and the names (`loops.setPlaces`), never coordinates. Location access is explained before iOS asks, in its two steps (While Using, then Always). `-qaBotDemo chat -qaLoopsDemo [off]` (`-qaLoopsEmpty`) and `-qaPlacesDemo` draw it all offline | `iOS/Loops`, `NotificationService/LoopCategories.swift`, `iOS/Bot/BotTab.swift` |
 | Home and lock screen status widgets: what needs you is the Bot's attention (`bot_attention`: its count, and its reason such as "Asked you a question" as the headline, opening the Bot), then what's running. From a Studio without `bot_attention`, or when it fails, they count BB's threads waiting on you as before. `-qaStateDemo widgets` draws the widget's view in the app for screenshots | `Widgets/StatusWidget.swift`, `Shared/ThreadSummary.swift` (`NeedsYouCount`) |
 | Work widget: the Bot's attention (its reason, opening the Bot; BB's waiting threads on an older Studio) and approvals, and running agents. Tap a thread or review link to open it | `Widgets/WorkWidget.swift` |
 | Spotlight indexes open threads and Studio pages, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
@@ -370,6 +371,14 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 `-qaShelfDemo` (Debug builds) fills every thread's shelf with sample cards.
 
 ### Testing
+
+`LoopsUITests` checks the Attention Router offline (`-qaLoopsDemo`): card
+actions, Snooze, Hand off, Nudge, the morning card, the Loops screen and
+Change trigger, the setting turned off and Places on an iPhone simulator, and
+Chat \| Loops and the left-pane Loops on an iPhone Duo simulator (folded and
+unfolded). Set `TEST_RUNNER_BBGO_STATES_OUT` to keep PNGs; the Duo's land in
+the app's Documents as `loops-duo-*.png`. Places never asks for location in
+tests: `-qaPlacesDemo` uses no Core Location at all.
 
 Set `STAGED_SERVER_URL` in the examples below to your isolated staged BB's URL.
 Server-backed UI tests require `TEST_RUNNER_BBGO_QA_SERVER` to name an isolated

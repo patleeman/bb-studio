@@ -57,6 +57,10 @@
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Studio notices when you arrive at or leave your saved places, so loops can wait for the right place. Only the place name leaves this iPhone.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>With Always, Studio notices arriving home or leaving the office even when it's closed. Only the place name leaves this iPhone, never where you are.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

@@ -17,6 +17,7 @@ final class NotificationService: UNNotificationServiceExtension {
         self.contentHandler = contentHandler
         self.content = content
         let info = content.userInfo
+        if content.categoryIdentifier == LoopCategories.category { return loop(content) }
         guard content.categoryIdentifier == "BB_CHOICE", let choices = info["choices"] as? [String], !choices.isEmpty
         else { return finish() }
 
@@ -41,6 +42,31 @@ final class NotificationService: UNNotificationServiceExtension {
                 .union([UNNotificationCategory(identifier: identifier, actions: actions, intentIdentifiers: [])])
             center.setNotificationCategories(categories)
             // Reading back waits until iOS has stored the category, so the notification can use it.
+            center.getNotificationCategories { _ in
+                content.categoryIdentifier = identifier
+                self.finish()
+            }
+        }
+    }
+
+    /// An Attention Router push: buttons by the loop's kind, and one per
+    /// option for a decision, in a category made for those options.
+    private func loop(_ content: UNMutableNotificationContent) {
+        let kind = content.userInfo["loopKind"] as? String
+        let options = content.userInfo["options"] as? [String] ?? []
+        let identifier = LoopCategories.identifier(kind: kind, options: options)
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationCategories { existing in
+            guard !existing.contains(where: { $0.identifier == identifier }) else {
+                content.categoryIdentifier = identifier
+                return self.finish()
+            }
+            var dynamic = existing.filter { $0.identifier.hasPrefix(LoopCategories.category + ".decide.") }
+            if dynamic.count >= 20 { dynamic = [] }
+            let categories = existing.filter { !$0.identifier.hasPrefix(LoopCategories.category + ".decide.") }
+                .union(dynamic)
+                .union([UNNotificationCategory(identifier: identifier, actions: LoopCategories.actions(kind: kind, options: options), intentIdentifiers: [])])
+            center.setNotificationCategories(categories)
             center.getNotificationCategories { _ in
                 content.categoryIdentifier = identifier
                 self.finish()

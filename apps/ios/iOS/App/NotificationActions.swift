@@ -14,7 +14,9 @@ enum NotificationActions {
         // Keep the extension's option categories, or delivered questions lose their buttons.
         let center = UNUserNotificationCenter.current()
         center.getNotificationCategories { existing in
-            center.setNotificationCategories(fixed.union(existing.filter { $0.identifier.hasPrefix("BB_CHOICE.") }))
+            center.setNotificationCategories(fixed.union(existing.filter {
+                $0.identifier.hasPrefix("BB_CHOICE.") || $0.identifier.hasPrefix(LoopCategories.category + ".decide.")
+            }))
         }
     }
 
@@ -49,12 +51,13 @@ enum NotificationActions {
             // The extension swaps in a per-options category; this is the fallback if it doesn't run.
             UNNotificationCategory(identifier: "BB_CHOICE", actions: [answer], intentIdentifiers: []),
         ]
-        return fixed
+        return fixed.union(LoopCategories.fixed())
     }
 
     /// Runs a lock-screen action. Returns false when the app should open the thread instead.
     static func handle(_ response: UNNotificationResponse) async -> Bool {
         let info = response.notification.request.content.userInfo
+        if response.actionIdentifier.hasPrefix(LoopCategories.prefix) { return await LoopNotifications.handle(response) }
         guard let threadId = info["threadId"] as? String else { return false }
         let interactionId = info["interactionId"] as? String
         guard [approve, deny, reply].contains(response.actionIdentifier) || response.actionIdentifier.hasPrefix(choicePrefix) else { return false }
@@ -120,7 +123,7 @@ enum NotificationActions {
     }
 
     /// A quiet follow-up notification when an action fails.
-    private static func confirm(_ threadId: String, _ body: String, serverId: String?) async {
+    static func confirm(_ threadId: String, _ body: String, serverId: String?) async {
         let content = UNMutableNotificationContent()
         content.title = "BB"
         content.body = body

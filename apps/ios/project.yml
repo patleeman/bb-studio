@@ -28,6 +28,8 @@ targets:
       - path: iOS
       - path: Shared
       - path: LiveActivity
+      # Attention Router push buttons, shared with the notification extension.
+      - path: NotificationService/LoopCategories.swift
       # The status widget's view, for `-qaStateDemo widgets` screenshots of it.
       - path: Widgets/StatusWidget.swift
     settings:
