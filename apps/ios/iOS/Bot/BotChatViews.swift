@@ -162,6 +162,8 @@ struct BotMessageRow: View {
         LinearGradient(colors: [tint, tint.mix(with: .black, by: 0.18)], startPoint: .top, endPoint: .bottom)
     }
 
+    private var hasLoops: Bool { text.contains("::loop") && !LoopDirective.all(in: text).isEmpty }
+
     private var reply: some View {
         // As on the desktop: the avatar and name open the Bot's run.
         HStack(alignment: .top, spacing: 8) {
@@ -175,20 +177,32 @@ struct BotMessageRow: View {
                         .padding(.leading, 12)
                         .accessibilityHidden(true)
                 }
-                MarkdownText(text)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color(uiColor: .secondarySystemBackground), in: bubbleShape(mine: false))
-                    .contentShape(.contextMenuPreview, bubbleShape(mine: false))
-                    .contextMenu { menu }
+                if hasLoops {
+                    // Loop cards stand on their own between the reply's bubbles.
+                    LoopMessage(text: text) { AnyView(bubble($0)) }
+                        .environment(\.loopDraft, { app.draftForBot($0) })
+                } else {
+                    bubble(text)
+                }
                 let reactions = Directive.reactions(in: text)
                 if !reactions.isEmpty { ReactionChips(items: reactions, react: react).padding(.top, 4) }
                 if let sideThread, let replyInThread { BotSideThreadRow(thread: sideThread, tint: tint, open: replyInThread) }
             }
-            Spacer(minLength: 24)
+            // Loop cards take the row's width; a Spacer would split it with them.
+            if !hasLoops { Spacer(minLength: 24) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(bot.name): \(plainText)")
+    }
+
+    /// The reply's text in its bubble.
+    private func bubble(_ text: String) -> some View {
+        MarkdownText(text)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color(uiColor: .secondarySystemBackground), in: bubbleShape(mine: false))
+            .contentShape(.contextMenuPreview, bubbleShape(mine: false))
+            .contextMenu { menu }
     }
 
     /// Bubbles in a run tuck their corners on the side of the sender.

@@ -346,7 +346,7 @@ enum BotDemo {
                 lead: ThreadLead(threadId: threadId), shape: "blob", color: "#2ba59a", role: "Keeps the launch on track.") : nil
             let duoActivity = args.contains("-qaDuoLong") ? activity(needs: true) : wideTitles ? activity(needs: false) : nil
             return Fixture(bot: phoneBot, activity: duoActivity, thread: thread(running: false, needs: question),
-                           rows: args.contains("-qaDuoLong") || question ? longRows : transcript, interactions: question ? questionInteractions : [])
+                           rows: (args.contains("-qaDuoLong") || question ? longRows : transcript) + loopRows(), interactions: question ? questionInteractions : [])
         }
         let running = variant == "working"
         let bot = variant == "onboarding" ? nil : BotInfo(
@@ -360,7 +360,7 @@ enum BotDemo {
                            rows: longRows, interactions: questionInteractions)
         }
         return Fixture(bot: bot, activity: activity(needs: variant == "needs"), thread: thread(running: running, needs: variant == "needs"),
-                       rows: served != nil && variant == "chat" ? longRows : rows(variant), interactions: variant == "needs" ? interactions : [])
+                       rows: (served != nil && variant == "chat" ? longRows : rows(variant)) + loopRows(), interactions: variant == "needs" ? interactions : [])
     }
 
     /// The Bots list: Juniper alone, or with two more for `-qaBotDemo list`.
@@ -398,6 +398,14 @@ enum BotDemo {
          {"id":"run_metrics","providerId":"claude-code","threadId":"thr_runmetrics","name":"Weekly metrics digest","state":"active","schedule":{"cadence":"daily","time":"18:00"},"nextRunAt":\#(now + 86_400_000 + 3_600_000),"lastRunAt":\#(now - 20_000_000),"lastRunStatus":"failed"},
          {"id":"run_news","providerId":"codex","threadId":"thr_runnews","name":"Industry news","state":"paused","schedule":{"cadence":"daily","time":"07:30"},"lastReport":"Quiet day.","lastReportAt":\#(now - 86_400_000 * 3),"lastRunAt":\#(now - 86_400_000 * 3)}]
         """#)
+    }
+
+    /// `-qaLoopsDemo`: the morning card and loop cards at the end of the chat.
+    private static func loopRows() -> [TimelineRow] {
+        let start = now - 300_000
+        return LoopsDemo.messages().enumerated().map { index, message in
+            row(id: "loop-\(index)", role: message.role, text: message.text, at: start + Double(index) * 1_000)
+        }
     }
 
     fileprivate static func decode<T: Decodable>(_ json: String) -> T {

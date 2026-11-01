@@ -107,6 +107,10 @@ final class AppModel: ObservableObject {
     @Published var newThreadDraft: String?
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
     @Published var replyThreadId: String?
+    /// Text for the Bot chat's composer (Nudge them drafts; it never sends).
+    @Published var botDraft: String?
+    /// Set to show the Bot's Loops (the morning card's "N more", `bbstudio://loops`).
+    @Published var botShowsLoops = false
 
     /// The last thread opened.
     var lastThreadId: String {
@@ -197,7 +201,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://dashboard[/<id>]`, `bbstudio://mini[/<id>]`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`).
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`), `bbstudio://loops` (the Bot's Loops).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
@@ -227,6 +231,7 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)
+        case "loops": openLoops()
         case "bot": openBots(id.map { .bot($0) } ?? .primary)
         case "chief", "web": openBots(.primary)
         case "bot-talk", "chief-talk": toggleBotTalk()
@@ -288,6 +293,19 @@ final class AppModel: ObservableObject {
         sheet = nil
         openBots(.primary)
         botTalkPending = true
+    }
+
+    /// The Bot's Loops screen.
+    func openLoops() {
+        if tab != .bot { openBots(.primary) }
+        botShowsLoops = true
+    }
+
+    /// Puts text in the Bot chat's composer and shows the chat.
+    func draftForBot(_ text: String) {
+        botShowsLoops = false
+        if tab != .bot { openBots(.primary) }
+        botDraft = text
     }
 
     func openBots(_ route: BotRoute) {

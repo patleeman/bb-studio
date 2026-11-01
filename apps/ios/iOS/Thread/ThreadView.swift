@@ -1460,6 +1460,12 @@ struct ThreadView: View {
         .padding(.vertical, 8)
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
+        // Nudge them on a loop card drafts here, in the Bot's chat.
+        .onChange(of: app.botDraft, initial: true) { _, text in
+            guard botChrome != nil, let text else { return }
+            draftReply(text)
+            app.botDraft = nil
+        }
         // A `bbstudio://reply/<id>` link lands here.
         .onChange(of: app.replyThreadId, initial: true) { _, id in
             guard id == model.threadId else { return }
