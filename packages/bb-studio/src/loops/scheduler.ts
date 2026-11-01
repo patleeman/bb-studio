@@ -36,6 +36,18 @@ export class LoopScheduler {
   if(!held)count++;return {loop,held};});}
  /** Why each due loop of Patrick's waits (loops.list `held`). */
  held(now=Date.now()){return this.plan(now).flatMap(({loop,held})=>held?[{id:loop.id,reason:held}]:[]);}
+ /**
+  * Patrick pressed Surface now: post the card right away, skipping the
+  * low-priority morning hold and the daily budget (his own ask, so it
+  * isn't an interruption and doesn't count toward the budget). Throws why
+  * when it can't, so the button never silently does nothing.
+  */
+ async surfaceNow(id:string){const l=this.store.get(id);
+ if(!this.settings().enabled)throw Error('The Attention Router is off. Turn it on in Studio settings to surface loops.');
+ if(l.closedAt)throw Error('This loop is already closed.');
+ if(l.owner!=='patrick')throw Error('Only your own loops can be surfaced. Take it back first.');
+ if(l.status!=='surfaced')await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);
+ this.store.event(l.id,'surfaced_by_you');return this.store.update(l.id,{status:'surfaced'});}
  async tick(){if(this.running||!this.settings().enabled)return;this.running=true;try{const now=Date.now(),s=this.settings(),p=local(now,s.timeZone),quiet=this.quiet(now);
  for(const {loop:l,held} of this.plan(now)){if(!this.settings().enabled)return;if(held)continue;
  await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);

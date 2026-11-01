@@ -85,3 +85,24 @@ it('serves loops.list with held reasons and thread owners, and ticks when the At
  expect(list.owners).toEqual(expect.arrayContaining([{owner:'thread:thr_egv6yq7mbp',name:'AI power Long read',threadId:'thr_egv6yq7mbp'},{owner:'thread:thr_gone',name:'A thread that was removed',threadId:null}]));
  expect((await handlers['loops.get']!({id:owned.id}) as {owner?:unknown}).owner).toMatchObject({name:'AI power Long read'});
  expect(store.get(l.id).status).toBe('queued');onChange({loopsEnabled:true});await vi.advanceTimersByTimeAsync(0);expect(store.get(l.id).status).toBe('surfaced');});
+
+it('releases Patrick\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
+ const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
+  settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
+ const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
+ const low=loops.store.add({title:'Tailscale node',priority:'low'});const later=loops.store.add({title:'Later',trigger:{type:'time',at:Date.now()+86400000}});
+ await loops.scheduler.tick();expect(store.get(low.id).status).toBe('queued');expect(loops.scheduler.held()).toEqual([{id:low.id,reason:'morning'}]);
+ post.mockClear();
+ for(const l of [low,later]){const out=await handlers['loops.update']!({id:l.id,surfaceNow:true}) as {status:string};expect(out.status).toBe('surfaced');}
+ expect(post).toHaveBeenCalledTimes(2);expect(post.mock.calls[0]![0]).toContain(`::loop{id="${low.id}"}`);
+ expect(store.groups().needsYouNow.map(l=>l.id)).toEqual(expect.arrayContaining([low.id,later.id]));
+ // Pressing it again doesn't post a second card; it isn't counted against the budget.
+ await handlers['loops.update']!({id:low.id,surfaceNow:true});expect(post).toHaveBeenCalledTimes(2);
+ expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
+ const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own loops');
+ loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
+ onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Attention Router is off');
+ // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
+ const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
+ expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});
