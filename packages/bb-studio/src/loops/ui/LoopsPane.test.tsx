@@ -40,7 +40,7 @@ vi.mock("../../ui/live", () => ({
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({ openAppPath: state.open, ICON_BUTTON: "icon-button" }));
 
-const { LoopsPane, LoopsHeaderAction } = await import("./LoopsPane");
+const { LoopsPane, LoopsHeaderAction, withClosed, closesFromCircle } = await import("./LoopsPane");
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
@@ -188,4 +188,40 @@ it("opens the pane when the sidebar asks the Bot chat's header, now or once the 
   expect(state.openPanel).toHaveBeenCalledTimes(1);
   await act(async () => requestLoopsPane("thr_bot"));
   expect(state.openPanel).toHaveBeenCalledTimes(2);
+});
+
+it("closes a do or read loop in one click on its circle, done in place with Undo", async () => {
+  (state.groups as typeof empty).needsYouNow.push(loop("loop_r", "Your recruiter call moved to Thu", { kind: "read" }));
+  await render();
+  const circle = (title: string) => row(title).querySelector("[role=checkbox]") as HTMLButtonElement | null;
+  // Do and read rows (and Patrick's own coming-up do), not decisions, waits, agents or the Bot's.
+  expect(circle("Reply to Yassine")!.getAttribute("aria-label")).toBe("Mark done: Reply to Yassine about the FDE referral");
+  expect(circle("Reply to Yassine")!.title).toBe("Mark done");
+  expect(circle("Call the plumber")).not.toBeNull();
+  for (const title of ["Choose the deck", "Signed lease", "Draft the Kensico", "Book the car service"]) expect(circle(title)).toBeNull();
+  // The circle shows a check on hover.
+  expect(circle("Reply to Yassine")!.querySelector("[data-icon=Check]")).not.toBeNull();
+  await act(async () => circle("Reply to Yassine")!.click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "done" });
+  const done = container.querySelector("[data-testid=loop-just-done]") as HTMLElement;
+  expect(done.textContent).toContain("Reply to Yassine about the FDE referral");
+  expect(done.textContent).toContain("Done · just now");
+  // Still first in Needs you now, where it was.
+  expect(section("Needs you now").querySelector("[data-testid^=loop-]")).toBe(done);
+  await act(async () => circle("Your recruiter call")!.click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_r", action: "got_it" });
+  await act(async () => buttonIn(done, "Undo").click());
+  expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_n", changes: { status: "surfaced" } });
+  expect(circle("Reply to Yassine")).not.toBeNull();
+});
+
+it("keeps a just-closed loop at its place after the refetch moves it to Done", () => {
+  const a = loop("a", "A"), b = loop("b", "B"), c = loop("c", "C");
+  const closed = new Map([["b", { loop: b, place: "needs" as const, index: 1, action: "done" as const }]]);
+  expect(withClosed([a, c], "needs", closed).map((each) => each.id)).toEqual(["a", "b", "c"]);
+  expect(withClosed([a, b, c], "needs", closed).map((each) => each.id)).toEqual(["a", "b", "c"]);
+  expect(withClosed([a, c], "coming", closed).map((each) => each.id)).toEqual(["a", "c"]);
+  expect(closesFromCircle(loop("x", "X", { kind: "decide" }))).toBe(false);
+  expect(closesFromCircle(loop("x", "X", { kind: "read" }))).toBe(true);
+  expect(closesFromCircle(loop("x", "X", { owner: "cos" }))).toBe(false);
 });

@@ -45,6 +45,17 @@ function Board({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
   const [showAllDone, setShowAllDone] = useState(false);
   const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, unread, open, chat, needs, nextAt, row, add, filtered } = useLoopsBoard();
+  // Loops closed from their circle stay where they were, done with Undo,
+  // until the pane closes; the refetch has moved them to Done by then.
+  const [closed, setClosed] = useState<ReadonlyMap<string, Closed>>(new Map());
+  const close = (entry: Closed) => setClosed((current) => new Map(current).set(entry.loop.id, entry));
+  const reopen = (id: string) => setClosed((current) => { const next = new Map(current); next.delete(id); return next; });
+  const lines = (loops: Loop[], place: Place) => withClosed(loops, place, closed).map((loop, index) => {
+    const done = closed.get(loop.id);
+    return done ? <JustDoneLine key={loop.id} entry={done} refresh={row.refresh} onUndone={() => reopen(loop.id)} />
+      : <LoopLine key={loop.id} loop={loop} place={place} {...row} onClosed={(action) => close({ loop, place, index, action })} />;
+  });
+  const kept = (place: Place) => [...closed.values()].some((each) => each.place === place);
   // Beside the Bot's own chat, its questions and replies are right there.
   const besideChat = !!people.botThreadId && people.botThreadId === threadId;
   const openChat = people.botThreadId && !besideChat
@@ -82,14 +93,14 @@ function Board({ threadId }: { threadId: string }) {
     <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-6">
       {list.error ? <p role="alert" className="px-3 pt-2 text-xs text-destructive">{list.error}</p> : null}
       {!groups ? <div className="m-3 h-40 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none" /> : <>
-        {open === 0 && !chat ? (
+        {open === 0 && !chat && !closed.size ? (
           <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center" data-testid="loops-empty">
             <Icon name="ListTodo" className="size-5 text-muted-foreground" />
             <div className="text-sm font-medium">{filtered ? "No open loops match" : "No open loops"}</div>
             <p className="text-sm text-muted-foreground">When email, calls or chats need you, {people.botName} adds a loop here. You can also add one above.</p>
           </div>
         ) : <>
-          {needs ? (
+          {needs || kept("needs") ? (
             <PaneSection title="Needs you now" count={needs}>
               {pending.map((question) => (
                 <PaneRow key={question.id} testId="loop-pending" icon="MessageQuestion" title={question.reason}
@@ -99,29 +110,29 @@ function Board({ threadId }: { threadId: string }) {
                 <PaneRow testId="loop-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`}
                   meta={<span>{where} · not read yet</span>} trailing={openChat} />
               ) : null}
-              {groups.needsYouNow.map((loop) => <LoopLine key={loop.id} loop={loop} place="needs" {...row} />)}
+              {lines(groups.needsYouNow, "needs")}
             </PaneSection>
           ) : null}
-          {groups.comingUp.length ? (
+          {groups.comingUp.length || kept("coming") ? (
             <PaneSection title="Coming up" count={groups.comingUp.length} aside={Number.isFinite(nextAt) ? `Next: ${fullWhen(nextAt)}` : undefined}>
-              {groups.comingUp.map((loop) => <LoopLine key={loop.id} loop={loop} place="coming" {...row} />)}
+              {lines(groups.comingUp, "coming")}
             </PaneSection>
           ) : null}
           {groups.agentsOnIt.length ? (
             <PaneSection title="Agents on it" count={groups.agentsOnIt.length}>
-              {groups.agentsOnIt.map((loop) => <LoopLine key={loop.id} loop={loop} place="agents" {...row} />)}
+              {lines(groups.agentsOnIt, "agents")}
             </PaneSection>
           ) : null}
           {groups.waitingOnOthers.length ? (
             <PaneSection title="Waiting on others" count={groups.waitingOnOthers.length}>
-              {groups.waitingOnOthers.map((loop) => <LoopLine key={loop.id} loop={loop} place="waiting" {...row} />)}
+              {lines(groups.waitingOnOthers, "waiting")}
             </PaneSection>
           ) : null}
         </>}
         {groups.done.length ? (
           <PaneSection title="Done · last 7 days" count={groups.done.length}
             aside={groups.done.length > DONE_SHOWN ? <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowAllDone(!showAllDone)}>{showAllDone ? "Show less" : "Show all"}</button> : undefined}>
-            {[...groups.done].sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)).slice(0, showAllDone ? undefined : DONE_SHOWN).map((loop) => <DoneLine key={loop.id} loop={loop} {...row} />)}
+            {groups.done.filter((loop) => !closed.has(loop.id)).sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)).slice(0, showAllDone ? undefined : DONE_SHOWN).map((loop) => <DoneLine key={loop.id} loop={loop} {...row} />)}
           </PaneSection>
         ) : null}
       </>}
@@ -142,11 +153,11 @@ function PaneSection({ title, count, aside, children }: { title: string; count: 
   );
 }
 
-function PaneRow({ icon, iconClass, title, meta, trailing, below, testId, muted }: { icon: string; iconClass?: string; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean }) {
+function PaneRow({ icon, iconClass, lead, title, meta, trailing, below, testId, muted }: { icon: string; iconClass?: string; lead?: ReactNode; title: ReactNode; meta?: ReactNode; trailing?: ReactNode; below?: ReactNode; testId?: string; muted?: boolean }) {
   return (
     <div className="flex flex-col rounded-md hover:bg-state-hover/40 has-[[data-state=open]]:bg-state-hover/40" data-testid={testId}>
       <div className="flex min-w-0 items-start gap-2.5 py-1.5 pr-1 pl-2">
-        <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />
+        {lead ?? <Icon name={icon} className={cn("mt-1 size-4 shrink-0 text-muted-foreground", iconClass)} />}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
           <div className={cn("line-clamp-2 text-sm leading-snug", muted ? "text-muted-foreground" : "text-foreground")}>{title}</div>
           {meta ? <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">{meta}</div> : null}
@@ -159,6 +170,47 @@ function PaneRow({ icon, iconClass, title, meta, trailing, below, testId, muted 
 }
 
 type Place = "needs" | "coming" | "agents" | "waiting";
+/** A loop closed from its circle: where it was, and how it closed. */
+type Closed = { loop: Loop; place: Place; index: number; action: "done" | "got_it" };
+
+/** A section's loops with the ones just closed from it back at their places. */
+export function withClosed(loops: readonly Loop[], place: Place, closed: ReadonlyMap<string, Closed>): Loop[] {
+  const list = [...loops];
+  const missing = [...closed.values()].filter((each) => each.place === place && !list.some((loop) => loop.id === each.loop.id)).sort((a, b) => a.index - b.index);
+  for (const each of missing) list.splice(Math.min(each.index, list.length), 0, each.loop);
+  return list;
+}
+
+/** Done is one click for Patrick's do and read loops (read: Got it); decisions and waits have their own actions. */
+export const closesFromCircle = (loop: Loop) => loop.owner === "patrick" && (loop.kind === "do" || loop.kind === "read");
+
+/** The row's kind circle as its Done checkbox: a check on hover, Mark done. */
+function DoneCircle({ loop, disabled, onDone }: { loop: Loop; disabled: boolean; onDone(): void }) {
+  return (
+    <button type="button" role="checkbox" aria-checked={false} aria-label={`Mark done: ${loop.title}`} title="Mark done" disabled={disabled} onClick={onDone}
+      className="group/done -m-0.5 mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-success/15 hover:text-success focus-visible:bg-success/15 focus-visible:text-success disabled:opacity-50">
+      <Icon name={KIND[loop.kind].icon} className="size-4 group-hover/done:hidden group-focus-visible/done:hidden" />
+      <Icon name="Check" className="hidden size-3.5 group-hover/done:block group-focus-visible/done:block" />
+    </button>
+  );
+}
+
+/** A loop just closed from its circle, in place: done, struck through, with Undo. */
+function JustDoneLine({ entry, refresh, onUndone }: { entry: Closed; refresh(): void; onUndone(): void }) {
+  const { update, busy, error } = useLoopActions(refresh);
+  const { loop } = entry;
+  return (
+    <PaneRow testId="loop-just-done" muted icon="CircleCheck" iconClass="text-success" title={<span className="line-through decoration-muted-foreground/60">{loop.title}</span>}
+      meta={<span>{entry.action === "got_it" ? "Got it" : "Done"} · just now</span>}
+      trailing={
+        <button type="button" disabled={busy} aria-label={`Undo: ${loop.title}`} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } }).then((ok) => ok && onUndone())}
+          className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5">
+          <Icon name="ArrowTurnBackward" />Undo
+        </button>
+      }
+      below={error ? <p role="alert" className="px-8 pb-2 text-xs text-destructive">{error}</p> : null} />
+  );
+}
 
 /** A row's detail line: its parts with a "·" between them, then the area chip. */
 function Dotted({ parts, area }: { parts: ReactNode[]; area: string | null }) {
@@ -170,7 +222,7 @@ function Dotted({ parts, area }: { parts: ReactNode[]; area: string | null }) {
 }
 
 /** One open loop: its line and its ⋯ menu, with what its section allows. */
-function LoopLine({ loop, place, people, places, refresh, held, owners }: RowProps & { place: Place }) {
+function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed }: RowProps & { place: Place; onClosed(action: "done" | "got_it"): void }) {
   const navigate = useBbNavigate();
   const { act, update, busy, error } = useLoopActions(refresh);
   const [editing, setEditing] = useState(false);
@@ -275,8 +327,10 @@ function LoopLine({ loop, place, people, places, refresh, held, owners }: RowPro
 
   const testId = { needs: "loop-needs", coming: "loop-coming", agents: "loop-agent", waiting: "loop-waiting" }[place];
   const icon = place === "agents" || (place === "coming" && !mine) ? "Bot" : KIND[loop.kind].icon;
+  const circle = (place === "needs" || place === "coming") && closesFromCircle(loop) ? (loop.kind === "read" ? "got_it" : "done") : null;
   return <>
     <PaneRow testId={testId} icon={icon} iconClass={place === "agents" && working ? "text-success" : undefined} title={loop.title} meta={meta}
+      lead={circle ? <DoneCircle loop={loop} disabled={busy} onDone={() => void act({ id: loop.id, action: circle }).then((ok) => ok && onClosed(circle))} /> : undefined}
       trailing={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
