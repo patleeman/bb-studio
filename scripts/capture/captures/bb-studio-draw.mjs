@@ -20,7 +20,7 @@ export default ({ seedDrawing, pluginRpc, sleep }) => [
         await close();
         // The page shows the whiteboard; Open drawing opens the full editor.
         await client.navigate(`/plugins/studio/studio/pages/${page.id}`);
-        await client.waitForSelector(`[data-whiteboard="${drawing.id}"] svg`, 30000);
+        await client.waitForSelector(`svg[data-whiteboard="${drawing.id}"]`, 30000);
         await client.clickButtonText("Open drawing");
         await client.waitForSelector(editor, 30000);
         // In a workspace tab the name is the tab's title, and the drawing's tools sit in the tab row.

@@ -101,7 +101,8 @@ collection as the workspace's new tab, a list with search and compact Project an
 Kind menus above it. The tab strip shows **+** (new tab) with **▾** (New item)
 beside it.
 Tags and Status are available under **More filters**. The rows show
-a paused Talk recording, a drawing and three Orbit pages.
+a paused Talk recording, the "Checkout flow" whiteboard and four Orbit pages,
+including "Checkout whiteboard", the page it lives in.
 
 ### Bot sidebar provider status
 
@@ -146,7 +147,8 @@ Record a call and your templates, the same list as the sidebar's **+** and
 the thread's Studio tab. New items go into the project BB has open, or, with
 none open, the one the list's Project filter picks. The new tab page keeps a
 New button only when the list is empty. The capture checks that Whiteboards and
-Pages filters offer the same menu, and that neither Drawing nor Whiteboard is offered as the unfiltered collection.
+Pages filters offer the same menu as the unfiltered collection, and that it
+offers neither Drawing nor Whiteboard.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
