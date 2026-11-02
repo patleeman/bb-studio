@@ -1736,7 +1736,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
 
   **Week** (the default; `src/ui/bot/AutomationsCalendar.tsx`, model in
   `calendar.ts`): a calendar of today and the next 6 days (5 in a narrow
-  pane), time of day down, in your time zone, with ‹ › for other weeks.
+  pane), as wide as the Bot page (it leaves the page's column; beside a
+  thread it fills the pane), time of day down, in your time zone, with ‹ › for other weeks.
   Each check-in, reminder, watcher, runner and plain BB schedule of the Bot
   is expanded from its schedule or cron in its own time zone (quiet hours,
   end dates and DST kept: a skipped time runs an hour later, a repeated one

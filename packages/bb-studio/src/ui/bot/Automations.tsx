@@ -31,7 +31,7 @@ export const useAutomations = (botId: string) => useLive("bot_automations", { bo
 
 type Sheet = { kind: "new"; type: Kind } | { kind: "edit"; automation: BotAutomationView } | { kind: "delete"; automation: BotAutomationView } | null;
 
-export function AutomationsSection({ botId, botName, onOpen, disabled, external = false }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean; external?: boolean }) {
+export function AutomationsSection({ botId, botName, onOpen, disabled, external = false, page = false }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean; external?: boolean; page?: boolean }) {
   const data = useAutomations(botId);
   const call = useCall();
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -69,7 +69,7 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
       </div>
       {error && !sheet ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
       {list.length && view === "week" ? (
-        <AutomationsCalendar botId={botId} automations={list} onOpen={onOpen} busy={busy || disabled}
+        <AutomationsCalendar wide={page} botId={botId} automations={list} onOpen={onOpen} busy={busy || disabled}
           onPick={(id) => { setView("list"); setOpen(id); if (list.find((each) => each.id === id && (each.state === "done" || each.state === "ended"))) setShowDone(true); }}
           onResume={(id) => void run("bot_automation_resume", { id }, false)} />
       ) : list.length ? (

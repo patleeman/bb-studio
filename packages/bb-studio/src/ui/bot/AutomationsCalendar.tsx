@@ -64,8 +64,13 @@ function RunsFeed({ botId, id, onRuns }: { botId: string; id: string; onRuns(id:
   return null;
 }
 
-export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResume, busy }: {
+/** On the Bot page the week leaves the page's narrow column for the page's full width (less a 24 px margin each side), centred on it. */
+const BREAKOUT: CSSProperties = { width: "calc(100cqw - 48px)", marginLeft: "calc(50% - 50cqw + 24px)" };
+
+export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResume, busy, wide = false }: {
   botId: string; automations: BotAutomationView[];
+  /** Inside a PageColumn (the Bot page): take the page's full width. Beside a thread it keeps the pane's. */
+  wide?: boolean;
   onOpen(threadId: string): void;
   /** A job's block without a thread to open: show the job. */
   onPick(id: string): void;
@@ -106,7 +111,7 @@ export function AutomationsCalendar({ botId, automations, onOpen, onPick, onResu
   const open = (event: CalendarEvent) => { if (event.threadId) onOpen(event.threadId); else if (byId.get(event.sourceId)?.runs !== null) onPick(event.sourceId); };
 
   return (
-    <div ref={box} data-testid="automations-calendar" className="mt-2 flex flex-col gap-2">
+    <div ref={box} data-testid="automations-calendar" data-wide={wide || undefined} className="mt-2 flex flex-col gap-2" style={wide ? BREAKOUT : undefined}>
       {automations.map((each) => <RunsFeed key={each.id} botId={botId} id={each.id} onRuns={onRuns} />)}
       <div className="flex items-center gap-1">
         <button type="button" className={ICON_BUTTON} aria-label="Earlier" onClick={() => setWeek(week - 1)}><Icon name="ChevronLeft" /></button>
