@@ -7,7 +7,7 @@ import { DECISIONS_SETTINGS } from "./src/decisions/settings";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
-import { DRAW_TOOLS, registerDraw } from "./src/draw/server";
+import { DRAW_TOOLS, moveOrphanDrawings, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
 import { MINI_INSTRUCTIONS, MINI_TOOLS, registerMinis } from "./src/minis/server";
@@ -232,6 +232,10 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   bb.onDispose(() => pages.dispose());
+  // Whiteboards: drawings live in pages. Drawings in no page move into a
+  // "Drawings" page, once each (src/draw/server/whiteboards.ts).
+  drawings.connectPages(pages.whiteboards);
+  await moveOrphanDrawings(bb, drawings, pages.whiteboards).catch((error) => bb.log.warn(`Couldn't move drawings into a Drawings page: ${errorText(error)}`));
   const recordings = await registerTalk(bb, db, settings as unknown as TalkSettingsHandle, pages.notes, notifyBuiltin);
   bb.onDispose(() => recordings.dispose());
 
@@ -248,7 +252,7 @@ export default async function plugin(bb: BbPluginApi) {
     { pluginId: "studio-code", name: "VS Code", handlers: code.provider },
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
     { pluginId: "artifacts", name: "Artifacts", handlers: artifacts.provider },
-    { pluginId: "excalidraw", name: "Drawings", handlers: drawings.provider },
+    { pluginId: "excalidraw", name: "Whiteboards", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
     { pluginId: "dashboards", name: "Dashboards", handlers: dashboards.provider },

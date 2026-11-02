@@ -48,6 +48,11 @@ export const rpcContract = defineRpcContract({
     output: z.object({ drawing: drawingFullSchema.nullable() }),
   },
   /** A drawing's card in a reply: its name and size, without the scene. */
+  /** The page a whiteboard is in (a live one first), or null for a drawing no page shows. */
+  "drawings.whiteboardPage": {
+    input: z.object({ id: z.string() }),
+    output: z.object({ page: z.object({ id: z.string(), title: z.string(), href: z.string() }).nullable() }),
+  },
   "drawings.getDrawingMeta": {
     input: z.object({ id: z.string() }),
     output: z.object({ drawing: drawingMetaSchema.nullable() }),

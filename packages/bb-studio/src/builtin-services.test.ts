@@ -9,7 +9,7 @@ import { registerDashboards } from "./dashboards/server";
 
 describe("built-in item thread links", () => {
   for (const [kind, register, tool, input] of [
-    ["excalidraw", registerDraw, "excalidraw_create_drawing", { name: "Plan" }],
+    ["excalidraw", registerDraw, "excalidraw_create_drawing", { pageId: "pg_plan", name: "Plan" }],
     ["design", registerDesign, "design_create", { name: "Plan" }],
     ["artifacts", registerArtifacts, "artifacts_save", { title: "Plan", name: "plan.md", content: "Plan" }],
     ["dashboards", registerDashboards, "dashboard_create", { name: "Plan" }],
@@ -21,6 +21,8 @@ describe("built-in item thread links", () => {
       for (const sql of MIGRATIONS) db.exec(sql);
       const services = new StudioServices(db);
       const builtin = register(host.bb, db, services, async () => {});
+      // A whiteboard is made in a page.
+      if ("connectPages" in builtin) builtin.connectPages({ embeddings: () => new Map(), page: (id) => ({ id, title: "Plan", projectId: null, archived: false }), embed() {}, createPage: () => "pg_new" });
       try {
         await host.harness.behavior.callAgentTool(tool, input, { threadId: "thr_maker" });
         expect(services.threadsForThread("thr_maker")).toMatchObject([{ ref: { pluginId: kind }, role: "created" }]);

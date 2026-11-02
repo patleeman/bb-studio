@@ -184,6 +184,7 @@ public enum Studio {
     public static let drawings_listDrawings = "drawings.listDrawings"
     public static let drawings_createDrawing = "drawings.createDrawing"
     public static let drawings_getDrawing = "drawings.getDrawing"
+    public static let drawings_whiteboardPage = "drawings.whiteboardPage"
     public static let drawings_getDrawingMeta = "drawings.getDrawingMeta"
     public static let drawings_getDrawingUpdatedAt = "drawings.getDrawingUpdatedAt"
     public static let drawings_saveDrawing = "drawings.saveDrawing"
@@ -721,6 +722,8 @@ public enum Studio {
   public typealias DrawingsCreateDrawing = DrawingsCreateDrawingOutput
 
   public typealias DrawingsGetDrawing = DrawingsGetDrawingOutput
+
+  public typealias DrawingsWhiteboardPage = DrawingsWhiteboardPageOutput
 
   public typealias DrawingsGetDrawingMeta = DrawingsGetDrawingMetaOutput
 
@@ -17751,6 +17754,34 @@ public enum Studio {
 
     public init(drawing: DrawingsGetDrawingOutputDrawing? = nil) {
       self.drawing = drawing
+    }
+  }
+
+  public struct DrawingsWhiteboardPageInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DrawingsWhiteboardPageOutputPage: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var href: String?
+
+    public init(id: String? = nil, title: String? = nil, href: String? = nil) {
+      self.id = id
+      self.title = title
+      self.href = href
+    }
+  }
+
+  public struct DrawingsWhiteboardPageOutput: Sendable, Hashable, Codable {
+    public var page: DrawingsWhiteboardPageOutputPage?
+
+    public init(page: DrawingsWhiteboardPageOutputPage? = nil) {
+      self.page = page
     }
   }
 

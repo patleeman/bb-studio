@@ -70,3 +70,26 @@ it("links pages and checklist handoffs directly, and reports activity failures w
     expect(callRpc).not.toHaveBeenCalled();
   } finally { pages.dispose(); await host.harness.lifecycle.dispose(); vi.useRealTimers(); }
 });
+
+it("embeds whiteboards in a page and finds the pages each drawing is in", async () => {
+  const host = createFakePluginHost({ pluginId: "studio" });
+  const db = host.bb.storage.database();
+  for (const sql of MIGRATIONS) db.exec(sql);
+  const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, new StudioServices(db), async () => {}, {
+    items: async () => [], create: async () => { throw new Error("not in this test"); },
+    drawing: () => null, saveDrawing: () => { throw new Error("not in this test"); },
+    artifact: () => null, artifactText: () => ({ text: null, truncated: false }), recording: () => null,
+  });
+  try {
+    const { whiteboards } = pages;
+    const plan = pages.createPage({ projectId: "proj_a", title: "Plan", markdown: "Intro" });
+    whiteboards.embed(plan, ["drw_0000000000000001", "drw_0000000000000002"]);
+    const made = whiteboards.createPage({ projectId: null, title: "Drawings", markdown: "```embed\n{\"kind\":\"drawing\",\"target\":\"drw_0000000000000001\"}\n```" });
+    const embeddings = whiteboards.embeddings();
+    expect(embeddings.get("drw_0000000000000001")?.map((page) => page.id).sort()).toEqual([made, plan].sort());
+    expect(embeddings.get("drw_0000000000000002")).toEqual([{ id: plan, title: "Plan", projectId: "proj_a", archived: false }]);
+    expect(pages.markdown(plan)).toMatch(/^Intro\n/);
+    expect(whiteboards.page("pg_missing")).toBeNull();
+    expect(() => whiteboards.embed("pg_missing", ["drw_0000000000000003"])).toThrow();
+  } finally { pages.dispose(); await host.harness.lifecycle.dispose(); }
+});

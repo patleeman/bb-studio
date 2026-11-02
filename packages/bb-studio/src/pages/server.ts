@@ -37,6 +37,7 @@ import { Checklists } from "./checklists";
 import { pagesCli } from "./cli";
 import { registerNotes } from "./notes";
 import { TagStore } from "../tags";
+import { embeddedDrawingIds, whiteboardMarkdown, type WhiteboardPage, type WhiteboardPages } from "../draw/server/whiteboards";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
@@ -57,6 +58,8 @@ export interface BuiltinPages {
   addCheckin(pageId: string, line: string): boolean;
   /** A page's text as Markdown, or null when there's no such page. */
   markdown(pageId: string): string | null;
+  /** The pages whiteboards (drawings) live in, for Drawings' tools and editor. */
+  whiteboards: WhiteboardPages;
   dispose(): void;
 }
 
@@ -464,6 +467,31 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     cli: (argv, ctx) => cli.run(argv, ctx),
     createPage: (input) => service.createPage({ ...input, parentId: null, actor: PLUGIN_RPC_ACTOR }).id,
     markdown: (pageId) => (store.meta(pageId) ? readMarkdown(service.hub.open(pageId).doc) : null),
+    whiteboards: {
+      embeddings() {
+        // Each page's saved Markdown; Pages writes embeds as compact JSON.
+        const rows = db.prepare(`SELECT id, title, project_id, archived_at, markdown FROM pages WHERE markdown LIKE '%"kind":"drawing"%'`)
+          .all() as { id: string; title: string; project_id: string | null; archived_at: number | null; markdown: string }[];
+        const found = new Map<string, WhiteboardPage[]>();
+        for (const row of rows) {
+          const page = { id: row.id, title: untitled(row.title), projectId: row.project_id, archived: row.archived_at !== null };
+          for (const drawingId of embeddedDrawingIds(row.markdown)) found.set(drawingId, [...(found.get(drawingId) ?? []), page]);
+        }
+        return found;
+      },
+      page(id) {
+        const meta = store.meta(id);
+        return meta ? { id: meta.id, title: untitled(meta.title), projectId: meta.project_id, archived: meta.archived_at !== null } : null;
+      },
+      embed(pageId, drawingIds, { afterBlockId, by = "agent" } = {}) {
+        requireMeta(pageId);
+        const markdown = drawingIds.map(whiteboardMarkdown).join("\n\n");
+        const actor = { key: PLUGIN_RPC_ACTOR, name: by === "agent" ? "Agent" : "Studio", color: actorColor(PLUGIN_RPC_ACTOR) };
+        service.edit(pageId, [afterBlockId ? { op: "insert_after", block: afterBlockId, markdown } : { op: "append", markdown }], actor);
+        service.hub.flush(service.hub.open(pageId));
+      },
+      createPage: (input) => service.createPage({ ...input, parentId: null, icon: "🖍️", actor: PLUGIN_RPC_ACTOR }).id,
+    },
     addCheckin(pageId, line) {
       const page = service.hub.open(pageId);
       if (readMarkdown(page.doc).includes(line)) return false;
