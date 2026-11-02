@@ -23650,36 +23650,6 @@
         "additionalProperties": false
       }
     },
-    "drawings.pickDrawing": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "drawingId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "drawingId"
-        ],
-        "additionalProperties": false
-      }
-    },
     "designs.getDesign": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

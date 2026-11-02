@@ -34,7 +34,7 @@ import { mentionContext as buildMentionContext } from "./server/mention";
 import { drawingProvider } from "./server/provider";
 import { DrawingStore, displayName, toMeta, type DrawingRow, type Writer } from "./server/store";
 import { sceneThumbnail } from "./server/thumbnail";
-import { DRAWING_UPDATE_TYPE, PICKER_ID, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, drawingHref } from "./shared";
+import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, drawingHref } from "./shared";
 
 const MAX_TOOL_SCENE_CHARS = 400_000;
 
@@ -223,18 +223,6 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
         mimeType: "image/png",
       });
       return { ok: true };
-    },
-    async "drawings.pickDrawing"({ threadId }) {
-      const result = await bb.ui.requestInput({
-        threadId,
-        rendererId: PICKER_ID,
-        title: "Attach a drawing",
-        payload: { drawings: store.list().map(toMeta) },
-        timeoutMs: 300_000,
-      });
-      if (result.outcome === "cancelled") return { drawingId: null };
-      const value = result.value as { drawingId?: string };
-      return { drawingId: value?.drawingId ?? null };
     },
   });
 

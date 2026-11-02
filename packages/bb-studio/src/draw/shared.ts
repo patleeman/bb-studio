@@ -13,8 +13,6 @@ export const REALTIME_CHANNEL = "excalidraw";
 export const DRAWING_UPDATE_TYPE = "drawing:updated";
 /** The Drawings workbench tab's action id; reply cards open it with `{ drawingId }`. */
 export const DRAWINGS_TAB = "excalidraw";
-/** The composer `+` menu's picker, rendered in place of the composer. */
-export const PICKER_ID = "excalidraw-picker";
 
 export function drawingHref(id: string): string {
   return `/plugins/studio/studio/${ROUTE_SEGMENT}/${encodeURIComponent(id)}`;

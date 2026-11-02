@@ -191,7 +191,6 @@ public enum Studio {
     public static let drawings_renameDrawing = "drawings.renameDrawing"
     public static let drawings_deleteDrawing = "drawings.deleteDrawing"
     public static let drawings_attachDrawingImage = "drawings.attachDrawingImage"
-    public static let drawings_pickDrawing = "drawings.pickDrawing"
     public static let designs_getDesign = "designs.getDesign"
     public static let designs_renameDesign = "designs.renameDesign"
     public static let designs_deleteDesign = "designs.deleteDesign"
@@ -736,8 +735,6 @@ public enum Studio {
   public typealias DrawingsDeleteDrawing = DrawingsDeleteDrawingOutput
 
   public typealias DrawingsAttachDrawingImage = DrawingsAttachDrawingImageOutput
-
-  public typealias DrawingsPickDrawing = DrawingsPickDrawingOutput
 
   public typealias DesignsGetDesign = DesignsGetDesignOutput
 
@@ -17932,22 +17929,6 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
-    }
-  }
-
-  public struct DrawingsPickDrawingInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-
-    public init(threadId: String? = nil) {
-      self.threadId = threadId
-    }
-  }
-
-  public struct DrawingsPickDrawingOutput: Sendable, Hashable, Codable {
-    public var drawingId: String?
-
-    public init(drawingId: String? = nil) {
-      self.drawingId = drawingId
     }
   }
 

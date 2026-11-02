@@ -12,10 +12,8 @@ import { openAppPath, registerWorkspaceProvider, RetainedPanels, retainPanel, St
 import { BUILTIN_ROUTES, builtinSegment, CHATS_PATH, legacyChatPath, STUDIO_ROOT } from "./src/builtins";
 import { ArtifactCard } from "./src/artifacts/ui/artifact-card";
 import { isArtifactId } from "./src/artifacts/shared";
-import { isDrawingId, PICKER_ID } from "./src/draw/shared";
+import { isDrawingId } from "./src/draw/shared";
 import { DrawingDirective } from "./src/draw/ui/drawing-directive";
-import { ExcalidrawPicker } from "./src/draw/ui/excalidraw-picker";
-import { createExcalidrawComposerCustomization } from "./src/draw/ui/composer-registration";
 import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
 import { isDashboardId } from "./src/dashboards/shared";
@@ -236,18 +234,9 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "artifact", component: whenOn(kinds, "artifact", ArtifactCard) });
   // Mini apps (built in): `::mini{id="mini_…"}` in a reply is the app itself, live.
   app.slots.messageDirective({ id: "mini", component: whenOn(kinds, "mini", MiniCard) });
-  // Drawings (built in): in the Studio tab, the `::drawing{id="…"}`
-  // card, and the composer's `+` → Drawing, which attaches one as a PNG.
-  if (on("drawing")) {
-    if (!kinds.routedAway.has("drawing")) {
-      app.composer.customize(createExcalidrawComposerCustomization((scope) => {
-        void import("./src/draw/ui/attach").then(({ attachFromComposer }) => attachFromComposer(scope));
-      }));
-    }
-  }
+  // Whiteboards (drawings, built in): the read-only `::drawing{id="…"}` card
+  // older replies carry. New replies link the page the whiteboard is in.
   app.slots.messageDirective({ id: "drawing", component: whenOn(kinds, "drawing", DrawingDirective) });
-  // Kept while off, so a picker an agent opened earlier can still be answered.
-  app.slots.pendingInteraction({ id: PICKER_ID, component: ExcalidrawPicker });
   // Designs (built in): in the Studio tab, the `::design{id="dsn_…"}`
   // card, and the question form design_ask opens in the composer.
   app.slots.messageDirective({ id: "design", component: whenOn(kinds, "design", DesignCard) });

@@ -94,12 +94,4 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ ok: z.boolean() }),
   },
-  /**
-   * Blocks until the user picks a drawing in the host-rendered picker
-   * (pendingInteraction slot "excalidraw-picker"). Returns null on cancel.
-   */
-  "drawings.pickDrawing": {
-    input: z.object({ threadId: z.string() }),
-    output: z.object({ drawingId: z.string().nullable() }),
-  },
 });
