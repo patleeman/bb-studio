@@ -18,3 +18,12 @@ export type MenuSettings = ReturnType<typeof menuSettings>;
 export function needsMenuReload(applied: MenuSettings, saved: MenuSettings): boolean {
   return Object.keys(applied).some((key) => applied[key as keyof MenuSettings] !== saved[key as keyof MenuSettings]);
 }
+
+let applied: MenuSettings | null = null;
+/** The settings this window's menu actions were registered with (registerReactionsApp), for the reload notice. */
+export function appliedMenuSettings(): MenuSettings | null {
+  return applied;
+}
+export function setAppliedMenuSettings(settings: MenuSettings): void {
+  applied = settings;
+}

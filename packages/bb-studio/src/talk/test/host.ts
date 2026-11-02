@@ -1,5 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
-import { registerTalk, TALK_SETTINGS } from "../server";
+import { registerTalk } from "../server";
+import { settingDefaults } from "../../settings/schema";
 import { MIGRATIONS } from "../server/store";
 
 /** Studio on a fake host with only its recordings registered. Studio's other calls fail, as when it's busy. */
@@ -9,7 +10,7 @@ export async function talkHost() {
   } });
   const db = host.bb.storage.database();
   for (const statement of MIGRATIONS) db.exec(statement);
-  const talk = await registerTalk(host.bb, db, host.bb.settings.define(TALK_SETTINGS), {
+  const talk = await registerTalk(host.bb, db, { get: async () => settingDefaults(), onChange: () => {} }, {
     exists: async () => false, create: async () => { throw new Error("not in this test"); },
     markdown: async () => "", replace: async () => {}, search: async () => [],
   }, async () => {});

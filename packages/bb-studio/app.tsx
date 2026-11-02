@@ -1,5 +1,5 @@
 import { registerCodeApp } from "./src/code/register";
-import { registerDecisionsApp } from "./src/decisions/ui/register";
+import { registerSettingsApp } from "./src/settings/ui/sections";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
@@ -36,7 +36,6 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
-import { VoiceSettingsSection } from "./src/voice/live/ui/QuickSettings";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
@@ -152,6 +151,9 @@ function BuiltinRoutes() {
 }
 
 export default definePluginApp((app) => {
+  // Studio's settings sections (src/settings/ui), first so they keep their
+  // order after BB's API key fields; and push status on BB's Mobile page.
+  registerSettingsApp(app);
   registerCodeApp(app);
   app.slots.experimental_appOverlay({ id: "workspace-bridge", component: WorkspaceBridge });
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
@@ -182,7 +184,6 @@ export default definePluginApp((app) => {
   // composer button is registered below, after Notes' Expand; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
-  app.slots.settingsSection({ id: "voice", title: "Hands-free voice", component: VoiceSettingsSection });
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
   // opens them through: an overlay that asks the chat to open the tab beside it
@@ -258,7 +259,6 @@ export default definePluginApp((app) => {
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
-  registerDecisionsApp(app);
   if (on("recording")) registerTalkApp(app);
   // Off: the `::recording` line still renders, as nothing.
   else app.slots.messageDirective({ id: "recording", component: () => null });

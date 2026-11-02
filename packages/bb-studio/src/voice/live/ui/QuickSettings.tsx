@@ -1,12 +1,13 @@
 // Hands-free voice's quick settings: the right-click menu on the composer's
-// waveform button, and the "Hands-free voice" section on Studio's settings
-// page that its "Voice settings…" opens. BB's composer action has no menu of
+// waveform button. Its "Voice settings…" opens Studio's settings page on the
+// Voice section (src/settings/ui/sections.tsx). BB's composer action has no menu of
 // its own (SDK 0.6.37 and 0.6.104), so this is a context menu on Studio's own
-// button. Every choice is a Studio setting (live.ts VOICE_LIVE_SETTINGS) read
+// button. Every choice is a Studio setting (src/settings/schema.ts) read
 // when a session starts, so it applies to the next session, never the running
 // one: OpenAI fixes a session's voice and models when it's created.
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { requestVoiceSection, STUDIO_SETTINGS_PATH } from "../../../settings/ui/voice-anchor";
 import { openAppPath } from "../../../kit/app/nav";
 import { errorMessage } from "../../../kit/format";
 import {
@@ -19,9 +20,8 @@ import { BACKEND_MODELS, LIVE_MODELS, LIVE_VOICES, usd, type BackendModel, type 
 type Rpc = { call(method: string, input: unknown): Promise<unknown> };
 export type VoiceChoice = { model?: LiveModel; voice?: string; backendModel?: BackendModel };
 
-/** Studio's settings page, scrolled to the Hands-free voice section. */
-export const VOICE_SETTINGS_PATH = "/settings/plugins/studio";
-export const VOICE_SETTINGS_ANCHOR = "studio-voice-settings";
+/** Studio's settings page; the Voice section scrolls itself into view. */
+export const VOICE_SETTINGS_PATH = STUDIO_SETTINGS_PATH;
 
 const MODEL_NOTES: Record<LiveModel, string> = {
   "gpt-live-1": "$0.05 a minute, plus the backend",
@@ -37,11 +37,8 @@ export const loadVoiceState = async (rpc: Rpc) => (await rpc.call("voiceLive.sta
 /** Saves a choice as Studio settings for the next session; the new state. */
 export const saveVoiceChoice = async (rpc: Rpc, choice: VoiceChoice) => (await rpc.call("voiceLive.configure", choice)) as VoiceLiveState;
 
-/** Set by "Voice settings…": the section scrolls itself into view when it next mounts. */
-let scrollToSection = false;
-
 export function openVoiceSettings(): void {
-  scrollToSection = true;
+  requestVoiceSection();
   openAppPath(VOICE_SETTINGS_PATH);
 }
 
@@ -125,7 +122,7 @@ export function QuickSettingsItems({ state, error, live, choose }: { state: Voic
           <ContextMenuLabel data-testid="handsfree-menu-spend" className="flex items-baseline">
             This month<span className="ml-auto pl-3 tabular-nums"><span className="font-medium">{usd(state.monthUsd)}</span><span className="text-muted-foreground"> of {usd(state.capUsd)}</span></span>
           </ContextMenuLabel>
-          <ContextMenuLabel className="pt-0 text-[11px] leading-4 text-muted-foreground">Change the monthly cap in Voice settings.</ContextMenuLabel>
+          <ContextMenuLabel className="pt-0 text-[11px] leading-4 text-muted-foreground">Change the monthly limit in Voice settings.</ContextMenuLabel>
           {error ? <ContextMenuLabel role="alert" className="text-[11px] text-destructive">{error}</ContextMenuLabel> : null}
         </>
       )}
@@ -134,36 +131,5 @@ export function QuickSettingsItems({ state, error, live, choose }: { state: Voic
         <Icon name="Settings" className="size-3.5 shrink-0" aria-hidden />Voice settings…
       </ContextMenuItem>
     </>
-  );
-}
-
-/**
- * Studio's settings page: what hands-free voice will use and this month's
- * spend. The fields themselves are BB's form above it ("Hands-free voice: …"),
- * since a plugin can't anchor into that form.
- */
-export function VoiceSettingsSection() {
-  const rpc = useRpc<typeof voiceLiveContract>() as unknown as Rpc;
-  const [state, setState] = useState<VoiceLiveState | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { void loadVoiceState(rpc).then(setState, () => {}); }, [rpc]);
-  // Asked for by "Voice settings…": BB's form above loads after this mounts and
-  // pushes it down, so scroll again as the page settles.
-  useEffect(() => {
-    if (!scrollToSection) return;
-    scrollToSection = false;
-    const timers = [0, 300, 800, 1600].map((ms) => setTimeout(() => ref.current?.scrollIntoView({ block: "center" }), ms));
-    return () => timers.forEach(clearTimeout);
-  }, []);
-  return (
-    <div ref={ref} id={VOICE_SETTINGS_ANCHOR} data-testid="studio-voice-settings" className="space-y-1.5 text-sm">
-      {state ? (
-        <>
-          <p>Next session: <span className="font-medium">{state.model}</span>, voice <span className="font-medium">{state.voice}</span>{state.model === "gpt-live-1" ? <>, backend <span className="font-medium">{state.backendModel}</span></> : null}.</p>
-          <p className="tabular-nums">This month: <span className="font-medium">{usd(state.monthUsd)}</span> of the {usd(state.capUsd)} cap.</p>
-        </>
-      ) : <p className="text-muted-foreground">Loading…</p>}
-      <p className="text-xs text-muted-foreground">Change them in the Hands-free voice fields above: model, voice, backend model and monthly cap (USD). Right-click the waveform button in a thread’s composer for the same choices. Changes apply to the next session.</p>
-    </div>
   );
 }

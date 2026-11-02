@@ -18,11 +18,11 @@ const state = vi.hoisted(() => ({
   groups: null as unknown,
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  useSettings: () => ({ values: { loopsEnabled: state.enabled } }),
   useBbNavigate: () => ({ toThread: state.toThread }),
   experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => ({ projects: { list: async () => [{ id: "proj_k", name: "Kensico" }] } }),
 }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,
   useLive: (method: string, _input: unknown, options: { enabled?: boolean } = {}) => {

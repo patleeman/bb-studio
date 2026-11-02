@@ -16,14 +16,16 @@ export function threadOwner(owner:string,thread:ThreadLike|null):z.infer<typeof 
  if(!thread||thread.deletedAt)return {owner,name:'A thread that was removed',threadId:null};
  const title=(thread.title||thread.titleFallback||'').trim()||'Untitled thread';return {owner,name:thread.archivedAt?`${title} (archived)`:title,threadId};}
 export const LOOP_TOOLS=['loops_add','loops_list','loops_get','loops_update','loops_act','loops_fire','loops_morning'];
-export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3]){
+/** Loops' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention. The time zone is this Mac's. */
+type LoopSettings={get():Promise<Record<string,unknown>>;onChange(listener:(next:Record<string,unknown>)=>void):void};
+export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>defaults.timeZone){
  // Every saved change tells open windows (cards, the Loops tab, badges) to refetch.
- const store=new LoopStore(db,()=>bb.realtime.publish(STUDIO_REALTIME_CHANNEL,{pluginId:'studio'}));const settings=bb.settings.define({loopsEnabled:{type:'boolean',label:'Attention Router',default:false},loopTimeZone:{type:'string',label:'Attention time zone',default:defaults.timeZone},loopDailyBudget:{type:'number',label:'Daily attention budget',default:5},loopQuietStart:{type:'number',label:'Quiet hours start',default:22},loopQuietEnd:{type:'number',label:'Quiet hours end',default:7}});
+ const store=new LoopStore(db,()=>bb.realtime.publish(STUDIO_REALTIME_CHANNEL,{pluginId:'studio'}));
  let config=defaults;
  const scheduler=new LoopScheduler(store,()=>config,post,notify);
  const tick=()=>void scheduler.tick().catch(e=>bb.log.warn(String(e)));
  // Turning the Attention Router on releases what queued while it was off, without waiting a minute.
- const refresh=(v:Record<string,unknown>)=>{const zone=String(v.loopTimeZone??defaults.timeZone);try{localCheck(zone);const was=config.enabled;config={enabled:v.loopsEnabled===true,timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};if(!was&&config.enabled)tick();}catch(e){bb.log.warn(String(e));}};
+ const refresh=(v:Record<string,unknown>)=>{const zone=timeZone();try{localCheck(zone);const was=config.enabled;config={enabled:v.loopsEnabled===true,timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};if(!was&&config.enabled)tick();}catch(e){bb.log.warn(String(e));}};
  function localCheck(zone:string){new Intl.DateTimeFormat('en',{timeZone:zone}).format();}
  void settings.get().then(refresh);settings.onChange(refresh);
  // A thread owner's name: the thread's title, "(archived)" once archived, or a fallback when it's gone.

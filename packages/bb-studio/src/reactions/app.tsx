@@ -11,15 +11,13 @@
 //    `::reactions{items="…"}`; a messageDirective still renders it as reaction
 //    buttons so it never shows as raw text. Agents no longer write it.
 //
-// 3. Settings: Studio's settings form holds them (./server.ts). A read-only
-//    preview shows whether saved menu settings need a window reload. Static
-//    action registrations read one snapshot at setup.
+// 3. Settings: Studio settings (src/settings), edited in Studio's Agent
+//    replies section. Static action registrations read one snapshot at setup.
 //
 // Drafting goes through the kit's composer bridge, which Explore's
 // registration mounts in every composer (registerExploreApp).
 import { toast } from "sonner";
 import {
-  useSettings,
   type PluginAppBuilder,
   type PluginComposerApi,
   type PluginMessageActionContext,
@@ -27,7 +25,8 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Button } from "../kit/ui/index";
 import { parseEmojiItems } from "./emoji-items";
-import { menuSettings, needsMenuReload, type MenuSettings } from "./settings";
+import { menuSettings, setAppliedMenuSettings, type MenuSettings } from "./settings";
+import { readStudioSettingsNow } from "../settings/ui/use-settings";
 import { mountActionDecoration } from "./action-decoration";
 import { composerFor } from "../kit/composer";
 import {
@@ -40,24 +39,11 @@ import {
   SMART_REACTIONS_DIRECTIVE,
 } from "./smart-reactions";
 
-const PLUGIN_ID = "studio";
-
-// ---------------------------------------------------------------------------
 // Settings snapshot read synchronously at setup (slot registrations are
-// static per frontend interpretation, and `useSettings` is hook-only).
-// ---------------------------------------------------------------------------
-
+// static per frontend interpretation): Studio's settings RPC, so a change
+// applies after a window reload (Studio's Agent replies section says so).
 function readSettingsSnapshot(): MenuSettings {
-  try {
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", `/api/v1/plugins/${PLUGIN_ID}/settings`, false);
-    xhr.send();
-    if (xhr.status !== 200) return menuSettings();
-    const body = JSON.parse(xhr.responseText) as { values?: Record<string, unknown> };
-    return menuSettings(body.values);
-  } catch {
-    return menuSettings();
-  }
+  return menuSettings(readStudioSettingsNow());
 }
 
 /** Draft the reaction: quote and reaction text in the configured order. */
@@ -126,34 +112,12 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
 }
 
 // ---------------------------------------------------------------------------
-// The host owns editing and persistence. This section only previews saved
-// settings and makes static menu registration state explicit.
-// ---------------------------------------------------------------------------
-
-function ReactionsPreview({ applied }: { applied: MenuSettings }) {
-  const { values, isLoading } = useSettings();
-  const saved = menuSettings(values ?? {});
-  const items = parseEmojiItems(saved.emojiItems);
-  const pending = needsMenuReload(applied, saved);
-  return <div className="space-y-3">
-    <p className="text-sm text-muted-foreground">Edit and save your reactions in the settings above. Each button drafts its reaction into the conversation.</p>
-    <div className="flex flex-wrap gap-2" aria-label="Saved reaction preview">
-      {items.map((item, index) => <span key={index} className="rounded-md border border-border px-2 py-1 text-sm">{item.text}</span>)}
-      {!items.length && <span className="text-sm text-muted-foreground">No reaction buttons configured.</span>}
-    </div>
-    <p role="status" className="text-sm text-muted-foreground">{isLoading ? "Loading saved settings…" : !values ? "Saved settings are unavailable. Reopen settings when connected." : pending
-      ? "Your changes are saved. Reload this window to apply them to message menus."
-      : "Saved menu settings are applied in this window."}</p>
-    {pending && !isLoading && values && <Button type="button" size="sm" onClick={() => window.location.reload()}>Reload window to apply</Button>}
-  </div>;
-}
-
-// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
 export function registerReactionsApp(app: PluginAppBuilder) {
   const snapshot = readSettingsSnapshot();
+  setAppliedMenuSettings(snapshot);
   const items = parseEmojiItems(snapshot.emojiItems);
   const quoteSelection = snapshot.quoteSelection;
   const quotePosition = snapshot.quotePosition;
@@ -199,12 +163,6 @@ export function registerReactionsApp(app: PluginAppBuilder) {
   app.slots.messageDirective({
     id: SMART_REACTIONS_DIRECTIVE,
     component: SmartReactions,
-  });
-
-  app.slots.settingsSection({
-    id: "emoji-reactions-editor",
-    title: "Saved reactions",
-    component: () => <ReactionsPreview applied={snapshot} />,
   });
 
   app.contentScripts.register({

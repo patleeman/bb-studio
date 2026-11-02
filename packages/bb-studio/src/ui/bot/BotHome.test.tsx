@@ -38,7 +38,6 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread, toCompose: state.toCompose }),
   experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openThreadPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => sdk,
-  useSettings: () => ({ values: state.settings }),
   experimental_useSidebarThreads: () => state.sidebarThreads,
   experimental_ThreadActionsContextMenu: ({ children, requestRename, thread }: { children: React.ReactNode; requestRename(id: string): void; thread: { id: string } }) =>
     React.createElement("div", { "data-menu-for": thread.id }, children, React.createElement("button", { type: "button", "data-rename": thread.id, onClick: () => requestRename(thread.id) }, "rename")),
@@ -53,6 +52,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     React.createElement("button", { type: "button", onClick: () => onChange({ providerId: "codex", model: "gpt-5", reasoningLevel: "high" }) }, "pick codex")),
   experimental_PermissionModePicker: ({ value }: { value: string }) => React.createElement("span", { "data-permission": value }),
 }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: state.settings })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [] }, threads: { interactions: { list: async () => [] }, update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };

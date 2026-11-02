@@ -1,7 +1,8 @@
 // A Bot's Controls (bot/<botId>/controls): every setting, off the main page,
 // with a back link to it. Section links on the left: Profile (with Profile
 // changes and Revert), Model, Memory, Skills (with Learn from work and its
-// history), Check-ins, Prompt cache (the only place tokens and cost show) and
+// history), Check-ins, Attention (the primary Bot's Loops: daily budget and
+// quiet hours), Prompt cache (the only place tokens and cost show) and
 // Maintenance (the switch, rules and history). An external Bot has no
 // Memory page, skills or maintenance here: Profile, Model and Check-ins.
 // The components are the ones Bot info always had, moved here.
@@ -17,18 +18,20 @@ import { SwitchModelDialog } from "./BotModel";
 import { ProfileChanges } from "./ProfileChanges";
 import { BotCacheSection } from "./BotCache";
 import { BotMaintenance } from "./BotMaintenance";
+import { BotAttention } from "./BotAttention";
 import { botPath } from "./selection";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 type Section = { id: string; label: string };
 
-/** The sections an internal Bot has, and the three an external one keeps. */
-export function controlSections(external: boolean): Section[] {
+/** The sections an internal Bot has, and the three an external one keeps. Attention is the primary Bot's (Loops are its). */
+export function controlSections(external: boolean, primary = false): Section[] {
   const all: Section[] = [
     { id: "profile", label: "Profile" }, { id: "model", label: "Model" }, { id: "memory", label: "Memory" }, { id: "skills", label: "Skills" },
-    { id: "checkins", label: "Check-ins" }, { id: "cache", label: "Prompt cache" }, { id: "maintenance", label: "Maintenance" },
+    { id: "checkins", label: "Check-ins" }, { id: "attention", label: "Attention" }, { id: "cache", label: "Prompt cache" }, { id: "maintenance", label: "Maintenance" },
   ];
-  return external ? all.filter((each) => ["profile", "model", "checkins"].includes(each.id)) : all;
+  if (external) return all.filter((each) => ["profile", "model", "checkins"].includes(each.id));
+  return primary ? all : all.filter((each) => each.id !== "attention");
 }
 
 /** What its check-ins are, in words: a preset's name and when, or Off. */
@@ -45,7 +48,8 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
   const { bot, profile, busy, error, setSheet, openMemory, saveProfile, sheets } = useBotControls(view, refresh, running);
   const [switching, setSwitching] = useState(false);
   const external = bot.kind === "external";
-  const sections = controlSections(external);
+  const primary = !!bot.primary;
+  const sections = controlSections(external, primary);
   const [current, setCurrent] = useState(sections[0]!.id);
   const go = (id: string) => { setCurrent(id); document.getElementById(`controls-${id}`)?.scrollIntoView({ block: "start", behavior: "smooth" }); };
   // A link to a section (controls#maintenance) opens on it.
@@ -100,6 +104,11 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
           <Part id="checkins" title="Check-ins">
             <Row label="Preset" value={checkinWords(view.run)} action={bot.state === "active" ? <button type="button" className={OUTLINE_BUTTON} onClick={() => setSheet("checkins")}>Change…</button> : null} />
           </Part>
+          {external || !primary ? null : (
+            <Part id="attention" title="Attention">
+              <BotAttention botName={bot.name} />
+            </Part>
+          )}
           {external ? null : (
             <Part id="cache" title="Prompt cache">
               <div className="[&>section]:mx-0 [&>section]:mt-0">

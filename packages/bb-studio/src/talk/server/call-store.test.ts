@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { callRetentionDays, callSttFor, talkSettingsSchema, TALK_SETTINGS } from "../shared/contract";
+import { callRetentionDays, callSttFor } from "../shared/contract";
+import { STUDIO_SETTINGS } from "../../settings/schema";
 import { joinTranscript } from "../shared/format";
 import { memoryStore } from "../test/db";
 
@@ -56,11 +57,11 @@ describe("call storage", () => {
 
 describe("call settings", () => {
   it("defaults to local WhisperKit and 30 days of audio", () => {
-    expect(TALK_SETTINGS.callTranscription.default).toBe("Local (WhisperKit)");
-    expect(TALK_SETTINGS.callAudioRetention.options).toEqual(["7 days", "30 days", "Forever"]);
-    expect(TALK_SETTINGS.callAudioRetention.default).toBe("30 days");
+    expect(STUDIO_SETTINGS.callTranscription.default).toBe("Local (WhisperKit)");
+    expect(STUDIO_SETTINGS.callAudioRetention.options).toEqual(["7 days", "30 days", "Forever"]);
+    expect(STUDIO_SETTINGS.callAudioRetention.default).toBe("30 days");
     // No server and no secret by default.
-    expect(TALK_SETTINGS.callServerUrl.default).toBe("");
+    expect(STUDIO_SETTINGS.callServerUrl.default).toBe("");
   });
 
   it("maps each choice", () => {
@@ -72,6 +73,5 @@ describe("call settings", () => {
     expect(callRetentionDays("30 days")).toBe(30);
     expect(callRetentionDays("Forever")).toBeNull();
     expect(callRetentionDays(undefined)).toBe(30);
-    expect(talkSettingsSchema.safeParse({ callServerUrl: "http://red4:8000", callAudioRetention: "7 days" }).success).toBe(true);
   });
 });

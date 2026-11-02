@@ -13,7 +13,8 @@ vi.mock("../../../kit/ui", async (importOriginal) => ({
   Icon: ({ name, className }: { name: string; className?: string }) => <span data-icon={name} className={className} />,
 }));
 
-import { HandsFreeQuickSettings, VOICE_SETTINGS_PATH, VoiceSettingsSection } from "./QuickSettings";
+import { HandsFreeQuickSettings, VOICE_SETTINGS_PATH } from "./QuickSettings";
+import { takeVoiceSectionRequest } from "../../../settings/ui/voice-anchor";
 
 const STATE: VoiceLiveState = { ready: true, problem: null, cosName: "Dot", monthUsd: 3.42, capUsd: 20, model: "gpt-live-1", voice: "marin", backendModel: "gpt-5.6-luna" };
 
@@ -120,27 +121,13 @@ describe("the waveform button's right-click menu", () => {
     expect($("handsfree-menu-backend")!.textContent).toContain("None");
   });
 
-  it("Voice settings… opens Studio's settings, and its voice section scrolls into view", async () => {
+  it("Voice settings… opens Studio's settings and asks its Voice section to scroll into view, once", async () => {
     await rightClick();
     await pick("handsfree-menu-settings");
     expect(nav.openAppPath).toHaveBeenCalledWith(VOICE_SETTINGS_PATH);
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    vi.useFakeTimers();
-    act(() => root.render(<VoiceSettingsSection />));
-    await flush();
-    // Again as BB's form above it loads and pushes it down.
-    act(() => { vi.advanceTimersByTime(2000); });
-    vi.useRealTimers();
-    expect(scroll).toHaveBeenCalledTimes(4);
-    expect($("studio-voice-settings")!.textContent).toContain("Next session: gpt-live-1, voice marin, backend gpt-5.6-luna.");
-    expect($("studio-voice-settings")!.textContent).toContain("This month: $3.42 of the $20.00 cap.");
-    // Only once: opening the settings page on its own doesn't scroll.
-    act(() => root.unmount());
-    root = createRoot(host);
-    act(() => root.render(<VoiceSettingsSection />));
-    await flush();
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
-    expect(scroll).toHaveBeenCalledTimes(4);
+    expect(VOICE_SETTINGS_PATH).toBe("/settings/plugins/studio");
+    // The section (src/settings/ui/sections.tsx) takes the request when it mounts.
+    expect(takeVoiceSectionRequest()).toBe(true);
+    expect(takeVoiceSectionRequest()).toBe(false);
   });
 });

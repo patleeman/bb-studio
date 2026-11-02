@@ -1,6 +1,7 @@
 // What the loop UI reads besides the loops: whether the Attention Router is
 // on, the people a loop can belong to, and the actions it takes.
-import { useBbNavigate, useSdk, useSettings } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
+import { useStudioSettings } from "../../settings/ui/use-settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { errorMessage } from "../../kit/format";
 import { openAppPath } from "../../kit/app/index";
@@ -14,9 +15,9 @@ import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** The `loopsEnabled` setting (label "Attention Router", default off). */
+/** The `loopsEnabled` Studio setting (label "Attention Router", default off). */
 export function useLoopsEnabled(): boolean {
-  const { values } = useSettings();
+  const { values } = useStudioSettings();
   return values?.loopsEnabled === true;
 }
 
