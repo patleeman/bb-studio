@@ -7,12 +7,15 @@ fallback, eyes-free rules enforced in Studio, Bluetooth mic routing, and an iOS
 screen with a talking icon and subtitles. CarPlay is on hold. This is a spike:
 it isn't merged or released.
 
-**Status, Nov 1.** Everything runs end to end against a scripted mock of
-GPT-Live, with Studio's real tool layer and the real iOS app in a simulator.
-**The live demo is pending a key.** Two `bb secret request` prompts for a
-staged-only OpenAI key timed out unanswered, so no request has gone to OpenAI.
-The OpenAI request bodies follow the docs as read on Nov 1, and they're tested
-with mocked fetches.
+**Status, Nov 1.** It ran live against the real `gpt-live-1`, with Studio's
+real tool layer and the real iOS app in a simulator (see "Live run" below):
+"what's waiting", a relay to the Kensico lead with the read-back and a spoken
+"yes" that Studio checked, the lead's reply read back, and a barge-in. The key
+came through `bb secret request` into a staged-only dotenv, and was used only
+by the harness process on this Mac. **Still untested live: the phone's own
+WebRTC connection.** The live run used GPT-Live's WebSocket transport from the
+host instead, because a mic in the simulator is the Mac's mic and would raise
+a macOS microphone prompt.
 
 ## What was built
 
@@ -182,11 +185,64 @@ mock server, all local:**
 The voice's turn timing in the mock is scripted, so it says nothing about
 GPT-Live's speed.
 
-**Live: pending a key.** Still to measure: the time from session start to first
-words; the time from the end of the user's speech to the first audio; the
-backend tool turn; and, most important for barge-in, **how long GPT-Live takes
-to send the first input transcript delta**. GPT-Live has no speech-started
-event, so that delay sets how fast the phone can mute.
+### Live run (gpt-live-1, Nov 1)
+
+**Setup.** `scripts/voice-mock/server.ts --live` opened a GPT-Live session from
+the host over its WebSocket transport (`wss://api.openai.com/v1/live/sessions`,
+`session.start` with the same session config Studio sends, `responses`
+delegation to `gpt-5.6-luna` with Studio's tools). The user was macOS `say`
+speech streamed as a continuous mic: silence between lines, 24 kHz PCM in
+100 ms chunks. The real iOS app in the simulator (iPhone 17 Pro, iOS 27.0) got
+GPT-Live's events and audio through the bridge. It relayed the tool calls to
+Studio's tool layer, ran the subtitles and did the barge-in mute. Times are on
+the host's clock. "First word" is when speech starts in the clip that was sent.
+
+| What | Measured |
+| --- | --- |
+| Connect to `session.started` | 0.25 s (WebSocket from the host) |
+| User's first word → first input transcript word, a normal turn | 0.87–1.18 s (5 turns) |
+| End of the user's speech → the voice's first audio, **turn latency** | 1.24–1.97 s. "What's waiting" 1.75 s, the send request 1.66 s, "Yes, send it" 1.97 s, the long question 1.24 s and the goodbye 0.75 s. Each of the first four includes a tool call; the voice often says a short "Checking now" or "Okay" first. |
+| The user's last word → the backend's tool call | about 0.7 s (from the first probe: last transcript word to `function_call` done) |
+| Tool round trip: the call reaches the app → Studio's tool layer → the result is back on the channel | 21–31 ms (4 calls, simulator and host) |
+| Studio's tool layer itself | 0–4 ms |
+| The tool result → the voice's answer starts | about 1.5 s (a second backend turn writes it, then the voice says it) |
+| **Barge-in: first word → voice muted on the phone** | **2.05 s**. The first input transcript word took 2.05 s while the voice was talking (against about 1 s on a quiet line), and the app muted 2 ms after it arrived. |
+| Barge-in: first word → GPT-Live stops sending the voice's audio | 3.06 s (the phone had already silenced it by then) |
+| The lead's reply → the voice says it | It was spoken right after "Sent." (the 3 s reply poll, then `session.commentary.append`) |
+| Session cost | ≈ $0.06 for 69 s (Studio's own estimate from `session.usage.updated` and the backend's tokens) |
+
+**The relay, live.** The user said "Tell the Kensico lead to pause the eBay
+fetcher until Monday". The backend called `send_to_thread`; Studio drafted it
+and returned the read-back, and the voice said it word for word: "Send to the
+Kensico lead: Please pause the eBay fetcher until Monday. Say yes to send." The
+user said "Yes, send it". The backend called `confirm_send`, and Studio found
+the yes in its own transcript after the draft and sent it, from the voice
+thread. The fake lead answered 2.5 s later, and the voice said: "The Kensico
+lead says the eBay fetcher is paused, and it'll resume Monday at 9."
+
+**What this says.**
+- **Turns are fine for driving:** about 1.2–2 s from the end of speech to the
+  voice, tool calls included.
+- **Barge-in is the weak spot.** While GPT-Live is talking, its input
+  transcript runs about 2 s behind the user, and GPT-Live's own stop came about
+  3 s after the user started. The phone mutes on the first transcript word, so
+  it can't be faster than that. The fix to try first is a local level gate:
+  while the voice plays, mute on mic energy (WebRTC's echo cancellation makes
+  that safe enough), and let the transcript confirm.
+- **What matched the docs:** the event shapes (`session.delegation.created`,
+  `response.event` wrapping Responses events, `response.item.create` plus
+  `response.create` for tool results, `session.thinking.append`/`appended`,
+  `session.usage.updated` every 15 s, and `session.closed` with
+  `close_requested`) and the `marin` voice.
+- **What the docs don't say:** GPT-Live **streams output audio all the time,
+  silence included**, so "the voice is talking" has to come from the audio
+  level or the transcript, not from audio arriving. Its replies also pause up
+  to about 0.7 s between phrases.
+
+**Fixed after the run.** The read-back had a double period because the model
+ended the message with one ("Monday.. Say yes"). The voice's lines also split
+at GPT-Live's phrase pauses. Lines now stay open 0.9 s, the bridge waits 0.9 s
+of silence, and both fixes have tests.
 
 ## Cost per minute
 
@@ -221,14 +277,14 @@ shares:
 
 ## Risks
 
-- **Not run against OpenAI yet.** The request bodies and event names come from
-  the Nov 1 docs. GPT-Live is new: check `responses` delegation's tool-call
-  envelope, the `response.item.create` result shape and the voice name on the
-  first live run.
-- **Barge-in on GPT-Live** depends on how fast the first input transcript delta
-  arrives. If it's slow, the voice talks over the user for that long. Possible
-  fixes: a local level gate on the mic while the voice speaks (WebRTC's AEC
-  makes that safer than today's gate), or WebRTC audio-level stats.
+- **The phone's WebRTC path hasn't run live.** The live run used GPT-Live's
+  WebSocket transport from the host. Studio's `/v1/live/sessions` SDP exchange
+  and the app's WebRTC transport need a real device (or a simulator allowed to
+  use the Mac's mic).
+- **Barge-in on GPT-Live is slow: about 2 s, measured.** The voice talks over
+  the user for that long. Next: a local level gate on the mic while the voice
+  plays (WebRTC's AEC makes that safer than today's gate), with the transcript
+  to confirm.
 - **Echo and car noise.** `.voiceChat` AEC and the transcript echo guard aren't
   tested with real audio, a car or HFP. The yes check fails safe: unclear or
   hedged speech isn't a yes.
@@ -260,8 +316,12 @@ shares:
 - A scripted session:
   1. Run `../../node_modules/.bin/tsx scripts/voice-mock/server.ts --port 8790 --out <dir>` from `packages/bb-studio`.
   2. Launch the app with `-qaVoiceLive script -qaVoiceLiveStudio http://127.0.0.1:8790 -qaVoiceLiveAutostart`.
-- Live, in a staged BB: put the key in Studio's settings, or in
-  `OPENAI_API_KEY` on the staged host, and set "Hands-free voice: model".
+- Live, from the host: with `OPENAI_API_KEY` in a staged-only dotenv, run
+  `(set -a; . <dotenv>; set +a; ../../node_modules/.bin/tsx scripts/voice-mock/server.ts --live --port 8790 --out <dir>)`
+  and launch the app as for the scripted session. It writes
+  `live-timings.json`, `live-audio.wav` (both sides) and `live-events.jsonl`.
+- Live, on a phone: put the key in Studio's settings and set "Hands-free voice:
+  model". Not tried yet.
 
 ## Deliverables
 
@@ -285,3 +345,11 @@ In `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
   lead's reply, and a barge-in.
 - **`mock-voice-thread.md`, `mock-timings.json` and `mock-server.log`** come
   from that run.
+- **`hands-free-live-session.mp4`** is the live run against `gpt-live-1`: 74 s,
+  **with sound** (GPT-Live's voice and the synthetic user, put on the
+  simulator video and lined up to the subtitles within about 0.2 s). It has
+  what's waiting, the relay with the read-back and "yes, send it", the lead's
+  reply, and a barge-in on a long answer. `live-audio.wav` is the sound alone.
+- **`live-timings.json`, `live-voice-thread.md` and `live-server.log`** come
+  from the live run. The voice thread got exactly two posts: the relay as it
+  happened, and the transcript at hang-up.
