@@ -113,6 +113,18 @@ describe("session machine", () => {
     expect(machine.card?.title).toBe("Dropped the loop 'Remove the stale Tailscale node'.");
   });
 
+  it("a line doesn't end while the user is still audibly talking, however slow the transcript", () => {
+    const machine = live();
+    machine.handle({ type: "userText", text: "Okay" }, t0 + 1);
+    // 1.2 s with no new words, but the mic still hears them (live run: the transcript lags while the voice talks).
+    machine.micLevels(Array.from({ length: 60 }, (_, index) => ({ level: 0.1, at: t0 + 1 + index * 0.02 })), 0);
+    expect(machine.tick(t0 + 2.2)).toEqual([]);
+    expect(machine.phase.kind).toBe("userSpeaking");
+    machine.handle({ type: "userText", text: ". Stop there" }, t0 + 2.3);
+    expect(machine.tick(t0 + 3.4)).toEqual([{ type: "earcon", earcon: "heard" }]);
+    expect(transcripts(machine.drain())).toEqual(["user: Okay. Stop there"]);
+  });
+
   it("says why the session ended, in words", () => {
     const machine = live();
     machine.handle({ type: "closed", reason: "remote_hangup" }, t0 + 9);

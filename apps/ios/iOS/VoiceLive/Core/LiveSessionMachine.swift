@@ -94,6 +94,8 @@ struct LiveSessionMachine: Sendable {
     var confirmWindow: TimeInterval = 1.0
     /// The last mic frame above the gate's bar during a provisional mute.
     private var loudUntil: TimeInterval = 0
+    /// The last mic frame that sounded like the user (above the gate's bar), for ending lines.
+    private var lastLoudAt: TimeInterval = 0
 
     /// GPT-Live and the mock have no end-of-line events: a pause ends a line.
     var endsLinesOnPause: Bool
@@ -232,6 +234,9 @@ struct LiveSessionMachine: Sendable {
     /// While the voice talks, the user's voice above its echo mutes it at once (BargeInGate);
     /// the transcript then confirms (userHeard) or the window cancels it (tick).
     mutating func micLevels(_ frames: [(level: Float, at: TimeInterval)], playback: Float) -> [LiveEffect] {
+        // While the user is audibly talking, their line isn't over, however slowly the transcript comes.
+        let playing = phase == .agentSpeaking && !agentMuted
+        for frame in frames where frame.level > gate.threshold(playback: playback, voicePlaying: playing) { lastLoudAt = max(lastLoudAt, frame.at) }
         // While muted provisionally, keep track of whether the user is still talking.
         if let since = provisionalSince {
             let bar = gate.threshold(playback: 0, voicePlaying: true)
@@ -263,7 +268,8 @@ struct LiveSessionMachine: Sendable {
             falseTriggers += 1
             effects.append(.muteAgentAudio(false))
         }
-        if endsLinesOnPause, phase == .userSpeaking, !userText.isEmpty, now - lastUserAt > userPause {
+        // GPT-Live's transcript of the user comes in bursts while the voice talks: a line ends on a pause in the words and in the mic.
+        if endsLinesOnPause, phase == .userSpeaking, !userText.isEmpty, now - lastUserAt > userPause, now - lastLoudAt > userPause {
             effects += finishUser(now: now)
         }
         if phase == .agentSpeaking, provisionalSince == nil, now > agentUntil, endsLinesOnPause || agentText.isEmpty {

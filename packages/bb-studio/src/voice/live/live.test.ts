@@ -253,7 +253,7 @@ describe("eyes-free rules in the tool layer", () => {
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [said("Thank you for watching")])).toMatch(/hasn't heard/);
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [said("Drop the loop Remove the stale Tailscale node? Say yes to drop.")])).toMatch(/didn't hear a clear yes/);
     expect(act).not.toHaveBeenCalled();
-    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [said("Yes, drop it")])).toBe(`Dropped the loop 'Remove the stale Tailscale node'. Say that briefly.`);
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [said("Yes, drop it")])).toBe(`Dropped the loop 'Remove the stale Tailscale node'. Say that briefly; it can't be undone by voice.`);
     expect(act).toHaveBeenCalledWith("loop_ts", "drop");
     expect(loops.loop_ts!.status).toBe("dropped");
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [said("yes")])).toBe("That was already done.");
@@ -286,7 +286,7 @@ describe("eyes-free rules in the tool layer", () => {
     for (const [tool, args, question, done] of cases) {
       const asked = await live.tool(sessionId, tool, JSON.stringify(args));
       expect(prompt(asked)).toBe(question);
-      expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: actionId(asked) }), [said("Yes, stop it")])).toBe(`${done} Say that briefly.`);
+      expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: actionId(asked) }), [said("Yes, stop it")])).toBe(`${done} Say that briefly; it can't be undone by voice.`);
     }
     expect(threads.stop).toHaveBeenCalledWith(KENSICO.threadId);
     expect(threads.archive).toHaveBeenCalledWith(KENSICO.threadId);

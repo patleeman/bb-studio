@@ -483,7 +483,7 @@ export class VoiceLive {
     const { pending } = found;
     const done = await this.carryOut(pending);
     this.append(row.id, "confirmed", { text: done, data: { actionId, action: pending.action, name: pending.name } });
-    return `${done} Say that briefly.`;
+    return `${done} Say that briefly; it can't be undone by voice.`;
   }
 
   private async carryOut(pending: Pending): Promise<string> {

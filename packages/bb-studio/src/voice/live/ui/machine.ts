@@ -144,6 +144,8 @@ export class SessionMachine {
   private awaitingTurn = false;
   private lastAgentLine = "";
   private loudUntil = 0;
+  /** The last mic frame that sounded like the user (above the gate's bar), for ending lines. */
+  private lastLoudAt = 0;
 
   /** GPT-Live and the mock have no end-of-line events: a pause ends a line. */
   constructor(public endsLinesOnPause = true) {}
@@ -253,6 +255,9 @@ export class SessionMachine {
    * cancels it (tick).
    */
   micLevels(frames: { level: number; at: number }[], playback: number): Effect[] {
+    // While the user is audibly talking, their line isn't over, however slowly the transcript comes.
+    const playing = this.phase.kind === "agentSpeaking" && !this.agentMuted;
+    for (const frame of frames) if (frame.level > this.gate.threshold(playback, playing)) this.lastLoudAt = Math.max(this.lastLoudAt, frame.at);
     if (this.provisionalSince !== null) {
       const bar = this.gate.threshold(0, true);
       for (const frame of frames) if (frame.at >= this.provisionalSince && frame.level > bar) this.loudUntil = Math.max(this.loudUntil, frame.at);
@@ -284,7 +289,8 @@ export class SessionMachine {
       this.falseTriggers++;
       effects.push({ type: "muteAgentAudio", muted: false });
     }
-    if (this.endsLinesOnPause && this.phase.kind === "userSpeaking" && this.userText && now - this.lastUserAt > this.userPause) effects.push(...this.finishUser(now));
+    // GPT-Live's transcript of the user comes in bursts while the voice talks: a line ends on a pause in the words and in the mic.
+    if (this.endsLinesOnPause && this.phase.kind === "userSpeaking" && this.userText && now - this.lastUserAt > this.userPause && now - this.lastLoudAt > this.userPause) effects.push(...this.finishUser(now));
     if (this.phase.kind === "agentSpeaking" && this.provisionalSince === null && now > this.agentUntil && (this.endsLinesOnPause || !this.agentText)) this.finishAgent(now);
     return effects;
   }
