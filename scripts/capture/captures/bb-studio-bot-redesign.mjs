@@ -212,7 +212,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       bbDb.prepare("INSERT INTO pending_interactions (id, thread_id, origin_kind, turn_id, provider_id, provider_thread_id, provider_request_id, status, payload, created_at, updated_at) VALUES (?, ?, 'provider', 'turn_capture', ?, ?, 'req_capture_vault', 'pending', ?, ?, ?)")
         .run("pi_capture_vault", bot.threadId, thread?.provider_id ?? "codex", bot.threadId, JSON.stringify({ kind: "user_question", questions: [{ id: "vault", prompt: "Which vault holds the deploy key?", allowFreeText: true, multiSelect: false }] }), Date.now() - 12 * 60_000, Date.now() - 12 * 60_000);
     } finally { studio.close(); bbDb.close(); }
-    await bbCli(["plugin", "config", "studio", "set", "loopsEnabled", "true"]);
+    await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
     // Three runners at work.
     const live = (await pluginRpc("studio", "bot_runners", {})).runners;
     for (const [name, job] of Object.entries(WORKING)) {

@@ -141,7 +141,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     await bbCli(["thread", "tell", bot.threadId, `Capture fixture (${label}). Don't call any tools. Reply with exactly the text between the markers, unchanged, and nothing else.\n<<<\n${text}\n>>>`]);
     await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
   };
-  const setEnabled = (on) => bbCli(["plugin", "config", "studio", "set", "loopsEnabled", on ? "true" : "false"]);
+  const setEnabled = (on) => bbCli(["studio", "settings", "set", "loopsEnabled", on ? "true" : "false"]);
   const chatPath = (bot) => `/threads/${bot.threadId}`;
   /** Scroll the chat so `selector`'s first match is near the top. */
   /** The newest reply's text: the last element holding `text`, scrolled to the top of the chat. */

@@ -18,6 +18,7 @@ import bb_studio_artifacts from "./captures/bb-studio-artifacts.mjs";
 import bb_studio_reactions from "./captures/bb-studio-reactions-settings.mjs";
 import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
+import bb_studio_settings from "./captures/bb-studio-settings.mjs";
 import design from "./captures/design.mjs";
 import bb_studio_code from "./captures/bb-studio-code.mjs";
 import compactHeaders from "./captures/compact-headers.mjs";
@@ -44,6 +45,7 @@ export function loadCaptures(context) {
     ...bb_studio_reactions(context),
     ...bb_studio_decisions(context),
     ...bb_studio_mobile(context),
+    ...bb_studio_settings(context),
     ...design(context),
     ...bb_studio_code(context),
   ];

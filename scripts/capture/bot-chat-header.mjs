@@ -75,7 +75,7 @@ const clickHeaderLoops = () => client.evaluate(`(() => {
 try {
   await client.connect();
   await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false });
-  await bbCli(["plugin", "config", "studio", "set", "loopsEnabled", "true"]);
+  await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
   const { bot } = await pluginRpc("studio", "bot_get", {});
   if (!bot?.threadId) throw new Error("The staged BB has no Bot with a chat; run a Bot or Loops capture first.");
 
