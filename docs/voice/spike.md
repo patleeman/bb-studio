@@ -9,8 +9,9 @@ it isn't merged or released.
 
 **Status, Nov 1.** It ran live against the real `gpt-live-1`, with Studio's
 real tool layer and the real iOS app in a simulator (see "Live run" below):
-"what's waiting", a relay to the Kensico lead with the read-back and a spoken
-"yes" that Studio checked, the lead's reply read back, and a barge-in. The key
+"what's waiting", a relay to the Kensico lead (then still with a read-back and
+a spoken "yes" that Studio checked; relays are now instant, see the rules), the
+lead's reply read back, and a barge-in. The key
 came through `bb secret request` into a staged-only dotenv, and was used only
 by the harness process on this Mac. **Still untested live: the phone's own
 WebRTC connection.** The live run used GPT-Live's WebSocket transport from the
@@ -102,23 +103,27 @@ the app's networking, and it would save one hop. `client` delegation would mean
 running our own agent per turn, so it's slower and costs more than a small
 Responses model that only picks tools.
 
-The tools are `loops_list`, `read_replies`, `send_to_cos`, `send_to_thread`
-(by name, or "the X lead"), `confirm_send`, `cancel_send`, `loops_act`
-(done or snooze only) and `undo`.
+The tools are:
+- **reads:** `loops_list`, `read_replies`;
+- **at once:** `send_to_cos`, `send_to_thread` (by name, or "the X lead"),
+  `loops_act` (done, snooze, hand off), `loops_add`, `undo`;
+- **after a spoken yes:** `loops_act` drop, `stop_thread`, `archive_thread`,
+  `pause_automation`, `delete_automation`, answered with `confirm` or `cancel`.
 
 ## Eyes-free rules, enforced in the tool layer
 
-All of these are in [`rules.ts`](../../packages/bb-studio/src/voice/live/rules.ts)
-and [`live.ts`](../../packages/bb-studio/src/voice/live/live.ts), with tests in
-`live.test.ts` and `rules.test.ts`.
+Patrick's rule (Nov 1, replacing "read back every send"): **act at once, say it
+briefly; confirm only what's destructive or hard to undo.** Every tool call is
+classified in [`rules.ts`](../../packages/bb-studio/src/voice/live/rules.ts)
+(`classify`) and enforced in [`live.ts`](../../packages/bb-studio/src/voice/live/live.ts),
+not just in the prompt. Tests are in `live.test.ts` and `rules.test.ts`.
 
-| Rule | How Studio enforces it |
-| --- | --- |
-| Status, "what's waiting", replies are free | Read-only tools; tests check they write nothing. |
-| Every send is read back and needs a spoken yes | `send_to_*` only makes a **draft** and returns the read-back ("Send to the Kensico lead: … Say yes to send."). `confirm_send` sends only if Studio's own transcript has a **user line after the draft** that is a short, clear yes. A yes said before the read-back doesn't count. A no or a change cancels. Whisper's filler ("Thank you for watching") and the voice's own read-back echoed into the mic aren't a yes. A draft expires after 45 s. The model saying "they said yes" counts for nothing. |
-| Done and snooze have a spoken undo window | `loops_act` runs at once and returns "say undo in the next 10 seconds". `undo` restores the loop's status and trigger (`loops.update` reopens a closed loop) and is refused after 10 s. Drop, hand off, choose and nudge are refused. |
-| Never by voice: spending, email, posting, deleting, approvals | Those tools don't exist, and an unknown tool name gets a refusal. A send that *asks* for one is still relayed after a yes, as a request. The message is marked "⚠️ Voice can't approve this: ask me here first", and an agent-only note on every relay tells the target not to act on the voice's word for any of them. |
-| Relays are visible | The message lands in the target thread **from the voice thread** (`senderThreadId`). The voice thread gets the transcript, "→ Sent to …" and "← … answered" lines, and a summary line at hang-up. |
+| Class | Tools | How Studio enforces it |
+| --- | --- | --- |
+| **Read**, free | `loops_list`, `read_replies` | Read-only; tests check they write nothing. |
+| **At once**, said briefly | Relays: `send_to_cos`, `send_to_thread`. Loop actions: done, snooze, hand off (`loops_act`), add (`loops_add`) | A relay is sent right away, visible in the target thread **from the voice thread** (`senderThreadId`), and posted in the voice thread. Studio answers "Sent to the Kensico lead." and the voice says just that; the phone shows "✓ Sent to the Kensico lead" under the subtitles. Loop actions run at once with a **spoken 10 s undo** (`undo` restores status, trigger and owner; undoing an add removes the loop). |
+| **Confirm**, destructive or hard to undo | Drop a loop (`loops_act` drop), `stop_thread`, `archive_thread`, `pause_automation`, `delete_automation` | Nothing happens yet. Studio returns one question ("Drop the loop 'Remove the stale Tailscale node'? Say yes to drop."), the voice asks it, and the phone shows **"Waiting for your yes"**, the only place that card appears. `confirm` acts only if Studio's own transcript has a **user line after the question** that is a short, clear yes ("Yes, drop it" counts). A yes said before the question doesn't count. A no or a change cancels. Whisper's filler ("Thank you for watching") and the voice's own question echoed into the mic aren't a yes. It expires after 45 s. The model saying "they said yes" counts for nothing. |
+| **Never by voice** | Spending money, email or messages to people outside BB, posting publicly, approving credentials | No such tools exist, and an unknown tool name gets a refusal. A relay that *asks* for one is still sent, as a request. It's marked "⚠️ Voice can't approve this: ask me here first", and an agent-only note on every relay tells the target not to act on the voice's word for any of them. |
 
 ## The voice thread
 
@@ -129,15 +134,16 @@ kept to the minimum:
 
 - **Every relay, as it happens:** one line, "→ Sent to the Kensico lead: …".
 - **The full transcript once, at hang-up:** a summary line, then both sides'
-  words in order, interruptions, what was sent and what came back.
+  words in order, interruptions, what was sent and what came back, the loop
+  actions ("✓ Loop done: …") and anything done after a spoken yes ("⚠️ Done
+  after a spoken yes: Dropped the loop '…'.").
 - **A reply that arrives after hang-up:** one line, plus the phone push.
 
 Nothing else is posted while the session runs: no transcript batches, and
 replies during the session go into the end transcript (`live.test.ts`, "the
 voice thread"). A session with one relay costs two short turns there. The
-voice thread from the recorded mock session (before this change, with
-per-batch posts) is saved as `mock-voice-thread.md` in the deliverables
-folder.
+voice thread from the recorded mock session is saved as `mock-voice-thread.md`
+in the deliverables folder.
 
 ## Barge-in and the subtitle UI
 
@@ -168,8 +174,9 @@ folder.
 - **Subtitles.** A talking icon moves while either side speaks: teal for you,
   the app's accent for the voice, and purple while thinking. Under it, the
   current line streams in large type, not chat bubbles, and keeps its newest
-  words in view. A read-back card says "Waiting for your yes". Tool results
-  show as one small card.
+  words in view. A relay shows "✓ Sent to …" as a line under the subtitles.
+  "Waiting for your yes" appears only for a destructive action. Other tool
+  results show as one small card.
 - **Earcons** play for start, heard, working, sent, error and end.
 - **Audio session.** One `.playAndRecord` / `.voiceChat` session runs from Start
   to End, with `.allowBluetoothHFP`, A2DP, `bluetoothHighQualityRecording`,
@@ -227,7 +234,7 @@ the host's clock. "First word" is when speech starts in the clip that was sent.
 | The lead's reply → the voice says it | It was spoken right after "Sent." (the 3 s reply poll, then `session.commentary.append`) |
 | Session cost | ≈ $0.06 for 69 s (Studio's own estimate from `session.usage.updated` and the backend's tokens) |
 
-**The relay, live.** The user said "Tell the Kensico lead to pause the eBay
+**The relay, live** (under the earlier read-back rule; relays are now instant). The user said "Tell the Kensico lead to pause the eBay
 fetcher until Monday". The backend called `send_to_thread`; Studio drafted it
 and returned the read-back, and the voice said it word for word: "Send to the
 Kensico lead: Please pause the eBay fetcher until Monday. Say yes to send." The
@@ -357,14 +364,17 @@ In `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
   - you talking;
   - the voice speaking, with subtitles;
   - a tool result ("2 need you");
-  - the relay confirmation ("Send to the Kensico lead: … Say yes to send.");
-  - sent;
+  - a relay, sent at once ("✓ Sent to the Kensico lead" under the subtitles);
+  - the only confirm card: a destructive action ("Drop the loop 'Remove the
+    stale Tailscale node'? Say yes to drop.");
+  - dropped, after the yes;
   - a reply;
-  - speaking and confirm again in dark mode.
-- **`hands-free-scripted-session.mp4`** is the 53 s simulator recording of the
-  mock session (`-small.mp4` is a 1 MB copy). It runs "What's waiting", a
-  snooze, a send to the Kensico lead with the read-back and a spoken yes, the
-  lead's reply, and a barge-in.
+  - every state again in dark mode (`-dark`).
+- **`hands-free-scripted-session.mp4`** is the simulator recording of the mock
+  session under the new rules. It runs "What's waiting", a snooze, an instant
+  send to the Kensico lead, dropping a loop after a spoken yes, the lead's
+  reply, and a barge-in. (`-small.mp4` is the earlier recording, under the
+  read-back rule.)
 - **`mock-voice-thread.md`, `mock-timings.json` and `mock-server.log`** come
   from that run.
 - **`hands-free-live-session.mp4`** is the live run against `gpt-live-1`: 74 s,
@@ -373,8 +383,8 @@ In `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
   what's waiting, the relay with the read-back and "yes, send it", the lead's
   reply, and a barge-in on a long answer. `live-audio.wav` is the sound alone.
 - **`live-timings.json`, `live-voice-thread.md` and `live-server.log`** come
-  from the live run.
+  from the live run. The voice thread got exactly two posts: the relay as it
+  happened, and the transcript at hang-up.
 - **`hands-free-live-bargein.mp4`** (with sound) and `live-bargein-*` are the
   re-run with the level-based barge-in: two cut-ins, muted 0.20 s and 0.18 s
-  after the first word. The voice thread got exactly two posts: the relay as it
-  happened, and the transcript at hang-up.
+  after the first word.
