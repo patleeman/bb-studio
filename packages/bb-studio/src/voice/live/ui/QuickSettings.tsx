@@ -98,7 +98,7 @@ export function QuickSettingsItems({ state, error, live, choose }: { state: Voic
           </ContextMenuSub>
           <ContextMenuSub>
             <ContextMenuSubTrigger data-testid="handsfree-menu-voice">Voice<Value>{state.voice}</Value><Icon name="ChevronRight" className="size-3.5 shrink-0" aria-hidden /></ContextMenuSubTrigger>
-            <ContextMenuSubContent data-testid="handsfree-voices" className="max-h-[min(22rem,var(--radix-context-menu-content-available-height))] w-48 overflow-y-auto">
+            <ContextMenuSubContent data-testid="handsfree-voices" className="max-h-[var(--radix-context-menu-content-available-height)] w-48 overflow-y-auto">
               <ContextMenuLabel className="text-[11px] text-muted-foreground">{state.model}’s voices</ContextMenuLabel>
               {LIVE_VOICES[state.model].map((voice) => (
                 <ContextMenuItem key={voice} data-testid={`handsfree-voice-${voice}`} aria-checked={state.voice === voice} role="menuitemradio" onSelect={() => choose({ voice })}>
