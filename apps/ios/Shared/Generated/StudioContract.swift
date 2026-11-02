@@ -27338,11 +27338,13 @@ public enum Studio {
     public var costUsd: Double?
     public var replies: Int?
     public var stop: String?
+    public var voiceThreadId: String?
 
-    public init(costUsd: Double? = nil, replies: Int? = nil, stop: String? = nil) {
+    public init(costUsd: Double? = nil, replies: Int? = nil, stop: String? = nil, voiceThreadId: String? = nil) {
       self.costUsd = costUsd
       self.replies = replies
       self.stop = stop
+      self.voiceThreadId = voiceThreadId
     }
   }
 

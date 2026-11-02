@@ -1309,6 +1309,8 @@ export default async function plugin(bb: BbPluginApi) {
       pluginMetadata: { voiceLive: true },
       input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
     } as never)).id,
+    // Voice threads live under the Bot, like its other threads: hidden from BB's main list, in its Recent.
+    claim: async (threadId) => { const bot = bots.stored(); if (bot) await ownedThreads.claim(threadId, bot.id); },
     send: ({ threadId, senderThreadId, text, note, mode }) => bb.sdk.threads.send({
       threadId, mode, ...(senderThreadId ? { senderThreadId } : {}),
       input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],

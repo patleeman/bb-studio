@@ -27,6 +27,7 @@ function setup(options: { key?: string; cap?: number; model?: string; status?: n
   const push = vi.fn(async (_input: { title: string; body: string; threadId: string; coalesceKey: string }) => {});
   const publish = vi.fn();
   const openThread = vi.fn(async (_input: { title: string; text: string; note: string }) => "thr_voice");
+  const claim = vi.fn(async (_threadId: string) => true);
   const loops: Record<string, VoiceLoop> = {
     loop_1: { id: "loop_1", title: "Reply to Dana", kind: "do", status: "surfaced", priority: "urgent", due: null, trigger: { type: "none" }, owner: "patrick" },
     loop_2: { id: "loop_2", title: "Renew the domain", kind: "do", status: "queued", priority: "normal", due: null, trigger: { type: "none" }, owner: "patrick" },
@@ -55,13 +56,13 @@ function setup(options: { key?: string; cap?: number; model?: string; status?: n
     resolve,
     latestReply: async (threadId) => (threadId === KENSICO.threadId ? { title: "the Kensico lead", text: "**Paused** the eBay fetcher until Monday." } : null),
     loops: { groups: () => ({ needsYouNow: [loops.loop_1!], comingUp: [loops.loop_2!] }), get: (id) => { if (!loops[id]) throw new Error("No such loop."); return loops[id]!; }, act, add, restore },
-    threads, automations,
+    threads, automations, claim,
     openThread, send, push, publish,
     mockUrl: () => options.mock ?? null,
     now: () => now,
     ...overrides,
   });
-  return { db, live, fetch, send, push, publish, openThread, act, add, restore, threads, automations, loops, resolve, advance: (ms: number) => { now += ms; } };
+  return { db, live, fetch, send, push, publish, openThread, claim, act, add, restore, threads, automations, loops, resolve, advance: (ms: number) => { now += ms; } };
 }
 
 const said = (text: string) => ({ type: "transcript" as const, role: "user" as const, text });
@@ -71,7 +72,7 @@ const eventCount = (db: Database.Database) => (db.prepare("SELECT COUNT(*) AS n 
 
 describe("voiceLive.start", () => {
   it("gpt-live-1: Studio creates the session with the phone's SDP; no credential reaches the phone", async () => {
-    const { live, fetch, openThread } = setup();
+    const { live, fetch, openThread, claim } = setup();
     const started = await live.start({ sdp: "v=0 offer" });
     expect(voiceLiveContract["voiceLive.start"].output.parse(started)).toEqual(started);
     expect(started).toMatchObject({ model: "gpt-live-1", transport: "live-webrtc", answerSdp: "v=0 answer", clientSecret: null, callsUrl: null, mockUrl: null, cosName: "Dot" });
@@ -89,6 +90,9 @@ describe("voiceLive.start", () => {
     expect(JSON.stringify(body)).not.toContain(KEY);
     // The voice thread opens beside the call.
     expect(await live.voiceThread(started.sessionId)).toBe("thr_voice");
+    // It moves under the Bot, and the client learns its id.
+    expect(claim).toHaveBeenCalledWith("thr_voice");
+    expect(live.record(started.sessionId, []).voiceThreadId).toBe("thr_voice");
     expect(openThread.mock.calls[0]![0].title).toMatch(/^🎙 Voice · /);
   });
 

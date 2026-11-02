@@ -228,3 +228,25 @@ it("releases a thread the user takes back: shown again, no Bot's, and what it sp
   await expect(x.owned.release("thr_k3mtxc4nju")).rejects.toThrow(/own chat/);
   await expect(x.owned.release("thr_fork")).rejects.toThrow(/isn't a bot's/);
 });
+
+it("claims a hands-free voice thread for the Bot: hidden from BB's list, listed under the Bot, nothing posted in its chat, and it stays through sweeps", async () => {
+  const x = await setup();
+  seedChief(x);
+  x.add({ id: "thr_voice", title: "🎙 Voice · Nov 1, 8:26 PM" });
+  expect(await x.owned.claim("thr_voice", "bot_main")).toBe(true);
+  expect(x.threads.get("thr_voice")!.visibility).toBe("hidden");
+  expect(x.owned.owned("bot_main").has("thr_voice")).toBe(true);
+  expect(x.owned.ownerOf("thr_voice")).toBe("bot_main");
+  expect(x.handed).not.toHaveBeenCalled();
+  expect(x.db.prepare("SELECT reason FROM bot_hidden_threads WHERE thread_id = ?").get("thr_voice")).toEqual({ reason: "voice" });
+  // A sweep keeps it the Bot's; the user's own threads stay theirs.
+  await x.owned.sweep();
+  expect(x.owned.owned("bot_main").has("thr_voice")).toBe(true);
+  expect(x.threads.get("thr_user")!.visibility).toBe("visible");
+  // BB refusing to hide it leaves it unclaimed (and listed), so nothing is lost.
+  x.add({ id: "thr_voice_2", title: "🎙 Voice · Nov 1, 9:00 PM" });
+  const update = (x.update as unknown as { mockRejectedValueOnce(error: Error): void });
+  update.mockRejectedValueOnce(new Error("busy"));
+  expect(await x.owned.claim("thr_voice_2", "bot_main")).toBe(false);
+  expect(x.owned.owned("bot_main").has("thr_voice_2")).toBe(false);
+});

@@ -104,7 +104,8 @@ export const voiceLiveContract = defineRpcContract({
   "voiceLive.event": {
     experimental_description: "Report what happened: finished transcript lines, interruptions and usage. Returns the running cost, how many replies wait for voiceLive.poll, and whether to stop (the monthly cap).",
     input: z.object({ sessionId, events: z.array(liveEventSchema).max(200) }).strict(),
-    output: z.object({ costUsd: z.number().nullable(), replies: z.number().int(), stop: z.string().nullable() }),
+    /** voiceThreadId: the session's voice thread once it's open (the pill links to it). */
+    output: z.object({ costUsd: z.number().nullable(), replies: z.number().int(), stop: z.string().nullable(), voiceThreadId: z.string().nullable() }),
   },
   "voiceLive.poll": {
     experimental_description: "Replies to what the session sent, not yet picked up; each has the note to add to the conversation.",

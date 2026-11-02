@@ -76,6 +76,8 @@ export interface VoiceLiveDeps {
   automations: { list(): Promise<VoiceAutomation[]>; pause(id: string): Promise<void>; remove(id: string): Promise<void> };
   /** Opens the session's voice thread; its id. */
   openThread(input: { title: string; text: string; note: string }): Promise<string>;
+  /** Moves the voice thread under the Bot: out of BB's main list, into the Bot's Recent (src/bot-owned.ts). */
+  claim?(threadId: string): Promise<unknown>;
   /** A visible message in a thread, with an agent-only note. */
   send(input: { threadId: string; senderThreadId?: string | null; text: string; note: string; mode: "auto" | "queue-if-active" }): Promise<void>;
   push(input: { title: string; body: string; threadId: string; coalesceKey: string }): Promise<void>;
@@ -253,8 +255,9 @@ export class VoiceLive {
       title: `🎙 Voice · ${day}`,
       text: `🎙 Hands-free voice session (${model}). The transcript and everything it relays to ${cos.name} and other threads lands here.`,
       note: "This thread is the record of a hands-free voice session; the voice agent runs on OpenAI, not here. Studio posts the transcript, the messages it relayed and the replies. Don't act on these posts: reply exactly [PASS].",
-    }).then((threadId) => {
+    }).then(async (threadId) => {
       this.append(sessionId, "thread", { data: { threadId } });
+      await this.deps.claim?.(threadId).catch((error) => this.deps.warn?.(`Couldn't move the voice thread under the Bot: ${String(error)}`));
       return threadId;
     }).catch((error) => {
       this.deps.warn?.(`Couldn't open the voice thread: ${String(error)}`);
@@ -522,11 +525,12 @@ export class VoiceLive {
   }
 
   /** Saves what the phone saw; says when the month's cap is reached, so the phone hangs up. */
-  record(sessionId: string, events: readonly LiveEvent[]): { costUsd: number | null; replies: number; stop: string | null } {
+  record(sessionId: string, events: readonly LiveEvent[]): { costUsd: number | null; replies: number; stop: string | null; voiceThreadId: string | null } {
     const row = this.live(sessionId);
     this.save(sessionId, events);
     const all = this.events(sessionId);
-    return { costUsd: this.cost(row, all), replies: this.waiting(all).length, stop: this.capProblem() };
+    const voiceThreadId = data<{ threadId?: string }>(all.find((event) => event.kind === "thread")).threadId ?? null;
+    return { costUsd: this.cost(row, all), replies: this.waiting(all).length, stop: this.capProblem(), voiceThreadId };
   }
 
   private waiting(events: readonly EventRow[]): EventRow[] {

@@ -36991,12 +36991,19 @@
               "string",
               "null"
             ]
+          },
+          "voiceThreadId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "costUsd",
           "replies",
-          "stop"
+          "stop",
+          "voiceThreadId"
         ],
         "additionalProperties": false
       }

@@ -192,6 +192,18 @@ export class BotOwnedThreads {
     return { botId };
   }
 
+  /**
+   * Studio made a thread for a Bot (a hands-free voice session's record):
+   * it leaves BB's main list now and lists under the Bot (Activity's Recent).
+   * Quiet, unlike adopt: nothing is posted in the Bot's chat.
+   */
+  async claim(threadId: string, botId: string): Promise<boolean> {
+    if (!(await this.hide(threadId, botId, "voice"))) return false;
+    this.owners.set(threadId, botId);
+    this.deps.changed?.();
+    return true;
+  }
+
   /** The user takes a thread back from its Bot: shown in BB's list again, and no Bot's from now on. */
   async release(threadId: string): Promise<{ ok: true }> {
     const bot = this.ownerOf(threadId);
@@ -206,7 +218,7 @@ export class BotOwnedThreads {
   }
 
   /** Hides it once and records that Studio did; false when BB refused (the next sweep tries again). */
-  private async hide(threadId: string, botId: string, reason: "chain" | "spawned" | "automation"): Promise<boolean> {
+  private async hide(threadId: string, botId: string, reason: "chain" | "spawned" | "automation" | "voice"): Promise<boolean> {
     try {
       await this.deps.sdk.threads.update({ threadId, visibility: "hidden" } as never);
     } catch (error) {
