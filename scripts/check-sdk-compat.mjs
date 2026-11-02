@@ -20,9 +20,17 @@
  *
  * Set BB_STABLE_VERSION and BB_STABLE_SDK_VERSION to check offline or against
  * a specific release.
+ *
+ * When the `bb` CLI is on this machine, it also checks the SDK of the BB that
+ * is running here (Patrick's, which may be an older Nightly than stable): a
+ * plugin whose engines.bbPluginSdk floor is above it would be refused on the
+ * next reload. Pass --running-optional to only warn, or set
+ * BB_RUNNING_SDK_VERSION to check against a given version.
  */
 
+import { execFile } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -220,3 +228,28 @@ if (failures > 0) {
   process.exit(1);
 }
 console.log(`\nAll ${plugins.length} plugins are compatible with stable bb ${stable.bb}.`);
+
+// The BB running on this machine: the SDK it hosts plugins with. CI has no bb,
+// so it's skipped there.
+async function runningSdk() {
+  if (process.env.BB_RUNNING_SDK_VERSION) return process.env.BB_RUNNING_SDK_VERSION;
+  try {
+    const { stdout } = await promisify(execFile)("bb", ["plugin", "list", "--json"], { timeout: 15_000, maxBuffer: 32 << 20 });
+    const versions = (JSON.parse(stdout).plugins ?? []).map((p) => p?.app?.bundle?.sdkVersion).filter(Boolean);
+    return versions[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const running = await runningSdk();
+if (running) {
+  const below = plugins.filter(({ manifest }) => {
+    const range = manifest.engines?.bbPluginSdk;
+    return range && !sdkRangeSatisfied(parseVersion(running), range);
+  });
+  console.log(`\nThe BB running here hosts ${sdkPackage}@${running}.`);
+  for (const plugin of below) console.log(`${process.argv.includes("--running-optional") ? "WARN" : "FAIL"}  ${plugin.dir}: engines.bbPluginSdk ${JSON.stringify(plugin.manifest.engines.bbPluginSdk)} is above it; this BB would refuse it on reload. Update BB first.`);
+  if (below.length && !process.argv.includes("--running-optional")) process.exit(1);
+  if (!below.length) console.log("All plugins load on the BB running here.");
+}

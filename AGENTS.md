@@ -60,7 +60,10 @@ Stable BB then refuses the plugin with "requires bb plugin SDK ...".
   below the stable app version. Don't copy the version the scaffold or
   `bb plugin build` on Nightly writes.
 - Run `pnpm check:compat` before handoff. It prints the current stable app and
-  SDK versions and fails on any plugin that stable BB would refuse. Don't
+  SDK versions and fails on any plugin that stable BB would refuse. On a Mac
+  with `bb`, it also fails when the BB running there (Patrick's Nightly can be
+  older than stable) would refuse a plugin on reload: update that BB before
+  raising an SDK floor. Don't
   raise a floor past stable to make it pass; wait for the API to ship in
   stable instead.
 
