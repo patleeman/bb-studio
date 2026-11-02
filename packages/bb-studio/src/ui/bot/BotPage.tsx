@@ -78,7 +78,8 @@ export function useBotPageModel(view: BotView) {
     working.push({
       id: thread.id, threadId: thread.id, since: thread.runningSince ?? null, waiting: thread.waitingFor ?? null, providerId: thread.providerId ?? null,
       name: runner?.name ?? (thread.relation === "self" ? bot.name : thread.title),
-      detail: runner ? (thread.title && thread.title !== runner.name ? thread.title : firstSentence(runner.job)) : thread.relation === "self" ? "Working in its chat" : "A thread it started",
+      // A runner's thread is titled after it ("Comms · Runner"): its job says what it's doing.
+      detail: runner ? firstSentence(runner.job) : thread.relation === "self" ? "Working in its chat" : "A thread it started",
     });
   }
   for (const runner of runners) if (runner.running && runner.threadId && !working.some((each) => each.threadId === runner.threadId)) {
