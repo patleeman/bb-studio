@@ -81,14 +81,15 @@ describe("Up next and Recent", () => {
       ...[0, 2, 4, 6, 8, 10, 12].map((hour) => event("beat", hour * 60, "ok", "Nothing new")),
       event("wrap", 18 * 60, "scheduled"),
     ];
-    const entries = recentEntries({ events, sources, frequent: new Set(["beat"]), reports: [], finished: [{ id: "t1", title: "Set up GB Studio", at: TODAY - 2 * H }], maintenance: [], names: { "05:00-05:15|comms,staff,systems": "Area sweep", "13:00-13:01|house,security,staff": "Midday check" }, now: NOW, zone: NY });
+    const entries = recentEntries({ events, sources, frequent: new Set(["beat"]), reports: [], finished: [{ id: "t1", title: "Set up GB Studio", at: TODAY - 2 * H }], maintenance: [{ at: TODAY - 3 * H, summary: "Archived 5", dryRun: false }, { at: TODAY - 3 * H, summary: "Archived 5", dryRun: false }], names: { "05:00-05:15|comms,staff,systems": "Area sweep", "13:00-13:01|house,security,staff": "Midday check" }, now: NOW, zone: NY });
     const text = entries.map((entry) => entry.parts.map((part) => part.text).join(""));
     expect(text[0]).toBe("Midday check: House and Staff quiet. Security couldn't sign in to Wyze.");
     expect(entries[0]!.parts.at(-1)).toEqual({ text: " Security couldn't sign in to Wyze.", tone: "failed" });
     expect(text).toContain("Area sweep: Comms found 2 new emails; Systems and Staff quiet.");
     const frequent = entries.find((entry) => entry.muted)!;
     expect(frequent.parts[0]!.text).toBe("Frequent checks ran 7 times today with nothing to report.");
-    expect(text.at(-1)).toBe("Finished Set up GB Studio.");
+    expect(text.filter((line) => line.startsWith("Daily cleanup"))).toEqual(["Daily cleanup: Archived 5."]);
+    expect(text).toContain("Finished Set up GB Studio.");
     // Nothing that hasn't happened yet.
     expect(text.some((line) => line.includes("Evening wrap-up"))).toBe(false);
   });
