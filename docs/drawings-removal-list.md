@@ -4,6 +4,21 @@ An audit, 2026-11-01. Nothing has been removed yet. This lists every
 standalone-Drawings piece still in Studio and iOS, with a recommendation for
 each.
 
+## Status (2026-11-01)
+
+Patrick approved this list. The REMOVEs and the cheap REPOINTs are done:
+
+- Removed entirely: the composer + → Drawing action and its picker
+  (`drawings.pickDrawing`), rather than the whiteboard repoint below.
+- The whiteboard kind has no New `create` mode, so no New menu offers it
+  (desktop, iOS or the Studio tab). It also has no sidebar row.
+- `excalidraw_create_drawing` takes a page id, and the startup migration to a
+  "Drawings" page is in `src/draw/server/whiteboards.ts`.
+- The `@drawing` mention still resolves older mentions and item chats, but
+  offers nothing in the @ menu.
+
+The tables below are the original audit.
+
 ## The key finding: a whiteboard is a drawing
 
 Pages' inline whiteboards are not a new storage format. Each one is a row in
