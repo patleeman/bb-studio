@@ -63,7 +63,7 @@ describe("new-conversation page", () => {
   it("starts in the item's project and opens the new thread in the main view", async () => {
     await render(itemDraftPath(ref));
     expect(state.props.get("studio-chat:artifacts:first")?.defaultProjectId).toBe(item.projectId);
-    const request = { input: [{ type: "text", text: "Fix it" }], reasoningLevel: "high" };
+    const request = { input: [{ type: "text", text: "Fix it" }] };
     await act(async () => { await state.submit.get("studio-chat:artifacts:first")!(request); });
     expect(state.rpc.call).toHaveBeenCalledWith("chat.start", { item: ref, request });
     expect(state.navigate.toThread).toHaveBeenCalledWith("created");
@@ -78,14 +78,14 @@ describe("new-conversation page", () => {
     const textarea = container.querySelector("textarea")!;
     expect(textarea.value).toContain("Fix the arrow");
     expect(container.querySelector("img")?.src).toBe(quote.image);
-    const request = { input: [{ type: "text", text: "Make it clearer" }, { type: "file", url: "file:///release.txt" }], reasoningLevel: "high" };
+    const request = { input: [{ type: "text", text: "Make it clearer" }, { type: "file", url: "file:///release.txt" }] };
     state.rpc.call.mockRejectedValueOnce(new Error("Connection lost"));
     await act(async () => { await expect(state.submit.get(draftKey)!(request)).rejects.toThrow("Connection lost"); });
     expect(remove).not.toHaveBeenCalled();
     expect(container.querySelector("textarea")).toBe(textarea);
     expect(container.textContent).toContain("Connection lost");
     await act(async () => { await state.submit.get(draftKey)!(request); });
-    expect(state.rpc.call).toHaveBeenLastCalledWith("chat.start", { item: ref, request: { ...request, input: [...request.input, { type: "image", url: quote.image }] } });
+    expect(state.rpc.call).toHaveBeenLastCalledWith("chat.start", { item: ref, request: { input: [...request.input, { type: "image", url: quote.image }] } });
     expect(remove).toHaveBeenCalledWith(id);
     expect(state.navigate.toThread).toHaveBeenCalledWith("created");
   });

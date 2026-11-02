@@ -25,11 +25,11 @@ test("Studio owns all six code tools and every prefixed RPC", async () => {
   expect(await harness.behavior.callRpc("code.get", { id: "missing" })).toMatchObject({ workspace: null });
 });
 
-test("keeps the + menu tab and file opener ids, and registers no header button", async () => {
+test("keeps the + menu action and file opener ids, and registers no header button", async () => {
   const app = await loadPluginApp(async () => ({ default: definePluginApp(registerCodeApp) }));
-  expect(app.tabs.map((tab) => [tab.id, tab.context.kind, tab.availability])).toEqual([["code", "thread", "action"]]);
+  expect(app.threadPanelActions.map((action) => action.id)).toEqual(["code"]);
   expect(app.fileOpeners.map((opener) => opener.id)).toEqual(["vscode"]);
-  expect(app.threadActions.filter((action) => action.placement === "header")).toEqual([]);
+  expect(app.threadHeaderActions).toEqual([]);
 });
 
 test("old addresses, item ids and mentions resolve to the same workspace in Studio", () => {

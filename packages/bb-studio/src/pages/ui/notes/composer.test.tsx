@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   call: vi.fn(),
-  openThreadPanel: vi.fn((_options: unknown) => true),
+  openThreadPanel: vi.fn(() => true),
   split: vi.fn(),
   realtime: [] as ((payload: unknown) => void)[],
   composer: null as unknown as {
@@ -17,11 +17,11 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => {
   const rpc = { call: state.call };
-  const panel = { openTab: ({ tab, ...rest }: { tab: { id: string } }) => state.openThreadPanel({ actionId: tab.id, ...rest }) };
+  const navigate = { openThreadPanel: state.openThreadPanel };
   return {
     useComposer: () => state.composer,
     useRpc: () => rpc,
-    experimental_useAppPanel: () => panel,
+    useBbNavigate: () => navigate,
     useRealtime: (_channel: string, handler: (payload: unknown) => void) => { state.realtime.push(handler); },
   };
 });

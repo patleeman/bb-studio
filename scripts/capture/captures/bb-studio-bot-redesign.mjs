@@ -16,7 +16,6 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { readStagedInstance } from "../../staged-instance.mjs";
 import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
-import { clickHeaderAction } from "../header-actions.mjs";
 
 const require = createRequire(import.meta.url);
 const ALL = [0, 1, 2, 3, 4, 5, 6];
@@ -134,8 +133,6 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       for (const runner of runners) {
         const row = runnerRows.find((each) => each.id === runner.id);
         const spec = RUNNERS.find((each) => each.name === runner.name);
-        // Other captures add runners of their own to the same staged Bot.
-        if (!spec) continue;
         const times = spec.schedule.cron ? [[5, 15], [13, 15]] : [spec.schedule.time.split(":").map(Number)];
         for (const day of [-1, 0]) {
           if (spec.schedule.cadence === "weekdays" && [0, 6].includes(new Date(at(day, 12)).getDay())) continue;
@@ -212,7 +209,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       bbDb.prepare("INSERT INTO pending_interactions (id, thread_id, origin_kind, turn_id, provider_id, provider_thread_id, provider_request_id, status, payload, created_at, updated_at) VALUES (?, ?, 'provider', 'turn_capture', ?, ?, 'req_capture_vault', 'pending', ?, ?, ?)")
         .run("pi_capture_vault", bot.threadId, thread?.provider_id ?? "codex", bot.threadId, JSON.stringify({ kind: "user_question", questions: [{ id: "vault", prompt: "Which vault holds the deploy key?", allowFreeText: true, multiSelect: false }] }), Date.now() - 12 * 60_000, Date.now() - 12 * 60_000);
     } finally { studio.close(); bbDb.close(); }
-    await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
+    await bbCli(["plugin", "config", "studio", "set", "loopsEnabled", "true"]);
     // Three runners at work.
     const live = (await pluginRpc("studio", "bot_runners", {})).runners;
     for (const [name, job] of Object.entries(WORKING)) {
@@ -340,9 +337,10 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await scheme(client, mode);
       await client.command("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: 900, deviceScaleFactor: 1, mobile: false });
       await client.navigate(`/threads/${bot.threadId}`);
+      await client.waitForSelector('[data-testid="bot-info-header"]', 60000);
       await dismissProblems(client);
-      // Bot info opens beside the chat by itself; else its header action.
-      if (!(await client.poll(`!!document.querySelector("[data-testid=bot-pane]")`))) await clickHeaderAction(client, "^Bot info$", 60000);
+      const opened = await client.evaluate(`(() => { if (document.querySelector("[data-testid=bot-pane]")) return true; document.querySelector('[data-testid="bot-info-header"]').click(); return true; })()`);
+      if (!opened) throw new Error("Bot info didn't open");
       await collapseSidebar(client);
       await client.waitForSelector("[data-testid=bot-pane]", 30000);
       for (const text of ["Working now", "Needs you", "Up next", "Recent", "Controls"]) await client.waitForText(text, 30000);

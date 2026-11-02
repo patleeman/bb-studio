@@ -318,10 +318,6 @@ public enum Studio {
     public static let voiceLive_event = "voiceLive.event"
     public static let voiceLive_poll = "voiceLive.poll"
     public static let voiceLive_end = "voiceLive.end"
-    public static let settings_get = "settings.get"
-    public static let settings_set = "settings.set"
-    public static let mobile_push_status = "mobile.push.status"
-    public static let mobile_push_test = "mobile.push.test"
   }
 
   public typealias LoopsList = LoopsListOutput
@@ -1013,20 +1009,6 @@ public enum Studio {
   public typealias VoiceLivePoll = VoiceLivePollOutput
 
   public typealias VoiceLiveEnd = VoiceLiveEndOutput
-
-  public typealias SettingsGetInput = StudioJSONValue
-
-  public typealias SettingsGet = SettingsGetOutput
-
-  public typealias SettingsSet = SettingsSetOutput
-
-  public typealias MobilePushStatusInput = StudioJSONValue
-
-  public typealias MobilePushStatus = MobilePushStatusOutput
-
-  public typealias MobilePushTestInput = StudioJSONValue
-
-  public typealias MobilePushTest = MobilePushTestOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -10969,33 +10951,6 @@ public enum Studio {
     }
   }
 
-  public enum BotSideThreadsForBotOutputThreadsItemMenuParentNotifications: Sendable, Hashable, Codable {
-    case auto
-    case off
-    case stuck
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "auto": self = .auto
-      case "off": self = .off
-      case "stuck": self = .stuck
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .auto: try container.encode("auto")
-      case .off: try container.encode("off")
-      case .stuck: try container.encode("stuck")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct BotSideThreadsForBotOutputThreadsItemMenu: Sendable, Hashable, Codable {
     public var projectId: String?
     public var parentThreadId: String?
@@ -11003,16 +10958,14 @@ public enum Studio {
     public var sectionId: String?
     public var status: String?
     public var isUnread: Bool?
-    public var parentNotifications: BotSideThreadsForBotOutputThreadsItemMenuParentNotifications?
 
-    public init(projectId: String? = nil, parentThreadId: String? = nil, pinnedAt: Double? = nil, sectionId: String? = nil, status: String? = nil, isUnread: Bool? = nil, parentNotifications: BotSideThreadsForBotOutputThreadsItemMenuParentNotifications? = nil) {
+    public init(projectId: String? = nil, parentThreadId: String? = nil, pinnedAt: Double? = nil, sectionId: String? = nil, status: String? = nil, isUnread: Bool? = nil) {
       self.projectId = projectId
       self.parentThreadId = parentThreadId
       self.pinnedAt = pinnedAt
       self.sectionId = sectionId
       self.status = status
       self.isUnread = isUnread
-      self.parentNotifications = parentNotifications
     }
   }
 
@@ -27104,74 +27057,6 @@ public enum Studio {
       self.transcript = transcript
       self.sent = sent
       self.replies = replies
-    }
-  }
-
-  public struct SettingsGetOutput: Sendable, Hashable, Codable {
-    public var values: [String: StudioJSONValue]?
-    public var changed: [String]?
-    public var timeZone: String?
-
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil) {
-      self.values = values
-      self.changed = changed
-      self.timeZone = timeZone
-    }
-  }
-
-  public struct SettingsSetInput: Sendable, Hashable, Codable {
-    public var values: [String: StudioJSONValue]?
-
-    public init(values: [String: StudioJSONValue]? = nil) {
-      self.values = values
-    }
-  }
-
-  public struct SettingsSetOutput: Sendable, Hashable, Codable {
-    public var values: [String: StudioJSONValue]?
-    public var changed: [String]?
-
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil) {
-      self.values = values
-      self.changed = changed
-    }
-  }
-
-  public struct MobilePushStatusOutputLastDelivery: Sendable, Hashable, Codable {
-    public var at: Double?
-    public var sent: Int?
-
-    public init(at: Double? = nil, sent: Int? = nil) {
-      self.at = at
-      self.sent = sent
-    }
-  }
-
-  public struct MobilePushStatusOutput: Sendable, Hashable, Codable {
-    public var installed: Bool?
-    public var ready: Bool?
-    public var problem: String?
-    public var devices: Int?
-    public var lastDelivery: MobilePushStatusOutputLastDelivery?
-
-    public init(installed: Bool? = nil, ready: Bool? = nil, problem: String? = nil, devices: Int? = nil, lastDelivery: MobilePushStatusOutputLastDelivery? = nil) {
-      self.installed = installed
-      self.ready = ready
-      self.problem = problem
-      self.devices = devices
-      self.lastDelivery = lastDelivery
-    }
-  }
-
-  public struct MobilePushTestOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-    public var sent: Int?
-    public var message: String?
-
-    public init(ok: Bool? = nil, sent: Int? = nil, message: String? = nil) {
-      self.ok = ok
-      self.sent = sent
-      self.message = message
     }
   }
 

@@ -232,59 +232,6 @@ is a quiet line (one per morning message):
 
 ![The morning message with the Attention Router off: one "Attention Router is off" line under On today's list, and no All loops row under the Bot](assets/loops-off.png)
 
-## Settings
-
-**Settings → Plugins → Studio** starts with Studio's API keys, which BB keeps
-in its secret files: OpenAI, OpenRouter, xAI, TypeSafe, Vercel AI Gateway,
-OpenCode Zen and your own Jev endpoint's key. Every other setting is Studio's
-own, in grouped sections below them: **Voice** (dictation and hands-free:
-model, voice, backend model and monthly limit), **Recordings and calls**,
-**Agent replies** (the Next row and reactions), **Threads** (Smart Queue,
-resume after a restart, the Attention Router and page history), **Jev** (the
-provider, its connection test, the fallback model and your own endpoint) and
-**Advanced** (Smart Queue batch confidence). Last, **Phone notifications**
-shows Studio Mobile's push status and **Send a test push**. The Attention
-Router's daily budget and quiet hours are on the Bot page, under **Controls →
-Attention**.
-
-![Studio's settings page, dark](assets/settings/settings-page-dark.png)
-
-![Studio's settings page, light](assets/settings/settings-page-light.png)
-
-Captured from a staged BB upgraded from the previous Studio with changed
-settings (voice cedar, page history 40, Home server calls, custom quick
-replies), which the migration carried over. Bot → Controls → Attention:
-
-![Bot Controls, Attention](assets/settings/bot-controls-dark.png)
-
-`bb plugin config studio` lists only the API keys. The rest are scriptable
-with `bb studio settings`:
-
-```sh
-bb studio settings                    # every setting by section; (default) marks unchanged ones
-bb studio settings get loopDailyBudget
-bb studio settings set loopQuietStart 23
-bb studio settings reset autoTitle    # back to the default
-bb studio settings list --json
-```
-
-The keys are the ones BB's settings used. On the first load after this
-change, Studio copied every changed value into its own storage once, cleared
-the old **Bot avatars: OpenAI API key** (moving it only into an empty
-**OpenAI API key**; never logged) and reloaded itself so BB's page dropped the
-old fields. The old values stay unread in BB's table for a rollback.
-
-Some settings became constants. A BB host can override each with an
-environment variable (restart BB after setting one):
-
-| Was | Now | Variable |
-| --- | --- | --- |
-| Jev: TypeSafe model | `jev-latest` | `STUDIO_TYPESAFE_MODEL` |
-| Jev timeout | 5000 ms | `STUDIO_JEV_TIMEOUT_MS` (250–15000) |
-| Smart Queue: minimum confidence to steer | 0.5 | `STUDIO_JEV_STEER_CONFIDENCE` (0–1) |
-| Attention time zone | this Mac's | `STUDIO_LOOP_TIME_ZONE` |
-| Talk segment length | 25 seconds | none |
-
 ## Pages
 
 Pages are built into Studio: collaborative documents you write together with
@@ -492,7 +439,7 @@ workflows.
 
 ### Storage
 
-In **Settings → Studio → Threads**, **Page history** (`snapshotsPerPage`) controls history
+In **Settings → Studio**, **Saved versions per page** controls history
 retention. The default is 50. Set 1 to 1000 to keep that many versions, or 0
 to keep all. Lowering the limit removes older versions when that page next
 saves a version. Existing pages use the new limit without a restart.
@@ -528,7 +475,7 @@ again after you close it picks it up.
 
 Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
 
-Explore's settings are in **Settings → Studio → Agent replies** (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **Next row** (on), **Things to explore** (on), **Quick replies** (on), and **Your usual quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change.
+Explore's settings appear in **Settings → Studio** with an **Explore:** prefix (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **End replies with a Next row** (on), **Suggest things to explore** (on), **Offer quick replies** (on), and **Preferred quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change.
 
 ### Next row
 
@@ -1265,21 +1212,22 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| Microphone button starts Talk | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
-| Name recordings | on | Titles recordings from their transcripts. |
-| Summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
+| Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
+| Segment length (seconds) | 25 | Target piece length, 8–60. Shorter pieces show text sooner. |
+| Auto-title recordings | on | Titles recordings from their transcripts. |
+| Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
 | Cleanup model | Studio Decisions | Provider, model, reasoning, and supported service tier for dictation and saved-transcript cleanup. |
 | Titles model | Studio Decisions | Model for automatic recording titles. |
 | Summaries model | Studio Decisions | Model for automatic and on-demand summaries, and for notes pages. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
 | Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
-| Transcribe calls | This Mac | Where a recorded call becomes text: WhisperKit on this Mac, Home server (red4), or BB voice service. |
-| Home server URL | empty | Shown for Home server: an OpenAI-compatible `/v1/audio/transcriptions` server, such as `http://red4:8000`. |
-| Home server model | empty | Under Transcription models; the model name the server expects. Empty sends `whisper-1`. |
-| Model on this Mac | `openai_whisper-large-v3-v20240930_626MB` | Under Transcription models; the WhisperKit model, downloaded on first use. |
+| Call transcription | Local (WhisperKit) | Where a recorded call becomes text: WhisperKit on this Mac, Home server (red4), or BB voice service. |
+| Call transcription: home server URL | empty | An OpenAI-compatible `/v1/audio/transcriptions` server, such as `http://red4:8000`. |
+| Call transcription: home server model | empty | The model name the server expects; empty sends `whisper-1`. |
+| Call transcription: local model | `openai_whisper-large-v3-v20240930_626MB` | The WhisperKit model, downloaded on first use. |
 | Keep call audio | 30 days | 7 days, 30 days or Forever. The transcript and notes stay until you delete the recording. |
 
-They are on Studio's settings page: **Settings → Studio**, under **Voice** (the microphone and hold-to-talk key) and **Recordings and calls**, whose **Models for titles, summaries and cleanup** disclosure has the three model choices. Audio is cut into pieces of about 25 seconds (a constant now; it was the Segment length setting). Each job can follow Studio Decisions
+They are on Studio's settings page: **Settings → Studio**, with **Talk models** below them. Open **Talk models** for the three model choices. Each job can follow Studio Decisions
 or use **A specific model**, selected with BB's provider and model picker.
 Choices apply to the next request and persist across devices and restarts.
 Studio Decisions must be enabled to run either choice. Existing cleaned text,
@@ -1439,27 +1387,29 @@ offers quick replies.
 
 ![Live BB screenshot of the Reactions settings in Studio](assets/reactions.png)
 
-Captured from a staged BB: Studio's **Agent replies** settings section with
-the default reaction list (Agree, Disagree, Do it, Clarify) and **Quote the
-selected text** on Before. Before it, the capture checks that the seeded agent
-reply's message bar shows the four reactions as emoji.
+Captured from a staged BB: Studio's settings page with the default reaction
+list (Agree, Disagree, Do it, Clarify), quoting before the reaction, all three
+location toggles on, and the **Saved reactions** preview saying the menu
+settings are applied in this window. Before it, the capture checks that the
+seeded agent reply's message bar shows the four reactions as emoji.
 
 | Setting | Key | Default |
 | --- | --- | --- |
 | Reactions: up to 8 `emoji label` items, separated by lines or commas. Empty removes the buttons. | `emojiItems` | `👍 Agree, 👎 Disagree, ✅ Do it, ❓ Clarify` |
-| Quote the selected text: Before, After or Off (one control for the next two keys) | `quoteSelection` | on |
-| | `quotePosition` | `before` |
-| Show reactions when you select text (and the right-click menu) | `showInSelectionMenu` | on |
-| Show reactions under Studio's replies | `showInAssistantBar` | on |
-| Show reactions under your messages | `showInUserBar` | on |
+| Quote the highlighted text | `quoteSelection` | on |
+| Quote position: `before` or `after` the reaction | `quotePosition` | `before` |
+| In the text selection menu (and the right-click menu) | `showInSelectionMenu` | on |
+| Under assistant messages | `showInAssistantBar` | on |
+| Under your messages | `showInUserBar` | on |
 
 ```sh
-bb studio settings set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
-bb studio settings set quotePosition after
+bb plugin config studio set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
+bb plugin config studio set quotePosition after
 ```
 
-Message menus read the settings once when Studio's frontend loads. After a
-change, the Agent replies section shows **Reload window**, which refreshes the
+Message menus read the settings once when Studio's frontend loads. The
+**Saved reactions** section previews the stored list and says whether this
+window still uses older settings; **Reload window to apply** refreshes the
 menus. Other open windows update on their next reload.
 
 **Moving from Studio Reactions.** On its first start with `emoji-react`
@@ -2531,7 +2481,7 @@ Old draft keys and quote storage are retained.
 
 See the [Decisions guide](../../docs/decisions.md) for provider setup and the plugin RPC.
 
-Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (its keys with the API keys, the rest in the Jev, Threads and Advanced sections; `decisions_` keys, also with `bb studio settings`), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
+Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
 The Decisions migration is complete. If Setup still lists an old Decisions
 bridge install, it is safe to remove: Studio already has the settings, keys,

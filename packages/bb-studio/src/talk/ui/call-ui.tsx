@@ -4,8 +4,7 @@
 // (server/call-capture.ts); this only starts, shows and stops it.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useStudioSettings } from "../../settings/ui/use-settings";
+import { useRealtime, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { openAppPath } from "../../kit/app/index";
 import { errorMessage } from "../../kit/format";
 import { Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, cn } from "../../kit/ui/index";
@@ -156,7 +155,7 @@ function SourceRow({ checked, onSelect, icon, title, detail, badge }: { checked:
 
 function PickerStep({ onCancel, onStarted }: { onCancel(): void; onStarted(recording: Recording): void }) {
   const rpc = useRpc<TalkRpcContract>();
-  const { values } = useStudioSettings();
+  const { values } = useSettings();
   const [sources, setSources] = useState<Sources | null>(null);
   const [error, setError] = useState<string | null>(null);
   const remembered = useRef(lastSource());

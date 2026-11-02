@@ -1,16 +1,16 @@
 import type { Fallback } from "../contract";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  type PluginAppBuilder,
   experimental_ProviderModelPicker as ProviderModelPicker,
   useRpc,
+  useSettings,
 } from "@get-bb/plugin-sdk/app";
-import { useStudioSettings } from "../../settings/ui/use-settings";
 import { Button } from "../../kit/ui/index";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
 import type { rpcContract } from "../contract";
 
 import { errorMessage as errorText } from "../../kit/format";
-import { toReasoningLevelOrNull } from "../../kit/reasoning";
 
 /** Matches the host-rendered settings rows above: copy on the left, control on the right. */
 function Row({ label, description, children }: { label: string; description: ReactNode; children: ReactNode }) {
@@ -25,10 +25,9 @@ function Row({ label, description, children }: { label: string; description: Rea
   );
 }
 
-/** Which Jev providers Studio will call, in order, and a connection test. Part of Studio's Jev settings section. */
-export function JevConnection({ bare = false }: { bare?: boolean }) {
+function JevConnection() {
   const rpc = useRpc<typeof rpcContract>();
-  const { values } = useStudioSettings();
+  const { values } = useSettings();
   const [status, setStatus] = useState<{ provider: string; routes: { name: string; model: string }[]; problems: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +64,7 @@ export function JevConnection({ bare = false }: { bare?: boolean }) {
 
   const routes = status?.routes ?? [];
   return (
-    <div className={bare ? "divide-y divide-border px-4" : "divide-y divide-border rounded-lg border border-border bg-card px-4"}>
+    <div className="divide-y divide-border rounded-lg border border-border bg-card px-4">
       <Row
         label={status?.provider === "auto" || !status ? "Providers auto will try" : "Provider"}
         description="Only providers with a key, or a complete custom endpoint, are used. Keys stay on the server."
@@ -110,8 +109,7 @@ const modeLabels = {
   off: "Off",
 } as const;
 
-/** The model that decides when no Jev provider answers. Part of Studio's Jev settings section. */
-export function FallbackModel({ bare = false }: { bare?: boolean }) {
+function FallbackModel() {
   const rpc = useRpc<typeof rpcContract>();
   const [value, setValue] = useState<Fallback | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,9 +160,9 @@ export function FallbackModel({ bare = false }: { bare?: boolean }) {
 
   if (!value) return <div><p className="text-sm text-muted-foreground">{error ?? "Loading…"}</p>{error && <Button size="sm" variant="outline" onClick={refresh}>Retry</Button>}</div>;
   return (
-    <div className={bare ? "divide-y divide-border px-4" : "divide-y divide-border rounded-lg border border-border bg-card px-4"}>
+    <div className="divide-y divide-border rounded-lg border border-border bg-card px-4">
       <Row
-        label="If Jev doesn’t answer, use"
+        label="Use"
         description="Decides when no Jev provider answers, in a hidden thread that is deleted afterwards. Off sends every undecided Smart Queue message as a follow-up."
       >
         <Select disabled={busy} value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>
@@ -201,7 +199,7 @@ export function FallbackModel({ bare = false }: { bare?: boolean }) {
                 mode: "model",
                 providerId: next.providerId,
                 model: next.model,
-                reasoningLevel: toReasoningLevelOrNull(next.reasoningLevel),
+                reasoningLevel: next.reasoningLevel,
                 ...(next.serviceTier ? { serviceTier: next.serviceTier } : {}),
               })
             }
@@ -212,4 +210,19 @@ export function FallbackModel({ bare = false }: { bare?: boolean }) {
       {suggestionFailed && <Button size="sm" variant="outline" disabled={busy} onClick={() => void chooseMode("model")}>Retry</Button>}
     </div>
   );
+}
+
+export function registerDecisionsApp(app: PluginAppBuilder) {
+  app.slots.settingsSection({
+    id: "decisions-jev-connection",
+    title: "Jev connection",
+    description: "Which Jev providers Studio Decisions will call, in order, for Smart Queue and other plugins.",
+    component: JevConnection,
+  });
+  app.slots.settingsSection({
+    id: "decisions-fallback-model",
+    title: "Fallback model",
+    description: "The model that decides when no Jev provider answers.",
+    component: FallbackModel,
+  });
 }

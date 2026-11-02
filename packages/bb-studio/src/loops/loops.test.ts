@@ -77,7 +77,7 @@ it('serves loops.list with held reasons and thread owners, and ticks when the At
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:false}),onChange:(f:typeof onChange)=>{onChange=f;}})},
   sdk:{threads:{get:async({threadId}:{threadId:string})=>{if(threadId==='thr_egv6yq7mbp')return {title:'AI power Long read'};throw Error('Not found');}}}};
- const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
+ const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
  const l=loops.store.add({title:'Call'});const owned=loops.store.add({title:'Utilities',owner:'thread:thr_egv6yq7mbp',status:'in_progress'});loops.store.add({title:'Gone',owner:'thread:thr_gone',status:'in_progress'});
  loops.store.add({title:'Low',priority:'low'});
  const list=await handlers['loops.list']!({}) as import('zod').infer<typeof rpcContract['loops.list']['output']>;
@@ -90,7 +90,7 @@ it('releases Patrick\'s own Surface now at once, past the morning hold and the b
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
- const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
+ const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
  const low=loops.store.add({title:'Tailscale node',priority:'low'});const later=loops.store.add({title:'Later',trigger:{type:'time',at:Date.now()+86400000}});
  await loops.scheduler.tick();expect(store.get(low.id).status).toBe('queued');expect(loops.scheduler.held()).toEqual([{id:low.id,reason:'morning'}]);
  post.mockClear();
@@ -110,7 +110,7 @@ it('releases Patrick\'s own Surface now at once, past the morning hold and the b
 it('gives the Bot a mentioned or referenced loop: the @loop provider, loops_get, and the hint in the tool descriptions',async()=>{
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:vi.fn()},
   settings:{define:()=>({get:async()=>({loopsEnabled:true}),onChange:()=>{}})},sdk:{threads:{get:async()=>null}}};
- const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
+ const loops=registerLoops(bb as never,db,post,notify);await vi.advanceTimersByTimeAsync(0);
  const l=loops.store.add({title:'Reply to Yassine\nabout the referral',why:'The posting closes Friday.',trigger:{type:'event',event:'reply:yassine',label:'when Yassine replies'}});
  loops.store.add({title:'Pay the tax'});
  const provider=(bb.ui.registerMentionProvider as ReturnType<typeof vi.fn>).mock.calls[0]![0];

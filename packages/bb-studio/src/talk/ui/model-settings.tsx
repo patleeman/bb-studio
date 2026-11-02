@@ -4,7 +4,6 @@ import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue }
 import { errorMessage } from "../../kit/format";
 import type { ModelSelection } from "../../decisions/contract";
 import type { ModelPreferences, ModelPurpose, TalkRpcContract } from "../shared/contract";
-import { toReasoningLevelOrNull } from "../../kit/reasoning";
 
 const purposes: { id: ModelPurpose; label: string; description: string }[] = [
   { id: "cleanup", label: "Cleanup", description: "Tidies dictation before inserting and cleans up saved recordings." },
@@ -61,7 +60,7 @@ export function ModelSettings() {
               </SelectContent>
             </Select>
             {value && <ProviderModelPicker value={{ ...value, reasoningLevel: value.reasoningLevel ?? "low" }} disabled={saving} align="end" onChange={(next) => void save(id, {
-              providerId: next.providerId, model: next.model, reasoningLevel: toReasoningLevelOrNull(next.reasoningLevel),
+              providerId: next.providerId, model: next.model, reasoningLevel: next.reasoningLevel,
               ...(next.serviceTier ? { serviceTier: next.serviceTier } : {}),
             })} />}
           </div>

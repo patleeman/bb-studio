@@ -8,19 +8,19 @@
 // the chat's draft as an `@loop` chip; dragging a row into the composer drops
 // its `::loop` line (reference.ts). It refetches on Studio's realtime signal,
 // like the tab and the cards (useLive).
-import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import type { ThreadTabProps } from "../../kit/app/thread-panel";
-import { useRef, useState, type ReactNode } from "react";
+import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Icon, cn,
 } from "../../kit/ui/index";
 import { ICON_BUTTON } from "../../kit/app/index";
+import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
-import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, type RowProps } from "./LoopsTab";
+import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, useNeedsYou, type RowProps } from "./LoopsTab";
 import { AREAS, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled } from "./hooks";
+import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled, useLoopsPaneRequests } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -28,7 +28,7 @@ const DONE_SHOWN = 3;
 const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground disabled:opacity-50 [&_svg]:size-4";
 
 /** The "Loops" thread panel tab. `threadId` is the chat it's beside. */
-export function LoopsPane({ threadId }: ThreadTabProps) {
+export function LoopsPane({ threadId }: PluginThreadPanelProps) {
   const enabled = useLoopsEnabled();
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-testid="loops-pane">
@@ -373,5 +373,36 @@ function DoneLine({ loop, people, refresh }: RowProps) {
           <Icon name="ArrowTurnBackward" />
         </button>
       } />
+  );
+}
+
+/**
+ * The Loops button in the Bot chat's header (experimental_threadHeaderAction):
+ * opens the pane beside the chat, with what needs Patrick now as its badge.
+ * Only on the primary Bot's chat, while the Attention Router is on. It also
+ * opens the pane when the sidebar asks (requestLoopsPane).
+ */
+export function LoopsHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
+  const enabled = useLoopsEnabled();
+  const bot = useLive("bot_get", {}, { enabled, pollMs: 120_000 }).data?.bot ?? null;
+  const onChat = enabled && !!bot?.threadId && bot.threadId === threadId;
+  if (!onChat) return null;
+  return <HeaderButton botId={bot!.id} threadId={threadId} />;
+}
+
+function HeaderButton({ botId, threadId }: { botId: string; threadId: string }) {
+  const navigate = useBbNavigate();
+  const openPane = useCallback(() => navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" }), [navigate]);
+  // The sidebar's All loops and badge ask from outside the thread view.
+  useLoopsPaneRequests(threadId, openPane);
+  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const needs = useNeedsYou(botId, threadId, list.data?.needsYouNow).count;
+  const label = needs ? `Loops beside the chat, ${needs} need you now` : "Loops beside the chat";
+  return (
+    <button type="button" data-testid="loops-header" aria-label={label} title={label} className={cn(ICON_BUTTON, "relative")}
+      onClick={() => { if (!openPane()) openLoops(botId); }}>
+      <Icon name="ListTodo" aria-hidden />
+      {needs ? <span aria-hidden className="absolute -top-0.5 -right-0.5 min-w-3.5 rounded-full bg-warning px-1 text-[10px] font-medium leading-3.5 text-background tabular-nums">{needs}</span> : null}
+    </button>
   );
 }

@@ -24,9 +24,11 @@ import { TalkOverlay } from "./overlay";
 import { ComposerBridge } from "./ComposerBridge";
 import { linkRecordingMentions } from "./recording-mentions";
 import { RecordingCard } from "./recording-card";
+import { ModelSettings } from "./model-settings";
 import { CallOverlay, openCallPicker } from "./call-ui";
 
 export function registerTalkApp(app: PluginAppBuilder): void {
+  app.slots.settingsSection({ id: "models", title: "Talk models", component: ModelSettings });
   app.contentScripts.register({
     id: "recording-links",
     mount({ signal }) { linkRecordingMentions(openAppPath, signal); },

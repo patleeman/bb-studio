@@ -1,21 +1,61 @@
 // Reactions (built in; was the Studio Reactions plugin, `emoji-react`).
 //
 // Reactions keep no items, only settings: the emoji list shown on messages
-// and where they show. They are Studio settings (src/settings), under the
-// keys Reactions used. The frontend (./app.tsx) reads them once per frontend
-// interpretation, so a change applies after a window reload.
+// and where they show. Studio defines them under the keys Reactions used, in
+// its one `bb.settings.define`. The frontend (./app.tsx) reads them once per
+// frontend interpretation, so a change applies after a window reload.
 //
 // On start, Studio copies the old plugin's settings once if it's still
 // installed: each value the user hasn't already changed in Studio.
-import { pickSettings } from "../settings/schema";
+import type { PluginSettingDescriptor } from "@get-bb/plugin-sdk";
+import { DEFAULT_EMOJI_ITEMS } from "./emoji-items";
 
 /** The old plugin's id; its settings are read once, then it can be removed. */
 export const REACTIONS_PLUGIN_ID = "emoji-react";
 /** KV marker: the old plugin's settings were copied. */
 export const REACTIONS_SETTINGS_IMPORTED = "reactions:settings-imported";
 
-/** Reactions' Studio settings (src/settings/schema.ts, Agent replies). */
-export const REACTIONS_SETTINGS = pickSettings(["emojiItems", "quoteSelection", "quotePosition", "showInSelectionMenu", "showInAssistantBar", "showInUserBar"]);
+export const REACTIONS_SETTINGS = {
+  emojiItems: {
+    type: "string",
+    label: "Reactions",
+    experimental_multiline: true,
+    default: DEFAULT_EMOJI_ITEMS,
+    description:
+      "Up to eight emoji and label pairs, such as \"👍 Agree\", separated by lines or commas. Each shows as its emoji and is drafted as your reply. Leave empty to hide the buttons.",
+  },
+  quoteSelection: {
+    type: "boolean",
+    label: "Quote the highlighted text",
+    default: true,
+    description: "Reacting drafts the text you selected as a quote, so the agent sees what you reacted to.",
+  },
+  quotePosition: {
+    type: "select",
+    label: "Quote position",
+    options: ["before", "after"] as string[],
+    default: "before",
+    description: "Put the quote \"before\" or \"after\" the reaction.",
+  },
+  showInSelectionMenu: {
+    type: "boolean",
+    label: "In the text selection menu",
+    default: true,
+    description: "Show reactions in the menu that opens when you select text, and in the right-click menu.",
+  },
+  showInAssistantBar: {
+    type: "boolean",
+    label: "Under assistant messages",
+    default: true,
+    description: "Show reactions in the bar under assistant messages.",
+  },
+  showInUserBar: {
+    type: "boolean",
+    label: "Under your messages",
+    default: true,
+    description: "Show reactions in the bar under your own messages.",
+  },
+} as const satisfies Record<string, PluginSettingDescriptor>;
 
 export interface ReactionsImportDeps {
   plugins: {

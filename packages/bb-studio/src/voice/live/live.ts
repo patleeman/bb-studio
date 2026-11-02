@@ -28,11 +28,10 @@ import type Database from "better-sqlite3";
 import { addRealtimeUsage, addTranscriptionUsage, EMPTY_TALLY, liveCost, realtimeCost, type RealtimeTally } from "../../bot-prices";
 import { buildSeed, type SeedInput, type VoiceIdentity } from "./identity";
 import { speakable } from "./speakable";
-import { pickSettings } from "../../settings/schema";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest } from "./session";
-import { BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
+import { ALL_VOICES, BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
 
 export { DEFAULT_CAP_USD };
 /** Most a tool answers with, in characters (it all goes to OpenAI). */
@@ -43,10 +42,16 @@ export const REPLY_SUMMARY_CHARS = 600;
 const WAIT_MS = 24 * 3600_000;
 
 /**
- * Hands-free voice's Studio settings (src/settings/schema.ts, Voice), all
- * read when a session starts: a change applies to the next one.
+ * Hands-free voice's settings, all read when a session starts (a change
+ * applies to the next one). Named voiceLive* so they group as one Voice
+ * section; the cap and model keep their original keys so saved values stay.
  */
-export const VOICE_LIVE_SETTINGS = pickSettings(["voiceLiveModel", "voiceLiveVoice", "voiceLiveBackendModel", "voiceLiveMonthlyCapUsd"]);
+export const VOICE_LIVE_SETTINGS = {
+  voiceLiveModel: { type: "select" as const, label: "Hands-free voice: model", description: "gpt-live-1 ($0.05 a minute plus a small backend model) or the Realtime API's gpt-realtime-2.1 (by token, about 7¢ a minute).", options: [...LIVE_MODELS] as string[], default: LIVE_MODELS[0] as string },
+  voiceLiveVoice: { type: "select" as const, label: "Hands-free voice: voice", description: "The voice it speaks in. gpt-live-1 and gpt-realtime-2.1 have different voices; marin is in both. A voice the chosen model doesn't have uses marin.", options: [...ALL_VOICES], default: DEFAULT_VOICE },
+  voiceLiveBackendModel: { type: "select" as const, label: "Hands-free voice: backend model", description: "gpt-live-1 only: the model that picks its tools and words the answers. gpt-5.6-luna is the cheapest and fastest.", options: [...BACKEND_MODELS] as string[], default: DEFAULT_BACKEND_MODEL as string },
+  voiceLiveMonthlyCapUsd: { type: "number" as const, label: "Hands-free voice: monthly cap (USD)", description: "Studio won't start a hands-free voice session once this calendar month's sessions reach it, and stops one that crosses it. Estimated from OpenAI's usage reports.", default: DEFAULT_CAP_USD },
+};
 
 /** What the quick-settings menu may change: the next session's model, voice and backend. */
 export interface VoiceLiveChoice { model?: LiveModel; voice?: string; backendModel?: BackendModel }
@@ -215,7 +220,7 @@ export class VoiceLive {
     if (spent < capUsd) return null;
     const next = new Date(monthStart(this.now()));
     next.setMonth(next.getMonth() + 1);
-    return `This month's hands-free voice has reached the ${usd(capUsd)} cap (about ${usd(spent)} so far). Raise the monthly limit in Studio's settings (Voice), or talk again from ${next.toLocaleDateString("en-US", { month: "long", day: "numeric" })}.`;
+    return `This month's hands-free voice has reached the ${usd(capUsd)} cap (about ${usd(spent)} so far). Raise "Hands-free voice: monthly cap" in Studio's settings, or talk again from ${next.toLocaleDateString("en-US", { month: "long", day: "numeric" })}.`;
   }
 
   private problem(): string | null {

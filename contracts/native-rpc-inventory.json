@@ -614,12 +614,6 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
-      "file": "apps/ios/Shared/ReactionSettings.swift",
-      "plugin": "studio",
-      "method": "settings.get",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/ServerTools.swift",
       "plugin": "account-pool",
       "method": "account.list",

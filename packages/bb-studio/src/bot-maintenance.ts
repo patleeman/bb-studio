@@ -21,69 +21,34 @@ export function finished(thread: Pick<Thread, "status" | "hasPendingInteraction"
   return thread.status === "idle" && !thread.hasPendingInteraction && !targeted && thread.queuedWork === "none" && Object.values(thread.activity).every((count) => count === 0) && !interactions.some((i) => i.status === "pending" || i.status === "resolving");
 }
 export function archiveAge(worker: boolean, captured: boolean, ownerReplied: boolean): number { return (worker ? ownerReplied ? 1 : 3 : captured ? 3 : 7) * DAY; }
-const changedFile = z.object({ path: z.string(), status: z.string() }).passthrough();
-/**
- * An environment's git status from BB's Git plugin (`bb--git`'s
- * `workspaceStatus` RPC). SDK 0.6.104 dropped `environments.status`; git
- * moved to that plugin. Only the fields the checks read are required.
- */
-const workspaceStatusSchema = z.discriminatedUnion("outcome", [
-  z.object({
-    outcome: z.literal("available"),
-    workspace: z.object({
-      checkout: z.object({ kind: z.string(), branchName: z.string().nullish() }).passthrough(),
-      workingTree: z.object({ files: z.array(changedFile) }).passthrough(),
-      mergeBase: z.object({ mergeBaseBranch: z.string(), aheadCount: z.number(), files: z.array(changedFile) }).passthrough().nullish(),
-    }).passthrough(),
-  }).passthrough(),
-  z.object({ outcome: z.literal("not_applicable") }).passthrough(),
-  z.object({ outcome: z.literal("unavailable") }).passthrough(),
-]);
-export type WorkspaceStatus = z.infer<typeof workspaceStatusSchema>;
-export const GIT_PLUGIN_ID = "bb--git";
-export const PULL_REQUEST_PLUGIN_ID = "bb--github-pr-status";
 /**
  * Why a workspace must not be archived, or null. Only real work blocks:
  * uncommitted changes to tracked files, or commits ahead of this branch's
  * own remote-tracking ref. Untracked scratch files, non-git workspaces and
  * workspaces that are gone don't block. A status that couldn't be read at
- * all (the call failed, the Git plugin is off or answered something else:
- * null) does block: it fails closed.
+ * all (the call failed: null) does block: it fails closed.
  */
-export function workspaceBlock(status: WorkspaceStatus | null): string | null {
+export function workspaceBlock(status: Awaited<ReturnType<Sdk["environments"]["status"]>> | null): string | null {
   if (status === null) return "Couldn't read the workspace's git status.";
   if (status.outcome !== "available") return null;
   const { checkout, mergeBase, workingTree } = status.workspace;
   const tracked = workingTree.files.filter((f) => f.status !== "??" && f.status !== "?");
   if (tracked.length) return `Uncommitted changes to ${count(tracked.length, "tracked file")}.`;
-  // No upstream/push count: only a remote-tracking ref for this exact
-  // branch proves which commits are unpushed. `baseRef` is a SHA.
+  // 0.6.37 has no upstream/push count: only a remote-tracking ref for this
+  // exact branch proves which commits are unpushed. `baseRef` is a SHA.
   const remote = mergeBase && !mergeBase.mergeBaseBranch.startsWith("refs/heads/") ? /^(?:refs\/remotes\/)?[^/]+\/(.+)$/.exec(mergeBase.mergeBaseBranch)?.[1] : undefined;
   if (checkout.kind === "branch" && remote === checkout.branchName && mergeBase!.aheadCount > 0 && mergeBase!.files.length) return `${count(mergeBase!.aheadCount, "unpushed commit")}.`;
   return null;
 }
 /**
- * A thread environment's git status through the Git plugin, compared with
- * `mergeBaseBranch` when given. Null when it can't be read (fails closed in
- * workspaceBlock).
+ * A thread environment's pull request, or null when unavailable. Stable BB
+ * 0.47 has no environments.pullRequest; calling it threw synchronously
+ * (before any .catch), which stopped the whole maintenance run.
  */
-export async function readWorkspaceStatus(plugins: Pick<Sdk["plugins"], "callRpc">, environmentId: string, mergeBaseBranch?: string): Promise<WorkspaceStatus | null> {
-  return Promise.resolve()
-    .then(() => plugins.callRpc({ pluginId: GIT_PLUGIN_ID, method: "workspaceStatus", input: { environmentId, ...mergeBaseBranch ? { mergeBaseBranch } : {} }, outputSchema: workspaceStatusSchema }))
-    .then((status) => workspaceStatusSchema.parse(status))
-    .catch(() => null);
-}
-const pullRequestRows = z.record(z.string(), z.object({ outcome: z.string(), pullRequest: z.object({ attention: z.string() }).passthrough().optional() }).passthrough());
-/**
- * Whether a thread environment's pull request is merged, through the GitHub
- * PR plugin (`pullRequests` RPC). False when there's none or it can't be read:
- * a merged PR only shortens how long a thread is kept, so unknown is safe.
- */
-export async function pullRequestMerged(plugins: Pick<Sdk["plugins"], "callRpc">, environmentId: string): Promise<boolean> {
-  return Promise.resolve()
-    .then(() => plugins.callRpc({ pluginId: PULL_REQUEST_PLUGIN_ID, method: "pullRequests", input: { keys: [environmentId] }, outputSchema: pullRequestRows }))
-    .then((rows) => { const row = pullRequestRows.parse(rows)[environmentId]; return row?.outcome === "available" && row.pullRequest?.attention === "merged"; })
-    .catch(() => false);
+export async function readPullRequest(environments: Pick<Sdk["environments"], "pullRequest"> | Record<string, unknown>, environmentId: string) {
+  const pullRequest = (environments as { pullRequest?: Sdk["environments"]["pullRequest"] }).pullRequest;
+  if (typeof pullRequest !== "function") return null;
+  return Promise.resolve().then(() => pullRequest.call(environments, { environmentId })).catch(() => null);
 }
 export function memoryNeedsTidy(text: string, budget: number, updatedAt: number, now: number): boolean {
   const dates = [...text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => Date.parse(m[1]!)).filter(Number.isFinite);
@@ -193,7 +158,8 @@ export class BotMaintenance {
         if (plans.some((p) => (p.data as { plan?: { status: string }[] }).plan?.some((s) => s.status !== "completed"))) continue;
         let captured = !!this.deps.db.prepare("SELECT 1 FROM item_threads WHERE thread_id = ? LIMIT 1").get(id);
         if (!captured && thread.environmentId) {
-          captured = await pullRequestMerged(this.deps.sdk.plugins, thread.environmentId);
+          const pr = await readPullRequest(this.deps.sdk.environments, thread.environmentId);
+          captured = pr?.outcome === "available" && pr.pullRequest.attention === "merged";
         }
         const ownerId = thread.lifecycleOwnerThreadId ?? thread.parentThreadId ?? thread.sourceThreadId;
         const owner = worker && ownerId ? await this.deps.sdk.threads.get({ threadId: ownerId }).catch(() => null) : null;
@@ -207,7 +173,7 @@ export class BotMaintenance {
         if (live.automations.some((a) => a.automation.enabled && a.automation.execution.targetThreadId === id)) continue;
         if (thread.environmentId) {
           // A missing or failing status call reads as null, which blocks (fails closed).
-          const status = await readWorkspaceStatus(this.deps.sdk.plugins, thread.environmentId, thread.environmentBranchName ? `origin/${thread.environmentBranchName}` : undefined);
+          const status = await Promise.resolve().then(() => this.deps.sdk.environments.status({ environmentId: thread.environmentId!, ...thread.environmentBranchName ? { mergeBaseBranch: `origin/${thread.environmentBranchName}` } : {} })).catch(() => null);
           const reason = workspaceBlock(status);
           if (reason) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason }); continue; }
         }

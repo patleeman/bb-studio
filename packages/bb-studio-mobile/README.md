@@ -53,18 +53,10 @@ or updates Live Activities.
 
 - `bb mobile status [--json]` shows whether APNs is ready, the relay path, and
   the last delivery.
-- RPC: `notify`, `mute_list`, `mute_set`, `push_status`, `push_test`.
-- Settings (`bb plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.
-  The team ID, bundle ID, APNs environment and Expo push URL are constants,
-  each overridable with an environment variable on the BB host
-  (`BB_MOBILE_APNS_TEAM_ID`, `BB_MOBILE_BUNDLE_ID`,
-  `BB_MOBILE_APNS_ENVIRONMENT`, `BB_MOBILE_EXPO_PUSH_URL`). The old key file
-  path folded into the key: a readable file's contents moved into `apnsKey`
-  once. The skill file describes each one.
-- Push status and **Send a test push** are in Studio's settings, under Phone
-  notifications. The plugin has no frontend, so Studio draws that section and
-  asks this plugin through `push_status` and `push_test`. (Stable BB draws
-  plugin sections on its own Mobile page only for the machine-access plugin.)
+- RPC: `notify`, `mute_list`, `mute_set`.
+- Settings (`bb plugin config mobile`): `apnsKey` (secret), `apnsKeyPath`,
+  `apnsKeyId`, `apnsTeamId`, `bundleId`, `apnsEnvironment`, `expoPushUrl`. The
+  skill file describes each one.
 - No agent tools.
 
 ## Install and build
@@ -81,8 +73,8 @@ bb plugin install .
 
 ![Studio Mobile settings in the running BB app](assets/staged-preview.png)
 
-The plugin's settings page in a staged BB (`node scripts/staged-bb.mjs start`)
-shows its two settings: the APNs key (secret) and its Key ID. The staged BB
-was upgraded from the previous version with a key ID and an unreadable test
-key file path set: the key ID carried over and the key reads `[not set]`. No
-private APNs key or device token is staged for the capture.
+The plugin's settings page in a staged BB (`node scripts/staged-bb.mjs start`) shows the APNs key, key file, key ID,
+team, bundle ID and environment fields and the Expo push URL, with the
+plugin's defaults: team `3753DAN98U`, bundle `nyc.plee.bbgo`, environment
+`auto` and Expo's push URL. The APNs key reads `[not set]`; no private APNs
+key or device token is staged for the capture.

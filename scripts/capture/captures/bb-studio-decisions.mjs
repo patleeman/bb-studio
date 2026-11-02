@@ -34,27 +34,26 @@ export default ({ bbCli }) => [
     fileName: "decisions-preview.png",
     setup: async (client) => {
       const jev = await startJevStandIn();
-      // Studio settings (bb studio settings), not BB's declared ones.
       const settings = { jevProvider: "custom", customJevEndpoint: jev.endpoint, customJevModel: "jev-local" };
       const cleanup = async () => {
-        for (const key of Object.keys(settings)) await bbCli(["studio", "settings", "reset", `decisions_${key}`]).catch(() => {});
+        for (const key of Object.keys(settings)) await bbCli(["plugin", "config", "studio", "unset", `decisions_${key}`]).catch(() => {});
         await jev.close();
       };
       try {
-        for (const [key, value] of Object.entries(settings)) await bbCli(["studio", "settings", "set", `decisions_${key}`, value]);
+        for (const [key, value] of Object.entries(settings)) await bbCli(["plugin", "config", "studio", "set", `decisions_${key}`, value]);
         await client.navigate("/settings/plugins/studio");
         await client.waitForText("Studio");
-        // Studio's Jev section (src/settings/ui/sections.tsx).
-        await client.waitForText("Jev provider");
+        await client.waitForText("Jev connection");
         await client.waitForText("jev-local");
-        await client.waitForText("If Jev doesn’t answer, use");
+        await client.waitForText("Fallback model");
         await client.clickButtonText("Test");
         await client.waitForText("Jev answered through");
         await client.evaluate(`(() => {
           const routes = document.querySelector('[aria-label="Jev providers in order"]')?.innerText ?? '';
           if (!routes.includes('jev-local')) throw new Error('Jev connection must list the custom endpoint: ' + routes);
-          // Scroll to the Jev section: the provider, the test result and the fallback model.
-          document.querySelector('[data-testid="setting-decisions_jevProvider"]')?.scrollIntoView({ block: 'start' });
+          // Scroll the settings page to its end: the test result and the fallback model.
+          for (const el of document.querySelectorAll('*'))
+            if (el.scrollHeight > el.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) el.scrollTop = el.scrollHeight;
         })()`);
       } catch (error) {
         await cleanup();

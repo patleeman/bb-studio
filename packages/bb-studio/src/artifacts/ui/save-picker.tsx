@@ -7,8 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "../../kit/app/index";
 import { errorMessage, plural, relativeTime } from "../../kit/format";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import type { ThreadTabProps } from "../../kit/app/thread-panel";
+import { useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, isArtifactId, mimeFor, prunePicked } from "../shared";
@@ -33,13 +32,13 @@ export function pickerArtifactId(params: unknown): string | null {
   return typeof id === "string" && isArtifactId(id) ? id : null;
 }
 
-export function SavePicker(props: Pick<ThreadTabProps, "threadId" | "params">) {
+export function SavePicker(props: PluginThreadPanelProps) {
   // BB reuses the panel when its tab switches to another artifact; start over
   // on the one asked for, rather than keep showing the first.
   return <SavePickerView key={pickerArtifactId(props.params) ?? ""} {...props} />;
 }
 
-function SavePickerView({ threadId, params }: Pick<ThreadTabProps, "threadId" | "params">) {
+function SavePickerView({ threadId, params }: PluginThreadPanelProps) {
   const [openId, setOpenId] = useState<string | null>(() => pickerArtifactId(params));
   const back = useCallback(() => setOpenId(null), []);
   if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} threadId={threadId} />;

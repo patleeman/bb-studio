@@ -43,7 +43,7 @@ bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-l
 
 ## Settings
 
-Change settings with `bb studio settings set decisions_<key> <value>` (`bb studio settings list` shows them). The provider keys are BB secret fields: `bb plugin config studio`.
+Change settings with `bb plugin config studio set decisions_<key> <value>`.
 
 - `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
   `opencode-zen`, or `custom`. `auto` tries each configured provider in that
@@ -51,17 +51,15 @@ Change settings with `bb studio settings set decisions_<key> <value>` (`bb studi
 - Provider keys are secrets: `typesafeApiKey`, `vercelApiKey`,
   `openRouterApiKey`, `zenApiKey`, and `customJevApiKey`. Have the owner enter them in Studio settings; never request or print their contents. Environment fallbacks are `TYPESAFE_API_KEY`,
   `AI_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, and `OPENCODE_API_KEY`.
-- The TypeSafe model is `jev-latest`, a constant; the host can set `STUDIO_TYPESAFE_MODEL`.
+- `typesafeModel`: `jev-latest` (default), `jev-preview`, or `jev-1.13.0`.
 - A custom provider needs `customJevEndpoint` (full HTTPS URL of a System One
   endpoint, or HTTP on localhost) and `customJevModel`. For short-lived tokens,
   set `customJevApiKeyCommand` to a command that prints the token instead of
   `customJevApiKey`. `customJevHeaders` adds `name: value` headers separated by
   semicolons.
-- The Jev timeout (5000 ms) and Smart Queue's steer threshold (0.5) are
-  constants; the host can set `STUDIO_JEV_TIMEOUT_MS` or
-  `STUDIO_JEV_STEER_CONFIDENCE`. `batchConfidence` and `enabled` apply to Smart
-  Queue only; other plugins apply their own thresholds.
-- The fallback model is not a `bb studio settings` setting. Use
+- `jevTimeoutMs` applies to every caller. `steerConfidence`, `batchConfidence` and
+  `enabled` apply to Smart Queue only; other plugins apply their own thresholds.
+- The fallback model is not a `bb plugin config` setting. Use
   `bb studio decisions fallback`, or the picker on the settings page.
 
 Run `bb studio decisions status` after a change. It lists the Jev routes in order
@@ -84,6 +82,6 @@ and any configuration problems.
   retry with a fixed sample.
 - *No Jev provider is configured*: add a key here.
 - To stop Smart Queue, run
-  `bb studio settings set decisions_enabled false`.
+  `bb plugin config studio set decisions_enabled false`.
 
 Settings live under Studio with a `decisions_` prefix. Use Studio settings to enter API keys securely; never ask for or print their contents. Use `bb studio decisions` for the current CLI, such as `bb studio decisions status`.

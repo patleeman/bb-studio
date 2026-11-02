@@ -1,7 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { modelSelectionSchema, type ModelSelection } from "../../decisions/contract";
 import type { ModelPreferences, ModelPurpose } from "../shared/contract";
-import { toReasoningLevel } from "../../kit/reasoning";
 
 /** Studio's KV key for a purpose's model; the Talk plugin used `model:<purpose>`. */
 export const modelKey = (purpose: ModelPurpose) => `talk:model:${purpose}`;
@@ -40,7 +39,7 @@ export function talkModels(bb: BbPluginApi) {
           return {
             providerId: provider.id,
             model: model.model,
-            reasoningLevel: efforts.includes("none") ? "none" : efforts.includes("low") ? "low" : toReasoningLevel(model.defaultReasoningEffort),
+            reasoningLevel: efforts.includes("none") ? "none" : efforts.includes("low") ? "low" : model.defaultReasoningEffort,
           };
         }
         return null;

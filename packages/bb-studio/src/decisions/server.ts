@@ -23,7 +23,6 @@ import { defaultFallback, fallbackSchema, type Fallback } from "./contract";
 import { jevRoutes } from "./server/jev-providers";
 import { askSystemOne } from "./server/system-one";
 import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./server/queue";
-import { toReasoningLevel } from "../kit/reasoning";
 
 const recentKey = "decisions:recent-decisions";
 const fallbackKey = "decisions:fallback";
@@ -158,7 +157,7 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
         mode: "model" as const,
         providerId: provider.id,
         model: model.model,
-        reasoningLevel: efforts.includes("none") ? ("none" as const) : efforts.includes("low") ? ("low" as const) : toReasoningLevel(model.defaultReasoningEffort),
+        reasoningLevel: efforts.includes("none") ? ("none" as const) : efforts.includes("low") ? ("low" as const) : model.defaultReasoningEffort,
       };
     }
     return null;

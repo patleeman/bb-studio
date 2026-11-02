@@ -1,11 +1,9 @@
 // What the loop UI reads besides the loops: whether the Attention Router is
 // on, the people a loop can belong to, and the actions it takes.
-import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
-import { useStudioSettings } from "../../settings/ui/use-settings";
+import { useBbNavigate, useSdk, useSettings } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { errorMessage } from "../../kit/format";
 import { openAppPath } from "../../kit/app/index";
-import { requestThreadTab, useOpenThreadTab, type ThreadTabOpen } from "../../kit/app/thread-panel";
 import { useCall, useLive, type RpcInput } from "../../ui/live";
 import { botPath } from "../../ui/bot/selection";
 import { toast } from "sonner";
@@ -15,9 +13,9 @@ import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** The `loopsEnabled` Studio setting (label "Attention Router", default off). */
+/** The `loopsEnabled` setting (label "Attention Router", default off). */
 export function useLoopsEnabled(): boolean {
-  const { values } = useStudioSettings();
+  const { values } = useSettings();
   return values?.loopsEnabled === true;
 }
 
@@ -26,22 +24,39 @@ export const loopsPath = (botId: string) => `${botPath(botId)}/loops`;
 export const isLoopsPath = (pathname: string) => /^\/plugins\/studio\/studio\/bot\/[^/]+\/loops\/?$/.test(pathname);
 export const openLoops = (botId: string | null | undefined) => openAppPath(botId ? loopsPath(botId) : botPath());
 
-/** The Loops pane's thread tab (app.tsx): the loop list beside a chat. */
+/** The Loops pane's thread panel action (app.tsx): the loop list beside a chat. */
 export const LOOPS_PANE = "loops";
-const LOOPS_OPEN: ThreadTabOpen = { actionId: LOOPS_PANE, title: "Loops" };
+
+const PANE_EVENT = "studio:loops-pane";
+/** The chat asked to open the Loops pane, until its header action does. */
+let paneWanted: string | null = null;
 
 /**
  * Asks the Bot chat `threadId` to open the Loops pane beside it, from outside
- * its thread view (the sidebar): the chat's view opens it once, now or when
- * it opens (kit/app/thread-panel.tsx). True when the pane opened.
+ * its thread view (the sidebar): openThreadPanel only works reliably from
+ * inside it, so the chat's Loops header button opens it, now or when the
+ * chat opens (useLoopsPaneRequests).
  */
-export function requestLoopsPane(threadId: string): Promise<boolean> {
-  return requestThreadTab(threadId, LOOPS_OPEN);
+export function requestLoopsPane(threadId: string): void {
+  paneWanted = threadId;
+  window.dispatchEvent(new Event(PANE_EVENT));
 }
 
-/** Says the Loops pane didn't open, with a way to the Loops page instead. */
-export function reportLoopsPaneFailed(botId: string | null | undefined): void {
-  toast.error("Couldn’t open Loops beside the chat.", { action: { label: "Open Loops", onClick: () => openLoops(botId) } });
+/** In the chat `threadId`'s header: runs `open` for each request for it. A declined open is retried briefly while the view mounts. */
+export function useLoopsPaneRequests(threadId: string, open: () => boolean): void {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const take = () => {
+      if (paneWanted !== threadId) return;
+      paneWanted = null;
+      let tries = 0;
+      const attempt = () => { if (!open() && ++tries < 6) timer = setTimeout(attempt, 300); };
+      attempt();
+    };
+    take();
+    window.addEventListener(PANE_EVENT, take);
+    return () => { window.removeEventListener(PANE_EVENT, take); clearTimeout(timer); };
+  }, [threadId, open]);
 }
 
 /**
@@ -49,12 +64,12 @@ export function reportLoopsPaneFailed(botId: string | null | undefined): void {
  * the Loops tab where there's no side panel. True when the pane opened.
  */
 export function useOpenLoopsPane(): (botId: string | null | undefined) => boolean {
-  const openTab = useOpenThreadTab();
+  const navigate = useBbNavigate();
   return useCallback((botId) => {
-    if (openTab(LOOPS_OPEN)) return true;
+    if (navigate.openThreadPanel({ actionId: LOOPS_PANE, title: "Loops" })) return true;
     openLoops(botId);
     return false;
-  }, [openTab]);
+  }, [navigate]);
 }
 
 const CHIP_LENGTH = 60;

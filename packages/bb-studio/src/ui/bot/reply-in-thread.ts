@@ -8,7 +8,7 @@
 import { relativeTime } from "../../kit/format";
 import type { SideThreadView } from "../../contract";
 
-/** A row's click: `detail.threadId` is the side thread to open beside `detail.sourceThreadId`, the chat it's on (SideThreadOpener). */
+/** A row's click: `detail.threadId` is the side thread to open (SideThreadOpener). */
 export const OPEN_SIDE_THREAD_EVENT = "studio:open-side-thread";
 const ROW = "data-studio-side-thread";
 /** How often an open Bot chat's side threads are fetched again. */
@@ -90,7 +90,7 @@ export function mountSideThreadRows(
         row = makeRow();
         row.addEventListener("click", () => {
           const sideThread = row!.getAttribute("data-thread");
-          if (sideThread) window.dispatchEvent(new CustomEvent(OPEN_SIDE_THREAD_EVENT, { detail: { threadId: sideThread, sourceThreadId: threadInPath(location.pathname) } }));
+          if (sideThread) window.dispatchEvent(new CustomEvent(OPEN_SIDE_THREAD_EVENT, { detail: { threadId: sideThread } }));
         });
         (message.querySelector("[data-message-column]") ?? message).appendChild(row);
         rows.add(row);

@@ -1,60 +1,106 @@
-// Studio Decisions' settings. Its API keys are BB secret fields (keys stay in
-// BB's 0600 secret files); every other Decisions setting is a Studio setting
-// (src/settings/schema.ts, keys `decisions_*`). The TypeSafe model, the Jev
-// timeout and the steer threshold are constants, which a BB host can still
-// override with an environment variable.
 import type { PluginSettingDescriptor } from "@get-bb/plugin-sdk";
-import { STUDIO_SETTINGS } from "../settings/schema";
+import { z } from "zod";
+import { jevProviderChoices } from "./server/jev-providers";
+export const typesafeModels = ["jev-latest", "jev-preview", "jev-1.13.0"];
+const decisionsSettingDescriptors = {
+    enabled: {
+      type: "boolean",
+      label: "Smart Queue",
+      default: true,
+      description:
+        "Hold a message you send while a thread is working, then steer the current turn or queue it as a follow-up. Pauses while the standalone Smart Queue plugin is on.",
+    },
+    jevProvider: {
+      type: "select",
+      label: "Jev provider",
+      options: [...jevProviderChoices],
+      default: "auto",
+      description:
+        "Where Studio Decisions calls Jev, for Smart Queue and for other plugins. Auto tries TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen, then Custom, using each one that has a key, and moves on when one fails.",
+    },
+    typesafeApiKey: {
+      type: "string",
+      label: "TypeSafe API key",
+      secret: true,
+      description:
+        "TypeSafe serves Jev directly. Create a key at https://console.typesafe.ai/keys. Falls back to the server's TYPESAFE_API_KEY environment variable.",
+    },
+    typesafeModel: {
+      type: "select",
+      label: "TypeSafe model",
+      options: typesafeModels,
+      default: "jev-latest",
+      description: "jev-latest follows each stable release, jev-preview tries previews, and jev-1.13.0 pins that version.",
+    },
+    vercelApiKey: {
+      type: "string",
+      label: "Vercel AI Gateway API key",
+      secret: true,
+      description: "Calls Jev through Vercel AI Gateway. Falls back to AI_GATEWAY_API_KEY.",
+    },
+    openRouterApiKey: {
+      type: "string",
+      label: "OpenRouter API key",
+      secret: true,
+      description: "Calls Jev through OpenRouter. Falls back to OPENROUTER_API_KEY.",
+    },
+    zenApiKey: {
+      type: "string",
+      label: "OpenCode Zen API key",
+      secret: true,
+      description: "Calls Jev through OpenCode Zen. Falls back to OPENCODE_API_KEY.",
+    },
+    customJevEndpoint: {
+      type: "string",
+      label: "Custom Jev endpoint",
+      description:
+        "Bring your own provider: the full URL of any endpoint that speaks TypeSafe's System One API, such as https://gateway.example.com/v1/systemone. HTTPS is required except on localhost.",
+    },
+    customJevApiKey: {
+      type: "string",
+      label: "Custom Jev API key",
+      secret: true,
+      description: "Sent as a bearer token to the custom endpoint. Leave empty if it needs none.",
+    },
+    customJevApiKeyCommand: {
+      type: "string",
+      label: "Custom Jev key command",
+      description:
+        "For short-lived tokens: a shell command, run on the BB server, that prints the bearer token. The token is reused until its JWT expiry, or for five minutes. Use this instead of the API key.",
+    },
+    customJevHeaders: {
+      type: "string",
+      label: "Custom Jev headers",
+      description: "Extra request headers as `name: value` pairs separated by semicolons, such as `source: bb; org-id: 2`.",
+    },
+    customJevModel: {
+      type: "string",
+      label: "Custom Jev model",
+      description: "The model name the custom endpoint expects, such as jev-latest.",
+    },
+    jevTimeoutMs: {
+      type: "number",
+      label: "Jev timeout (milliseconds)",
+      default: 5000,
+      experimental_schema: z.number().int().min(250).max(15000),
+      description: "Direct request deadline, from 250 to 15000 milliseconds.",
+    },
+    steerConfidence: {
+      type: "number",
+      label: "Smart Queue: minimum confidence to steer",
+      default: 0.5,
+      experimental_schema: z.number().min(0).max(1),
+      description: "A value from 0 to 1. An uncertain steer becomes a follow-up. Other plugins apply their own thresholds.",
+    },
+    batchConfidence: {
+      type: "number",
+      label: "Smart Queue: minimum confidence to batch",
+      default: 0.5,
+      experimental_schema: z.number().min(0).max(1),
+      description:
+        "A value from 0 to 1. When a thread frees up, queued follow-ups Jev is this sure belong with the next one are sent with it as one turn. Set to 1 to send each on its own.",
+    },
+} satisfies Record<string, PluginSettingDescriptor>;
 
-export const DECISIONS_KEY_SETTINGS = {
-  decisions_typesafeApiKey: {
-    type: "string",
-    label: "TypeSafe API key",
-    secret: true,
-    description: "Jev, Studio’s fast decision model, tried first. Create a key at https://console.typesafe.ai/keys. Falls back to TYPESAFE_API_KEY on the BB host.",
-  },
-  decisions_vercelApiKey: {
-    type: "string",
-    label: "Vercel AI Gateway API key",
-    secret: true,
-    description: "Jev through Vercel AI Gateway. Falls back to AI_GATEWAY_API_KEY.",
-  },
-  decisions_openRouterApiKey: {
-    type: "string",
-    label: "OpenRouter API key",
-    secret: true,
-    description: "Jev through OpenRouter. Falls back to OPENROUTER_API_KEY.",
-  },
-  decisions_zenApiKey: {
-    type: "string",
-    label: "OpenCode Zen API key",
-    secret: true,
-    description: "Jev through OpenCode Zen, the last fallback. Falls back to OPENCODE_API_KEY.",
-  },
-  decisions_customJevApiKey: {
-    type: "string",
-    label: "Your own Jev endpoint: key",
-    secret: true,
-    description: "Sent as a bearer token to the endpoint set in Jev ▸ Your own Jev endpoint. Leave empty if it needs none.",
-  },
-} as const satisfies Record<string, PluginSettingDescriptor>;
-
-const number = (raw: string | undefined, fallback: number, min: number, max: number) => {
-  const value = raw?.trim() ? Number(raw) : Number.NaN;
-  return Number.isFinite(value) && value >= min && value <= max ? value : fallback;
-};
-
-/** The settings that became constants, with the host's overrides. */
-export function decisionsConstants(env: NodeJS.ProcessEnv = process.env) {
-  return {
-    typesafeModel: env.STUDIO_TYPESAFE_MODEL?.trim() || "jev-latest",
-    jevTimeoutMs: Math.round(number(env.STUDIO_JEV_TIMEOUT_MS, 5000, 250, 15_000)),
-    steerConfidence: number(env.STUDIO_JEV_STEER_CONFIDENCE, 0.5, 0, 1),
-  };
-}
-
-/** Decisions' settings without the `decisions_` prefix: the constants, then the Studio settings' defaults. */
-export const decisionsDefaults: Record<string, unknown> = {
-  ...decisionsConstants(),
-  ...Object.fromEntries(Object.entries(STUDIO_SETTINGS).filter(([key]) => key.startsWith("decisions_")).map(([key, setting]) => [key.slice("decisions_".length), setting.default])),
-};
+export const DECISIONS_SETTINGS = Object.fromEntries(Object.entries(decisionsSettingDescriptors).map(([key, descriptor]) => [`decisions_${key}`, descriptor]));
+export const decisionsDefaults = Object.fromEntries(Object.entries(decisionsSettingDescriptors).flatMap(([key, descriptor]) => "default" in descriptor ? [[key, descriptor.default]] : []));

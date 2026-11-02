@@ -472,8 +472,7 @@ describe("hands-free voice's settings: the next session's model, voice, backend 
     expect(Object.fromEntries(Object.entries(VOICE_LIVE_SETTINGS).map(([key, spec]) => [key, spec.default]))).toEqual({
       voiceLiveModel: "gpt-live-1", voiceLiveVoice: "marin", voiceLiveBackendModel: "gpt-5.6-luna", voiceLiveMonthlyCapUsd: 20,
     });
-    // Studio settings in its Voice section, with plain labels (no "Hands-free voice:" prefix).
-    for (const spec of Object.values(VOICE_LIVE_SETTINGS)) { expect(spec.group).toBe("voice"); expect(spec.label).not.toMatch(/:/); }
+    for (const spec of Object.values(VOICE_LIVE_SETTINGS)) expect(spec.label).toMatch(/^Hands-free voice: [a-z]/);
     // Every voice of either model is a valid option; the select can't filter by model, so start falls back to marin.
     expect(VOICE_LIVE_SETTINGS.voiceLiveVoice.options).toEqual(expect.arrayContaining([...LIVE_VOICES["gpt-live-1"], ...LIVE_VOICES["gpt-realtime-2.1"]]));
     // Nothing saved at all (or junk) still means today's values.

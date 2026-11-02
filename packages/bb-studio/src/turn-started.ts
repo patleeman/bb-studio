@@ -6,7 +6,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 type Sdk = BbPluginApi["sdk"];
-type Row = Extract<Awaited<ReturnType<Sdk["threads"]["timeline"]>>, { rows: unknown }>["rows"][number];
+type Row = Awaited<ReturnType<Sdk["threads"]["timeline"]>>["rows"][number];
 
 /** The open turn's start in a page of timeline rows, oldest first; null with none. */
 export function openTurnStart(rows: readonly Row[]): number | null {

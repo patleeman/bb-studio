@@ -4,15 +4,16 @@
 // (bot/<botId>/loops) is the full loop list, each with a back link. "Bot info"
 // beside a Bot's thread (BotInfoPanel) is the page's compact version
 // (BotPane). Its chat and the threads it lists open as BB threads.
-import { PageColumn, usePathname, openAppPath } from "../../kit/app/index";
+import { ICON_BUTTON, PageColumn, usePathname, openAppPath } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
-import type { ThreadTabProps } from "../../kit/app/thread-panel";
+import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotView } from "../../contract";
 import { useLive } from "../live";
 import { BotHome } from "./BotHome";
 import { BOT_STYLES } from "./BotAvatar";
 import { BotPage, BotPane, isControlsPath } from "./BotPage";
 import { BotControls } from "./BotControls";
+import { BOT_INFO_ACTION } from "./workspace";
 import { LoopsTab } from "../../loops/ui/LoopsTab";
 import { isLoopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botPath } from "./selection";
@@ -51,12 +52,26 @@ function LoopsPage({ view }: { view: BotView }) {
   );
 }
 
-/** The "Bot info" thread tab: the Info of the Bot that owns the thread. */
-export function BotInfoPanel({ threadId }: ThreadTabProps) {
+/** The "Bot info" thread panel tab: the Info of the Bot that owns the thread. */
+export function BotInfoPanel({ threadId }: PluginThreadPanelProps) {
   const owner = useLive("bot_thread_owner", { threadId }, { pollMs: 120_000 });
   const botId = owner.data?.botId ?? null;
   if (!botId) return <p className="p-4 text-sm text-muted-foreground">{owner.loading || !owner.data ? "Loading…" : "Not a Bot thread. Bot info shows on a Bot's chat and the threads it started."}</p>;
   return <BotInfo botId={botId} threadId={threadId} />;
+}
+
+/** Header action beside the cache indicator on a Bot-owned thread: a borderless chrome button, like the indicator. */
+export function BotInfoHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
+  const owner = useLive("bot_thread_owner", { threadId }, { pollMs: 120_000 });
+  const navigate = useBbNavigate();
+  if (!owner.data?.botId) return null;
+  return (
+    <button type="button" data-testid="bot-info-header" aria-label="Bot info" title="Bot info"
+      onClick={() => navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })}
+      className={ICON_BUTTON}>
+      <Icon name="Bot" aria-hidden />
+    </button>
+  );
 }
 
 /** One Bot's Info by id: the compact page. */

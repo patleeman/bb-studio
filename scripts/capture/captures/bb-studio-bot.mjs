@@ -784,15 +784,12 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
     await dismissProblems(client);
     await openChat(client, bot.threadId, "/PASS/");
     await client.command("Page.reload");
-    // The cache sits in the context row above the composer; Bot info is a
-    // header action (the Loops split button's menu while Loops is on).
+    await client.waitForSelector('[data-testid="bot-info-header"]', 30000);
     await client.waitForSelector('[data-testid="bot-cache-chip"]', 30000);
     await client.evaluate(`(() => {
-      const header = document.querySelector('[data-testid="app-page-header-content-row"]');
-      const info = [...(header?.querySelectorAll("button") ?? [])].find((each) => each.textContent.trim() === "Bot info" || each.getAttribute("aria-label") === "More actions");
+      const info = document.querySelector('[data-testid="bot-info-header"]');
       const chip = document.querySelector('[data-testid="bot-cache-chip"]');
-      if (!info || !chip) throw new Error("The Bot thread is missing Bot info in its header or the cache in its context row");
-      if (chip.closest('[data-testid="app-page-header-content-row"]')) throw new Error("The cache indicator is still in the header");
+      if (!info || !chip) throw new Error("The Bot thread header is missing Bot info or the cache indicator");
       if (!chip.textContent.includes(${JSON.stringify(filenameCheck)})) throw new Error("The cache chip reads " + chip.textContent);
       if (chip.getAttribute("aria-label") !== ${JSON.stringify(state === "warm" ? "Prompt cache: 59m left" : "Prompt cache: cold")}) throw new Error("The cache chip label is " + chip.getAttribute("aria-label"));
       return true;
@@ -821,14 +818,13 @@ export function botFixtures({ projectId, pluginRpc, bbCli, sleep }) {
       const started = Date.now();
       const tick = () => {
         const header = document.querySelector('[data-testid="app-page-header-content-row"]');
-        // The count is in the context row above the composer now, not the header.
-        const button = [...document.querySelectorAll("button")].find((each) => /automation.*wake this thread/i.test(each.getAttribute("aria-label") ?? each.title) && !each.closest('[data-testid="app-page-header-content-row"]'));
+        const button = header && [...header.querySelectorAll("button")].find((each) => /automation.*wake this thread/i.test(each.getAttribute("aria-label") ?? each.title));
         const vscode = [...(header?.querySelectorAll("button") ?? [])].find((each) => /visual studio code|vs code|vscode/i.test((each.getAttribute("aria-label") ?? "") + " " + each.title + " " + each.textContent));
         if (button) {
           if (vscode) return reject(new Error("The regular thread header still has a VS Code button"));
           return resolve(true);
         }
-        if (Date.now() - started > 30000) return reject(new Error("The regular thread has no Automations count in its context row"));
+        if (Date.now() - started > 30000) return reject(new Error("The regular thread header has no Automations button"));
         setTimeout(tick, 250);
       };
       tick();

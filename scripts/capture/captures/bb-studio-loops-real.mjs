@@ -80,9 +80,9 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     owner ??= await json(["thread", "spawn", "--project", kensico.id, "--title", OWNER_TITLE, "--prompt", "Add the remaining utilities.", "--send-at", "30d"]);
     writeLoops(loops(owner.id));
     // Off, then on: the new Studio ticks the scheduler when the Attention Router turns on.
-    await bbCli(["studio", "settings", "set", "loopsEnabled", "false"]);
+    await bbCli(["plugin", "config", "studio", "set", "loopsEnabled", "false"]);
     await sleep(1000);
-    await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
+    await bbCli(["plugin", "config", "studio", "set", "loopsEnabled", "true"]);
     fixture = { bot, owner };
     return fixture;
   }

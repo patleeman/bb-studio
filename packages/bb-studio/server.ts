@@ -3,6 +3,7 @@ import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerDecisions } from "./src/decisions/server";
+import { DECISIONS_SETTINGS } from "./src/decisions/settings";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
@@ -11,21 +12,18 @@ import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
 import { MINI_INSTRUCTIONS, MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
-import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
+import { registerTalk, TALK_SETTINGS, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { AGENT_INSTRUCTIONS as PAGE_INSTRUCTIONS } from "./src/pages/tools";
 import { registerExploreBuiltin } from "./src/explore/server";
-import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
+import { PAGES_SETTINGS } from "./src/kit/pages-contract";
+import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
 import { kindsContract, type KindsState } from "./src/kinds-contract";
-import { openaiKey } from "./src/openai-key";
-import { registerSettings } from "./src/settings/register";
-import { loopTimeZone } from "./src/settings/constants";
-import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
-import { STUDIO_SETTINGS } from "./src/settings/schema";
-import { VoiceLive } from "./src/voice/live/live";
+import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
+import { VOICE_LIVE_SETTINGS, VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
 import { gatherSeed, RECENT_MESSAGES, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
@@ -60,7 +58,7 @@ import { EXTERNAL_AGENTS_PLUGIN_ID } from "./src/bot";
 import { ChangeLog, recordProviderChanges } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
-import { AVATAR_ROUTE, imageMime, pickImageProvider } from "./src/bot-avatar";
+import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
 import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
@@ -72,7 +70,7 @@ import { BotNudges, type NudgeOwner } from "./src/bot-nudge";
 /** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
 const STOPPED_NOTE = "Studio notice: something you own stopped after failing. You decide what the user sees: if you can fix it (resume it, retry it), do. If the user must act, tell them in one or two short lines what stopped and what to do. If it needs nothing from them, reply exactly [PASS].";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
-import { ThreadResume, type ThreadOwner } from "./src/thread-resume";
+import { THREAD_RESUME_SETTINGS, ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
 import { Automations } from "./src/automations";
 import { lintSkill, patchText, REVIEW_TOOLS, SkillLearning } from "./src/skill-learning";
@@ -175,17 +173,20 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
   bb.onDispose(() => minis.dispose());
-  // Studio's settings (src/settings): BB draws only the API keys; everything
-  // else is in Studio's own storage, shown in Studio's grouped sections. On the
-  // first load after the move, the old values migrate once. `settings` merges
-  // both under the keys Talk, Pages, Explore, Reactions, Decisions, Bot avatars,
-  // thread resume, hands-free voice and Loops always used.
-  const { settings, store: studioSettings } = await registerSettings(bb, STUDIO_PLUGIN_ID);
+  // BB takes one settings definition per plugin. Studio's settings are Talk's,
+  // Pages', Explore's and Reactions', under the keys they had in their own plugins,
+  // then Bot avatars' (with Studio's shared OpenAI key), thread resume's and
+  // hands-free voice's, plus Decisions under namespaced keys.
+  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...THREAD_RESUME_SETTINGS, ...VOICE_LIVE_SETTINGS });
   const code = registerCode(bb, db);
   // BB allows one message.dispatch hook per plugin; Decisions owns it and asks
   // the runner guard (assigned below, once runners exist) first.
   let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
   const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
+  // "Bot avatars: OpenAI API key" became Studio's one OpenAI key: move a key set there.
+  await migrateOpenaiKey({ get: () => settings.get(), set: (values) => settings.experimental_set(values as never) })
+    .then((moved) => { if (moved) bb.log.info("Moved the Bot avatars OpenAI key to Studio's OpenAI API key setting."); })
+    .catch((error) => bb.log.warn(`Couldn't move the Bot avatars OpenAI key: ${errorText(error)}`));
   let settingValues: Record<string, unknown> = await settings.get();
   const explore = registerExploreBuiltin(bb, db, settingValues);
   settings.onChange((next) => {
@@ -196,12 +197,12 @@ export default async function plugin(bb: BbPluginApi) {
   const reactionsImport = {
     plugins: bb.sdk.plugins,
     kv: bb.storage.kv,
-    settings: { get: () => settings.get(), set: (values: Record<string, unknown>) => settings.experimental_set(values) },
+    settings: { get: () => settings.get(), set: (values: Record<string, unknown>) => settings.experimental_set(values as never) },
   };
   void importReactionsSettings(reactionsImport).then((applied) => { if (applied) bb.log.info(`Copied Studio Reactions settings (${applied.join(", ") || "none changed"}).`); })
     .catch((error) => bb.log.warn(`Couldn't copy Studio Reactions settings: ${errorText(error)}`));
   const pages = registerPages(bb, db, {
-    snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? STUDIO_SETTINGS.snapshotsPerPage.default),
+    snapshotsPerPage: () => Number(settingValues.snapshotsPerPage ?? PAGES_SETTINGS.snapshotsPerPage.default),
   }, {
     created: (ref, threadId) => services.created(ref, threadId),
     linkThread: (thread) => services.linkThread(thread),
@@ -526,7 +527,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
-  }, settings, loopTimeZone);
+  });
   loopsEnabled = loops.enabled;
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
@@ -1266,7 +1267,7 @@ export default async function plugin(bb: BbPluginApi) {
     key: () => openaiKey(settingValues),
     settings: () => settingValues,
     // The composer menu's quick settings; the returned values are current at once (onChange follows).
-    saveSettings: async (values) => { settingValues = await settings.experimental_set(values); },
+    saveSettings: async (values) => { settingValues = await settings.experimental_set(values as never); },
     cos: () => { const bot = bots.stored(); return bot ? { name: bot.name, threadId: bot.threadId ?? null } : null; },
     // The session's identity seed (src/voice/live/identity.ts): cheap sources only, read once at start.
     seed: async (threadId) => {
@@ -1883,7 +1884,6 @@ export default async function plugin(bb: BbPluginApi) {
     name: "studio",
     summary: "BB Studio: pages, recordings, drawings, designs, artifacts and other add-ons' items",
     commands: [
-      { name: "settings", summary: "List, read and change Studio's settings (API keys: bb plugin config studio)", usage: SETTINGS_USAGE },
       { name: "decisions", summary: "Jev, fallback model and Smart Queue", usage: "bb studio decisions <status|recent|classify|check|fallback>" },
       { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
@@ -1904,7 +1904,6 @@ export default async function plugin(bb: BbPluginApi) {
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
-      if (argv[0] === "settings") return settingsCli(argv.slice(1), studioSettings);
       if (argv[0] === "decisions") return decisions.cli(argv.slice(1));
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
       if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);

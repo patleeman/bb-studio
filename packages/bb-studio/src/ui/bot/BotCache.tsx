@@ -1,10 +1,10 @@
-// A Bot chat's prompt cache on the desktop (src/bot-cache.ts): its segment
-// in the chat's context row (minutes left; open for details and actions),
-// the composer's cold-send banner, and the Prompt cache section of Bot info.
+// A Bot chat's prompt cache on the desktop (src/bot-cache.ts): the header
+// dot with its state tooltip and menu, the composer's
+// cold-send banner, and the Prompt cache section of Bot info.
 import { GHOST_BUTTON } from "../../kit/app/index";
 import { errorMessage } from "../../kit/format";
-import { Icon } from "../../kit/ui/index";
-import { useComposer } from "@get-bb/plugin-sdk/app";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
+import { useComposer, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { BotCacheStateView } from "../../contract";
 import { formatTokens, formatUsd } from "../../bot-cache-format";
@@ -55,60 +55,44 @@ export function costLine(state: BotCacheStateView): string | null {
 
 const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
-/** A Bot chat's cache state, polled, with its two actions (warming on/off, Compact now). */
-export function useBotCache(threadId: string) {
+/** The header chip on a Bot's chat; nothing on other threads. */
+export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
   const live = useLive("bot_cache_state", { threadId }, { pollMs: POLL_MS });
   const call = useCall();
   const [error, setError] = useState<string | null>(null);
   useTick(30_000);
   const state = live.data;
+  if (!state?.botId) return null;
+  const indicator = cacheIndicator(state);
   const act = <M extends Method,>(method: M, input: RpcInput<M>) => { setError(null); void call(method, input).then(() => live.refresh(), (cause: unknown) => setError(errorMessage(cause))); };
-  return { state: state?.botId ? state : null, error, act };
-}
-
-const toneClass = (tone: CacheIndicator["tone"]) => tone === "amber" ? "text-warning" : tone === "dim" ? "text-muted-foreground/40" : "text-muted-foreground";
-
-/**
- * The prompt cache in a Bot chat's context row (above the composer): a clock
- * and the minutes left; a click shows the details below the row. Nothing on
- * other threads (the segment's useVisible hides it).
- */
-export function BotCacheSummary({ threadId, isExpanded, onToggle }: { threadId: string; isExpanded: boolean; onToggle(): void }) {
-  const { state } = useBotCache(threadId);
-  if (!state) return null;
-  const indicator = cacheIndicator(state);
-  return (
-    <button type="button" data-testid="bot-cache-chip" aria-label={indicator.label} title={indicator.label} aria-expanded={isExpanded} onClick={onToggle}
-      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-expanded:bg-state-active">
-      <Icon name="Clock" className={`size-3.5 ${toneClass(indicator.tone)}`} aria-hidden />
-      <span className={`tabular-nums ${indicator.tone === "amber" ? "text-warning" : "text-muted-foreground"}`}>{indicator.text ?? "Warming off"}</span>
-    </button>
-  );
-}
-
-/** Below the context row while the cache segment is open: why, what's next, the cost, and the two actions. */
-export function BotCacheDetails({ threadId, isExpanded }: { threadId: string; isExpanded: boolean }) {
-  const { state, error, act } = useBotCache(threadId);
-  if (!isExpanded || !state) return null;
-  const indicator = cacheIndicator(state);
   const cost = costLine(state);
   return (
-    <div data-testid="bot-cache-details" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-xs text-muted-foreground">
-      <span className="font-medium text-foreground">Prompt cache: {indicator.text ?? "Warming off"}</span>
-      {state.warming.reason ? <span>{state.warming.reason}.</span> : null}
-      {state.warming.active && state.warming.nextPingAt ? <span>Next keep-alive ping around {clock(state.warming.nextPingAt)}.</span> : null}
-      {state.warming.compactAt ? <span>Compacts around {clock(state.warming.compactAt)}.</span> : state.warming.lastCompactAt ? <span>Compacted at {clock(state.warming.lastCompactAt)}.</span> : null}
-      {cost ? <span>{cost}</span> : null}
-      {error ? <span role="alert" className="text-destructive">{error}</span> : null}
-      <span className="ml-auto flex gap-1">
-        <button type="button" className={GHOST_BUTTON} onClick={() => act("bot_cache_set", { botId: state.botId ?? undefined, enabled: !state.settings.enabled })}>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" data-testid="bot-cache-chip" aria-label={indicator.label} title={indicator.label}
+          className="inline-flex h-7 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-xs outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-state-active">
+          <Icon name="Clock" className={`size-3.5 ${indicator.tone === "amber" ? "text-warning" : indicator.tone === "dim" ? "text-muted-foreground/40" : "text-muted-foreground"}`} aria-hidden />
+          {indicator.text ? <span className={`tabular-nums ${indicator.tone === "amber" ? "text-warning" : "text-muted-foreground"}`}>{indicator.text}</span> : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <div className="flex flex-col gap-1 px-2 py-1.5 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Prompt cache: {indicator.text ?? "Warming off"}</span>
+          {state.warming.reason ? <span>{state.warming.reason}.</span> : null}
+          {state.warming.active && state.warming.nextPingAt ? <span>Next keep-alive ping around {clock(state.warming.nextPingAt)}.</span> : null}
+          {state.warming.compactAt ? <span>Compacts around {clock(state.warming.compactAt)}.</span> : state.warming.lastCompactAt ? <span>Compacted at {clock(state.warming.lastCompactAt)}.</span> : null}
+          {cost ? <span>{cost}</span> : null}
+          {error ? <span role="alert" className="text-destructive">{error}</span> : null}
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => act("bot_cache_set", { botId: state.botId ?? undefined, enabled: !state.settings.enabled })}>
           <Icon name={state.settings.enabled ? "Pause" : "Play"} />{state.settings.enabled ? "Turn warming off" : "Turn warming on"}
-        </button>
-        <button type="button" className={GHOST_BUTTON} onClick={() => { if (confirm("Compact this chat? BB summarizes its history; the next send writes the shorter context.")) act("bot_cache_compact", { threadId }); }}>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { if (confirm("Compact this chat? BB summarizes its history; the next send writes the shorter context.")) act("bot_cache_compact", { threadId }); }}>
           <Icon name="Minimize2" />Compact now…
-        </button>
-      </span>
-    </div>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

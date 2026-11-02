@@ -8,8 +8,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   useRealtime: () => {},
   useRpc: () => ({ call: async () => ({ active: null, consented: true }) }),
+  useSettings: () => ({ values: {} }),
 }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: {} })) }), readStudioSettingsNow: () => ({}) }));
 vi.mock("../../kit/app/index", () => ({ openAppPath: vi.fn() }));
 
 const { CallBar, CallTranscript } = await import("./call-ui");

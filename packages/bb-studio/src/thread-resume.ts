@@ -44,6 +44,16 @@ const IN_FLIGHT_MS = 15 * 60_000;
 const PAGE = 200;
 const PAGES = 5;
 
+/** Studio's setting (on by default). */
+export const THREAD_RESUME_SETTINGS = {
+  autoResumeThreads: {
+    type: "boolean",
+    label: "Resume threads cut off by a restart",
+    default: true,
+    description: `When a host restart or a lost host connection stops a running thread, Studio sends it "${RESUME_MARKER}" so it continues, at most ${RESUME_CAP} times per thread an hour.`,
+  },
+} as const;
+
 export type RestartReason = "host restarted" | "host connection lost";
 export interface Interruption { eventId: string; seq: number; reason: RestartReason }
 

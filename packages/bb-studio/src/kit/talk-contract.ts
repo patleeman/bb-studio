@@ -281,6 +281,89 @@ export const AUDIO_FILE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}\/[A-Za-z0-9][A-Za-z0
 
 export const HOLD_KEY_OPTIONS = ["Right Option (Alt)", "Right Command", "Right Control", "Off"] as const;
 
+/**
+ * Talk's settings (`bb.settings.define`), on Studio's settings page now.
+ */
+export const TALK_SETTINGS = {
+  replaceBuiltInDictation: {
+    type: "boolean" as const,
+    label: "Replace built-in dictation",
+    description:
+      "The composer's microphone starts Talk instead of BB's one-shot dictation, so every dictation is saved and can run for hours.",
+    default: true,
+  },
+  segmentSeconds: {
+    type: "number" as const,
+    label: "Segment length (seconds)",
+    description:
+      "Audio is uploaded and transcribed in pieces of about this length, cut at a pause. Shorter pieces stream text sooner; 15–40 works well.",
+    default: 25,
+    experimental_schema: z.number().int().min(8).max(60),
+  },
+  autoTitle: {
+    type: "boolean" as const,
+    label: "Auto-title recordings",
+    description: "Ask Studio Decisions for a short title once a recording has some text.",
+    default: true,
+  },
+  autoMeetingNotes: {
+    type: "boolean" as const,
+    label: "Automatically summarize recordings",
+    description: "Generate a concise summary when a recording finishes. You can also summarize a recording from its menu.",
+    default: false,
+  },
+  holdToTalkKey: {
+    type: "select" as const,
+    label: "Hold-to-talk key",
+    description:
+      "Hold this key to dictate into the focused composer or field, and let go to insert the text. Pressing it with another key does nothing.",
+    options: [...HOLD_KEY_OPTIONS],
+    default: HOLD_KEY_OPTIONS[0],
+  },
+  dictationAudioDays: {
+    type: "number" as const,
+    label: "Keep dictation audio (days)",
+    description:
+      "Delete a finished dictation's audio after this many days and keep its transcript. Recordings keep their audio. 0 keeps it forever.",
+    default: 1,
+    experimental_schema: z.number().int().min(0).max(3650),
+  },
+  callTranscription: {
+    type: "select" as const,
+    label: "Call transcription",
+    description:
+      "Where a recorded call's speech becomes text. Local runs WhisperKit on this Mac and keeps the audio here; the home server and BB's voice service receive each piece of audio.",
+    options: [...CALL_STT_OPTIONS],
+    default: CALL_STT_OPTIONS[0],
+  },
+  callServerUrl: {
+    type: "string" as const,
+    label: "Call transcription: home server URL",
+    description:
+      "Your speech-to-text server with an OpenAI-compatible /v1/audio/transcriptions endpoint, such as http://red4:8000. Used when Call transcription is Home server.",
+    default: "",
+  },
+  callServerModel: {
+    type: "string" as const,
+    label: "Call transcription: home server model",
+    description: "The model name the home server expects. Leave empty for whisper-1.",
+    default: "",
+  },
+  callLocalModel: {
+    type: "string" as const,
+    label: "Call transcription: local model",
+    description: "The WhisperKit model the helper runs on this Mac. It is downloaded the first time a call uses it.",
+    default: "openai_whisper-large-v3-v20240930_626MB",
+  },
+  callAudioRetention: {
+    type: "select" as const,
+    label: "Keep call audio",
+    description: "Delete a finished call's audio after this long. Its transcript and notes stay until you delete the recording.",
+    options: [...CALL_RETENTION_OPTIONS],
+    default: CALL_RETENTION_OPTIONS[1],
+  },
+};
+
 /** The setting's label as the STT kind the capture uses. */
 export function callSttFor(setting: unknown): CallStt {
   if (setting === CALL_STT_OPTIONS[1]) return "red4";
@@ -294,3 +377,19 @@ export function callRetentionDays(setting: unknown): number | null {
   if (setting === "7 days") return 7;
   return 30;
 }
+
+/** Talk's settings, which Studio has now. */
+export const talkSettingsSchema = z.object({
+  replaceBuiltInDictation: z.boolean(),
+  segmentSeconds: z.number().int().min(8).max(60),
+  autoTitle: z.boolean(),
+  autoMeetingNotes: z.boolean(),
+  holdToTalkKey: z.string().max(100),
+  dictationAudioDays: z.number().int().min(0).max(3650),
+  callTranscription: z.string().max(100),
+  callServerUrl: z.string().max(500),
+  callServerModel: z.string().max(200),
+  callLocalModel: z.string().max(200),
+  callAudioRetention: z.string().max(100),
+}).partial();
+export type TalkSettings = z.infer<typeof talkSettingsSchema>;
