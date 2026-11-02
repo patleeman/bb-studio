@@ -1297,7 +1297,8 @@ export default async function plugin(bb: BbPluginApi) {
     },
     openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
       projectId: PERSONAL_PROJECT_ID, title,
-      environment: { type: "host", workspace: { type: "unmanaged", path: null } },
+      // As the Bot's chat: the personal project's default environment (a host one needs a host id).
+      environment: { type: "project-default" },
       pluginMetadata: { voiceLive: true },
       input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
     } as never)).id,
