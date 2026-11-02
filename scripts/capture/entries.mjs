@@ -10,6 +10,7 @@ import bb_studio_bot_maintenance from "./captures/bb-studio-bot-maintenance.mjs"
 import bb_studio_bot from "./captures/bb-studio-bot.mjs";
 import bb_studio_bot_calendar from "./captures/bb-studio-bot-calendar.mjs";
 import bb_studio_bot_redesign from "./captures/bb-studio-bot-redesign.mjs";
+import bb_studio_bot_needs_you from "./captures/bb-studio-bot-needs-you.mjs";
 import bb_studio_loops from "./captures/bb-studio-loops.mjs";
 import bb_studio_loops_real from "./captures/bb-studio-loops-real.mjs";
 import bb_studio_thread_resume from "./captures/bb-studio-thread-resume.mjs";
@@ -34,6 +35,7 @@ export function loadCaptures(context) {
     ...bb_studio_bot(context),
     ...bb_studio_bot_calendar(context),
     ...bb_studio_bot_redesign(context),
+    ...bb_studio_bot_needs_you(context),
     ...bb_studio_loops(context),
     ...bb_studio_loops_real(context),
     ...bb_studio_bot_maintenance(context),
