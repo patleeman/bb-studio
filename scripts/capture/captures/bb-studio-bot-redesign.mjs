@@ -16,6 +16,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { readStagedInstance } from "../../staged-instance.mjs";
 import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
+import { clickHeaderAction } from "../header-actions.mjs";
 
 const require = createRequire(import.meta.url);
 const ALL = [0, 1, 2, 3, 4, 5, 6];
@@ -337,10 +338,9 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await scheme(client, mode);
       await client.command("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: 900, deviceScaleFactor: 1, mobile: false });
       await client.navigate(`/threads/${bot.threadId}`);
-      await client.waitForSelector('[data-testid="bot-info-header"]', 60000);
       await dismissProblems(client);
-      const opened = await client.evaluate(`(() => { if (document.querySelector("[data-testid=bot-pane]")) return true; document.querySelector('[data-testid="bot-info-header"]').click(); return true; })()`);
-      if (!opened) throw new Error("Bot info didn't open");
+      // Bot info opens beside the chat by itself; else its header action.
+      if (!(await client.poll(`!!document.querySelector("[data-testid=bot-pane]")`))) await clickHeaderAction(client, "^Bot info$", 60000);
       await collapseSidebar(client);
       await client.waitForSelector("[data-testid=bot-pane]", 30000);
       for (const text of ["Working now", "Needs you", "Up next", "Recent", "Controls"]) await client.waitForText(text, 30000);
