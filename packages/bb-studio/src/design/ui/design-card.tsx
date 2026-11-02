@@ -1,10 +1,11 @@
 // The `::design{id="dsn_…"}` card in a reply: the newest round's screens,
 // under a header that opens the design in the thread's Studio tab.
 import { ItemDirectiveCard, openAppPath, remember } from "../../kit/app/index";
-import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { DESIGN_ICON, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
 import { useDesign } from "./use-design";
 import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
+import { useOpenThreadTab } from "../../kit/app/thread-panel";
 
 /** Screens a card shows from the newest round. */
 export const PREVIEW_SCREENS = 3;
@@ -40,7 +41,7 @@ function DesignPreview({ design }: { design: DesignView }) {
 
 /** `::design{id="dsn_…"}` in a reply: the newest round's screens, under a header that opens the design in the workbench. */
 export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const id = attributes.id ?? "";
   const valid = isDesignId(id);
   const design = remember(`design:${id}`, useDesign(valid ? id : "").design);
@@ -61,7 +62,7 @@ export function DesignCard({ attributes }: PluginMessageDirectiveProps) {
       body={<DesignPreview design={design} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
-        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title: name, params: itemParams("design", id) }))
+        if (!openTab({ actionId: STUDIO_TAB, title: name, params: itemParams("design", id) }))
           openAppPath(designHref(id));
       }}
     />

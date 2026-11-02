@@ -53,20 +53,32 @@ directly. Threads are tracked for three days.
 ## Commands
 
 - `bb mobile status [--json]` — whether APNs is configured, and the last delivery result.
+- RPC `push_status` and `push_test` — the same status, and a test push to every remembered phone.
 
 ## Settings (`bb plugin config mobile`)
 
 | Setting | Meaning |
 |---|---|
 | `apnsKey` (secret) | Contents of the `AuthKey_XXXXXXXXXX.p8` key. Line breaks optional. |
-| `apnsKeyPath` | Path to the `.p8` file, used when `apnsKey` is empty. |
 | `apnsKeyId` | The 10-character key ID. |
-| `apnsTeamId` | Apple team ID. Default `3753DAN98U`. |
-| `bundleId` | App bundle ID. Default `nyc.plee.bbgo`. |
-| `apnsEnvironment` | `auto` (production, then sandbox), `production`, or `development`. |
-| `expoPushUrl` | Where non-APNs tokens go. Default Expo's push API. |
 
-Settings are read on every delivery; no reload is needed.
+Settings are read on every delivery; no reload is needed. Push status and
+**Send a test push** are in Studio's settings under Phone notifications
+(Studio draws them; the `push_status` and `push_test` RPCs answer).
+
+These were settings once and are constants now. Override one with an
+environment variable on the BB host, then restart BB:
+
+| Constant | Default | Variable |
+|---|---|---|
+| Apple team ID | `3753DAN98U` | `BB_MOBILE_APNS_TEAM_ID` |
+| App bundle ID | `nyc.plee.bbgo` | `BB_MOBILE_BUNDLE_ID` |
+| APNs environment | `auto` (production, then sandbox) | `BB_MOBILE_APNS_ENVIRONMENT` (`production` or `development`) |
+| Expo push URL for non-APNs tokens | Expo's push API | `BB_MOBILE_EXPO_PUSH_URL` |
+
+The key file path setting (`apnsKeyPath`) is gone: on the first load after
+the change, a readable key file's contents moved into `apnsKey`. An
+unreadable path is kept as a fallback until a key is pasted.
 
 ## Wiring
 

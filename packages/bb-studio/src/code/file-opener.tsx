@@ -6,10 +6,11 @@ import type { CodeContract } from "./contract";
 // (no thread, thread storage, a thread on another machine) show BB's preview.
 // Settings → Files can pin BB's preview instead.
 import { useCallback, useEffect, useState } from "react";
-import { useBbNavigate, useRpc, type PluginFileOpenerProps, type PluginFileOpenerSource } from "@get-bb/plugin-sdk/app";
+import { useRpc, type PluginFileOpenerProps, type PluginFileOpenerSource } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, Icon } from "../kit/app/index";
 import { errorMessage } from "../kit/format";
 import { CODE_TAB } from "./shared";
+import { useOpenThreadTab } from "../kit/app/thread-panel";
 
 /** Text and code files worth editing in VS Code. Markdown stays in BB's preview, which renders it. */
 export const CODE_EXTENSIONS = [
@@ -43,7 +44,7 @@ export function claimOpen(threadId: string, path: string, range: unknown): boole
 
 export function VsCodeFileOpener({ path, source, experimental_lineRange, Original }: PluginFileOpenerProps) {
   const rpc = useRpc<CodeContract>();
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const threadId = shouldAutoOpen(source) ? source.threadId : null;
   const [state, setState] = useState<State>(() =>
     threadId && sent.get(`${threadId}\n${path}`) === experimental_lineRange ? { kind: "shown" } : { kind: "opening" });
@@ -57,12 +58,12 @@ export function VsCodeFileOpener({ path, source, experimental_lineRange, Origina
       const startLine = experimental_lineRange?.startLineNumber ?? 1;
       // Held until the editor connects, so it lands once the tab loads.
       await rpc.call("code.reveal", { id: workspace.id, path, startLine, endLine: experimental_lineRange?.endLineNumber ?? startLine });
-      if (!navigate.openThreadPanel({ actionId: CODE_TAB, title: "VS Code" })) throw new Error("There's no side panel here for VS Code.");
+      if (!openTab({ actionId: CODE_TAB, title: "VS Code" })) throw new Error("There's no side panel here for VS Code.");
       setState({ kind: "opened" });
     } catch (cause) {
       setState({ kind: "error", message: errorMessage(cause) });
     }
-  }, [rpc, navigate, threadId, path, experimental_lineRange]);
+  }, [rpc, openTab, threadId, path, experimental_lineRange]);
 
   // Each open goes to VS Code once (claimOpen), so StrictMode's second run
   // and a remount after VS Code closes leave it closed.

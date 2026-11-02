@@ -19,6 +19,7 @@ import { mkdir } from "node:fs/promises";
 
 import { readStagedInstance } from "../../staged-instance.mjs";
 import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
+import { clickHeaderAction } from "../header-actions.mjs";
 
 const require = createRequire(import.meta.url);
 const BEFORE = process.env.BB_CAPTURE_LOOPS_BEFORE === "1";
@@ -140,7 +141,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     await bbCli(["thread", "tell", bot.threadId, `Capture fixture (${label}). Don't call any tools. Reply with exactly the text between the markers, unchanged, and nothing else.\n<<<\n${text}\n>>>`]);
     await bbCli(["thread", "wait", bot.threadId, "--status", "idle", "--timeout", "240"]).catch(() => {});
   };
-  const setEnabled = (on) => bbCli(["plugin", "config", "studio", "set", "loopsEnabled", on ? "true" : "false"]);
+  const setEnabled = (on) => bbCli(["studio", "settings", "set", "loopsEnabled", on ? "true" : "false"]);
   const chatPath = (bot) => `/threads/${bot.threadId}`;
   /** Scroll the chat so `selector`'s first match is near the top. */
   /** The newest reply's text: the last element holding `text`, scrolled to the top of the chat. */
@@ -235,10 +236,9 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     await scrollTo(client, "[data-testid=loops-open]");
     return bot;
   };
-  /** The pane open beside the chat, from the header's Loops button. */
+  /** The pane open beside the chat, from the header's Loops button (a header action: "Loops · 4"). */
   const openPane = async (client) => {
-    await client.waitForSelector("[data-testid=loops-header]", 30000);
-    await client.evaluate(`(() => { document.querySelector("[data-testid=loops-header]").click(); return true; })()`);
+    await clickHeaderAction(client, "^Loops( · \\d+)?$");
     await client.waitForSelector("[data-testid=loops-pane]", 30000);
     for (const text of PANE_TEXTS) await client.waitForText(text, 30000);
     await sleep(800);
@@ -385,6 +385,9 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     paneCapture("studio-loops-pane-card", "loops-pane-card.png", "dark", async (client) => {
       await client.waitForText("Open Loops beside the chat", 30000);
       if (!/\d+ need/.test(await client.evaluate(`document.querySelector("[data-testid=loops-open]").textContent`))) throw new Error("The Loops card has no summary");
+      // Focus the chat's pane first: with the side panel focused, BB takes the
+      // first press in the chat to move focus there (base Studio too).
+      await press(client, "[data-testid=loops-open] span", "Loops");
       await press(client, "[data-testid=loops-open] button", "Open Loops beside the chat");
       await client.waitForSelector("[data-testid=loops-pane]", 30000);
       for (const text of PANE_TEXTS) await client.waitForText(text, 30000);

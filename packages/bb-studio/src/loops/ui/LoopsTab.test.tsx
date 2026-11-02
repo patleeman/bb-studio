@@ -21,10 +21,10 @@ const state = vi.hoisted(() => ({
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  useSettings: () => ({ values: { loopsEnabled: true } }),
   useBbNavigate: () => ({ toThread: state.toThread }),
   useSdk: () => sdk,
 }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: true } })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [{ id: "proj_k", name: "Kensico" }] }, threads: { interactions: { list: async () => state.interactions } } };
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,

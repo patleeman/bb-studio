@@ -23,10 +23,11 @@ const state = vi.hoisted(() => ({
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => { state.composerAsked.push(threadId); return state.composer; } }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  useSettings: () => ({ values: { loopsEnabled: state.enabled } }),
-  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openPanel }),
+  useBbNavigate: () => ({ toThread: state.toThread }),
+  experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => sdk,
 }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [{ id: "proj_k", name: "Kensico" }] }, threads: { interactions: { list: async () => state.interactions } } };
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,
@@ -44,7 +45,7 @@ vi.mock("../../ui/live", () => ({
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({ openAppPath: state.open, ICON_BUTTON: "icon-button" }));
 
-const { LoopsPane, LoopsHeaderAction, withClosed, closesFromCircle } = await import("./LoopsPane");
+const { LoopsPane, withClosed, closesFromCircle } = await import("./LoopsPane");
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
@@ -64,7 +65,7 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); });
 
 const render = async (threadId = "thr_bot") => {
-  await act(async () => root.render(<LoopsPane threadId={threadId} params={null} />));
+  await act(async () => root.render(<LoopsPane threadId={threadId} environment={null} params={null} />));
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 };
 const section = (name: string) => container.querySelector(`section[aria-label="${name}"]`) as HTMLElement;
@@ -168,30 +169,55 @@ it("opens the full page from its header, and says when the Attention Router is o
 });
 
 it("puts a Loops button in the Bot chat's header only, opening the pane", async () => {
-  await act(async () => root.render(<LoopsHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />));
-  const button = container.querySelector("[data-testid=loops-header]") as HTMLButtonElement;
-  expect(button.getAttribute("aria-label")).toBe("Loops beside the chat, 2 need you now");
-  await act(async () => button.click());
-  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Loops" });
-  await act(async () => root.render(<LoopsHeaderAction threadId="thr_other" projectId="proj_k" isCompactViewport={false} />));
-  expect(container.querySelector("[data-testid=loops-header]")).toBeNull();
+  const { loopsHeaderAction } = await import("../../ui/thread-header");
+  let data: unknown;
+  function Header({ ids }: { ids: string[] }) { data = loopsHeaderAction.useData!({ threadIds: ids }); return null; }
+  const panel = { openTab: vi.fn((_options: unknown) => true) };
+  const item = (threadId: string) => loopsHeaderAction.item({ thread: { id: threadId } as never, data: data as never, sdk: null as never, navigate: null as never, experimental_panel: panel as never });
+  await act(async () => root.render(<Header ids={["thr_bot"]} />));
+  const action = item("thr_bot")!;
+  expect(action.label).toBe("Loops · 2");
+  expect(action.detail).toBe("2 need you now");
+  await act(async () => { await action.run({ requestRename: () => {} }); });
+  expect(panel.openTab).toHaveBeenCalledWith({ tab: { id: "loops", context: { kind: "thread" }, availability: "action" }, title: "Loops" });
+  expect(state.open).not.toHaveBeenCalled();
+  // Where the pane can't open, the Loops page instead, once (no retries).
+  panel.openTab.mockReturnValue(false);
+  await act(async () => { await action.run({ requestRename: () => {} }); });
+  expect(panel.openTab).toHaveBeenCalledTimes(2);
+  expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
+  expect(item("thr_other")).toBeNull();
+  // Another thread's header alone: nothing.
+  await act(async () => root.render(<Header ids={["thr_other"]} />));
+  expect(item("thr_bot")).toBeNull();
   state.enabled = false;
-  await act(async () => root.render(<LoopsHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />));
-  expect(container.querySelector("[data-testid=loops-header]")).toBeNull();
+  await act(async () => root.render(<Header ids={["thr_bot"]} />));
+  expect(item("thr_bot")).toBeNull();
 });
 
-it("opens the pane when the sidebar asks the Bot chat's header, now or once the chat opens", async () => {
+it("opens the pane when the sidebar asks the Bot chat, now or once the chat opens, once, and reports whether it opened", async () => {
   const { requestLoopsPane } = await import("./hooks");
-  // Asked before the chat is open: its header opens the pane when it mounts.
-  requestLoopsPane("thr_bot");
-  await act(async () => root.render(<LoopsHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />));
+  const { useThreadTabRequests, resetThreadTabRequests } = await import("../../kit/app/thread-panel");
+  function Chat({ threadId }: { threadId: string }) { useThreadTabRequests(threadId); return null; }
+  // Asked before the chat is open: its view opens the pane when it mounts.
+  const early = requestLoopsPane("thr_bot");
+  await act(async () => root.render(<Chat threadId="thr_bot" />));
+  await expect(early).resolves.toBe(true);
   expect(state.openPanel).toHaveBeenCalledTimes(1);
   expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Loops" });
   // Asked while the chat is open; another thread's request isn't its.
-  await act(async () => requestLoopsPane("thr_other"));
+  void requestLoopsPane("thr_other");
   expect(state.openPanel).toHaveBeenCalledTimes(1);
-  await act(async () => requestLoopsPane("thr_bot"));
+  let opened: boolean | undefined;
+  await act(async () => { opened = await requestLoopsPane("thr_bot"); });
+  expect(opened).toBe(true);
   expect(state.openPanel).toHaveBeenCalledTimes(2);
+  // Declined: false, after one try.
+  state.openPanel.mockReturnValueOnce(false);
+  await act(async () => { opened = await requestLoopsPane("thr_bot"); });
+  expect(opened).toBe(false);
+  expect(state.openPanel).toHaveBeenCalledTimes(3);
+  resetThreadTabRequests();
 });
 
 it("closes a do or read loop in one click on its circle, done in place with Undo", async () => {

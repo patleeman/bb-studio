@@ -227,6 +227,7 @@ function menuTarget(thread: Thread) {
     pinnedAt: thread.pinnedAt,
     sectionId: thread.sectionId,
     isUnread: thread.isUnread,
+    parentNotifications: thread.parentNotifications,
     status: thread.status,
     environment: thread.environment?.id ? { id: thread.environment.id, path: thread.environment.path } : null,
   };

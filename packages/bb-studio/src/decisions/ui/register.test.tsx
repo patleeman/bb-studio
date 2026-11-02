@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
-import { act, type ComponentType, type ReactNode } from "react";
+import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
-import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
-import { registerDecisionsApp } from "./register";
+import { FallbackModel, JevConnection } from "./register";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
-const settings = { values: {} };
+const settings = vi.hoisted(() => ({ values: {} }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  useRpc: () => rpc, useSettings: () => settings,
+  useRpc: () => rpc,
   experimental_ProviderModelPicker: ({ disabled }: { disabled?: boolean }) => <button disabled={disabled}>Pick model</button>,
 }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(settings) }), readStudioSettingsNow: () => ({}) }));
 vi.mock("../../kit/ui/index", () => ({
   Button: ({ children, size: _size, variant: _variant, ...props }: { children: ReactNode; size?: string; variant?: string }) => <button {...props}>{children}</button>,
   Select: ({ value, disabled, onValueChange }: { value: string; disabled?: boolean; onValueChange(value: string): void }) => <select aria-label="Fallback model source" value={value} disabled={disabled} onChange={(event) => onValueChange(event.target.value)}><option value="thread">Thread</option><option value="model">Model</option><option value="off">Off</option></select>,
@@ -19,10 +19,9 @@ vi.mock("../../kit/ui/index", () => ({
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root | undefined;
 afterEach(() => { if (root) act(() => root!.unmount()); root = undefined; document.body.innerHTML = ""; rpc.call.mockReset(); });
-async function mount(id: string) {
-  const sections = new Map<string, ComponentType>();
-  registerDecisionsApp({ slots: { settingsSection: (section: { id: string; component: ComponentType }) => sections.set(section.id, section.component) } } as unknown as PluginAppBuilder);
-  const Component = sections.get(id)!;
+// Parts of Studio's Jev settings section (src/settings/ui/sections.tsx).
+async function mount(id: "decisions-jev-connection" | "decisions-fallback-model") {
+  const Component = id === "decisions-jev-connection" ? JevConnection : FallbackModel;
   root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root!.render(<Component />); });
 }

@@ -9,7 +9,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
   const rpc = { call: state.call };
   return {
     Markdown: ({ content }: { content: string }) => <p>{content}</p>,
-    useBbNavigate: () => ({ openThreadPanel: () => true, toPluginPanel: () => {} }),
+    experimental_useAppPanel: () => ({ openTab: () => true }),
     useRpc: () => rpc,
   };
 });

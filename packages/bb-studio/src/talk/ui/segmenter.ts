@@ -13,6 +13,9 @@ export interface SegmentPolicy {
   pauseMs: number;
 }
 
+/** Each audio segment's target length. A setting once (segmentSeconds); 15–40 works well. */
+export const SEGMENT_SECONDS = 25;
+
 export function segmentPolicy(segmentSeconds: number): SegmentPolicy {
   const target = Math.min(60, Math.max(8, Number.isFinite(segmentSeconds) ? segmentSeconds : 25));
   return { targetMs: target * 1000, maxMs: Math.round(target * 1.6 * 1000), pauseMs: 350 };

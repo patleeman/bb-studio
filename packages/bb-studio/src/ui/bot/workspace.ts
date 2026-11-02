@@ -7,9 +7,10 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 import { botPath } from "./selection";
-import { LOOPS_PANE, requestLoopsPane } from "../../loops/ui/hooks";
+import { LOOPS_PANE, reportLoopsPaneFailed, requestLoopsPane } from "../../loops/ui/hooks";
+import { requestThreadTab, type ThreadTabOpen } from "../../kit/app/thread-panel";
 
-/** The thread panel action that shows a Bot thread's Info (app.tsx). */
+/** The thread tab that shows a Bot thread's Info (app.tsx). */
 export const BOT_INFO_ACTION = "bot-info";
 
 /**
@@ -35,26 +36,28 @@ export function forgetThreadStrips(storage: Pick<Storage, "length" | "key" | "re
 }
 
 /**
- * Opens a Bot's Info: beside the chat (the Bot info thread panel action) when
- * one of its threads is open, else its Bot page, which is its Info.
+ * Opens a Bot's Info: beside the chat (the Bot info tab) when one of its
+ * threads is open, else its Bot page, which is its Info. The sidebar isn't
+ * inside the thread view, so it asks the open thread (requestThreadTab), and
+ * opens the Bot page when the tab couldn't open.
  */
 export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBotsThread: boolean) => void {
-  const navigate = useBbNavigate();
   return useCallback((bot, onBotsThread) => {
-    if (onBotsThread && navigate.openThreadPanel({ actionId: BOT_INFO_ACTION, title: "Bot info" })) return;
-    openAppPath(botPath(bot.id));
-  }, [navigate]);
+    const threadId = visit.threadId;
+    if (!onBotsThread || !threadId) { openAppPath(botPath(bot.id)); return; }
+    void requestThreadTab(threadId, BOT_INFO_PANEL).then((opened) => { if (!opened) openAppPath(botPath(bot.id)); });
+  }, []);
 }
 
 /** A tab beside the Bot's chat: Bot info, or the Loops pane (src/loops/ui/LoopsPane.tsx). */
-export interface ChatPanel { actionId: string; title: string }
+export type ChatPanel = ThreadTabOpen & { title: string };
 export const BOT_INFO_PANEL: ChatPanel = { actionId: BOT_INFO_ACTION, title: "Bot info" };
 export const LOOPS_PANEL: ChatPanel = { actionId: LOOPS_PANE, title: "Loops" };
 
 /** The thread open in the main pane, and whether a panel was opened beside it yet. */
 let visit: { threadId: string | null; infoOpened: boolean } = { threadId: null, infoOpened: false };
-/** The panel asked for when the chat next opens (All loops), instead of the usual one. */
-let wanted: ChatPanel | null = null;
+/** The panel asked for when the chat next opens (All loops), instead of the usual one, and the Bot it's for. */
+let wanted: { panel: ChatPanel; botId: string | null } | null = null;
 
 /** Notes the thread now open (null: none); a different one starts a new visit. */
 export function noteOpenThread(threadId: string | null): void {
@@ -62,19 +65,20 @@ export function noteOpenThread(threadId: string | null): void {
 }
 
 /**
- * Opens the Loops pane beside the Bot's chat: the chat's header opens it, at
- * once when the chat is the open thread, else when the chat opens (and
- * instead of Bot info). False when the Bot has no chat.
+ * Opens the Loops pane beside the Bot's chat: at once when the chat is the
+ * open thread, else when the chat opens (instead of Bot info). Says so when
+ * the pane couldn't open. False when the Bot has no chat.
  */
-export function useOpenLoopsBesideChat(): (chatId: string | null, activeThreadId: string | null) => boolean {
+export function useOpenLoopsBesideChat(): (chatId: string | null, activeThreadId: string | null, botId?: string | null) => boolean {
   const navigate = useBbNavigate();
-  return useCallback((chatId, activeThreadId) => {
+  return useCallback((chatId, activeThreadId, botId = null) => {
     if (!chatId) return false;
-    requestLoopsPane(chatId);
-    if (activeThreadId !== chatId) {
-      wanted = LOOPS_PANEL;
-      navigate.toThread(chatId);
+    if (activeThreadId === chatId) {
+      void requestLoopsPane(chatId).then((opened) => { if (!opened) reportLoopsPaneFailed(botId); });
+      return true;
     }
+    wanted = { panel: LOOPS_PANEL, botId };
+    navigate.toThread(chatId);
     return true;
   }, [navigate]);
 }
@@ -83,32 +87,26 @@ export function useOpenLoopsBesideChat(): (chatId: string | null, activeThreadId
  * Opens a panel beside a Bot's own chat (`chatIds`: its chain) once each
  * time that thread opens: `panel` (Bot info unless the caller says, e.g. the
  * Loops pane while something needs the user), or the one All loops asked
- * for. Closing it sticks until the user opens the thread again. The thread
- * view may mount after the sidebar, so a declined open is retried briefly.
+ * for. Closing it sticks until the user opens the thread again. The chat's
+ * view opens it once when it's on screen; a Loops pane that All loops asked
+ * for and couldn't open is reported.
  */
 export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: readonly string[], panel: ChatPanel = BOT_INFO_PANEL): void {
-  const navigate = useBbNavigate();
   const onChat = !!activeThreadId && chatIds.includes(activeThreadId);
   useEffect(() => {
     noteOpenThread(activeThreadId);
     if (!activeThreadId || !onChat) return;
     if (visit.infoOpened) return;
     visit.infoOpened = true;
-    const current = visit;
-    const open = wanted ?? panel;
+    const asked = wanted;
     wanted = null;
-    // Only the chat's own header opens the pane reliably (requestLoopsPane).
-    if (open.actionId === LOOPS_PANE) { requestLoopsPane(activeThreadId); return; }
-    let tries = 0;
-    const attempt = () => {
-      if (visit !== current) return;
-      if (navigate.openThreadPanel(open)) return;
-      if (++tries < 6) setTimeout(attempt, 500);
-    };
-    attempt();
+    // What All loops asked for is the user's; the usual panel is a background
+    // open that leaves a tab the user already opened alone.
+    const open = asked ? asked.panel : { ...panel, background: true };
+    void requestThreadTab(activeThreadId, open).then((opened) => { if (!opened && asked) reportLoopsPaneFailed(asked.botId); });
     // The panel is chosen when the chat opens; a later change waits for the next visit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThreadId, onChat, navigate]);
+  }, [activeThreadId, onChat]);
 }
 
 // --- The Bot's sidebar -----------------------------------------------------

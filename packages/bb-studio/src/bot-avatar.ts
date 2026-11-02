@@ -14,7 +14,7 @@
 // Never log a key.
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
-import { OPENAI_KEY_SETTINGS, openaiKey } from "./openai-key";
+import { openaiKey } from "./openai-key";
 
 /** How many images a Bot keeps. */
 export const AVATAR_HISTORY = 5;
@@ -110,10 +110,9 @@ export function openaiImageProvider(key: string, options: { baseUrl?: string; mo
 export type ImageKeys = { settings?: Record<string, unknown>; env?: NodeJS.ProcessEnv; fetch?: Fetch };
 export const IMAGE_KEY_SETTINGS = { xai: "botAvatarXaiApiKey" } as const;
 
-/** Studio's settings for the keys: secret, so they stay on the server. OpenAI's is Studio's shared key (src/openai-key.ts). */
-export const BOT_AVATAR_SETTINGS = {
-  ...OPENAI_KEY_SETTINGS,
-  [IMAGE_KEY_SETTINGS.xai]: { type: "string", label: "Bot avatars: xAI API key", description: "Lets a Bot draw its own avatar with Grok's image model (about 7¢ an image). Falls back to XAI_API_KEY on the BB host.", secret: true, default: "" },
+/** The xAI key's setting: secret, so it stays on the server. OpenAI's is Studio's shared key (src/openai-key.ts). */
+export const BOT_AVATAR_KEY_SETTINGS = {
+  [IMAGE_KEY_SETTINGS.xai]: { type: "string", label: "xAI API key", description: "Bots that draw their own avatar with Grok’s image model (about 7¢ an image). Falls back to XAI_API_KEY on the BB host.", secret: true, default: "" },
 } as const;
 
 /** The first provider with a key, OpenAI before xAI (cheaper per avatar); throws ImageNotSetUpError when none has one. */

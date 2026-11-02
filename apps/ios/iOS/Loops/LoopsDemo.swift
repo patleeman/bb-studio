@@ -79,8 +79,8 @@ enum LoopsDemo {
         private(set) var requests: [(String, [String: Any])] = []
 
         func respond(_ method: String, _ path: String, _ body: Data?) -> (Int, Data)? {
-            if method == "GET", path == "/api/v1/plugins/studio/settings" {
-                return json(["values": ["loopsEnabled": LoopsDemo.enabled]])
+            if method == "POST", path == "/api/v1/plugins/studio/rpc/settings.get" {
+                return ok(["values": ["loopsEnabled": LoopsDemo.enabled], "changed": ["loopsEnabled"], "timeZone": "America/New_York"])
             }
             let prefix = "/api/v1/plugins/studio/rpc/loops."
             guard method == "POST", path.hasPrefix(prefix) else { return nil }

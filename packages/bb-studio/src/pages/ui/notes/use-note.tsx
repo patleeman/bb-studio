@@ -1,11 +1,12 @@
 // A thread's open note, or a page's note, kept current; and opening one
 // beside its thread. Light: the composer loads it on every thread.
 import { useOpenTarget } from "../../../kit/app/index";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
 import type { NoteView, rpcContract } from "../../notes-contract";
 import { itemParams, STUDIO_TAB } from "../../../ui/studio-tab/model";
+import { useOpenThreadTab } from "../../../kit/app/thread-panel";
 
 export type NotesRpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -56,12 +57,12 @@ export function usePageNote(pageId: string | null) {
 
 /** Opens a note in its thread's side panel, beside the chat; a split where there's no side panel. Render `anchor` once. */
 export function useOpenNote(): { openNote(note: NoteView): void; anchor: ReactNode } {
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const { open, anchor } = useOpenTarget();
   const openNote = useCallback((note: NoteView) => {
-    if (navigate.openThreadPanel({ actionId: STUDIO_TAB, title: note.title, params: itemParams("page", note.pageId) })) return;
+    if (openTab({ actionId: STUDIO_TAB, title: note.title, params: itemParams("page", note.pageId) })) return;
     open({ kind: "path", path: note.href, title: note.title }, "split");
-  }, [navigate, open]);
+  }, [openTab, open]);
   return { openNote, anchor };
 }
 

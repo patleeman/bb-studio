@@ -1,51 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { pickImageProvider } from "./bot-avatar";
-import { LEGACY_OPENAI_KEY_SETTING, migrateOpenaiKey, OPENAI_KEY_SETTING, OPENAI_KEY_SETTINGS, openaiKey } from "./openai-key";
-
-/** A settings handle over a plain object, as BB's experimental_set behaves: null unsets. */
-function store(values: Record<string, unknown>) {
-  return {
-    values,
-    get: async () => ({ ...values }),
-    set: async (patch: Record<string, string | null>) => {
-      for (const [key, value] of Object.entries(patch)) {
-        if (value === null) delete values[key];
-        else values[key] = value;
-      }
-    },
-  };
-}
+import { OPENAI_KEY_SETTING, OPENAI_KEY_SETTINGS, openaiKey, openaiKeyMigration } from "./openai-key";
 
 describe("Studio's OpenAI key", () => {
-  it("is one secret setting, with the old avatar one kept readable", () => {
+  it("is one secret setting; the old avatar key is no longer declared", () => {
     expect(OPENAI_KEY_SETTINGS[OPENAI_KEY_SETTING]).toMatchObject({ label: "OpenAI API key", secret: true });
-    expect(OPENAI_KEY_SETTINGS[LEGACY_OPENAI_KEY_SETTING]).toMatchObject({ secret: true });
+    expect(Object.keys(OPENAI_KEY_SETTINGS)).toEqual(["openaiApiKey"]);
   });
 
-  it("reads the new key, then the old avatar key, then OPENAI_API_KEY", () => {
-    expect(openaiKey({ openaiApiKey: " new ", botAvatarOpenaiApiKey: "old" }, { OPENAI_API_KEY: "env" })).toBe("new");
-    expect(openaiKey({ openaiApiKey: "", botAvatarOpenaiApiKey: "old" }, { OPENAI_API_KEY: "env" })).toBe("old");
-    expect(openaiKey({ openaiApiKey: "  " }, { OPENAI_API_KEY: "env" })).toBe("env");
+  it("reads the key, then OPENAI_API_KEY, and never the old avatar key", () => {
+    expect(openaiKey({ openaiApiKey: " new " }, { OPENAI_API_KEY: "env" })).toBe("new");
+    expect(openaiKey({ openaiApiKey: "", botAvatarOpenaiApiKey: "old" }, { OPENAI_API_KEY: "env" })).toBe("env");
+    expect(openaiKey({ botAvatarOpenaiApiKey: "old" }, {})).toBe("");
     expect(openaiKey({}, {})).toBe("");
   });
 
-  it("moves the old avatar key into the shared setting once", async () => {
-    const settings = store({ botAvatarOpenaiApiKey: "sk-old" });
-    expect(await migrateOpenaiKey(settings)).toBe(true);
-    expect(settings.values).toEqual({ openaiApiKey: "sk-old" });
-    expect(await migrateOpenaiKey(settings)).toBe(false);
-    expect(settings.values).toEqual({ openaiApiKey: "sk-old" });
+  it("migration: clears the old avatar key when the shared key is set, without copying it", () => {
+    expect(openaiKeyMigration({ openaiApiKey: "sk-new", botAvatarOpenaiApiKey: "sk-old" })).toEqual({ patch: { botAvatarOpenaiApiKey: null }, outcome: "cleared" });
   });
 
-  it("leaves both alone when the new key is already set", async () => {
-    const settings = store({ openaiApiKey: "sk-new", botAvatarOpenaiApiKey: "sk-old" });
-    expect(await migrateOpenaiKey(settings)).toBe(false);
-    expect(settings.values).toEqual({ openaiApiKey: "sk-new", botAvatarOpenaiApiKey: "sk-old" });
-    expect(await migrateOpenaiKey(store({}))).toBe(false);
+  it("migration: moves the old key into an empty shared key, and clears it", () => {
+    expect(openaiKeyMigration({ openaiApiKey: "", botAvatarOpenaiApiKey: "sk-old" })).toEqual({ patch: { openaiApiKey: "sk-old", botAvatarOpenaiApiKey: null }, outcome: "copied" });
+    expect(openaiKeyMigration({ openaiApiKey: "sk-new" })).toEqual({ patch: {}, outcome: "none" });
   });
 
   it("is the key Bot avatars use", () => {
     expect(pickImageProvider({ settings: { openaiApiKey: "o" }, env: {} }).id).toBe("openai");
-    expect(pickImageProvider({ settings: { botAvatarOpenaiApiKey: "o" }, env: {} }).id).toBe("openai");
+    expect(() => pickImageProvider({ settings: { botAvatarOpenaiApiKey: "o" }, env: {} })).toThrow();
   });
 });

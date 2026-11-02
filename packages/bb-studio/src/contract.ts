@@ -253,7 +253,7 @@ export type SideThreadView = z.infer<typeof sideThread>;
 const botSideThread = z.object({
   threadId: z.string(), sourceThreadId: z.string(), messageId: z.string(), title: z.string(), replies: z.number(), working: z.boolean(), updatedAt: z.number(),
   /** What BB's thread menu needs: archive, rename, pin… */
-  menu: z.object({ projectId: z.string(), parentThreadId: z.string().nullable(), pinnedAt: z.number().nullable(), sectionId: z.string().nullable(), status: z.string(), isUnread: z.boolean() }),
+  menu: z.object({ projectId: z.string(), parentThreadId: z.string().nullable(), pinnedAt: z.number().nullable(), sectionId: z.string().nullable(), status: z.string(), isUnread: z.boolean(), parentNotifications: z.enum(["auto", "off", "stuck"]) }),
 });
 export type BotSideThreadListView = z.infer<typeof botSideThread>;
 const threadIdInput = z.string().min(1).max(200);

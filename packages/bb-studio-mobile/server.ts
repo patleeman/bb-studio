@@ -31,6 +31,7 @@ import {
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
 import { isQuietCompletion } from "./notifications.js";
+import { describeMobileMigration, LEGACY_KEY_PATH_KEY, LEGACY_MOBILE_SETTINGS, migrateMobileSettings, MOBILE_MIGRATED_KEY, MOBILE_SETTINGS, mobileConstants } from "./settings.js";
 
 const messageSchema = z.object({ to: z.string().min(1), body: z.string().optional(), data: z.record(z.string(), z.unknown()).optional() }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
@@ -76,6 +77,21 @@ export const mobileContract = defineRpcContract({
     }),
     output: z.object({ ok: z.literal(true), sent: z.number() }),
   },
+  push_status: {
+    experimental_description: "Whether pushes can go out, to how many phones, and the last delivery. Studio shows it in its Phone notifications settings.",
+    input: z.null().optional(),
+    output: z.object({
+      ready: z.boolean(),
+      problem: z.string().nullable(),
+      devices: z.number().int().min(0),
+      lastDelivery: z.object({ at: z.number(), sent: z.number().int().min(0) }).nullable(),
+    }),
+  },
+  push_test: {
+    experimental_description: "Send a test push to every phone the relay has delivered to.",
+    input: z.null().optional(),
+    output: z.object({ ok: z.boolean(), sent: z.number().int().min(0), message: z.string() }),
+  },
   mute_set: {
     experimental_description: "BB Studio mutes or unmutes a thread's notifications on this phone.",
     input: z.object({ threadId: z.string().regex(/^thr_[A-Za-z0-9]+$/), muted: z.boolean() }),
@@ -88,35 +104,31 @@ export default async function plugin(bb: BbPluginApi) {
   const serverId = (await bb.storage.kv.get<string>("server-id")) ?? randomUUID();
   await bb.storage.kv.set("server-id", serverId);
   bb.http.route("GET", "/identity", (context) => context.json({ serverId }));
-  const settings = bb.settings.define({
-    apnsKey: {
-      type: "string",
-      label: "APNs auth key (.p8 contents)",
-      description: "Paste the key; line breaks are optional. Leave empty to use the key file path instead.",
-      secret: true,
-    },
-    apnsKeyPath: {
-      type: "string",
-      label: "APNs auth key file",
-      description: "Path to AuthKey_XXXXXXXXXX.p8, used when the key above is empty. ~ is expanded.",
-      default: "",
-    },
-    apnsKeyId: { type: "string", label: "APNs key ID", default: "" },
-    apnsTeamId: { type: "string", label: "Apple team ID", default: "3753DAN98U" },
-    bundleId: { type: "string", label: "App bundle ID", default: "nyc.plee.bbgo" },
-    apnsEnvironment: {
-      type: "select",
-      label: "APNs environment",
-      description: "auto tries production, then the sandbox for Xcode-installed builds.",
-      options: ["auto", "production", "development"],
-      default: "auto",
-    },
-    expoPushUrl: {
-      type: "string",
-      label: "Expo push URL for non-APNs tokens",
-      default: "https://exp.host/--/api/v2/push/send",
-    },
-  });
+  // Only the APNs key and Key ID are settings (settings.ts); the rest are constants.
+  const settings = bb.settings.define(MOBILE_SETTINGS);
+  const constants = mobileConstants();
+  if (!(await bb.storage.kv.get(MOBILE_MIGRATED_KEY))) {
+    // The old fields, declared for this load only, so BB returns their values.
+    const legacy = bb.settings.define(LEGACY_MOBILE_SETTINGS);
+    try {
+      const report = await migrateMobileSettings({
+        kv: bb.storage.kv,
+        keys: { get: () => settings.get(), experimental_set: (values) => settings.experimental_set(values) },
+        legacy: { get: () => legacy.get() },
+        readKeyFile: (path) => readFile(path.replace(/^~(?=\/)/, homedir()), "utf8"),
+      });
+      if (report) {
+        bb.log.info(describeMobileMigration(report));
+        const timer = setTimeout(() => {
+          void Promise.resolve().then(() => bb.sdk.plugins.reload({ pluginId: "mobile" })).catch((error: unknown) => bb.log.warn(`Settings moved; reload Studio Mobile to hide the old fields (${error instanceof Error ? error.message : String(error)}).`));
+        }, 3000);
+        timer.unref?.();
+        bb.onDispose(() => clearTimeout(timer));
+      }
+    } catch (error) {
+      bb.log.warn(`Couldn't migrate Studio Mobile's settings; trying again next load: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   const sender = new Http2ApnsSender();
   bb.onDispose(() => sender.close());
@@ -127,11 +139,13 @@ export default async function plugin(bb: BbPluginApi) {
   async function apnsConfig(): Promise<{ config: ApnsConfig; token: ProviderToken } | { missing: string }> {
     const values = await settings.get();
     let keyPem = values.apnsKey?.toString().trim() ?? "";
-    if (keyPem === "" && values.apnsKeyPath.trim() !== "") {
+    // A key file path the migration couldn't read (settings.ts); pasting the key replaces it.
+    const keyPath = keyPem === "" ? (await bb.storage.kv.get<string>(LEGACY_KEY_PATH_KEY)) ?? "" : "";
+    if (keyPath !== "") {
       try {
-        keyPem = await readFile(values.apnsKeyPath.trim().replace(/^~(?=\/)/, homedir()), "utf8");
+        keyPem = await readFile(keyPath.replace(/^~(?=\/)/, homedir()), "utf8");
       } catch {
-        return { missing: `APNs key file not readable at ${values.apnsKeyPath}` };
+        return { missing: `APNs key is not set, and the old key file isn't readable at ${keyPath}` };
       }
     }
     if (keyPem === "") return { missing: "APNs key is not set" };
@@ -139,9 +153,9 @@ export default async function plugin(bb: BbPluginApi) {
     const config: ApnsConfig = {
       keyPem,
       keyId: values.apnsKeyId.trim(),
-      teamId: values.apnsTeamId.trim(),
-      bundleId: values.bundleId.trim(),
-      environment: values.apnsEnvironment as ApnsConfig["environment"],
+      teamId: constants.teamId,
+      bundleId: constants.bundleId,
+      environment: constants.environment,
     };
     const fingerprint = `${config.keyId}:${config.teamId}:${createHash("sha256").update(keyPem).digest("hex")}`;
     if (tokenCache?.fingerprint !== fingerprint) {
@@ -157,7 +171,7 @@ export default async function plugin(bb: BbPluginApi) {
   async function forwardToExpo(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
     const failed = (message: string): ExpoTicket[] => messages.map(() => ({ status: "error", message }));
     try {
-      const response = await fetch((await settings.get()).expoPushUrl, {
+      const response = await fetch(constants.expoPushUrl, {
         method: "POST",
         headers: { accept: "application/json", "content-type": "application/json" },
         body: JSON.stringify(messages),
@@ -447,6 +461,33 @@ export default async function plugin(bb: BbPluginApi) {
       const sent = tickets.filter((ticket, index) => ticket.status === "ok" &&
         !(devices[index]!.startsWith(APNS_TOKEN_PREFIX) && input.threadId && muted.has(input.threadId))).length;
       return { ok: true as const, sent };
+    },
+    async push_status() {
+      const apns = await apnsConfig();
+      const now = Date.now();
+      const devices = Object.entries((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+        .filter(([to, seen]) => to.startsWith(APNS_TOKEN_PREFIX) && now - seen <= DEVICE_TTL_MS).length;
+      const last = await bb.storage.kv.get<LastDelivery>(LAST_DELIVERY_KEY);
+      return {
+        ready: !("missing" in apns),
+        problem: "missing" in apns ? apns.missing : null,
+        devices,
+        lastDelivery: last ? { at: Date.parse(last.at) || 0, sent: Math.max(0, last.apns + last.expo - last.errors.length) } : null,
+      };
+    },
+    async push_test() {
+      const apns = await apnsConfig();
+      if ("missing" in apns) return { ok: false, sent: 0, message: apns.missing };
+      const now = Date.now();
+      const devices = Object.entries((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+        .flatMap(([to, seen]) => (to.startsWith(APNS_TOKEN_PREFIX) && now - seen <= DEVICE_TTL_MS ? [to] : []));
+      if (!devices.length) return { ok: false, sent: 0, message: "No phone has received a push yet. Open the BB Studio app and allow notifications." };
+      const tickets = await deliver(devices.map((to) => ({ to, title: "BB Studio", body: "Test push from Studio Mobile. Pushes work.", sound: "default", data: {} })));
+      const sent = tickets.filter((ticket) => ticket.status === "ok").length;
+      const failed = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
+      return sent
+        ? { ok: true, sent, message: `Sent to ${sent} phone${sent === 1 ? "" : "s"}.` }
+        : { ok: false, sent: 0, message: `Apple didn't take it: ${[...new Set(failed)].join("; ") || "unknown error"}` };
     },
     async mute_list() {
       return { threadIds: (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [] };

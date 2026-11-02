@@ -44,7 +44,8 @@ import { heartbeatCron, PERSONAL_PROJECT_ID } from "./project-lead";
 import { turnStartedAt } from "./turn-started";
 
 type Sdk = BbPluginApi["sdk"];
-type TimelineRow = Awaited<ReturnType<Sdk["threads"]["timeline"]>>["rows"][number];
+/** SDK 0.6.104 overloads timeline (a delta read too); a full read has `rows`. */
+type TimelineRow = Extract<Awaited<ReturnType<Sdk["threads"]["timeline"]>>, { rows: unknown }>["rows"][number];
 /** Runner thread statuses that mean a run is going on now. */
 const RUNNING = new Set(["starting", "active", "stopping"]);
 export type RunnerLevel = "log" | "tell" | "urgent";

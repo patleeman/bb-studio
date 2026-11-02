@@ -1,5 +1,5 @@
 import { registerCodeApp } from "./src/code/register";
-import { registerDecisionsApp } from "./src/decisions/ui/register";
+import { registerSettingsApp } from "./src/settings/ui/sections";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { ChatOverlay } from "./src/chat/ui/ChatOverlay";
@@ -24,7 +24,6 @@ import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
 import { isPageId, PageCard } from "./src/pages/ui/PageCard";
 import { enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
-import { ThreadPageLink } from "./src/pages/ui/ThreadPageLink";
 import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
@@ -37,10 +36,9 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
-import { VoiceSettingsSection } from "./src/voice/live/ui/QuickSettings";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
-import { BotInfoHeaderAction, BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
-import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
+import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
+import { BotCacheBanner } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
 import { BotThreadDirective, SIDE_THREAD_ACTION, SideThreadOpener, SideThreadPanel } from "./src/ui/bot/SideThreads";
 import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
@@ -51,7 +49,10 @@ import { BOT_LIST_ID, STUDIO_LIST_ID } from "./src/ui/bot/threadListSwitch";
 import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopDirective, LoopsDirective } from "./src/loops/ui/LoopCard";
-import { LOOPS_PANE, LoopsHeaderAction, LoopsPane } from "./src/loops/ui/LoopsPane";
+import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
+import { registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
+import { registerThreadHeader } from "./src/ui/thread-header";
+import { registerThreadContext } from "./src/ui/thread-context";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -150,6 +151,9 @@ function BuiltinRoutes() {
 }
 
 export default definePluginApp((app) => {
+  // Studio's settings sections (src/settings/ui), first so they keep their
+  // order after BB's API key fields; and push status on BB's Mobile page.
+  registerSettingsApp(app);
   registerCodeApp(app);
   app.slots.experimental_appOverlay({ id: "workspace-bridge", component: WorkspaceBridge });
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
@@ -157,8 +161,12 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
-  // Beside a Bot's thread, the "Bot info" panel action shows the Bot page's Info.
-  app.slots.threadPanelAction({ id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
+  // Studio's tabs beside a thread (src/kit/app/thread-panel.tsx). Code
+  // outside the thread view (the sidebar, content scripts) asks the thread to
+  // open one; this bare banner in every thread's composer takes the request.
+  app.composer.customize({ id: "thread-tabs", scopes: ["thread"], banners: [{ id: "requests", chrome: "bare", component: ThreadTabReceiver }] });
+  // Beside a Bot's thread, the "Bot info" tab shows the Bot page's Info.
+  registerThreadTab(app, { id: BOT_INFO_ACTION, title: "Bot info", icon: "Bot", layout: "flush", component: BotInfoPanel });
   // Side threads on a Bot's replies (src/bot-side-threads.ts): the side thread
   // in a tab beside the chat. Replies the Bot wrote before Studio drew the rows
   // itself may end with the directive, which now draws nothing.
@@ -169,25 +177,21 @@ export default definePluginApp((app) => {
   // placeholders while the loopsEnabled setting is off.
   app.slots.messageDirective({ id: "loop", component: LoopDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
-  // The Loops pane: the loop list in a tab beside the chat, and its button in
-  // the Bot chat's header.
-  app.slots.threadPanelAction({ id: LOOPS_PANE, title: "Loops", icon: "ListTodo", layout: "flush", component: LoopsPane });
-  app.slots.experimental_threadHeaderAction({ id: "loops-pane", title: "Loops", component: LoopsHeaderAction });
+  // The Loops pane: the loop list in a tab beside the chat. Its button in the
+  // Bot chat's header is with the other header buttons (src/ui/thread-header.tsx).
+  registerThreadTab(app, { id: LOOPS_PANE, title: "Loops", icon: "ListTodo", layout: "flush", component: LoopsPane });
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its
   // composer button is registered below, after Notes' Expand; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
-  app.slots.settingsSection({ id: "voice", title: "Hands-free voice", component: VoiceSettingsSection });
-  app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
+  registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
-  // opens them through: a header action, since only components inside the thread
-  // view can open a tab beside it (BB declines openThreadPanel from an overlay).
+  // opens them through: an overlay that asks the chat to open the tab beside it
+  // (only the thread view can open its tabs).
   app.contentScripts.register({ id: "bot-reply-in-thread", mount: ({ signal }) => mountSideThreadRows(signal) });
-  app.slots.experimental_threadHeaderAction({ id: "side-thread-opener", title: "Side threads", component: SideThreadOpener });
-  // A Bot chat's prompt cache (src/bot-cache.ts): a minimal state dot in its
-  // header, and a banner in its composer when the cache expired on a big chat.
-  app.slots.experimental_threadHeaderAction({ id: "bot-cache", title: "Prompt cache", component: BotCacheChip });
-  app.slots.experimental_threadHeaderAction({ id: "bot-info", title: "Bot info", component: BotInfoHeaderAction });
+  app.slots.experimental_appOverlay({ id: "side-thread-opener", component: SideThreadOpener });
+  // A Bot chat's prompt cache (src/bot-cache.ts): a banner in its composer
+  // when the cache expired on a big chat.
   app.composer.customize({ id: "bot-cache", banners: [{ id: "cold", chrome: "bare", component: BotCacheBanner }] });
   // Keeps the panel's views alive across route changes (with retainPanel).
   app.slots.experimental_appOverlay({ id: "retained", component: () => <RetainedPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
@@ -197,17 +201,23 @@ export default definePluginApp((app) => {
   // another provider drops its composer entry. Read once per window load.
   const kinds = readKindsSnapshot();
   const on = (kind: string) => !kinds.off.has(kind);
+  // Header buttons: Loops and Bot info on a Bot's chat, and the page a thread
+  // works on (SDK 0.6.104 header actions; src/ui/thread-header.tsx).
+  registerThreadHeader(app, { pages: on("page") });
+  // The facts the header used to draw: a Bot chat's prompt cache and a
+  // thread's automations in the context row above the composer, and the
+  // thread's Bot in the Info tab (src/ui/thread-context.tsx).
+  registerThreadContext(app);
   // The thread's Studio tab: one workbench tab for every kind that opens
   // beside the chat (src/ui/studio-tab). Reply cards open it with
   // `{ kind, id }`; its collection lists only the kinds that are on.
   const tabKinds = enabledKinds(kinds.off);
   if (tabKinds.length) {
-    app.slots.threadPanelAction({
+    registerThreadTab(app, {
       id: STUDIO_TAB,
       title: "Studio",
       icon: STUDIO_TAB_ICON,
       layout: "flush",
-      run: async ({ openPanel }) => { await openPanel({ title: "Studio" }); },
       component: (props) => <Suspense fallback={null}><StudioTab {...props} /></Suspense>,
     });
   }
@@ -215,7 +225,6 @@ export default definePluginApp((app) => {
   // `::page{id="pg_…"}` card in replies, the header link back to a page a
   // thread was started from, and opening a page Talk dictated into.
   if (on("page")) {
-    app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
     app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
     // Notes (src/pages/notes.ts): the composer's Expand to page, which moves
     // the draft into a temp page beside the thread, and the "Notes in
@@ -250,7 +259,6 @@ export default definePluginApp((app) => {
   // Recordings (built in): the recorder overlay and pill, the composer's
   // microphone, hold-to-talk, dictation into other plugins' fields, the
   // `::recording{id="rec_…"}` card, Talk's commands and its Models settings.
-  registerDecisionsApp(app);
   if (on("recording")) registerTalkApp(app);
   // Off: the `::recording` line still renders, as nothing.
   else app.slots.messageDirective({ id: "recording", component: () => null });

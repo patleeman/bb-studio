@@ -47,7 +47,7 @@ Every provider serves the same Jev model through TypeSafe's
 
 | Provider | Key setting | Environment fallback | Model |
 | --- | --- | --- | --- |
-| [TypeSafe](https://typesafe.ai) (canonical) | `decisions_typesafeApiKey` | `TYPESAFE_API_KEY` | `decisions_typesafeModel`, default `jev-latest` |
+| [TypeSafe](https://typesafe.ai) (canonical) | `decisions_typesafeApiKey` | `TYPESAFE_API_KEY` | `jev-latest` (`STUDIO_TYPESAFE_MODEL` on the host overrides it) |
 | Vercel AI Gateway | `decisions_vercelApiKey` | `AI_GATEWAY_API_KEY` | `typesafe-ai/jev` |
 | OpenRouter | `decisions_openRouterApiKey` | `OPENROUTER_API_KEY` | `typesafe/jev-1.13` |
 | OpenCode Zen | `decisions_zenApiKey` | `OPENCODE_API_KEY` | `jev-1.13` |
@@ -118,25 +118,27 @@ card starts a fresh decision for the new text.
 
 ## Settings
 
-Open **Settings → Plugins → Studio**, or use `bb plugin config studio`.
+Open **Settings → Plugins → Studio**. The keys are BB secret fields at the top (`bb plugin config studio`); the rest are in Studio's Threads, Jev and Advanced sections (`bb studio settings`).
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `decisions_enabled` | `true` | Turn Smart Queue on or off. Other plugins' calls are unaffected. |
 | `decisions_jevProvider` | `auto` | `auto`, `typesafe`, `vercel`, `openrouter`, `opencode-zen`, or `custom`. |
 | `decisions_typesafeApiKey`, `decisions_vercelApiKey`, `decisions_openRouterApiKey`, `decisions_zenApiKey` | — | Provider keys (secret). See [Jev providers](#jev-providers). |
-| `decisions_typesafeModel` | `jev-latest` | Dropdown: `jev-latest`, `jev-preview`, or `jev-1.13.0` to pin that version. |
 | `decisions_customJevEndpoint`, `decisions_customJevApiKey`, `decisions_customJevApiKeyCommand`, `decisions_customJevHeaders`, `decisions_customJevModel` | — | Your own System One endpoint. See [Jev providers](#jev-providers). |
-| `decisions_jevTimeoutMs` | `5000` | Deadline for each provider attempt, 250 to 15000 ms, for every caller. |
-| `decisions_steerConfidence` | `0.5` | Smart Queue's minimum Jev confidence to steer. |
 | `decisions_batchConfidence` | `0.5` | Smart Queue's minimum Jev confidence to send a follow-up in the same turn as the next one. `1` sends each on its own. |
 
-Below the form, two sections complete the page:
+The TypeSafe model (`jev-latest`), the Jev timeout (5000 ms per provider
+attempt) and Smart Queue's minimum confidence to steer (0.5) are constants. A
+BB host can set `STUDIO_TYPESAFE_MODEL`, `STUDIO_JEV_TIMEOUT_MS` (250–15000) or
+`STUDIO_JEV_STEER_CONFIDENCE` (0–1).
 
-- **Jev connection** lists the providers Studio Decisions will call, in order, and
+The Jev section also has:
+
+- The provider list shows the providers Studio Decisions will call, in order, and
   any configuration problems. **Test** sends a fixed sample message to Jev and
   reports which provider answered; it never reads a thread.
-- **Fallback model** chooses what decides when no Jev provider answers: the
+- **If Jev doesn't answer, use** chooses what decides when no Jev provider answers: the
   caller's provider (the busy thread's for Smart Queue), a
   specific model picked with BB's own provider, model, and reasoning picker,
   or off. The same choice is available as `bb studio decisions fallback`.

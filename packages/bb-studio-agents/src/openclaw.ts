@@ -28,7 +28,7 @@ export function mapAgents(value: unknown): AvailableModel[] {
   const parsed = z.object({ defaultId: z.string().optional(), agents: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]+$/), name: z.string().optional() })) }).safeParse(value);
   if (!parsed.success) throw new AgentConnectionError("OpenClaw returned an invalid agent catalog.");
   const defaultId = parsed.data.defaultId ?? parsed.data.agents[0]?.id;
-  return parsed.data.agents.map(agent => ({ id: `openclaw/${agent.id}`, model: `openclaw/${agent.id}`, displayName: agent.name || agent.id, description: "OpenClaw Gateway agent", isDefault: agent.id === defaultId, defaultReasoningEffort: "none", supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Agent default" }] }));
+  return parsed.data.agents.map(agent => ({ id: `openclaw/${agent.id}`, model: `openclaw/${agent.id}`, displayName: agent.name || agent.id, description: "OpenClaw Gateway agent", isDefault: agent.id === defaultId, defaultReasoningEffort: "none", reasoningDiscovery: "known" as const, supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Agent default" }] }));
 }
 export async function prepareOpenClaw(connection: OpenClawConnection, root = tmpdir()) {
   const config = openclawConnectionSchema.parse(connection);

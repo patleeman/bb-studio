@@ -1,5 +1,5 @@
 // Reactions, built into Studio (was Studio Reactions, `emoji-react`): their
-// settings on Studio's settings page, with the saved preview below them.
+// settings in Studio's Agent replies section.
 export default ({ projectId, bbCli, sleep }) => [
   {
     id: "studio-reactions",
@@ -19,18 +19,15 @@ export default ({ projectId, bbCli, sleep }) => [
         await sleep(500);
       }
       await client.navigate("/settings/plugins/studio");
-      await client.waitForText("Saved reactions", 30000);
-      await client.waitForText("👍 Agree");
-      await client.waitForText("Quote the highlighted text");
-      await client.waitForText("Under your messages");
-      await client.waitForText("Saved menu settings are applied in this window.");
+      await client.waitForText("Agent replies", 30000);
+      await client.waitForText("Quote the selected text");
+      await client.waitForText("Show reactions under your messages");
       await client.evaluate(`(() => {
-        const preview = document.querySelector('[aria-label="Saved reaction preview"]');
-        if (!preview?.textContent.includes("👍 Agree") || !preview.textContent.includes("❓ Clarify")) throw new Error("Saved reaction preview is missing configured choices");
-        const label = [...document.querySelectorAll("label, span, p, div")].find((node) => node.childElementCount === 0 && node.textContent.trim() === "Quote the highlighted text");
-        if (!label) throw new Error("Reactions settings are missing from Studio's settings");
-        label.scrollIntoView({ block: "start" });
-        window.scrollBy?.(0, -120);
+        const field = document.querySelector('[data-testid="setting-emojiItems"] textarea');
+        if (!field?.value.includes("👍 Agree") || !field.value.includes("❓ Clarify")) throw new Error("The Reactions field is missing the configured choices");
+        const quote = document.querySelector('[data-testid="setting-quoteSelection"] [role="radio"][aria-checked="true"]');
+        if (quote?.textContent !== "Before") throw new Error("Quote the selected text should be Before by default");
+        document.querySelector('[data-testid="setting-explore_next"]')?.scrollIntoView({ block: "start" });
         return true;
       })()`);
       await sleep(400);

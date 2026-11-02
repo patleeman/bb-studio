@@ -18,10 +18,11 @@ import { studioSchemas } from "../kit/contract";
 import { subcommand, takeOption } from "../kit/cli";
 import { newId } from "../kit/ids";
 import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
-import type { BbPluginApi, PluginSettingsHandle } from "@get-bb/plugin-sdk";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { StudioSettingValues } from "../settings/schema";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { rpcContract, TALK_SETTINGS } from "./shared/contract";
+import { rpcContract } from "./shared/contract";
 import { PANEL_PATH, PLUGIN_ID, RECORDING_CHANGED, formatLength, recordingHref } from "./shared/format";
 import { AudioFiles, extensionFor, pluginDataDirectory } from "./server/audio-files";
 import { audioResponse } from "./server/audio-response";
@@ -45,7 +46,6 @@ import { TapHelper } from "./server/tap-helper";
 import { CALL_LIVE, type CallLive } from "./shared/format";
 import { callRetentionDays, callSttFor } from "./shared/contract";
 
-export { TALK_SETTINGS } from "./shared/contract";
 
 /** A capturing client heartbeats every 20s; after 2 minutes it is gone. */
 const STALE_AFTER_MS = 120_000;
@@ -66,7 +66,9 @@ export const RECORDINGS_USAGE = [
   "  bb studio recordings notes <recording-id> [--json]",
 ].join("\n");
 
-export type TalkSettingsHandle = PluginSettingsHandle<typeof TALK_SETTINGS>;
+/** Talk's Studio settings (src/settings/schema.ts). */
+type TalkConfig = Pick<StudioSettingValues, "autoTitle" | "autoMeetingNotes" | "dictationAudioDays" | "callTranscription" | "callServerUrl" | "callServerModel" | "callLocalModel" | "callAudioRetention">;
+export type TalkSettingsHandle = { get(): Promise<TalkConfig>; onChange(listener: (next: TalkConfig) => void): void };
 
 export interface BuiltinRecordings {
   store: TalkStore;

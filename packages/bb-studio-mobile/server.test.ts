@@ -128,7 +128,7 @@ function recordingSession() {
 
 async function configuredHost() {
   const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
-  const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test", apnsEnvironment: "production" },
+  const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test" },
     sdk: { threads: { interactions: { list: async () => [] } } },
   });
   await plugin(host.bb);
@@ -197,7 +197,7 @@ describe("muting", () => {
 describe("clearing notifications", () => {
   async function clearingHost(interactions: () => Promise<never[]>) {
     const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
-    const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test", apnsEnvironment: "production" },
+    const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test" },
       sdk: { threads: { get: async () => makeThreadResponse({ id: "thr_a", lastReadAt: 2000, latestAttentionAt: 1000 }), interactions: { list: interactions } } },
     });
     await plugin(host.bb);

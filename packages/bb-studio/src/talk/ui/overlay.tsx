@@ -8,8 +8,8 @@ import {
   useBbNavigate,
   useRealtime,
   useRpc,
-  useSettings,
 } from "@get-bb/plugin-sdk/app";
+import { useStudioSettings } from "../../settings/ui/use-settings";
 import type { TalkRpcContract } from "../shared/contract";
 import { HTTP_ROOT, NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
 import type { StudioCreateEventDetail } from "../../kit/contract";
@@ -17,6 +17,7 @@ import { Icon } from "../../kit/ui/index";
 import { openAppPath, useOpenMain } from "../../kit/app/index";
 import { cn } from "../../kit/ui/index";
 import { talk, useTalkState, type TalkState } from "./controller";
+import { SEGMENT_SECONDS } from "./segmenter";
 import { useDraggable } from "./draggable";
 import { useInlineDictation } from "./inline-dictation";
 
@@ -27,7 +28,7 @@ const NO_DRAG = "[app-region:no-drag] [-webkit-app-region:no-drag]";
 /** Keeps the controller attached to this window's SDK contexts. */
 function useControllerWiring(): void {
   const rpc = useRpc<TalkRpcContract>();
-  const { values } = useSettings();
+  const { values } = useStudioSettings();
   const { projectId, threadId } = useBbContext();
   const navigate = useBbNavigate();
   const open = useOpenMain();
@@ -35,7 +36,7 @@ function useControllerWiring(): void {
   useEffect(() => talk.setNavigator(navigate, open), [navigate, open]);
   useEffect(() => {
     talk.configure({
-      segmentSeconds: typeof values?.segmentSeconds === "number" ? values.segmentSeconds : 25,
+      segmentSeconds: SEGMENT_SECONDS,
       replaceBuiltIn: values?.replaceBuiltInDictation !== false,
       holdKey: holdKeyCode(values?.holdToTalkKey),
     });
