@@ -141,14 +141,30 @@ folder.
 
 ## Barge-in and the subtitle UI
 
-- **Barge-in.** As soon as the user's speech shows up (Realtime's
-  `speech_started`, or GPT-Live's first input transcript delta), the phone mutes
-  the voice's WebRTC track (`isEnabled = false`). In the mock it stops the
-  player. Then it sends a silent note with what the user heard: "The user
-  interrupted you. They heard up to: '…'" (`session.thinking.append` for Live,
-  a system item for Realtime). The rest of the cut-off reply isn't shown or
-  played. The next reply unmutes. The voice's own words echoing back into the
-  mic don't trigger a barge-in.
+- **Barge-in, by level first.** While the voice plays, the phone watches the
+  mic level ([`BargeInGate.swift`](../../apps/ios/iOS/VoiceLive/Core/BargeInGate.swift)).
+  On the phone, the levels are WebRTC's `audioLevel` stats every 50 ms: the mic
+  (`media-source`, after echo cancellation) and the voice (`inbound-rtp`).
+  - **When it triggers.** The level must stay above a bar for 120 ms. The bar
+    is 0.02 RMS when the voice is quiet. While the voice plays it is the higher
+    of 0.035 and half the voice's playback level plus 0.02, so the voice's own
+    echo can't trigger it.
+  - **What happens.** The phone mutes the voice's track at once
+    (`isEnabled = false`; in the mock it stops the player). Nothing is sent to
+    the model yet.
+  - **The transcript decides.** Words arriving confirm the barge-in. Then the
+    phone sends the silent note with what the user heard ("The user interrupted
+    you. They heard up to: '…'"; `session.thinking.append` for Live, a system
+    item for Realtime), and the rest of the cut-off reply isn't shown or played.
+    If no words come within 1 s of the user's level dropping back, it was a
+    false alarm (a cough, a bump): the voice is unmuted and carries on. While
+    muted it skips that stretch, because WebRTC can't pause a live stream.
+  - **Why the window starts when the level drops.** GPT-Live's transcript of
+    the user lags about 2.4 s while the voice talks. A window counted from the
+    trigger cancelled a real barge-in in testing.
+  - **Without levels** (the scripted mock, or no stats), the first transcript
+    word still barges in on its own. The voice's own words echoing back into
+    the mic don't trigger it.
 - **Subtitles.** A talking icon moves while either side speaks: teal for you,
   the app's accent for the voice, and purple while thinking. Under it, the
   current line streams in large type, not chat bubbles, and keeps its newest
@@ -206,7 +222,7 @@ the host's clock. "First word" is when speech starts in the clip that was sent.
 | Tool round trip: the call reaches the app → Studio's tool layer → the result is back on the channel | 21–31 ms (4 calls, simulator and host) |
 | Studio's tool layer itself | 0–4 ms |
 | The tool result → the voice's answer starts | about 1.5 s (a second backend turn writes it, then the voice says it) |
-| **Barge-in: first word → voice muted on the phone** | **2.05 s**. The first input transcript word took 2.05 s while the voice was talking (against about 1 s on a quiet line), and the app muted 2 ms after it arrived. |
+| **Barge-in: first word → voice muted on the phone** | First run, transcript only: **2.05 s**. The first input transcript word took 2.05 s while the voice was talking (against about 1 s on a quiet line), and the app muted 2 ms after it arrived. **With the level gate: 0.20 s and 0.18 s** (two cut-ins, no false triggers), and the transcript confirmed each 1.2 s and 1.4 s after the first word. |
 | Barge-in: first word → GPT-Live stops sending the voice's audio | 3.06 s (the phone had already silenced it by then) |
 | The lead's reply → the voice says it | It was spoken right after "Sent." (the 3 s reply poll, then `session.commentary.append`) |
 | Session cost | ≈ $0.06 for 69 s (Studio's own estimate from `session.usage.updated` and the backend's tokens) |
@@ -223,12 +239,16 @@ lead says the eBay fetcher is paused, and it'll resume Monday at 9."
 **What this says.**
 - **Turns are fine for driving:** about 1.2–2 s from the end of speech to the
   voice, tool calls included.
-- **Barge-in is the weak spot.** While GPT-Live is talking, its input
-  transcript runs about 2 s behind the user, and GPT-Live's own stop came about
-  3 s after the user started. The phone mutes on the first transcript word, so
-  it can't be faster than that. The fix to try first is a local level gate:
-  while the voice plays, mute on mic energy (WebRTC's echo cancellation makes
-  that safe enough), and let the transcript confirm.
+- **Barge-in was the weak spot, so it now goes by level.** While GPT-Live is
+  talking, its input transcript runs about 2 s behind the user, and GPT-Live's
+  own stop came about 3 s after the user started. Muting on the first
+  transcript word took 2.05 s. With the level gate, the phone mutes about 0.2 s
+  after the first word, and the transcript only confirms.
+- **How the level run worked.** In the harness, the mic level is the bridge's
+  synthetic user plus a simulated echo residual of 35% of the voice's level
+  (pessimistic for WebRTC's AEC). The app's gate, machine and mute path are the
+  real ones; real phone levels come from WebRTC stats and haven't been tried on
+  a device yet.
 - **What matched the docs:** the event shapes (`session.delegation.created`,
   `response.event` wrapping Responses events, `response.item.create` plus
   `response.create` for tool results, `session.thinking.append`/`appended`,
@@ -281,10 +301,12 @@ shares:
   WebSocket transport from the host. Studio's `/v1/live/sessions` SDP exchange
   and the app's WebRTC transport need a real device (or a simulator allowed to
   use the Mac's mic).
-- **Barge-in on GPT-Live is slow: about 2 s, measured.** The voice talks over
-  the user for that long. Next: a local level gate on the mic while the voice
-  plays (WebRTC's AEC makes that safer than today's gate), with the transcript
-  to confirm.
+- **Barge-in thresholds aren't tuned on a device.** The gate's bar (half the
+  voice's level plus 0.02, 120 ms) was checked against a simulated echo, not a
+  real phone speaker, a car or HFP. Too low, and road noise or the radio mutes
+  the voice for a second (it then comes back); too high, and the user waits for
+  the transcript (about 2 s). Tune it on a device with WebRTC's real
+  `audioLevel` stats.
 - **Echo and car noise.** `.voiceChat` AEC and the transcript echo guard aren't
   tested with real audio, a car or HFP. The yes check fails safe: unclear or
   hedged speech isn't a yes.
@@ -351,5 +373,8 @@ In `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
   what's waiting, the relay with the read-back and "yes, send it", the lead's
   reply, and a barge-in on a long answer. `live-audio.wav` is the sound alone.
 - **`live-timings.json`, `live-voice-thread.md` and `live-server.log`** come
-  from the live run. The voice thread got exactly two posts: the relay as it
+  from the live run.
+- **`hands-free-live-bargein.mp4`** (with sound) and `live-bargein-*` are the
+  re-run with the level-based barge-in: two cut-ins, muted 0.20 s and 0.18 s
+  after the first word. The voice thread got exactly two posts: the relay as it
   happened, and the transcript at hang-up.
