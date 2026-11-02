@@ -87,6 +87,9 @@ public enum Studio {
     public static let bot_maintenance_run = "bot_maintenance_run"
     public static let bot_activity = "bot_activity"
     public static let bot_attention = "bot_attention"
+    public static let bot_page_state = "bot_page_state"
+    public static let bot_calendar_group_rename = "bot_calendar_group_rename"
+    public static let bot_run_dismiss = "bot_run_dismiss"
     public static let bot_cache_state = "bot_cache_state"
     public static let bot_cache_set = "bot_cache_set"
     public static let bot_cache_banner_hide = "bot_cache_banner_hide"
@@ -523,6 +526,12 @@ public enum Studio {
   public typealias BotActivity = BotActivityOutput
 
   public typealias BotAttention = BotAttentionOutput
+
+  public typealias BotPageState = BotPageStateOutput
+
+  public typealias BotCalendarGroupRename = BotCalendarGroupRenameOutput
+
+  public typealias BotRunDismiss = BotRunDismissOutput
 
   public typealias BotCacheState = BotCacheStateOutput
 
@@ -10536,6 +10545,68 @@ public enum Studio {
     public init(attention: BotAttentionOutputAttention? = nil, hasBot: Bool? = nil) {
       self.attention = attention
       self.hasBot = hasBot
+    }
+  }
+
+  public struct BotPageStateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotPageStateOutput: Sendable, Hashable, Codable {
+    public var groupNames: [String: String]?
+    public var dismissed: [String]?
+
+    public init(groupNames: [String: String]? = nil, dismissed: [String]? = nil) {
+      self.groupNames = groupNames
+      self.dismissed = dismissed
+    }
+  }
+
+  public struct BotCalendarGroupRenameInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var key: String?
+    public var name: String?
+
+    public init(botId: String? = nil, key: String? = nil, name: String? = nil) {
+      self.botId = botId
+      self.key = key
+      self.name = name
+    }
+  }
+
+  public struct BotCalendarGroupRenameOutput: Sendable, Hashable, Codable {
+    public var groupNames: [String: String]?
+    public var dismissed: [String]?
+
+    public init(groupNames: [String: String]? = nil, dismissed: [String]? = nil) {
+      self.groupNames = groupNames
+      self.dismissed = dismissed
+    }
+  }
+
+  public struct BotRunDismissInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var automationId: String?
+    public var runId: String?
+
+    public init(botId: String? = nil, automationId: String? = nil, runId: String? = nil) {
+      self.botId = botId
+      self.automationId = automationId
+      self.runId = runId
+    }
+  }
+
+  public struct BotRunDismissOutput: Sendable, Hashable, Codable {
+    public var groupNames: [String: String]?
+    public var dismissed: [String]?
+
+    public init(groupNames: [String: String]? = nil, dismissed: [String]? = nil) {
+      self.groupNames = groupNames
+      self.dismissed = dismissed
     }
   }
 

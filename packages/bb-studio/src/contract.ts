@@ -305,6 +305,8 @@ const botActivity = z.object({
   compactions: z.array(z.object({ threadId: z.string(), at: z.number(), tokens: z.number().nullable() })).optional(),
 });
 export type BotActivityView = z.infer<typeof botActivity>;
+const botPageState = z.object({ groupNames: z.record(z.string(), z.string()), dismissed: z.array(z.string()) });
+export type BotPageStateView = z.infer<typeof botPageState>;
 /** A Bot's runner (src/runners.ts): a long-lived thread on its own schedule that reports only through runner_report. */
 const runnerSchedule = heartbeatRunSchema.omit({ enabled: true, time: true }).extend({ time: heartbeatRunSchema.shape.time.default("09:00") });
 const runnerLevel = z.enum(["log", "tell", "urgent"]);
@@ -516,6 +518,12 @@ export const rpcContract = defineRpcContract({
   /** Just the Bot's attention (bot_activity's), for a Bot row that isn't expanded. */
   /** hasBot false: no such Bot (or it has no chat yet), so a client counts what waits on the user some other way. */
   bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable(), hasBot: z.boolean().optional() }) },
+  /** The Bot page's saved state (src/bot-page-state.ts): calendar group names by group key, and failed runs dismissed from Needs you ("<automationId>:<runId>"). */
+  bot_page_state: { input: forBot, output: botPageState },
+  /** Names a calendar group (its key: window and jobs); an empty name goes back to the automatic one. */
+  bot_calendar_group_rename: { input: z.object({ botId, key: z.string().min(1).max(4000), name: z.string().max(200).nullable() }), output: botPageState },
+  /** Dismisses one failed run from Needs you; a later failure shows again. */
+  bot_run_dismiss: { input: z.object({ botId, automationId: z.string().min(1).max(200), runId: z.string().min(1).max(200) }), output: botPageState },
   /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
   bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },
   /** Changes a Bot's cache-warming settings; returns its chat's cache state. */

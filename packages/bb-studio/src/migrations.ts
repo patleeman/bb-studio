@@ -818,4 +818,8 @@ export const MIGRATIONS = [
    CREATE TABLE loop_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, loop_id TEXT NOT NULL, type TEXT NOT NULL, at INTEGER NOT NULL, data TEXT NOT NULL);
    CREATE INDEX loop_events_loop ON loop_events(loop_id, at);
    CREATE TABLE loop_scheduler (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+  // The Bot page (src/bot-page-state.ts): calendar group names by group key,
+  // and the failed runs Patrick dismissed from Needs you.
+  `CREATE TABLE bot_group_names (bot_id TEXT NOT NULL, key TEXT NOT NULL, name TEXT NOT NULL, by TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (bot_id, key));
+   CREATE TABLE bot_run_dismissals (bot_id TEXT NOT NULL, automation_id TEXT NOT NULL, run_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (bot_id, automation_id, run_id));`,
 ];

@@ -62,6 +62,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { AVATAR_ROUTE, BOT_AVATAR_SETTINGS, imageMime, pickImageProvider } from "./src/bot-avatar";
 import { registerBotProfileTools } from "./src/bot-profile-tools";
+import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
 import { SIDE_THREAD_INSTRUCTIONS, SideThreads } from "./src/bot-side-threads";
@@ -753,6 +754,9 @@ export default async function plugin(bb: BbPluginApi) {
   const warmTimer = setInterval(() => void warmer.tick().catch((error) => bb.log.warn(`Cache warming tick failed: ${errorText(error)}`)), 60_000);
   bb.onDispose(() => clearInterval(warmTimer));
   /** A Studio bot's id for its learning settings (the primary without one). */
+  const pageState = new BotPageState(db);
+  const pageBotId = (botId?: string) => { const bot = bots.stored(botId); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); return bot.id; };
+  const pageStateView = (botId: string) => ({ groupNames: pageState.groupNames(botId), dismissed: pageState.dismissed(botId) });
   const learnerId = (botId?: string) => { const bot = bots.stored(botId); if (!bot) throw new Error(botId ? `No Bot "${botId}".` : "Make your Bot first."); bots.requireStudio(bot.id, "skill learning"); return bot.id; };
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => void learning.idle(thread, lastAssistantText).catch((error) => bb.log.warn(`Skill learning: ${errorText(error)}`)));
   // A cache-warming ping isn't a new turn by the user: it leaves a running review alone.
@@ -960,6 +964,9 @@ export default async function plugin(bb: BbPluginApi) {
     bot_maintenance_set: ({ botId, ...patch }) => maintenance.set(learnerId(botId), patch),
     bot_maintenance_run: ({ botId, dryRun }) => maintenance.run(learnerId(botId), { dryRun }),
     bot_attention: ({ botId }) => bots.attentionView(botId),
+    bot_page_state: ({ botId }) => pageStateView(pageBotId(botId)),
+    bot_calendar_group_rename: ({ botId, key, name }) => { const id = pageBotId(botId); pageState.renameGroup(id, key, name, "user"); return pageStateView(id); },
+    bot_run_dismiss: ({ botId, automationId, runId }) => { const id = pageBotId(botId); pageState.dismiss(id, automationId, runId); return pageStateView(id); },
     bot_activity: async ({ botId }) => ({ ...await bots.activity(botId), maintenance: bots.stored(botId) ? maintenance.view(bots.stored(botId)!.id).runs : [] }),
     bot_cache_state: ({ threadId, botId }) => warmer.state(cacheThread(threadId, botId)),
     bot_cache_set: ({ botId, ...patch }) => {
@@ -1318,6 +1325,7 @@ export default async function plugin(bb: BbPluginApi) {
     warn: (message) => bb.log.warn(message),
   });
   registerVoiceLive(bb, voiceLive);
+  registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
   // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.
   bb.http.route("GET", AVATAR_ROUTE, (context) => {
     const image = bots.avatarImage(context.req.query("bot") ?? "", context.req.query("image") ?? "");

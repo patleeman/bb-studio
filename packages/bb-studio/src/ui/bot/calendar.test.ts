@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Schedule } from "../../schedule";
-import { cadenceLabel, calendarDays, placeBlocks, windowStart, minuteOfDay, occurrences, pausedSources, sourceEvents, windowDays, zonedTime, type CalendarSource } from "./calendar";
+import { cadenceLabel, calendarDays, calendarWeek, chainGroups, groupName, isFrequent, isGroup, placeBlocks, windowStart, minuteOfDay, occurrences, pausedSources, sourceEvents, windowDays, zonedTime, type CalendarEvent, type CalendarGroup, type CalendarSource } from "./calendar";
 
 const NY = "America/New_York";
 const H = 3_600_000, M = 60_000;
@@ -152,5 +152,75 @@ describe("days", () => {
   it("pages by as many days as show", () => {
     expect(windowStart(MON, 1, 5) - MON).toBe(5 * 24 * H);
     expect(windowStart(MON, -1, 7) - MON).toBe(-7 * 24 * H);
+  });
+});
+
+describe("frequent jobs", () => {
+  const days = windowDays(MON, 7, NY);
+  const ALL = [0, 1, 2, 3, 4, 5, 6] as const;
+  it("every 2 hours or more often is frequent; twice a day, a daily or a weekly isn't", () => {
+    const at = (job: Partial<CalendarSource>) => occurrences(source(job), MON, MON + 7 * 24 * H, NY);
+    expect(isFrequent(at({ schedule: { type: "interval", every: 2, unit: "hours", days: [...ALL], from: "00:00", to: "23:59", timezone: NY } }), days)).toBe(true);
+    expect(isFrequent(at({ schedule: { type: "interval", every: 1, unit: "hours", days: [...ALL], from: "00:00", to: "23:59", timezone: NY } }), days)).toBe(true);
+    // Working hours only, every 2 hours (9, 11, 13, 15, 17): still frequent.
+    expect(isFrequent(at({ cron: "0 9-17/2 * * 1-5" }), days)).toBe(true);
+    expect(isFrequent(at({ schedule: { type: "times", days: [...ALL], times: ["08:00", "13:00"], timezone: NY } }), days)).toBe(false);
+    expect(isFrequent(at({ cron: "0 13 * * *" }), days)).toBe(false);
+    expect(isFrequent(at({ cron: "0 16 * * 5" }), days)).toBe(false);
+    // Three a day but 3 hours apart: not frequent.
+    expect(isFrequent(at({ schedule: { type: "times", days: [...ALL], times: ["09:00", "12:00", "15:00"], timezone: NY } }), days)).toBe(false);
+  });
+
+  it("hidden by default: no band and no block, but listed; shown: a band each day", () => {
+    const heartbeat = source({ id: "beat", name: "Systems heartbeat", kind: "watcher", schedule: { type: "interval", every: 2, unit: "hours", days: [...ALL], from: "00:00", to: "23:59", timezone: NY } });
+    const daily = source({ id: "daily", name: "Midday check", schedule: { type: "times", days: [...ALL], times: ["13:00"], timezone: NY } });
+    const hidden = calendarWeek([heartbeat, daily], days, MON - H, NY, false);
+    expect(hidden.frequent).toEqual([{ sourceId: "beat", every: "every 2 h" }]);
+    expect(hidden.days.every((day) => !day.bands.length && day.singles.every((event) => event.sourceId === "daily"))).toBe(true);
+    const shown = calendarWeek([heartbeat, daily], days, MON - H, NY, true);
+    expect(shown.days.every((day) => day.bands.length === 1 && day.bands[0]!.sourceId === "beat")).toBe(true);
+    expect(shown.frequent).toEqual(hidden.frequent);
+  });
+});
+
+describe("15-minute chains", () => {
+  const event = (minute: number, sourceId: string, status: CalendarEvent["status"] = "ok"): CalendarEvent => ({ key: `${sourceId}:${minute}`, sourceId, at: MON + minute * M, status, outcome: status === "failed" ? "Failed: couldn't sign in to Wyze" : "Ran", error: status === "failed" ? "couldn't sign in to Wyze" : null, threadId: null, manual: false });
+
+  it("chains each run that starts within 15 minutes of the previous one, so 5:00 and 5:15 join through 5:05 and 5:10", () => {
+    const items = chainGroups([event(300, "systems"), event(305, "comms"), event(310, "home"), event(315, "staff"), event(420, "card"), event(780, "staff"), event(780, "house"), event(780, "security")], NY);
+    expect(items).toHaveLength(3);
+    const [sweep, card, midday] = items as [CalendarGroup, CalendarEvent, CalendarGroup];
+    expect(isGroup(sweep) && sweep.events.map((each) => each.sourceId)).toEqual(["systems", "comms", "home", "staff"]);
+    expect(sweep.key).toBe("05:00-05:15|comms,home,staff,systems");
+    expect(isGroup(card)).toBe(false);
+    expect(isGroup(midday) && midday.sourceIds).toEqual(["house", "security", "staff"]);
+    // Gaps over 15 minutes break the chain; exactly 15 joins it.
+    expect(chainGroups([event(300, "a"), event(316, "b")], NY)).toHaveLength(2);
+    expect(chainGroups([event(300, "a"), event(315, "b")], NY)).toHaveLength(1);
+  });
+
+  it("the same group on another day has the same key, so a name holds all week", () => {
+    const tue = (minute: number, id: string) => ({ ...event(minute, id), at: MON + 24 * H + minute * M });
+    const [mon] = chainGroups([event(300, "systems"), event(305, "comms")], NY) as CalendarGroup[];
+    const [next] = chainGroups([tue(300, "comms"), tue(305, "systems")], NY) as CalendarGroup[];
+    expect(next!.key).toBe(mon!.key);
+  });
+
+  it("a failure is never hidden: the group's status is failed, then running, then due", () => {
+    const [failed] = chainGroups([event(780, "staff"), event(780, "house"), event(781, "security", "failed")], NY) as CalendarGroup[];
+    expect(failed!.status).toBe("failed");
+    expect(failed!.events.find((each) => each.status === "failed")!.error).toBe("couldn't sign in to Wyze");
+    const [live] = chainGroups([event(780, "staff", "running"), event(785, "house")], NY) as CalendarGroup[];
+    expect(live!.status).toBe("running");
+    const [due] = chainGroups([event(780, "staff", "scheduled"), event(785, "house", "scheduled")], NY) as CalendarGroup[];
+    expect(due!.status).toBe("scheduled");
+  });
+
+  it("names a group from its time until it's renamed", () => {
+    const [sweep] = chainGroups([event(300, "systems"), event(305, "comms")], NY) as CalendarGroup[];
+    expect(groupName(sweep!, NY)).toBe("5 AM checks");
+    expect(groupName(sweep!, NY, { [sweep!.key]: "Area sweep" })).toBe("Area sweep");
+    const [half] = chainGroups([event(810, "a"), event(815, "b")], NY) as CalendarGroup[];
+    expect(groupName(half!, NY)).toBe("1:30 PM checks");
   });
 });

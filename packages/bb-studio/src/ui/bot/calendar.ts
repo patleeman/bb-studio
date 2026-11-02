@@ -3,9 +3,14 @@
 // into its runs in a window of days, in the viewer's time zone. Past runs come
 // from run history (each links to its thread and carries its error when it
 // failed), a run going on now is live, and the rest are the schedule's next
-// occurrences. A job that runs many times a day collapses into one band per
-// day. Pure, so the expansion is tested without a browser.
+// occurrences. A frequent job (every 2 hours or more often) is hidden behind
+// Show frequent, and a band per day when shown. Runs that start within 15
+// minutes of the one before chain into one group block, named from its time
+// ("5 AM checks") unless the Bot or Patrick renamed it. Each job belongs to an
+// area (a runner, or the Bot itself), which picks its colour everywhere.
+// Pure, so the expansion is tested without a browser.
 import { cronValues, DAY_WORDS, endOfDay, runMinutes, type Schedule } from "../../schedule";
+import { groupKey } from "../../calendar-group-key";
 
 export type CalendarRun = { id: string; at: number; status: string; outcome: string; threadId: string | null; manual?: boolean };
 export type CalendarSource = {
@@ -25,6 +30,8 @@ export type CalendarSource = {
   lastRun?: { at: number; status: string | null } | null;
   /** A run going on now: when it started. */
   runningSince?: number | null;
+  /** The area it works for: a runner (its own, or the one a watcher wakes); null for the Bot itself. */
+  area?: { id: string; name: string } | null;
 };
 export type EventStatus = "scheduled" | "running" | "ok" | "failed" | "skipped";
 export type CalendarEvent = {
@@ -220,37 +227,119 @@ export function cadenceLabel(times: number[]): string {
   return hours === 1 ? "hourly" : `every ${hours} h`;
 }
 
+/** A job runs this often or more (minutes between runs) and at least FREQUENT_RUNS times a day: frequent. */
+export const FREQUENT_GAP = 120;
+export const FREQUENT_RUNS = 3;
+
 /**
- * The days of a window: each day's blocks, and a band for each dense job: one
- * whose schedule runs more than DENSE_PER_DAY times on some day of the window,
- * or that ran that often. A dense job is a band on every day, however few of
- * its runs that day shows, so it reads the same all week.
+ * Frequent: on some day of the window it runs more than DENSE_PER_DAY times,
+ * or at least FREQUENT_RUNS times with a usual gap of FREQUENT_GAP minutes or
+ * less. A job every 2 hours from 9 to 5 is frequent; one at 8:00 and 13:00 isn't.
  */
-export function calendarDays(sources: CalendarSource[], days: { start: number; end: number }[], now: number, zone: string): CalendarDay[] {
-  if (!days.length) return [];
+export function isFrequent(times: number[], days: { start: number; end: number }[]): boolean {
+  return days.some(({ start, end }) => {
+    const today = times.filter((at) => at >= start && at < end).sort((a, b) => a - b);
+    if (today.length > DENSE_PER_DAY) return true;
+    if (today.length < FREQUENT_RUNS) return false;
+    const gaps = today.slice(1).map((at, i) => (at - today[i]!) / MINUTE).sort((a, b) => a - b);
+    return gaps[Math.floor(gaps.length / 2)]! <= FREQUENT_GAP;
+  });
+}
+
+export type FrequentJob = { sourceId: string; every: string };
+export type CalendarWeek = { days: CalendarDay[]; frequent: FrequentJob[] };
+
+/**
+ * The days of a window: each day's blocks, and the frequent jobs (isFrequent
+ * on the schedule or on what ran). A frequent job is listed in `frequent`
+ * and, with `showFrequent`, a band on every day it runs, however few of its
+ * runs that day shows, so it reads the same all week; hidden, it draws nothing.
+ */
+export function calendarWeek(sources: CalendarSource[], days: { start: number; end: number }[], now: number, zone: string, showFrequent = true): CalendarWeek {
+  if (!days.length) return { days: [], frequent: [] };
   const from = days[0]!.start, to = days.at(-1)!.end;
-  const perDay = (times: number[]) => Math.max(0, ...days.map(({ start, end }) => times.filter((at) => at >= start && at < end).length));
   const all = sources.map((source) => {
     const events = sourceEvents(source, from, to, now, zone);
     const due = occurrences(source, from, to, zone);
-    const dense = perDay(due) > DENSE_PER_DAY || perDay(events.map((event) => event.at)) > DENSE_PER_DAY;
-    return { source, events, dense, every: cadenceLabel(due.length > 1 ? due : events.filter((event) => !event.manual).map((event) => event.at)) };
+    const frequent = isFrequent(due, days) || isFrequent(events.filter((event) => !event.manual).map((event) => event.at), days);
+    return { source, events, frequent, every: cadenceLabel(due.length > 1 ? due : events.filter((event) => !event.manual).map((event) => event.at)) };
   });
-  return days.map(({ start, end }) => {
+  const out = days.map(({ start, end }) => {
     const day: CalendarDay = { start, end, singles: [], bands: [] };
-    for (const { source, events, dense, every } of all) {
+    for (const { source, events, frequent, every } of all) {
       const today = events.filter((event) => event.at >= start && event.at < end);
       if (!today.length) continue;
-      if (dense) day.bands.push({ sourceId: source.id, events: today, from: today[0]!.at, to: today.at(-1)!.at, every });
+      if (frequent) { if (showFrequent) day.bands.push({ sourceId: source.id, events: today, from: today[0]!.at, to: today.at(-1)!.at, every }); }
       else day.singles.push(...today);
     }
     day.singles.sort((a, b) => a.at - b.at || a.sourceId.localeCompare(b.sourceId));
     return day;
   });
+  return { days: out, frequent: all.filter((each) => each.frequent && each.events.length).map((each) => ({ sourceId: each.source.id, every: each.every })) };
 }
 
-export type PlacedBlock = { event: CalendarEvent; lane: number; of: number; folded: boolean };
-export type FoldChip = { at: number; events: CalendarEvent[] };
+/** calendarWeek's days, frequent jobs as bands. */
+export const calendarDays = (sources: CalendarSource[], days: { start: number; end: number }[], now: number, zone: string): CalendarDay[] => calendarWeek(sources, days, now, zone, true).days;
+
+// ---- Groups -----------------------------------------------------------------
+
+/** A run starting this many minutes or less after the previous one joins its group. */
+export const CHAIN_GAP = 15;
+export type CalendarGroup = {
+  /** Stable across days: the window's clock times and the jobs in it (groupKey). */
+  key: string;
+  at: number; to: number;
+  events: CalendarEvent[];
+  sourceIds: string[];
+  status: EventStatus;
+};
+export type CalendarItem = CalendarEvent | CalendarGroup;
+export const isGroup = (item: CalendarItem): item is CalendarGroup => "events" in item;
+
+export { groupKey };
+
+/** A group's status: a failure shows, then a live run, then due, then done. */
+function groupStatus(events: CalendarEvent[]): EventStatus {
+  if (events.some((event) => event.status === "failed")) return "failed";
+  if (events.some((event) => event.status === "running")) return "running";
+  if (events.every((event) => event.status === "scheduled")) return "scheduled";
+  return "ok";
+}
+
+/**
+ * Chains a day's runs: each run that starts within CHAIN_GAP minutes of the
+ * previous one joins its group (so 5:00, 5:05, 5:10 and 5:15 are one). A
+ * chain of one stays a single run. A failure stays in its group and turns it
+ * red (status "failed").
+ */
+export function chainGroups(events: CalendarEvent[], zone: string, gap = CHAIN_GAP): CalendarItem[] {
+  const sorted = [...events].sort((a, b) => a.at - b.at || a.sourceId.localeCompare(b.sourceId));
+  const chains: CalendarEvent[][] = [];
+  for (const event of sorted) {
+    const chain = chains.at(-1);
+    if (chain && event.at - chain.at(-1)!.at <= gap * MINUTE) chain.push(event);
+    else chains.push([event]);
+  }
+  return chains.map((chain) => chain.length === 1 ? chain[0]! : {
+    key: groupKey(minuteOfDay(chain[0]!.at, zone), minuteOfDay(chain.at(-1)!.at, zone), chain.map((event) => event.sourceId)),
+    at: chain[0]!.at, to: chain.at(-1)!.at, events: chain, sourceIds: [...new Set(chain.map((event) => event.sourceId))], status: groupStatus(chain),
+  });
+}
+
+/** "5 AM", "1:30 PM": a minute of the day on a 12-hour clock. */
+export function clockWords(minute: number): string {
+  const hour = Math.floor(minute / 60) % 24, rest = minute % 60;
+  return `${hour % 12 || 12}${rest ? `:${String(rest).padStart(2, "0")}` : ""} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+/** A group's name: the one saved for its key (a rename), else from its time: "5 AM checks". */
+export function groupName(group: Pick<CalendarGroup, "key" | "at">, zone: string, names: Readonly<Record<string, string>> = {}): string {
+  return names[group.key]?.trim() || `${clockWords(minuteOfDay(group.at, zone))} checks`;
+}
+
+type Placeable = { at: number; status: EventStatus };
+export type PlacedBlock<T extends Placeable = CalendarEvent> = { event: T; lane: number; of: number; folded: boolean };
+export type FoldChip<T extends Placeable = CalendarEvent> = { at: number; events: T[] };
 const PRIORITY: Record<EventStatus, number> = { failed: 0, running: 1, scheduled: 2, ok: 3, skipped: 4 };
 
 /**
@@ -259,10 +348,10 @@ const PRIORITY: Record<EventStatus, number> = { failed: 0, running: 1, scheduled
  * (a failure, then a live run, then the earliest) and folds the rest into a
  * "+N" chip at the cluster's top, which the view draws under them.
  */
-export function placeBlocks(events: CalendarEvent[], zone: string, span: number, maxLanes = Infinity): { blocks: PlacedBlock[]; chips: FoldChip[] } {
-  const blocks: PlacedBlock[] = [];
-  const chips: FoldChip[] = [];
-  let group: { event: CalendarEvent; lane: number }[] = [];
+export function placeBlocks<T extends Placeable = CalendarEvent>(events: T[], zone: string, span: number, maxLanes = Infinity): { blocks: PlacedBlock<T>[]; chips: FoldChip<T>[] } {
+  const blocks: PlacedBlock<T>[] = [];
+  const chips: FoldChip<T>[] = [];
+  let group: { event: T; lane: number }[] = [];
   let ends: number[] = [];
   let groupEnd = -Infinity;
   const finish = () => {
