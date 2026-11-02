@@ -15,7 +15,7 @@ import {
 } from "../query";
 
 const FIELD_HINTS: Record<FilterField, string> = {
-  kind: "Pages, recordings, drawings…",
+  kind: "Pages, recordings, whiteboards…",
   project: "A project, or global",
   tag: "A tag, or none",
   is: "Archived or templates",

@@ -34,7 +34,7 @@ do not have to maintain competing defaults.
 | Pages | Page location, icon, chat, history and restore | Added global version-retention setting. |
 | Explore | Next row and suggestions switches in Pages settings | The digest and explainers are retired. |
 | Talk | Microphone replacement, segment length, automatic titles/summaries, hold key, audio retention; cleanup toggle per device in the recorder; playback controls on recordings | Added the 3 model pickers and numeric validation. Transcription still uses BB AI services. |
-| Draw | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
+| Whiteboards (in Pages; was Draw) | Excalidraw's canvas controls and item-level title, project, export, and deletion | Existing controls cover drawing preferences. There is no background model job to configure. |
 | Artifacts | Explicit save/upload, project placement, item versions, preview/download/export, archive/delete | Existing item controls cover storage actions; no automatic expiry is imposed. |
 | Mobile | APNs credentials/environment/bundle and Expo endpoint in plugin settings; mute per thread; notification permission and presentation in BB/iOS | Relay configuration already exists. BB's Push notifications plugin owns event selection. |
 | Reactions (in Studio) | Reaction list, quoting/quote placement, selection/message-bar visibility in Studio's settings | Moved from the retired `emoji-react` plugin; Studio copies its values once. |

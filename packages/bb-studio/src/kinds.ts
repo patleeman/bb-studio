@@ -28,7 +28,7 @@ export interface BuiltinKind {
 
 export const BUILTIN_KINDS: readonly BuiltinKind[] = [
   { kind: "page", pluginId: "pages", label: "Pages", covers: "Pages, pages in the thread's Studio tab, page cards and the thread header's page link." },
-  { kind: "drawing", pluginId: "excalidraw", label: "Drawings", covers: "Drawings, drawings in the thread's Studio tab, drawing cards and the composer's + → Drawing." },
+  { kind: "drawing", pluginId: "excalidraw", label: "Whiteboards", covers: "Whiteboards in pages and their full editor, whiteboards in the thread's Studio tab, their agent tools and older drawing cards." },
   { kind: "recording", pluginId: "talk", label: "Recordings and dictation", covers: "Recordings, the recorder, dictation, hold-to-talk, recording cards and Talk models." },
   { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, artifacts and the save picker in the thread's Studio tab, and artifact cards." },
   { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, designs in the thread's Studio tab, and design cards." },

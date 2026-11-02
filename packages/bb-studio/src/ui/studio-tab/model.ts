@@ -32,7 +32,7 @@ export interface TabKindInfo {
 /** Kinds the Studio tab can open in place, in its filter order. */
 export const TAB_KINDS: readonly TabKindInfo[] = [
   { kind: "page", pluginId: PAGES_PLUGIN, channel: PAGES_CHANNEL, label: "Page", plural: "Pages", icon: "studio/pages", isId: isPageId, gate: "page" },
-  { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Drawing", plural: "Drawings", icon: DRAW_ICON, isId: isDrawingId, gate: "drawing" },
+  { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Whiteboard", plural: "Whiteboards", icon: DRAW_ICON, isId: isDrawingId, gate: "drawing" },
   { kind: "design", pluginId: DESIGN_PLUGIN, channel: DESIGN_CHANNEL, label: "Design", plural: "Designs", icon: DESIGN_ICON, isId: isDesignId, gate: "design" },
   { kind: DASHBOARD_KIND as "dashboard", pluginId: DASHBOARDS_PLUGIN, channel: DASHBOARDS_CHANNEL, label: "Dashboard", plural: "Dashboards", icon: DASHBOARD_ICON, isId: isDashboardId, gate: "dashboard" },
   { kind: "mini", pluginId: MINIS_PLUGIN, channel: MINIS_CHANNEL, label: "Mini app", plural: "Mini apps", icon: MINI_ICON, isId: isMiniId, gate: "mini" },

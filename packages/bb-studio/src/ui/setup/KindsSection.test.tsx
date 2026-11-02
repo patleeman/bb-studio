@@ -22,7 +22,7 @@ const studio = (pluginId: string, kind: string, label: string) => ({ pluginId, n
 const state = (pageOn = true): KindsState => ({
   kinds: [
     { kind: "page", label: "Pages", covers: "Pages and their tab.", on: pageOn, choice: null, active: { pluginId: "notion", name: "Notion", kindId: "notion-page", label: "Notion page" }, reason: "only-replacement", alternatives: [{ pluginId: "notion", name: "Notion", kindId: "notion-page", label: "Notion page" }] },
-    { kind: "drawing", label: "Drawings", covers: "Drawings.", on: true, choice: null, active: studio("excalidraw", "drawing", "Drawings"), reason: "built-in", alternatives: [] },
+    { kind: "drawing", label: "Whiteboards", covers: "Whiteboards.", on: true, choice: null, active: studio("excalidraw", "drawing", "Whiteboards"), reason: "built-in", alternatives: [] },
   ],
   frontend: { off: pageOn ? [] : ["page"], routedAway: ["page"] },
 });
@@ -41,7 +41,7 @@ test("lists each built-in kind with its switch, and offers alternatives only whe
   rpc.call.mockImplementation(async (method: string, input: unknown) => method === "kinds.state" ? state() : (expect(input).toEqual({ kind: "page", on: false }), state(false)));
   await act(async () => root.render(React.createElement(KindsSection)));
   const switches = [...container.querySelectorAll('[role="switch"]')];
-  expect(switches.map((each) => each.getAttribute("aria-label"))).toEqual(["Pages: turn off", "Drawings: turn off"]);
+  expect(switches.map((each) => each.getAttribute("aria-label"))).toEqual(["Pages: turn off", "Whiteboards: turn off"]);
   expect(container.textContent).toContain("Open and create with");
   expect([...container.querySelectorAll('[role="option"]')].map((each) => each.textContent)).toEqual(["Automatic (Notion)", "Studio", "Notion (Notion page)"]);
   expect(container.textContent).toContain("New pages are made with Notion.");
