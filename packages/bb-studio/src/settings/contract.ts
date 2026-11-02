@@ -1,6 +1,6 @@
 // The RPCs behind Studio's settings sections, `bb studio settings` and the
 // iOS app's reads (reactions, the Attention Router), plus the push status
-// Studio shows on BB's Mobile settings page for the Mobile plugin.
+// Studio shows for the Mobile plugin (Phone notifications, on Studio's settings page).
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 

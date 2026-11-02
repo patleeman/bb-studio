@@ -1,7 +1,8 @@
-// Push status and "Send a test push" on BB's Mobile settings page. The
-// Studio Mobile plugin sends the pushes but has no frontend of its own, so
-// Studio draws this for it (Studio is always installed with its add-ons) and
-// asks it through Studio's server (mobile.push.status, mobile.push.test).
+// Push status and "Send a test push", the last section of Studio's settings
+// page (Phone notifications). The Studio Mobile plugin sends the pushes but
+// has no frontend of its own, so Studio draws this for it (Studio is always
+// installed with its add-ons) and asks it through Studio's server
+// (mobile.push.status, mobile.push.test).
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { openAppPath } from "../../kit/app/nav";

@@ -67,10 +67,12 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Studio's settings sections", () => {
-  it("registers Voice, Recordings and calls, Agent replies, Threads, Jev and Advanced in order, then push status on BB's Mobile page", () => {
+  it("registers Voice, Recordings and calls, Agent replies, Threads, Jev and Advanced in order, then Phone notifications", () => {
     expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "mobile-push"]);
     expect([...sections.values()].slice(0, 6).map((section) => section.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Jev", "Advanced"]);
-    expect(sections.get("mobile-push")).toMatchObject({ experimental_page: "mobile", title: "Push notifications" });
+    // Stable BB draws experimental_page "mobile" sections only for the machine-access plugin, so it's on Studio's page.
+    expect(sections.get("mobile-push")).toMatchObject({ title: "Phone notifications" });
+    expect(sections.get("mobile-push")!.experimental_page).toBeUndefined();
   });
 
   it("Voice: dictation and the hands-free settings, with this month's spend; switches save", async () => {
@@ -154,7 +156,7 @@ describe("Studio's settings sections", () => {
     expect(state.set).toHaveBeenCalledWith({ decisions_batchConfidence: 1 });
   });
 
-  it("Mobile page: push status and a test push", async () => {
+  it("Phone notifications: push status and a test push", async () => {
     await render("mobile-push");
     await act(async () => {});
     expect($("mobile-push-status")!.textContent).toContain("Sending to 2 phones");

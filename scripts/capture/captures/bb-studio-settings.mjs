@@ -1,8 +1,10 @@
 // Studio's settings after the settings cleanup (src/settings): Settings ▸
 // Plugins ▸ Studio at its full scroll (BB's API key fields, then Studio's
 // Voice, Recordings and calls, Agent replies, Threads, Jev and Advanced
-// sections), Bot ▸ Controls ▸ Attention, and BB's Settings ▸ Mobile page with
-// the push section Studio draws for Studio Mobile. Each in dark and light.
+// sections, then Phone notifications for Studio Mobile), Bot ▸ Controls ▸
+// Attention, BB's Settings ▸ Mobile page and Studio Mobile's own settings.
+// Each in dark and light. (Stable BB draws plugin sections on its Mobile page
+// only for the machine-access plugin, so push status is on Studio's page.)
 //
 // BB_SETTINGS_RENDER=before captures the same pages from a Studio before the
 // cleanup (installed from a local git ref), for the review: it skips the new
@@ -53,7 +55,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       if (STAGE === "after") {
         // Values the sections show: a changed setting from the CLI, so the page isn't all defaults.
         await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
-        for (const text of ["Voice", "Hold-to-talk key", "Hands-free model", "Monthly limit (USD)", "Recordings and calls", "Transcribe calls", "Agent replies", "Next row", "Quote the selected text", "Threads", "Smart Queue", "Attention Router", "Jev", "If Jev doesn’t answer, use", "Advanced", "Smart Queue batch confidence", "xAI API key", "TypeSafe API key"]) await client.waitForText(text, 30000);
+        for (const text of ["Voice", "Hold-to-talk key", "Hands-free model", "Monthly limit (USD)", "Recordings and calls", "Transcribe calls", "Agent replies", "Next row", "Quote the selected text", "Threads", "Smart Queue", "Attention Router", "Jev", "If Jev doesn’t answer, use", "Advanced", "Smart Queue batch confidence", "Phone notifications", "Push status", "Send a test push", "xAI API key", "TypeSafe API key"]) await client.waitForText(text, 30000);
         await absent(client, ["Explore: ", "Hands-free voice: ", "Segment length", "Jev timeout", "Bot avatars: OpenAI API key", "Attention time zone", "Daily attention budget", "Saved reactions", "Talk models", "Jev connection"]);
       } else {
         await client.waitForText("Hands-free voice", 30000);
@@ -98,11 +100,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       await scheme(client, mode);
       await client.navigate("/settings/mobile");
       await client.waitForText("Mobile", 30000);
-      if (STAGE === "after") {
-        for (const text of ["Push notifications", "Push status", "Send a test push", "APNs key and Key ID"]) await client.waitForText(text, 30000);
-        // Studio Mobile has no APNs key in the staged BB, so the status says what's missing.
-        await client.waitForText("Not set up", 30000);
-      }
+      await client.waitForText("Accessing bb from your phone", 30000);
       await sleep(800);
       await fullHeight(client);
       return restore(client);

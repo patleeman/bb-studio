@@ -63,8 +63,8 @@ directly. Threads are tracked for three days.
 | `apnsKeyId` | The 10-character key ID. |
 
 Settings are read on every delivery; no reload is needed. Push status and
-**Send a test push** are on BB's Settings ▸ Mobile page (Studio draws them;
-the `push_status` and `push_test` RPCs answer).
+**Send a test push** are in Studio's settings under Phone notifications
+(Studio draws them; the `push_status` and `push_test` RPCs answer).
 
 These were settings once and are constants now. Override one with an
 environment variable on the BB host, then restart BB:

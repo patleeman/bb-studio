@@ -78,7 +78,7 @@ export const mobileContract = defineRpcContract({
     output: z.object({ ok: z.literal(true), sent: z.number() }),
   },
   push_status: {
-    experimental_description: "Whether pushes can go out, to how many phones, and the last delivery. Studio shows it on BB's Mobile settings page.",
+    experimental_description: "Whether pushes can go out, to how many phones, and the last delivery. Studio shows it in its Phone notifications settings.",
     input: z.null().optional(),
     output: z.object({
       ready: z.boolean(),

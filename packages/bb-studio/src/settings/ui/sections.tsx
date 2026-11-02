@@ -1,8 +1,11 @@
 // Studio's settings page, after BB's API key fields: one section per group
 // (schema.ts SETTINGS_GROUPS), in order. Fields show only when they apply
 // (the home server's URL only for Home server). The Attention settings are
-// on the Bot page (BotAttention.tsx), and push status on BB's Mobile page
-// (PushSection.tsx).
+// on the Bot page (BotAttention.tsx). Last, Phone notifications: Studio
+// Mobile's push status and test push (PushSection.tsx). BB's Mobile page
+// would be the natural home, but stable BB (0.48.1) draws `experimental_page:
+// "mobile"` sections only for the machine-access plugin picked under
+// "Accessing bb from your phone", so it stays here.
 import { useRpc, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef, useState } from "react";
 import { openAppPath } from "../../kit/app/nav";
@@ -171,10 +174,10 @@ function AdvancedSection() {
 
 const SECTIONS = { voice: VoiceSection, recordings: RecordingsSection, replies: RepliesSection, threads: ThreadsSection, jev: JevSection, advanced: AdvancedSection };
 
-/** Studio's settings sections, in order; BB draws them after the API key fields. Then push status on BB's Mobile page. */
+/** Studio's settings sections, in order; BB draws them after the API key fields. Phone notifications comes last. */
 export function registerSettingsApp(app: PluginAppBuilder): void {
   for (const group of SETTINGS_GROUPS) {
     app.slots.settingsSection({ id: `settings-${group.id}`, title: group.title, description: group.description, component: SECTIONS[group.id] });
   }
-  app.slots.settingsSection({ id: "mobile-push", experimental_page: "mobile", title: "Push notifications", description: "The BB Studio app’s pushes, sent by the Studio Mobile plugin.", component: PushSection });
+  app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", description: "Pushes to the BB Studio app, sent by the Studio Mobile plugin.", component: PushSection });
 }

@@ -61,9 +61,10 @@ or updates Live Activities.
   `BB_MOBILE_APNS_ENVIRONMENT`, `BB_MOBILE_EXPO_PUSH_URL`). The old key file
   path folded into the key: a readable file's contents moved into `apnsKey`
   once. The skill file describes each one.
-- Push status and **Send a test push** are on BB's Settings ▸ Mobile page.
-  The plugin has no frontend, so Studio draws that section and asks this
-  plugin through `push_status` and `push_test`.
+- Push status and **Send a test push** are in Studio's settings, under Phone
+  notifications. The plugin has no frontend, so Studio draws that section and
+  asks this plugin through `push_status` and `push_test`. (Stable BB draws
+  plugin sections on its own Mobile page only for the machine-access plugin.)
 - No agent tools.
 
 ## Install and build
