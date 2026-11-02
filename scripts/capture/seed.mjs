@@ -49,7 +49,7 @@ export async function seedPages() {
   return { page, notes, cleanup };
 }
 
-/** A "Checkout flow" diagram: three labelled steps joined by arrows. */
+/** A "Checkout flow" whiteboard in the "Checkout whiteboard" page: three labelled steps joined by arrows. */
 export async function seedDrawing() {
   let seed = 1;
   const base = (type, x, y, width, height, extra = {}) => ({
@@ -126,7 +126,19 @@ export async function seedDrawing() {
     id: drawing.id,
     data: JSON.stringify({ type: "excalidraw", version: 2, source: "bb-capture", elements, appState: { viewBackgroundColor: "#ffffff" }, files: {} }),
   });
-  return { drawing, cleanup: () => pluginRpc("studio", "drawings.deleteDrawing", { id: drawing.id }).catch(() => {}) };
+  // A drawing is a whiteboard in a page: embed it, as /whiteboard does.
+  const { page } = await pluginRpc("studio", "pages.create", {
+    projectId, parentId: null, title: "Checkout whiteboard", icon: "🖍️",
+    markdown: ["The checkout steps, with the retry path.", "```embed\n" + JSON.stringify({ kind: "drawing", target: drawing.id }) + "\n```"].join("\n\n"),
+  });
+  return {
+    drawing,
+    page,
+    cleanup: async () => {
+      await pluginRpc("studio", "pages.remove", { id: page.id }).catch(() => {});
+      await pluginRpc("studio", "drawings.deleteDrawing", { id: drawing.id }).catch(() => {});
+    },
+  };
 }
 
 
