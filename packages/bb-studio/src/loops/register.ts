@@ -31,10 +31,12 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
  const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Loop ${l.id}: nudge. Draft the nudge message and show it to Patrick in this chat for approval. Do not send it until he approves.`);else if(['hand_off','choose'].includes(x.action))await post(`Loop ${l.id}: ${x.action}. ${x.option??''} Owner: ${l.owner}. Use loops_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
+ // A spoken or typed line becomes a draft loop the Bot fills in.
+ const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft loop ${l.id} from this typed line using loops_update, then queue it: ${JSON.stringify(text)}`);return l;};
  const get=async(id:string)=>{const l=store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
  bb.rpc.register(rpcContract,{
  'loops.list':list,'loops.get':({id})=>get(id),
- 'loops.add':async({text})=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft loop ${l.id} from this typed line using loops_update, then queue it: ${JSON.stringify(text)}`);return l;},
+ 'loops.add':({text})=>addLine(text),
  'loops.update':async(x:z.infer<typeof update>)=>{if(!x.surfaceNow)return change(x);if(x.changes)store.update(x.id,x.changes);return scheduler.surfaceNow(x.id);},'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${placeKey(place)}:${direction}`),'loops.setPlaces':({names})=>({names:store.setPlaces(names)}),'loops.places':()=>({names:store.places()}),'loops.morning':()=>scheduler.morning(),
  });
  bb.agents.registerTool({name:'loops_add',description:'Track an open obligation, decision or item to read. Set its owner and release trigger; give an event trigger a short label in words ("when Unraid fixes the PHP CVE"). Avoid duplicating pending chat questions.',parameters:add,execute:x=>JSON.stringify(store.add(x))});
@@ -50,5 +52,5 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
   search:({query})=>{const q=query.trim().toLowerCase();const g=store.groups();return [...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].filter(l=>!q||l.title.toLowerCase().includes(q)).map(l=>({id:l.id,title:l.title,subtitle:l.closedAt?'Done':KIND[l.kind].label,icon:KIND[l.kind].icon}));},
   resolve:(id)=>{try{return {context:loopContext(store.get(id))};}catch{return {context:`Patrick mentioned loop ${id}, which no longer exists.`};}}}));
  const timer=setInterval(tick,60_000);bb.onDispose(()=>clearInterval(timer));
- return {store,scheduler,act:action,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
+ return {store,scheduler,act:action,add:addLine,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
 }

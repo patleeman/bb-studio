@@ -59,6 +59,7 @@ const loops = new Map<string, VoiceLoop>([
   ["loop_dana", { id: "loop_dana", title: "Reply to Dana about the pricing deck", kind: "do", status: "surfaced", priority: "urgent", due: null, trigger: { type: "none" } }],
   ["loop_domain", { id: "loop_domain", title: "Renew bbstudio.app before Friday", kind: "do", status: "surfaced", priority: "normal", due: null, trigger: { type: "none" } }],
   ["loop_car", { id: "loop_car", title: "Book the car service", kind: "do", status: "queued", priority: "normal", due: null, trigger: { type: "none" } }],
+  ["loop_ts", { id: "loop_ts", title: "Remove the stale Tailscale node", kind: "do", status: "queued", priority: "low", due: null, trigger: { type: "none" } }],
 ]);
 const voiceThread: string[] = [];
 const timings: Record<string, number[]> = {};
@@ -74,9 +75,12 @@ const live: VoiceLive = new VoiceLive({
   loops: {
     groups: () => ({ needsYouNow: [...loops.values()].filter((loop) => loop.status === "surfaced"), comingUp: [...loops.values()].filter((loop) => loop.status === "queued" || loop.status === "snoozed") }),
     get: (id) => { const loop = loops.get(id); if (!loop) throw new Error("No such loop."); return loop; },
-    act: async (id, action, snooze) => { const loop = { ...loops.get(id)!, status: action === "done" ? "done" : "snoozed", trigger: action === "snooze" ? { type: "time", preset: snooze } : loops.get(id)!.trigger }; loops.set(id, loop); return loop; },
+    act: async (id, action, options) => { const loop = { ...loops.get(id)!, status: action === "done" ? "done" : action === "drop" ? "dropped" : action === "snooze" ? "snoozed" : "in_progress", trigger: action === "snooze" ? { type: "time", preset: options?.snooze } : loops.get(id)!.trigger, owner: options?.owner ?? loops.get(id)!.owner }; loops.set(id, loop); say(`loop ${id} → ${loop.status}`); return loop; },
+    add: async (text) => { const loop: VoiceLoop = { id: `loop_${loops.size + 1}`, title: text, kind: "do", status: "in_progress", priority: "normal", due: null, trigger: { type: "none" }, owner: "cos" }; loops.set(loop.id, loop); return loop; },
     restore: (id, before) => { const loop = { ...loops.get(id)!, ...before }; loops.set(id, loop); return loop; },
   },
+  threads: { stop: async (threadId) => say(`stopped ${threadId}`), archive: async (threadId) => say(`archived ${threadId}`) },
+  automations: { list: async () => [{ id: "auto_1", name: "Morning brief", state: "active" }], pause: async (id) => say(`paused ${id}`), remove: async (id) => say(`deleted ${id}`) },
   openThread: async ({ title, text }) => { voiceThread.push(`# ${title}`, "", text, ""); return "thr_voice_demo"; },
   send: async ({ threadId, text, senderThreadId }) => {
     const where = THREADS.find((thread) => thread.id === threadId)?.title ?? threadId;
@@ -169,12 +173,17 @@ const SCRIPT: Step[] = [
   { user: "Snooze the domain one to tonight." },
   { tool: "loops_act", args: { loop_id: "loop_domain", action: "snooze", snooze: "tonight" } },
   { say: "Snoozed the domain renewal to tonight. Say undo in the next ten seconds if that's wrong." },
+  // A relay goes at once: no read-back.
   { user: "Tell the Kensico lead to pause the eBay fetcher until Monday." },
   { tool: "send_to_thread", args: { target: "the Kensico lead", message: "Pause the eBay fetcher until Monday" } },
+  { say: "Sent to the Kensico lead." },
+  // Destructive: the only thing that waits for a yes.
+  { user: "Drop the Tailscale node one." },
+  { tool: "loops_act", args: { loop_id: "loop_ts", action: "drop" } },
   { sayReadBack: true },
-  { user: "Yes." },
-  { tool: "confirm_send", args: { draft_id: "$draft" } },
-  { say: "Sent." },
+  { user: "Yes, drop it." },
+  { tool: "confirm", args: { action_id: "$draft" } },
+  { say: "Dropped it." },
   { waitNote: true },
   { say: "The Kensico lead says the eBay fetcher is paused, and it picks up again Monday at nine. Anything else on Kensico while I have you?", bargeIn: { afterMs: 2600, text: "No, that's all, thanks." } },
   { say: "Okay. Talk soon." },
@@ -273,7 +282,7 @@ function runScript(socket: Duplex) {
       send({ type: "response.event", delegation_id: "item_mock", event: { type: "response.output_item.done", item: { type: "function_call", call_id: callId, name, arguments: resolved } } });
     });
     lastOutput = output;
-    draft = output.match(/Draft (d_[a-f0-9]+)/)?.[1] ?? draft;
+    draft = output.match(/\(action (d_[a-f0-9]+)\)/)?.[1] ?? draft;
     // The backend's turn: a few hundred tokens.
     send({ type: "response.event", event: { type: "response.completed", response: { usage: { input_tokens: 900, output_tokens: 40, input_tokens_details: { cached_tokens: 700 } } } } });
     await sleep(350);
@@ -286,7 +295,7 @@ function runScript(socket: Duplex) {
       if (closed) break;
       if ("user" in step) await user(step.user);
       else if ("tool" in step) await tool(step.tool, step.args);
-      else if ("sayReadBack" in step) await speak(lastOutput.match(/"(Send to [^"]+)"/)?.[1] ?? "Send it?");
+      else if ("sayReadBack" in step) await speak(lastOutput.match(/Ask exactly this and wait: "([^"]+)"/)?.[1] ?? "Are you sure?");
       else if ("say" in step) await speak(step.say, step.bargeIn);
       else if ("waitNote" in step) await Promise.race([new Promise<void>((resolve) => (noteWaiter = resolve)), sleep(15_000)]);
       else if ("close" in step) {
@@ -450,7 +459,7 @@ function runLiveBridge(app: Duplex) {
       if (barge && barge.confirmed === undefined) barge.confirmed = at;
       say("live: barge-in confirmed by the transcript");
     }
-    if (event.type === "response.item.create" && event.item?.output?.includes("Say yes to send")) readBack = true;
+    if (event.type === "response.item.create" && event.item?.output?.includes("Ask exactly this and wait")) readBack = true;
     if (event.type === "session.commentary.append") commentary = true;
     if (["response.item.create", "response.create", "session.commentary.append", "session.thinking.append", "session.instructions.append", "session.close"].includes(event.type)) toOpenAI(event as never);
   }, () => { if (!closed) toOpenAI({ type: "session.close" }); closed = true; });
@@ -523,10 +532,14 @@ function runLiveBridge(app: Duplex) {
     await sleep(1500);
     await utter("What's waiting on me?");
     await turn();
+    // A relay goes at once, no read-back.
     await utter("Tell the Kensico lead to pause the eBay fetcher until Monday.");
     await turn();
-    if (!(await until(() => readBack, 2000))) say("live: no read-back seen yet");
-    await utter("Yes, send it.");
+    // Destructive: waits for a spoken yes.
+    await utter("Drop the loop about the stale Tailscale node.");
+    await turn();
+    if (!(await until(() => readBack, 2000))) say("live: no question seen yet");
+    await utter("Yes, drop it.");
     await turn();
     // The lead answers (2.5 s), the app picks it up (poll) and the voice says it.
     if (!(await until(() => commentary, 25_000))) say("live: the reply never reached the voice");

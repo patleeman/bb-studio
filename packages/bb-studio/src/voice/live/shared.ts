@@ -27,12 +27,13 @@ export const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 export const DATA_CHANNEL = "oai-events";
 
 /**
- * The voice agent's tools. Reads are free; sends need a spoken yes
- * (confirm_send); done and snooze run at once with a spoken undo window.
- * Nothing else is a tool: spending, email, posting, deleting and approvals
- * can't be reached by voice at all.
+ * The voice agent's tools. Reads are free; relays and loop actions happen at
+ * once (loop actions with a spoken undo); destructive ones (drop a loop, stop
+ * or archive a thread, pause or delete an automation) wait for a spoken yes
+ * (confirm). Spending, messaging people outside BB, posting publicly and
+ * approving credentials aren't tools at all.
  */
-export const VOICE_TOOLS = ["loops_list", "read_replies", "send_to_cos", "send_to_thread", "confirm_send", "cancel_send", "loops_act", "undo"] as const;
+export const VOICE_TOOLS = ["loops_list", "read_replies", "send_to_cos", "send_to_thread", "loops_act", "loops_add", "undo", "stop_thread", "archive_thread", "pause_automation", "delete_automation", "confirm", "cancel"] as const;
 export type VoiceToolName = (typeof VOICE_TOOLS)[number];
 
 /** "$0.42", "<$0.01". */

@@ -25,6 +25,7 @@ struct VoiceLiveView: View {
             SubtitleView(subtitle: controller.machine.subtitle)
                 .padding(.top, 14)
                 .padding(.horizontal, 28)
+            RelayLine(card: controller.machine.card)
             Spacer(minLength: 12)
             VoiceLiveCards(confirmation: controller.machine.confirmation, card: controller.machine.card)
                 .padding(.horizontal, 20)
@@ -185,23 +186,42 @@ private struct VoiceLiveCards: View {
     var body: some View {
         VStack(spacing: 10) {
             if let confirmation { ConfirmCard(readBack: confirmation).transition(.move(edge: .bottom).combined(with: .opacity)) }
-            if let card { ToolCardView(card: card).transition(.opacity) }
+            // A relay's "Sent to …" is a line under the subtitles (RelayLine), not a card.
+            if let card, card.kind != .sent { ToolCardView(card: card).transition(.opacity) }
         }
         .animation(.snappy, value: confirmation)
         .animation(.snappy, value: card)
     }
 }
 
-/// A send waiting for a spoken yes: who, what, and how to answer.
+/// Relays go at once: "✓ Sent to the Kensico lead" under the subtitles.
+private struct RelayLine: View {
+    let card: LiveToolCard?
+
+    var body: some View {
+        Group {
+            if let card, card.kind == .sent {
+                Label(card.title, systemImage: "checkmark")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+            }
+        }
+        .padding(.top, 6)
+        .animation(.snappy, value: card)
+    }
+}
+
+/// Only for what's destructive or hard to undo: the question, and how to answer.
 private struct ConfirmCard: View {
     let readBack: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Waiting for your yes", systemImage: "paperplane")
+            Label("Waiting for your yes", systemImage: "exclamationmark.triangle")
                 .font(.caption.weight(.semibold)).foregroundStyle(.tint)
             Text(readBack).font(.body.weight(.medium))
-            Text("Say “yes” to send, or “no”.").font(.footnote).foregroundStyle(.secondary)
+            Text("Say “yes”, or “no”.").font(.footnote).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

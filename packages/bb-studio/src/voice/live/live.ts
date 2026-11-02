@@ -5,9 +5,9 @@
 //   personal project that keeps the whole record: transcript, every relayed
 //   message and every reply.
 // - Tools: the voice's tool calls come back here (tool()). This is where the
-//   eyes-free rules hold (rules.ts): reads are free; a send is a draft until
-//   Studio hears the user's own yes; done and snooze can be undone for a few
-//   seconds; nothing else is a tool.
+//   eyes-free rules hold (rules.ts, classify): reads are free; relays and loop
+//   actions happen at once (loop actions undoable for 10 s); destructive ones
+//   wait until Studio hears the user's own spoken yes; nothing else is a tool.
 // - Relays are visible: the message lands in the target thread from the
 //   voice thread (senderThreadId), with an agent-only note of the rules, and
 //   a line in the voice thread at once. When the target finishes, its reply
@@ -26,7 +26,7 @@ import type Database from "better-sqlite3";
 import { addRealtimeUsage, addTranscriptionUsage, EMPTY_TALLY, liveCost, realtimeCost, type RealtimeTally } from "../../bot-prices";
 import { speakable } from "../instructions";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
-import { DRAFT_MS, hallucinated, outwardKinds, readBack, relayNote, spokenAnswer, UNDO_MS, VOICE_LOOP_ACTIONS, VOICE_SNOOZES } from "./rules";
+import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
 import { CLIENT_SECRETS_URL, LIVE_BACKEND_MODEL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest, VOICE } from "./session";
 import { LIVE_MODELS, REALTIME_CALLS_URL, replyNote, sessionLength, usd, VOICE_TOOLS, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
 
@@ -44,7 +44,10 @@ export const VOICE_LIVE_SETTINGS = {
 };
 
 export interface VoiceTarget { threadId: string; title: string }
-export interface VoiceLoop { id: string; title: string; kind: string; status: string; priority: string; due: number | null; trigger: unknown }
+export interface VoiceLoop { id: string; title: string; kind: string; status: string; priority: string; due: number | null; trigger: unknown; owner?: string }
+/** What undo puts back. */
+export interface LoopBefore { status: string; trigger: unknown; owner?: string }
+export interface VoiceAutomation { id: string; name: string; state: string }
 export interface VoiceLoopGroups { needsYouNow: VoiceLoop[]; comingUp: VoiceLoop[] }
 
 export interface VoiceLiveDeps {
@@ -62,10 +65,15 @@ export interface VoiceLiveDeps {
   loops: {
     groups(): VoiceLoopGroups;
     get(id: string): VoiceLoop;
-    act(id: string, action: "done" | "snooze", snooze?: string): Promise<VoiceLoop>;
-    /** Puts a loop back as it was (undo). */
-    restore(id: string, before: { status: string; trigger: unknown }): VoiceLoop;
+    act(id: string, action: "done" | "snooze" | "hand_off" | "drop", options?: { snooze?: string; owner?: string }): Promise<VoiceLoop>;
+    /** A new loop from a spoken line, for the Chief of Staff to fill in. */
+    add(text: string): Promise<VoiceLoop>;
+    /** Puts a loop back as it was (undo); a status of "dropped" removes a loop just added. */
+    restore(id: string, before: LoopBefore): VoiceLoop;
   };
+  threads: { stop(threadId: string): Promise<void>; archive(threadId: string): Promise<void> };
+  /** The Chief of Staff's automations. */
+  automations: { list(): Promise<VoiceAutomation[]>; pause(id: string): Promise<void>; remove(id: string): Promise<void> };
   /** Opens the session's voice thread; its id. */
   openThread(input: { title: string; text: string; note: string }): Promise<string>;
   /** A visible message in a thread, with an agent-only note. */
@@ -80,8 +88,9 @@ export interface VoiceLiveDeps {
 
 type SessionRow = { id: string; bot_id: string; bot_name: string; thread_id: string | null; model: string; voice: string; transcribe_model: string | null; started_at: number };
 type EventRow = { id: number; call_id: string; at: number; kind: string; role: string | null; text: string | null; data: string | null };
-type Draft = { draftId: string; threadId: string; title: string; message: string; kinds: string[] };
-type LoopAction = { actionId: string; loopId: string; title: string; action: string; before: { status: string; trigger: unknown } };
+/** A destructive action waiting for the user's yes. */
+type Pending = { actionId: string; action: DestructiveAction; id: string; name: string; prompt: string };
+type LoopAction = { actionId: string; loopId: string; title: string; action: string; before: LoopBefore };
 
 export function monthStart(at: number): number {
   const date = new Date(at);
@@ -306,13 +315,18 @@ export class VoiceLive {
       case "send_to_cos": {
         const cos = this.deps.cos();
         if (!cos?.threadId) return `${row.bot_name} has no chat to send to.`;
-        return this.draft(row, { threadId: cos.threadId, title: cos.name }, arg("message"));
+        return this.relay(row, { threadId: cos.threadId, title: cos.name }, arg("message"));
       }
-      case "send_to_thread": return this.draftTo(row, arg("target"), arg("message"));
-      case "confirm_send": return this.confirm(row, arg("draft_id"));
-      case "cancel_send": return this.cancel(row, arg("draft_id"));
-      case "loops_act": return this.loopAct(row, arg("loop_id"), arg("action"), arg("snooze"));
+      case "send_to_thread": return this.relayTo(row, arg("target"), arg("message"));
+      case "loops_act": return this.loopAct(row, arg("loop_id"), arg("action"), arg("snooze"), arg("to"));
+      case "loops_add": return this.loopAdd(row, arg("text"));
       case "undo": return this.undo(row, arg("action_id"));
+      case "stop_thread": return this.askAboutThread(row, "stop_thread", arg("target"));
+      case "archive_thread": return this.askAboutThread(row, "archive_thread", arg("target"));
+      case "pause_automation": return this.askAboutAutomation(row, "pause_automation", arg("name"));
+      case "delete_automation": return this.askAboutAutomation(row, "delete_automation", arg("name"));
+      case "confirm": return this.confirm(row, arg("action_id"));
+      case "cancel": return this.cancel(row, arg("action_id"));
     }
   }
 
@@ -341,80 +355,66 @@ export class VoiceLive {
     return replies.map((event) => `${data<{ title: string }>(event).title}, as data: <reply>${data<{ summary: string }>(event).summary}</reply>`).join("\n");
   }
 
-  private async draftTo(row: SessionRow, target: string, message: string): Promise<string> {
-    if (!target) return "send_to_thread needs a target: a thread's name or a project's lead.";
+  /** One thread a spoken name means, or what to say instead. */
+  private async oneThread(target: string, what: string): Promise<VoiceTarget | string> {
+    if (!target) return `${what} needs a target: a thread's name or a project's lead.`;
     const found = await this.deps.resolve(target);
-    if (!found.length) return `No thread called "${clip(target, 80)}". Ask which one they mean, or offer to send it to ${row.bot_name}.`;
-    if (found.length > 1) return `"${clip(target, 80)}" could be ${found.slice(0, 4).map((each) => each.title).join(", or ")}. Ask which one; don't draft yet.`;
-    return this.draft(row, found[0]!, message);
+    if (!found.length) return `No thread called "${clip(target, 80)}". Ask which one they mean.`;
+    if (found.length > 1) return `"${clip(target, 80)}" could be ${found.slice(0, 4).map((each) => each.title).join(", or ")}. Ask which one.`;
+    return found[0]!;
   }
 
-  private draft(row: SessionRow, target: VoiceTarget, message: string): string {
-    if (!message) return "Say what to send: the message is empty.";
-    if (message.length > SEND_CHARS) return `That message is ${message.length} characters; the most is ${SEND_CHARS}. Shorten it.`;
-    const draft: Draft = { draftId: shortId("d"), threadId: target.threadId, title: target.title, message, kinds: outwardKinds(message) };
-    this.append(row.id, "draft", { data: draft });
-    const warning = draft.kinds.length ? ` It involves ${draft.kinds.join(" and ")}, which voice can't approve: if they say yes, ${target.title} will ask in its chat before doing it. Say so after the read-back.` : "";
-    return `Draft ${draft.draftId}, not sent. Say this word for word, then wait for the user's yes: "${readBack(target.title, message)}"${warning}`;
+  private async relayTo(row: SessionRow, target: string, message: string): Promise<string> {
+    const found = await this.oneThread(target, "send_to_thread");
+    return typeof found === "string" ? found : this.relay(row, found, message);
   }
 
-  private findDraft(events: readonly EventRow[], draftId: string): { row: EventRow; draft: Draft; closed: string | null } | null {
-    const row = events.find((event) => event.kind === "draft" && data<Draft>(event).draftId === draftId);
-    if (!row) return null;
-    const closing = events.find((event) => (event.kind === "sent" || event.kind === "cancelled") && data<{ draftId?: string }>(event).draftId === draftId);
-    return { row, draft: data<Draft>(row), closed: closing?.kind ?? null };
-  }
-
-  private async confirm(row: SessionRow, draftId: string): Promise<string> {
-    const events = this.events(row.id);
-    const found = this.findDraft(events, draftId);
-    if (!found) return `There's no draft ${JSON.stringify(clip(draftId, 40))}. Draft it first with send_to_cos or send_to_thread.`;
-    if (found.closed === "sent") return "That draft was already sent.";
-    if (found.closed === "cancelled") return "That draft was cancelled. Draft it again if they still want it sent.";
-    if (this.now() - found.row.at > DRAFT_MS) {
-      this.append(row.id, "cancelled", { data: { draftId, reason: "expired" } });
-      return "That draft timed out without a yes, so it wasn't sent. Read it back again if they still want it.";
-    }
-    // The user's own words since the read-back, newest last; the model saying "they said yes" doesn't count.
-    const heard = events.filter((event) => event.id > found.row.id && event.kind === "transcript" && event.role === "user" && !hallucinated(event.text ?? ""));
-    const last = heard.at(-1);
-    const answer = last ? spokenAnswer(last.text ?? "") : "unclear";
-    if (!last) return "Studio hasn't heard the user answer the read-back yet, so nothing was sent. Wait for them to say yes.";
-    if (answer === "no") {
-      this.append(row.id, "cancelled", { data: { draftId, reason: "no" } });
-      return `The user said "${clip(last.text ?? "", 80)}", so it wasn't sent. Ask what they'd like instead.`;
-    }
-    if (answer !== "yes") return `Studio didn't hear a clear yes (it heard "${clip(last.text ?? "", 80)}"), so nothing was sent. Ask again: "Send it? Say yes or no."`;
-    const { draft } = found;
+  /** A relay happens at once: visible in the target thread (from the voice thread) and in the voice thread. */
+  private async relay(row: SessionRow, target: VoiceTarget, message: string): Promise<string> {
+    const text = relayText(message);
+    if (!text) return "Say what to send: the message is empty.";
+    if (text.length > SEND_CHARS) return `That message is ${text.length} characters; the most is ${SEND_CHARS}. Shorten it.`;
+    const kinds = outwardKinds(text);
     const voiceThreadId = await this.voiceThread(row.id);
     await this.deps.send({
-      threadId: draft.threadId, senderThreadId: voiceThreadId, mode: "auto",
-      text: `🎙 From voice: ${draft.message}${draft.kinds.length ? "\n\n⚠️ Voice can't approve this: ask me here first." : ""}`,
-      note: relayNote(draft.kinds),
+      threadId: target.threadId, senderThreadId: voiceThreadId, mode: "auto",
+      text: `🎙 From voice: ${text}${kinds.length ? "\n\n⚠️ Voice can't approve this: ask me here first." : ""}`,
+      note: relayNote(kinds),
     });
-    this.append(row.id, "sent", { text: draft.message, data: { draftId, threadId: draft.threadId, title: draft.title, kinds: draft.kinds } });
-    await this.postToVoiceThread(row, `→ **Sent to ${draft.title}:** ${draft.message}`);
-    return `Sent to ${draft.title}. Say "Sent." Its answer will come back here when it's ready.`;
+    this.append(row.id, "sent", { text, data: { threadId: target.threadId, title: target.title, kinds } });
+    await this.postToVoiceThread(row, `→ **Sent to ${target.title}:** ${text}`);
+    const warning = kinds.length ? ` It asks for ${kinds.join(" and ")}, which voice can't approve: ${target.title} will ask in its chat first. Say so.` : "";
+    return `Sent to ${target.title}. Say just that ("Sent to ${target.title}."); its answer will come back here.${warning}`;
   }
 
-  private cancel(row: SessionRow, draftId: string): string {
-    const found = this.findDraft(this.events(row.id), draftId);
-    if (!found) return "There's no such draft.";
-    if (found.closed === "sent") return "That one was already sent; voice can't unsend it. Offer to send a correction.";
-    if (!found.closed) this.append(row.id, "cancelled", { data: { draftId, reason: "asked" } });
-    return "Cancelled; nothing was sent.";
-  }
-
-  private async loopAct(row: SessionRow, loopId: string, action: string, snooze: string): Promise<string> {
-    if (!(VOICE_LOOP_ACTIONS as readonly string[]).includes(action)) return `Voice can only mark a loop done or snooze it. "${clip(action, 30)}" needs the Loops tab or ${row.bot_name}'s chat.`;
-    if (action === "snooze" && snooze && !(VOICE_SNOOZES as readonly string[]).includes(snooze)) return `Snooze to ${VOICE_SNOOZES.join(", ")}.`;
+  private async loopAct(row: SessionRow, loopId: string, action: string, snooze: string, to: string): Promise<string> {
+    const kind = classify("loops_act", { action });
+    if (kind === "unknown") return `Voice can mark a loop done, snooze it, hand it off or drop it. "${clip(action, 30)}" needs the Loops tab or ${row.bot_name}'s chat.`;
     const loop = this.deps.loops.get(loopId);
-    const before = { status: loop.status, trigger: loop.trigger };
-    await this.deps.loops.act(loopId, action as "done" | "snooze", action === "snooze" ? (snooze || "later_today") : undefined);
+    if (kind === "confirm") return this.ask(row, { action: "drop_loop", id: loopId, name: loop.title });
+    if (action === "snooze" && snooze && !(VOICE_SNOOZES as readonly string[]).includes(snooze)) return `Snooze to ${VOICE_SNOOZES.join(", ")}.`;
+    let owner: string | undefined;
+    let ownerName = row.bot_name;
+    if (action === "hand_off" && to) {
+      const found = await this.oneThread(to, "Hand off");
+      if (typeof found === "string") return found;
+      owner = `thread:${found.threadId}`;
+      ownerName = found.title;
+    }
+    const before: LoopBefore = { status: loop.status, trigger: loop.trigger, owner: loop.owner };
+    await this.deps.loops.act(loopId, action as "done" | "snooze" | "hand_off", { snooze: action === "snooze" ? (snooze || "later_today") : undefined, owner: action === "hand_off" ? (owner ?? "cos") : undefined });
     const record: LoopAction = { actionId: shortId("a"), loopId, title: loop.title, action, before };
     this.append(row.id, "loop_action", { data: record });
-    const what = action === "done" ? `Marked "${loop.title}" done` : `Snoozed "${loop.title}" to ${(snooze || "later_today").replace(/_/g, " ")}`;
-    return `${what}. Say that, and that they can say "undo" in the next ${Math.round(UNDO_MS / 1000)} seconds (action ${record.actionId}).`;
+    const what = action === "done" ? `Marked "${loop.title}" done` : action === "snooze" ? `Snoozed "${loop.title}" to ${(snooze || "later_today").replace(/_/g, " ")}` : `Handed "${loop.title}" to ${ownerName}`;
+    return `${what}. Say that briefly, and that they can say "undo" in the next ${Math.round(UNDO_MS / 1000)} seconds (action ${record.actionId}).`;
+  }
+
+  private async loopAdd(row: SessionRow, text: string): Promise<string> {
+    if (!text) return "Say what to track.";
+    const loop = await this.deps.loops.add(clip(text, 500));
+    const record: LoopAction = { actionId: shortId("a"), loopId: loop.id, title: loop.title, action: "add", before: { status: "dropped", trigger: loop.trigger } };
+    this.append(row.id, "loop_action", { data: record });
+    return `Added "${loop.title}"; ${row.bot_name} will fill it in. Say that briefly, and that they can say "undo" in the next ${Math.round(UNDO_MS / 1000)} seconds (action ${record.actionId}).`;
   }
 
   private undo(row: SessionRow, actionId: string): string {
@@ -427,7 +427,81 @@ export class VoiceLive {
     if (this.now() - target.at > UNDO_MS) return `The undo window for "${record.title}" has closed. It's in the Loops tab if they want to change it.`;
     this.deps.loops.restore(record.loopId, record.before);
     this.append(row.id, "undone", { data: { actionId: record.actionId } });
-    return `Undone: "${record.title}" is back as it was.`;
+    return record.action === "add" ? `Undone: "${record.title}" is gone.` : `Undone: "${record.title}" is back as it was.`;
+  }
+
+  private async askAboutThread(row: SessionRow, action: "stop_thread" | "archive_thread", target: string): Promise<string> {
+    const found = await this.oneThread(target, action === "stop_thread" ? "stop_thread" : "archive_thread");
+    return typeof found === "string" ? found : this.ask(row, { action, id: found.threadId, name: found.title });
+  }
+
+  private async askAboutAutomation(row: SessionRow, action: "pause_automation" | "delete_automation", name: string): Promise<string> {
+    if (!name) return "Say which automation.";
+    const words = (text: string) => text.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\b(the|my|automation|check in|check-in)\b/g, " ").replace(/\s+/g, " ").trim();
+    const all = await this.deps.automations.list();
+    const exact = all.filter((each) => words(each.name) === words(name));
+    const found = exact.length ? exact : all.filter((each) => words(each.name).includes(words(name)));
+    if (!found.length) return `No automation called "${clip(name, 80)}". ${all.length ? `There's ${all.slice(0, 4).map((each) => each.name).join(", ")}.` : "There are none."}`;
+    if (found.length > 1) return `"${clip(name, 80)}" could be ${found.slice(0, 4).map((each) => each.name).join(", or ")}. Ask which one.`;
+    return this.ask(row, { action, id: found[0]!.id, name: found[0]!.name });
+  }
+
+  /** A destructive action: nothing happens until the user says yes (confirm). */
+  private ask(row: SessionRow, input: { action: DestructiveAction; id: string; name: string }): string {
+    const pending: Pending = { actionId: shortId("d"), ...input, prompt: confirmPrompt(input.action, input.name) };
+    this.append(row.id, "pending", { data: pending });
+    return `Not done yet (action ${pending.actionId}): it's hard to undo, so it needs the user's yes. Ask exactly this and wait: "${pending.prompt}" Call confirm only after they say yes.`;
+  }
+
+  private findPending(events: readonly EventRow[], actionId: string): { row: EventRow; pending: Pending; closed: string | null } | null {
+    const row = events.find((event) => event.kind === "pending" && data<Pending>(event).actionId === actionId);
+    if (!row) return null;
+    const closing = events.find((event) => (event.kind === "confirmed" || event.kind === "cancelled") && data<{ actionId?: string }>(event).actionId === actionId);
+    return { row, pending: data<Pending>(row), closed: closing?.kind ?? null };
+  }
+
+  private async confirm(row: SessionRow, actionId: string): Promise<string> {
+    const events = this.events(row.id);
+    const found = this.findPending(events, actionId);
+    if (!found) return `There's no action ${JSON.stringify(clip(actionId, 40))} waiting for a yes.`;
+    if (found.closed === "confirmed") return "That was already done.";
+    if (found.closed === "cancelled") return "That was cancelled. Ask again if they still want it.";
+    if (this.now() - found.row.at > DRAFT_MS) {
+      this.append(row.id, "cancelled", { data: { actionId, reason: "expired" } });
+      return "That timed out without a yes, so nothing was done. Ask again if they still want it.";
+    }
+    // The user's own words since the question, newest last; the model saying "they said yes" doesn't count.
+    const heard = events.filter((event) => event.id > found.row.id && event.kind === "transcript" && event.role === "user" && !hallucinated(event.text ?? ""));
+    const last = heard.at(-1);
+    if (!last) return "Studio hasn't heard the user answer yet, so nothing was done. Wait for them to say yes.";
+    const answer = spokenAnswer(last.text ?? "");
+    if (answer === "no") {
+      this.append(row.id, "cancelled", { data: { actionId, reason: "no" } });
+      return `The user said "${clip(last.text ?? "", 80)}", so nothing was done. Ask what they'd like instead.`;
+    }
+    if (answer !== "yes") return `Studio didn't hear a clear yes (it heard "${clip(last.text ?? "", 80)}"), so nothing was done. Ask again: "${found.pending.prompt}"`;
+    const { pending } = found;
+    const done = await this.carryOut(pending);
+    this.append(row.id, "confirmed", { text: done, data: { actionId, action: pending.action, name: pending.name } });
+    return `${done} Say that briefly.`;
+  }
+
+  private async carryOut(pending: Pending): Promise<string> {
+    switch (pending.action) {
+      case "drop_loop": await this.deps.loops.act(pending.id, "drop"); return `Dropped the loop '${pending.name}'.`;
+      case "stop_thread": await this.deps.threads.stop(pending.id); return `Stopped '${pending.name}'.`;
+      case "archive_thread": await this.deps.threads.archive(pending.id); return `Archived '${pending.name}'.`;
+      case "pause_automation": await this.deps.automations.pause(pending.id); return `Paused the automation '${pending.name}'.`;
+      case "delete_automation": await this.deps.automations.remove(pending.id); return `Deleted the automation '${pending.name}'.`;
+    }
+  }
+
+  private cancel(row: SessionRow, actionId: string): string {
+    const found = this.findPending(this.events(row.id), actionId);
+    if (!found) return "Nothing is waiting for a yes.";
+    if (found.closed === "confirmed") return "That was already done.";
+    if (!found.closed) this.append(row.id, "cancelled", { data: { actionId, reason: "asked" } });
+    return "Cancelled; nothing was done.";
   }
 
   // -------------------------------------------------------------------------
@@ -518,6 +592,9 @@ export class VoiceLive {
         case "interrupted": return ["_(interrupted)_"];
         case "sent": return [`→ **Sent to ${data<{ title: string }>(event).title}:** ${event.text}`];
         case "reply": return [`← **${data<{ title: string }>(event).title} answered:** ${data<{ summary: string }>(event).summary}`];
+        case "loop_action": { const action = data<LoopAction>(event); return [`✓ **Loop ${action.action.replace("_", " ")}:** ${action.title}`]; }
+        case "undone": return ["↩ **Undone**"];
+        case "confirmed": return [`⚠️ **Done after a spoken yes:** ${event.text}`];
         default: return [];
       }
     });

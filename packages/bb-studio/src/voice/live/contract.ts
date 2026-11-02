@@ -97,7 +97,7 @@ export const voiceLiveContract = defineRpcContract({
     }),
   },
   "voiceLive.tool": {
-    experimental_description: "Run one of the voice's tools (loops_list, read_replies, send_to_cos, send_to_thread, confirm_send, cancel_send, loops_act, undo). Saves `events` first, so a yes said just before confirm_send counts. Returns the function_call_output text.",
+    experimental_description: "Run one of the voice's tools (loops_list, read_replies, send_to_cos, send_to_thread, loops_act, loops_add, undo, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). Relays and loop actions happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text.",
     input: z.object({ sessionId, name: z.string().min(1).max(64), args: z.string().max(20_000).optional(), events: z.array(liveEventSchema).max(200).optional() }).strict(),
     output: z.object({ output: z.string() }),
   },

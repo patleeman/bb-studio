@@ -116,33 +116,45 @@ final class VoiceLiveMachineTests: XCTestCase {
         XCTAssertTrue(effects.contains(.earcon(.working)))
     }
 
-    func testReadBackWaitsForAYesThenShowsSent() {
+    func testARelayShowsSentAtOnceWithNoQuestion() {
         var machine = live()
-        let effects = machine.toolFinished(callId: "c1", name: "send_to_thread", output: VoiceLiveDemo.draftOutput)
-        XCTAssertEqual(effects, [.send(.toolResult(callId: "c1", output: VoiceLiveDemo.draftOutput))])
-        XCTAssertEqual(machine.confirmation, "Send to the Kensico lead: Pause the eBay fetcher until Monday. Say yes to send.")
-        // Studio didn't hear a yes: still waiting.
-        _ = machine.toolFinished(callId: "c2", name: "confirm_send", output: "Studio didn't hear a clear yes (it heard \"hmm\"), so nothing was sent.")
-        XCTAssertNotNil(machine.confirmation)
-        let sent = machine.toolFinished(callId: "c3", name: "confirm_send", output: "Sent to the Kensico lead. Say \"Sent.\" Its answer will come back here when it's ready.")
-        XCTAssertTrue(sent.contains(.earcon(.sent)))
-        XCTAssertNil(machine.confirmation)
-        XCTAssertEqual(machine.card, LiveToolCard(kind: .sent, title: "Sent to the Kensico lead", detail: "Its reply will be read to you"))
+        let effects = machine.toolFinished(callId: "c1", name: "send_to_thread", output: VoiceLiveDemo.sentOutput)
+        XCTAssertEqual(effects, [.send(.toolResult(callId: "c1", output: VoiceLiveDemo.sentOutput)), .earcon(.sent)])
+        XCTAssertNil(machine.confirmation, "relays don't wait for a yes")
+        XCTAssertEqual(machine.card, LiveToolCard(kind: .sent, title: "Sent to the Kensico lead", detail: ""))
     }
 
-    func testANoClearsTheReadBack() {
+    func testOnlyDestructiveActionsWaitForAYes() {
         var machine = live()
-        _ = machine.toolFinished(callId: "c1", name: "send_to_cos", output: VoiceLiveDemo.draftOutput)
-        _ = machine.toolFinished(callId: "c2", name: "confirm_send", output: "The user said \"no\", so it wasn't sent. Ask what they'd like instead.")
+        _ = machine.toolFinished(callId: "c1", name: "loops_act", output: VoiceLiveDemo.dropOutput)
+        XCTAssertEqual(machine.confirmation, "Drop the loop 'Remove the stale Tailscale node'? Say yes to drop.")
+        XCTAssertNil(machine.card)
+        // Studio didn't hear the yes: still waiting.
+        _ = machine.toolFinished(callId: "c2", name: "confirm", output: "Studio didn't hear a clear yes (it heard \"hmm\"), so nothing was done.")
+        XCTAssertNotNil(machine.confirmation)
+        let done = machine.toolFinished(callId: "c3", name: "confirm", output: "Dropped the loop 'Remove the stale Tailscale node'. Say that briefly.")
+        XCTAssertTrue(done.contains(.earcon(.sent)))
         XCTAssertNil(machine.confirmation)
-        XCTAssertEqual(machine.card?.title, "Not sent")
+        XCTAssertEqual(machine.card, LiveToolCard(kind: .loop, title: "Dropped the loop 'Remove the stale Tailscale node'.", detail: ""))
+        // Loop actions that aren't destructive just happen, with undo.
+        _ = machine.toolFinished(callId: "c4", name: "loops_act", output: #"Snoozed "Renew the domain" to tonight. Say that briefly, and that they can say "undo" in the next 10 seconds (action a_1)."#)
+        XCTAssertNil(machine.confirmation)
+        XCTAssertEqual(machine.card?.detail, "Say “undo” to undo")
+    }
+
+    func testANoClearsTheQuestion() {
+        var machine = live()
+        _ = machine.toolFinished(callId: "c1", name: "stop_thread", output: VoiceLiveDemo.dropOutput)
+        _ = machine.toolFinished(callId: "c2", name: "confirm", output: "The user said \"no\", so nothing was done. Ask what they'd like instead.")
+        XCTAssertNil(machine.confirmation)
+        XCTAssertEqual(machine.card?.title, "Not done")
     }
 
     func testToolCards() {
         var machine = live()
         _ = machine.toolFinished(callId: "c", name: "loops_list", output: VoiceLiveDemo.loopsOutput)
         XCTAssertEqual(machine.card, LiveToolCard(kind: .waiting, title: "2 need you", detail: "Reply to Dana about the pricing deck · Renew bbstudio.app before Friday"))
-        _ = machine.toolFinished(callId: "c", name: "loops_act", output: #"Marked "Reply to Dana" done. Say that, and that they can say "undo" in the next 10 seconds (action a_1)."#)
+        _ = machine.toolFinished(callId: "c", name: "loops_act", output: #"Marked "Reply to Dana" done. Say that briefly, and that they can say "undo" in the next 10 seconds (action a_1)."#)
         XCTAssertEqual(machine.card, LiveToolCard(kind: .loop, title: #"Marked "Reply to Dana" done."#, detail: "Say “undo” to undo"))
         _ = machine.toolFinished(callId: "c", name: "send_email", output: "There's no tool named \"send_email\", and voice can't spend money. Offer to pass it on.")
         XCTAssertEqual(machine.card?.title, "Not by voice")

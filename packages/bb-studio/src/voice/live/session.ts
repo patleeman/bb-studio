@@ -41,17 +41,18 @@ How to talk:
 
 How to work:
 - "What's waiting?": loops_list, then the most urgent few, briefly.
-- To pass something on: send_to_cos, or send_to_thread with a name like "the Kensico lead". Write a complete request: they don't hear this conversation. Studio answers with a read-back; say it exactly, then wait. Only when the user says yes, call confirm_send. A no, a change or silence means cancel_send or a new draft.
-- Done or snooze a loop with loops_act. Say what you did and that they can say "undo" for ${seconds(UNDO_MS)} seconds; on "undo", call undo.
+- To pass something on: send_to_cos, or send_to_thread with a name like "the Kensico lead". Write a complete request: they don't hear this conversation. It's sent at once, with no read-back: just say "Sent to the Kensico lead."
+- Done, snooze, hand off or add a loop with loops_act or loops_add. It happens at once; say what you did and that they can say "undo" for ${seconds(UNDO_MS)} seconds. On "undo", call undo.
+- Destructive or hard to undo (drop a loop, stop or archive a thread, pause or delete an automation): Studio answers with a question. Ask it word for word and wait. Only when the user says yes, call confirm. A no, a change or silence means cancel.
 - When a thread answers, Studio tells you. Sum it up in a sentence or two. read_replies reads one again.
-- You can't spend money, email or message people, post anything, delete anything or approve anything, and neither can ${cosName} on your word. Say ${cosName} will ask in the chat.`;
+- You can't spend money, email or message people outside BB, post anything publicly or approve credentials, and neither can ${cosName} on your word. Say ${cosName} will ask in the chat.`;
 }
 
 /** GPT-Live's backend model: it decides on tools and words the results for the voice. */
 export function backendInstructions(cosName: string): string {
   return `${voiceInstructions(cosName)}
 
-You are the backend behind the live voice: call the tools, then answer in one or two short spoken sentences the voice can say as they are. Read a send's read-back word for word. A draft waits ${seconds(DRAFT_MS)} seconds for a yes.`;
+You are the backend behind the live voice: call the tools, then answer in one or two short spoken sentences the voice can say as they are. Ask a destructive action's question word for word. It waits ${seconds(DRAFT_MS)} seconds for a yes.`;
 }
 
 type ToolDefinition = { type: "function"; name: VoiceToolName; description: string; parameters: Record<string, unknown> };
@@ -61,12 +62,17 @@ const message = { type: "string", description: "A complete request: the receiver
 export const VOICE_TOOL_DEFINITIONS: ToolDefinition[] = [
   { type: "function", name: "loops_list", description: "What's waiting on the user: needs you now, then coming up, with each loop's id.", parameters: object({}) },
   { type: "function", name: "read_replies", description: "The latest reply from a thread you sent to (or a named one): who answered and what, summed up.", parameters: object({ target: { type: "string", description: "Optional: a thread's name, \"the Bot\" or \"the Kensico lead\". Empty: the replies to this session's sends." } }) },
-  { type: "function", name: "send_to_cos", description: "Draft a message to the Chief of Staff. Nothing is sent until the user says yes: it returns the read-back to say.", parameters: object({ message }, ["message"]) },
-  { type: "function", name: "send_to_thread", description: "Draft a message to a thread by name or project lead (\"the Kensico lead\", \"launch review\"). Nothing is sent until the user says yes: it returns the read-back to say, or the names to choose from.", parameters: object({ target: { type: "string" }, message }, ["target", "message"]) },
-  { type: "function", name: "confirm_send", description: "Send a draft after the user said yes out loud. Studio checks it heard the yes itself.", parameters: object({ draft_id: { type: "string" } }, ["draft_id"]) },
-  { type: "function", name: "cancel_send", description: "Drop a draft: the user said no or changed it.", parameters: object({ draft_id: { type: "string" } }, ["draft_id"]) },
-  { type: "function", name: "loops_act", description: "Mark a loop done, or snooze it. Runs at once and can be undone for a few seconds.", parameters: object({ loop_id: { type: "string" }, action: { type: "string", enum: ["done", "snooze"] }, snooze: { type: "string", enum: [...VOICE_SNOOZES] } }, ["loop_id", "action"]) },
-  { type: "function", name: "undo", description: "Undo the last done or snooze, while its window is open.", parameters: object({ action_id: { type: "string" } }, ["action_id"]) },
+  { type: "function", name: "send_to_cos", description: "Send a message to the Chief of Staff now. It's visible in their chat; their reply comes back here.", parameters: object({ message }, ["message"]) },
+  { type: "function", name: "send_to_thread", description: "Send a message now to a thread by name or project lead (\"the Kensico lead\", \"launch review\"). It returns the names to choose from when it's ambiguous.", parameters: object({ target: { type: "string" }, message }, ["target", "message"]) },
+  { type: "function", name: "loops_act", description: "Done, snooze or hand off a loop: at once, undoable for a few seconds. Drop needs the user's yes: it returns the question to ask.", parameters: object({ loop_id: { type: "string" }, action: { type: "string", enum: ["done", "snooze", "hand_off", "drop"] }, snooze: { type: "string", enum: [...VOICE_SNOOZES] }, to: { type: "string", description: "hand_off: a thread's name, or empty for the Chief of Staff." } }, ["loop_id", "action"]) },
+  { type: "function", name: "loops_add", description: "Track something new the user mentions, as a loop the Chief of Staff fills in. At once, undoable.", parameters: object({ text: { type: "string" } }, ["text"]) },
+  { type: "function", name: "undo", description: "Undo the last loop action, while its window is open.", parameters: object({ action_id: { type: "string" } }) },
+  { type: "function", name: "stop_thread", description: "Stop a running thread by name. Needs the user's yes: it returns the question to ask.", parameters: object({ target: { type: "string" } }, ["target"]) },
+  { type: "function", name: "archive_thread", description: "Archive a thread by name. Needs the user's yes: it returns the question to ask.", parameters: object({ target: { type: "string" } }, ["target"]) },
+  { type: "function", name: "pause_automation", description: "Pause one of the Chief of Staff's automations by name. Needs the user's yes.", parameters: object({ name: { type: "string" } }, ["name"]) },
+  { type: "function", name: "delete_automation", description: "Delete one of the Chief of Staff's automations by name. Needs the user's yes.", parameters: object({ name: { type: "string" } }, ["name"]) },
+  { type: "function", name: "confirm", description: "Do a destructive action after the user said yes out loud. Studio checks it heard the yes itself.", parameters: object({ action_id: { type: "string" } }, ["action_id"]) },
+  { type: "function", name: "cancel", description: "Drop a destructive action that's waiting: the user said no or changed their mind.", parameters: object({ action_id: { type: "string" } }, ["action_id"]) },
 ];
 
 /** POST /v1/live/sessions: GPT-Live over WebRTC, its backend a Responses model with Studio's tools. */

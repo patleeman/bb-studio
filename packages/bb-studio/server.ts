@@ -1282,8 +1282,18 @@ export default async function plugin(bb: BbPluginApi) {
     loops: {
       groups: () => loops.store.groups(),
       get: (id) => loops.store.get(id),
-      act: (id, action, snooze) => loops.act({ id, action, ...(snooze ? { snooze: snooze as never } : {}) }),
-      restore: (id, before) => loops.store.update(id, before as never),
+      act: (id, action, options) => loops.act({ id, action, ...(options?.snooze ? { snooze: options.snooze as never } : {}), ...(options?.owner ? { owner: options.owner } : {}) }),
+      add: (text) => loops.add(text),
+      restore: (id, before) => loops.store.update(id, (before.owner ? before : { status: before.status, trigger: before.trigger }) as never),
+    },
+    threads: {
+      stop: async (threadId) => { await bb.sdk.threads.stop({ threadId }); },
+      archive: async (threadId) => { await bb.sdk.threads.archive({ threadId }); },
+    },
+    automations: {
+      list: async () => (await automations.list()).map((each) => ({ id: each.id, name: each.name, state: each.state })),
+      pause: async (id) => { await automations.setState(id, "paused"); },
+      remove: async (id) => { await automations.delete(id); },
     },
     openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
       projectId: PERSONAL_PROJECT_ID, title,

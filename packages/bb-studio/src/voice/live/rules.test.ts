@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hallucinated, outwardKinds, readBack, spokenAnswer } from "./rules";
+import { classify, confirmPrompt, hallucinated, outwardKinds, relayText, spokenAnswer } from "./rules";
 import { resolveTarget } from "./targets";
 
 describe("spokenAnswer", () => {
@@ -12,8 +12,14 @@ describe("spokenAnswer", () => {
   it.each(["", "um", "what did you say", "yes I think we should probably also talk about the budget later"])("%j is unclear", (line) => {
     expect(spokenAnswer(line)).toBe("unclear");
   });
-  it("the voice's own read-back heard in the mic isn't a yes", () => {
-    expect(spokenAnswer("Say yes to send")).toBe("unclear");
+  it("the voice's own question heard in the mic isn't a yes", () => {
+    expect(spokenAnswer("Say yes to drop")).toBe("unclear");
+    expect(spokenAnswer("Drop the loop? Say yes to drop.")).toBe("unclear");
+  });
+  it("yes with the action's own verb is a yes; a bare stop isn't", () => {
+    expect(spokenAnswer("Yes, stop it")).toBe("yes");
+    expect(spokenAnswer("Yes, drop it")).toBe("yes");
+    expect(spokenAnswer("stop")).toBe("unclear");
   });
 });
 
@@ -21,10 +27,11 @@ describe("outwardKinds", () => {
   it("finds the never-by-voice kinds", () => {
     expect(outwardKinds("Pause the eBay fetcher until Monday")).toEqual([]);
     expect(outwardKinds("buy two tickets")).toEqual(["spending money"]);
-    expect(outwardKinds("email Dana the deck")).toEqual(["messaging people"]);
-    expect(outwardKinds("tweet the launch")).toEqual(["posting or publishing"]);
-    expect(outwardKinds("delete the old branch")).toEqual(["deleting"]);
-    expect(outwardKinds("approve the permission request")).toEqual(["approving"]);
+    expect(outwardKinds("email Dana the deck")).toEqual(["messaging people outside BB"]);
+    expect(outwardKinds("tweet the launch")).toEqual(["posting publicly"]);
+    expect(outwardKinds("approve the API key for the vendor")).toEqual(["approving credentials"]);
+    // Deleting is a destructive action voice can confirm, not a never; asking a thread to tidy up is fine.
+    expect(outwardKinds("delete the old branch")).toEqual([]);
   });
 });
 
@@ -33,10 +40,28 @@ it("filters Whisper's silence hallucinations", () => {
   expect(hallucinated("Thank you, send it")).toBe(false);
 });
 
-it("reads back who and what in one sentence", () => {
-  expect(readBack("the Kensico lead", "  pause the\nfetcher ")).toBe("Send to the Kensico lead: pause the fetcher. Say yes to send.");
+it("relays one line, without the model's trailing period", () => {
+  expect(relayText("  pause the\nfetcher ")).toBe("pause the fetcher");
   // GPT-Live's backend ends the message with its own period (live run, Nov 1).
-  expect(readBack("the Kensico lead", "Please pause the eBay fetcher until Monday.")).toBe("Send to the Kensico lead: Please pause the eBay fetcher until Monday. Say yes to send.");
+  expect(relayText("Please pause the eBay fetcher until Monday.")).toBe("Please pause the eBay fetcher until Monday");
+});
+
+describe("classify", () => {
+  it("reads, instant actions, confirm-only destructive ones, and nothing else", () => {
+    expect(classify("loops_list")).toBe("read");
+    expect(classify("read_replies")).toBe("read");
+    for (const tool of ["send_to_cos", "send_to_thread", "loops_add", "undo", "confirm", "cancel"]) expect(classify(tool)).toBe("act");
+    for (const action of ["done", "snooze", "hand_off"]) expect(classify("loops_act", { action })).toBe("act");
+    expect(classify("loops_act", { action: "drop" })).toBe("confirm");
+    for (const action of ["choose", "nudge", "keep", ""]) expect(classify("loops_act", { action })).toBe("unknown");
+    for (const tool of ["stop_thread", "archive_thread", "pause_automation", "delete_automation"]) expect(classify(tool)).toBe("confirm");
+    for (const tool of ["send_email", "purchase", "post", "approve_credentials", "delete_thread"]) expect(classify(tool)).toBe("unknown");
+  });
+
+  it("asks one plain question per destructive action", () => {
+    expect(confirmPrompt("drop_loop", "Remove the stale Tailscale node")).toBe(`Drop the loop 'Remove the stale Tailscale node'? Say yes to drop.`);
+    expect(confirmPrompt("delete_automation", "Morning brief")).toBe(`Delete the automation 'Morning brief'? It can't be undone. Say yes to delete.`);
+  });
 });
 
 describe("resolveTarget", () => {

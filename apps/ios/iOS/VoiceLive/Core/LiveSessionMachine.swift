@@ -78,7 +78,7 @@ enum LiveEffect: Equatable, Sendable {
 struct LiveSessionMachine: Sendable {
     private(set) var phase: LivePhase = .idle
     private(set) var subtitle: LiveSubtitle?
-    /// "Send to the Kensico lead: … Say yes to send." while a draft waits.
+    /// "Drop the loop '…'? Say yes to drop." while a destructive action waits for a yes.
     private(set) var confirmation: String?
     private(set) var card: LiveToolCard?
     private(set) var agentMuted = false
@@ -280,38 +280,46 @@ struct LiveSessionMachine: Sendable {
 
     // MARK: Studio's side
 
-    /// A tool's output from Studio: shows its card or read-back, and returns it to the model.
+    /// A tool's output from Studio: shows its card, or the question a destructive action waits on, and returns it to the model.
     mutating func toolFinished(callId: String, name: String, output: String) -> [LiveEffect] {
         var effects: [LiveEffect] = [.send(.toolResult(callId: callId, output: output))]
+        // Destructive (drop a loop, stop or archive a thread, pause or delete an automation): the only "Waiting for your yes".
+        if let question = Self.confirmQuestion(in: output) {
+            confirmation = question
+            card = nil
+            return effects
+        }
         switch name {
         case "send_to_cos", "send_to_thread":
-            if let readBack = Self.readBack(in: output) {
-                confirmation = readBack
-                card = nil
+            // Relays go at once: a short "Sent to …" line under the subtitles.
+            if output.hasPrefix("Sent to ") {
+                let title = String(output.dropFirst("Sent to ".count).prefix { $0 != "." })
+                card = LiveToolCard(kind: .sent, title: "Sent to \(title)", detail: "")
+                effects.append(.earcon(.sent))
             } else {
                 card = LiveToolCard(kind: .notice, title: "Which thread?", detail: Self.firstSentence(output))
             }
-        case "confirm_send":
-            if output.hasPrefix("Sent to ") {
-                let title = String(output.dropFirst("Sent to ".count).prefix { $0 != "." })
-                card = LiveToolCard(kind: .sent, title: "Sent to \(title)", detail: "Its reply will be read to you")
-                confirmation = nil
-                effects.append(.earcon(.sent))
-            } else if output.contains("wasn't sent") || output.contains("cancelled") || output.contains("timed out") {
-                confirmation = nil
-                card = LiveToolCard(kind: .notice, title: "Not sent", detail: Self.firstSentence(output))
-            }
-        case "cancel_send":
+        case "confirm":
+            // Studio didn't hear the yes: keep asking.
+            if output.contains("hasn't heard") || output.contains("didn't hear a clear yes") { break }
             confirmation = nil
-            card = LiveToolCard(kind: .notice, title: "Not sent", detail: "Cancelled")
+            let undone = output.contains("nothing was done") || output.contains("cancelled") || output.contains("timed out")
+            card = LiveToolCard(kind: undone ? .notice : .loop, title: undone ? "Not done" : Self.firstSentence(output), detail: undone ? Self.firstSentence(output) : "")
+            if !undone { effects.append(.earcon(.sent)) }
+        case "cancel":
+            confirmation = nil
+            card = LiveToolCard(kind: .notice, title: "Not done", detail: "Cancelled")
         case "loops_list":
             card = Self.waitingCard(output)
-        case "loops_act":
-            card = LiveToolCard(kind: .loop, title: Self.firstSentence(output), detail: output.hasPrefix("Voice can only") ? "" : "Say “undo” to undo")
+        case "loops_act", "loops_add":
+            let refused = output.hasPrefix("Voice can")
+            card = LiveToolCard(kind: refused ? .notice : .loop, title: Self.firstSentence(output), detail: refused ? "" : "Say “undo” to undo")
         case "undo":
             card = LiveToolCard(kind: .loop, title: Self.firstSentence(output), detail: "")
         case "read_replies":
             card = LiveToolCard(kind: .reply, title: "Reply", detail: Self.stripData(output))
+        case "stop_thread", "archive_thread", "pause_automation", "delete_automation":
+            card = LiveToolCard(kind: .notice, title: "Which one?", detail: Self.firstSentence(output))
         default:
             card = LiveToolCard(kind: .notice, title: "Not by voice", detail: Self.firstSentence(output))
         }
@@ -447,10 +455,11 @@ struct LiveSessionMachine: Sendable {
         return normalized(said).contains(words)
     }
 
-    /// The quoted read-back in a draft's output.
-    static func readBack(in output: String) -> String? {
-        guard let start = output.range(of: "\"Send to "), let end = output.range(of: "Say yes to send.\"", range: start.upperBound..<output.endIndex) else { return nil }
-        return String(output[output.index(after: start.lowerBound)..<output.index(before: end.upperBound)])
+    /// The question in a destructive action's output: Studio says `Ask exactly this and wait: "…"`.
+    static func confirmQuestion(in output: String) -> String? {
+        guard let start = output.range(of: "Ask exactly this and wait: \""),
+              let end = output.range(of: "\"", range: start.upperBound..<output.endIndex) else { return nil }
+        return String(output[start.upperBound..<end.lowerBound])
     }
 
     static func firstSentence(_ text: String) -> String {
