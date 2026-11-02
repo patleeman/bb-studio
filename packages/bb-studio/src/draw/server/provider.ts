@@ -55,7 +55,9 @@ export const DRAWING_KIND: StudioKind = {
   icon: DRAW_ICON,
   columns: [{ id: "elements", label: "Elements" }],
   actions: [{ id: "copy-text", label: "Copy text", icon: "Copy", result: "copy" }],
-  create: { mode: "rpc" },
+  // No New entry anywhere (desktop, iOS, Studio tab): a page makes a
+  // whiteboard with /whiteboard, through studio_create.
+  create: null,
   canArchive: true,
   capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false, templates: false },
   mentionProviderId: "drawing",

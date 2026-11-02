@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
 const kind = (id: string, plural: string) => ({ id, label: id, plural, icon: "File", columns: [], actions: [], create: { mode: "rpc" }, canArchive: true, blurb: "" });
 const item = (id: string, updatedAt: number, tags: string[] = []) => ({ id, kind: "page", title: `Item ${id}`, icon: null, projectId: null, parentId: null, createdAt: 0, updatedAt, updatedBy: null, preview: null, facts: [], badge: null, thumbnailUrl: null, href: `/plugins/studio/page/${id}`, archived: false, pluginId: "studio", tags });
 const overview = {
-  providers: [{ pluginId: "studio", name: "Studio", state: "ready", detail: null, panel: null, kinds: [kind("drawing", "Drawings"), kind("page", "Pages")] }],
+  providers: [{ pluginId: "studio", name: "Studio", state: "ready", detail: null, panel: null, kinds: [{ ...kind("drawing", "Whiteboards"), create: null }, kind("page", "Pages")] }],
   items: [item("a", 1, ["t1"]), item("b", 2)],
   tags: [{ id: "t1", name: "Launch", color: "blue" }],
   views: [{ id: "v1", name: "My pages", query: "kind:page" }],

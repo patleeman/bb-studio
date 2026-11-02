@@ -93,10 +93,10 @@ describe("the Draw Studio provider", () => {
     // Same frame; without fonts both render as the same empty image.
     expect(await png("Hello")).not.toBe(await png("World"));
   });
-  it("describes drawings, which Studio can create", async () => {
+  it("describes whiteboards, which pages create but no New menu offers", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);
-    expect(info).toMatchObject({ pluginId: "excalidraw", panel: null, kinds: [{ id: "drawing", create: { mode: "rpc" } }] });
+    expect(info).toMatchObject({ pluginId: "excalidraw", panel: null, kinds: [{ id: "drawing", create: null, capabilities: { create: true } }] });
     expect(studioSchemas(z).info.parse(info)).toBeTruthy();
   });
 

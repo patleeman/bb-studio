@@ -20,8 +20,8 @@ export interface StudioSidebarModel {
 export const KIND_ORDER = ["page", "recording", "artifact", "design"];
 /**
  * Kinds that live inside pages: a whiteboard is a drawing a page embeds.
- * They stay in the library and search, but get no sidebar row and no New
- * entry; `/whiteboard` in a page makes one.
+ * They stay in the library and search, but get no sidebar row. (Their kind
+ * has no `create` mode, so no New menu offers them; `/whiteboard` does.)
  */
 export const IN_PAGE_KINDS: ReadonlySet<string> = new Set(["drawing"]);
 export const RECENT_LIMIT = 15;

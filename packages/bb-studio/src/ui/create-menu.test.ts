@@ -10,7 +10,7 @@ const providers = [
   provider("design", [kind("design", "Design")]),
   provider("talk", [kind("recording", "Recording", { create: { mode: "event", event: "talk:new" } }), kind("dictation", "Dictation", { create: null })]),
   provider("pages", [kind("page", "Page")]),
-  provider("draw", [kind("drawing", "Drawing"), kind("sketch", "Sketch", { capabilities: { create: false } })]),
+  provider("draw", [kind("drawing", "Drawing", { create: null }), kind("sketch", "Sketch", { capabilities: { create: false } })]),
   provider("notion", [kind("notion-page", "Notion page")], "offline"),
 ];
 const labels = (entries: ReturnType<typeof createEntries>) => entries.map((entry) => entry.label);
@@ -23,7 +23,7 @@ it("lists the kinds Studio can make in Studio's order, then Record a call, then 
   expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, true, false]);
 });
 
-it("leaves out whiteboards: a page makes them with /whiteboard", () => {
+it("leaves out kinds with no create mode, like whiteboards, which a page makes", () => {
   expect(createEntries(providers).map((entry) => entry.key)).not.toContain("draw:drawing");
 });
 
