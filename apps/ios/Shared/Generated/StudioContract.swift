@@ -26567,10 +26567,12 @@ public enum Studio {
   public struct VoiceLiveStartInput: Sendable, Hashable, Codable {
     public var model: VoiceLiveStartInputModel?
     public var sdp: String?
+    public var threadId: String?
 
-    public init(model: VoiceLiveStartInputModel? = nil, sdp: String? = nil) {
+    public init(model: VoiceLiveStartInputModel? = nil, sdp: String? = nil, threadId: String? = nil) {
       self.model = model
       self.sdp = sdp
+      self.threadId = threadId
     }
   }
 
@@ -26625,6 +26627,53 @@ public enum Studio {
     }
   }
 
+  public enum VoiceLiveStartOutputIdentityKind: Sendable, Hashable, Codable {
+    case cos
+    case bot
+    case lead
+    case runner
+    case thread
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "cos": self = .cos
+      case "bot": self = .bot
+      case "lead": self = .lead
+      case "runner": self = .runner
+      case "thread": self = .thread
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .cos: try container.encode("cos")
+      case .bot: try container.encode("bot")
+      case .lead: try container.encode("lead")
+      case .runner: try container.encode("runner")
+      case .thread: try container.encode("thread")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveStartOutputIdentity: Sendable, Hashable, Codable {
+    public var kind: VoiceLiveStartOutputIdentityKind?
+    public var label: String?
+    public var name: String?
+    public var threadId: String?
+
+    public init(kind: VoiceLiveStartOutputIdentityKind? = nil, label: String? = nil, name: String? = nil, threadId: String? = nil) {
+      self.kind = kind
+      self.label = label
+      self.name = name
+      self.threadId = threadId
+    }
+  }
+
   public struct VoiceLiveStartOutput: Sendable, Hashable, Codable {
     public var sessionId: String?
     public var model: VoiceLiveStartOutputModel?
@@ -26636,8 +26685,9 @@ public enum Studio {
     public var mockUrl: String?
     public var voiceThreadId: String?
     public var cosName: String?
+    public var identity: VoiceLiveStartOutputIdentity?
 
-    public init(sessionId: String? = nil, model: VoiceLiveStartOutputModel? = nil, transport: VoiceLiveStartOutputTransport? = nil, answerSdp: String? = nil, clientSecret: String? = nil, expiresAt: Double? = nil, callsUrl: String? = nil, mockUrl: String? = nil, voiceThreadId: String? = nil, cosName: String? = nil) {
+    public init(sessionId: String? = nil, model: VoiceLiveStartOutputModel? = nil, transport: VoiceLiveStartOutputTransport? = nil, answerSdp: String? = nil, clientSecret: String? = nil, expiresAt: Double? = nil, callsUrl: String? = nil, mockUrl: String? = nil, voiceThreadId: String? = nil, cosName: String? = nil, identity: VoiceLiveStartOutputIdentity? = nil) {
       self.sessionId = sessionId
       self.model = model
       self.transport = transport
@@ -26648,6 +26698,7 @@ public enum Studio {
       self.mockUrl = mockUrl
       self.voiceThreadId = voiceThreadId
       self.cosName = cosName
+      self.identity = identity
     }
   }
 

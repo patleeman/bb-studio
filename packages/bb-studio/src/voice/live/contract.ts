@@ -46,6 +46,13 @@ export const liveEventSchema = z.discriminatedUnion("type", [
 ]);
 export type LiveEvent = z.infer<typeof liveEventSchema>;
 
+export const voiceIdentitySchema = z.object({
+  kind: z.enum(["cos", "bot", "lead", "runner", "thread"]),
+  label: z.string(),
+  name: z.string(),
+  threadId: z.string().nullable(),
+});
+
 export const voiceLiveStateSchema = z.object({
   /** Whether a session can start now (a Chief of Staff, a key, under the cap). */
   ready: z.boolean(),
@@ -78,8 +85,12 @@ export const voiceLiveContract = defineRpcContract({
     output: voiceLiveStateSchema,
   },
   "voiceLive.start": {
-    experimental_description: "Start a hands-free voice session: checks the monthly cap and opens its voice thread. gpt-live-1: pass the WebRTC SDP offer; Studio creates the session with OpenAI and returns the answer (no credential reaches the phone). gpt-realtime-2.1: returns a 2-minute client secret; POST the offer to callsUrl with it.",
-    input: z.object({ model: z.enum(LIVE_MODELS).optional(), sdp: z.string().min(1).max(100_000).optional() }).strict(),
+    experimental_description: "Start a hands-free voice session: checks the monthly cap, builds its identity seed once from the launching thread (threadId; none means the Chief of Staff) and opens its voice thread. gpt-live-1: pass the WebRTC SDP offer; Studio creates the session with OpenAI and returns the answer (no credential reaches the phone). gpt-realtime-2.1: returns a 2-minute client secret; POST the offer to callsUrl with it.",
+    input: z.object({
+      model: z.enum(LIVE_MODELS).optional(), sdp: z.string().min(1).max(100_000).optional(),
+      /** The thread it was launched from: the session speaks as it (docs/voice/identity.md). None: the Chief of Staff. */
+      threadId: z.string().min(1).max(200).optional(),
+    }).strict(),
     output: z.object({
       sessionId: z.string(),
       model: z.enum(LIVE_MODELS),
@@ -94,6 +105,8 @@ export const voiceLiveContract = defineRpcContract({
       mockUrl: z.string().nullable(),
       voiceThreadId: z.string().nullable(),
       cosName: z.string(),
+      /** Who the session speaks as: the pill shows `label`; relays with no target go to `threadId`. */
+      identity: voiceIdentitySchema,
     }),
   },
   "voiceLive.tool": {

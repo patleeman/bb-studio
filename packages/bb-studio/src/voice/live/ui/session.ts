@@ -7,10 +7,13 @@ import { encodeOutgoing, parseEvent, type LiveProtocol } from "./events";
 import { SessionMachine, type Earcon, type Effect, type Report } from "./machine";
 import { connectMock, connectWebRtc, realtimeExchange, type LiveTransport } from "./transport";
 
+/** Who the session speaks as (src/voice/live/identity.ts): the pill shows `label`. */
+export interface LiveIdentity { kind: string; label: string; name: string; threadId: string | null }
+
 /** Studio's side (voiceLive.*). */
 export interface LiveServer {
   state(): Promise<{ ready: boolean; problem: string | null; model: string; cosName: string | null }>;
-  start(input: { model?: string; sdp?: string }): Promise<{ sessionId: string; model: string; transport: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null; mockUrl: string | null; cosName: string }>;
+  start(input: { model?: string; sdp?: string; threadId?: string }): Promise<{ sessionId: string; model: string; transport: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null; mockUrl: string | null; cosName: string; identity?: LiveIdentity }>;
   tool(input: { sessionId: string; name: string; args: string; events: Report[] }): Promise<{ output: string }>;
   event(input: { sessionId: string; events: Report[] }): Promise<{ costUsd: number | null; replies: number; stop: string | null; voiceThreadId?: string | null }>;
   poll(input: { sessionId: string }): Promise<{ replies: { id: number; title: string; summary: string; note: string }[] }>;
@@ -24,6 +27,8 @@ export interface SessionOptions {
   /** Overrides the transports (tests). */
   connect?: (start: (sdp?: string) => ReturnType<LiveServer["start"]>, model: string) => Promise<{ transport: LiveTransport; started: Awaited<ReturnType<LiveServer["start"]>> }>;
   earcon?: (earcon: Earcon) => void;
+  /** The thread it was launched from: the session speaks as it. None: the Chief of Staff. */
+  threadId?: string | null;
 }
 
 /** What happened when, for measuring (window.__studioVoiceLive in staged runs). */
@@ -36,6 +41,8 @@ export class LiveSession {
   micLabel = "";
   /** The session's voice thread, once Studio has opened it: the pill links to it. */
   voiceThreadId: string | null = null;
+  /** Who it speaks as, once Studio has started it. */
+  identity: LiveIdentity | null = null;
   readonly trace: TraceEntry[] = [];
   private transport: LiveTransport | null = null;
   private sessionId: string | null = null;
@@ -111,9 +118,12 @@ export class LiveSession {
       const state = await this.server.state();
       if (!state.ready) throw new Error(state.problem ?? "Hands-free voice isn't set up.");
       this.model = state.model;
-      const start = (sdp?: string) => this.server.start({ model: state.model, ...(sdp ? { sdp } : {}) });
+      const threadId = this.options.threadId ?? undefined;
+      const start = (sdp?: string) => this.server.start({ model: state.model, ...(sdp ? { sdp } : {}), ...(threadId ? { threadId } : {}) });
       const { transport, started } = await (this.options.connect ?? defaultConnect)(start, state.model);
       this.sessionId = started.sessionId;
+      this.identity = started.identity ?? null;
+      if (this.identity) this.log(`speaking as ${this.identity.label}`);
       this.protocol = started.transport === "realtime-webrtc" ? "realtime" : "live";
       this.machine.endsLinesOnPause = this.protocol === "live";
       this.micLabel = transport.micLabel;

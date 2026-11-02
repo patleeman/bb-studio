@@ -405,3 +405,56 @@ describe("searching voice threads", () => {
     expect(keyless.live.search("eBay")).toEqual([]);
   });
 });
+
+describe("identity: the session speaks as the thread it was launched from", () => {
+  const leadSeed = { kind: "lead" as const, name: "Kensico lead", threadId: "thr_kensico", role: "Lead of the Kensico project.", recent: [{ role: "assistant" as const, text: "The eBay fetcher hit a rate limit." }], project: "Kensico" };
+
+  it("builds the seed once at start, puts it in the instructions and returns who it speaks as", async () => {
+    const seed = vi.fn(async (threadId: string | null) => (threadId === "thr_kensico" ? leadSeed : null));
+    const { live, fetch, db } = setup({}, { seed });
+    const started = await live.start({ sdp: "v=0 offer", threadId: "thr_kensico" });
+    expect(seed).toHaveBeenCalledTimes(1);
+    expect(seed).toHaveBeenCalledWith("thr_kensico");
+    expect(started.identity).toEqual({ kind: "lead", label: "Kensico lead", name: "Kensico lead", threadId: "thr_kensico" });
+    expect(voiceLiveContract["voiceLive.start"].output.parse(started)).toEqual(started);
+    const body = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    for (const instructions of [body.session.instructions, body.session.delegation.responses.instructions]) {
+      expect(instructions).toContain('You are the voice of the thread "Kensico lead"');
+      expect(instructions).toContain("<context>\nYou speak for the thread \"Kensico lead\".\nRole: Lead of the Kensico project.");
+      expect(instructions).toContain("Kensico lead: The eBay fetcher hit a rate limit.");
+    }
+    const recorded = db.prepare("SELECT data FROM voice_call_events WHERE kind = 'identity'").get() as { data: string };
+    expect(JSON.parse(recorded.data)).toMatchObject({ identity: { kind: "lead" }, missing: [], ms: 0 });
+
+    // Tools don't rebuild it.
+    await live.tool(started.sessionId, "loops_list", "{}");
+    await live.tool(started.sessionId, "send_to_thread", JSON.stringify({ message: "Retry the fetcher" }));
+    expect(seed).toHaveBeenCalledTimes(1);
+  });
+
+  it("relays with no target go to the launching thread; send_to_cos and names still reach the others", async () => {
+    const { live, send } = setup({}, { seed: async () => leadSeed });
+    const { sessionId } = await live.start({ sdp: "v=0 offer", threadId: "thr_kensico" });
+    expect(await live.tool(sessionId, "send_to_thread", JSON.stringify({ target: "", message: "Retry the fetcher at noon" }))).toMatch(/^Sent to Kensico lead\./);
+    expect(send.mock.calls.at(-2)![0]).toMatchObject({ threadId: "thr_kensico", text: "🎙 From voice: Retry the fetcher at noon" });
+    expect(await live.tool(sessionId, "send_to_cos", JSON.stringify({ message: "Book the car" }))).toMatch(/^Sent to Dot\./);
+    expect(send.mock.calls.at(-2)![0]).toMatchObject({ threadId: "thr_cos" });
+  });
+
+  it("launched from the Chief of Staff, or with no seed source, it is the Chief of Staff and relays there by default", async () => {
+    for (const overrides of [{ seed: async () => null }, {}, { seed: async () => { throw new Error("sources down"); } }]) {
+      const { live, send } = setup({}, overrides as Partial<VoiceLiveDeps>);
+      const started = await live.start({ sdp: "v=0 offer" });
+      expect(started.identity).toEqual({ kind: "cos", label: "Chief of Staff", name: "Dot", threadId: "thr_cos" });
+      expect(await live.tool(started.sessionId, "send_to_thread", JSON.stringify({ message: "Check the backups" }))).toMatch(/^Sent to Dot\./);
+      expect(send.mock.calls.at(-2)![0]).toMatchObject({ threadId: "thr_cos" });
+    }
+  });
+
+  it("no seed is built when the start is refused", async () => {
+    const seed = vi.fn(async () => leadSeed);
+    const { live } = setup({}, { seed });
+    await expect(live.start({ threadId: "thr_kensico" })).rejects.toThrow(/needs the phone's SDP offer/);
+    expect(seed).not.toHaveBeenCalled();
+  });
+});

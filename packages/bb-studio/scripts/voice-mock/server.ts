@@ -32,6 +32,7 @@ import Database from "better-sqlite3";
 import { MIGRATIONS } from "../../src/migrations";
 import { voiceLiveContract } from "../../src/voice/live/contract";
 import { VoiceLive, type VoiceLoop } from "../../src/voice/live/live";
+import { buildSeed, gatherSeed, type SeedSources } from "../../src/voice/live/identity";
 import { liveSessionRequest } from "../../src/voice/live/session";
 import { resolveTarget } from "../../src/voice/live/targets";
 
@@ -61,6 +62,19 @@ const loops = new Map<string, VoiceLoop>([
   ["loop_car", { id: "loop_car", title: "Book the car service", kind: "do", status: "queued", priority: "normal", due: null, trigger: { type: "none" } }],
   ["loop_ts", { id: "loop_ts", title: "Remove the stale Tailscale node", kind: "do", status: "queued", priority: "low", due: null, trigger: { type: "none" } }],
 ]);
+/** The seed's sources (identity.ts), faked: the CoS with a Memory page and recent chat, and the Kensico lead. */
+const SEED_SOURCES: SeedSources = {
+  bots: () => [{ name: COS.name, role: "Keeps Patrick's week on track and chases what's waiting.", threadId: COS.threadId, memoryPageId: "pg_memory", primary: true }],
+  memory: () => "## Check-in\n- Look at the inbox\n\n## Memory\n- Patrick drives to Kensico on Tuesdays.\n- The eBay fetcher runs nightly; Kensico's lead owns it.",
+  leadOf: (threadId) => LEADS.find((lead) => lead.threadId === threadId)?.project ?? null,
+  runnerOf: () => null,
+  thread: async (threadId) => { const thread = THREADS.find((each) => each.id === threadId); return thread ? { title: thread.title, project: LEADS.find((lead) => lead.threadId === threadId)?.project ?? null } : null; },
+  recent: async (threadId) => threadId === COS.threadId
+    ? [{ role: "user", text: "What's on for tomorrow?" }, { role: "assistant", text: "The domain renewal is due Friday, and the Kensico lead is pausing the eBay fetcher." }]
+    : [{ role: "assistant", text: "The eBay fetcher hit a rate limit last night; I'll retry at 9." }],
+  loops: () => ({ needsYouNow: [...loops.values()].filter((loop) => loop.status === "surfaced").map((loop) => loop.title), comingUp: [...loops.values()].filter((loop) => loop.status === "queued").map((loop) => loop.title) }),
+};
+
 const voiceThread: string[] = [];
 const timings: Record<string, number[]> = {};
 const time = (name: string, ms: number) => (timings[name] ??= []).push(Math.round(ms));
@@ -70,6 +84,7 @@ const live: VoiceLive = new VoiceLive({
   key: () => "",
   settings: () => ({ voiceLiveMonthlyCapUsd: 20, voiceLiveModel: "gpt-live-1" }),
   cos: () => COS,
+  seed: (threadId) => gatherSeed(threadId, SEED_SOURCES),
   resolve: async (name) => resolveTarget(name, { cos: COS, leads: LEADS, threads: THREADS }),
   latestReply: async (threadId) => ({ title: THREADS.find((thread) => thread.id === threadId)?.title ?? threadId, text: "Paused the eBay fetcher. It resumes Monday at 9." }),
   loops: {
@@ -98,7 +113,7 @@ const live: VoiceLive = new VoiceLive({
 type Handler = (input: never) => unknown;
 const handlers: Record<string, Handler> = {
   "voiceLive.state": () => live.state(),
-  "voiceLive.start": (input: { model?: "gpt-live-1"; sdp?: string }) => live.start(input),
+  "voiceLive.start": (input: { model?: "gpt-live-1"; sdp?: string; threadId?: string }) => live.start(input),
   "voiceLive.tool": async (input: { sessionId: string; name: string; args?: string; events?: never[] }) => {
     const started = performance.now();
     const output = await live.tool(input.sessionId, input.name, input.args, input.events);
@@ -409,7 +424,8 @@ function runLiveBridge(app: Duplex) {
 
   openai.onopen = () => {
     say("live: connected to GPT-Live");
-    toOpenAI({ type: "session.start", session: liveSessionRequest({ cosName: COS.name, sdp: "" }).session });
+    const seed = buildSeed({ kind: "cos", name: COS.name, threadId: COS.threadId, role: null, recent: null });
+    toOpenAI({ type: "session.start", session: liveSessionRequest({ persona: { identity: seed.identity, seed: seed.text, cosName: COS.name }, sdp: "" }).session });
   };
   openai.onerror = () => say("live: socket error");
   openai.onclose = (event) => { say(`live: GPT-Live socket closed (${event.code} ${event.reason})`); if (!closed) toApp({ type: "session.closed", reason: "connection_lost" }); closed = true; };

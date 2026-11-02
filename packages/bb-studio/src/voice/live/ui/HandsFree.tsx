@@ -42,11 +42,14 @@ const useStore = () => useSyncExternalStore((listener) => { listeners.add(listen
 /** The pill keeps Studio's RPC client, so the command palette can start a session too. */
 let windowRpc: Rpc | null = null;
 
-/** Starts a session, or, when one is running, opens its pill. */
-export function startHandsFree(rpc: Rpc | null = windowRpc): void {
+/**
+ * Starts a session, or, when one is running, opens its pill. It speaks as the
+ * thread it's launched from (docs/voice/identity.md); none: the Chief of Staff.
+ */
+export function startHandsFree(rpc: Rpc | null = windowRpc, threadId: string | null = null): void {
   if (state.session?.machine.isLive) return set({ expanded: true });
   if (!rpc) return;
-  const session = new LiveSession(liveServer(rpc));
+  const session = new LiveSession(liveServer(rpc), { threadId });
   // Staged runs read the trace to measure barge-in and turns.
   (globalThis as { __studioVoiceLive?: LiveSession }).__studioVoiceLive = session;
   set({ session, expanded: false });
@@ -73,7 +76,7 @@ export function HandsFreeComposerButton() {
   return (
     <button type="button" data-testid="handsfree-composer" aria-label={label} title={label} aria-pressed={live}
       className={handsFreeButtonClass(live)}
-      onClick={() => startHandsFree(rpc as unknown as Rpc)}>
+      onClick={() => startHandsFree(rpc as unknown as Rpc, composer.scope.kind === "thread" ? composer.scope.threadId : null)}>
       <Icon name="studio/handsfree" className="size-4" aria-hidden />
     </button>
   );
@@ -133,6 +136,7 @@ function Pill({ session, expanded }: { session: LiveSession; expanded: boolean }
       <div {...drag.handleProps} title="Drag to move" className={cn("flex touch-none select-none items-center gap-2.5 py-1.5 pl-1.5 pr-1.5", drag.dragging ? "cursor-grabbing" : "cursor-grab")}>
         <MiniOrb speaker={speaker} thinking={machine.phase.kind === "thinking"} live={live} />
         <div className="min-w-0 flex-1" aria-live="polite">
+          {session.identity ? <div data-testid="handsfree-identity" title={`Talking with ${session.identity.name}`} className="truncate text-[11px] font-semibold leading-4 text-foreground/80">{session.identity.label}</div> : null}
           {line ? (
             <div data-testid="handsfree-subtitle" data-speaker={line.speaker} className={cn("truncate text-[13px] leading-5", line.speaker === "user" ? "text-muted-foreground" : "font-medium")}>{tail(line.text)}</div>
           ) : (

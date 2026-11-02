@@ -35737,6 +35737,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100000
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           }
         },
         "additionalProperties": false
@@ -35801,6 +35806,40 @@
           },
           "cosName": {
             "type": "string"
+          },
+          "identity": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "cos",
+                  "bot",
+                  "lead",
+                  "runner",
+                  "thread"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "label",
+              "name",
+              "threadId"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -35813,7 +35852,8 @@
           "callsUrl",
           "mockUrl",
           "voiceThreadId",
-          "cosName"
+          "cosName",
+          "identity"
         ],
         "additionalProperties": false
       }

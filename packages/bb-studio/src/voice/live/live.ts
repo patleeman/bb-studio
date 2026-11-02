@@ -8,6 +8,9 @@
 //   eyes-free rules hold (rules.ts, classify): reads are free; relays and loop
 //   actions happen at once (loop actions undoable for 10 s); destructive ones
 //   wait until Studio hears the user's own spoken yes; nothing else is a tool.
+// - Identity: the session speaks as the thread it was launched from
+//   (identity.ts, docs/voice/identity.md). Its seed is built once at start,
+//   kept with the session, and relays with no target go to that thread.
 // - Relays are visible: the message lands in the target thread from the
 //   voice thread (senderThreadId), with an agent-only note of the rules, and
 //   a line in the voice thread at once. When the target finishes, its reply
@@ -23,6 +26,7 @@
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
 import { addRealtimeUsage, addTranscriptionUsage, EMPTY_TALLY, liveCost, realtimeCost, type RealtimeTally } from "../../bot-prices";
+import { buildSeed, type SeedInput, type VoiceIdentity } from "./identity";
 import { speakable } from "./speakable";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
@@ -57,6 +61,11 @@ export interface VoiceLiveDeps {
   settings(): Record<string, unknown>;
   /** The Chief of Staff (the primary Bot): its name and chat, or null. */
   cos(): { name: string; threadId: string | null } | null;
+  /**
+   * The seed's sources for the launching thread (identity.ts gatherSeed); null
+   * or no launching thread means the Chief of Staff. Called once per session.
+   */
+  seed?(threadId: string | null): Promise<SeedInput | null>;
   /** Threads a spoken name could mean: "the Kensico lead", a title. */
   resolve(name: string): Promise<VoiceTarget[]>;
   /** A thread's latest reply, or null. */
@@ -225,26 +234,47 @@ export class VoiceLive {
     return JSON.parse(text) as Record<string, unknown>;
   }
 
-  /** Checks the cap, starts the OpenAI side and opens the voice thread. */
-  async start(input: { model?: LiveModel; sdp?: string } = {}) {
+  /**
+   * Who the session speaks as, and its seed: built once, here, and timed. A
+   * missing or failing source leaves the Chief of Staff with no context rather
+   * than failing the start.
+   */
+  private async persona(threadId: string | null, cos: { name: string; threadId: string | null }) {
+    const began = this.now();
+    let input: SeedInput | null = null;
+    try { input = (await this.deps.seed?.(threadId)) ?? null; } catch (error) { this.deps.warn?.(`Couldn't gather the voice seed: ${String(error)}`); }
+    const seed = buildSeed(input ?? { kind: "cos", name: cos.name, threadId: cos.threadId, role: null, memory: null, loops: null, recent: null });
+    return { seed, ms: this.now() - began };
+  }
+
+  /** The thread a session speaks for (relays with no target go there); the CoS chat before identities. */
+  private identity(sessionId: string): VoiceIdentity | null {
+    const event = this.events(sessionId).find((each) => each.kind === "identity");
+    return event ? data<{ identity: VoiceIdentity }>(event).identity : null;
+  }
+
+  /** Checks the cap, builds the seed, starts the OpenAI side and opens the voice thread. */
+  async start(input: { model?: LiveModel; sdp?: string; threadId?: string } = {}) {
     const problem = this.problem();
     if (problem) throw new VoiceRefused(problem);
     const cos = this.deps.cos()!;
     const model = input.model ?? this.config().model;
     const mockUrl = this.deps.mockUrl?.() ?? null;
+    if (!mockUrl && model === "gpt-live-1" && !input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
+    const { seed, ms } = await this.persona(input.threadId ?? null, cos);
+    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name };
     let transport: LiveTransport = model === "gpt-live-1" ? "live-webrtc" : "realtime-webrtc";
     let answerSdp: string | null = null;
     let clientSecret: string | null = null;
     let expiresAt: number | null = null;
     if (mockUrl) transport = "mock";
     else if (model === "gpt-live-1") {
-      if (!input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
-      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ cosName: cos.name, sdp: input.sdp }), "the voice session");
+      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp! }), "the voice session");
       const sdp = (created.transport as { sdp?: unknown } | undefined)?.sdp;
       if (typeof sdp !== "string" || !sdp) throw new Error("OpenAI answered without an SDP answer.");
       answerSdp = sdp;
     } else {
-      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ cosName: cos.name }), "the voice session");
+      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona }), "the voice session");
       if (typeof minted.value !== "string" || !minted.value) throw new Error("OpenAI answered without a client secret.");
       clientSecret = minted.value;
       expiresAt = typeof minted.expires_at === "number" ? minted.expires_at * 1000 : this.now() + 60_000;
@@ -253,10 +283,11 @@ export class VoiceLive {
     const startedAt = this.now();
     this.deps.db.prepare("INSERT INTO voice_calls (id, bot_id, bot_name, thread_id, model, voice, transcribe_model, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(sessionId, "cos", cos.name, null, model, VOICE, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
+    this.append(sessionId, "identity", { data: { identity: seed.identity, chars: seed.text.length, ms, missing: seed.missing } });
     // The thread opens beside the call: the phone connects without waiting for it.
     this.opening.set(sessionId, this.deps.openThread({
       title: voiceTitle(startedAt),
-      text: `🎙 Hands-free voice session (${model}). The transcript and everything it relays to ${cos.name} and other threads lands here.`,
+      text: `🎙 Hands-free voice session (${model}), speaking as ${seed.identity.kind === "cos" ? `${cos.name}, the Chief of Staff` : seed.identity.name}. The transcript and everything it relays lands here.`,
       note: "This thread is the record of a hands-free voice session; the voice agent runs on OpenAI, not here. Studio posts the transcript, the messages it relayed and the replies. Don't act on these posts: reply exactly [PASS].",
     }).then(async (threadId) => {
       this.append(sessionId, "thread", { data: { threadId } });
@@ -271,6 +302,7 @@ export class VoiceLive {
       callsUrl: transport === "realtime-webrtc" ? REALTIME_CALLS_URL : null,
       mockUrl: transport === "mock" ? mockUrl : null,
       voiceThreadId: null, cosName: cos.name,
+      identity: seed.identity,
     };
   }
 
@@ -296,7 +328,7 @@ export class VoiceLive {
     const row = this.live(sessionId);
     if (events.length) this.save(sessionId, events);
     if (!(VOICE_TOOLS as readonly string[]).includes(name)) {
-      return `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${row.bot_name} instead.`;
+      return `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${this.identity(row.id)?.name ?? row.bot_name} instead.`;
     }
     let parsed: Record<string, unknown> = {};
     if (args?.trim()) {
@@ -370,7 +402,15 @@ export class VoiceLive {
     return found[0]!;
   }
 
+  /** No target: the thread the session speaks for (the CoS chat for the Chief of Staff). */
   private async relayTo(row: SessionRow, target: string, message: string): Promise<string> {
+    if (!target) {
+      const home = this.identity(row.id);
+      const cos = this.deps.cos();
+      const threadId = home?.threadId ?? cos?.threadId;
+      if (!threadId) return "send_to_thread needs a target: a thread's name or a project's lead.";
+      return this.relay(row, { threadId, title: home?.name ?? cos!.name }, message);
+    }
     const found = await this.oneThread(target, "send_to_thread");
     return typeof found === "string" ? found : this.relay(row, found, message);
   }

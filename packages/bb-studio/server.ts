@@ -25,6 +25,7 @@ import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
 import { VOICE_LIVE_SETTINGS, VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
+import { gatherSeed, RECENT_MESSAGES, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
 import { subcommand, usage } from "./src/kit/cli";
@@ -1262,6 +1263,39 @@ export default async function plugin(bb: BbPluginApi) {
     key: () => openaiKey(settingValues),
     settings: () => settingValues,
     cos: () => { const bot = bots.stored(); return bot ? { name: bot.name, threadId: bot.threadId ?? null } : null; },
+    // The session's identity seed (src/voice/live/identity.ts): cheap sources only, read once at start.
+    seed: async (threadId) => {
+      const projectNames = bb.sdk.projects.list({ includePersonal: true }).then((list) => new Map((list as { id: string; name: string }[]).map((project) => [project.id, project.name]))).catch(() => new Map<string, string>());
+      return gatherSeed(threadId, {
+        bots: () => bots.list().map((bot) => ({ name: bot.name, role: bot.role ?? null, threadId: bot.threadId, memoryPageId: bot.memoryPageId ?? null, primary: !!bot.primary })),
+        memory: (pageId) => pages.markdown(pageId) ?? null,
+        leadOf: async (id) => { const lead = projectLeads.list().find((each) => each.leadThreadId === id && each.projectId !== PERSONAL_PROJECT_ID); return lead ? (await projectNames).get(lead.projectId) ?? lead.projectId : null; },
+        runnerOf: (id) => { const runner = runners.forThread(id); return runner ? { name: runner.name, job: runner.job } : null; },
+        thread: async (id) => {
+          const thread = await bb.sdk.threads.get({ threadId: id }) as { title?: string | null; titleFallback?: string | null; projectId?: string | null };
+          const projectId = thread.projectId ?? null;
+          const project = projectId && projectId !== PERSONAL_PROJECT_ID ? (await projectNames).get(projectId) ?? null : null;
+          return { title: thread.title || thread.titleFallback || "this thread", project };
+        },
+        recent: async (id) => {
+          const page = await bb.sdk.threads.timeline({ threadId: id, segmentLimit: "4" } as never) as { rows?: { kind: string; role?: string; text?: string; children?: unknown[] }[] };
+          const messages: SeedMessage[] = [];
+          const visit = (rows: { kind: string; role?: string; text?: string; children?: unknown[] }[]) => {
+            for (const row of rows) {
+              if (row.kind === "conversation" && (row.role === "user" || row.role === "assistant") && row.text) messages.push({ role: row.role, text: row.text });
+              if (Array.isArray(row.children)) visit(row.children as never);
+            }
+          };
+          visit(page.rows ?? []);
+          return messages.slice(-RECENT_MESSAGES);
+        },
+        loops: () => {
+          if (!loopsEnabled()) return null;
+          const groups = loops.store.groups();
+          return { needsYouNow: groups.needsYouNow.map((loop) => loop.title), comingUp: groups.comingUp.map((loop) => loop.title) };
+        },
+      });
+    },
     resolve: async (name) => {
       const bot = bots.stored();
       const projects = new Map(((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).map((project) => [project.id, project.name]));
