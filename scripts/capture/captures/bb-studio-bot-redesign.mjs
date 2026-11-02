@@ -134,6 +134,8 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       for (const runner of runners) {
         const row = runnerRows.find((each) => each.id === runner.id);
         const spec = RUNNERS.find((each) => each.name === runner.name);
+        // Other captures add runners of their own to the same staged Bot.
+        if (!spec) continue;
         const times = spec.schedule.cron ? [[5, 15], [13, 15]] : [spec.schedule.time.split(":").map(Number)];
         for (const day of [-1, 0]) {
           if (spec.schedule.cadence === "weekdays" && [0, 6].includes(new Date(at(day, 12)).getDay())) continue;

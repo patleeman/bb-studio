@@ -385,6 +385,9 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     paneCapture("studio-loops-pane-card", "loops-pane-card.png", "dark", async (client) => {
       await client.waitForText("Open Loops beside the chat", 30000);
       if (!/\d+ need/.test(await client.evaluate(`document.querySelector("[data-testid=loops-open]").textContent`))) throw new Error("The Loops card has no summary");
+      // Focus the chat's pane first: with the side panel focused, BB takes the
+      // first press in the chat to move focus there (base Studio too).
+      await press(client, "[data-testid=loops-open] span", "Loops");
       await press(client, "[data-testid=loops-open] button", "Open Loops beside the chat");
       await client.waitForSelector("[data-testid=loops-pane]", 30000);
       for (const text of PANE_TEXTS) await client.waitForText(text, 30000);
