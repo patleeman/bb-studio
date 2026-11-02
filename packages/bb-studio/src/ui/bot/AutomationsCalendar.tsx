@@ -20,7 +20,7 @@ import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
 import { useRunners } from "./Runners";
 import { sidebarAgenda } from "./sidebarAgenda";
-import { areaColor, areaColors, clockAt, inSentence, outcomeWords } from "./pageModel";
+import { areaColor, areaColors, clockAt, inSentence, lastFailure, outcomeWords } from "./pageModel";
 import { calendarWeek, chainGroups, groupName, isGroup, minuteOfDay, pausedSources, placeBlocks, windowDays, windowStart, type CalendarBand, type CalendarEvent, type CalendarGroup, type CalendarItem, type CalendarSource, type FoldChip, RUNS_LIMIT } from "./calendar";
 
 /** An hour's height on the page, where the week shows whole; beside a thread it scrolls. */
@@ -268,7 +268,10 @@ export function AutomationsCalendar({ botId, botName = "The Bot", automations, o
                 <Dot color={areaColor(colors, source.area)} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm">{source.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{[source.area?.name, source.scheduleText].filter(Boolean).join(" · ")}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {[source.area?.name, source.scheduleText].filter(Boolean).join(" · ")}
+                    {lastFailure(source) ? <span className="text-destructive" data-paused-failed>{source.area?.name || source.scheduleText ? " · " : ""}Last run failed</span> : null}
+                  </span>
                 </span>
                 {source.runs !== null ? <button type="button" className={OUTLINE_BUTTON} disabled={busy} onClick={() => onResume(source.id)}><Icon name="Play" />Resume</button> : null}
               </li>

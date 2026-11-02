@@ -19,7 +19,7 @@ import { AutomationsSection, useAutomations } from "./Automations";
 import { Dot, Dots, useBotJobs } from "./AutomationsCalendar";
 import { RunnersSection } from "./Runners";
 import { calendarWeek, chainGroups, groupName, isGroup, windowDays, type CalendarEvent } from "./calendar";
-import { agoWords, areaColor, clockAt, failedRuns, failedTitle, inSentence, recentEntries, statusSentence, upNext, whenWords, type RecentEntry } from "./pageModel";
+import { agoWords, areaColor, clockAt, failedRuns, failedTitle, inSentence, type FailedRun, recentEntries, statusSentence, upNext, whenWords, type RecentEntry } from "./pageModel";
 import { useOpenThread } from "./workspace";
 import { botPath } from "./selection";
 import { usePendingQuestions } from "../../loops/ui/LoopsTab";
@@ -38,6 +38,9 @@ export const isControlsPath = (pathname: string) => /^\/plugins\/studio\/studio\
 
 const firstSentence = (text: string | null | undefined) => ((text ?? "").split(/(?<=[.!?])\s/)[0] ?? "").replace(/[.!]$/, "");
 const capitalize = (text: string) => text ? text[0]!.toUpperCase() + text.slice(1) : text;
+const sentence = (text: string) => /[.!?…]$/.test(text) ? text : `${text}.`;
+/** A thread at one message, as BB links it (`/threads/<id>#msg=<seq>`). */
+export const messagePath = (threadId: string, seq: number) => `/threads/${encodeURIComponent(threadId)}#msg=${seq}`;
 
 export type WorkItem = { id: string; name: string; detail: string; since: number | null; waiting: string | null; providerId: string | null; threadId: string };
 export type NeedItem = {
@@ -97,9 +100,19 @@ export function useBotPageModel(view: BotView) {
   const loopNeeds = loopsOn ? loops.data?.needsYouNow ?? [] : [];
   const failures = failedRuns(sources, dismissed);
   for (const loop of loopNeeds.filter((each) => dueLabel(each.due, now)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now), action: loopAction(loop) });
+  // A failed run opens itself: its thread at the message it sent, or its automation's runs.
+  const openRun = (run: FailedRun) => {
+    const fallback = () => run.threadId ? openThread(run.threadId) : openAppPath(botPath(bot.id));
+    void call("bot_run_link", { botId: bot.id, automationId: run.sourceId, runId: run.runId }).then((link) => {
+      if (link.threadId && link.seq !== null) openAppPath(messagePath(link.threadId, link.seq));
+      else if (link.threadId) openThread(link.threadId);
+      else if (link.path) openAppPath(link.path);
+      else fallback();
+    }, fallback);
+  };
   for (const run of failures) needs.push({
-    key: `failed:${run.sourceId}:${run.runId}`, icon: "AlertTriangle", tone: "failed", title: failedTitle(run, now, tz), detail: capitalize(/^(it|she|he|they)\b/i.test(run.error) ? run.error : `It ${run.error}`.replace(/^It (C|c)ouldn't/, "It couldn't")),
-    action: run.threadId ? { label: "Open", run: () => openThread(run.threadId!) } : { label: "Open", run: () => openAppPath(botPath(bot.id)) },
+    key: `failed:${run.sourceId}:${run.runId}`, icon: "AlertTriangle", tone: "failed", title: failedTitle(run, now, tz), detail: capitalize(sentence(run.error)),
+    action: { label: "Open", run: () => openRun(run) },
     dismiss: () => void call("bot_run_dismiss", { botId: bot.id, automationId: run.sourceId, runId: run.runId }).then(() => page.refresh(), () => {}),
   });
   const tracked = new Set(loopNeeds.filter((loop) => loop.source?.kind === "interaction").map((loop) => loop.source!.ref));

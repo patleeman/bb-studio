@@ -369,14 +369,25 @@ test("Needs you: a failed run with Open and Dismiss, a pending question, and mai
     const needs = container.querySelector('section[aria-label="Needs you"]')!;
     const row = needs.querySelector('[data-need="failed:security:run_9"]')!;
     expect(row.textContent).toContain("Security check failed");
-    expect(row.textContent).toContain("It couldn't sign in to Wyze");
+    expect(row.textContent).toContain("Couldn't sign in to Wyze.");
+    expect(row.textContent).not.toContain("It couldn't");
+    // Open: the run itself, its thread at the message it sent.
+    const { openAppPath } = await import("../../kit/app/index");
+    state.call.mockImplementation((async (method: string) => method === "bot_run_link" ? { threadId: "thr_sec_run", seq: 41, path: null } : {}) as never);
+    await act(async () => click([...row.querySelectorAll("button")].find((each) => each.textContent === "Open")));
+    expect(state.call).toHaveBeenCalledWith("bot_run_link", { botId: "bot_main", automationId: "security", runId: "run_9" });
+    expect(openAppPath).toHaveBeenCalledWith("/threads/thr_sec_run#msg=41");
+    // A script's run: its automation's runs. No link at all: its thread.
+    state.call.mockImplementation((async (method: string) => method === "bot_run_link" ? { threadId: null, seq: null, path: "/plugins/automations/automations/proj_p/a1" } : {}) as never);
+    await act(async () => click([...row.querySelectorAll("button")].find((each) => each.textContent === "Open")));
+    expect(openAppPath).toHaveBeenCalledWith("/plugins/automations/automations/proj_p/a1");
+    state.call.mockImplementation(async () => ({}));
     await act(async () => click([...row.querySelectorAll("button")].find((each) => each.textContent === "Open")));
     expect(state.toThread).toHaveBeenCalledWith("thr_sec_run");
     await act(async () => click(row.querySelector('[aria-label^="Dismiss"]')));
     expect(state.call).toHaveBeenCalledWith("bot_run_dismiss", { botId: "bot_main", automationId: "security", runId: "run_9" });
     expect(needs.querySelector('[data-need="question:q1"]')?.textContent).toContain("Which vault holds the deploy key?");
     expect(needs.querySelector('[data-need="maintenance:calls"]')?.textContent).toContain("Archive 3 finished threads?");
-    const { openAppPath } = await import("../../kit/app/index");
     await act(async () => click([...needs.querySelectorAll('[data-need="maintenance:calls"] button')].find((each) => each.textContent === "Review")));
     expect(openAppPath).toHaveBeenCalledWith(`${CONTROLS}#maintenance`);
     // Dismissed: gone. A later success clears it too.

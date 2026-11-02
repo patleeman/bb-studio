@@ -177,7 +177,30 @@ export function runStatus(status: string | null | undefined): Exclude<EventStatu
   if (/skip|cancel/.test(text)) return "skipped";
   return "ok";
 }
-const errorOf = (outcome: string) => outcome.replace(/^Failed:?\s*/i, "") || "Failed";
+const errorOf = (outcome: string) => plainError(outcome.replace(/^Failed:?\s*/i, "")) || "Failed";
+
+/**
+ * A run's error in plain words: "The script stopped with an error (exit 2)",
+ * "The script was stopped", "Its thread hit an error", "It took too long", or
+ * a short, clean version of the message (its first sentence, no ids). Empty
+ * for no error.
+ */
+export function plainError(raw: string | null | undefined): string {
+  const text = (raw ?? "").replace(/^(error|failed):?\s*/i, "").trim();
+  if (!text) return "";
+  if (/timed?[ -]?out|timeout|took too long|deadline exceeded/i.test(text)) return "It took too long";
+  const exit = /exit(?:ed)?(?: with)?(?: exit)? code:? *(-?\d+|null|undefined|none)?/i.exec(text);
+  if (exit) return exit[1] && /^-?\d+$/.test(exit[1]) ? `The script stopped with an error (exit ${exit[1]})` : "The script was stopped";
+  if (/\b(killed|terminated|aborted)\b|\bSIG[A-Z]+\b/.test(text)) return "The script was stopped";
+  if (/thread\b.*\b(error state|errored)\b/i.test(text)) return "Its thread hit an error";
+  // The first line's first sentence, without ids, paths' noise or a trailing stop.
+  let line = (text.split("\n").find((each) => each.trim()) ?? "").trim();
+  line = (line.split(/(?<=[.!?])\s/)[0] ?? line)
+    .replace(/\s*\(?\b(?:thr|proj|env|run|auto|mini|pg|art|bot)_[A-Za-z0-9_-]+\b\)?/g, "")
+    .replace(/\s{2,}/g, " ").replace(/\s+([.,:;!?])/g, "$1").replace(/[.:;,]+$/, "").trim();
+  if (line.length > 100) line = `${line.slice(0, 99).replace(/\s+\S*$/, "")}…`;
+  return line ? line[0]!.toUpperCase() + line.slice(1) : "It failed";
+}
 
 /**
  * A job's events in [from, to) at `now`: its runs that happened (or are going

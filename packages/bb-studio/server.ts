@@ -1001,6 +1001,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_automation_run_now: ({ botId, id }) => automations.runNow(id, botId),
     bot_automation_delete: ({ botId, id }) => automations.delete(id, botId),
     bot_automation_runs: async ({ botId, id, limit }) => ({ runs: await automations.runs(id, botId, limit) }),
+    bot_run_link: ({ botId, automationId, runId }) => automations.runLink(automationId, runId, botId),
     bot_runners: async ({ botId }) => { const [list, adoptable] = await Promise.all([runners.list(botId), runners.adoptable(botId)]); return { runners: list, adoptable }; },
     bot_runner_create: ({ botId, ...input }) => { bots.requireStudio(botId, "runners"); return runners.create(input, botId); },
     bot_runner_update: ({ botId, ...input }) => runners.update(input, botId),

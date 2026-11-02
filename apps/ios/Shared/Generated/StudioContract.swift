@@ -90,6 +90,7 @@ public enum Studio {
     public static let bot_page_state = "bot_page_state"
     public static let bot_calendar_group_rename = "bot_calendar_group_rename"
     public static let bot_run_dismiss = "bot_run_dismiss"
+    public static let bot_run_link = "bot_run_link"
     public static let bot_cache_state = "bot_cache_state"
     public static let bot_cache_set = "bot_cache_set"
     public static let bot_cache_banner_hide = "bot_cache_banner_hide"
@@ -523,6 +524,8 @@ public enum Studio {
   public typealias BotCalendarGroupRename = BotCalendarGroupRenameOutput
 
   public typealias BotRunDismiss = BotRunDismissOutput
+
+  public typealias BotRunLink = BotRunLinkOutput
 
   public typealias BotCacheState = BotCacheStateOutput
 
@@ -10576,6 +10579,30 @@ public enum Studio {
     public init(groupNames: [String: String]? = nil, dismissed: [String]? = nil) {
       self.groupNames = groupNames
       self.dismissed = dismissed
+    }
+  }
+
+  public struct BotRunLinkInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var automationId: String?
+    public var runId: String?
+
+    public init(botId: String? = nil, automationId: String? = nil, runId: String? = nil) {
+      self.botId = botId
+      self.automationId = automationId
+      self.runId = runId
+    }
+  }
+
+  public struct BotRunLinkOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var seq: Int?
+    public var path: String?
+
+    public init(threadId: String? = nil, seq: Int? = nil, path: String? = nil) {
+      self.threadId = threadId
+      self.seq = seq
+      self.path = path
     }
   }
 

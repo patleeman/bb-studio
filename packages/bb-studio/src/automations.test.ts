@@ -12,6 +12,8 @@ async function setup() {
   const send = vi.fn(async () => ({ ok: true }));
   const automations: Record<string, unknown>[] = [];
   const runs = new Map<string, Record<string, unknown>[]>();
+  /** Each thread's message requests, newest first. */
+  const requests = new Map<string, { seq: number; createdAt: number }[]>();
   const calls: { method: string; input: Record<string, unknown> }[] = [];
   const callRpc = vi.fn(async ({ method, input }: { method: string; input: Record<string, unknown> }) => {
     calls.push({ method, input });
@@ -31,6 +33,7 @@ async function setup() {
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       get: (async ({ threadId }: { threadId: string }) => threads.get(threadId)!) as never, send: send as never,
+      events: { list: (async ({ threadId, beforeSeq }: { threadId: string; beforeSeq?: string }) => (requests.get(threadId) ?? []).filter((each) => beforeSeq === undefined || each.seq < Number(beforeSeq))) as never } as never,
       defaultExecutionOptions: async () => ({ model: "gpt-big", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
@@ -50,7 +53,7 @@ async function setup() {
       list: listRunners, get: vi.fn() as never, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
     },
   });
-  return { auto, automations, runs, calls, callRpc, send, bot, threads, listRunners, setHeartbeat, db, heartbeat: () => heartbeat };
+  return { auto, automations, runs, requests, calls, callRpc, send, bot, threads, listRunners, setHeartbeat, db, heartbeat: () => heartbeat };
 }
 
 it("lists the original check-in first, unchanged, then new ones", async () => {
@@ -368,4 +371,22 @@ it("includes runner machine metadata in automation responses for Schedule", asyn
     schedule: { cadence: "hourly", time: "09:00" }, nextRunAt: null, lastRunAt: null, lastReport: null, lastLevel: null, lastReportAt: null,
     machineName: "red4", machineOffline: true }]);
   expect((await x.auto.list()).find(item => item.id === "remote")).toMatchObject({ machineName: "red4", machineOffline: true });
+});
+
+it("links a run to the message it sent, else to its automation's runs", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "Summarize my day.", schedule: { type: "times", days: [1, 2, 3, 4, 5], times: ["08:00"] } });
+  const bbId = x.automations[0]!.id as string;
+  x.runs.set(bbId, [
+    { id: "late", status: "failed", threadId: "bot1", startedAt: 50_000_000, error: "Target thread bot1 is in an error state" },
+    { id: "sent", status: "succeeded", threadId: "bot1", startedAt: 10_000_000 },
+    { id: "none", status: "failed", threadId: null, startedAt: 20_000_000, error: "Target thread bot1 is in an error state" },
+  ]);
+  // The chat's requests, newest first: a later message, the run's, an older one.
+  x.requests.set("bot1", [{ seq: 90, createdAt: 30_000_000 }, { seq: 41, createdAt: 10_000_400 }, { seq: 12, createdAt: 1_000 }]);
+  expect(await x.auto.runLink(made.id, "sent")).toEqual({ threadId: "bot1", seq: 41, path: `/plugins/automations/automations/proj_personal/${bbId}` });
+  // Failed before it sent anything, with no thread of its own: its automation's runs.
+  expect(await x.auto.runLink(made.id, "none")).toEqual({ threadId: null, seq: null, path: `/plugins/automations/automations/proj_personal/${bbId}` });
+  // A thread of its own with nothing sent: that thread.
+  expect(await x.auto.runLink(made.id, "late")).toMatchObject({ threadId: "bot1", seq: null });
 });

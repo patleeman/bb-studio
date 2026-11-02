@@ -524,6 +524,8 @@ export const rpcContract = defineRpcContract({
   bot_calendar_group_rename: { input: z.object({ botId, key: z.string().min(1).max(4000), name: z.string().max(200).nullable() }), output: botPageState },
   /** Dismisses one failed run from Needs you; a later failure shows again. */
   bot_run_dismiss: { input: z.object({ botId, automationId: z.string().min(1).max(200), runId: z.string().min(1).max(200) }), output: botPageState },
+  /** Where a run opens: its thread at the message it sent (seq), its thread, or its automation's page in the automations plugin (path). */
+  bot_run_link: { input: z.object({ botId, automationId: z.string().min(1).max(200), runId: z.string().min(1).max(200) }), output: z.object({ threadId: z.string().nullable(), seq: z.number().int().nullable(), path: z.string().nullable() }) },
   /** A thread's prompt cache when it's a Bot's chat (botId null otherwise); with botId alone, that Bot's chat. */
   bot_cache_state: { input: z.object({ threadId: threadIdInput.optional(), botId }), output: botCacheState },
   /** Changes a Bot's cache-warming settings; returns its chat's cache state. */

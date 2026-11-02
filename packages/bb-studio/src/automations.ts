@@ -150,6 +150,10 @@ export type UpdateInput = Partial<Omit<CreateInput, "kind">> & { id: string };
 
 const HEARTBEAT_ID = "heartbeat";
 const MAINTENANCE_ID = "maintenance";
+/** A run's message is the first one its thread got from a little before the run started… */
+const RUN_MESSAGE_SLACK_MS = 60_000;
+/** …to a while after (a queued send waits for the thread to be free). */
+const RUN_MESSAGE_WINDOW_MS = 30 * 60_000;
 const MAINTENANCE_SCHEDULE: Schedule = { type: "cron", cron: "0 4 * * *" };
 const HEARTBEAT_NAME = "Check-in";
 
@@ -569,18 +573,11 @@ export class Automations {
   async runs(id: string, botId?: string, limit = 10): Promise<BotAutomationRunView[]> {
     const bot = this.bot(botId);
     id = automationId(this.deps.db, bot.id, id);
-    let kind: AutomationKind = "checkin";
-    let targets: { id: string; projectId: string }[] = [];
     if (id === MAINTENANCE_ID) {
       const maintenance = this.deps.maintenance?.get(bot.id);
       return maintenance?.lastRunAt ? [{ id: `${MAINTENANCE_ID}-${maintenance.lastRunAt}`, at: maintenance.lastRunAt, status: "succeeded", manual: false, outcome: maintenance.lastOutcome ?? "Ran", threadId: null }] : [];
     }
-    if (id === HEARTBEAT_ID) { const one = this.deps.heartbeat.automation(bot.id); targets = one ? [one] : []; }
-    else {
-      const runnerId = this.isRunner(id, bot.id);
-      if (runnerId) { kind = "runner"; const one = this.deps.runners.automation(runnerId); targets = one ? [one] : []; }
-      else { const row = this.row(id, bot.id); kind = row.kind; targets = this.resources(row); }
-    }
+    const { kind, targets } = this.targets(id, bot.id);
     const runs = (await Promise.all(targets.map((target) => this.bbRuns(target, limit)))).flat();
     const views: BotAutomationRunView[] = runs.map((run) => ({
       id: run.id, at: run.startedAt ?? run.scheduledFor ?? 0, status: run.status, manual: run.trigger === "manual", outcome: runOutcome(kind, run), threadId: run.threadId ?? null,
@@ -588,6 +585,61 @@ export class Automations {
     // Studio's auto-resumes show among the runs (src/auto-resume.ts).
     for (const resume of resumeLog(this.deps.db, targets.map((target) => target.id), limit)) views.push({ id: resume.id, at: resume.at, status: "resumed", manual: false, outcome: resume.message, threadId: null });
     return views.sort((a, b) => b.at - a.at).slice(0, limit);
+  }
+
+  /** The BB automations behind one of a Bot's jobs, and its kind. */
+  private targets(id: string, botId: string): { kind: AutomationKind; targets: { id: string; projectId: string }[] } {
+    if (id === HEARTBEAT_ID) { const one = this.deps.heartbeat.automation(botId); return { kind: "checkin", targets: one ? [one] : [] }; }
+    const runnerId = this.isRunner(id, botId);
+    if (runnerId) { const one = this.deps.runners.automation(runnerId); return { kind: "runner", targets: one ? [one] : [] }; }
+    const row = this.row(id, botId);
+    return { kind: row.kind, targets: this.resources(row) };
+  }
+
+  /**
+   * Where one run opens (the Bot page's Needs you): a run that sent a message
+   * opens its thread at that message (a runner's run, a check-in in the
+   * Bot's chat); one that ran in a thread without sending one opens that
+   * thread; a script's run opens its automation in the automations plugin,
+   * which shows its runs' output.
+   */
+  async runLink(id: string, runId: string, botId?: string): Promise<{ threadId: string | null; seq: number | null; path: string | null }> {
+    const bot = this.bot(botId);
+    id = automationId(this.deps.db, bot.id, id);
+    const { kind, targets } = this.targets(id, bot.id);
+    const page = (target: { id: string; projectId: string }) => `/plugins/automations/automations/${encodeURIComponent(target.projectId)}/${encodeURIComponent(target.id)}`;
+    for (const target of targets) {
+      const run = (await this.bbRuns(target, 50)).find((each) => each.id === runId);
+      if (!run) continue;
+      // A check-in writes in the Bot's chat and a runner's run in its thread, even when the run doesn't say so.
+      const runnerId = kind === "runner" ? this.isRunner(id, bot.id) : null;
+      const threadId = run.threadId ?? (kind === "checkin" ? bot.threadId : runnerId ? (await this.deps.runners.get(runnerId, bot.id).catch(() => null))?.threadId ?? null : null);
+      if (!threadId) return { threadId: null, seq: null, path: page(target) };
+      const seq = await this.messageAt(threadId, run.startedAt ?? run.scheduledFor ?? null).catch(() => null);
+      // It sent nothing there (it failed first): its run's log says what happened.
+      if (seq === null && !run.threadId) return { threadId: null, seq: null, path: page(target) };
+      return { threadId, seq, path: page(target) };
+    }
+    return { threadId: null, seq: null, path: targets[0] ? page(targets[0]) : null };
+  }
+
+  /** The message a run sent a thread: its first request at or after the run started (a little slack for clocks); null when it sent none. */
+  private async messageAt(threadId: string, at: number | null): Promise<number | null> {
+    if (at === null) return null;
+    const from = at - RUN_MESSAGE_SLACK_MS;
+    let before: number | null = null, found: number | null = null;
+    // Newest first, 100 a page, back to the run (10 pages at most).
+    for (let page = 0; page < 10; page++) {
+      const events = await this.deps.sdk.threads.events.list({ threadId, order: "desc", limit: "100", types: ["client/turn/requested"], ...(before === null ? {} : { beforeSeq: String(before) }) }) as { seq: number; createdAt: number }[];
+      for (const event of events) {
+        if (event.createdAt < from) return found;
+        // Not one sent long after the run started: a later run's.
+        if (event.createdAt <= at + RUN_MESSAGE_WINDOW_MS) found = event.seq;
+      }
+      if (events.length < 100) return found;
+      before = events.at(-1)!.seq;
+    }
+    return found;
   }
 
   private async bbRuns(target: { id: string; projectId: string }, limit: number): Promise<BbRun[]> {

@@ -82,7 +82,7 @@ describe("events", () => {
       { id: "r0", at: MON - 15 * H, status: "succeeded", outcome: "Ran", threadId: "t0" },
     ] }), MON, MON + 24 * H, now, NY);
     expect(events.map((event) => [wall(event.at), event.status, event.threadId, event.error])).toEqual([
-      ["Mon 09:00", "failed", "runner-thread", "provider timed out"],
+      ["Mon 09:00", "failed", "runner-thread", "It took too long"],
       ["Mon 13:00", "scheduled", null, null],
     ]);
     const ok = sourceEvents(source({ schedule: daily, runs: [{ id: "r", at: MON + 9 * H, status: "succeeded", outcome: "Woke it: build 418", threadId: "t9" }] }), MON, MON + 24 * H, now, NY)[0]!;

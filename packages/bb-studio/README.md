@@ -1644,8 +1644,16 @@ of Staff", with the same thread and check-ins; rename it from its page.
   beside **Needs you**: due loops (Done, Decide, Got it or Nudge), the
   chat's pending questions (Answer), failed runs (Open, and ✕ to dismiss)
   and maintenance's calls ("Archive 3 finished threads?", Review), one
-  action each. A failed run stays until the job's next run succeeds or you
-  dismiss that run (`bot_run_dismiss`; a later failure shows again). With
+  action each. A failed run's line says what went wrong in plain words
+  ("The script stopped with an error (exit 2)", "The script was stopped",
+  "Its thread hit an error", "It took too long"), and **Open** opens the run
+  itself (`bot_run_link`): its thread at the message it sent (a runner's
+  run, a check-in in the chat), or, for a script that sent nothing, its
+  automation's runs in the automations plugin. A failed run stays until any
+  newer run succeeds (a manual one too, and a watcher's quiet "skipped:
+  empty output" tick counts) or you dismiss that run (`bot_run_dismiss`; a
+  later failure shows again). A paused job's failure isn't there: Paused
+  marks it "Last run failed". With
   nothing running and nothing waiting, both shrink to one line: "Nothing
   running, and nothing needs you." Then **This week** at the page's full
   width with **Paused** below it (see Week under Automations), then

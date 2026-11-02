@@ -4,7 +4,7 @@
 // it's tested without a browser. Plain language only: no cron strings, ids or
 // token counts.
 import type { RunnerView } from "../../contract";
-import { chainGroups, clockWords, groupName, isGroup, minuteOfDay, runStatus, startOfDay, type CalendarEvent, type CalendarSource } from "./calendar";
+import { chainGroups, clockWords, groupName, isGroup, minuteOfDay, plainError, runStatus, startOfDay, type CalendarEvent, type CalendarSource } from "./calendar";
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
@@ -47,7 +47,8 @@ export function outcomeWords(event: Pick<CalendarEvent, "status" | "outcome" | "
   if (event.status === "failed") return event.error ?? "Failed";
   if (event.status === "running") return "Running now";
   if (event.status === "scheduled") return event.at > now ? "Due" : "Didn't run";
-  if (event.status === "skipped") return "Skipped";
+  // A watcher's quiet tick is recorded as a skip: it had nothing to say.
+  if (event.status === "skipped") return /nothing new|empty output|no output/i.test(event.outcome ?? "") ? "Quiet" : "Skipped";
   const text = (event.outcome ?? "").trim();
   if (/^woke it:\s*/i.test(text)) return text.replace(/^woke it:\s*/i, "");
   if (!text || /^(ran|succeeded|nothing new|quiet|completed?)$/i.test(text)) return "Quiet";
@@ -93,17 +94,41 @@ export type FailedRun = { sourceId: string; name: string; runId: string; at: num
 export const dismissKey = (sourceId: string, runId: string) => `${sourceId}:${runId}`;
 
 /**
+ * Whether a finished run counts as a success: it ran fine, or it's a watcher
+ * (or script) that had nothing to say ("skipped", "empty output", "Nothing
+ * new"). A skip for another reason (the Bot was busy) says nothing either way.
+ */
+function succeeded(source: Pick<CalendarSource, "kind">, run: { status: string | null; outcome?: string | null }): boolean | null {
+  const status = runStatus(run.status);
+  if (status === "ok") return true;
+  if (status === "failed") return false;
+  if (status === "skipped") return source.kind === "watcher" || /empty output|no output|nothing new/i.test(`${run.status ?? ""} ${run.outcome ?? ""}`) ? true : null;
+  return null;
+}
+
+/** A job's latest finished run when that run failed (its run id and error), else null: any newer success, a watcher's quiet skip included, clears it. */
+export function lastFailure(source: CalendarSource): { id: string; at: number; outcome: string; threadId: string | null } | null {
+  const finished = (source.runs ?? []).filter((run) => run.status !== "resumed" && succeeded(source, run) !== null).sort((a, b) => b.at - a.at);
+  const last = finished[0];
+  if (!last || succeeded(source, last)) return null;
+  // A runner's last run, when the history read doesn't reach it.
+  if (source.lastRun && source.lastRun.at > last.at && succeeded(source, source.lastRun)) return null;
+  return last;
+}
+
+/**
  * Each job whose latest finished run failed: it stays in Needs you until a
- * later run succeeds or Patrick dismisses that run. A run going on now
- * doesn't clear it; a skipped run doesn't either.
+ * newer run succeeds (a watcher's quiet skip counts) or Patrick dismisses
+ * that run. A run going on now doesn't clear it. A paused job's failure isn't
+ * here: it's paused on purpose, and Paused marks it failed.
  */
 export function failedRuns(sources: readonly CalendarSource[], dismissed: ReadonlySet<string>): FailedRun[] {
   const out: FailedRun[] = [];
   for (const source of sources) {
-    const finished = (source.runs ?? []).filter((run) => run.status !== "resumed" && !["running", "skipped"].includes(runStatus(run.status))).sort((a, b) => b.at - a.at);
-    const last = finished[0];
-    if (!last || runStatus(last.status) !== "failed" || dismissed.has(dismissKey(source.id, last.id))) continue;
-    out.push({ sourceId: source.id, name: source.name, runId: last.id, at: last.at, error: last.outcome.replace(/^Failed:?\s*/i, "") || "It failed", threadId: last.threadId ?? source.threadId, kind: source.kind });
+    if (source.state === "paused") continue;
+    const last = lastFailure(source);
+    if (!last || dismissed.has(dismissKey(source.id, last.id))) continue;
+    out.push({ sourceId: source.id, name: source.name, runId: last.id, at: last.at, error: plainError(last.outcome.replace(/^Failed:?\s*/i, "")) || "It failed", threadId: last.threadId ?? source.threadId, kind: source.kind });
   }
   return out.sort((a, b) => b.at - a.at);
 }

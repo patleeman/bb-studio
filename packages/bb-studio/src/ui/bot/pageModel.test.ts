@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { zonedTime, type CalendarEvent, type CalendarSource } from "./calendar";
-import { areaColors, BOT_AREA_COLOR, dismissKey, failedRuns, failedTitle, outcomeWords, recentEntries, statusSentence, upNext } from "./pageModel";
+import { plainError, zonedTime, type CalendarEvent, type CalendarSource } from "./calendar";
+import { areaColors, BOT_AREA_COLOR, dismissKey, failedRuns, failedTitle, lastFailure, outcomeWords, recentEntries, statusSentence, upNext } from "./pageModel";
 
 const NY = "America/New_York";
 const H = 3_600_000;
@@ -36,13 +36,58 @@ describe("failed runs in Needs you", () => {
   const security = source({ id: "security", name: "Security", kind: "runner", runs: [run("r2", 13 * 60, "failed"), run("r1", 8 * 60, "succeeded")] });
   it("a job whose latest finished run failed is listed with the failure in plain words", () => {
     const [failed] = failedRuns([security], new Set());
-    expect(failed).toMatchObject({ sourceId: "security", runId: "r2", error: "couldn't sign in to Wyze", threadId: "thr_r2" });
+    expect(failed).toMatchObject({ sourceId: "security", runId: "r2", error: "Couldn't sign in to Wyze", threadId: "thr_r2" });
     expect(failedTitle(failed!, NOW, NY)).toBe("Security check failed at 1:00 PM");
   });
-  it("stays until a later run succeeds; a live or skipped run doesn't clear it", () => {
+  it("stays until a later run succeeds; a live run or a check-in skipped while busy doesn't clear it", () => {
     expect(failedRuns([{ ...security, runs: [run("r3", 14 * 60, "running"), ...security.runs!] }], new Set())).toHaveLength(1);
-    expect(failedRuns([{ ...security, runs: [run("r3", 14 * 60, "skipped"), ...security.runs!] }], new Set())).toHaveLength(1);
+    expect(failedRuns([{ ...security, runs: [{ ...run("r3", 14 * 60, "skipped"), outcome: "Skipped (thread busy)" }, ...security.runs!] }], new Set())).toHaveLength(1);
     expect(failedRuns([{ ...security, runs: [run("r3", 14 * 60, "succeeded"), ...security.runs!] }], new Set())).toEqual([]);
+  });
+  // Patrick's live cases (Nov 1, 2026).
+  const sat = (minute: number) => zonedTime(2026, 10, 31, minute, NY);
+  const morningKick = (id: string, at: number, status: string, outcome: string) => ({ id, at, status, outcome, threadId: null });
+  const morning = source({ id: "morning", name: "Morning card", kind: "watcher", runs: [
+    morningKick("m1", sat(8 * 60), "failed", "Failed: Script exited with code null"),
+    morningKick("m2", sat(8 * 60 + 15), "skipped", "Nothing new"),
+    morningKick("m3", wall(8 * 60), "skipped", "Nothing new"),
+  ] });
+  it("the Oct 31 Morning kick failure: runs since that recorded \"skipped: empty output\" are successes and clear it", () => {
+    const failedOnly = { ...morning, runs: morning.runs!.slice(0, 1) };
+    const [failed] = failedRuns([failedOnly], new Set());
+    expect(failedTitle(failed!, NOW, NY)).toBe("Morning card failed Sat at 8:00 AM");
+    expect(failed!.error).toBe("The script was stopped");
+    expect(failedRuns([morning], new Set())).toEqual([]);
+    // The same skip from a plain script automation (not a watcher) reads "Skipped (empty output)".
+    expect(failedRuns([{ ...morning, kind: "automation", runs: [morningKick("m1", sat(8 * 60), "failed", "Failed: Script exited with code null"), morningKick("m2", wall(8 * 60), "skipped", "Skipped (empty output)")] }], new Set())).toEqual([]);
+    expect(outcomeWords({ status: "skipped", outcome: "Nothing new", error: null, at: 0 })).toBe("Quiet");
+  });
+  it("Project Lead, paused on purpose: its old failure isn't in Needs you, but Paused can still mark it", () => {
+    const wed = zonedTime(2026, 10, 28, 0, NY);
+    const lead = source({ id: "lead", name: "Project Lead", kind: "runner", state: "paused", threadId: "thr_leadrunner01", runs: [
+      { id: "l1", at: wed, status: "failed", outcome: "Failed: Target thread thr_leadrunner01 is in an error state", threadId: "thr_leadrunner01" },
+    ] });
+    expect(failedRuns([lead], new Set())).toEqual([]);
+    expect(lastFailure(lead)).toMatchObject({ id: "l1" });
+    // Resumed and still failing, it's back, in plain words.
+    const [failed] = failedRuns([{ ...lead, state: "active" }], new Set());
+    expect(failedTitle(failed!, NOW, NY)).toBe("Project Lead check failed Wed at 12:00 AM");
+    expect(failed!.error).toBe("Its thread hit an error");
+  });
+  it("a newer success of any kind clears it: a manual run, or a runner's last run the history doesn't reach", () => {
+    expect(failedRuns([{ ...security, runs: [{ ...run("r3", 14 * 60, "succeeded"), manual: true }, ...security.runs!] }], new Set())).toEqual([]);
+    expect(failedRuns([{ ...security, lastRun: { at: wall(14 * 60), status: "succeeded" } }], new Set())).toEqual([]);
+    expect(failedRuns([{ ...security, lastRun: { at: wall(12 * 60), status: "succeeded" } }], new Set())).toHaveLength(1);
+  });
+  it("errors read in plain words: no \"It \", raw thread ids or \"code null\"", () => {
+    expect(plainError("Script exited with code null")).toBe("The script was stopped");
+    expect(plainError("Script exited with code 2")).toBe("The script stopped with an error (exit 2)");
+    expect(plainError("Target thread thr_k3m9x2p4qa is in an error state")).toBe("Its thread hit an error");
+    expect(plainError("Script timed out after 60000ms")).toBe("It took too long");
+    expect(plainError("Error: Timeout waiting for the thread")).toBe("It took too long");
+    expect(plainError("couldn't sign in to Wyze")).toBe("Couldn't sign in to Wyze");
+    expect(plainError("Thread thr_k3m9x2p4qa was archived. Restore it first.\n  at send (server.js:1)")).toBe("Thread was archived");
+    expect(plainError("x".repeat(300))).toHaveLength(100);
   });
   it("Patrick's dismissal hides that run only: the next failure shows again", () => {
     expect(failedRuns([security], new Set([dismissKey("security", "r2")]))).toEqual([]);
