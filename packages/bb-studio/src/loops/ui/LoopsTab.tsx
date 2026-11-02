@@ -20,7 +20,10 @@ import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, type Loop
 const ROW_ACTIONS = "hidden items-center gap-1.5 group-hover:flex group-focus-within:flex group-has-[[data-state=open]]:flex [@media(hover:none)]:flex";
 const DONE_SHOWN = 3;
 
-type Pending = { id: string; reason: string; createdAt: number };
+/** `text`: the question's own words, when it has them (the Bot page's Needs you shows it). */
+export type Pending = { id: string; reason: string; createdAt: number; text?: string | null };
+type Payload = { kind?: string; title?: string; questions?: { prompt?: string; question?: string }[]; data?: { title?: string; questions?: { question?: string }[] } | null };
+const questionText = (payload: Payload | null | undefined) => payload?.questions?.[0]?.prompt ?? payload?.questions?.[0]?.question ?? payload?.data?.questions?.[0]?.question ?? (payload?.kind === "approval" ? payload.title ?? null : null);
 
 /** The Bot chat's pending questions and approvals (one inbox, decision 8). */
 export function usePendingQuestions(threadId: string | null): Pending[] {
@@ -31,9 +34,9 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
     let live = true;
     const load = () => void sdk.threads.interactions.list({ threadId }).then((list) => {
       if (!live) return;
-      const items = (list as { id?: string; status?: string; createdAt?: number; payload?: { kind?: string } | null }[])
+      const items = (list as { id?: string; status?: string; createdAt?: number; payload?: Payload | null }[])
         .filter((each) => each.status === "pending" && each.id)
-        .map((each) => ({ id: each.id!, createdAt: each.createdAt ?? Date.now(), reason: each.payload?.kind === "approval" ? "Waiting for your approval" : "Asked you a question" }));
+        .map((each) => ({ id: each.id!, createdAt: each.createdAt ?? Date.now(), reason: each.payload?.kind === "approval" ? "Waiting for your approval" : "Asked you a question", text: questionText(each.payload) }));
       setPending(items);
     }, () => {});
     load();

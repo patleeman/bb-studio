@@ -14,7 +14,8 @@ const labels: Record<MaintenanceRule, string> = { threads: "Finished threads", w
 const CHECKBOX = "size-3.5 shrink-0 accent-[var(--foreground)] disabled:opacity-50";
 const when = (at: number) => new Date(at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
-export function BotMaintenance({ botId }: { botId: string }) {
+/** `heading` false: Controls names the section. */
+export function BotMaintenance({ botId, heading = true }: { botId: string; heading?: boolean }) {
   const live = useLive("bot_maintenance_get", { botId });
   const call = useCall();
   const open = useOpenThread();
@@ -33,7 +34,7 @@ export function BotMaintenance({ botId }: { botId: string }) {
   return (
     <section aria-label="Maintenance" data-testid="bot-maintenance" className="px-4 pt-4">
       <div className="flex items-center gap-2">
-        <h3 className="flex-1 text-xs font-medium text-muted-foreground">Maintenance</h3>
+        {heading ? <h3 className="flex-1 text-xs font-medium text-muted-foreground">Maintenance</h3> : <span className="flex-1" />}
         {view ? <>
           <button type="button" className={GHOST_BUTTON} disabled={busy} title="See what it would do, without doing it" onClick={() => void act("bot_maintenance_run", { dryRun: true })}><Icon name="Eye" />Dry run</button>
           <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={() => void act("bot_maintenance_run", { dryRun: false })}><Icon name="Play" />Run now</button>

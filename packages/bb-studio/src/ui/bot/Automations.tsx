@@ -1,4 +1,4 @@
-// The Info tab's Automations: what wakes a Bot (src/automations.ts) — check-ins,
+// The Bot page's week (This week): what wakes a Bot (src/automations.ts) — check-ins,
 // reminders, watchers and runners — as a week calendar (AutomationsCalendar.tsx)
 // or a list. A block with no thread to open shows its job in the list. A row shows its kind, name,
 // schedule and next run; opening it shows the instruction (or script), the
@@ -46,33 +46,41 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
   const [showDone, setShowDone] = useState(false);
   const [view, setView] = useState<"week" | "list">("week");
   const kinds: Kind[] = external ? ["checkin", "reminder", "watcher"] : ["checkin", "reminder", "watcher", "runner"];
+  const toolbar = (
+    <>
+      {list.length ? (
+        <div role="tablist" aria-label="Automations view" className="flex items-center rounded-md border border-border p-0.5">
+          {(["week", "list"] as const).map((each) => (
+            <button key={each} type="button" role="tab" aria-selected={view === each} onClick={() => setView(each)}
+              className="flex h-6 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground">
+              <Icon name={each === "week" ? "Calendar" : "List"} className="size-3.5" />{each === "week" ? "Week" : "List"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild><button type="button" className={GHOST_BUTTON} disabled={disabled}><Icon name="Plus" />New</button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {kinds.map((kind) => <DropdownMenuItem key={kind} onSelect={() => { setError(null); setSheet({ kind: "new", type: kind }); }}><Icon name={KIND[kind].icon} />{KIND[kind].label}</DropdownMenuItem>)}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
   return (
-    <section aria-label="Automations" data-testid="bot-automations" className="px-4 pt-4">
-      <div className="flex items-center gap-2">
-        <h3 className="flex-1 text-xs font-medium text-muted-foreground">Automations</h3>
-        {list.length ? (
-          <div role="tablist" aria-label="Automations view" className="flex items-center rounded-md border border-border p-0.5">
-            {(["week", "list"] as const).map((each) => (
-              <button key={each} type="button" role="tab" aria-selected={view === each} onClick={() => setView(each)}
-                className="flex h-6 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground">
-                <Icon name={each === "week" ? "Calendar" : "List"} className="size-3.5" />{each === "week" ? "Week" : "List"}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><button type="button" className={GHOST_BUTTON} disabled={disabled}><Icon name="Plus" />New</button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {kinds.map((kind) => <DropdownMenuItem key={kind} onSelect={() => { setError(null); setSheet({ kind: "new", type: kind }); }}><Icon name={KIND[kind].icon} />{KIND[kind].label}</DropdownMenuItem>)}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      {error && !sheet ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
+    <section aria-label="Automations" data-testid="bot-automations" className={page ? "pt-8" : "px-4 pt-4"}>
+      {error && !sheet ? <p role="alert" className="pb-1 text-xs text-destructive">{error}</p> : null}
       {list.length && view === "week" ? (
-        <AutomationsCalendar wide={page} botId={botId} automations={list} onOpen={onOpen} busy={busy || disabled}
+        <AutomationsCalendar wide={page} botId={botId} botName={botName} automations={list} onOpen={onOpen} busy={busy || disabled} toolbar={toolbar}
           onPick={(id) => { setView("list"); setOpen(id); if (list.find((each) => each.id === id && (each.state === "done" || each.state === "ended"))) setShowDone(true); }}
-          onResume={(id) => void run("bot_automation_resume", { id }, false)} />
-      ) : list.length ? (
+          onResume={(id) => void run("bot_automation_resume", { id }, false)}
+          onRunNow={(id) => void run("bot_automation_run_now", { id }, false)} />
+      ) : (
+        <div className="flex items-center gap-2">
+          <h3 className="flex-1 text-sm font-medium">{page ? "This week" : "Automations"}</h3>
+          {toolbar}
+        </div>
+      )}
+      {list.length && view === "list" ? (
         <ul className="mt-1 flex flex-col divide-y divide-border border-y border-border">
           {list.filter((a) => showDone || (a.state !== "done" && a.state !== "ended")).map((automation) => (
             <AutomationRow key={automation.id} botId={botId} automation={automation} expanded={open === automation.id} busy={busy} disabled={disabled}
@@ -81,9 +89,9 @@ export function AutomationsSection({ botId, botName, onOpen, disabled, external 
               onEdit={() => { setError(null); setSheet({ kind: "edit", automation }); }} onDelete={() => { if (automation.original) void run("bot_automation_pause", { id: automation.id }); else { setError(null); setSheet({ kind: "delete", automation }); } }} />
           ))}
         </ul>
-      ) : (
+      ) : !list.length ? (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : `No check-ins. ${botName} only wakes when you write.`}</p>
-      )}
+      ) : null}
       {view === "list" && list.some((a) => a.state === "done" || a.state === "ended") ? <button className={GHOST_BUTTON} onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>Done</button> : null}
       {sheet?.kind === "new" || sheet?.kind === "edit" ? (
         <AutomationDialog type={sheet.kind === "new" ? sheet.type : sheet.automation.kind} automation={sheet.kind === "edit" ? sheet.automation : null} runners={list.filter((each) => each.kind === "runner")} busy={busy} error={error} onClose={() => setSheet(null)}

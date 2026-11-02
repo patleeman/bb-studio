@@ -1,8 +1,9 @@
-// The Bot page's model (BotPage.tsx, BotPane.tsx): the status sentence under
+// The Bot page's model (BotPage.tsx: the page and BotPane): the status sentence under
 // its name, the failed runs that sit in Needs you, Recent in plain words, Up
 // next, and the area colours the calendar, Runners and Paused share. Pure, so
 // it's tested without a browser. Plain language only: no cron strings, ids or
 // token counts.
+import type { RunnerView } from "../../contract";
 import { chainGroups, clockWords, groupName, isGroup, minuteOfDay, runStatus, startOfDay, type CalendarEvent, type CalendarSource } from "./calendar";
 
 const MINUTE = 60_000;
@@ -219,3 +220,25 @@ function failedClause(error: string): string {
   const text = inSentence(error.trim());
   return sentence(/^(couldn't|could not|can't|failed|didn't|timed out|lost)/i.test(text) ? text : `failed: ${text}`);
 }
+
+// ---- Runners ------------------------------------------------------------------
+
+/** "9 h ago", "yesterday". */
+export function agoWords(at: number, now = Date.now()): string {
+  const minutes = Math.round((now - at) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
+  if (minutes < 60 * 48) return "yesterday";
+  return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+/** Runner rows' right side on the page: working now, failed, paused, or "Quiet · 9 h ago". */
+export function runnerState(runner: RunnerView, now = Date.now()): { text: string; tone?: "failed" | "working" } {
+  if (runner.running) return { text: "Working now", tone: "working" };
+  if (runner.state === "paused") return { text: "Paused" };
+  const failed = /fail|error/i.test(runner.lastRunStatus ?? "");
+  if (!runner.lastRunAt) return { text: runner.nextRunAt ? `Next ${whenWords(runner.nextRunAt, now, Intl.DateTimeFormat().resolvedOptions().timeZone).replace(/^at /, "")}` : "Not run yet" };
+  const reported = runner.lastReportAt && runner.lastReportAt >= runner.lastRunAt;
+  return { text: `${failed ? "Failed" : reported ? "Reported" : "Quiet"} · ${agoWords(runner.lastRunAt, now)}`, tone: failed ? "failed" : undefined };
+}
+

@@ -127,7 +127,8 @@ const THRESHOLDS = [50_000, 100_000, 150_000, 200_000, 300_000];
 const IDLE_HOURS = [1, 2, 3, 4, 6, 8];
 
 /** Bot info's Prompt cache section: the state, warming's cost, its settings, and Compact. */
-export function BotCacheSection({ botId, threadId }: { botId: string; threadId: string | null }) {
+/** `heading` false: Controls names the section. */
+export function BotCacheSection({ botId, threadId, heading = true }: { botId: string; threadId: string | null; heading?: boolean }) {
   const live = useLive("bot_cache_state", { botId }, { pollMs: POLL_MS });
   const call = useCall();
   const [busy, setBusy] = useState(false);
@@ -147,7 +148,7 @@ export function BotCacheSection({ botId, threadId }: { botId: string; threadId: 
   return (
     <section className="mx-4 mt-3 flex flex-col gap-1.5 rounded-md bg-muted/40 p-2 text-xs" aria-label="Prompt cache" data-testid="bot-cache-section">
       <span className="flex items-center gap-1.5">
-        <span className="font-medium text-foreground">Prompt cache</span>
+        {heading ? <span className="font-medium text-foreground">Prompt cache</span> : null}
         <span className="text-muted-foreground">{cacheLabel(state)}</span>
         <span className="flex-1" />
         <button type="button" className={GHOST_BUTTON} disabled={busy} title="BB summarizes the chat's history" onClick={() => { if (confirm("Compact this chat? BB summarizes its history; the next send writes the shorter context.")) void run("bot_cache_compact", { threadId }); }}>Compact</button>

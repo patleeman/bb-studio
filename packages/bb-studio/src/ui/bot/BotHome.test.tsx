@@ -86,12 +86,13 @@ vi.mock("../../kit/ui/index", () => ({
   DialogDescription: ({ children }: { children: React.ReactNode }) => React.createElement("p", null, children),
   Popover: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
-  PopoverContent: () => null,
+  PopoverAnchor: ({ children }: { children: React.ReactNode }) => children,
+  PopoverContent: ({ children, "data-testid": testId }: { children: React.ReactNode; "data-testid"?: string }) => testId === "calendar-group" ? React.createElement("div", { "data-popover": testId }, children) : null,
   Checkbox: () => null,
   Tooltip: ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => React.createElement(React.Fragment, null, children, React.createElement("span", { hidden: true, "data-tooltip": true }, label)),
 }));
 
-const { ActivityPanel, BOT_PATH } = await import("./BotHome");
+const { BOT_PATH } = await import("./BotHome");
 const { BotInfoPanel, BotPanel } = await import("./BotTabs");
 const { BotThreadList } = await import("./BotSidebar");
 const { forgetListMode } = await import("./threadListSwitch");
@@ -130,6 +131,7 @@ const button = (label: string) => [...container.querySelectorAll("button")].find
 const click = (el: Element | null | undefined) => (el as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
 const thread = (id: string, title: string) => ({ id, title, status: "idle", projectId: "p", updatedAt: Date.now(), relation: "started" as const, parentId: null as string | null });
 const empty = { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
+const CONTROLS = "/plugins/studio/studio/bot/bot_main/controls";
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
 
 test("with no Bot, the welcome's Create makes it with the setup and opens its chat", async () => {
@@ -159,19 +161,6 @@ test("the Bot's chat open marks it read, so the Bot's badge clears", async () =>
 
 test("the Bot page lives under the Studio panel", () => {
   expect(BOT_PATH).toBe("/plugins/studio/studio/bot");
-});
-
-test("Activity: one quiet line when all is empty, sections only when non-empty, the recent few completed", () => {
-  act(() => root.render(<ActivityPanel loading={false} data={empty} />));
-  expect(container.textContent).toBe("Nothing going on right now.");
-  expect(container.querySelector("section")).toBeNull();
-  const completed = ["a", "b", "c", "d", "e"].map((id) => thread(id, `Done ${id}`));
-  act(() => root.render(<ActivityPanel loading={false} data={{ ...empty, waiting: [thread("w", "Friday digest")], completed }} />));
-  expect(container.textContent).toContain("Friday digest");
-  expect([...container.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"))).toEqual(["Waiting to start", "Recent"]);
-  expect(container.textContent).not.toContain("Done d");
-  act(() => button("Show all 5").click());
-  expect(container.textContent).toContain("Done e");
 });
 
 test("the Bots list: the bot on top saying what waits on you, no Needs you, started threads nested under the one that started them; a row opens the thread as a BB thread", async () => {
@@ -229,12 +218,12 @@ test("the Bots list: the bot on top saying what waits on you, no Needs you, star
   // Closed groups are remembered.
   act(() => click(nav2.querySelector('section[aria-label="Recent"] > button')));
   expect(JSON.parse(localStorage.getItem("studio.bot.sidebar")!).closed).toContain("recent");
-  // The Bot page is its Info, with what needs the user; no embedded chat.
+  // The Bot page: Working now beside Needs you; no embedded chat or sidebar list.
   await show(<BotPanel />);
-  expect(container.querySelector("nav")).toBeNull();
-  expect(container.querySelector('section[aria-label="Needs you"]')).toBeNull();
-  expect(container.querySelector('section[aria-label="Running"]')?.textContent).toContain("Approve deploy");
-  expect(container.querySelector('section[aria-label="Running"]')?.textContent).toContain("waiting for approval");
+  expect(container.querySelector('nav[aria-label="Bots"]')).toBeNull();
+  expect(container.querySelector('section[aria-label="Needs you"]')).not.toBeNull();
+  expect(container.querySelector('section[aria-label="Working now"]')?.textContent).toContain("Approve deploy");
+  expect(container.querySelector('section[aria-label="Working now"]')?.textContent).toContain("Waiting for approval");
 });
 
 test("on the Studio panel the Bots list puts Studio's list back and shows a placeholder", async () => {
@@ -320,7 +309,7 @@ test("the Bots list forgets the removed Threads tab's saved strips", async () =>
   expect(localStorage.getItem("studio.bot.bot_main.threads")).toBeNull();
 });
 
-test("Info tab: profile, controls, automations, and activity whose rows open as BB threads", async () => {
+test("the Bot page: a status sentence, Open chat, Pause, Stop… and Controls with no ⋯ menu; Working now; the week with Paused below; rows open as BB threads", async () => {
   state.data = {
     bot_get: { bot: { ...dot, role: "You are my chief of staff." }, run: { enabled: true, cadence: "weekdays", time: "08:00" } },
     bot_activity: { ...empty, inProgress: [{ ...thread("t1", "Approve deploy"), status: "active", waitingFor: "Waiting for approval" }] },
@@ -330,19 +319,73 @@ test("Info tab: profile, controls, automations, and activity whose rows open as 
     ] },
   };
   await show(<BotPanel />);
-  await act(async () => button("Edit").click());
-  expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
-  expect((container.querySelector('textarea[aria-label="Description"]') as HTMLTextAreaElement)?.value).toBe("You are my chief of staff.");
-  // Automations open as the week; List has the rows.
-  expect(container.querySelector("[data-testid=automations-calendar]")).not.toBeNull();
-  expect(container.querySelector('[data-testid=calendar-paused] [data-paused="aut_w"]')).not.toBeNull();
+  expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toMatch(/^Working on 1 thing\./);
+  // The ⋯ menu is gone: its items live in Controls.
+  expect(container.querySelector('[aria-label="Bot menu"]')).toBeNull();
+  expect(button("Skills…")).toBeUndefined();
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
+  // Settings moved to Controls: no profile editor, maintenance, cache or skills on the main page.
+  for (const id of ["bot-profile-section", "bot-maintenance", "bot-cache-section"]) expect(container.querySelector(`[data-testid=${id}]`)).toBeNull();
+  const { openAppPath } = await import("../../kit/app/index");
+  await act(async () => click(container.querySelector("[data-testid=bot-controls]")));
+  expect(openAppPath).toHaveBeenCalledWith(CONTROLS);
+  // The week, Paused under it (not beside), and List with the rows.
+  const calendar = container.querySelector("[data-testid=automations-calendar]")!;
+  expect(calendar).not.toBeNull();
+  expect(calendar.querySelector('[data-testid=calendar-paused] [data-paused="aut_w"]')).not.toBeNull();
+  expect(calendar.textContent).toContain("This week");
   await act(async () => [...container.querySelectorAll("[role=tab]")].find((each) => each.textContent === "List")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
   expect(container.querySelector("[data-automation=heartbeat]")?.textContent).toContain("Weekdays 8:00");
   expect(container.querySelector("[data-automation=aut_w]")?.textContent).toContain("Paused");
-  await act(async () => [...container.querySelectorAll("button")].find((each) => each.textContent?.startsWith("Approve deploy"))!.click());
+  await act(async () => click(container.querySelector('section[aria-label="Working now"] button')));
   expect(state.toThread).toHaveBeenCalledWith("t1");
   await act(async () => button("Pause").click());
   expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_main" });
+});
+
+test("quiet: one line instead of Working now and Needs you, and the last run", async () => {
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect(container.querySelector("[data-testid=bot-quiet]")?.textContent).toContain("Nothing running, and nothing needs you.");
+  expect(container.querySelector('section[aria-label="Working now"]')).toBeNull();
+  expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toBe("Idle.");
+});
+
+test("Needs you: a failed run with Open and Dismiss, a pending question, and maintenance's call; a later success clears the failure", async () => {
+  const { maintenanceDefaults } = await import("../../bot-maintenance");
+  const now = Date.now();
+  const security = { id: "security", kind: "runner", name: "Security", original: false, instruction: "", schedule: { type: "times", days: [0, 1, 2, 3, 4, 5, 6], times: ["13:00"] }, scheduleText: "Every day at 1:00 PM", state: "active", nextRunAt: null, lastRunAt: null, lastOutcome: null, model: null, script: null, target: "own", targetName: "Security", threadId: "thr_sec" };
+  const failed = { runs: [{ id: "run_9", at: now - 3_600_000, status: "failed", manual: false, outcome: "Failed: couldn't sign in to Wyze", threadId: "thr_sec_run" }] };
+  sdk.threads.interactions.list = (async () => [{ id: "q1", status: "pending", createdAt: now - 12 * 60_000, payload: { kind: "user_question", questions: [{ prompt: "Which vault holds the deploy key?" }] } }]) as never;
+  state.data = {
+    bot_get: { bot: dot, run: null }, bot_activity: empty,
+    bot_automations: { automations: [security] },
+    bot_automation_runs: () => failed,
+    bot_page_state: { groupNames: {}, dismissed: [] },
+    bot_maintenance_get: { settings: maintenanceDefaults(), liveAt: null, runs: [{ at: now, dryRun: false, summary: "Archived 5", actions: [], needsCall: [{ threadId: "a", title: "A", reason: "r" }, { threadId: "b", title: "B", reason: "r" }, { threadId: "c", title: "C", reason: "r" }], suggestions: [] }] },
+  };
+  try {
+    await show(<BotPanel />);
+    const needs = container.querySelector('section[aria-label="Needs you"]')!;
+    const row = needs.querySelector('[data-need="failed:security:run_9"]')!;
+    expect(row.textContent).toContain("Security check failed");
+    expect(row.textContent).toContain("It couldn't sign in to Wyze");
+    await act(async () => click([...row.querySelectorAll("button")].find((each) => each.textContent === "Open")));
+    expect(state.toThread).toHaveBeenCalledWith("thr_sec_run");
+    await act(async () => click(row.querySelector('[aria-label^="Dismiss"]')));
+    expect(state.call).toHaveBeenCalledWith("bot_run_dismiss", { botId: "bot_main", automationId: "security", runId: "run_9" });
+    expect(needs.querySelector('[data-need="question:q1"]')?.textContent).toContain("Which vault holds the deploy key?");
+    expect(needs.querySelector('[data-need="maintenance:calls"]')?.textContent).toContain("Archive 3 finished threads?");
+    const { openAppPath } = await import("../../kit/app/index");
+    await act(async () => click([...needs.querySelectorAll('[data-need="maintenance:calls"] button')].find((each) => each.textContent === "Review")));
+    expect(openAppPath).toHaveBeenCalledWith(`${CONTROLS}#maintenance`);
+    // Dismissed: gone. A later success clears it too.
+    state.data.bot_page_state = { groupNames: {}, dismissed: ["security:run_9"] };
+    await show(<BotPanel />);
+    expect(container.querySelector('[data-need="failed:security:run_9"]')).toBeNull();
+  } finally {
+    sdk.threads.interactions.list = async () => [];
+  }
 });
 
 test("Automations as a week: today first, dense jobs as a band, a failed past run outlined with its error and opening its thread, a live run, the paused list, and a due block opening its job", async () => {
@@ -379,24 +422,30 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
     expect((calendar as HTMLElement).style.width).toContain("100cqw");
     const headers = [...calendar.querySelectorAll(".grid.border-b > span")].map((each) => each.textContent).filter(Boolean);
     expect(headers).toHaveLength(7);
-    expect(headers[0]).toBe("Today");
-    // Every 2 h is a band with a tick per run; its legend names the cadence.
+    expect(headers[0]).toMatch(/^Today · /);
+    // Every 2 h is frequent: hidden, but listed; Show frequent draws it as a band with a tick per run.
+    expect(calendar.querySelector('[data-band="triage"]')).toBeNull();
+    expect(calendar.querySelector('[data-source="triage"]')).toBeNull();
+    expect(calendar.querySelector("[data-testid=calendar-frequent]")?.textContent).toContain("Frequent, hidden:");
+    expect(calendar.textContent).toContain("Inbox triage · every 2 hours");
+    await act(async () => click(calendar.querySelector("[data-testid=calendar-show-frequent]")));
+    expect(localStorage.getItem("studio.bot.showFrequent")).toBe("1");
     const band = calendar.querySelector('[data-band="triage"]')!;
     expect(band.querySelectorAll("[data-tick]").length).toBeGreaterThan(8);
     expect(band.querySelector('[data-tick="running"]')).not.toBeNull();
-    expect(calendar.textContent).toContain("Inbox triage · every 2 h");
-    // The failed run: outlined red, its error in the tooltip; it opens its thread.
-    const failed = calendar.querySelector('[data-source="probe"][data-status="failed"]')!;
-    expect(failed.className).toContain("ring-destructive");
-    expect(failed.nextElementSibling?.textContent).toContain("Failed: exit 2: status page unreachable");
-    await act(async () => click(failed));
+    expect(calendar.querySelector("[data-testid=calendar-frequent]")?.textContent).toContain("Frequent:");
+    // Status probe (10:00) and Backup check (10:05) start within 15 minutes: one group, red with the failure,
+    // listing each run's result and the failure with Open thread and Run again.
+    const group = calendar.querySelector('[data-group][data-status="failed"]')!;
+    expect(group.getAttribute("aria-label")).toMatch(/^10 AM checks, 2 runs, .*one failed$/);
+    expect(group.closest("[data-day]")!.querySelector('[data-source="probe"]')).toBeNull();
+    const list = group.closest("[data-day]")!.querySelector('[data-popover="calendar-group"]')!;
+    expect(list.textContent).toContain("Status probe exit 2: status page unreachable.");
+    expect(list.textContent).toContain("Backup check");
+    await act(async () => click([...list.querySelectorAll("button")].find((each) => each.textContent === "Open Status probe's thread")));
     expect(state.toThread).toHaveBeenCalledWith("thr_bot");
-    // Overlapping it in a narrow day, Backup check folds into "+1"; the failure keeps the room.
-    const today = failed.closest("[data-day]")!;
-    expect(today.querySelector('[data-source="backup"]')).toBeNull();
-    const chip = today.querySelector("[data-fold]")!;
-    expect(chip.textContent).toBe("+1");
-    expect(chip.nextElementSibling?.textContent).toContain("Backup check");
+    await act(async () => click([...list.querySelectorAll("button")].find((each) => each.textContent === "Run again")));
+    expect(state.call).toHaveBeenCalledWith("bot_automation_run_now", { id: "probe", botId: "bot_main" });
     // The one-off reminder and the paused watcher: one block; none, but listed under Paused.
     expect(calendar.querySelectorAll('[data-source="remind"]')).toHaveLength(1);
     expect(calendar.querySelector('[data-source="watch"]')).toBeNull();
@@ -408,6 +457,7 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
     // A due block has no thread yet: it opens its job in the list.
     const due = calendar.querySelector('[data-source="lunch"][data-status="scheduled"]')!;
     expect(due.nextElementSibling?.textContent).toContain("Due");
+    expect(due.nextElementSibling?.textContent).not.toMatch(/\d+ \d+ \* \*/);
     await act(async () => click(due));
     expect(container.querySelector("[data-testid=automations-calendar]")).toBeNull();
     expect(container.querySelector('[data-automation="lunch"] > button')?.getAttribute("aria-expanded")).toBe("true");
@@ -426,14 +476,14 @@ test("the Bot page shows its status and confirms Stop", async () => {
     bot_activity: { ...empty, inProgress: [thread("t2", "Research flights")] },
   };
   await show(<BotPanel />);
-  expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toBe("Working on 1 thread");
+  expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toBe("Working on 1 thing.");
   act(() => button("Stop…").click());
   expect(container.textContent).toContain("the threads it started stop (not your own forks of its chat)");
   await act(async () => click([...container.querySelectorAll("[role=dialog] button")].find((each) => each.textContent === "Stop")));
   expect(state.call).toHaveBeenCalledWith("bot_stop", { botId: "bot_main" });
 });
 
-test("Bot info keeps profile and history collapsed until asked, then saves profile edits inline", async () => {
+test("Controls: profile and history collapsed until asked, Memory, Skills, and profile edits saved inline", async () => {
   vi.stubGlobal("confirm", () => true);
   state.data = {
     bot_get: { bot: { ...dot, role: "Chief of staff.", memoryPageId: "pg_mem" }, run: null },
@@ -442,8 +492,13 @@ test("Bot info keeps profile and history collapsed until asked, then saves profi
     bot_profile_changes: { changes: [{ id: "change_1", field: "role", reverts: null, actorName: "Dot", oldValue: "Assistant", newValue: "Chief of staff", oldImageUrl: null, newImageUrl: null, revertedAt: null, at: Date.now() }] },
     bot_skills: { skills: [{ name: "weekly-review", description: "Fridays: sum up the week", updatedAt: 1 }] },
   };
+  state.pathname = CONTROLS;
   await show(<BotPanel />);
-  expect(container.querySelector('[data-testid="bot-profile-section"]')).not.toBeNull();
+  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "memory", "skills", "checkins", "cache", "maintenance"]);
+  // The components Bot info had, moved: one each.
+  expect(container.querySelectorAll('[data-controls="profile"] [data-testid="bot-profile-section"]')).toHaveLength(1);
+  expect(container.querySelectorAll('[data-controls="maintenance"] [data-testid="bot-maintenance"]')).toHaveLength(1);
+  expect(container.querySelector('[data-testid="bot-page"]')).toBeNull();
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
   expect(container.querySelector('input[type="file"][accept*="image/png"]')).toBeNull();
@@ -457,13 +512,12 @@ test("Bot info keeps profile and history collapsed until asked, then saves profi
   expect(container.textContent).toContain("Changed by Dot");
   await act(async () => button("Profile changes").click());
   const { openAppPath } = await import("../../kit/app/index");
-  await act(async () => button("Memory").click());
+  await act(async () => click(container.querySelector('[aria-label="Open memory"]')));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
-  // Pause and Stop live once, in the button row, not again in the ⋯ menu.
-  const labelled = (text: string) => [...container.querySelectorAll("button, [role=menuitem]")].filter((el) => el.textContent?.trim() === text);
-  expect(labelled("Pause")).toHaveLength(1);
-  expect(labelled("Stop…")).toHaveLength(1);
-  act(() => button("Skills…").click());
+  // Pause and Stop are the main page's, not Controls'; the back link goes there.
+  expect(button("Pause")).toBeUndefined();
+  await act(async () => click(button("Dot")));
+  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main");
   expect(container.textContent).toContain("weekly-review");
   expect(container.querySelector('[role="dialog"]')).toBeNull();
   await act(async () => button("Share").click());
@@ -487,6 +541,7 @@ test("Bot info keeps profile and history collapsed until asked, then saves profi
 
 test("Bot profile opens from its name or avatar, and Cancel and Escape close it with focus returned", async () => {
   state.data = { bot_get: { bot: { ...dot, role: "Chief of staff." }, run: null }, bot_activity: empty };
+  state.pathname = CONTROLS;
   await show(<BotPanel />);
   const avatar = container.querySelector('button[aria-label="Edit Dot avatar and profile"]') as HTMLButtonElement;
   const name = container.querySelector('button[aria-label="Edit Dot profile"]') as HTMLButtonElement;
@@ -516,15 +571,19 @@ test("the Bot page embeds no chat; Open chat opens its main thread as a BB threa
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
 });
 
-test("Bot info beside a thread: the owner's Info, no Open chat on its own chat; a thread no Bot owns says so", async () => {
-  state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: dot, run: null }, bot_activity: empty };
+test("Bot info beside a thread: the owner's compact page (Needs you, Up next, Recent, links out), no Open chat on its own chat; a thread no Bot owns says so", async () => {
+  state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: dot, run: null }, bot_activity: { ...empty, inProgress: [{ ...thread("t1", "Research flights"), status: "active", runningSince: Date.now() - 60_000 }] } };
   await show(<BotInfoPanel threadId="thr_bot" params={null} />);
   expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_bot" }]);
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_main" }]);
-  await act(async () => button("Edit").click());
-  expect((container.querySelector('input[aria-label="Bot name"]') as HTMLInputElement)?.value).toBe("Dot");
-  expect(container.querySelector('[role="dialog"]')).toBeNull();
+  const pane = container.querySelector("[data-testid=bot-pane]")!;
+  expect([...pane.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Working now", "Needs you", "Up next", "Recent"]);
+  expect(pane.querySelector("[data-testid=bot-info-status]")?.textContent).toBe("Working on 1 thing");
+  expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
   expect(container.querySelector("[data-testid=bot-open-chat]")).toBeNull();
+  const { openAppPath } = await import("../../kit/app/index");
+  await act(async () => click(button("Controls")));
+  expect(openAppPath).toHaveBeenCalledWith(CONTROLS);
   await show(<BotInfoPanel threadId="t9" params={null} />);
   expect(container.querySelector("[data-testid=bot-open-chat]")).not.toBeNull();
   state.data = { bot_thread_owner: { botId: null } };
@@ -588,8 +647,10 @@ test("the cache header shows a Clock and time, turns amber near expiry, and dims
 
 test("Check-ins offers presets, marks the current one, and applies one in a click", async () => {
   state.data = { bot_get: { bot: dot, run: { enabled: true, cadence: "weekdays", time: "08:00" } }, bot_activity: empty };
+  state.pathname = CONTROLS;
   await show(<BotPanel />);
-  act(() => button("Check-ins…").click());
+  expect(container.querySelector('[data-controls="checkins"]')?.textContent).toContain("Morning brief, weekdays at 8:00");
+  act(() => button("Change…").click());
   const presets = [...container.querySelectorAll('[role=radiogroup][aria-label="Check-in preset"] [role=radio]')];
   expect(presets.map((each) => each.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
   await act(async () => click(presets[1]));
@@ -683,12 +744,16 @@ test("Bot info opens beside a Bot's chat once each time the chat opens, not agai
   state.call.mockImplementation(async () => ({}));
 });
 
-test("an external bot shows its provider's logo and hides Memory, skills and runners with a note", async () => {
+test("an external bot shows its provider's logo; Controls keeps Profile, Model and Check-ins, with a note", async () => {
   const herm = { ...dot, id: "bot_h", name: "Herm", primary: false, kind: "external", providerId: "hermes", model: "hermes-agent" };
   state.pathname = "/plugins/studio/studio/bot/bot_h";
   state.data = { bot_get: { bot: herm, run: null }, bot_activity: empty };
   await show(<BotPanel />);
   expect(container.querySelector('[data-logo="hermes"]')).not.toBeNull();
+  expect(container.querySelector('section[aria-label="Runners"]')).toBeNull();
+  state.pathname = "/plugins/studio/studio/bot/bot_h/controls";
+  await show(<BotPanel />);
+  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "checkins"]);
   expect(container.textContent).toContain("Runs on Hermes — its memory and tools live there.");
   expect(container.textContent).toContain("hermes-agent");
   expect(button("Open")).toBeUndefined();
@@ -731,8 +796,8 @@ test("Skills: learn from work, the last review, history, pins and archived skill
       toolTurns: 3, userTurns: 1, reviewing: false, lastReview: { at: Date.now() - 2 * 3_600_000, result: "Saved 1 skill" }, lastCurator: null,
     },
   };
+  state.pathname = CONTROLS;
   await show(<BotPanel />);
-  act(() => button("Skills…").click());
   expect(container.textContent).toContain("Saved 1 skill · 2h ago");
   expect(container.textContent).toContain("Cheapest (claude-haiku-5-5)");
   expect(container.textContent).toContain("stale");
@@ -907,21 +972,24 @@ test("Attention Router off: no Loops tab on the Bot page and no All loops row", 
   expect(container.querySelector("[data-testid=bot-all-loops]")).toBeNull();
 });
 
-test("Attention Router on: Info | Loops on the Bot page, the count of what needs you, and Loops at its own address", async () => {
+test("Attention Router on: no tabs; Needs you has the due loop with one action, All loops and the Loops summary link to Loops at its own address", async () => {
   state.settings = { loopsEnabled: true };
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups };
   await show(<BotPanel />);
-  const tabs = [...container.querySelectorAll("[role=tab]")];
-  expect(tabs.map((tab) => tab.textContent)).toEqual(["Info", "Loops1"]);
-  expect(tabs[0]!.getAttribute("aria-selected")).toBe("true");
-  expect(container.textContent).toContain("Activity");
+  expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
+  const needs = container.querySelector('section[aria-label="Needs you"]')!;
+  expect(needs.querySelector('[data-need="loop:loop_a"]')?.textContent).toContain("Pay the property tax");
+  await act(async () => click([...needs.querySelectorAll('[data-need="loop:loop_a"] button')].find((each) => each.textContent === "Done")));
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_a", action: "done" });
+  expect(container.querySelector("[data-testid=bot-loops]")?.textContent).toContain("1 need you");
+  expect(container.querySelector("[data-testid=bot-loops]")?.textContent).toContain("1 coming up");
   const { openAppPath } = await import("../../kit/app/index");
-  act(() => click(tabs[1]));
+  act(() => click(container.querySelector("[data-testid=bot-loops-tab]")));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main/loops");
   state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
   await show(<BotPanel />);
   expect(container.querySelector("[data-testid=loops-tab]")?.textContent).toContain("Pay the property tax");
-  expect(container.textContent).not.toContain("Activity");
+  expect(container.querySelector("[data-testid=bot-page]")).toBeNull();
 });
 
 test("the sidebar has an All loops row under the primary Bot, with its open count, and no Needs you list", async () => {

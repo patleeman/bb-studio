@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { zonedTime, type CalendarEvent, type CalendarSource } from "./calendar";
-import { areaColors, BOT_AREA_COLOR, dismissKey, failedRuns, failedTitle, outcomeWords, recentEntries, statusSentence, upNext } from "./botPage";
+import { areaColors, BOT_AREA_COLOR, dismissKey, failedRuns, failedTitle, outcomeWords, recentEntries, statusSentence, upNext } from "./pageModel";
 
 const NY = "America/New_York";
 const H = 3_600_000;

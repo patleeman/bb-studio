@@ -13,14 +13,12 @@ import { Badge, BAR_BUTTON, DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, openApp
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input, Textarea } from "../../kit/ui/index";
 import { Fragment, useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
-import type { BotActivityView, BotLearningView, BotScheduledView, BotThreadView, BotView, HeartbeatRun } from "../../contract";
+import type { BotActivityView, BotLearningView, BotView, HeartbeatRun } from "../../contract";
 import { pagePath } from "../../pages/constants";
-import { describeCron } from "../../schedule";
 import { useCall, useLive, type Method, type RpcInput } from "../live";
 import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { BOT_COLORS, BOT_SHAPES, BotAvatar, botProvider, colorForName, DEFAULT_SHAPE, isBotShape } from "./BotAvatar";
 import { Welcome } from "./Onboarding";
-import { Elapsed, ProviderStatusMark, runningLabel, type ProviderCatalogEntry } from "./ProviderStatusMark";
 import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
@@ -45,24 +43,9 @@ export function presetOf(run: HeartbeatRun | null): Preset | null {
   if (run.cadence === "custom" && run.cron === "0 9-17/2 * * 1-5") return "working";
   return null;
 }
-const COMPLETED_PREVIEW = 3;
 const threadPath = (id: string) => `/threads/${encodeURIComponent(id)}`;
 
 const STATE_LABEL = { active: "Active", paused: "Paused", stopped: "Stopped" } as const;
-
-function ago(at: number, now = Date.now()): string {
-  const minutes = Math.round((now - at) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (minutes < 60 * 24) return `${Math.round(minutes / 60)}h ago`;
-  return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function when(at: number): string {
-  const date = new Date(at);
-  const today = new Date().toDateString() === date.toDateString();
-  return `${today ? "Today" : date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
-}
 
 /** Calls an RPC, refreshing the Bot after; errors show in the home. bot_* calls act on `botId` when given. */
 export function useAction(refresh: () => void, botId?: string) {
@@ -171,12 +154,11 @@ function CreateBot({ first, onCreated }: { first: boolean; onCreated(): void }) 
 
 export type Sheet = "checkins" | "stop" | null;
 
-/** The Bot's controls, shared by the page and its Info tab: RPCs, dialogs, and opening its Memory. */
+/** The Bot's controls, shared by the page, its pane and Controls: RPCs, dialogs (Check-ins, Stop), and opening its Memory. */
 export function useBotControls(view: BotView, refresh: () => void, running: number) {
   const bot = view.bot!;
   const { run, busy, error } = useAction(refresh, bot.id);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [skillsOpen, setSkillsOpen] = useState(false);
   const profile: Profile = { name: bot.name, shape: isBotShape(bot.shape) ? bot.shape : null, color: bot.color ?? null, role: bot.role ?? "", emoji: bot.avatar };
   const saveProfile = (next: Profile) => {
     const input = {
@@ -188,17 +170,10 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
     };
     if (Object.keys(input).length) void run("bot_set", input);
   };
-  const toggleSkills = () => setSkillsOpen((open) => !open);
   const openMemory = async () => {
     const memory = bot.memoryPageId ? { pageId: bot.memoryPageId } : await run("bot_memory") as { pageId: string | null } | null;
     if (memory?.pageId) openAppPath(pagePath(memory.pageId));
   };
-  const skills = skillsOpen && bot.kind !== "external" ? (
-    <section aria-label="Skills" className="mx-4 mt-3 flex flex-col gap-2 border-t border-border pt-3">
-      <h3 className="text-xs font-medium text-muted-foreground">Skills</h3>
-      <SkillsList botId={bot.id} name={bot.name} />
-    </section>
-  ) : null;
   const sheets = (
     <>
       {sheet === "checkins" ? (
@@ -224,7 +199,7 @@ export function useBotControls(view: BotView, refresh: () => void, running: numb
       ) : null}
     </>
   );
-  return { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, toggleSkills, skills, sheets };
+  return { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, sheets };
 }
 
 /** Threads it started that are running now. */
@@ -237,77 +212,6 @@ export function statusLabel(run: HeartbeatRun | null, state: keyof typeof STATE_
   if (!run?.enabled) return "Idle";
   const cadence = run.cadence === "custom" ? "on a schedule" : run.cadence.replace(/^every(\d+)(minutes|hours)$/, "every $1 $2").replace(/^every(\w)/, "every $1");
   return `Checks in ${cadence}${run.time && /daily|weekdays|weekly/.test(run.cadence) ? ` at ${run.time}` : ""}`;
-}
-
-/** Activity's sections, only those with something in them; one quiet line when all are empty. */
-export function ActivityPanel({ data, loading, error, onOpen = openThreadPage, providers }: { data: BotActivityView | null | undefined; loading: boolean; error?: string | null; onOpen?(threadId: string): void; providers?: readonly ProviderCatalogEntry[] }) {
-  const [allRecent, setAllRecent] = useState(false);
-  if (!data) return <p className="px-4 py-3 text-xs text-muted-foreground">{loading ? "Loading…" : ""}</p>;
-  const recent = allRecent ? data.completed : data.completed.slice(0, COMPLETED_PREVIEW);
-  const empty = !data.waiting?.length && !data.inProgress.length && !data.scheduled.length && !data.completed.length;
-  return (
-    <div className="flex flex-col gap-4 px-2.5 pt-2 pb-3">
-      {data.maintenance?.map((run) => <div key={run.at} className="px-1.5 text-xs"><span className="font-medium">Maintenance</span> · {run.summary}</div>)}
-      {empty ? <p className="px-1.5 text-sm text-muted-foreground">Nothing going on right now.</p> : null}
-      {data.inProgress.length ? <Section title="Running"><ThreadList threads={data.inProgress} onOpen={onOpen} running={providers ?? []} /></Section> : null}
-      {data.waiting?.length ? <Section title="Waiting to start"><ThreadList threads={data.waiting} onOpen={onOpen} /></Section> : null}
-      {data.scheduled.length ? <Section title="Scheduled"><ScheduledList items={data.scheduled} /></Section> : null}
-      {data.completed.length ? (
-        <Section title="Recent">
-          <ThreadList threads={recent} onOpen={onOpen} />
-          {data.completed.length > COMPLETED_PREVIEW ? (
-            <button type="button" className="self-start px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground" onClick={() => setAllRecent(!allRecent)}>
-              {allRecent ? "Show fewer" : `Show all ${data.completed.length}`}
-            </button>
-          ) : null}
-        </Section>
-      ) : null}
-      {error ? <p role="alert" className="px-1.5 text-xs text-destructive">{error}</p> : null}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="flex flex-col">
-      <h3 className="px-1.5 pb-1 text-xs font-medium text-muted-foreground">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-/** `running`: the provider catalog, when these threads are running: each gets the running mark and its ticking time, as in the sidebar. */
-function ThreadList({ threads, onOpen, running }: { threads: BotThreadView[]; onOpen(threadId: string): void; running?: readonly ProviderCatalogEntry[] }) {
-  return (
-    <ul className="flex flex-col">
-      {threads.map((thread) => (
-        <li key={thread.id}>
-          <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-state-hover" onClick={() => onOpen(thread.id)}>
-            {running ? <ProviderStatusMark providerId={thread.providerId} tone={thread.waitingFor ? "needs" : "running"} providers={running} label={thread.waitingFor ?? runningLabel(thread.runningSince)} /> : null}
-            <span className="min-w-0 flex-1 truncate">{thread.relation === "self" ? "Its chat" : thread.title}</span>
-            {thread.waitingFor
-              ? <span className="shrink-0 text-xs text-muted-foreground">{thread.waitingFor.replace(/^Waiting for /, "waiting for ")}</span>
-              : running && thread.runningSince != null
-              ? <Elapsed since={thread.runningSince} className="text-xs text-success" />
-              : <span className="shrink-0 text-xs text-muted-foreground">{ago(thread.updatedAt)}</span>}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ScheduledList({ items }: { items: BotScheduledView[] }) {
-  return (
-    <ul className="flex flex-col">
-      {items.map((item) => (
-        <li key={item.id} className="flex min-w-0 items-center gap-2 px-1.5 py-1 text-sm">
-          <span className="min-w-0 flex-1 truncate">{item.name}</span>
-          <span className="shrink-0 text-xs text-muted-foreground" title={item.cron ? describeCron(item.cron) : undefined}>{!item.enabled ? "off" : item.nextRunAt ? when(item.nextRunAt) : item.cron ? describeCron(item.cron) : "on"}</span>
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 /** Check-ins: a preset in one click (Morning brief, Evening wrap-up, Every 2 hours, Off), or a custom schedule. */
@@ -530,7 +434,7 @@ function AvatarImages({ botId, onChanged }: { botId: string; onChanged(): void }
 }
 
 /** The Bot's own skills: only its thread loads them. Share moves one into BB's user skills, for every agent. */
-function SkillsList({ botId, name }: { botId: string; name: string }) {
+export function SkillsList({ botId, name }: { botId: string; name: string }) {
   const skills = useLive("bot_skills", { botId }, { pollMs: 30_000 });
   const learning = useLive("bot_learning", { botId }, { pollMs: 30_000 });
   const refresh = () => { skills.refresh(); learning.refresh(); };

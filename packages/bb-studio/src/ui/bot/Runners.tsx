@@ -4,8 +4,8 @@
 // runner for threads the Bot started that an automation wakes. Opening a
 // runner opens its thread as a BB thread.
 import { errorMessage } from "../../kit/format";
-import { DANGER_BUTTON, GHOST_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, Input } from "../../kit/ui/index";
+import { DANGER_BUTTON, GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON } from "../../kit/app/index";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon, Input } from "../../kit/ui/index";
 import { useState } from "react";
 import type { RunnerAdoptableView, RunnerView } from "../../contract";
 import { describeCron } from "../../schedule";
@@ -14,6 +14,7 @@ import { HeartbeatFields, useHeartbeatForm } from "../ProjectLeads";
 import { Elapsed, ProviderStatusMark, runnerStatusTone, runningLabel, type ProviderCatalogEntry } from "./ProviderStatusMark";
 
 import { botItemName, runnerLastRun, sidebarTime, type RunnerOutcome } from "./sidebarAgenda";
+import { runnerState } from "./pageModel";
 
 export type RunnersData = { runners: RunnerView[]; adoptable: RunnerAdoptableView[] };
 export const useRunners = (botId: string) => useLive("bot_runners", { botId }, { pollMs: 15_000 });
@@ -111,7 +112,12 @@ export function useOpenRunner(open: (threadId: string) => void) {
 type Sheet = { kind: "new" } | { kind: "edit"; runner: RunnerView } | { kind: "delete"; runner: RunnerView } | { kind: "move"; runner: RunnerView } | null;
 
 /** The Info tab's Runners section. */
-export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = false, providers = [], fallbackProviderId = null }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean; adoptOnly?: boolean; providers?: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null }) {
+/**
+ * The Bot page's Runners. `compact` (the page below the week): one row each,
+ * its area colour, name, schedule in words and state, with Pause, Run now,
+ * Edit, Move and Delete in the row's menu.
+ */
+export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = false, providers = [], fallbackProviderId = null, compact = false, colors, schedules = {} }: { botId: string; botName: string; onOpen(threadId: string): void; disabled: boolean; adoptOnly?: boolean; providers?: readonly ProviderCatalogEntry[]; fallbackProviderId?: string | null; compact?: boolean; colors?: ReadonlyMap<string, string>; schedules?: Readonly<Record<string, string>> }) {
   const data = useRunners(botId);
   const call = useCall();
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -125,8 +131,52 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
   const runners = data.data?.runners ?? [];
   // Adoption suggestions now live in the maintenance summary.
   if (adoptOnly) return null;
+  const menu = (runner: RunnerView) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><button type="button" className={ICON_BUTTON} aria-label={`${runner.name} actions`} disabled={busy}><Icon name="MoreHorizontal" /></button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        {runner.threadId ? <DropdownMenuItem onSelect={() => open(runner)}><Icon name="MessageSquare" />Open thread</DropdownMenuItem> : null}
+        {runner.state === "active"
+          ? <DropdownMenuItem onSelect={() => void run("bot_runner_pause", { id: runner.id })}><Icon name="Pause" />Pause</DropdownMenuItem>
+          : <DropdownMenuItem disabled={disabled} onSelect={() => void run("bot_runner_resume", { id: runner.id })}><Icon name="Play" />Resume</DropdownMenuItem>}
+        <DropdownMenuItem disabled={disabled} onSelect={() => void run("bot_runner_run_now", { id: runner.id })}><Icon name="Zap" />Run now</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { setError(null); setSheet({ kind: "edit", runner }); }}><Icon name="Edit" />Edit</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { setError(null); setSheet({ kind: "move", runner }); }}><Icon name="Laptop" />Move to machine…</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { setError(null); setSheet({ kind: "delete", runner }); }}><Icon name="Trash2" />Delete</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  const rows = compact ? (
+    <ul className="flex flex-col divide-y divide-border border-b border-border">
+      {runners.map((runner) => {
+        const state = runnerState(runner);
+        return (
+          <li key={runner.id} data-runner={runner.id} className="group flex min-w-0 items-center gap-2.5 py-2">
+            {state.tone === "working"
+              ? <ProviderStatusMark providerId={runner.providerId ?? fallbackProviderId} tone="running" providers={providers} label={runningLabel(runner.runningSince)} />
+              : <span aria-hidden className="mx-[5px] inline-block size-1.5 shrink-0 rounded-full" style={{ background: colors?.get(runner.id) ?? "var(--muted-foreground)" }} />}
+            <button type="button" className="flex min-w-0 flex-1 flex-col text-left" title={runnerTitle(runner)} onClick={() => open(runner)}>
+              <span className="truncate text-sm">{runner.name}{runner.machineName ? <span className="text-muted-foreground"> · {runner.machineName}</span> : null}</span>
+              <span className="truncate text-xs text-muted-foreground">{schedules[runner.id] || scheduleLabel(runner.schedule)}</span>
+            </button>
+            <span className={`shrink-0 text-xs ${state.tone === "failed" ? "text-destructive" : "text-muted-foreground"}`}>{state.text}</span>
+            {menu(runner)}
+          </li>
+        );
+      })}
+    </ul>
+  ) : null;
   return (
-    <section aria-label="Runners" data-testid="bot-runners" className="px-4 pt-4">
+    <section aria-label="Runners" data-testid="bot-runners" className={compact ? "" : "px-4 pt-4"}>
+      {compact ? (
+        <div className="flex h-8 items-center gap-2 border-b border-border">
+          <h2 className="flex-1 text-sm font-medium">Runners</h2>
+          <button type="button" className={GHOST_BUTTON} disabled={disabled} onClick={() => { setError(null); setSheet({ kind: "new" }); }}><Icon name="Plus" />New runner</button>
+        </div>
+      ) : null}
+      {compact ? (runners.length ? rows : <p className="pt-2 text-xs text-muted-foreground">{data.loading ? "Loading…" : `Recurring jobs ${botName} hands off. They stay quiet unless they have something to tell you.`}</p>) : null}
+      {compact && error && !sheet ? <p role="alert" className="pt-1 text-xs text-destructive">{error}</p> : null}
+      {compact ? null : <>
       <div className="flex items-center gap-2">
         <h3 className="flex-1 text-xs font-medium text-muted-foreground">Runners</h3>
         <button type="button" className={GHOST_BUTTON} disabled={disabled} onClick={() => { setError(null); setSheet({ kind: "new" }); }}><Icon name="Plus" />New runner</button>
@@ -166,6 +216,7 @@ export function RunnersSection({ botId, botName, onOpen, disabled, adoptOnly = f
       ) : (
         <p className="pt-1 text-xs text-muted-foreground">{data.loading ? "Loading…" : `Recurring jobs ${botName} hands off. They stay quiet unless they have something to tell you.`}</p>
       )}
+      </>}
       {sheet?.kind === "new" || sheet?.kind === "edit" || sheet?.kind === "move" ? (
         <RunnerDialog botId={botId} moving={sheet.kind === "move"} runner={sheet.kind !== "new" ? sheet.runner : null} busy={busy} error={error} onClose={() => setSheet(null)}
           onSave={(input) => sheet.kind === "move" ? void run("bot_runner_migrate", { id: sheet.runner.id, machine: input.machine ?? null, confirm: input.confirm }) : void run(sheet.kind === "edit" ? "bot_runner_update" : "bot_runner_create", sheet.kind === "edit" ? { id: sheet.runner.id, ...input } : input)} />

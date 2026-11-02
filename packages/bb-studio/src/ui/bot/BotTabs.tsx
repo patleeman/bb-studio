@@ -1,44 +1,54 @@
-// A Bot's Info: its inline profile, controls (Pause/Resume, Stop, the ⋯ menu
-// with Memory, Skills, Check-ins and Switch model), Memory, skills,
-// automations (check-ins, reminders, watchers, runners) and activity. It is
-// the Bot page itself (/plugins/studio/studio/bot[/<botId>], BotPanel), and the
-// "Bot info" thread panel action beside a Bot's thread (BotInfoPanel). Its
-// chat and the threads it lists open as BB threads.
-import { GHOST_BUTTON, ICON_BUTTON, OUTLINE_BUTTON, PageColumn, PRIMARY_BUTTON } from "../../kit/app/index";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
-import { useState } from "react";
-import { experimental_useProviders as useProviders, useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+// A Bot's page and Bot info. The Bot page (/plugins/studio/studio/bot[/<botId>],
+// BotPanel) is one scroll, most important first (BotPage.tsx); Controls
+// (bot/<botId>/controls, BotControls.tsx) holds every setting; Loops
+// (bot/<botId>/loops) is the full loop list, each with a back link. "Bot info"
+// beside a Bot's thread (BotInfoPanel) is the page's compact version
+// (BotPane). Its chat and the threads it lists open as BB threads.
+import { ICON_BUTTON, PageColumn, usePathname, openAppPath } from "../../kit/app/index";
+import { Icon } from "../../kit/ui/index";
+import { useBbNavigate, type PluginThreadHeaderActionProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { BotView } from "../../contract";
 import { useLive } from "../live";
-import { ActivityPanel, BotHome, BotProfileEditor, runningCount, statusLabel, useBotControls } from "./BotHome";
+import { BotHome } from "./BotHome";
 import { BOT_STYLES } from "./BotAvatar";
-import { SwitchModelDialog } from "./BotModel";
-import { externalName, externalNote } from "../../external-providers";
-import { RunnersSection } from "./Runners";
-import { AutomationsSection } from "./Automations";
-import { ProfileChanges } from "./ProfileChanges";
-import { BotMaintenance } from "./BotMaintenance";
-import { BotCacheSection } from "./BotCache";
-import { BOT_INFO_ACTION, useOpenThread } from "./workspace";
-import { usePathname, openAppPath } from "../../kit/app/index";
-import { LoopsTab, useNeedsYou } from "../../loops/ui/LoopsTab";
-import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
+import { BotPage, BotPane, isControlsPath } from "./BotPage";
+import { BotControls } from "./BotControls";
+import { BOT_INFO_ACTION } from "./workspace";
+import { LoopsTab } from "../../loops/ui/LoopsTab";
+import { isLoopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botPath } from "./selection";
-
-const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 
 /** The Bot page (nav panel `bot`): the selected Bot's Info, or the create flow. */
 export function BotPanel() {
   return <BotHome Info={InfoPage} />;
 }
 
-// The page scrolls as a whole, its bar at the pane's edge, like every Studio page.
+// The page scrolls as a whole, at the page's width, like every Studio page.
 function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
+  const pathname = usePathname();
+  const loopsOn = useLoopsEnabled() && view.bot!.primary !== false;
+  const body = isControlsPath(pathname) ? <BotControls view={view} refresh={refresh} />
+    : loopsOn && isLoopsPath(pathname) ? <LoopsPage view={view} />
+      : <BotPage view={view} refresh={refresh} />;
   return (
-    <PageColumn className="max-w-2xl px-0 pt-0 pb-0 @max-3xl/page:px-0 @max-3xl/page:pt-0">
+    <PageColumn className="max-w-6xl pt-0 pb-0 @max-3xl/page:pt-0">
       <style>{BOT_STYLES}</style>
-      <Info view={view} refresh={refresh} page />
+      {body}
     </PageColumn>
+  );
+}
+
+/** The full loop list, with a back link to the Bot page. */
+function LoopsPage({ view }: { view: BotView }) {
+  const bot = view.bot!;
+  return (
+    <div className="flex flex-col" aria-label={`${bot.name} loops`}>
+      <button type="button" className="flex items-center gap-1.5 self-start pt-6 text-sm text-muted-foreground hover:text-foreground" onClick={() => openAppPath(botPath(bot.id))}>
+        <Icon name="ArrowLeft" className="size-3.5" aria-hidden />{bot.name}
+      </button>
+      <h1 className="pt-3 pb-5 text-xl font-semibold">Loops</h1>
+      <div className="-mx-4"><LoopsTab /></div>
+    </div>
   );
 }
 
@@ -64,111 +74,9 @@ export function BotInfoHeaderAction({ threadId }: PluginThreadHeaderActionProps)
   );
 }
 
-/** One Bot's Info by id. */
+/** One Bot's Info by id: the compact page. */
 export function BotInfo({ botId, threadId }: { botId: string; threadId?: string }) {
   const view = useLive("bot_get", { botId }, { pollMs: 30_000 });
   if (!view.data?.bot) return <p className="p-4 text-sm text-muted-foreground">{view.loading ? "Loading…" : view.error ?? "No bot."}</p>;
-  return <Info key={view.data.bot.id} view={view.data} refresh={view.refresh} threadId={threadId} />;
-}
-
-/** `threadId`: the thread it shows beside, if any (Open chat hides on the chat itself). */
-function Info({ view, refresh, threadId, page = false }: { view: BotView; refresh(): void; threadId?: string; page?: boolean }) {
-  // The Bot page has Info | Loops for the primary Bot while the Attention Router is on.
-  const pathname = usePathname();
-  const loopsOn = useLoopsEnabled() && page && view.bot!.primary !== false;
-  const onLoops = loopsOn && isLoopsPath(pathname);
-  const activity = useLive("bot_activity", { botId: view.bot!.id }, { pollMs: 15_000 });
-  const running = runningCount(activity.data);
-  const { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, toggleSkills, skills, sheets } = useBotControls(view, () => { refresh(); activity.refresh(); }, running);
-  const openSub = useOpenThread();
-  const [switching, setSwitching] = useState(false);
-  const profileChanged = () => { refresh(); activity.refresh(); };
-  const { providers } = useProviders();
-  const menu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" className={ICON_BUTTON} aria-label="Bot menu" title="More" disabled={!!busy}><Icon name="MoreHorizontal" /></button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-44">
-        {bot.kind === "external"
-          ? <DropdownMenuItem disabled data-testid="bot-external-note"><Icon name="Info" />{externalNote(bot.providerId)}</DropdownMenuItem>
-          : <>
-            <DropdownMenuItem onSelect={() => void openMemory()}><Icon name="FileText" />Memory</DropdownMenuItem>
-            <DropdownMenuItem onSelect={toggleSkills}><Icon name="ListTodo" />Skills…</DropdownMenuItem>
-          </>}
-        {bot.state === "active" ? <DropdownMenuItem onSelect={() => setSheet("checkins")}><Icon name="Calendar" />Check-ins…</DropdownMenuItem> : null}
-        {bot.threadId && bot.providerId && bot.model ? <DropdownMenuItem onSelect={() => setSwitching(true)}><Icon name="Repeat" />Switch model…</DropdownMenuItem> : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-  return (
-    <div className={page ? "flex flex-col" : "studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground"} aria-label={`${bot.name} info`}>
-      <BotProfileEditor bot={bot} value={profile} status={statusLabel(view.run, bot.state, running)} statusDot={STATE_DOT[bot.state]} working={running > 0} busy={!!busy}
-        onChanged={profileChanged} onSave={saveProfile} actions={menu}>
-        <ProfileChanges botId={bot.id} onChanged={profileChanged} />
-      </BotProfileEditor>
-      {switching && bot.threadId && bot.providerId && bot.model
-        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
-        : null}
-
-      <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
-        {bot.threadId && bot.threadId !== threadId
-          ? <button type="button" className={PRIMARY_BUTTON} data-testid="bot-open-chat" onClick={() => openSub(bot.threadId!)}><Icon name="MessageSquare" />Open chat</button>
-          : null}
-        {bot.state === "active"
-          ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
-          : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
-        {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" className="fill-current" />Stop…</button> : null}
-      </div>
-      {error ? <p role="alert" className="px-4 pb-2 text-xs text-destructive">{error}</p> : null}
-      {!bot.threadId ? <p className="px-4 pb-2 text-xs text-muted-foreground">{bot.name} has no chat.{bot.primary === false ? "" : " Make a thread your Bot from its ⋯ menu."}</p> : null}
-      {loopsOn ? <PageTabs botId={bot.id} threadId={bot.threadId} loops={onLoops} /> : null}
-      {onLoops ? <LoopsTab /> : <>
-
-      <dl className="mx-4 flex flex-col divide-y divide-border border-y border-border text-sm">
-        {bot.kind === "external" ? <InfoRow label="Runs on" value={`${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}`} action={null} /> : <>
-          <InfoRow label="Memory" value="What it keeps in mind" action={{ label: "Open", run: () => void openMemory() }} />
-          <InfoRow label="Skills" value="Procedures it saved" action={{ label: "Manage", run: toggleSkills }} />
-        </>}
-      </dl>
-      {skills}
-      {bot.kind === "external" ? null : <BotCacheSection botId={bot.id} threadId={bot.threadId} />}
-
-      {bot.kind === "external" ? null : <BotMaintenance botId={bot.id} />}
-      <AutomationsSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} external={bot.kind === "external"} page={page} />
-      {bot.kind === "external"
-        ? <p className="px-4 pt-3 text-xs text-muted-foreground" data-testid="bot-external-note">{externalNote(bot.providerId)} Studio's Memory page, skills and runners don't reach it; chat, threads, check-ins and pause work as usual.</p>
-        : <RunnersSection botId={bot.id} botName={bot.name} onOpen={openSub} disabled={bot.state !== "active"} providers={providers} fallbackProviderId={bot.providerId} />}
-
-      <h3 className="px-4 pt-4 text-xs font-medium text-muted-foreground">Activity</h3>
-      <ActivityPanel data={activity.data} loading={activity.loading} error={activity.error} onOpen={openSub} providers={providers} />
-      </>}
-      {sheets}
-    </div>
-  );
-}
-
-function InfoRow({ label, value, action }: { label: string; value: string; action: { label: string; run(): void } | null }) {
-  return (
-    <div className="flex min-h-10 items-center gap-3 py-1.5">
-      <dt className="w-20 shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate">{value}</dd>
-      {action ? <button type="button" className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={action.run} aria-label={`${action.label} ${label.toLowerCase()}`}>{action.label}</button> : null}
-    </div>
-  );
-}
-
-/** Info | Loops under the Bot's header; Loops counts what needs Patrick now, as the Bot row's badge does. */
-function PageTabs({ botId, threadId, loops }: { botId: string; threadId: string | null; loops: boolean }) {
-  const list = useLive("loops.list", {}, { pollMs: 60_000 });
-  const needs = useNeedsYou(botId, threadId, list.data?.needsYouNow).count;
-  const tab = "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground aria-selected:bg-state-active aria-selected:text-foreground";
-  return (
-    <div role="tablist" aria-label="Bot page" className="flex items-center gap-1 px-4 pb-3">
-      <button type="button" role="tab" aria-selected={!loops} className={tab} onClick={() => openAppPath(botPath(botId))}>Info</button>
-      <button type="button" role="tab" aria-selected={loops} className={tab} data-testid="bot-loops-tab" onClick={() => openAppPath(loopsPath(botId))}>
-        Loops{needs ? <span className="rounded-full bg-warning px-1.5 text-xs font-medium leading-4 text-background tabular-nums">{needs}</span> : null}
-      </button>
-    </div>
-  );
+  return <BotPane key={view.data.bot.id} view={view.data} refresh={view.refresh} threadId={threadId} />;
 }
