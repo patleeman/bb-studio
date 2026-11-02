@@ -123,6 +123,8 @@ export class SessionMachine {
   /** "Drop the loop '…'? Say yes to drop." while a destructive action waits for a yes. */
   confirmation: string | null = null;
   card: ToolCard | null = null;
+  /** The session's finished lines, newest last (the pill's transcript); at most 60. */
+  lines: Subtitle[] = [];
   agentMuted = false;
   interruptions = 0;
   falseTriggers = 0;
@@ -317,6 +319,7 @@ export class SessionMachine {
       case "send_to_cos": case "send_to_thread":
         if (output.startsWith("Sent to ")) {
           this.card = { kind: "sent", title: `Sent to ${output.slice("Sent to ".length).split(".")[0]}`, detail: "" };
+          this.line({ speaker: "agent", text: `✓ ${this.card.title}` });
           effects.push({ type: "earcon", earcon: "sent" });
         } else this.card = { kind: "notice", title: "Which thread?", detail: firstSentence(output) };
         break;
@@ -416,6 +419,7 @@ export class SessionMachine {
     if (this.phase.kind === "userSpeaking") this.phase = { kind: "thinking" };
     if (isEcho(text, this.recentAgent)) return [];
     this.reports.push({ type: "transcript", role: "user", text, at: ms(now) });
+    this.line({ speaker: "user", text });
     return [{ type: "earcon", earcon: "heard" }];
   }
 
@@ -427,5 +431,10 @@ export class SessionMachine {
     this.lastAgentLine = text;
     this.recentAgent = `${this.recentAgent} ${text}`.slice(-400);
     this.reports.push({ type: "transcript", role: "assistant", text, at: ms(now) });
+    this.line({ speaker: "agent", text });
+  }
+
+  private line(line: Subtitle) {
+    this.lines = [...this.lines, line].slice(-60);
   }
 }

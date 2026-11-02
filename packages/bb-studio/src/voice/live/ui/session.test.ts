@@ -22,7 +22,7 @@ function fakes(options: { stop?: string | null; replies?: number } = {}) {
     state: vi.fn(async () => ({ ready: true, problem: null, model: "gpt-live-1", cosName: "Dot" })),
     start: vi.fn(async () => started),
     tool: vi.fn(async ({ name }: { name: string }) => ({ output: name === "send_to_thread" ? `Sent to the Kensico lead. Say just that ("Sent to the Kensico lead."); its answer will come back here.` : "ok" })),
-    event: vi.fn(async () => ({ costUsd: 0.02, replies: options.replies ?? 0, stop: options.stop ?? null })),
+    event: vi.fn(async () => ({ costUsd: 0.02, replies: options.replies ?? 0, stop: options.stop ?? null, voiceThreadId: "thr_voice" })),
     poll: vi.fn(async () => ({ replies: [{ id: 1, title: "the Kensico lead", summary: "Paused.", note: "(Studio, not the user:) the Kensico lead answered: Paused." }] })),
     end: vi.fn(async () => ({})),
   };
@@ -72,6 +72,7 @@ describe("LiveSession", () => {
     replying.emit({ type: "session.started" });
     await replying.session.sync();
     expect(replying.session.costUsd).toBe(0.02);
+    expect(replying.session.voiceThreadId).toBe("thr_voice");
     expect(replying.sent).toContainEqual({ type: "session.commentary.append", delegation_id: null, content: "(Studio, not the user:) the Kensico lead answered: Paused." });
     expect(replying.session.machine.card?.title).toBe("the Kensico lead answered");
 

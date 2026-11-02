@@ -12,7 +12,7 @@ export interface LiveServer {
   state(): Promise<{ ready: boolean; problem: string | null; model: string; cosName: string | null }>;
   start(input: { model?: string; sdp?: string }): Promise<{ sessionId: string; model: string; transport: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null; mockUrl: string | null; cosName: string }>;
   tool(input: { sessionId: string; name: string; args: string; events: Report[] }): Promise<{ output: string }>;
-  event(input: { sessionId: string; events: Report[] }): Promise<{ costUsd: number | null; replies: number; stop: string | null }>;
+  event(input: { sessionId: string; events: Report[] }): Promise<{ costUsd: number | null; replies: number; stop: string | null; voiceThreadId?: string | null }>;
   poll(input: { sessionId: string }): Promise<{ replies: { id: number; title: string; summary: string; note: string }[] }>;
   end(input: { sessionId: string; events: Report[] }): Promise<unknown>;
 }
@@ -34,6 +34,8 @@ export class LiveSession {
   model = "gpt-live-1";
   costUsd: number | null = null;
   micLabel = "";
+  /** The session's voice thread, once Studio has opened it: the pill links to it. */
+  voiceThreadId: string | null = null;
   readonly trace: TraceEntry[] = [];
   private transport: LiveTransport | null = null;
   private sessionId: string | null = null;
@@ -154,6 +156,7 @@ export class LiveSession {
     try {
       const result = await this.server.event({ sessionId: this.sessionId, events: this.machine.drain() });
       this.costUsd = result.costUsd;
+      this.voiceThreadId = result.voiceThreadId ?? this.voiceThreadId;
       if (result.stop) {
         this.apply(this.machine.handle({ type: "error", message: result.stop }, this.now()));
         this.stop();

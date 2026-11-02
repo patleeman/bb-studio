@@ -1,17 +1,19 @@
-// Hands-free voice on the desktop, in the same UI language as the iPhone: a
-// talking orb that moves while either side speaks, the words streaming under
-// it like subtitles, "Waiting for your yes" only for destructive actions, End,
-// and the model, cost and mic in the header. It's a Studio app overlay (a
-// floating panel at the right that stays over every page while the session
-// runs), opened from the Bot chat's header and the command palette.
-import { useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
-import { useSyncExternalStore } from "react";
+// Hands-free voice on the desktop. A session is its own thread, so it isn't
+// tied to the composer it started from: the composer's waveform button (in
+// the slot voice mode's speaker uses) starts it, and from then on a small
+// floating pill stays over every page and thread until End. The pill, like
+// Talk's dictation pill (draggable, its own remembered spot), shows the
+// talking orb, the current subtitle line, "✓ Sent to …" and End. It expands
+// by itself for a destructive action's "yes" question, and on demand for the
+// transcript and a link to the session's voice thread.
+import { useBbNavigate, useComposer, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ICON_BUTTON } from "../../../kit/app/index";
 import { Icon, cn } from "../../../kit/ui";
-import { useLive } from "../../../ui/live";
+import { useDraggable } from "../../../talk/ui/draggable";
 import type { voiceLiveContract } from "../contract";
 import { usd, VOICE_LIVE_CHANNEL, type VoiceLiveSignal } from "../shared";
-import type { Phase, Speaker, Subtitle, ToolCard } from "./machine";
+import type { Phase, Speaker, ToolCard } from "./machine";
 import { LiveSession, type LiveServer } from "./session";
 
 type Rpc = { call(method: string, input: unknown): Promise<unknown> };
@@ -28,201 +30,197 @@ export function liveServer(rpc: Rpc): LiveServer {
   };
 }
 
-// The window's one panel and session.
-type State = { open: boolean; session: LiveSession | null };
-let state: State = { open: false, session: null };
+// The window's one session, and whether its pill is expanded.
+type State = { session: LiveSession | null; expanded: boolean };
+let state: State = { session: null, expanded: false };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<State>) => {
   state = { ...state, ...patch };
   for (const listener of listeners) listener();
 };
 const useStore = () => useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => state);
+/** The pill keeps Studio's RPC client, so the command palette can start a session too. */
+let windowRpc: Rpc | null = null;
 
-export function openHandsFree(): void {
-  set({ open: true });
+/** Starts a session, or, when one is running, opens its pill. */
+export function startHandsFree(rpc: Rpc | null = windowRpc): void {
+  if (state.session?.machine.isLive) return set({ expanded: true });
+  if (!rpc) return;
+  const session = new LiveSession(liveServer(rpc));
+  // Staged runs read the trace to measure barge-in and turns.
+  (globalThis as { __studioVoiceLive?: LiveSession }).__studioVoiceLive = session;
+  set({ session, expanded: false });
+  session.start();
 }
 
-export function toggleHandsFree(): void {
-  if (state.open && !state.session?.machine.isLive) set({ open: false });
-  else set({ open: true });
+function useSession(session: LiveSession | null) {
+  useSyncExternalStore((listener) => session?.subscribe(listener) ?? (() => {}), () => session?.snapshot ?? 0);
 }
 
-function useSession(session: LiveSession) {
-  useSyncExternalStore((listener) => session.subscribe(listener), () => session.snapshot);
-  return session;
-}
-
-/** The Bot chat's header: opens Hands-free. Nothing on other threads. */
-export function HandsFreeHeaderAction({ threadId }: PluginThreadHeaderActionProps) {
-  const bot = useLive("bot_get", {}, { pollMs: 120_000 }).data?.bot ?? null;
-  if (!bot?.threadId || bot.threadId !== threadId) return null;
+/** The composer's waveform button: starts a session (or opens the running one's pill). */
+export function HandsFreeComposerButton() {
+  const composer = useComposer();
+  const rpc = useRpc<typeof voiceLiveContract>();
+  const { session } = useStore();
+  useSession(session);
+  if (composer.scope.kind !== "thread") return null;
+  const live = !!session?.machine.isLive;
+  const label = live ? "Hands-free voice is on" : "Hands-free voice";
   return (
-    <button type="button" data-testid="handsfree-header" aria-label="Hands-free voice" title="Hands-free voice" className={ICON_BUTTON} onClick={openHandsFree}>
+    <button type="button" data-testid="handsfree-composer" aria-label={label} title={label} aria-pressed={live}
+      className={cn(ICON_BUTTON, "rounded-full", live && "bg-orange-500/15 text-orange-600 dark:text-orange-400")}
+      onClick={() => startHandsFree(rpc as unknown as Rpc)}>
       <Icon name="studio/handsfree" aria-hidden />
     </button>
   );
 }
 
-/** The panel, over every page while it's open. */
-export function HandsFreeOverlay() {
-  const { open, session } = useStore();
-  const rpc = useRpc<typeof voiceLiveContract>();
-  if (!open) return null;
-  const live = session?.machine.isLive ? session : null;
-  const begin = () => {
-    const next = new LiveSession(liveServer(rpc as unknown as Rpc));
-    // Staged runs read the trace to measure barge-in and turns.
-    (globalThis as { __studioVoiceLive?: LiveSession }).__studioVoiceLive = next;
-    set({ session: next });
-    next.start();
-  };
-  return session ? <Panel session={session} onStart={begin} onClose={() => { live?.stop(); set({ open: false }); }} /> : <Panel session={null} onStart={begin} onClose={() => set({ open: false })} />;
-}
-
-function Panel({ session, onStart, onClose }: { session: LiveSession | null; onStart: () => void; onClose: () => void }) {
-  if (session) return <LivePanel session={session} onStart={onStart} onClose={onClose} />;
-  return <PanelFrame speaker={null} header={<Header model="gpt-live-1" costUsd={null} mic="" onClose={onClose} />}><Body phase={{ kind: "idle" }} speaker={null} subtitle={null} card={null} confirmation={null} live={false} connecting={false} onStart={onStart} onStop={() => {}} /></PanelFrame>;
-}
-
-function LivePanel({ session, onStart, onClose }: { session: LiveSession; onStart: () => void; onClose: () => void }) {
-  useSession(session);
-  const { machine } = session;
-  useRealtime(VOICE_LIVE_CHANNEL, (payload) => {
-    const signal = payload as VoiceLiveSignal;
-    if (signal?.kind === "reply") void session.pickUp();
-  });
-  return (
-    <PanelFrame speaker={machine.speaking} header={<Header model={session.model} costUsd={session.costUsd} mic={session.micLabel} onClose={onClose} />}>
-      <Body phase={machine.phase} speaker={machine.speaking} subtitle={machine.subtitle} card={machine.card} confirmation={machine.confirmation}
-        live={machine.isLive} connecting={machine.phase.kind === "connecting"} onStart={onStart} onStop={() => session.stop()} />
-    </PanelFrame>
-  );
-}
-
-const TINT: Record<Speaker | "thinking" | "idle", string> = {
-  user: "from-teal-400 to-teal-600",
-  agent: "from-orange-500 to-red-600",
-  thinking: "from-fuchsia-500 to-purple-600",
-  idle: "from-zinc-400 to-zinc-500",
-};
-
-function PanelFrame({ speaker, header, children }: { speaker: Speaker | null; header: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div role="dialog" aria-label="Hands-free voice" data-testid="handsfree-panel"
-      className="fixed right-4 top-16 bottom-4 z-50 flex w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl">
-      <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b to-transparent transition-colors duration-300",
-        speaker === "user" ? "from-teal-500/10" : speaker === "agent" ? "from-orange-500/10" : "from-transparent")} />
-      {header}
-      {children}
-    </div>
-  );
-}
-
-function Header({ model, costUsd, mic, onClose }: { model: string; costUsd: number | null; mic: string; onClose: () => void }) {
-  const detail = [model, ...(costUsd != null ? [usd(costUsd)] : []), ...(mic ? [mic] : [])].join(" · ");
-  return (
-    <div className="relative flex items-center gap-3 px-5 pt-4">
-      <div className="min-w-0 flex-1">
-        <div className="text-base font-semibold">Hands-free</div>
-        <div className="truncate text-xs tabular-nums text-muted-foreground" data-testid="handsfree-detail">{detail}</div>
-      </div>
-      <button type="button" aria-label="Close" title="Close" className={cn(ICON_BUTTON, "rounded-full")} onClick={onClose}>
-        <Icon name="X" aria-hidden />
-      </button>
-    </div>
-  );
-}
+// BB's page header is a window drag region in the desktop app; the pill opts out, as Talk's does.
+const NO_DRAG = "[app-region:no-drag] [-webkit-app-region:no-drag]";
 
 const STATUS = (phase: Phase): string => {
   switch (phase.kind) {
-    case "idle": return "Click Start, then just talk";
+    case "idle": return "Hands-free";
     case "connecting": return "Connecting…";
     case "listening": return "Listening";
-    case "userSpeaking": return "You";
+    case "userSpeaking": return "Listening";
     case "thinking": return "Thinking…";
-    case "agentSpeaking": return "Voice";
+    case "agentSpeaking": return "";
     case "paused": return phase.why;
     case "ended": return phase.why ?? "Ended";
     case "failed": return phase.why;
   }
 };
 
-function Body(props: { phase: Phase; speaker: Speaker | null; subtitle: Subtitle | null; card: ToolCard | null; confirmation: string | null; live: boolean; connecting: boolean; onStart: () => void; onStop: () => void }) {
-  const { phase, speaker, subtitle, card, confirmation, live, connecting } = props;
+/** The floating pill, over every page while a session runs (and after it ends, until closed). */
+export function HandsFreePill() {
+  const { session, expanded } = useStore();
+  const rpc = useRpc<typeof voiceLiveContract>();
+  windowRpc = rpc as unknown as Rpc;
+  if (!session) return null;
+  return <Pill key={session.trace[0]?.at ?? 0} session={session} expanded={expanded} />;
+}
+
+function Pill({ session, expanded }: { session: LiveSession; expanded: boolean }) {
+  useSession(session);
+  const navigate = useBbNavigate();
+  const drag = useDraggable<HTMLDivElement>("bb-plugin-studio:handsfree-pill-position");
+  const { machine } = session;
+  useRealtime(VOICE_LIVE_CHANNEL, (payload) => {
+    const signal = payload as VoiceLiveSignal;
+    if (signal?.kind === "reply") void session.pickUp();
+  });
+  const live = machine.isLive;
+  const speaker = machine.speaking;
+  // A destructive action's question opens the pill by itself, and closes it again once answered.
+  const open = expanded || !!machine.confirmation;
+  const subtitle = machine.subtitle;
+  const sent = machine.card?.kind === "sent" ? machine.card : null;
+  const status = STATUS(machine.phase);
+  const line = live && subtitle?.text && (speaker || machine.phase.kind === "thinking" || machine.phase.kind === "listening") ? subtitle : null;
+  const detail = [session.model, ...(session.costUsd != null ? [usd(session.costUsd)] : []), ...(session.micLabel ? [session.micLabel] : [])].join(" · ");
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col items-center px-6">
-      <div className="flex-1" />
-      <Orb speaker={speaker} thinking={phase.kind === "thinking"} />
-      <div className="mt-4 text-sm font-medium text-muted-foreground" data-testid="handsfree-status" aria-live="polite">{STATUS(phase)}</div>
-      <SubtitleLine subtitle={subtitle} />
-      {card?.kind === "sent" ? (
-        <div className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground" data-testid="handsfree-sent"><Icon name="Check" className="size-4" aria-hidden />{card.title}</div>
-      ) : null}
-      <div className="flex-1" />
-      <div className="flex w-full flex-col gap-2.5">
-        {confirmation ? <ConfirmCard question={confirmation} /> : null}
-        {card && card.kind !== "sent" ? <Card card={card} /> : null}
+    <div ref={drag.ref} style={drag.style} role="region" aria-label="Hands-free voice" data-testid="handsfree-pill" data-open={open ? "" : undefined}
+      className={cn(NO_DRAG, "z-[70] flex w-[calc(100vw-16px)] max-w-[460px] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl sm:w-[440px]", drag.dragging && "shadow-2xl")}>
+      <div {...drag.handleProps} title="Drag to move" className={cn("flex touch-none select-none items-center gap-2.5 py-1.5 pl-1.5 pr-1.5", drag.dragging ? "cursor-grabbing" : "cursor-grab")}>
+        <MiniOrb speaker={speaker} thinking={machine.phase.kind === "thinking"} live={live} />
+        <div className="min-w-0 flex-1" aria-live="polite">
+          {line ? (
+            <div data-testid="handsfree-subtitle" data-speaker={line.speaker} className={cn("truncate text-[13px] leading-5", line.speaker === "user" ? "text-muted-foreground" : "font-medium")}>{tail(line.text)}</div>
+          ) : (
+            <div data-testid="handsfree-status" className="truncate text-[13px] leading-5 text-muted-foreground">{status || "Voice"}</div>
+          )}
+          {sent ? <div data-testid="handsfree-sent" className="flex items-center gap-1 truncate text-[11px] leading-4 font-medium text-emerald-600 dark:text-emerald-400"><Icon name="Check" className="size-3 shrink-0" aria-hidden />{sent.title}</div> : null}
+        </div>
+        <button type="button" data-testid="handsfree-expand" aria-expanded={open} aria-label={open ? "Hide the transcript" : "Show the transcript"} title={open ? "Hide the transcript" : "Show the transcript"}
+          className={cn(ICON_BUTTON, "rounded-full")} onClick={() => set({ expanded: !expanded })}>
+          <Icon name={open ? "ChevronUp" : "ChevronDown"} aria-hidden />
+        </button>
+        {live ? (
+          <button type="button" data-testid="handsfree-end" aria-label="End hands-free" title="End"
+            className="flex h-8 items-center gap-1 rounded-full bg-red-500 px-3 text-xs font-semibold text-white hover:bg-red-600" onClick={() => session.stop()}>
+            <Icon name="studio/phone-off" className="size-3.5" aria-hidden />End
+          </button>
+        ) : (
+          <button type="button" data-testid="handsfree-close" aria-label="Close" title="Close" className={cn(ICON_BUTTON, "rounded-full")} onClick={() => set({ session: null, expanded: false })}>
+            <Icon name="X" aria-hidden />
+          </button>
+        )}
       </div>
-      <button type="button" data-testid={live ? "handsfree-end" : "handsfree-start"} disabled={connecting} onClick={live ? props.onStop : props.onStart}
-        className={cn("my-6 flex size-24 flex-col items-center justify-center gap-1 rounded-full text-white shadow-lg transition-opacity disabled:opacity-60",
-          live ? "bg-red-500 hover:bg-red-600" : "bg-orange-600 hover:bg-orange-700")}>
-        <Icon name={live ? "studio/phone-off" : "Mic"} className="size-7" aria-hidden />
-        <span className="text-xs font-semibold">{live ? "End" : "Start"}</span>
-      </button>
+      {open ? (
+        <div className="flex flex-col gap-2.5 border-t border-border px-3 pb-3 pt-2.5">
+          {machine.confirmation ? <ConfirmCard question={machine.confirmation} /> : null}
+          {expanded ? (
+            <>
+              <div className="text-[11px] tabular-nums text-muted-foreground" data-testid="handsfree-detail">{detail}</div>
+              <Transcript lines={machine.lines} />
+              {machine.card && machine.card.kind !== "sent" ? <Card card={machine.card} /> : null}
+              <button type="button" data-testid="handsfree-thread" disabled={!session.voiceThreadId}
+                className="flex items-center gap-1.5 self-start rounded-md text-xs font-medium text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground disabled:no-underline"
+                onClick={() => { if (session.voiceThreadId) navigate.toThread(session.voiceThreadId); }}>
+                <Icon name="MessageSquare" className="size-3.5" aria-hidden />{session.voiceThreadId ? "Open the voice thread" : "The voice thread opens in a moment…"}
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/** Rings and bars that move while someone talks: teal for you, the accent for the voice. */
-function Orb({ speaker, thinking }: { speaker: Speaker | null; thinking: boolean }) {
+/** A long line's newest words. */
+const tail = (text: string) => (text.length > 90 ? `…${text.slice(-90).replace(/^\S*\s/, "")}` : text);
+
+/** The talking orb, small: teal for you, the accent for the voice, purple while thinking. */
+function MiniOrb({ speaker, thinking, live }: { speaker: Speaker | null; thinking: boolean; live: boolean }) {
   const active = !!speaker;
-  const tint = TINT[speaker ?? (thinking ? "thinking" : "idle")];
-  const ring = speaker === "user" ? "border-teal-400" : speaker === "agent" ? "border-orange-400" : thinking ? "border-fuchsia-400" : "border-zinc-300 dark:border-zinc-600";
+  const tint = speaker === "user" ? "from-teal-400 to-teal-600" : speaker === "agent" ? "from-orange-500 to-red-600" : thinking ? "from-fuchsia-500 to-purple-600" : live ? "from-zinc-400 to-zinc-500" : "from-zinc-300 to-zinc-400";
+  const ring = speaker === "user" ? "border-teal-400" : speaker === "agent" ? "border-orange-400" : "border-transparent";
   return (
-    <div className="relative flex size-40 items-center justify-center" data-testid="handsfree-orb" data-speaker={speaker ?? (thinking ? "thinking" : "idle")}
-      aria-label={speaker === "user" ? "You're talking" : speaker === "agent" ? "The voice is talking" : "Quiet"} role="img">
+    <span className="relative flex size-9 shrink-0 items-center justify-center" data-testid="handsfree-orb" data-speaker={speaker ?? (thinking ? "thinking" : "idle")}
+      role="img" aria-label={speaker === "user" ? "You're talking" : speaker === "agent" ? "The voice is talking" : thinking ? "Thinking" : "Quiet"}>
       <style>{`
-        @keyframes hf-ring { from { transform: scale(.62); opacity: .55 } to { transform: scale(1); opacity: 0 } }
+        @keyframes hf-ring { from { transform: scale(.7); opacity: .6 } to { transform: scale(1.15); opacity: 0 } }
         @keyframes hf-bar { 0%, 100% { transform: scaleY(.35) } 50% { transform: scaleY(1) } }
-        @keyframes hf-breathe { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.04) } }
+        @keyframes hf-breathe { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.06) } }
         @media (prefers-reduced-motion: reduce) { .hf-anim { animation: none !important } }
       `}</style>
-      {[0, 1, 2].map((index) => (
-        <span key={index} className={cn("hf-anim absolute inset-0 rounded-full border-[3px]", ring, active ? "" : "opacity-20")}
-          style={active ? { animation: `hf-ring 1.25s ease-out ${index * 0.42}s infinite` } : { transform: `scale(${0.7 + index * 0.1})` }} />
-      ))}
-      <span className={cn("hf-anim relative flex size-[104px] items-center justify-center rounded-full bg-gradient-to-b shadow-inner", tint)}
-        style={thinking ? { animation: "hf-breathe 1.6s ease-in-out infinite" } : undefined}>
-        <span className="flex h-12 items-center gap-1.5">
-          {[0.75, 0.9, 1, 0.9, 0.75].map((weight, index) => (
-            <span key={index} className="hf-anim w-[7px] rounded-full bg-white"
-              style={{ height: `${Math.round((active ? 46 : 12) * (active ? weight : 1))}px`, animation: active ? `hf-bar ${0.5 + index * 0.07}s ease-in-out ${index * 0.09}s infinite` : undefined }} />
+      {active ? [0, 1].map((index) => <span key={index} className={cn("hf-anim absolute inset-0 rounded-full border-2", ring)} style={{ animation: `hf-ring 1.2s ease-out ${index * 0.6}s infinite` }} />) : null}
+      <span className={cn("hf-anim relative flex size-7 items-center justify-center rounded-full bg-gradient-to-b", tint)} style={thinking ? { animation: "hf-breathe 1.6s ease-in-out infinite" } : undefined}>
+        <span className="flex h-3.5 items-center gap-[2px]">
+          {[0.7, 1, 0.7].map((weight, index) => (
+            <span key={index} className="hf-anim w-[2.5px] rounded-full bg-white"
+              style={{ height: `${Math.round((active ? 14 : 5) * (active ? weight : 1))}px`, animation: active ? `hf-bar ${0.45 + index * 0.08}s ease-in-out ${index * 0.1}s infinite` : undefined }} />
           ))}
         </span>
       </span>
-    </div>
-  );
-}
-
-/** The current line, streaming; long lines keep their newest words in view. */
-function SubtitleLine({ subtitle }: { subtitle: Subtitle | null }) {
-  const words = subtitle?.text ?? "";
-  const text = words.length > 160 ? `…${words.slice(-160).replace(/^\S*\s/, "")}` : words;
-  return (
-    <p data-testid="handsfree-subtitle" data-speaker={subtitle?.speaker ?? ""}
-      className={cn("mt-3 min-h-[5.5rem] max-w-full text-center text-xl leading-snug", subtitle?.speaker === "user" ? "text-muted-foreground" : "font-medium")}>
-      {text}
-    </p>
+    </span>
   );
 }
 
 /** Only for what's destructive or hard to undo: the question, and how to answer. */
 function ConfirmCard({ question }: { question: string }) {
   return (
-    <div data-testid="handsfree-confirm" className="rounded-2xl border border-orange-500/35 bg-orange-500/10 p-4">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 dark:text-orange-400"><Icon name="AlertTriangle" className="size-3.5" aria-hidden />Waiting for your yes</div>
-      <div className="mt-1.5 text-[15px] font-medium leading-snug">{question}</div>
-      <div className="mt-1 text-xs text-muted-foreground">Say “yes”, or “no”.</div>
+    <div data-testid="handsfree-confirm" className="rounded-xl border border-orange-500/35 bg-orange-500/10 p-3">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-600 dark:text-orange-400"><Icon name="AlertTriangle" className="size-3.5" aria-hidden />Waiting for your yes</div>
+      <div className="mt-1 text-sm font-medium leading-snug">{question}</div>
+      <div className="mt-0.5 text-[11px] text-muted-foreground">Say “yes”, or “no”.</div>
+    </div>
+  );
+}
+
+/** The session so far: both sides' words, newest at the bottom. */
+function Transcript({ lines }: { lines: { speaker: Speaker; text: string }[] }) {
+  const [list, setList] = useState<HTMLDivElement | null>(null);
+  useEffect(() => { if (list) list.scrollTop = list.scrollHeight; }, [list, lines.length]);
+  if (!lines.length) return <div className="text-xs text-muted-foreground">Nothing said yet.</div>;
+  return (
+    <div ref={setList} data-testid="handsfree-transcript" className="flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1 text-[13px] leading-snug">
+      {lines.map((line, index) => (
+        <div key={index} className={cn(line.speaker === "user" ? "text-muted-foreground" : "text-foreground")}>
+          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{line.speaker === "user" ? "You" : "Voice"}</span>{line.text}
+        </div>
+      ))}
     </div>
   );
 }
@@ -231,11 +229,11 @@ const CARD_ICON: Record<ToolCard["kind"], string> = { waiting: "ListTodo", sent:
 
 function Card({ card }: { card: ToolCard }) {
   return (
-    <div data-testid="handsfree-card" className="flex items-start gap-3 rounded-2xl bg-muted/70 p-3.5">
-      <Icon name={CARD_ICON[card.kind]} className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+    <div data-testid="handsfree-card" className="flex items-start gap-2.5 rounded-xl bg-muted/70 p-2.5">
+      <Icon name={CARD_ICON[card.kind]} className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0">
-        <div className="text-sm font-semibold">{card.title}</div>
-        {card.detail ? <div className="line-clamp-3 text-xs text-muted-foreground">{card.detail}</div> : null}
+        <div className="text-[13px] font-semibold">{card.title}</div>
+        {card.detail ? <div className="line-clamp-2 text-[11px] text-muted-foreground">{card.detail}</div> : null}
       </div>
     </div>
   );

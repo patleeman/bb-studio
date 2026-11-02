@@ -51,9 +51,9 @@ export function toFraction(pixels: { left: number; top: number }, bounds: Bounds
   };
 }
 
-function loadPosition(): Fraction {
+function loadPosition(key = STORAGE_KEY): Fraction {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Partial<Fraction> | null;
+    const parsed = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<Fraction> | null;
     if (typeof parsed?.x === "number" && typeof parsed.y === "number") {
       return { x: clamp01(parsed.x), y: clamp01(parsed.y) };
     }
@@ -86,10 +86,11 @@ function viewportBounds(): Bounds {
  * buttons inside the handle keep working; the click that ends a drag is
  * swallowed.
  */
-export function useDraggable<T extends HTMLElement>() {
+/** `storageKey`: where the position is kept; another pill (hands-free voice) keeps its own. */
+export function useDraggable<T extends HTMLElement>(storageKey = STORAGE_KEY) {
   // A callback ref, so the pill is placed whenever it (re)mounts.
   const [element, ref] = useState<T | null>(null);
-  const [position, setPosition] = useState(loadPosition);
+  const [position, setPosition] = useState(() => loadPosition(storageKey));
   const [pixels, setPixels] = useState<{ left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const suppressClick = useRef(false);
@@ -137,7 +138,7 @@ export function useDraggable<T extends HTMLElement>() {
       setTimeout(() => (suppressClick.current = false), 0);
       const next = toFraction(last, bounds, rect);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(storageKey, JSON.stringify(next));
       } catch {
         // Unsaved positions still apply for this page.
       }
