@@ -1,4 +1,4 @@
-// The thread panel's "Automations" tab and the header's clock badge: what
+// The thread panel's "Automations" tab and the context row's count: what
 // wakes this thread on a schedule, read from the built-in automations plugin.
 // Degrades to a short notice when that plugin is disabled or unreachable.
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -195,14 +195,19 @@ function AutomationRow({ row, now, onToggle }: { row: ThreadAutomation; now: num
   );
 }
 
-/** The automation clock remains on regular threads; Bot threads use their Bot info button instead. */
-export function ThreadAutomationsBadge(props: { threadId: string; projectId: string }) {
-  const owner = useLive("bot_thread_owner", { threadId: props.threadId }, { pollMs: 120_000 });
-  if (owner.loading || owner.data?.botId) return null;
-  return <RegularThreadAutomationsBadge {...props} />;
+/** Whether automations wake this thread: regular threads only (a Bot's threads have Bot info). */
+export function useThreadAutomationsVisible(threadId: string, projectId: string): boolean {
+  const owner = useLive("bot_thread_owner", { threadId }, { pollMs: 120_000 });
+  const regular = !owner.loading && !owner.data?.botId;
+  const { state } = useThreadAutomations(regular ? threadId : "", projectId);
+  return regular && state.kind === "ready" && state.rows.length > 0;
 }
 
-function RegularThreadAutomationsBadge({ threadId, projectId }: { threadId: string; projectId: string }) {
+/**
+ * In a regular thread's context row (above the composer): how many
+ * automations wake it; a click opens the Automations tab beside it.
+ */
+export function ThreadAutomationsSummary({ threadId, projectId }: { threadId: string; projectId: string }) {
   const openTab = useOpenThreadTab();
   const { state } = useThreadAutomations(threadId, projectId);
   if (state.kind !== "ready" || state.rows.length === 0) return null;
@@ -214,10 +219,10 @@ function RegularThreadAutomationsBadge({ threadId, projectId }: { threadId: stri
       title={label}
       aria-label={label}
       onClick={() => openTab({ actionId: AUTOMATIONS_TAB, title: "Automations" })}
-      className="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-background px-1.5 text-xs text-muted-foreground shadow-sm outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5"
+      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5"
     >
       <Icon name="Clock" aria-hidden />
-      <span className="tabular-nums">{state.rows.length}</span>
+      <span className="tabular-nums">{state.rows.length === 1 ? "1 automation" : `${state.rows.length} automations`}</span>
     </button>
   );
 }

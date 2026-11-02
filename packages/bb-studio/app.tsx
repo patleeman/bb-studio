@@ -53,6 +53,7 @@ import { LoopDirective, LoopsDirective } from "./src/loops/ui/LoopCard";
 import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
 import { registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
 import { registerThreadHeader } from "./src/ui/thread-header";
+import { registerThreadContext } from "./src/ui/thread-context";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -202,6 +203,10 @@ export default definePluginApp((app) => {
   // Header buttons: Loops and Bot info on a Bot's chat, and the page a thread
   // works on (SDK 0.6.104 header actions; src/ui/thread-header.tsx).
   registerThreadHeader(app, { pages: on("page") });
+  // The facts the header used to draw: a Bot chat's prompt cache and a
+  // thread's automations in the context row above the composer, and the
+  // thread's Bot in the Info tab (src/ui/thread-context.tsx).
+  registerThreadContext(app);
   // The thread's Studio tab: one workbench tab for every kind that opens
   // beside the chat (src/ui/studio-tab). Reply cards open it with
   // `{ kind, id }`; its collection lists only the kinds that are on.

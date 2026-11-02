@@ -250,26 +250,29 @@ describe("useThreadAutomations", () => {
   });
 });
 
-describe("ThreadAutomationsBadge", () => {
-  it("keeps the clock on regular threads and hides it for Bot-owned threads", async () => {
+describe("ThreadAutomationsSummary", () => {
+  it("counts a regular thread's automations in its context row, opening the tab, and hides for Bot-owned threads", async () => {
     const callRpc = vi.fn(async () => [automation()]);
     sdkForTest.current = {
       plugins: { callRpc, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
       threads: { get: vi.fn() },
       subscribe: () => () => {},
     };
-    const { ThreadAutomationsBadge } = await import("./ThreadAutomations");
+    const { ThreadAutomationsSummary, useThreadAutomationsVisible } = await import("./ThreadAutomations");
 
     headerForTest.owner = { data: { botId: "bot_1" }, loading: false };
-    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" />);
-    expect(document.querySelector("button")).toBeNull();
-    expect(callRpc).not.toHaveBeenCalled();
+    const bot = renderHook(() => useThreadAutomationsVisible("thr_1", "proj_1"));
+    await waitFor(() => expect(callRpc).toHaveBeenCalled());
+    expect(bot.result.current).toBe(false);
     cleanup();
 
     headerForTest.owner = { data: { botId: null }, loading: false };
-    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" />);
-    await waitFor(() => expect(callRpc).toHaveBeenCalled());
-    await waitFor(() => expect(document.querySelector('button[aria-label="1 automation wake this thread"]')).not.toBeNull());
+    const regular = renderHook(() => useThreadAutomationsVisible("thr_1", "proj_1"));
+    await waitFor(() => expect(regular.result.current).toBe(true));
+    cleanup();
+
+    render(<ThreadAutomationsSummary threadId="thr_1" projectId="proj_1" />);
+    await waitFor(() => expect(document.querySelector('button[aria-label="1 automation wake this thread"]')?.textContent).toBe("1 automation"));
     fireEvent.click(document.querySelector('button[aria-label="1 automation wake this thread"]')!);
     expect(headerForTest.openThreadPanel).toHaveBeenCalledWith({ actionId: "thread-automations", title: "Automations" });
   });

@@ -629,8 +629,9 @@ test("the thread header Bot info button opens the Bot info tab, on Bot threads o
   state.call.mockImplementation(async () => ({}));
 });
 
-test("the cache header shows a Clock and time, turns amber near expiry, and dims cold or disabled states", async () => {
-  const { BotCacheChip, cacheIndicator, cacheLabel } = await import("./BotCache");
+test("the cache segment shows a Clock and time, turns amber near expiry, dims cold or disabled states, and opens its details", async () => {
+  const { BotCacheSummary, BotCacheDetails, cacheIndicator, cacheLabel } = await import("./BotCache");
+  const BotCacheChip = ({ threadId }: { threadId: string }) => <><BotCacheSummary threadId={threadId} isExpanded onToggle={() => {}} /><BotCacheDetails threadId={threadId} isExpanded /></>;
   const now = Date.now();
   const warm = {
     botId: "bot_main", threadId: "thr_bot", state: "warm" as const, label: "Warm · 59m", warmUntil: now + 59 * 60_000,
@@ -655,8 +656,9 @@ test("the cache header shows a Clock and time, turns amber near expiry, and dims
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: 59m left");
   expect(chip.textContent).toBe("59m");
   expect(chip.querySelector('[data-icon="Clock"]')).not.toBeNull();
-  expect(container.querySelector('[role="menu"]')?.textContent).toContain("cold send ≈");
-  expect(container.querySelector('[role="menu"]')?.textContent).toContain("warming ≈");
+  expect(container.querySelector('[data-testid="bot-cache-details"]')?.textContent).toContain("cold send ≈");
+  expect(container.querySelector('[data-testid="bot-cache-details"]')?.textContent).toContain("warming ≈");
+  expect(container.querySelector('[data-testid="bot-cache-details"]')?.textContent).toContain("Turn warming off");
 
   state.data = { bot_cache_state: { ...warm, warmUntil: now } };
   await show(<BotCacheChip threadId="thr_bot" />);
@@ -665,7 +667,7 @@ test("the cache header shows a Clock and time, turns amber near expiry, and dims
 
   state.data = { bot_cache_state: off };
   await show(<BotCacheChip threadId="thr_bot" />);
-  expect(chip.textContent).toBe("");
+  expect(chip.textContent).toBe("Warming off");
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warming off");
 });
 
