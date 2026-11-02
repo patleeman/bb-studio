@@ -444,7 +444,7 @@ notifications, including through the notification extension.
    Keys). Then:
    ```sh
    cd ../../packages/bb-studio-mobile && npm install && bb plugin build && bb plugin install .
-   bb plugin config mobile set apnsKeyPath ~/path/to/AuthKey_XXXXXXXXXX.p8
+   bb plugin config mobile set apnsKey "$(cat ~/path/to/AuthKey_XXXXXXXXXX.p8)"
    bb plugin config mobile set apnsKeyId XXXXXXXXXX
    bb mobile status
    ```

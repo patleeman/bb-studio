@@ -5,12 +5,22 @@ public enum Mobile {
   public enum Method {
     public static let mute_list = "mute_list"
     public static let notify = "notify"
+    public static let push_status = "push_status"
+    public static let push_test = "push_test"
     public static let mute_set = "mute_set"
   }
 
   public typealias MuteList = MuteListOutput
 
   public typealias Notify = NotifyOutput
+
+  public typealias PushStatusInput = StudioJSONValue
+
+  public typealias PushStatus = PushStatusOutput
+
+  public typealias PushTestInput = StudioJSONValue
+
+  public typealias PushTest = PushTestOutput
 
   public typealias MuteSet = MuteSetOutput
 
@@ -161,6 +171,42 @@ public enum Mobile {
     public init(ok: Bool? = nil, sent: Double? = nil) {
       self.ok = ok
       self.sent = sent
+    }
+  }
+
+  public struct PushStatusOutputLastDelivery: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var sent: Int?
+
+    public init(at: Double? = nil, sent: Int? = nil) {
+      self.at = at
+      self.sent = sent
+    }
+  }
+
+  public struct PushStatusOutput: Sendable, Hashable, Codable {
+    public var ready: Bool?
+    public var problem: String?
+    public var devices: Int?
+    public var lastDelivery: PushStatusOutputLastDelivery?
+
+    public init(ready: Bool? = nil, problem: String? = nil, devices: Int? = nil, lastDelivery: PushStatusOutputLastDelivery? = nil) {
+      self.ready = ready
+      self.problem = problem
+      self.devices = devices
+      self.lastDelivery = lastDelivery
+    }
+  }
+
+  public struct PushTestOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var sent: Int?
+    public var message: String?
+
+    public init(ok: Bool? = nil, sent: Int? = nil, message: String? = nil) {
+      self.ok = ok
+      self.sent = sent
+      self.message = message
     }
   }
 

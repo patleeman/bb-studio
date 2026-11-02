@@ -397,9 +397,7 @@ extension BBClient {
 
     /// Studio's Attention Router setting (`loopsEnabled`, off by default).
     func loopsEnabled() async throws -> Bool {
-        struct Response: Decodable { var values: [String: JSONValue] }
-        let response: Response = try await get("/api/v1/plugins/studio/settings")
-        if case .bool(let on)? = response.values["loopsEnabled"] { return on }
+        if case .bool(let on)? = try await studioSettingValues()["loopsEnabled"] { return on }
         return false
     }
 
