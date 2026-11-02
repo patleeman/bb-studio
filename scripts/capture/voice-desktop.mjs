@@ -109,6 +109,11 @@ try {
         await render(name);
       }
     }
+    // A live session doesn't end by itself: VOICE_DESKTOP_END_AFTER clicks End after that many seconds.
+    const endAfter = Number(process.env.VOICE_DESKTOP_END_AFTER ?? 0);
+    if (endAfter && Date.now() - started > endAfter * 1000 && await exists('[data-testid="handsfree-end"]')) {
+      await client.evaluate(`document.querySelector('[data-testid="handsfree-end"]').click()`);
+    }
     // The session is over once Start is back (ended, failed or closed by the voice).
     if (Date.now() - started > 3000 && await exists('[data-testid="handsfree-start"]')) {
       for (let i = 0; i < 8; i++) { await recordFrame(); await sleep(120); }
