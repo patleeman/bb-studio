@@ -52,6 +52,8 @@ final class VoiceLiveMachineTests: XCTestCase {
         _ = machine.tick(now: t0 + 3.5)
         XCTAssertEqual(machine.phase, .agentSpeaking)
         _ = machine.tick(now: t0 + 5)
+        XCTAssertEqual(machine.phase, .agentSpeaking, "a phrase pause doesn't end the line")
+        _ = machine.tick(now: t0 + 5.5)
         XCTAssertEqual(machine.phase, .listening)
         XCTAssertEqual(machine.subtitle?.text, "Two things need you.")
         XCTAssertEqual(transcripts(machine.drain()), ["agent: Two things need you."])

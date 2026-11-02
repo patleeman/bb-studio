@@ -87,7 +87,8 @@ struct LiveSessionMachine: Sendable {
     /// GPT-Live and the mock have no end-of-line events: a pause ends a line.
     var endsLinesOnPause: Bool
     var userPause: TimeInterval = 0.9
-    var agentPause: TimeInterval = 0.6
+    /// GPT-Live pauses up to ~0.7 s between phrases of one reply (live run, Nov 1): a line stays open that long.
+    var agentPause: TimeInterval = 0.9
 
     private var userText = ""
     private var agentText = ""
@@ -329,7 +330,7 @@ struct LiveSessionMachine: Sendable {
             effects.append(.muteAgentAudio(false))
         }
         agentText += delta
-        agentUntil = max(agentUntil, now) + Self.speakingTime(delta)
+        agentUntil = max(agentUntil, now + agentPause) + Self.speakingTime(delta)
         phase = .agentSpeaking
         subtitle = LiveSubtitle(speaker: .agent, text: agentText.trimmingCharacters(in: .whitespaces))
         return effects

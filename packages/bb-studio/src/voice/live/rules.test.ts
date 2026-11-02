@@ -35,6 +35,8 @@ it("filters Whisper's silence hallucinations", () => {
 
 it("reads back who and what in one sentence", () => {
   expect(readBack("the Kensico lead", "  pause the\nfetcher ")).toBe("Send to the Kensico lead: pause the fetcher. Say yes to send.");
+  // GPT-Live's backend ends the message with its own period (live run, Nov 1).
+  expect(readBack("the Kensico lead", "Please pause the eBay fetcher until Monday.")).toBe("Send to the Kensico lead: Please pause the eBay fetcher until Monday. Say yes to send.");
 });
 
 describe("resolveTarget", () => {

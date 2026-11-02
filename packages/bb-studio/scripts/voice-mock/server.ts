@@ -23,7 +23,7 @@
 // live-audio.wav (both sides on one timeline) and live-timings.json.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { tmpdir } from "node:os";
@@ -308,6 +308,13 @@ function runScript(socket: Duplex) {
 const RATE = 24_000;
 const CHUNK = 4800; // 100 ms of PCM16
 
+/** The loudest sample in a chunk: GPT-Live streams silence too, so speech is what's loud. */
+function peak(pcm: Buffer): number {
+  let max = 0;
+  for (let i = 0; i + 1 < pcm.length; i += 2) max = Math.max(max, Math.abs(pcm.readInt16LE(i)));
+  return max;
+}
+
 /** Where speech starts in a clip: the first 10 ms above a small level. */
 function onsetMs(pcm: Buffer): number {
   for (let at = 0; at + 480 <= pcm.length / 2; at += 240) {
@@ -333,7 +340,9 @@ function runLiveBridge(app: Duplex) {
   // The app plays the voice in order; this is when its queued audio ends.
   let playbackEnd = 0;
   let agentSpeaking = false;
-  let agentStartedAt = 0;
+  /** When the voice's last loud audio ends, and when it last arrived. */
+  let voiceUntil = 0;
+  let lastVoiced = 0;
   let muted = false;
   let mutedAt = 0;
   let lastFirstInputDelta = 0;
@@ -342,6 +351,7 @@ function runLiveBridge(app: Duplex) {
   let utterance: { pcm: Buffer; offset: number; startedAt: number; onset: number; resolve: () => void } | null = null;
   const utterances: { text: string; startedAt: number; wordAt: number; endedAt: number; firstInputDelta?: number; firstAgentAudio?: number }[] = [];
   let barge: { wordAt: number; firstInputDelta?: number; muted?: number; serverAudioStopped?: number } | null = null;
+  let bargeVoiceStarted = 0;
   const types: Record<string, number> = {};
 
   openai.onopen = () => {
@@ -354,24 +364,28 @@ function runLiveBridge(app: Duplex) {
     const event = JSON.parse(String(message.data)) as Record<string, unknown> & { type: string };
     types[event.type] = (types[event.type] ?? 0) + 1;
     const at = now();
+    // Every event but audio, for checking GPT-Live's real shapes against the docs.
+    if (event.type !== "session.output_audio.delta") appendFileSync(join(OUT, "live-events.jsonl"), `${JSON.stringify({ at, ...event }).slice(0, 2000)}\n`);
     if (event.type === "session.output_audio.delta") {
       const pcm = Buffer.from(String(event.delta), "base64");
       if (muted) {
-        // Still the cut-off reply, which the app drops.
-        if (barge && !barge.serverAudioStopped) barge.serverAudioStopped = at;
+        // Still the cut-off reply, which the app drops; note when GPT-Live itself stops talking.
+        if (peak(Buffer.from(String(event.delta), "base64")) >= 800 && barge) barge.serverAudioStopped = at;
         return;
       }
       const start = Math.max(at, playbackEnd);
       track.push({ at: start, pcm });
       playbackEnd = start + (pcm.length / 2 / RATE) * 1000;
+      toApp({ type: "mock.audio.delta", audio: event.delta });
+      if (peak(pcm) < 800) return;
+      voiceUntil = playbackEnd;
+      lastVoiced = at;
       if (!agentSpeaking) {
         agentSpeaking = true;
-        agentStartedAt = at;
         const last = utterances.at(-1);
-        if (last && last.firstAgentAudio === undefined && at > last.endedAt) last.firstAgentAudio = at;
+        if (last && last.firstAgentAudio === undefined && last.endedAt && at > last.endedAt) last.firstAgentAudio = at;
         toApp({ type: "mock.audio.started" });
       }
-      toApp({ type: "mock.audio.delta", audio: event.delta });
       return;
     }
     if (event.type === "session.input_transcript.delta") {
@@ -391,6 +405,7 @@ function runLiveBridge(app: Duplex) {
     toApp(event);
   };
 
+  app.on("error", (error) => say("live: app socket error", String(error)));
   frames(app, (text) => {
     const event = JSON.parse(text) as { type: string; content?: string; item?: { output?: string; call_id?: string } };
     const at = now();
@@ -401,6 +416,7 @@ function runLiveBridge(app: Duplex) {
       muted = true;
       mutedAt = at;
       playbackEnd = at;
+      voiceUntil = at;
       agentSpeaking = false;
       if (barge && barge.muted === undefined) barge.muted = at;
       say("live: app muted the voice (barge-in)");
@@ -427,14 +443,15 @@ function runLiveBridge(app: Duplex) {
     }, 100);
   }
 
-  const quiet = () => !agentSpeaking || now() > playbackEnd + 300;
-  setInterval(() => { if (agentSpeaking && now() > playbackEnd + 300) { agentSpeaking = false; toApp({ type: "mock.audio.done" }); } }, 100);
+  // GPT-Live pauses up to ~0.7 s between phrases of one reply.
+  const quiet = () => !agentSpeaking || now() > voiceUntil + 900;
+  setInterval(() => { if (agentSpeaking && now() > voiceUntil + 900) { agentSpeaking = false; toApp({ type: "mock.audio.done" }); } }, 100);
 
   async function utter(text: string) {
     const pcm = speech(text);
     const startedAt = now();
     const onset = onsetMs(pcm);
-    const record = { text, startedAt, wordAt: startedAt + onset, endedAt: 0 };
+    const record: (typeof utterances)[number] = { text, startedAt, wordAt: startedAt + onset, endedAt: 0 };
     utterances.push(record);
     say(`live: user says "${text}"`);
     await new Promise<void>((resolve) => { utterance = { pcm, offset: 0, startedAt, onset, resolve }; });
@@ -458,6 +475,12 @@ function runLiveBridge(app: Duplex) {
     await until(() => { if (!quiet()) { quietSince = 0; return false; } quietSince ||= Date.now(); return Date.now() - quietSince > 1500; }, ms);
   }
 
+  /** The voice has been quiet for `ms`. */
+  async function quietFor(ms: number, timeout: number) {
+    let since = 0;
+    await until(() => { if (!quiet()) { since = 0; return false; } since ||= Date.now(); return Date.now() - since > ms; }, timeout);
+  }
+
   async function script() {
     await sleep(1500);
     await utter("What's waiting on me?");
@@ -465,17 +488,22 @@ function runLiveBridge(app: Duplex) {
     await utter("Tell the Kensico lead to pause the eBay fetcher until Monday.");
     await turn();
     if (!(await until(() => readBack, 2000))) say("live: no read-back seen yet");
-    await utter("Yes.");
+    await utter("Yes, send it.");
     await turn();
-    // The Kensico lead answers (2.5 s), the app picks it up (poll), the voice says it: cut in.
-    if (await until(() => commentary, 25_000)) {
-      await until(() => agentSpeaking, 15_000);
-      await sleep(1400);
+    // The lead answers (2.5 s), the app picks it up (poll) and the voice says it.
+    if (!(await until(() => commentary, 25_000))) say("live: the reply never reached the voice");
+    await quietFor(2500, 20_000);
+    // Barge-in: ask for a long answer, and cut in once the voice is well into it.
+    const long = await utter("Read me everything that's coming up, one at a time, with all the details.");
+    await until(() => long.firstAgentAudio !== undefined, 25_000);
+    await sleep(1800);
+    if (agentSpeaking) {
       const pcm = speech("Okay, stop there. That's all, thanks.");
       barge = { wordAt: now() + onsetMs(pcm) };
+      bargeVoiceStarted = long.firstAgentAudio ?? 0;
       await utter("Okay, stop there. That's all, thanks.");
       await turn(15_000);
-    } else say("live: the reply never reached the voice");
+    } else say("live: the voice wasn't talking when the barge-in was due");
     toOpenAI({ type: "session.close" });
     await until(() => closed, 8000);
     finish();
@@ -508,8 +536,10 @@ function runLiveBridge(app: Duplex) {
       firstWordToTranscriptMs: barge.firstInputDelta === undefined ? null : barge.firstInputDelta - barge.wordAt,
       firstWordToVoiceMutedMs: barge.muted === undefined ? null : barge.muted - barge.wordAt,
       transcriptToMutedMs: barge.muted === undefined || barge.firstInputDelta === undefined ? null : barge.muted - barge.firstInputDelta,
-      voiceStartedBeforeCutMs: barge.muted === undefined ? null : barge.muted - agentStartedAt,
+      voiceTalkingBeforeCutMs: barge.muted === undefined ? null : barge.muted - bargeVoiceStarted,
+      firstWordToServerStoppedMs: barge.serverAudioStopped === undefined ? null : barge.serverAudioStopped - barge.wordAt,
     } : null;
+    void lastVoiced;
     const result = { t0Epoch: t0, turns, bargeIn, toolRoundTripMs: timings.toolRoundTripMs ?? [], studioToolMs: timings.studioToolMs ?? [], events: types, lastFirstInputDelta };
     writeFileSync(join(OUT, "live-timings.json"), JSON.stringify(result, null, 2));
     say("live: done", JSON.stringify({ turns, bargeIn }));

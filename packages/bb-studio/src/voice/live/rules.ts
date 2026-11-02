@@ -69,5 +69,6 @@ export function relayNote(kinds: readonly string[]): string {
 
 /** The read-back the voice says before a send. */
 export function readBack(targetName: string, message: string): string {
-  return `Send to ${targetName}: ${message.trim().replace(/\s+/g, " ")}. Say yes to send.`;
+  // The model often ends the message with a period of its own ("…until Monday.").
+  return `Send to ${targetName}: ${message.trim().replace(/\s+/g, " ").replace(/[.\s]+$/, "")}. Say yes to send.`;
 }
