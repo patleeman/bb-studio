@@ -100,7 +100,9 @@ export function useOpenBotInfoOnChat(activeThreadId: string | null, chatIds: rea
     visit.infoOpened = true;
     const asked = wanted;
     wanted = null;
-    const open = asked?.panel ?? panel;
+    // What All loops asked for is the user's; the usual panel is a background
+    // open that leaves a tab the user already opened alone.
+    const open = asked ? asked.panel : { ...panel, background: true };
     void requestThreadTab(activeThreadId, open).then((opened) => { if (!opened && asked) reportLoopsPaneFailed(asked.botId); });
     // The panel is chosen when the chat opens; a later change waits for the next visit.
     // eslint-disable-next-line react-hooks/exhaustive-deps

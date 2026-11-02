@@ -11,7 +11,17 @@ import { experimental_useAppPanel, useComposer, type ExperimentalPanelController
 import { useCallback, useEffect, type ComponentType } from "react";
 
 /** One of Studio's thread tabs to open: its registration id, the tab's title, and the instance's params. */
-export interface ThreadTabOpen { actionId: string; title?: string; params?: JsonValue }
+export interface ThreadTabOpen {
+  actionId: string;
+  title?: string;
+  params?: JsonValue;
+  /**
+   * An open nobody clicked for (Bot info when a Bot's chat opens): it never
+   * replaces a waiting request, and is skipped while the panel already shows
+   * a plugin's tab, so it can't take the panel from a tab the user opened.
+   */
+  background?: boolean;
+}
 
 /** The reference `openTab` takes for Studio's thread tab `id`. */
 export function threadTab(id: string) {
@@ -47,6 +57,7 @@ const pending = new Map<string, { open: ThreadTabOpen; resolve(opened: boolean):
  */
 export function requestThreadTab(threadId: string, open: ThreadTabOpen): Promise<boolean> {
   const previous = pending.get(threadId);
+  if (previous && open.background && !previous.open.background) return Promise.resolve(false);
   if (previous) { clearTimeout(previous.timer); pending.delete(threadId); previous.resolve(false); }
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => { if (pending.get(threadId)?.resolve === resolve) pending.delete(threadId); resolve(false); }, REQUEST_TIMEOUT_MS);
@@ -60,9 +71,20 @@ export function hasThreadTabRequest(threadId: string): boolean {
   return pending.has(threadId);
 }
 
+/** Whether the side panel is showing a plugin's tab (one the user or a request opened). */
+function showingPluginTab(panel: Partial<Pick<ExperimentalPanelController, "getTabs">>): boolean {
+  try {
+    const tabs = panel.getTabs?.();
+    if (!tabs?.open || !tabs.selectedKey) return false;
+    return tabs.tabs.find((tab) => tab.key === tabs.selectedKey)?.detail.kind === "plugin";
+  } catch {
+    return false;
+  }
+}
+
 /** In thread `threadId`'s view: opens each tab requested for it, once. */
 export function useThreadTabRequests(threadId: string | null): void {
-  const open = useOpenThreadTab();
+  const panel = experimental_useAppPanel();
   useEffect(() => {
     if (!threadId) return;
     const take = () => {
@@ -70,13 +92,14 @@ export function useThreadTabRequests(threadId: string | null): void {
       if (!request) return;
       pending.delete(threadId);
       clearTimeout(request.timer);
-      request.resolve(open(request.open));
+      if (request.open.background && showingPluginTab(panel)) { request.resolve(false); return; }
+      request.resolve(openThreadTab(panel, request.open));
     };
     take();
     const onRequest = (event: Event) => { if ((event as CustomEvent<{ threadId?: string }>).detail?.threadId === threadId) take(); };
     window.addEventListener(REQUEST_EVENT, onRequest);
     return () => window.removeEventListener(REQUEST_EVENT, onRequest);
-  }, [threadId, open]);
+  }, [threadId, panel]);
 }
 
 /** A bare composer banner in every thread view that draws nothing and takes tab requests for its thread. */

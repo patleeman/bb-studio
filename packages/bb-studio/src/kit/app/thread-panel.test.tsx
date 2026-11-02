@@ -3,14 +3,15 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ openTab: vi.fn((_options: unknown) => true) }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_useAppPanel: () => ({ openTab: state.openTab }), useComposer: () => ({ scope: { kind: "thread", threadId: "thr_a" } }) }));
+const state = vi.hoisted(() => ({ openTab: vi.fn((_options: unknown) => true), tabs: { open: false, selectedKey: null as string | null, tabs: [] as unknown[] } }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_useAppPanel: () => ({ openTab: state.openTab, getTabs: () => state.tabs }), useComposer: () => ({ scope: { kind: "thread", threadId: "thr_a" } }) }));
 const { openThreadTab, requestThreadTab, resetThreadTabRequests, ThreadTabReceiver, threadTab } = await import("./thread-panel");
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.openTab.mockReset().mockReturnValue(true);
+  state.tabs = { open: false, selectedKey: null, tabs: [] };
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); resetThreadTabRequests(); vi.useRealTimers(); });
@@ -46,4 +47,22 @@ it("a newer request replaces a waiting one, and a request no thread takes gives 
   vi.advanceTimersByTime(15_000);
   await expect(second).resolves.toBe(false);
   expect(state.openTab).not.toHaveBeenCalled();
+});
+
+it("a background open waits behind the user's, and leaves a plugin tab the user opened alone", async () => {
+  const user = requestThreadTab("thr_a", { actionId: "loops" });
+  await expect(requestThreadTab("thr_a", { actionId: "bot-info", background: true })).resolves.toBe(false);
+  await act(async () => root.render(<ThreadTabReceiver />));
+  await expect(user).resolves.toBe(true);
+  expect(state.openTab).toHaveBeenCalledTimes(1);
+  expect(state.openTab).toHaveBeenLastCalledWith({ tab: threadTab("loops") });
+  state.tabs = { open: true, selectedKey: "k1", tabs: [{ key: "k1", title: "Loops", status: null, closable: true, detail: { kind: "plugin", pluginId: "studio", tab: threadTab("loops"), params: null } }] };
+  let opened: boolean | undefined;
+  await act(async () => { opened = await requestThreadTab("thr_a", { actionId: "bot-info", background: true }); });
+  expect(opened).toBe(false);
+  expect(state.openTab).toHaveBeenCalledTimes(1);
+  state.tabs = { open: true, selectedKey: "info", tabs: [{ key: "info", title: "Info", status: null, closable: false, detail: { kind: "info" } }] };
+  await act(async () => { opened = await requestThreadTab("thr_a", { actionId: "bot-info", background: true }); });
+  expect(opened).toBe(true);
+  expect(state.openTab).toHaveBeenCalledTimes(2);
 });
