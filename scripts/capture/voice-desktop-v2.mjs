@@ -119,6 +119,9 @@ try {
       await click('[data-testid="handsfree-expand"]');
       await sleep(400);
       await render("pill-ended-transcript");
+      // The transcript's link opens the session's voice thread (hidden from BB's list, under the Bot).
+      await click('[data-testid="handsfree-thread"]');
+      await client.waitForText("Hands-free voice session", 20000).then(async () => { await sleep(800); process.stdout.write("  voice-thread-opened\n"); await render("voice-thread-opened"); }, () => process.stdout.write("  (the voice thread didn't open)\n"));
       break;
     }
     await sleep(110);
