@@ -242,4 +242,3 @@ export function runnerState(runner: RunnerView, now = Date.now()): { text: strin
   const reported = runner.lastReportAt && runner.lastReportAt >= runner.lastRunAt;
   return { text: `${failed ? "Failed" : reported ? "Reported" : "Quiet"} · ${agoWords(runner.lastRunAt, now)}`, tone: failed ? "failed" : undefined };
 }
-
