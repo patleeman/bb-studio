@@ -21,6 +21,8 @@ export interface LiveTransport {
   levels(): { mic: number[]; playback: number };
   /** The mic's name, for the header ("MacBook Pro Microphone"); empty for the mock. */
   micLabel: string;
+  /** When the mic started (epoch ms), for measuring; null for the mock. */
+  micOpenedAt: number | null;
   close(): void;
 }
 
@@ -49,6 +51,7 @@ export async function connectWebRtc(options: WebRtcOptions): Promise<LiveTranspo
   const getUserMedia = options.getUserMedia ?? ((constraints) => navigator.mediaDevices.getUserMedia(constraints));
   // Echo cancellation keeps the voice out of the mic, which barge-in by level depends on.
   const mic = await getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const micOpenedAt = Date.now();
   const pc = new RTCPeerConnection();
   const audio = document.createElement("audio");
   audio.autoplay = true;
@@ -103,6 +106,7 @@ export async function connectWebRtc(options: WebRtcOptions): Promise<LiveTranspo
     setAgentAudio: (enabled) => { agentAudio = enabled; audio.muted = !enabled; },
     levels: () => ({ mic: [micLevel()], playback: agentAudio ? voiceLevel() : 0 }),
     micLabel: mic.getAudioTracks()[0]?.label ?? "",
+    micOpenedAt,
     close: shutdown,
   };
 }
@@ -192,6 +196,7 @@ export async function connectMock(url: string): Promise<LiveTransport> {
       return { mic, playback: agentAudio ? (current?.level ?? scriptedPlayback) : 0 };
     },
     micLabel: "",
+    micOpenedAt: null,
     close: () => {
       closed = true;
       stopAll();

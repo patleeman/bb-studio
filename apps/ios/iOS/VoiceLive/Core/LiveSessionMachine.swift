@@ -219,7 +219,7 @@ struct LiveSessionMachine: Sendable {
         case .closed(let reason):
             finishUser(now: now)
             finishAgent(now: now)
-            phase = .ended(reason == "close_requested" ? nil : reason)
+            phase = .ended(Self.closedReason(reason))
             confirmation = nil
             return [.hangUp(drain()), .earcon(.end)]
         case .error(let message):
@@ -433,6 +433,18 @@ struct LiveSessionMachine: Sendable {
     // MARK: Helpers
 
     static func ms(_ seconds: TimeInterval) -> Int { Int((seconds * 1000).rounded()) }
+
+    /// GPT-Live's session.closed reasons, in words; nil for the user's own hang-up.
+    static func closedReason(_ reason: String) -> String? {
+        switch reason {
+        case "close_requested": nil
+        case "expired": "The session reached its time limit"
+        case "content": "Ended by OpenAI's safety filter"
+        case "remote_hangup": "The voice ended the session"
+        case "connection_lost": "The connection was lost"
+        default: "The session ended"
+        }
+    }
 
     /// About how long words take to say: 15 characters a second.
     static func speakingTime(_ text: String) -> TimeInterval { Double(text.count) / 15 }

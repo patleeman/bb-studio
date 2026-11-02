@@ -490,6 +490,8 @@ export async function ensureChrome() {
         // Speech's Play sample plays without a real click, and silently.
         "--autoplay-policy=no-user-gesture-required",
         "--mute-audio",
+        // Opt-in extras, such as --use-file-for-fake-audio-capture=<wav> for a synthetic voice (scripts/capture/voice-desktop.mjs).
+        ...(process.env.BB_CAPTURE_CHROME_ARGS ? process.env.BB_CAPTURE_CHROME_ARGS.split(" ").filter(Boolean) : []),
         "about:blank",
       ],
       { stdio: "ignore" },

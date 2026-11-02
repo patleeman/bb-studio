@@ -71,6 +71,18 @@ const ms = (seconds: number) => Math.round(seconds * 1000);
 const speakingTime = (text: string) => text.length / 15;
 const normalized = (text: string) => text.toLowerCase().replace(/[^a-z ]+/g, "").split(/\s+/).filter(Boolean).join(" ");
 
+/** GPT-Live's session.closed reasons, in words; null for the user's own hang-up. */
+export function closedReason(reason: string): string | null {
+  switch (reason) {
+    case "close_requested": return null;
+    case "expired": return "The session reached its time limit";
+    case "content": return "Ended by OpenAI's safety filter";
+    case "remote_hangup": return "The voice ended the session";
+    case "connection_lost": return "The connection was lost";
+    default: return "The session ended";
+  }
+}
+
 export function interruptedNote(heard: string): string {
   return heard
     ? `(Studio, not the user:) The user interrupted you. They heard up to: "${heard.slice(-200)}". Don't repeat it; answer what they said next.`
@@ -225,7 +237,7 @@ export class SessionMachine {
       case "closed":
         this.finishUser(now);
         this.finishAgent(now);
-        this.phase = { kind: "ended", why: signal.reason === "close_requested" ? null : signal.reason };
+        this.phase = { kind: "ended", why: closedReason(signal.reason) };
         this.confirmation = null;
         return [{ type: "hangUp", reports: this.drain() }, { type: "earcon", earcon: "end" }];
       case "error":

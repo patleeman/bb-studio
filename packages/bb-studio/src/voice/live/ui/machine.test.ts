@@ -113,6 +113,12 @@ describe("session machine", () => {
     expect(machine.card?.title).toBe("Dropped the loop 'Remove the stale Tailscale node'.");
   });
 
+  it("says why the session ended, in words", () => {
+    const machine = live();
+    machine.handle({ type: "closed", reason: "remote_hangup" }, t0 + 9);
+    expect(machine.phase).toEqual({ kind: "ended", why: "The voice ended the session" });
+  });
+
   it("a tool call carries the lines heard so far, so Studio hears the yes first", () => {
     const machine = live();
     machine.handle({ type: "userText", text: "Yes." }, t0 + 1);

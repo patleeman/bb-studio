@@ -166,6 +166,29 @@ type Step =
   | { waitNote: true }
   | { close: true };
 
+/**
+ * --script desktop: for a staged BB's own Studio (the panel calls the real
+ * voiceLive.tool), so it names the staged data: the seeded ORBIT thread
+ * "Review the launch checklist", and loops found by title in loops_list's output.
+ */
+const DESKTOP_SCRIPT: Step[] = [
+  { user: "What's waiting on me?" },
+  { tool: "loops_list", args: {} },
+  { say: "Two things need you: reply to Dana about the pricing deck, and renew the domain before Friday." },
+  { user: "Tell the launch checklist thread to flag anything blocking Friday." },
+  { tool: "send_to_thread", args: { target: "launch checklist", message: "Flag anything blocking Friday's release" } },
+  { say: "Sent to the launch checklist." },
+  { user: "Drop the Tailscale node one." },
+  { tool: "loops_act", args: { loop_id: "$loop:Tailscale", action: "drop" } },
+  { sayReadBack: true },
+  { user: "Yes, drop it." },
+  { tool: "confirm", args: { action_id: "$draft" } },
+  { say: "Dropped it." },
+  { say: "Anything else? I can read you what's coming up next: booking the car service, and the release window on Friday afternoon.", bargeIn: { afterMs: 2600, text: "No, that's all, thanks." } },
+  { say: "Okay. Talk soon." },
+  { close: true },
+];
+
 const SCRIPT: Step[] = [
   { user: "What's waiting on me?" },
   { tool: "loops_list", args: {} },
@@ -206,6 +229,7 @@ function runScript(socket: Duplex) {
   const send = (event: Record<string, unknown>) => socket.write(frame(JSON.stringify(event)));
   let closed = false;
   let lastOutput = "";
+  let loopsOutput = "";
   let draft = "";
   let pendingTool: { callId: string; at: number; resolve: (output: string) => void } | null = null;
   let noteWaiter: (() => void) | null = null;
@@ -276,12 +300,14 @@ function runScript(socket: Duplex) {
 
   async function tool(name: string, args: Record<string, unknown>) {
     const callId = `call_${Math.random().toString(36).slice(2, 10)}`;
-    const resolved = JSON.stringify(args).replace("$draft", draft);
+    // "$loop:<title words>": the loop's id from the last loops_list.
+    const resolved = JSON.stringify(args).replace("$draft", draft).replace(/\$loop:([^"]+)/, (_, words: string) => loopsOutput.match(new RegExp(`- [^\\n]*${words}[^\\n]*\\(id ([^,)]+)`, "i"))?.[1] ?? "unknown");
     const output = await new Promise<string>((resolve) => {
       pendingTool = { callId, at: Date.now(), resolve };
       send({ type: "response.event", delegation_id: "item_mock", event: { type: "response.output_item.done", item: { type: "function_call", call_id: callId, name, arguments: resolved } } });
     });
     lastOutput = output;
+    if (name === "loops_list") loopsOutput = output;
     draft = output.match(/\(action (d_[a-f0-9]+)\)/)?.[1] ?? draft;
     // The backend's turn: a few hundred tokens.
     send({ type: "response.event", event: { type: "response.completed", response: { usage: { input_tokens: 900, output_tokens: 40, input_tokens_details: { cached_tokens: 700 } } } } });
@@ -291,7 +317,7 @@ function runScript(socket: Duplex) {
   void (async () => {
     send({ type: "session.started" });
     await sleep(1500);
-    for (const step of SCRIPT) {
+    for (const step of process.argv.includes("desktop") ? DESKTOP_SCRIPT : SCRIPT) {
       if (closed) break;
       if ("user" in step) await user(step.user);
       else if ("tool" in step) await tool(step.tool, step.args);

@@ -182,7 +182,7 @@ final class VoiceLiveMachineTests: XCTestCase {
     func testTheServerEndingTheSessionHangsUp() {
         var machine = live()
         let effects = machine.handle(.closed(reason: "expired"), now: t0 + 9)
-        XCTAssertEqual(machine.phase, .ended("expired"))
+        XCTAssertEqual(machine.phase, .ended("The session reached its time limit"))
         XCTAssertTrue(effects.contains { if case .hangUp = $0 { return true } else { return false } })
     }
 

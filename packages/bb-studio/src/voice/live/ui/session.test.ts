@@ -14,6 +14,7 @@ function fakes(options: { stop?: string | null; replies?: number } = {}) {
     setAgentAudio: (enabled) => muted.push(!enabled),
     levels: () => { const now = levels; levels = { mic: [], playback: levels.playback }; return now; },
     micLabel: "Fake mic",
+    micOpenedAt: null,
     close: vi.fn(),
   };
   const started = { sessionId: "vl_0123456789abcdef", model: "gpt-live-1", transport: "mock", answerSdp: null, clientSecret: null, callsUrl: null, mockUrl: "ws://mock", cosName: "Dot" };

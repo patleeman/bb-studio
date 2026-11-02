@@ -115,6 +115,7 @@ export class LiveSession {
       this.protocol = started.transport === "realtime-webrtc" ? "realtime" : "live";
       this.machine.endsLinesOnPause = this.protocol === "live";
       this.micLabel = transport.micLabel;
+      if (transport.micOpenedAt) this.trace.push({ at: transport.micOpenedAt, what: "mic open" });
       this.transport = transport;
       transport.onEvent((event) => this.receive(event));
       transport.onClose((reason) => { if (this.machine.isLive) this.apply(this.machine.fail(reason, this.now())); });
