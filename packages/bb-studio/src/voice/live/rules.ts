@@ -1,4 +1,3 @@
-import type { RelayIntent } from "./shared";
 // The eyes-free rules, enforced in the tool layer (live.ts), not only in the
 // voice's prompt: the model can ask for anything, and Studio decides
 // (classify below).
@@ -14,6 +13,7 @@ import type { RelayIntent } from "./shared";
 // - Never by voice: spending money, email or messages to people outside BB,
 //   posting publicly, approving credentials. Those aren't tools; a relay that
 //   asks for one is still sent, but marked so the target asks in its chat.
+import type { RelayIntent } from "./shared";
 
 /** A destructive action waits this long for a yes; then it's dropped. */
 export const DRAFT_MS = 45_000;

@@ -576,7 +576,8 @@ describe("hands-free answer intent", () => {
     expect(home[0]![0].text).toContain("@thread:thr_voice");
     expect(home[0]![0].note).toContain("otherwise reply exactly [PASS]");
     expect(send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text).toContain(reply.replace(/\n{2,}/g, "\n"));
-    if (intent === "answer" && process.env.BB_THREAD_STORAGE) writeFileSync(`${process.env.BB_THREAD_STORAGE}/voice-test-transcript.md`, [
+    // VOICE_TRANSCRIPT_OUT=<file> writes this session out as a readable transcript.
+    if (intent === "answer" && process.env.VOICE_TRANSCRIPT_OUT) writeFileSync(process.env.VOICE_TRANSCRIPT_OUT, [
       "# LiveVoice test session (real class, in-memory database, fake dependencies)",
       "User: run through the changes you're working on", "Relay tool: send_to_cos; intent: answer", "## Target message", target.text,
       "## Target agent-only note", target.note, "## Target reply", reply,
@@ -584,6 +585,15 @@ describe("hands-free answer intent", () => {
       "## Hang-up agent-only note", home[0]![0].note,
       "No live OpenAI session was run. This fixture uses fake transport and agent replies.",
     ].join("\n\n"));
+  });
+
+  it("a failed post to the launching thread still ends the session", async () => {
+    const { live, send } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    live.record(sessionId, [said("what's new"), { type: "transcript", role: "assistant", text: "Nothing new." }]);
+    send.mockImplementation(async (input: { threadId: string }) => { if (input.threadId === COS.threadId) throw new Error("offline"); });
+    const view = await live.end(sessionId);
+    expect(view.endedAt).not.toBeNull();
   });
 
   it("chunks at sentences and retrieves every part without losing words", async () => {
@@ -656,7 +666,7 @@ it("declares relay intent and read-back rules in both model instructions", async
 it("caps the launching transcript while keeping the full reply in the voice thread", async () => {
   const { live, send } = setup();
   const { sessionId } = await live.start({ sdp: "x" });
-  const reply = "Here is another change. ".repeat(1000);
+  const reply = "Here is another change. ".repeat(600);
   await live.tool(sessionId, "send_to_cos", JSON.stringify({ intent: "answer", message: "Run through the changes" }), [said("Run through the changes")]);
   await live.idle(COS.threadId, reply);
   const ended = await live.end(sessionId);

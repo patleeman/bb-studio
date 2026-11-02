@@ -682,7 +682,7 @@ export class VoiceLive {
       if (lastReply && lastReply.id > sent.id) continue;
       const title = data<{ title: string }>(sent).title;
       const summary = replySummary(lastAssistantText!);
-      this.append(row.id, "reply", { text: lastAssistantText!.trim(), data: { threadId, title, summary, intent: relayIntent(data<{ intent?: string }>(sent).intent) } });
+      this.append(row.id, "reply", { text: clip(lastAssistantText!.trim(), 20_000), data: { threadId, title, summary, intent: relayIntent(data<{ intent?: string }>(sent).intent) } });
       done.push(row.id);
       if (!this.ended(events)) {
         this.deps.publish({ sessionId: row.id, kind: "reply" });
@@ -745,15 +745,16 @@ export class VoiceLive {
       const voiceThreadId = await this.voiceThread(sessionId);
       const compact = all.flatMap((event) => {
         const title = data<{ title?: string }>(event).title;
-        if (event.kind === "transcript") return [`${event.role === "user" ? "You" : "Voice"}: ${(event.text ?? "").replace(/\s+/g, " ")}`];
+        if (event.kind === "transcript") return [`${event.role === "user" ? "You" : "Voice"}: ${clip((event.text ?? "").replace(/\s+/g, " "), 300)}`];
         if (event.kind === "sent") return [`→ sent to ${title}: ${event.text}`];
         if (event.kind === "reply") return [`← ${title} answered: ${clip(speakable(event.text ?? "").replace(/\s+/g, " "), 300)}`];
         return [];
       }).join("\n");
+      // A failed post must not keep the session from ending.
       await this.deps.send({ threadId: home, senderThreadId: voiceThreadId, mode: "queue-if-active",
-        text: `🎙 Voice session · ${Math.max(1, Math.round(draft.durationMs / 60_000))} min\n${clip(compact, 3800)}\n\nFull transcript: @thread:${voiceThreadId}`,
+        text: `🎙 Voice session · ${Math.max(1, Math.round(draft.durationMs / 60_000))} min\n${clip(compact, 3800)}${voiceThreadId ? `\n\nFull transcript: @thread:${voiceThreadId}` : ""}`,
         note: "This is the record of a voice conversation you were part of, for your context. Act only on requests that weren't already relayed and answered; otherwise reply exactly [PASS].",
-      });
+      }).catch((error) => this.deps.warn?.(`Couldn't post the voice session to its thread: ${String(error)}`));
     }
     this.append(sessionId, "ended");
     this.deps.publish({ sessionId, kind: "ended" });
