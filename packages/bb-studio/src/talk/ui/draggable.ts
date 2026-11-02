@@ -51,7 +51,7 @@ export function toFraction(pixels: { left: number; top: number }, bounds: Bounds
   };
 }
 
-function loadPosition(key = STORAGE_KEY): Fraction {
+export function loadPosition(key = STORAGE_KEY, fallback: Fraction = DEFAULT_POSITION): Fraction {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) ?? "null") as Partial<Fraction> | null;
     if (typeof parsed?.x === "number" && typeof parsed.y === "number") {
@@ -60,7 +60,7 @@ function loadPosition(key = STORAGE_KEY): Fraction {
   } catch {
     // A corrupt entry falls back to the default.
   }
-  return DEFAULT_POSITION;
+  return fallback;
 }
 
 function viewportBounds(): Bounds {
@@ -86,11 +86,14 @@ function viewportBounds(): Bounds {
  * buttons inside the handle keep working; the click that ends a drag is
  * swallowed.
  */
-/** `storageKey`: where the position is kept; another pill (hands-free voice) keeps its own. */
-export function useDraggable<T extends HTMLElement>(storageKey = STORAGE_KEY) {
+/**
+ * `storageKey`: where the position is kept; another pill (hands-free voice) keeps its own.
+ * `defaultPosition`: where it starts before it has been dragged (top center by default).
+ */
+export function useDraggable<T extends HTMLElement>(storageKey = STORAGE_KEY, defaultPosition: Fraction = DEFAULT_POSITION) {
   // A callback ref, so the pill is placed whenever it (re)mounts.
   const [element, ref] = useState<T | null>(null);
-  const [position, setPosition] = useState(() => loadPosition(storageKey));
+  const [position, setPosition] = useState(() => loadPosition(storageKey, defaultPosition));
   const [pixels, setPixels] = useState<{ left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const suppressClick = useRef(false);

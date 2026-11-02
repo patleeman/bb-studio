@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { toFraction, toPixels } from "./draggable";
+import { loadPosition, toFraction, toPixels } from "./draggable";
 
 const bounds = { width: 1000, height: 800, insetTop: 20, insetBottom: 10 };
 const size = { width: 300, height: 40 };
@@ -25,5 +26,16 @@ describe("pill position", () => {
     const wide = { width: 374, height: 48 };
     expect(toFraction({ left: 120, top: 55 }, phone, wide)).toEqual({ x: 0.5, y: 0 });
     expect(toPixels({ x: 0.9, y: 0 }, phone, wide).left).toBe(8);
+  });
+});
+
+describe("loadPosition", () => {
+  it("starts where the caller asks until the pill has been dragged, then remembers the drag", () => {
+    localStorage.removeItem("test:pill");
+    expect(loadPosition("test:pill")).toEqual({ x: 0.5, y: 0 });
+    expect(loadPosition("test:pill", { x: 1, y: 0.8 })).toEqual({ x: 1, y: 0.8 });
+    localStorage.setItem("test:pill", JSON.stringify({ x: 0.2, y: 0.3 }));
+    expect(loadPosition("test:pill", { x: 1, y: 0.8 })).toEqual({ x: 0.2, y: 0.3 });
+    localStorage.removeItem("test:pill");
   });
 });

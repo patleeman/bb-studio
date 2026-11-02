@@ -101,10 +101,14 @@ export function HandsFreePill() {
   return <Pill key={session.trace[0]?.at ?? 0} session={session} expanded={expanded} />;
 }
 
+/** Bottom right, above the composer's row: x is the right edge, y leaves room for the composer. */
+export const HANDSFREE_PILL_START = { x: 1, y: 0.8 };
+
 function Pill({ session, expanded }: { session: LiveSession; expanded: boolean }) {
   useSession(session);
   const navigate = useBbNavigate();
-  const drag = useDraggable<HTMLDivElement>("bb-plugin-studio:handsfree-pill-position");
+  // Starts bottom right, just above the composer; remembered once dragged.
+  const drag = useDraggable<HTMLDivElement>("bb-plugin-studio:handsfree-pill-position", HANDSFREE_PILL_START);
   const { machine } = session;
   useRealtime(VOICE_LIVE_CHANNEL, (payload) => {
     const signal = payload as VoiceLiveSignal;
