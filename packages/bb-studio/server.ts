@@ -86,7 +86,7 @@ import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } fr
 import { ViewStore } from "./src/views";
 import { ThreadTitles } from "./src/thread-titles";
 import { withTagHint } from "./src/create-tag-hint";
-import { SearchIndex } from "./src/search-index";
+import { excerpt, SearchIndex, tokens, type SearchHit } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
 import { ProviderHistory } from "./src/provider-history";
@@ -866,6 +866,8 @@ export default async function plugin(bb: BbPluginApi) {
     if (!bot?.threadId) throw new Error(bot ? `${bot.name} has no chat.` : "Make your Bot first.");
     return bot.threadId;
   };
+  // Set once hands-free voice is wired, further down.
+  let voiceSearch: ((query: string, limit: number) => SearchHit[]) | null = null;
   bb.rpc.register(rpcContract, {
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
@@ -877,7 +879,10 @@ export default async function plugin(bb: BbPluginApi) {
       const skip = query.trim() || kinds?.length ? [] : [...backgroundKinds(await hub.providers())];
       const studio = query.trim() ? searchIndex.search(query, { kinds, projectId, limit }) : searchIndex.recent(limit, { kinds, projectId, skip });
       const others = query.trim() ? await externalResults(bb, query, { kinds, projectId, limit }) : [];
-      return [...studio, ...others].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
+      // Voice threads are hidden under the Bot, which BB's thread search skips: Studio finds them in their transcripts.
+      const voice = query.trim() && (!kinds?.length || kinds.includes("thread")) && (projectId === undefined || projectId === PERSONAL_PROJECT_ID)
+        ? (voiceSearch?.(query, limit) ?? []).filter((hit) => !others.some((other) => other.ref.id === hit.ref.id)) : [];
+      return [...studio, ...others, ...voice].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
     },
     create: ({ pluginId, kind, projectId }) => hub.call(pluginId, "studio_create", { kind, projectId }),
     duplicate: ({ pluginId, id, projectId, includeChildren }) => hub.call(pluginId, "studio_duplicate", { id, projectId, includeChildren }),
@@ -1328,6 +1333,13 @@ export default async function plugin(bb: BbPluginApi) {
   });
   registerVoiceLive(bb, voiceLive);
   registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
+  voiceSearch = (query, limit) => {
+    const words = tokens(query);
+    return voiceLive.search(query, limit).map((hit) => ({
+      ref: { pluginId: "__bb__", id: hit.threadId }, kind: "thread", title: hit.title, snippet: excerpt(hit.text, words),
+      href: `/threads/${hit.threadId}`, projectId: PERSONAL_PROJECT_ID, updatedAt: hit.at, score: 1,
+    }));
+  };
   // A Bot's image avatar, for the desktop and the iOS app. The URL names the image, so it never goes stale.
   bb.http.route("GET", AVATAR_ROUTE, (context) => {
     const image = bots.avatarImage(context.req.query("bot") ?? "", context.req.query("image") ?? "");

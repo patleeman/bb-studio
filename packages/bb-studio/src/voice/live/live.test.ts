@@ -383,3 +383,25 @@ describe("the voice thread", () => {
     expect(posts()).toHaveLength(2);
   });
 });
+
+describe("searching voice threads", () => {
+  it("finds a session by its words (BB's thread search skips hidden threads), with its voice thread and the matching line", async () => {
+    const { live } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    await live.voiceThread(sessionId);
+    await live.tool(sessionId, "send_to_thread", JSON.stringify({ target: "the Kensico lead", message: "Pause the eBay fetcher until Monday" }), [said("Tell the Kensico lead to pause the eBay fetcher")]);
+    live.record(sessionId, [{ type: "transcript", role: "assistant", text: "Sent to the Kensico lead." }]);
+    const hits = live.search("eBay fetcher");
+    expect(hits).toEqual([{ threadId: "thr_voice", title: expect.stringMatching(/^🎙 Voice · /), text: "Tell the Kensico lead to pause the eBay fetcher", at: expect.any(Number) }]);
+    // Every word must be there; case doesn't matter.
+    expect(live.search("EBAY monday")).toHaveLength(1);
+    expect(live.search("eBay tulips")).toEqual([]);
+    expect(live.search("  ")).toEqual([]);
+    // A session whose thread never opened isn't findable (there's nothing to open).
+    const keyless = setup({}, { openThread: async () => { throw new Error("no"); } });
+    const s2 = await keyless.live.start({ sdp: "x" });
+    await keyless.live.voiceThread(s2.sessionId);
+    keyless.live.record(s2.sessionId, [said("eBay fetcher")]);
+    expect(keyless.live.search("eBay")).toEqual([]);
+  });
+});

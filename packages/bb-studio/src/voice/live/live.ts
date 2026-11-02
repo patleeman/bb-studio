@@ -104,6 +104,11 @@ const data = <T>(row: EventRow | undefined): T => JSON.parse(row?.data ?? "{}") 
 const answered = (text: string | null | undefined) => !!text?.trim() && !/^\s*\[PASS\]\s*$/i.test(text);
 const shortId = (prefix: string) => `${prefix}_${randomBytes(4).toString("hex")}`;
 
+/** "🎙 Voice · Nov 1, 8:26 PM": a session's voice thread. */
+export function voiceTitle(startedAt: number): string {
+  return `🎙 Voice · ${new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
+}
+
 export function replySummary(text: string): string {
   return clip(speakable(text).replace(/\s+/g, " ").trim(), REPLY_SUMMARY_CHARS);
 }
@@ -250,9 +255,8 @@ export class VoiceLive {
     this.deps.db.prepare("INSERT INTO voice_calls (id, bot_id, bot_name, thread_id, model, voice, transcribe_model, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(sessionId, "cos", cos.name, null, model, VOICE, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
     // The thread opens beside the call: the phone connects without waiting for it.
-    const day = new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     this.opening.set(sessionId, this.deps.openThread({
-      title: `🎙 Voice · ${day}`,
+      title: voiceTitle(startedAt),
       text: `🎙 Hands-free voice session (${model}). The transcript and everything it relays to ${cos.name} and other threads lands here.`,
       note: "This thread is the record of a hands-free voice session; the voice agent runs on OpenAI, not here. Studio posts the transcript, the messages it relayed and the replies. Don't act on these posts: reply exactly [PASS].",
     }).then(async (threadId) => {
@@ -617,6 +621,31 @@ export class VoiceLive {
     this.append(sessionId, "ended");
     this.deps.publish({ sessionId, kind: "ended" });
     return this.view(sessionId);
+  }
+
+  /**
+   * Voice threads live under the Bot, hidden from BB's list, and BB's thread
+   * search skips hidden threads. Studio has every session's words, so its
+   * own search finds them here: each session whose transcript, sends or
+   * replies hold every word, with its voice thread and the first matching line.
+   */
+  search(query: string, limit = 10): { threadId: string; title: string; text: string; at: number }[] {
+    const words = [...query.normalize("NFKC").toLocaleLowerCase().matchAll(/[\p{L}\p{N}]+/gu)].map((match) => match[0]);
+    if (!words.length) return [];
+    const sessions = this.deps.db.prepare("SELECT * FROM voice_calls WHERE id LIKE 'vl_%' ORDER BY started_at DESC LIMIT 500").all() as SessionRow[];
+    const hits: { threadId: string; title: string; text: string; at: number }[] = [];
+    for (const row of sessions) {
+      const events = this.events(row.id);
+      const threadId = data<{ threadId?: string }>(events.find((event) => event.kind === "thread")).threadId;
+      if (!threadId) continue;
+      const lines = events.filter((event) => (event.kind === "transcript" || event.kind === "sent" || event.kind === "reply") && event.text);
+      const all = lines.map((event) => event.text!.toLocaleLowerCase()).join("\n");
+      if (!words.every((word) => all.includes(word))) continue;
+      const line = lines.find((event) => words.some((word) => event.text!.toLocaleLowerCase().includes(word)));
+      hits.push({ threadId, title: voiceTitle(row.started_at), text: line?.text ?? "", at: events.at(-1)?.at ?? row.started_at });
+      if (hits.length >= limit) break;
+    }
+    return hits;
   }
 
   view(sessionId: string, endedAtOverride?: number): VoiceLiveView {
