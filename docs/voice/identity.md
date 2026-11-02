@@ -38,7 +38,17 @@ whole seed is cut at 6,000. It reaches OpenAI as data, not instructions.
 
 **Speed:** the sources are Studio's own tables and one timeline read, fetched
 together. Studio measures the build and records it with the session
-(`identity` event: `ms`, `chars`, `missing`).
+(`identity` event: `ms`, `chars`, `missing`). Measured on a staged BB on
+Nov 1, five starts each, the whole `voiceLive.start` call over the mock
+transport took 4–26 ms. The seed build within it took:
+
+- **Chief of Staff:** 2–6 ms, with one 21 ms cold start, for memory, loops
+  and recent turns (452 characters).
+- **Another thread:** 2–7 ms.
+
+That's well inside the start latency (GPT-Live's connect is about a second),
+so there's room for an LLM summary, but it isn't needed: the seed is
+extractive.
 
 ## Where relays go
 
