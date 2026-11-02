@@ -53,10 +53,17 @@ or updates Live Activities.
 
 - `bb mobile status [--json]` shows whether APNs is ready, the relay path, and
   the last delivery.
-- RPC: `notify`, `mute_list`, `mute_set`.
-- Settings (`bb plugin config mobile`): `apnsKey` (secret), `apnsKeyPath`,
-  `apnsKeyId`, `apnsTeamId`, `bundleId`, `apnsEnvironment`, `expoPushUrl`. The
-  skill file describes each one.
+- RPC: `notify`, `mute_list`, `mute_set`, `push_status`, `push_test`.
+- Settings (`bb plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.
+  The team ID, bundle ID, APNs environment and Expo push URL are constants,
+  each overridable with an environment variable on the BB host
+  (`BB_MOBILE_APNS_TEAM_ID`, `BB_MOBILE_BUNDLE_ID`,
+  `BB_MOBILE_APNS_ENVIRONMENT`, `BB_MOBILE_EXPO_PUSH_URL`). The old key file
+  path folded into the key: a readable file's contents moved into `apnsKey`
+  once. The skill file describes each one.
+- Push status and **Send a test push** are on BB's Settings ▸ Mobile page.
+  The plugin has no frontend, so Studio draws that section and asks this
+  plugin through `push_status` and `push_test`.
 - No agent tools.
 
 ## Install and build
