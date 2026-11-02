@@ -17,6 +17,14 @@ export const FLOATING =
 export const ICON_BUTTON =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4";
 
+/**
+ * An icon button in a thread composer's bottom row, beside BB's mic: the same
+ * 32px ghost button and 16px glyph, whether the icon is an svg or a plugin
+ * icon (a masked span).
+ */
+export const COMPOSER_BUTTON =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_[data-icon-root]]:size-4";
+
 /** A bar's one labelled action (Chat on an item, New on a collection), at the same height. */
 export const BAR_BUTTON =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4";

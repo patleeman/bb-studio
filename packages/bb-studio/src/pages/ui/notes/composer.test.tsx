@@ -25,7 +25,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
     useRealtime: (_channel: string, handler: (payload: unknown) => void) => { state.realtime.push(handler); },
   };
 });
-vi.mock("../../../kit/app/index", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
+vi.mock("../../../kit/app/index", () => ({ COMPOSER_BUTTON: "composer-button", useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("../../../kit/ui/index", () => ({ Icon: () => <span />, Tooltip: ({ children }: { children: unknown }) => children }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

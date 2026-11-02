@@ -8,7 +8,7 @@
 // transcript and a link to the session's voice thread.
 import { useBbNavigate, useComposer, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ICON_BUTTON } from "../../../kit/app/index";
+import { COMPOSER_BUTTON, ICON_BUTTON } from "../../../kit/app/index";
 import { Icon, cn } from "../../../kit/ui";
 import { useDraggable } from "../../../talk/ui/draggable";
 import type { voiceLiveContract } from "../contract";
@@ -57,6 +57,10 @@ function useSession(session: LiveSession | null) {
   useSyncExternalStore((listener) => session?.subscribe(listener) ?? (() => {}), () => session?.snapshot ?? 0);
 }
 
+/** The mic's own ghost button; while a session is live, only the glyph takes the accent. */
+export const handsFreeButtonClass = (live: boolean) =>
+  cn(COMPOSER_BUTTON, live && "text-orange-600 hover:text-orange-600 dark:text-orange-400 dark:hover:text-orange-400");
+
 /** The composer's waveform button: starts a session (or opens the running one's pill). */
 export function HandsFreeComposerButton() {
   const composer = useComposer();
@@ -68,9 +72,9 @@ export function HandsFreeComposerButton() {
   const label = live ? "Hands-free voice is on" : "Hands-free voice";
   return (
     <button type="button" data-testid="handsfree-composer" aria-label={label} title={label} aria-pressed={live}
-      className={cn(ICON_BUTTON, "rounded-full", live && "bg-orange-500/15 text-orange-600 dark:text-orange-400")}
+      className={handsFreeButtonClass(live)}
       onClick={() => startHandsFree(rpc as unknown as Rpc)}>
-      <Icon name="studio/handsfree" aria-hidden />
+      <Icon name="studio/handsfree" className="size-4" aria-hidden />
     </button>
   );
 }

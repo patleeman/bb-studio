@@ -28,6 +28,7 @@ export {
   BAR_BUTTON,
   GHOST_BUTTON,
   Highlight,
+  COMPOSER_BUTTON,
   ICON_BUTTON,
   ItemTile,
   ITEM_TITLE,

@@ -1,5 +1,6 @@
 // "Expand to page" in a thread's composer, and the "Notes in progress" chip
 // above it. Registered by app.tsx with app.composer.customize.
+import { COMPOSER_BUTTON } from "../../../kit/app/index";
 import { errorMessage } from "../../../kit/format";
 import { Icon, Tooltip } from "../../../kit/ui/index";
 import { useComposer, useRpc, type PluginComposerApi } from "@get-bb/plugin-sdk/app";
@@ -7,9 +8,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract } from "../../notes-contract";
 import { localTimeZone, shortNoteTitle, useOpenNote, useThreadNote } from "./use-note";
-
-const ACTION_BUTTON =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4";
 
 /** What the button says, from the thread's open note and the draft. */
 export function expandLabel(hasNote: boolean, draftEmpty: boolean): string {
@@ -60,7 +58,7 @@ function ExpandButton({ composer, threadId }: { composer: PluginComposerApi; thr
           type="button"
           aria-label={label}
           data-notes-expand=""
-          className={ACTION_BUTTON}
+          className={COMPOSER_BUTTON}
           disabled={busy || composer.isSubmitting}
           onClick={() => void run()}
         >
