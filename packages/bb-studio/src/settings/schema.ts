@@ -44,6 +44,8 @@ export const STUDIO_SETTINGS = {
   voiceLiveVoice: { group: "voice", type: "select", label: "Hands-free voice", description: "The two models have different voices. marin is in both; a voice the model doesn’t have uses marin.", options: ALL_VOICES, default: DEFAULT_VOICE },
   voiceLiveBackendModel: { group: "voice", type: "select", label: "Backend model", description: "gpt-live-1 only: the model that picks tools and words the answers. gpt-5.6-luna is the cheapest and fastest.", options: BACKEND_MODELS, default: DEFAULT_BACKEND_MODEL },
   voiceLiveMonthlyCapUsd: { group: "voice", type: "number", label: "Monthly limit (USD)", description: "Studio won’t start a hands-free session once this month’s sessions reach it, and stops one that goes over. Estimated from OpenAI’s usage reports.", default: DEFAULT_CAP_USD, min: 0, max: 10_000 },
+  meetingAgentName: { group: "voice", type: "string", label: "Meeting agent’s name", description: "What the meeting agent is called, shown on her screen. Saying it in the room is how you talk to her. Pick a name that’s rarely misheard as an ordinary word.", default: "Iris", maxLength: 24 },
+  meetingAddressing: { group: "voice", type: "select", label: "When the meeting agent answers", description: "When someone says her name, then follow-ups for a few seconds. Or also when she judges the room clearly wants her. The Quiet button silences her either way.", options: ["name", "judge"], optionLabels: { name: "When named", judge: "When named, or when it’s clear" }, default: "name" },
 
   // Recordings and calls
   autoTitle: { group: "recordings", type: "boolean", label: "Name recordings", description: "Give each recording a short title once it has some text.", default: true },

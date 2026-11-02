@@ -14,4 +14,5 @@ import { rpcContract as minis } from "./minis/contract";
 import { rpcContract as notes } from "./pages/notes-contract";
 import { voiceLiveContract as voiceLive } from "./voice/live/contract";
 import { settingsContract as settings } from "./settings/contract";
-export const rpcContract = defineRpcContract({ ...loops, ...code, ...decisions, ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...minis, ...voiceLive, ...settings });
+import { meetingContract as meeting } from "./voice/meeting/contract";
+export const rpcContract = defineRpcContract({ ...loops, ...code, ...decisions, ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...minis, ...voiceLive, ...meeting, ...settings });

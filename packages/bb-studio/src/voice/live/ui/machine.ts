@@ -125,6 +125,8 @@ export class SessionMachine {
   card: ToolCard | null = null;
   /** The session's finished lines, newest last (the pill's transcript); at most 60. */
   lines: Subtitle[] = [];
+  /** Every line ever added (lines keeps only the last 60), so a reader can tell which are new. */
+  linesTotal = 0;
   agentMuted = false;
   interruptions = 0;
   falseTriggers = 0;
@@ -435,6 +437,7 @@ export class SessionMachine {
   }
 
   private line(line: Subtitle) {
+    this.linesTotal++;
     this.lines = [...this.lines, line].slice(-60);
   }
 }

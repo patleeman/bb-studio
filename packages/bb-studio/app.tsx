@@ -36,6 +36,7 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
+import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
@@ -184,6 +185,8 @@ export default definePluginApp((app) => {
   // composer button is registered below, after Notes' Expand; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
+  // The meeting agent (src/voice/meeting/ui): a full-window stage for the room, or its pill.
+  app.slots.experimental_appOverlay({ id: "meeting", component: MeetingStage });
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
   // opens them through: an overlay that asks the chat to open the tab beside it
@@ -282,4 +285,5 @@ export default definePluginApp((app) => {
     run: toggleQuickOpen,
   });
   app.commands.register({ id: "handsfree", title: "Studio: Hands-free voice", run: () => startHandsFree() });
+  app.commands.register({ id: "meeting", title: "Studio: Start a meeting agent", run: () => void startMeeting() });
 });
