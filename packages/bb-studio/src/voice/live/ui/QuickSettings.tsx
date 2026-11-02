@@ -147,10 +147,13 @@ export function VoiceSettingsSection() {
   const [state, setState] = useState<VoiceLiveState | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { void loadVoiceState(rpc).then(setState, () => {}); }, [rpc]);
+  // Asked for by "Voice settings…": BB's form above loads after this mounts and
+  // pushes it down, so scroll again as the page settles.
   useEffect(() => {
     if (!scrollToSection) return;
     scrollToSection = false;
-    ref.current?.scrollIntoView({ block: "center" });
+    const timers = [0, 300, 800, 1600].map((ms) => setTimeout(() => ref.current?.scrollIntoView({ block: "center" }), ms));
+    return () => timers.forEach(clearTimeout);
   }, []);
   return (
     <div ref={ref} id={VOICE_SETTINGS_ANCHOR} data-testid="studio-voice-settings" className="space-y-1.5 text-sm">

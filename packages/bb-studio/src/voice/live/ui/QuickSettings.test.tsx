@@ -126,9 +126,13 @@ describe("the waveform button's right-click menu", () => {
     expect(nav.openAppPath).toHaveBeenCalledWith(VOICE_SETTINGS_PATH);
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
+    vi.useFakeTimers();
     act(() => root.render(<VoiceSettingsSection />));
     await flush();
-    expect(scroll).toHaveBeenCalledTimes(1);
+    // Again as BB's form above it loads and pushes it down.
+    act(() => { vi.advanceTimersByTime(2000); });
+    vi.useRealTimers();
+    expect(scroll).toHaveBeenCalledTimes(4);
     expect($("studio-voice-settings")!.textContent).toContain("Next session: gpt-live-1, voice marin, backend gpt-5.6-luna.");
     expect($("studio-voice-settings")!.textContent).toContain("This month: $3.42 of the $20.00 cap.");
     // Only once: opening the settings page on its own doesn't scroll.
@@ -136,6 +140,7 @@ describe("the waveform button's right-click menu", () => {
     root = createRoot(host);
     act(() => root.render(<VoiceSettingsSection />));
     await flush();
-    expect(scroll).toHaveBeenCalledTimes(1);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+    expect(scroll).toHaveBeenCalledTimes(4);
   });
 });
