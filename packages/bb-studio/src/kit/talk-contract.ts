@@ -294,4 +294,3 @@ export function callRetentionDays(setting: unknown): number | null {
   if (setting === "7 days") return 7;
   return 30;
 }
-
