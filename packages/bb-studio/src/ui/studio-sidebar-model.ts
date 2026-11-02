@@ -17,7 +17,13 @@ export interface StudioSidebarModel {
 }
 
 /** The built-in kinds first, in this order; others follow as their add-ons list them. */
-export const KIND_ORDER = ["page", "drawing", "recording", "artifact", "design"];
+export const KIND_ORDER = ["page", "recording", "artifact", "design"];
+/**
+ * Kinds that live inside pages: a whiteboard is a drawing a page embeds.
+ * They stay in the library and search, but get no sidebar row and no New
+ * entry; `/whiteboard` in a page makes one.
+ */
+export const IN_PAGE_KINDS: ReadonlySet<string> = new Set(["drawing"]);
 export const RECENT_LIMIT = 15;
 
 const kindQuery = (id: string) => formatQuery({ filters: [{ field: "kind", value: id }], text: "" });
@@ -31,7 +37,7 @@ export function studioSidebarModel(
   const live = data.items.filter((item) => !item.archived && !item.template);
   const count = (match: (item: CollectionItem) => boolean) => live.reduce((n, item) => n + (match(item) ? 1 : 0), 0);
   const rank = (id: string) => { const at = KIND_ORDER.indexOf(id); return at < 0 ? KIND_ORDER.length : at; };
-  const kinds = data.providers
+  const allKinds = data.providers
     .filter((provider) => provider.state === "ready")
     .flatMap((provider) => provider.kinds.filter((kind) => !off.has(kind.id)).map((kind) => ({
       pluginId: provider.pluginId,
@@ -44,7 +50,8 @@ export function studioSidebarModel(
     .map((kind, index) => ({ kind, index }))
     .sort((a, b) => rank(a.kind.id) - rank(b.kind.id) || a.index - b.index)
     .map(({ kind }) => kind);
-  const iconOf = new Map(kinds.map((kind) => [`${kind.pluginId}:${kind.id}`, kind.icon]));
+  const kinds = allKinds.filter((kind) => !IN_PAGE_KINDS.has(kind.id));
+  const iconOf = new Map(allKinds.map((kind) => [`${kind.pluginId}:${kind.id}`, kind.icon]));
   const tags = data.tags.map((tag) => ({ ...tag, count: count((item) => (item.tags ?? []).includes(tag.id)), query: tagQuery(tag.name) }));
   const pinned = tabs.filter((tab) => tab.pinned).map((tab) => ({ key: `${tab.pluginId}:${tab.id}`, title: tab.title, icon: tab.icon, kindIcon: tab.kindIcon, href: tab.href }));
   const pinnedKeys = new Set(pinned.map((item) => item.key));

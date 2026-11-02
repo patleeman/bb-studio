@@ -11,7 +11,7 @@ import { openAppPath } from "../kit/app/nav";
 import { openCallPicker } from "../talk/ui/call-view";
 import { appliedKinds } from "./kinds-snapshot";
 import { parseQuery, resolveValue } from "../query";
-import { KIND_ORDER } from "./studio-sidebar-model";
+import { IN_PAGE_KINDS, KIND_ORDER } from "./studio-sidebar-model";
 
 type ProviderKind = ProviderView["kinds"][number];
 export interface TemplateRef { pluginId: string; id: string; title: string }
@@ -26,7 +26,7 @@ export function createEntries(providers: readonly ProviderView[], { off = new Se
   const ready = providers.filter((provider) => provider.state === "ready");
   const rank = (id: string) => { const at = KIND_ORDER.indexOf(id); return at < 0 ? KIND_ORDER.length : at; };
   const kinds = ready
-    .flatMap((provider) => provider.kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true) && !off.has(kind.id)).map((kind) => ({ provider, kind })))
+    .flatMap((provider) => provider.kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true) && !off.has(kind.id) && !IN_PAGE_KINDS.has(kind.id)).map((kind) => ({ provider, kind })))
     .map((each, index) => ({ ...each, index }))
     .sort((a, b) => rank(a.kind.id) - rank(b.kind.id) || a.index - b.index)
     .map(({ provider, kind }): CreateEntry => ({ type: "kind", key: `${provider.pluginId}:${kind.id}`, label: kind.label, icon: kind.icon, pluginId: provider.pluginId, addOn: provider.name, kind }));

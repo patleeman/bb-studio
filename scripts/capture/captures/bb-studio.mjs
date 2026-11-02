@@ -160,8 +160,12 @@ return [
         // A staged BB has no Jev key; its plugin-health card would cover the sidebar.
         await dismissProblems(client);
         const unfiltered = await openNew();
-        for (const label of ["Page", "Drawing", "Record a call"]) {
+        for (const label of ["Page", "Record a call"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
+        }
+        // Whiteboards are made in a page (/whiteboard), not from New.
+        for (const label of ["Drawing", "Whiteboard"]) {
+          if (unfiltered.includes(label)) throw new Error(`New menu still offers ${label}`);
         }
         // Bots live in Teams, not Studio.
         if (unfiltered.includes("Bot")) throw new Error("The New menu still offers a bot");
@@ -169,7 +173,7 @@ return [
           await client.navigate("/plugins/studio/studio/collection");
           await client.evaluate(`localStorage.setItem('studio:query:all', ${JSON.stringify(`kind:${kind}`)})`);
           await client.navigate("/plugins/studio/studio/collection");
-          await client.waitForAriaButton(kind === "drawing" ? "Remove Kind Drawings" : "Remove Kind Pages");
+          await client.waitForAriaButton(kind === "drawing" ? "Remove Kind Whiteboards" : "Remove Kind Pages");
           const filtered = await openNew();
           if (JSON.stringify(filtered) !== JSON.stringify(unfiltered)) throw new Error(`The ${kind} filter changed the New menu`);
         }
@@ -205,11 +209,11 @@ return [
         await client.waitForAriaButton("Global");
         await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
         await client.clickAriaButtonWithPointer("Filter by kind");
-        for (const label of ["Pages", "Recordings", "Drawings"]) await client.waitForAriaButton(label);
+        for (const label of ["Pages", "Recordings", "Whiteboards"]) await client.waitForAriaButton(label);
         await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
         await client.waitForText("Pages");
         await client.waitForText("Recordings");
-        await client.waitForText("Drawings");
+        await client.waitForText("Whiteboards");
         await client.waitForText("Offline mode launch");
         await client.waitForText("Weekly product sync");
         await client.waitForText("Checkout flow");
@@ -258,10 +262,12 @@ return [
         const pref = JSON.parse(await bbCli(["settings", "ui", "get", "sidebar.threadListProvider"]));
         if (pref !== "studio/studio-items") throw new Error(`On the Studio page the thread list is ${pref}, not studio/studio-items`);
         if (!viewId) viewId = (await pluginRpc("studio", "overview", null)).views.find((view) => view.name === "Launch pages")?.id ?? null;
-        for (const text of ["All items", "Pages", "Drawings", "Saved views", "Launch pages", "Tags", "Launch", "Recent", "Offline mode launch", "Checkout flow"]) await client.waitForText(text, 30000);
+        for (const text of ["All items", "Pages", "Saved views", "Launch pages", "Tags", "Launch", "Recent", "Offline mode launch", "Checkout flow"]) await client.waitForText(text, 30000);
         await client.evaluate(`(() => {
           const nav = document.querySelector('nav[aria-label="Studio"]');
           if (nav.getBoundingClientRect().left > 120) throw new Error("The Studio list isn't in BB's sidebar");
+          // Whiteboards live in pages: no kind row of their own.
+          if (nav.querySelector('[data-kind="drawing"]')) throw new Error("The sidebar still lists drawings as a kind");
           const pages = nav.querySelector('[data-kind="page"]');
           if (!pages || !/\\d/.test(pages.textContent)) throw new Error("The Pages kind has no count");
           pages.click();

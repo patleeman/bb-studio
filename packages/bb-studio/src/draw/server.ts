@@ -347,17 +347,13 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   // Studio calls bb.agents.configure once, with DRAW_TOOLS (BB allows one configuration per plugin).
 
-  // `@drawing` in any composer: at send time the agent receives its scene as context.
+  // A drawing's mention still resolves, so older `@drawing` mentions and a
+  // whiteboard's item chat give the agent its scene. It offers nothing in the
+  // composer's @ menu: whiteboards live in pages, and `@page` finds them.
   bb.ui.registerMentionProvider(defineItemMention({
     id: "drawing",
-    label: "Drawings",
-    search({ query }) {
-      const q = query.trim().toLowerCase();
-      return store
-        .list({ limit: 50 })
-        .filter((r) => !q || displayName(r).toLowerCase().includes(q))
-        .map((r) => ({ id: r.id, title: displayName(r), subtitle: `${toMeta(r).elementCount} elements` }));
-    },
+    label: "Whiteboards",
+    search: () => [],
     resolve: (itemId) => ({ context: mention(itemId) }),
   }));
 

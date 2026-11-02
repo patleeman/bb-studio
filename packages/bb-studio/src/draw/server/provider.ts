@@ -50,14 +50,14 @@ const loadExportFonts = () => {
 
 export const DRAWING_KIND: StudioKind = {
   id: "drawing",
-  label: "Drawing",
-  plural: "Drawings",
+  label: "Whiteboard",
+  plural: "Whiteboards",
   icon: DRAW_ICON,
   columns: [{ id: "elements", label: "Elements" }],
   actions: [{ id: "copy-text", label: "Copy text", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: false, links: false, templates: true },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false, templates: false },
   mentionProviderId: "drawing",
 
   blurb: "Diagrams and sketches.",

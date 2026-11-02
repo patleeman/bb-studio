@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const host = vi.hoisted(() => ({ projectId: null as string | null, calls: [] as { method: string; input: unknown }[] }));
 const providers = [
   { pluginId: "pages", name: "Pages", state: "ready", detail: null, panel: null, kinds: [{ id: "page", label: "Page", plural: "Pages", icon: "File", columns: [], actions: [], create: { mode: "rpc" }, canArchive: true, blurb: "" }] },
-  { pluginId: "draw", name: "Draw", state: "ready", detail: null, panel: null, kinds: [{ id: "drawing", label: "Drawing", plural: "Drawings", icon: "File", columns: [], actions: [], create: { mode: "rpc" }, canArchive: true, blurb: "" }] },
+  { pluginId: "design", name: "Design", state: "ready", detail: null, panel: null, kinds: [{ id: "design", label: "Design", plural: "Designs", icon: "File", columns: [], actions: [], create: { mode: "rpc" }, canArchive: true, blurb: "" }] },
   { pluginId: "talk", name: "Talk", state: "ready", detail: null, panel: null, kinds: [{ id: "recording", label: "Recording", plural: "Recordings", icon: "File", columns: [], actions: [], create: { mode: "event", event: "talk:new" }, canArchive: true, blurb: "" }] },
 ];
 const rpc = { call: async (method: string, input: unknown) => {
@@ -65,7 +65,7 @@ it("is its own labelled button that opens the shared New menu, walks it with the
   trigger().focus();
   await key(trigger(), "ArrowDown");
   await settle();
-  expect(items().map((each) => each.textContent?.trim())).toEqual(["Page", "Drawing", "Recording", "Record a call"]);
+  expect(items().map((each) => each.textContent?.trim())).toEqual(["Page", "Recording", "Design", "Record a call"]);
   expect(document.activeElement).toBe(items()[0]);
   // Radix moves focus a task later.
   await key(items()[0]!, "ArrowDown");
@@ -88,5 +88,5 @@ it("makes the item in the project BB has open, over the library's filter", async
 it("falls back to the library's Project filter when no project is open", async () => {
   localStorage.setItem("studio:query:all", "project:Orbit");
   await show();
-  expect(await pick("Drawing")).toEqual({ pluginId: "draw", kind: "drawing", projectId: "proj_orbit" });
+  expect(await pick("Design")).toEqual({ pluginId: "design", kind: "design", projectId: "proj_orbit" });
 });

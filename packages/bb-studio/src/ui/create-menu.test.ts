@@ -19,12 +19,16 @@ afterEach(() => vi.restoreAllMocks());
 
 it("lists the kinds Studio can make in Studio's order, then Record a call, then templates", () => {
   const entries = createEntries(providers, { templates: [{ pluginId: "pages", id: "pg_t", title: "Weekly" }] });
-  expect(labels(entries)).toEqual(["Page", "Drawing", "Recording", "Design", "Record a call", "From template: Weekly"]);
-  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, false, true, false]);
+  expect(labels(entries)).toEqual(["Page", "Recording", "Design", "Record a call", "From template: Weekly"]);
+  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, true, false]);
+});
+
+it("leaves out whiteboards: a page makes them with /whiteboard", () => {
+  expect(createEntries(providers).map((entry) => entry.key)).not.toContain("draw:drawing");
 });
 
 it("drops what Setup → Kinds turned off, and Record a call with recordings", () => {
-  expect(labels(createEntries(providers, { off: new Set(["recording", "design"]) }))).toEqual(["Page", "Drawing"]);
+  expect(labels(createEntries(providers, { off: new Set(["recording", "design"]) }))).toEqual(["Page"]);
   expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Record a call");
 });
 

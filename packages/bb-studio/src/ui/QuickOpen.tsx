@@ -113,7 +113,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       });
     } });
     return [
-      ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)
+      ...([ ["page", "New page"], ["recording", "New recording"], ["task", "New task"] ] as const)
         .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => makes(each, kind))))
         .map(([kind, label]) => create(kind, label)),
       { type: "command", label: "Open Studio", run: () => { onClose(); openAppPath("/plugins/studio/studio"); } },

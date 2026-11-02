@@ -62,13 +62,14 @@ const deferred = <T,>() => {
 test("on the Studio page it lists kinds, views, tags and recent items, with the library filter selected", async () => {
   await show();
   const kinds = [...container.querySelectorAll('[data-testid="studio-sidebar-kind"]')].map((each) => each.textContent);
-  expect(kinds).toEqual(["All items", "Pages2", "Drawings0"]);
+  // Whiteboards (drawings) live in pages: no row of their own.
+  expect(kinds).toEqual(["All items", "Pages2"]);
   expect(container.querySelector('[data-kind="page"]')!.getAttribute("aria-current")).toBe("page");
   expect(container.textContent).toContain("My pages");
   expect(container.querySelector('[data-testid="studio-sidebar-tag"]')!.textContent).toBe("Launch1");
   expect([...container.querySelectorAll('[data-testid="studio-sidebar-item"]')].map((each) => each.textContent)).toEqual(["Item b", "Item a"]);
-  act(() => (container.querySelector('[data-kind="drawing"]') as HTMLButtonElement).click());
-  expect(state.showLibrary).toHaveBeenCalledWith("kind:drawing");
+  act(() => (container.querySelector('[data-kind="page"]') as HTMLButtonElement).click());
+  expect(state.showLibrary).toHaveBeenCalledWith("kind:page");
   act(() => (container.querySelector('[data-testid="studio-sidebar-item"]') as HTMLButtonElement).click());
   expect(state.openAppPath).toHaveBeenCalledWith("/plugins/studio/page/b");
   expect(state.setPref).not.toHaveBeenCalled();
@@ -82,7 +83,7 @@ test("New offers the shared create list, Record a call and templates included", 
   await act(async () => {});
   const menu = [...container.querySelectorAll('[data-testid="menu-item"]')].map((each) => each.textContent?.trim());
   expect(menu).toEqual(createEntries(withTalk.providers as never, { templates }).map((entry) => entry.label));
-  expect(menu).toEqual(["page", "drawing", "Recording", "Record a call", "From template: Weekly"]);
+  expect(menu).toEqual(["page", "Recording", "Record a call", "From template: Weekly"]);
 });
 
 test("off the Studio page it switches to the Bots list and shows a placeholder", async () => {
