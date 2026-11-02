@@ -9,8 +9,8 @@
 // BB_SETTINGS_RENDER=before captures the same pages from a Studio before the
 // cleanup (installed from a local git ref), for the review: it skips the new
 // sections' assertions and the Attention view, which didn't exist yet.
-// Renders go to assets/settings-review/<before|after>/; the after settings
-// page also goes to assets/settings/ for the README.
+// The after settings page and Attention go to assets/settings/ (the README);
+// the rest, and every before render, to assets/settings-review/ for the review.
 import { BOT_PATH } from "./bb-studio-bot.mjs";
 
 const scheme = (client, value) => client.command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value }] });
@@ -46,7 +46,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
   const settingsPage = (mode) => ({
     id: `studio-settings-page-${mode}`,
     packageDir: "bb-studio",
-    fileName: `settings-review/${STAGE}/settings-page-${mode}.png`,
+    fileName: STAGE === "after" ? `settings/settings-page-${mode}.png` : `settings-review/before/settings-page-${mode}.png`,
     privateSidebar: false,
     setup: async (client) => {
       await scheme(client, mode);
@@ -71,7 +71,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
   const attention = (mode) => ({
     id: `studio-settings-attention-${mode}`,
     packageDir: "bb-studio",
-    fileName: `settings-review/${STAGE}/bot-controls-${mode}.png`,
+    fileName: STAGE === "after" ? `settings/bot-controls-${mode}.png` : `settings-review/before/bot-controls-${mode}.png`,
     privateSidebar: true,
     setup: async (client) => {
       await scheme(client, mode);

@@ -133,12 +133,14 @@ Snooze values: later_today = +3h; tonight = next 19:00; tomorrow_morning = next
 07:45 (phase 2 placeholder, no Mac presence detection). Wall times use the configured
 time zone, including DST.
 
-Settings: `loopsEnabled` (label **Attention Router**, default **OFF**) gates all
+Settings (Studio settings, `bb studio settings`): `loopsEnabled` (label **Attention Router**, in Threads, default **OFF**) gates all
 scheduled releases, cards, stale messages, pushes and loop badge counts. Tools and
 RPC remain usable for testing while disabled. Enable only after the UI is ready.
 
-Other settings: loopTimeZone (America/New_York), loopDailyBudget (5), loopQuietStart
-(22), loopQuietEnd (7). Budget is server-side and shared by all release paths.
+Other settings, on the Bot page under Controls → Attention: loopDailyBudget (5),
+loopQuietStart (22), loopQuietEnd (7). The time zone is this Mac's
+(`STUDIO_LOOP_TIME_ZONE` overrides it). Budget is server-side and shared by all
+release paths.
 
 Mobile notify remains backward compatible. Optional category BB_LOOP, loopId and
 actions are carried in notification data. APNs selects category BB_LOOP. Action
