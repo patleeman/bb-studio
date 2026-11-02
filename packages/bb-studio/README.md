@@ -1,6 +1,6 @@
 # Studio
 
-> **Studio** is the core of **BB Studio**: pages, recordings, drawings, designs and artifacts are built in. See the [suite overview](../../README.md).
+> **Studio** is the core of **BB Studio**: pages (with their whiteboards), recordings, designs and artifacts are built in. See the [suite overview](../../README.md).
 
 Studio opens on the collection: everything you and your agents make, including pages, Talk
 recordings and dictations, drawings, designs and saved artifacts, and other plugins' items. Search across all of them, filter by
@@ -140,12 +140,13 @@ and reopening a view.
 ![Live BB screenshot of the New menu, opened from the ▾ beside the tab strip's +, with a Pages filter](assets/new-menu.png)
 
 **+** in the tab strip opens a new tab; **▾** right beside it (New item) opens
-Studio's New menu from any tab. It offers every kind Studio can make, then
+Studio's New menu from any tab. It offers every kind Studio can make (not
+whiteboards, which pages make with `/whiteboard`), then
 Record a call and your templates, the same list as the sidebar's **+** and
 the thread's Studio tab. New items go into the project BB has open, or, with
 none open, the one the list's Project filter picks. The new tab page keeps a
-New button only when the list is empty. The capture checks that Drawings and
-Pages filters offer the same menu as the unfiltered collection.
+New button only when the list is empty. The capture checks that Whiteboards and
+Pages filters offer the same menu, and that neither Drawing nor Whiteboard is offered as the unfiltered collection.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
@@ -557,23 +558,26 @@ Files are stored as BLOBs in Studio's SQLite database. Contents come from
 real PDF carries a `sandbox allow-scripts` CSP, so HTML gets an opaque origin
 and can't call BB's API with your session.
 
-## Drawings
+## Whiteboards
 
-Drawings are built into Studio: [Excalidraw](https://excalidraw.com) scenes
-you sketch with your agents. They used to be the separate Studio Draw plugin
-(`excalidraw`). Items keep that id as their namespace (`excalidraw:<id>`), so
-tags, tabs, links and chats carry over. If you still have the old plugin, see
-[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
+A whiteboard is an [Excalidraw](https://excalidraw.com) drawing that lives in
+a page: `/whiteboard` in a page makes one, and agents add one to a page with
+`excalidraw_create_drawing`. Each is stored as a Studio drawing and embedded
+in the page as `{"kind":"drawing","target":"drw_…"}`. Drawings used to be the
+separate Studio Draw plugin (`excalidraw`), and then a kind of their own.
+Items keep that id as their namespace (`excalidraw:<id>`) and the kind id
+`drawing`, so tags, tabs, links and chats carry over. If you still have the
+old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
-![Live BB screenshot of a drawing open as a Studio tab](assets/drawings-preview.png)
+![Live BB screenshot of a whiteboard opened from its page in the full editor](assets/drawings-preview.png)
 
-The seeded "Checkout flow" drawing open in the Excalidraw editor as a Studio
+The seeded "Checkout flow" whiteboard, opened from its page ("Checkout
+whiteboard") with **Open drawing**, in the full Excalidraw editor as a Studio
 tab, with sync status, Copy image and the ⋯ menu in the tab row: Cart,
 Payment and Confirmation boxes joined by arrows, with a "Retry payment on
-failure" note. Recapture with
-`BB_CAPTURE_ONLY=excalidraw`, which opens it from its old
-`/plugins/excalidraw/drawings/<id>` address and checks that it lands as a
-Studio tab.
+failure" note. Recapture with `BB_CAPTURE_ONLY=excalidraw`, which also opens
+it from its old `/plugins/excalidraw/drawings/<id>` address and checks that
+it lands as a Studio tab, and that **Back** names the page.
 
 ![The compact drawing header](assets/drawings-compact-header.png)
 
@@ -581,37 +585,40 @@ The same editor at 390 pixels wide as a Studio tab, with **Item actions**
 open. Recapture with
 `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=draw-compact-header`.
 
-- **In the library.** Drawings list next to pages, recordings and artifacts:
-  thumbnails, projects, search over the words on a drawing, archive, move,
-  delete, duplicate, templates and **Copy text**. Drawings have no collection
-  page of their own: `/plugins/studio/studio/drawings` opens the library
-  filtered to the Drawing kind.
+- **In a page.** See [Studio embeds](#pages) under Pages: the page shows the
+  whiteboard as SVG with a pen and an eraser, and **Open drawing** opens the
+  full editor.
+- **Old drawings.** At startup, Studio embeds each drawing that no page shows
+  in its project's **Drawings** page (made when needed), once each, so none is
+  lost. With no such drawings, nothing changes. Templates and archived
+  drawings stay in the library.
+- **In the library.** Whiteboards list under **Whiteboards** with
+  thumbnails, projects, search over the words on them, archive, move,
+  delete and **Copy text**. They have no sidebar row, no **New** entry and no
+  `@` suggestions of their own: they come with their page.
+  `/plugins/studio/studio/drawings` still opens the library filtered to them.
 - **Editor** (`/plugins/studio/studio/drawings/<id>`). Excalidraw loads the
-  first time a drawing opens, not with Studio. It autosaves as you work. The
-  header has an editable name, sync status, the drawing's chat, copy image,
-  and a menu with **Download PNG**, Move to and Delete. The editor follows
-  BB's active theme.
-- **Card in the agent's reply.** When an agent makes or changes a drawing,
-  its reply shows a card (`::drawing{id="…"}`) with the picture, name and
-  element count. It opens the drawing in the thread's **Studio** tab beside
-  the chat, or in Studio without a workbench.
-- **Thread tab.** The **Studio** tab lists the drawings made or changed in
-  that thread with its other items, then the project's recent ones; the
-  **Drawings** chip shows only drawings. **New → Drawing** makes one in the thread's
-  project and links it to the thread. In the editor, **Attach** adds the
-  drawing to the conversation as an image. So does the composer's `+` menu,
-  **Drawing**. Neither sends a message.
-- **Agent tools and skill.** `excalidraw_list_drawings`,
-  `excalidraw_get_drawing` (elements, app state, a text summary, and image
-  files without their data; scenes over about 400,000 characters come back
-  as element ids), `excalidraw_create_drawing` and `excalidraw_update_drawing`
-  (upserts and deletes up to 500 elements by id; only the elements you send
-  change), and the `draw` skill. `@drawing` mentions give the agent the scene.
-- **Live co-editing.** Keep a drawing open and ask an agent to change it. Your
-  editor shows its edits live, and the agent's next read sees yours. Edits
-  merge per element; two edits to the same element resolve by Excalidraw's
-  `version`, higher wins. Deletions travel as tombstones (pruned after 30 days).
-- **Commands.** `bb studio drawings list`, `create <name>`,
+  first time a whiteboard opens, not with Studio. It autosaves as you work.
+  The header has an editable name, sync status, the item's chat, copy image,
+  and a menu with **Download PNG**, Move to and Delete. **Back** returns to the
+  whiteboard's page. The editor follows BB's active theme. In the editor,
+  **Attach** adds the whiteboard to the conversation as an image.
+- **Card in the agent's reply.** When an agent adds or changes a whiteboard,
+  its reply links the page (`::page{id="…"}`). Older replies' `::drawing`
+  cards still show the picture, name and element count, read-only.
+- **Agent tools and skill.** `excalidraw_list_drawings` (each whiteboard with
+  its page), `excalidraw_get_drawing` (elements, app state, a text summary,
+  and image files without their data; scenes over about 400,000 characters
+  come back as element ids), `excalidraw_create_drawing` (a `pageId`, a name
+  and an optional `afterBlockId`) and `excalidraw_update_drawing` (upserts
+  and deletes up to 500 elements by id; only the elements you send change),
+  and the `draw` skill.
+- **Live co-editing.** Keep a whiteboard open and ask an agent to change it.
+  Your page or editor shows its edits live, and the agent's next read sees
+  yours. Edits merge per element; two edits to the same element resolve by
+  Excalidraw's `version`, higher wins. Deletions travel as tombstones (pruned
+  after 30 days).
+- **Commands.** `bb studio drawings list`, `create --page <page-id> <name>`,
   `show <id> [--raw]`, `rename <id> <new-name>`, `delete <id>`,
   `merge <id> <scene-file.json>` (an elements array or a full scene, with its
   image files) and `remove-elements <id> <element-id…>`. A plugin registers
@@ -2318,7 +2325,7 @@ commands left to run; `--json` prints the whole summary.
 
 ## Kinds
 
-**Setup → Kinds** lists the kinds built into Studio: pages, drawings,
+**Setup → Kinds** lists the kinds built into Studio: pages, whiteboards,
 recordings and dictation, artifacts, designs and dashboards.
 
 ![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
@@ -2448,7 +2455,7 @@ plugin with its own local silent-output helper.
 
 ## Templates and export
 
-Pages and drawings can be saved as templates from an item's menu. The New menu lists those templates.
+Pages can be saved as templates from an item's menu. The New menu lists those templates.
 
 The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `exportItem`, and `exportBulk` RPCs. `exportBulk` returns a base64 ZIP containing the provider's files. Individual exports use the item's menu. Template fields use `{{name}}` style variables; unknown variables remain visible.
 
