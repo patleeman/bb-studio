@@ -30,10 +30,10 @@ import { buildSeed, type SeedInput, type VoiceIdentity } from "./identity";
 import { speakable } from "./speakable";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
-import { CLIENT_SECRETS_URL, LIVE_BACKEND_MODEL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest, VOICE } from "./session";
-import { LIVE_MODELS, REALTIME_CALLS_URL, replyNote, sessionLength, usd, VOICE_TOOLS, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
+import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest } from "./session";
+import { ALL_VOICES, BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
 
-export const DEFAULT_CAP_USD = 20;
+export { DEFAULT_CAP_USD };
 /** Most a tool answers with, in characters (it all goes to OpenAI). */
 export const TOOL_OUTPUT_CHARS = 4000;
 export const SEND_CHARS = 4000;
@@ -41,10 +41,20 @@ export const REPLY_SUMMARY_CHARS = 600;
 /** Sessions this old no longer wait for replies. */
 const WAIT_MS = 24 * 3600_000;
 
+/**
+ * Hands-free voice's settings, all read when a session starts (a change
+ * applies to the next one). Named voiceLive* so they group as one Voice
+ * section; the cap and model keep their original keys so saved values stay.
+ */
 export const VOICE_LIVE_SETTINGS = {
-  voiceLiveMonthlyCapUsd: { type: "number" as const, label: "Hands-free voice: monthly cap (USD)", description: "Studio won't start a hands-free voice session once this calendar month's sessions reach it, and stops one that crosses it. Estimated from OpenAI's usage reports.", default: DEFAULT_CAP_USD },
   voiceLiveModel: { type: "select" as const, label: "Hands-free voice: model", description: "gpt-live-1 ($0.05 a minute plus a small backend model) or the Realtime API's gpt-realtime-2.1 (by token, about 7¢ a minute).", options: [...LIVE_MODELS] as string[], default: LIVE_MODELS[0] as string },
+  voiceLiveVoice: { type: "select" as const, label: "Hands-free voice: voice", description: "The voice it speaks in. gpt-live-1 and gpt-realtime-2.1 have different voices; marin is in both. A voice the chosen model doesn't have uses marin.", options: [...ALL_VOICES], default: DEFAULT_VOICE },
+  voiceLiveBackendModel: { type: "select" as const, label: "Hands-free voice: backend model", description: "gpt-live-1 only: the model that picks its tools and words the answers. gpt-5.6-luna is the cheapest and fastest.", options: [...BACKEND_MODELS] as string[], default: DEFAULT_BACKEND_MODEL as string },
+  voiceLiveMonthlyCapUsd: { type: "number" as const, label: "Hands-free voice: monthly cap (USD)", description: "Studio won't start a hands-free voice session once this calendar month's sessions reach it, and stops one that crosses it. Estimated from OpenAI's usage reports.", default: DEFAULT_CAP_USD },
 };
+
+/** What the quick-settings menu may change: the next session's model, voice and backend. */
+export interface VoiceLiveChoice { model?: LiveModel; voice?: string; backendModel?: BackendModel }
 
 export interface VoiceTarget { threadId: string; title: string }
 export interface VoiceLoop { id: string; title: string; kind: string; status: string; priority: string; due: number | null; trigger: unknown; owner?: string }
@@ -59,6 +69,8 @@ export interface VoiceLiveDeps {
   /** Studio's OpenAI key (src/openai-key.ts); "" when there's none. Never logged or returned. */
   key(): string;
   settings(): Record<string, unknown>;
+  /** Saves Studio settings (bb.settings experimental_set); the menu's choices go through it. */
+  saveSettings?(values: Record<string, unknown>): Promise<void>;
   /** The Chief of Staff (the primary Bot): its name and chat, or null. */
   cos(): { name: string; threadId: string | null } | null;
   /**
@@ -141,10 +153,14 @@ export class VoiceLive {
   private config() {
     const values = this.deps.settings();
     const cap = Number(values.voiceLiveMonthlyCapUsd);
-    const model = String(values.voiceLiveModel ?? "");
+    const raw = String(values.voiceLiveModel ?? "");
+    const model = ((LIVE_MODELS as readonly string[]).includes(raw) ? raw : LIVE_MODELS[0]) as LiveModel;
+    const backend = String(values.voiceLiveBackendModel ?? "");
     return {
       capUsd: Number.isFinite(cap) && cap >= 0 ? cap : DEFAULT_CAP_USD,
-      model: ((LIVE_MODELS as readonly string[]).includes(model) ? model : LIVE_MODELS[0]) as LiveModel,
+      model,
+      voice: voiceFor(model, values.voiceLiveVoice == null ? null : String(values.voiceLiveVoice)),
+      backendModel: ((BACKEND_MODELS as readonly string[]).includes(backend) ? backend : DEFAULT_BACKEND_MODEL) as BackendModel,
     };
   }
 
@@ -171,7 +187,8 @@ export class VoiceLive {
   private cost(row: SessionRow, events = this.events(row.id)): number | null {
     if (row.model === "gpt-live-1") {
       let seconds = 0;
-      const backend = { model: LIVE_BACKEND_MODEL, input: 0, cachedInput: 0, output: 0 };
+      const chosen = data<{ backendModel?: string }>(events.find((event) => event.kind === "config")).backendModel;
+      const backend = { model: chosen ?? DEFAULT_BACKEND_MODEL, input: 0, cachedInput: 0, output: 0 };
       for (const event of events) {
         if (event.kind === "live_usage") seconds = Math.max(seconds, Number(data<{ seconds?: number }>(event).seconds) || 0);
         if (event.kind === "backend_usage") {
@@ -213,9 +230,29 @@ export class VoiceLive {
   }
 
   state(): VoiceLiveState {
-    const { capUsd, model } = this.config();
+    const { capUsd, model, voice, backendModel } = this.config();
     const problem = this.problem();
-    return { ready: !problem, problem, cosName: this.deps.cos()?.name ?? null, monthUsd: this.monthUsd(), capUsd, model };
+    return { ready: !problem, problem, cosName: this.deps.cos()?.name ?? null, monthUsd: this.monthUsd(), capUsd, model, voice, backendModel };
+  }
+
+  /**
+   * The quick-settings menu's choice, saved as Studio settings for the next
+   * session (a running one keeps its own: OpenAI fixes a session's voice).
+   * Picking a model whose voices don't include the current one moves to marin.
+   */
+  async configure(choice: VoiceLiveChoice): Promise<VoiceLiveState> {
+    if (!this.deps.saveSettings) throw new Error("Studio can't save settings here.");
+    const current = this.config();
+    const model = choice.model ?? current.model;
+    const values: Record<string, unknown> = {};
+    if (choice.model) values.voiceLiveModel = choice.model;
+    if (choice.voice !== undefined) {
+      if (voiceFor(model, choice.voice) !== choice.voice) throw new Error(`${model} has no voice called ${choice.voice}.`);
+      values.voiceLiveVoice = choice.voice;
+    } else if (choice.model && voiceFor(model, current.voice) !== current.voice) values.voiceLiveVoice = DEFAULT_VOICE;
+    if (choice.backendModel) values.voiceLiveBackendModel = choice.backendModel;
+    if (Object.keys(values).length) await this.deps.saveSettings(values);
+    return this.state();
   }
 
   private async post(url: string, body: unknown, what: string): Promise<Record<string, unknown>> {
@@ -258,7 +295,11 @@ export class VoiceLive {
     const problem = this.problem();
     if (problem) throw new VoiceRefused(problem);
     const cos = this.deps.cos()!;
-    const model = input.model ?? this.config().model;
+    const config = this.config();
+    const model = input.model ?? config.model;
+    // A model passed in may not have the saved voice.
+    const voice = voiceFor(model, config.voice);
+    const { backendModel } = config;
     const mockUrl = this.deps.mockUrl?.() ?? null;
     if (!mockUrl && model === "gpt-live-1" && !input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
     const { seed, ms } = await this.persona(input.threadId ?? null, cos);
@@ -269,12 +310,12 @@ export class VoiceLive {
     let expiresAt: number | null = null;
     if (mockUrl) transport = "mock";
     else if (model === "gpt-live-1") {
-      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp! }), "the voice session");
+      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp!, voice, backendModel }), "the voice session");
       const sdp = (created.transport as { sdp?: unknown } | undefined)?.sdp;
       if (typeof sdp !== "string" || !sdp) throw new Error("OpenAI answered without an SDP answer.");
       answerSdp = sdp;
     } else {
-      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona }), "the voice session");
+      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona, voice }), "the voice session");
       if (typeof minted.value !== "string" || !minted.value) throw new Error("OpenAI answered without a client secret.");
       clientSecret = minted.value;
       expiresAt = typeof minted.expires_at === "number" ? minted.expires_at * 1000 : this.now() + 60_000;
@@ -282,7 +323,8 @@ export class VoiceLive {
     const sessionId = `vl_${randomBytes(8).toString("hex")}`;
     const startedAt = this.now();
     this.deps.db.prepare("INSERT INTO voice_calls (id, bot_id, bot_name, thread_id, model, voice, transcribe_model, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(sessionId, "cos", cos.name, null, model, VOICE, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
+      .run(sessionId, "cos", cos.name, null, model, voice, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
+    this.append(sessionId, "config", { data: { voice, backendModel: model === "gpt-live-1" ? backendModel : null } });
     this.append(sessionId, "identity", { data: { identity: seed.identity, chars: seed.text.length, ms, missing: seed.missing } });
     // The thread opens beside the call: the phone connects without waiting for it.
     this.opening.set(sessionId, this.deps.openThread({

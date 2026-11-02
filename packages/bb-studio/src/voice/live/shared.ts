@@ -18,6 +18,29 @@ export interface VoiceLiveSignal {
 export const LIVE_MODELS = ["gpt-live-1", "gpt-realtime-2.1"] as const;
 export type LiveModel = (typeof LIVE_MODELS)[number];
 
+/**
+ * Each model's voices (checked 2026-11-01). GPT-Live:
+ * developers.openai.com/api/docs/guides/live-conversations (default marin);
+ * Realtime: developers.openai.com/api/docs/guides/realtime-conversations.
+ * marin is in both, so it's the default.
+ */
+export const LIVE_VOICES: Record<LiveModel, readonly string[]> = {
+  "gpt-live-1": ["marin", "quartz", "ripple", "vesper", "willow", "stone", "gleam", "meridian", "bossa", "tempo", "beacon", "delta", "cinder", "nuri", "juni", "flitz", "brise", "sillage", "nira", "harema", "shida", "noeul"],
+  "gpt-realtime-2.1": ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"],
+};
+export const DEFAULT_VOICE = "marin";
+/** Every voice either model has, for the setting's options. */
+export const ALL_VOICES: readonly string[] = [...new Set(Object.values(LIVE_VOICES).flat())];
+/** The voice a session uses: the chosen one when its model has it, otherwise marin. */
+export const voiceFor = (model: LiveModel, voice: string | null | undefined): string =>
+  voice && LIVE_VOICES[model].includes(voice) ? voice : DEFAULT_VOICE;
+
+/** GPT-Live's backend (responses delegation): the models it may use, cheapest first. Realtime has none. */
+export const BACKEND_MODELS = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"] as const;
+export type BackendModel = (typeof BACKEND_MODELS)[number];
+export const DEFAULT_BACKEND_MODEL: BackendModel = "gpt-5.6-luna";
+export const DEFAULT_CAP_USD = 20;
+
 /** How the phone connects for each model. */
 export type LiveTransport = "live-webrtc" | "realtime-webrtc" | "mock";
 

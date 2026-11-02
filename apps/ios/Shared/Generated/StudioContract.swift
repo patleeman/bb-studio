@@ -312,6 +312,7 @@ public enum Studio {
     public static let minis_setSecret = "minis.setSecret"
     public static let minis_removeSecret = "minis.removeSecret"
     public static let voiceLive_state = "voiceLive.state"
+    public static let voiceLive_configure = "voiceLive.configure"
     public static let voiceLive_start = "voiceLive.start"
     public static let voiceLive_tool = "voiceLive.tool"
     public static let voiceLive_event = "voiceLive.event"
@@ -996,6 +997,8 @@ public enum Studio {
   public typealias MinisRemoveSecret = MinisRemoveSecretOutput
 
   public typealias VoiceLiveState = VoiceLiveStateOutput
+
+  public typealias VoiceLiveConfigure = VoiceLiveConfigureOutput
 
   public typealias VoiceLiveStart = VoiceLiveStartOutput
 
@@ -26534,6 +26537,33 @@ public enum Studio {
     }
   }
 
+  public enum VoiceLiveStateOutputBackendModel: Sendable, Hashable, Codable {
+    case gpt_5_6_luna
+    case gpt_5_6_terra
+    case gpt_5_6_sol
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-5.6-luna": self = .gpt_5_6_luna
+      case "gpt-5.6-terra": self = .gpt_5_6_terra
+      case "gpt-5.6-sol": self = .gpt_5_6_sol
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_5_6_luna: try container.encode("gpt-5.6-luna")
+      case .gpt_5_6_terra: try container.encode("gpt-5.6-terra")
+      case .gpt_5_6_sol: try container.encode("gpt-5.6-sol")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct VoiceLiveStateOutput: Sendable, Hashable, Codable {
     public var ready: Bool?
     public var problem: String?
@@ -26541,14 +26571,154 @@ public enum Studio {
     public var monthUsd: Double?
     public var capUsd: Double?
     public var model: VoiceLiveStateOutputModel?
+    public var voice: String?
+    public var backendModel: VoiceLiveStateOutputBackendModel?
 
-    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveStateOutputModel? = nil) {
+    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveStateOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveStateOutputBackendModel? = nil) {
       self.ready = ready
       self.problem = problem
       self.cosName = cosName
       self.monthUsd = monthUsd
       self.capUsd = capUsd
       self.model = model
+      self.voice = voice
+      self.backendModel = backendModel
+    }
+  }
+
+  public enum VoiceLiveConfigureInputModel: Sendable, Hashable, Codable {
+    case gpt_live_1
+    case gpt_realtime_2_1
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-live-1": self = .gpt_live_1
+      case "gpt-realtime-2.1": self = .gpt_realtime_2_1
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_live_1: try container.encode("gpt-live-1")
+      case .gpt_realtime_2_1: try container.encode("gpt-realtime-2.1")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum VoiceLiveConfigureInputBackendModel: Sendable, Hashable, Codable {
+    case gpt_5_6_luna
+    case gpt_5_6_terra
+    case gpt_5_6_sol
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-5.6-luna": self = .gpt_5_6_luna
+      case "gpt-5.6-terra": self = .gpt_5_6_terra
+      case "gpt-5.6-sol": self = .gpt_5_6_sol
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_5_6_luna: try container.encode("gpt-5.6-luna")
+      case .gpt_5_6_terra: try container.encode("gpt-5.6-terra")
+      case .gpt_5_6_sol: try container.encode("gpt-5.6-sol")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveConfigureInput: Sendable, Hashable, Codable {
+    public var model: VoiceLiveConfigureInputModel?
+    public var voice: String?
+    public var backendModel: VoiceLiveConfigureInputBackendModel?
+
+    public init(model: VoiceLiveConfigureInputModel? = nil, voice: String? = nil, backendModel: VoiceLiveConfigureInputBackendModel? = nil) {
+      self.model = model
+      self.voice = voice
+      self.backendModel = backendModel
+    }
+  }
+
+  public enum VoiceLiveConfigureOutputModel: Sendable, Hashable, Codable {
+    case gpt_live_1
+    case gpt_realtime_2_1
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-live-1": self = .gpt_live_1
+      case "gpt-realtime-2.1": self = .gpt_realtime_2_1
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_live_1: try container.encode("gpt-live-1")
+      case .gpt_realtime_2_1: try container.encode("gpt-realtime-2.1")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum VoiceLiveConfigureOutputBackendModel: Sendable, Hashable, Codable {
+    case gpt_5_6_luna
+    case gpt_5_6_terra
+    case gpt_5_6_sol
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "gpt-5.6-luna": self = .gpt_5_6_luna
+      case "gpt-5.6-terra": self = .gpt_5_6_terra
+      case "gpt-5.6-sol": self = .gpt_5_6_sol
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .gpt_5_6_luna: try container.encode("gpt-5.6-luna")
+      case .gpt_5_6_terra: try container.encode("gpt-5.6-terra")
+      case .gpt_5_6_sol: try container.encode("gpt-5.6-sol")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VoiceLiveConfigureOutput: Sendable, Hashable, Codable {
+    public var ready: Bool?
+    public var problem: String?
+    public var cosName: String?
+    public var monthUsd: Double?
+    public var capUsd: Double?
+    public var model: VoiceLiveConfigureOutputModel?
+    public var voice: String?
+    public var backendModel: VoiceLiveConfigureOutputBackendModel?
+
+    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveConfigureOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveConfigureOutputBackendModel? = nil) {
+      self.ready = ready
+      self.problem = problem
+      self.cosName = cosName
+      self.monthUsd = monthUsd
+      self.capUsd = capUsd
+      self.model = model
+      self.voice = voice
+      self.backendModel = backendModel
     }
   }
 

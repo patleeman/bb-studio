@@ -35729,6 +35729,17 @@
               "gpt-live-1",
               "gpt-realtime-2.1"
             ]
+          },
+          "voice": {
+            "type": "string"
+          },
+          "backendModel": {
+            "type": "string",
+            "enum": [
+              "gpt-5.6-luna",
+              "gpt-5.6-terra",
+              "gpt-5.6-sol"
+            ]
           }
         },
         "required": [
@@ -35737,7 +35748,94 @@
           "cosName",
           "monthUsd",
           "capUsd",
-          "model"
+          "model",
+          "voice",
+          "backendModel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voiceLive.configure": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-live-1",
+              "gpt-realtime-2.1"
+            ]
+          },
+          "voice": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "backendModel": {
+            "type": "string",
+            "enum": [
+              "gpt-5.6-luna",
+              "gpt-5.6-terra",
+              "gpt-5.6-sol"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cosName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "monthUsd": {
+            "type": "number"
+          },
+          "capUsd": {
+            "type": "number"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-live-1",
+              "gpt-realtime-2.1"
+            ]
+          },
+          "voice": {
+            "type": "string"
+          },
+          "backendModel": {
+            "type": "string",
+            "enum": [
+              "gpt-5.6-luna",
+              "gpt-5.6-terra",
+              "gpt-5.6-sol"
+            ]
+          }
+        },
+        "required": [
+          "ready",
+          "problem",
+          "cosName",
+          "monthUsd",
+          "capUsd",
+          "model",
+          "voice",
+          "backendModel"
         ],
         "additionalProperties": false
       }

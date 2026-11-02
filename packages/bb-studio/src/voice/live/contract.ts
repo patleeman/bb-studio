@@ -10,7 +10,7 @@
 // hit), voiceLive.poll picks up replies, and voiceLive.end hangs up.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { LIVE_MODELS } from "./shared";
+import { BACKEND_MODELS, LIVE_MODELS } from "./shared";
 
 const sessionId = z.string().regex(/^vl_[a-f0-9]{16}$/);
 const text = z.string().max(20_000);
@@ -61,6 +61,10 @@ export const voiceLiveStateSchema = z.object({
   monthUsd: z.number(),
   capUsd: z.number(),
   model: z.enum(LIVE_MODELS),
+  /** The next session's voice (one of the model's own; marin by default). */
+  voice: z.string(),
+  /** gpt-live-1's backend model (responses delegation); Realtime has none. */
+  backendModel: z.enum(BACKEND_MODELS),
 });
 export type VoiceLiveState = z.infer<typeof voiceLiveStateSchema>;
 
@@ -82,6 +86,11 @@ export const voiceLiveContract = defineRpcContract({
   "voiceLive.state": {
     experimental_description: "Whether a hands-free voice session can start, and this month's voice spend against the cap.",
     input: z.object({}).strict(),
+    output: voiceLiveStateSchema,
+  },
+  "voiceLive.configure": {
+    experimental_description: "Save the next hands-free session's model, voice or backend model as Studio settings (a running session keeps its own). A voice must be one of the model's; switching to a model without the current voice moves it to marin. Returns the new state.",
+    input: z.object({ model: z.enum(LIVE_MODELS).optional(), voice: z.string().min(1).max(40).optional(), backendModel: z.enum(BACKEND_MODELS).optional() }).strict(),
     output: voiceLiveStateSchema,
   },
   "voiceLive.start": {

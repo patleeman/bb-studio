@@ -1266,6 +1266,8 @@ export default async function plugin(bb: BbPluginApi) {
     db,
     key: () => openaiKey(settingValues),
     settings: () => settingValues,
+    // The composer menu's quick settings; the returned values are current at once (onChange follows).
+    saveSettings: async (values) => { settingValues = await settings.experimental_set(values as never); },
     cos: () => { const bot = bots.stored(); return bot ? { name: bot.name, threadId: bot.threadId ?? null } : null; },
     // The session's identity seed (src/voice/live/identity.ts): cheap sources only, read once at start.
     seed: async (threadId) => {

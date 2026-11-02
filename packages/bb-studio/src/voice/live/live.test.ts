@@ -2,9 +2,9 @@ import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../../migrations";
 import { voiceLiveContract } from "./contract";
-import { VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
+import { VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, VOICE_TOOL_DEFINITIONS } from "./session";
-import { REALTIME_CALLS_URL, VOICE_TOOLS } from "./shared";
+import { LIVE_VOICES, REALTIME_CALLS_URL, VOICE_TOOLS } from "./shared";
 import { DRAFT_MS, UNDO_MS } from "./rules";
 
 const KEY = "sk-test-secret-key";
@@ -456,5 +456,85 @@ describe("identity: the session speaks as the thread it was launched from", () =
     const { live } = setup({}, { seed });
     await expect(live.start({ threadId: "thr_kensico" })).rejects.toThrow(/needs the phone's SDP offer/);
     expect(seed).not.toHaveBeenCalled();
+  });
+});
+
+describe("hands-free voice's settings: the next session's model, voice, backend and cap", () => {
+  /** A settings store like BB's: defined defaults, then saved values over them. */
+  function withStore(saved: Record<string, unknown> = {}) {
+    const defaults = Object.fromEntries(Object.entries(VOICE_LIVE_SETTINGS).map(([key, spec]) => [key, spec.default]));
+    let values: Record<string, unknown> = { ...defaults, ...saved };
+    const saveSettings = vi.fn(async (patch: Record<string, unknown>) => { values = { ...values, ...patch }; });
+    return { saveSettings, settings: () => values };
+  }
+
+  it("defaults to today's values: gpt-live-1, marin, gpt-5.6-luna and $20, with plain labels", () => {
+    expect(Object.fromEntries(Object.entries(VOICE_LIVE_SETTINGS).map(([key, spec]) => [key, spec.default]))).toEqual({
+      voiceLiveModel: "gpt-live-1", voiceLiveVoice: "marin", voiceLiveBackendModel: "gpt-5.6-luna", voiceLiveMonthlyCapUsd: 20,
+    });
+    for (const spec of Object.values(VOICE_LIVE_SETTINGS)) expect(spec.label).toMatch(/^Hands-free voice: [a-z]/);
+    // Every voice of either model is a valid option; the select can't filter by model, so start falls back to marin.
+    expect(VOICE_LIVE_SETTINGS.voiceLiveVoice.options).toEqual(expect.arrayContaining([...LIVE_VOICES["gpt-live-1"], ...LIVE_VOICES["gpt-realtime-2.1"]]));
+    // Nothing saved at all (or junk) still means today's values.
+    const { live } = setup({}, { settings: () => ({}) });
+    expect(live.state()).toMatchObject({ model: "gpt-live-1", voice: "marin", backendModel: "gpt-5.6-luna", capUsd: 20 });
+    const junk = setup({}, { settings: () => ({ voiceLiveModel: "gpt-9", voiceLiveVoice: "nobody", voiceLiveBackendModel: "gpt-1", voiceLiveMonthlyCapUsd: -3 }) });
+    expect(junk.live.state()).toMatchObject({ model: "gpt-live-1", voice: "marin", backendModel: "gpt-5.6-luna", capUsd: 20 });
+  });
+
+  it("each model lists only its own voices; marin is in both", () => {
+    expect(LIVE_VOICES["gpt-live-1"]).toContain("quartz");
+    expect(LIVE_VOICES["gpt-live-1"]).not.toContain("cedar");
+    expect(LIVE_VOICES["gpt-realtime-2.1"]).toEqual(expect.arrayContaining(["cedar", "alloy", "verse"]));
+    expect(LIVE_VOICES["gpt-realtime-2.1"]).not.toContain("quartz");
+    for (const voices of Object.values(LIVE_VOICES)) expect(voices[0]).toBe("marin");
+  });
+
+  it("the menu's choices are saved as Studio settings and returned as the new state", async () => {
+    const store = withStore();
+    const { live } = setup({}, store);
+    expect(voiceLiveContract["voiceLive.configure"].output.parse(await live.configure({ voice: "quartz" }))).toMatchObject({ model: "gpt-live-1", voice: "quartz" });
+    expect(store.saveSettings).toHaveBeenLastCalledWith({ voiceLiveVoice: "quartz" });
+    expect(await live.configure({ backendModel: "gpt-5.6-terra" })).toMatchObject({ backendModel: "gpt-5.6-terra" });
+    expect(store.saveSettings).toHaveBeenLastCalledWith({ voiceLiveBackendModel: "gpt-5.6-terra" });
+    // Realtime has no quartz: switching moves the voice to marin.
+    expect(await live.configure({ model: "gpt-realtime-2.1" })).toMatchObject({ model: "gpt-realtime-2.1", voice: "marin" });
+    expect(store.saveSettings).toHaveBeenLastCalledWith({ voiceLiveModel: "gpt-realtime-2.1", voiceLiveVoice: "marin" });
+    // A voice the model doesn't have is refused, and nothing is saved.
+    const calls = store.saveSettings.mock.calls.length;
+    await expect(live.configure({ voice: "quartz" })).rejects.toThrow(/gpt-realtime-2.1 has no voice called quartz/);
+    expect(store.saveSettings).toHaveBeenCalledTimes(calls);
+    // Marin survives a model switch.
+    expect(await live.configure({ model: "gpt-live-1" })).toMatchObject({ model: "gpt-live-1", voice: "marin" });
+    expect(store.saveSettings).toHaveBeenLastCalledWith({ voiceLiveModel: "gpt-live-1" });
+  });
+
+  it("the next session picks them up: GPT-Live's voice and backend, Realtime's voice, and the cost by that backend", async () => {
+    const store = withStore({ voiceLiveMonthlyCapUsd: 100 });
+    const { live, fetch, db } = setup({}, store);
+    await live.configure({ voice: "vesper", backendModel: "gpt-5.6-sol" });
+    const started = await live.start({ sdp: "x" });
+    const body = JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body));
+    expect(body.session.audio.output.voice).toBe("vesper");
+    expect(body.session.delegation.responses.model).toBe("gpt-5.6-sol");
+    expect(db.prepare("SELECT voice FROM voice_calls WHERE id = ?").get(started.sessionId)).toEqual({ voice: "vesper" });
+    // Its backend tokens are priced as gpt-5.6-sol ($4/M in, $20/M out), not luna.
+    expect(live.record(started.sessionId, [{ type: "backend_usage", input_tokens: 1_000_000, output_tokens: 1_000_000 }]).costUsd).toBeCloseTo(4 + 20, 6);
+
+    await live.configure({ model: "gpt-realtime-2.1" });
+    await live.configure({ voice: "cedar" });
+    const realtime = await live.start();
+    expect(realtime.model).toBe("gpt-realtime-2.1");
+    const secret = JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body));
+    expect(secret.session.audio.output.voice).toBe("cedar");
+    // A model passed in that lacks the saved voice speaks in marin.
+    await live.configure({ voice: "ash" });
+    await live.start({ model: "gpt-live-1", sdp: "x" });
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)![1]?.body)).session.audio.output.voice).toBe("marin");
+  });
+
+  it("the cap is a setting too: the state shows this month's spend against it", async () => {
+    const { live } = setup({}, withStore({ voiceLiveMonthlyCapUsd: 5 }));
+    expect(live.state()).toMatchObject({ capUsd: 5, monthUsd: 0, ready: true });
   });
 });

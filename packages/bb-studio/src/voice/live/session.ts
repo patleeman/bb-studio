@@ -15,18 +15,14 @@
 //   secret with the whole session; the phone POSTs its SDP to /v1/realtime/calls.
 //   https://developers.openai.com/api/docs/guides/realtime-webrtc
 import type { VoiceIdentity } from "./identity";
-import type { LiveModel, VoiceToolName } from "./shared";
+import { DEFAULT_BACKEND_MODEL, DEFAULT_VOICE, type LiveModel, type VoiceToolName } from "./shared";
 import { DRAFT_MS, UNDO_MS, VOICE_SNOOZES } from "./rules";
 
 export const LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 export const CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets";
 /** A Realtime client secret lives this long; the phone must connect before then. */
 export const CLIENT_SECRET_SECONDS = 120;
-/** GPT-Live's backend: cheap and fast; it only picks tools and words replies. */
-export const LIVE_BACKEND_MODEL = "gpt-5.6-luna";
 export const REALTIME_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe";
-/** Both APIs default to marin; it's in GPT-Live's list and the Realtime one. */
-export const VOICE = "marin";
 
 const seconds = (ms: number) => Math.round(ms / 1000);
 
@@ -96,16 +92,17 @@ export const VOICE_TOOL_DEFINITIONS: ToolDefinition[] = [
 ];
 
 /** POST /v1/live/sessions: GPT-Live over WebRTC, its backend a Responses model with Studio's tools. */
-export function liveSessionRequest(input: { persona: VoicePersona; sdp: string; backendModel?: string }) {
+export function liveSessionRequest(input: { persona: VoicePersona; sdp: string; voice?: string; backendModel?: string }) {
   return {
     session: {
       model: "gpt-live-1" satisfies LiveModel,
       instructions: voiceInstructions(input.persona),
-      audio: { output: { voice: VOICE } },
+      audio: { output: { voice: input.voice ?? DEFAULT_VOICE } },
       delegation: {
         type: "responses",
         responses: {
-          model: input.backendModel ?? LIVE_BACKEND_MODEL,
+          // GPT-Live's backend: cheap and fast by default; it only picks tools and words replies.
+          model: input.backendModel ?? DEFAULT_BACKEND_MODEL,
           instructions: backendInstructions(input.persona),
           tools: VOICE_TOOL_DEFINITIONS,
           tool_choice: "auto",
@@ -120,7 +117,7 @@ export function liveSessionRequest(input: { persona: VoicePersona; sdp: string; 
 }
 
 /** POST /v1/realtime/client_secrets: the Realtime fallback's whole session, in a 2-minute secret. */
-export function realtimeSecretRequest(input: { persona: VoicePersona }) {
+export function realtimeSecretRequest(input: { persona: VoicePersona; voice?: string }) {
   return {
     expires_after: { anchor: "created_at", seconds: CLIENT_SECRET_SECONDS },
     session: {
@@ -135,7 +132,7 @@ export function realtimeSecretRequest(input: { persona: VoicePersona }) {
           // Semantic VAD waits for a finished thought, not a fixed pause; talking over the voice cancels its reply.
           turn_detection: { type: "semantic_vad", eagerness: "auto", create_response: true, interrupt_response: true },
         },
-        output: { voice: VOICE },
+        output: { voice: input.voice ?? DEFAULT_VOICE },
       },
       tools: VOICE_TOOL_DEFINITIONS,
       tool_choice: "auto",

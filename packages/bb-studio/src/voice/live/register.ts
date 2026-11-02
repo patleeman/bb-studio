@@ -6,6 +6,7 @@ import type { VoiceLive } from "./live";
 export function registerVoiceLive(bb: BbPluginApi, live: VoiceLive): void {
   bb.rpc.register(voiceLiveContract, {
     "voiceLive.state": () => live.state(),
+    "voiceLive.configure": (input) => live.configure(input),
     "voiceLive.start": (input) => live.start(input),
     "voiceLive.tool": async ({ sessionId, name, args, events }) => ({ output: await live.tool(sessionId, name, args, events) }),
     "voiceLive.event": ({ sessionId, events }) => live.record(sessionId, events),
