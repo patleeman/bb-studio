@@ -37,8 +37,6 @@
         "pages": "./icons/pages.svg",
         "explore": "./icons/explore.svg",
         "dashboard": "./icons/dashboard.svg",
-        "speaker": "./icons/speaker.svg",
-        "speaker-off": "./icons/speaker-off.svg",
         "handsfree": "./icons/handsfree.svg",
         "phone-off": "./icons/phone-off.svg"
       }

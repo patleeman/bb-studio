@@ -38,7 +38,6 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
-import { registerVoiceApp } from "./src/voice/ui/register";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoHeaderAction, BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
@@ -176,7 +175,7 @@ export default definePluginApp((app) => {
   app.slots.threadPanelAction({ id: LOOPS_PANE, title: "Loops", icon: "ListTodo", layout: "flush", component: LoopsPane });
   app.slots.experimental_threadHeaderAction({ id: "loops-pane", title: "Loops", component: LoopsHeaderAction });
   // Hands-free voice (src/voice/live/ui): a session is its own thread. The
-  // composer's waveform button (voice mode's slot) starts it; its pill floats
+  // composer's waveform button (beside the mic) starts it; its pill floats
   // over every page and thread until End.
   app.composer.customize({ id: "handsfree", scopes: ["thread"], actions: [{ id: "handsfree", component: HandsFreeComposerButton }] });
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
@@ -273,8 +272,6 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "bot-list-switch", component: ThreadListSwitcher });
   // The thread panel's Automations tab and the header's clock badge.
   registerThreadAutomations(app);
-  // Voice mode (src/voice/): the speaker button and orb in thread composers.
-  registerVoiceApp(app);
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

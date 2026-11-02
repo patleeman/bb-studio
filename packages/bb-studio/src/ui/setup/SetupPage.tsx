@@ -10,7 +10,6 @@ import { useHealth, type HealthApi } from "../health/use-health";
 import { useSetup, type SetupApi } from "./use-setup";
 import { BackupSection } from "./BackupSection";
 import { KindsSection } from "./KindsSection";
-import { SpeechSection } from "./SpeechSection";
 import { ProjectLeadsSection } from "../ProjectLeads";
 
 const STATUS: Record<AddOnStatus, { label: string; tone: string }> = {
@@ -178,7 +177,6 @@ export function SetupPage() {
             </section>
           ) : null}
           <KindsSection />
-          <SpeechSection />
           <ProjectLeadsSection />
           <BackupSection />
           <p className="text-xs text-subtle-foreground">Last checked {new Date(summary.checkedAt).toLocaleTimeString()}. The same list is in <code className="font-mono">bb studio setup</code>.</p>

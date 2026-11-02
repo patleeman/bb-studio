@@ -22,9 +22,6 @@ import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
 import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
 import { kindsContract, type KindsState } from "./src/kinds-contract";
-import { SPEECH_SETTINGS } from "./src/speech/settings";
-import { registerSpeech } from "./src/speech/register";
-import { registerVoice, type BuiltinVoice } from "./src/voice/register";
 import { migrateOpenaiKey, openaiKey } from "./src/openai-key";
 import { VOICE_LIVE_SETTINGS, VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
@@ -177,9 +174,9 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => minis.dispose());
   // BB takes one settings definition per plugin. Studio's settings are Talk's,
   // Pages', Explore's and Reactions', under the keys they had in their own plugins,
-  // then Bot avatars' (with Studio's shared OpenAI key), Speech's and thread
-  // resume's, plus Decisions under namespaced keys.
-  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...SPEECH_SETTINGS, ...THREAD_RESUME_SETTINGS, ...VOICE_LIVE_SETTINGS });
+  // then Bot avatars' (with Studio's shared OpenAI key), thread resume's and
+  // hands-free voice's, plus Decisions under namespaced keys.
+  const settings = bb.settings.define({ ...DECISIONS_SETTINGS, ...TALK_SETTINGS, ...PAGES_SETTINGS, ...REACTIONS_SETTINGS, ...BOT_AVATAR_SETTINGS, ...THREAD_RESUME_SETTINGS, ...VOICE_LIVE_SETTINGS });
   const code = registerCode(bb, db);
   // BB allows one message.dispatch hook per plugin; Decisions owns it and asks
   // the runner guard (assigned below, once runners exist) first.
@@ -194,10 +191,6 @@ export default async function plugin(bb: BbPluginApi) {
   settings.onChange((next) => {
     settingValues = next;
     explore.update(next);
-  });
-  const speech = registerSpeech(bb, db, {
-    values: () => settingValues,
-    set: async (values) => { settingValues = { ...settingValues, ...values }; await settings.experimental_set(values as never); },
   });
   // Reactions keep only settings: copy the old plugin's once, in the background.
   const reactionsImport = {
@@ -296,20 +289,11 @@ export default async function plugin(bb: BbPluginApi) {
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
   // session start or resume on (BB doesn't change a running session).
-  /** Studio → Voice (src/voice/); registered once the Bot is, below. */
-  let voice: BuiltinVoice | null = null;
   bb.agents.configure((context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     tools.push(...CODE_TOOLS);
-    // A voice chat is told to speak, not write, and gets Studio's item tools with its own;
-    // voice mode in any other thread adds the same to what it already gets (at the end).
-    const voiceMode = voice?.configure(context.thread.id, context.pluginMetadata) ?? null;
-    if (voiceMode?.chat) return { tools: [...tools, ...voiceMode.tools], skills: ["studio-code"], instructions: voiceMode.instructions };
-    const withVoice = (config: { tools: string[]; skills: string[]; instructions: string }) => voiceMode
-      ? { ...config, tools: [...config.tools, ...voiceMode.tools], instructions: [config.instructions, voiceMode.instructions].filter(Boolean).join("\n\n") }
-      : config;
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
@@ -321,16 +305,16 @@ export default async function plugin(bb: BbPluginApi) {
     if (sideBot && sideBot.kind !== "external") {
       const asBot = { ...sideBot, threadId: context.thread.id };
       const instructions = [bots.instructions(asBot), SIDE_THREAD_INSTRUCTIONS, off.has("page") ? "" : PAGE_INSTRUCTIONS, off.has("mini") ? "" : MINI_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-      return withVoice({ tools: [...tools, ...SIDE_THREAD_TOOLS], skills: ["studio-code"], instructions });
+      return { tools: [...tools, ...SIDE_THREAD_TOOLS], skills: ["studio-code"], instructions };
     }
     const bot = sideBot ? { ...sideBot, threadId: context.thread.id } : bots.forThread(context.thread.id, context.pluginMetadata);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
-    if (bot?.kind === "external") return withVoice({ tools: [], skills: [], instructions: bots.instructions(bot) });
-    if (bot && bot.state !== "active") return withVoice({ tools: [...BOT_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: bots.instructions(bot) });
+    if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
+    if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
     const instructions = [bot ? bots.instructions(bot) : "", runner ? runners.instructions(runner) : "", off.has("page") ? "" : PAGE_INSTRUCTIONS, off.has("mini") ? "" : MINI_INSTRUCTIONS, explore.instructions(), routingInstructions(kindRoutes, kindSettings.current)].filter(Boolean).join("\n\n");
-    return withVoice({ tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions });
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? BOT_OWN_TOOLS : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code"], instructions };
   });
   // Other add-ons reach built-in kinds' provider methods through Studio
   // (callProvider in the kit), as they reach an add-on's over RPC.
@@ -540,8 +524,6 @@ export default async function plugin(bb: BbPluginApi) {
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
   });
   loopsEnabled = loops.enabled;
-  // Voice sessions: a fast-model thread the user talks to, which hands work to the Bot or threads.
-  voice = await registerVoice(bb, { speech: speech.service, botThread: () => bots.stored()?.threadId ?? null });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, changed: tagsChanged,
@@ -1878,7 +1860,6 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
       { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
-      { name: "speech", summary: "Text to speech: show the engine, list its models, speak text to a file, run local voices", usage: "bb studio speech <status|models|say|local> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
@@ -1889,7 +1870,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "minis") return minis.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
-      if (argv[0] === "speech") return speech.cli(argv.slice(1), ctx);
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
@@ -1981,7 +1961,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|minis|speech|decisions> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|minis|decisions> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

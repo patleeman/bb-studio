@@ -1,6 +1,6 @@
 // Hands-free voice on the desktop. A session is its own thread, so it isn't
-// tied to the composer it started from: the composer's waveform button (in
-// the slot voice mode's speaker uses) starts it, and from then on a small
+// tied to the composer it started from: the composer's waveform button
+// (beside the mic) starts it, and from then on a small
 // floating pill stays over every page and thread until End. The pill, like
 // Talk's dictation pill (draggable, its own remembered spot), shows the
 // talking orb, the current subtitle line, "✓ Sent to …" and End. It expands

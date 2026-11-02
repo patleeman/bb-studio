@@ -18,13 +18,12 @@
 // - Cost: Realtime by token, GPT-Live by voice second plus its backend's
 //   tokens (bot-prices.ts). Over the cap, voiceLive.event tells the phone to stop.
 //
-// Built new, beside voice mode (../sessions.ts), which is due to be removed:
-// it shares only speakable() from ../instructions.ts and the retired Call's
-// tables (voice_calls, voice_call_events; append-only).
+// It replaced the old in-thread voice mode (removed Nov 1); it keeps the
+// retired Call's tables (voice_calls, voice_call_events; append-only).
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
 import { addRealtimeUsage, addTranscriptionUsage, EMPTY_TALLY, liveCost, realtimeCost, type RealtimeTally } from "../../bot-prices";
-import { speakable } from "../instructions";
+import { speakable } from "./speakable";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
 import { CLIENT_SECRETS_URL, LIVE_BACKEND_MODEL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest, VOICE } from "./session";
