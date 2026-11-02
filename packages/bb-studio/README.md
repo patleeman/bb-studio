@@ -1600,8 +1600,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   threads it started: **Running** (a thread that is running, waiting on an
   answer, or queued, or has one below it), **Runners**, **Recent**, **Side threads** (on
   its replies), and **Earlier conversations** (its
-  handoff chain, closed by default). When its automations run is Info's
-  Automations week, not the sidebar. A thread another of its threads started
+  handoff chain, closed by default). When its automations run is the Bot
+  page's week, not the sidebar. A thread another of its threads started
   nests under that one, at any depth (`bot_activity` returns each thread's
   `parentId`). A row opens the thread as a BB thread in the main pane; a
   bot's row opens its chat the same way, and the Bots list stays. On a
@@ -1634,19 +1634,42 @@ of Staff", with the same thread and check-ins; rename it from its page.
   it has no thread to open);
   its runners, check-ins, Memory and skills are that bot's. In a bot's own
   thread its tools act on that bot.
-- **Info**: a bot's Info page (`/plugins/studio/studio/bot/<botId>`), and the **Bot info** tab in a thread's side panel
-  (a thread panel action, so BB's panel launcher offers it on every thread;
-  on a thread no bot owns it shows "Not a Bot thread"). It has the
-  **Profile** section with the avatar, name, status and description. Choose
-  **Edit**, the name or avatar to open its inline editor; **Save**, **Cancel**
-  or Escape closes it. **Profile changes** stays behind a collapsed link until
-  you open it. The ⋯ menu has Memory, Skills, Check-ins,
-  Switch model, Pause / Resume and Stop. It also has **Open chat** (not on the
-  chat itself), Pause / Resume and Stop, Memory, Skills, Automations and
-  Activity: **Running**, **Waiting to start**, **Scheduled**
-  (its check-in and automations, with the next run) and **Recent** (the
-  last three, then Show all). A thread clicked in the Bots sidebar or
-  Activity opens as a normal BB thread in the main pane.
+- **The Bot page** (`/plugins/studio/studio/bot/<botId>`, `src/ui/bot/BotPage.tsx`):
+  one scroll, most important first, in plain words (no cron strings, ids or
+  token counts outside Controls). The header has the avatar, the name and a
+  status sentence ("Working on 3 things. 5 things need you. Next: evening
+  wrap-up at 6:00 PM."; "Idle. All quiet since 1:00 PM. Next: …"), then
+  **Open chat**, **Pause** / **Resume**, **Stop…** and **Controls**. There is
+  no ⋯ menu. **Working now** (what's running, a runner by its name) sits
+  beside **Needs you**: due loops (Done, Decide, Got it or Nudge), the
+  chat's pending questions (Answer), failed runs (Open, and ✕ to dismiss)
+  and maintenance's calls ("Archive 3 finished threads?", Review), one
+  action each. A failed run stays until the job's next run succeeds or you
+  dismiss that run (`bot_run_dismiss`; a later failure shows again). With
+  nothing running and nothing waiting, both shrink to one line: "Nothing
+  running, and nothing needs you." Then **This week** at the page's full
+  width with **Paused** below it (see Week under Automations), then
+  **Recent** (runs, groups and finished threads in a sentence each; a
+  failure in red; one muted line a day for frequent checks with nothing to
+  say), compact **Runners** (area colour, schedule in words, state; Pause,
+  Run now, Edit, Move and Delete in the row's menu) and, with the Attention
+  Router on, the **Loops** summary with **Open Loops** (the full list stays at
+  `bot/<botId>/loops`, with a back link).
+- **Controls** (`bot/<botId>/controls`, `src/ui/bot/BotControls.tsx`): every
+  setting, with a back link and section links: **Profile** (avatar, name and
+  description with Edit, and **Profile changes** with Revert), **Model**
+  (Switch model…), **Memory** (Open), **Skills** (Learn from work, pins,
+  history), **Check-ins** (Change…), **Prompt cache** (the only place tokens
+  and cost show) and **Maintenance** (the switch, rules, Dry run, Run now and
+  history). An external bot has Profile, Model and Check-ins only.
+- **Bot info** (the panel tab beside a bot's thread; a thread panel action,
+  so BB's panel launcher offers it on every thread; on a thread no bot owns
+  it shows "Not a Bot thread"): the page's compact version. Name and status
+  with Open chat (not on the chat itself), Pause and Controls, then Working
+  now, Needs you (four, then "N more"), **Up next** (the next three runs,
+  frequent jobs skipped, a group as one row) and Recent (three), with links
+  to Schedule, Loops and Controls. A thread clicked anywhere opens as a
+  normal BB thread in the main pane.
 - **The Bot is the triage layer** (docs/needs-you/REDO.md): runner
   reports, urgent alerts, failures and its threads' questions go to the
   Bot, which handles them or tells you in its own chat. There's no Needs
@@ -1735,26 +1758,44 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `[PASS]` rule (docs/silent-output.md).
 
   **Week** (the default; `src/ui/bot/AutomationsCalendar.tsx`, model in
-  `calendar.ts`): a calendar of today and the next 6 days (5 in a narrow
-  pane), as wide as the Bot page (it leaves the page's column; beside a
-  thread it fills the pane), time of day down, in your time zone, with ‹ › for other weeks.
-  Each check-in, reminder, watcher, runner and plain BB schedule of the Bot
-  is expanded from its schedule or cron in its own time zone (quiet hours,
-  end dates and DST kept: a skipped time runs an hour later, a repeated one
-  once); a one-off is a single block. Past blocks are real runs from run
-  history (`bot_automation_runs`, and a runner's last run) and open their
-  thread; a failed one is outlined red with ⚠ and its error in the tooltip.
-  A run going on now grows down to the red current-time line. A job that
-  runs more than eight times in a day draws as a thin band with a tick per
-  run (failures as red dots), named with its cadence under the grid ("Inbox
-  triage · every 2 h"). Blocks that overlap sit side by side while each
-  keeps 64 px; past that a failure, then a live run, keep the room and the
-  rest fold into a "+N" chip under them that lists them (pulsing when it holds the
-  live run). ‹ › page by as many days as
-  show. Paused jobs aren't drawn; they're listed under
-  **Paused** beside the grid (under it in a narrow pane) with **Resume**. A
-  due block opens its job in the list.
-  ![Dot's Automations week in a staged BB, dark: Today and Mon 2 to Sat 7 across, 7 AM to 7 PM down; the Daily digest runner at 8:00, Weekly review on Monday at 9:00, Status probe at 10:00 and 16:00, Lunch check at 13:00 and the Call Dana back reminder Monday at 15:30 as blocks; the Check-in and Inbox triage runner (every 2 h) as thin bands named under the grid; today, at the red current-time line, the Status probe run that failed outlined red with ⚠, and under it a pulsing “+4” chip holding that slot's other runs, the Daily digest run going on among them; Maintenance and Release watch listed under Paused with Resume; the sidebar's Dot group has Runners and no Schedule](assets/bot-automations-week.png)
+  `calendar.ts`): **This week**, today and the next 6 days (5 in a narrow
+  pane), at the Bot page's full width, time of day down (only the hours
+  that have runs, so the week shows whole), in your time zone, with ‹ › for
+  other weeks, **Show frequent**, **Week** / **List** and **New** in its
+  toolbar. Each check-in, reminder, watcher, runner and plain BB schedule of
+  the Bot is expanded from its schedule or cron in its own time zone (quiet
+  hours, end dates and DST kept); a one-off is a single block. Past blocks
+  are real runs from run history (`bot_automation_runs`, and a runner's last
+  run) and open their thread. Colours are by **area**: each runner is one
+  (a watcher that wakes a runner is that runner's), the Bot's own jobs are
+  grey, and the same colours mark Runners and Paused; the legend under the
+  grid lists the areas.
+  - **Frequent jobs** (every 2 hours or more often, at least 3 runs a day:
+    heartbeats, an hourly watch) are hidden behind **Show frequent** (kept on
+    this device) and listed under the legend ("Frequent, hidden: Inbox watch
+    · every hour"). Shown, each is a thin band down the day with a tick per
+    run, solid for past runs and faint for due ones.
+  - **Groups**: runs that start within 15 minutes of the previous one chain
+    into one block with its areas' dots, a name and a count ("Area sweep ·
+    4", 5:00–5:15). A click lists each run's outcome ("2 new emails",
+    "Quiet") with a link to its thread. A group is named from its time ("5
+    AM checks") until you rename it in that list or the Bot does
+    (`bot_calendar_group_rename`, tool and RPC). The name is saved in Studio
+    under the group's window and jobs, so it holds every day they run.
+  - **A failure is never hidden**: its block, or its group, turns red with ⚠
+    in place of the dots, and hovering or clicking it says what failed, each
+    run's result, **Open** its thread and **Run again**.
+  - A run going on now grows to the red current-time line. Blocks that
+    overlap sit side by side while each keeps 64 px; past that a failure,
+    then a live run, keep the room and the rest fold into a "+N" chip.
+    Paused jobs aren't drawn; they're listed under **Paused** below the
+    week with **Resume**. A due block opens its job in the list.
+  ![The redesigned Bot page in a staged BB, dark: Chief of Staff working on 3 things with 5 that need you; Working now (Comms, Project Lead, Systems) beside Needs you (the property tax loop, Security's failed 1:00 PM check, a chat question, the deck decision and three finished threads to archive); This week with the Area sweep and Midday check groups (today's red with the failure), the morning card, camera digest, standup, evening wrap-up and nightly build, frequent heartbeats hidden under the legend, Paused below; then Recent, Runners and Loops](assets/bot-redesign/main-busy-dark.png)
+  ![The week with Show frequent on, light: the hourly inbox watch and four 2-hourly heartbeats as thin bands down each day, the blocks beside them](assets/bot-redesign/cal-frequent-light.png)
+  ![Today's Area sweep group opened, light: Systems, Comms (2 new emails), Home & Family and Staff with their times and links to their threads](assets/bot-redesign/cal-group-light.png)
+  ![Today's Midday check hovered, dark: Staff and House quiet, Security failed; Security couldn't sign in to Wyze, with Open Security's thread and Run again](assets/bot-redesign/cal-failed-dark.png)
+  ![Controls, light: section links on the left; Profile with Profile changes, Model, Memory, Skills, Check-ins, Prompt cache and Maintenance](assets/bot-redesign/controls-page-light.png)
+  ![Bot info beside the Chief of Staff's chat, dark: Working now, Needs you with one more, Up next (three runs) and Recent, with links to Schedule, Loops and Controls](assets/bot-redesign/pane-compact-dark.png)
 
   **List**: each row shows its newest failed run in red when it was the
   last run ("Last run failed …: the error"), muted when a later run went
