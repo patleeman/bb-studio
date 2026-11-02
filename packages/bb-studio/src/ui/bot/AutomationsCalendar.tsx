@@ -36,6 +36,8 @@ const KIND_LABEL: Record<CalendarSource["kind"], string> = { checkin: "Check-in"
 const FREQUENT_KEY = "studio.bot.showFrequent";
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const dayTime = (at: number) => new Date(at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+/** "Sun 1". */
+const dayHeader = (at: number) => `${new Date(at).toLocaleDateString(undefined, { weekday: "short" })} ${new Date(at).getDate()}`;
 const hourLabel = (hour: number) => new Date(2026, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
 
 type RunnerLike = Pick<RunnerView, "id" | "name" | "threadId" | "lastRunAt"> & { lastRunStatus?: string | null; running?: boolean; runningSince?: number | null };
@@ -55,8 +57,8 @@ export function calendarSources(automations: BotAutomationView[], scheduled: Par
     return {
       id: item.id, name: item.name, kind: item.kind, schedule: studio?.schedule ?? null, cron: studio ? null : item.scheduleText || null,
       state: item.state, nextRunAt: item.nextRunAt, threadId: runner?.threadId ?? studio?.threadId ?? null,
-      // A plain BB job has only its cron: say it in words.
-      scheduleText: studio ? item.scheduleText : item.scheduleText ? describeCron(item.scheduleText) : "",
+      // A plain BB job has only its cron: say it in words. A cron words can't say stays out of sight.
+      scheduleText: plainSchedule(studio ? item.scheduleText : item.scheduleText ? describeCron(item.scheduleText) : ""),
       runs: studio ? runs[item.id] ?? [] : null,
       lastRun: runner?.lastRunAt ? { at: runner.lastRunAt, status: runner.lastRunStatus ?? "succeeded" } : null,
       runningSince: runner?.running ? runner.runningSince ?? null : null,
@@ -64,6 +66,9 @@ export function calendarSources(automations: BotAutomationView[], scheduled: Par
     };
   });
 }
+
+/** Schedule words with no cron in them: "Custom: 0 9 1-7 * 6" reads "Custom schedule". */
+export const plainSchedule = (text: string) => /^Custom:/.test(text) ? "Custom schedule" : text;
 
 /** Reads one automation's recent runs. */
 function RunsFeed({ botId, id, onRuns }: { botId: string; id: string; onRuns(id: string, runs: BotAutomationRunView[]): void }) {
@@ -95,9 +100,6 @@ function useShowFrequent(): [boolean, (next: boolean) => void] {
   return [value, (next) => { setValue(next); try { localStorage.setItem(FREQUENT_KEY, next ? "1" : "0"); } catch { /* private mode */ } }];
 }
 
-/** On the Bot page the week leaves the page's column for the page's full width (less a 24 px margin each side), centred on it. */
-const BREAKOUT: CSSProperties = { width: "calc(100cqw - 48px)", marginLeft: "calc(50% - 50cqw + 24px)" };
-
 /** The hours a window's runs need, at least 10, so the week shows whole without scrolling. */
 function hourRange(items: { at: number }[], tz: string): [number, number] {
   if (!items.length) return [7, 19];
@@ -109,7 +111,7 @@ function hourRange(items: { at: number }[], tz: string): [number, number] {
 
 export function AutomationsCalendar({ botId, botName = "The Bot", automations, onOpen, onPick, onResume, onRunNow, busy, wide = false, toolbar }: {
   botId: string; botName?: string; automations: BotAutomationView[];
-  /** On the Bot page: take the page's full width and show every hour that has runs. Beside a thread it keeps the pane's and scrolls. */
+  /** On the Bot page: show every hour that has runs, whole. Beside a thread it scrolls. */
   wide?: boolean;
   onOpen(threadId: string): void;
   /** A job's block without a thread to open: show the job. */
@@ -142,7 +144,8 @@ export function AutomationsCalendar({ botId, botName = "The Bot", automations, o
   const [week, setWeek] = useState(0);
   const tz = zone();
   const { sources, colors } = jobs;
-  const paused = pausedSources(sources);
+  // Maintenance's switch is in Controls, not Resume here.
+  const paused = pausedSources(sources).filter((source) => source.id !== "maintenance");
   const count = width >= 600 ? 7 : 5;
   const { days, frequent } = calendarWeek(sources, windowDays(windowStart(now, week, count), count, tz), now, tz, showFrequent);
   const byId = new Map(sources.map((source) => [source.id, source]));
@@ -165,7 +168,7 @@ export function AutomationsCalendar({ botId, botName = "The Bot", automations, o
   const grouped = days.some((day) => chainGroups(day.singles, tz).some(isGroup));
 
   return (
-    <div ref={box} data-testid="automations-calendar" data-wide={wide || undefined} className="flex flex-col gap-2" style={wide ? BREAKOUT : undefined}>
+    <div ref={box} data-testid="automations-calendar" data-wide={wide || undefined} className="flex flex-col gap-2">
       {jobs.feeds}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <h3 className="text-sm font-medium">{week === 0 ? "This week" : "Week"}</h3>
@@ -192,7 +195,7 @@ export function AutomationsCalendar({ botId, botName = "The Bot", automations, o
             const today = week === 0 && day.start <= now && now < day.end;
             return (
               <span key={day.start} className={`truncate border-l border-border px-2 py-1.5 ${today ? "font-medium text-foreground" : "text-muted-foreground"}`}>
-                {today ? `Today · ${new Date(day.start).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}` : new Date(day.start).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+                {today ? `Today · ${dayHeader(day.start)}` : dayHeader(day.start)}
               </span>
             );
           })}

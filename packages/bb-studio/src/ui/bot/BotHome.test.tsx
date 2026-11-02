@@ -417,9 +417,9 @@ test("Automations as a week: today first, dense jobs as a band, a failed past ru
     await show(<BotPanel />);
     const calendar = container.querySelector("[data-testid=automations-calendar]")!;
     expect(calendar).not.toBeNull();
-    // On the Bot page the week takes the page's full width, not the column's.
+    // On the Bot page the week shows whole: no scroller of its own.
     expect(calendar.getAttribute("data-wide")).toBe("true");
-    expect((calendar as HTMLElement).style.width).toContain("100cqw");
+    expect(calendar.querySelector(".overflow-y-auto")).toBeNull();
     const headers = [...calendar.querySelectorAll(".grid.border-b > span")].map((each) => each.textContent).filter(Boolean);
     expect(headers).toHaveLength(7);
     expect(headers[0]).toMatch(/^Today · /);

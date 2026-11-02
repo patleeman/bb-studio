@@ -30,7 +30,7 @@ import { Elapsed, ProviderStatusMark, runningLabel } from "./ProviderStatusMark"
 const DAY = 86_400_000;
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
-const RECENT_SHOWN = 6;
+const RECENT_SHOWN = 8;
 
 /** The Bot's Controls view (bot/<botId>/controls), with `section` scrolled to. */
 export const controlsPath = (botId: string, section?: string) => `${botPath(botId)}/controls${section ? `#${section}` : ""}`;
