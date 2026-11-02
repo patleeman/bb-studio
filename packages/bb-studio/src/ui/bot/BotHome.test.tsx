@@ -2,6 +2,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { useThreadTabRequests } from "../../kit/app/thread-panel";
 
 const state = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
@@ -34,7 +35,8 @@ vi.mock("../live", () => ({
 vi.mock("../ProjectLeads", () => ({ HeartbeatFields: () => null, useHeartbeatForm: () => ({ input: () => ({}) }) }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `title:${threadId}`),
-  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openThreadPanel, toCompose: state.toCompose }),
+  useBbNavigate: () => ({ toThread: state.toThread, toCompose: state.toCompose }),
+  experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openThreadPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => sdk,
   useSettings: () => ({ values: state.settings }),
   experimental_useSidebarThreads: () => state.sidebarThreads,
@@ -133,6 +135,9 @@ const thread = (id: string, title: string) => ({ id, title, status: "idle", proj
 const empty = { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
 const CONTROLS = "/plugins/studio/studio/bot/bot_main/controls";
 const dot = { id: "bot_main", name: "Dot", avatar: "🟣", shape: "blob", color: "#5b8def", state: "active", threadId: "thr_bot", createdAt: 1, updatedAt: 1 };
+
+/** A thread view's tab-request receiver (kit/app/thread-panel.tsx), beside the sidebar. */
+function Chat({ threadId }: { threadId: string }) { useThreadTabRequests(threadId); return null; }
 
 test("with no Bot, the welcome's Create makes it with the setup and opens its chat", async () => {
   state.data = { bot_get: { bot: null, run: null } };
@@ -584,7 +589,7 @@ test("the Bot page embeds no chat; Open chat opens its main thread as a BB threa
 
 test("Bot info beside a thread: the owner's compact page (Needs you, Up next, Recent, links out), no Open chat on its own chat; a thread no Bot owns says so", async () => {
   state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: dot, run: null }, bot_activity: { ...empty, inProgress: [{ ...thread("t1", "Research flights"), status: "active", runningSince: Date.now() - 60_000 }] } };
-  await show(<BotInfoPanel threadId="thr_bot" params={null} />);
+  await show(<BotInfoPanel threadId="thr_bot" environment={null} params={null} />);
   expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_bot" }]);
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_main" }]);
   const pane = container.querySelector("[data-testid=bot-pane]")!;
@@ -595,25 +600,33 @@ test("Bot info beside a thread: the owner's compact page (Needs you, Up next, Re
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => click(button("Controls")));
   expect(openAppPath).toHaveBeenCalledWith(CONTROLS);
-  await show(<BotInfoPanel threadId="t9" params={null} />);
+  await show(<BotInfoPanel threadId="t9" environment={null} params={null} />);
   expect(container.querySelector("[data-testid=bot-open-chat]")).not.toBeNull();
   state.data = { bot_thread_owner: { botId: null } };
-  await show(<BotInfoPanel threadId="t9" params={null} />);
+  await show(<BotInfoPanel threadId="t9" environment={null} params={null} />);
   expect(container.textContent).toContain("Not a Bot thread.");
 });
 
-test("the thread header Bot info button opens the existing right-side panel for Bot threads only", async () => {
-  const { BotInfoHeaderAction } = await import("./BotTabs");
-  state.data = { bot_thread_owner: { botId: "bot_main" } };
-  await show(<BotInfoHeaderAction threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
-  const button = container.querySelector('[data-testid="bot-info-header"]') as HTMLButtonElement;
-  expect(button.title).toBe("Bot info");
-  act(() => button.click());
-  expect(state.openThreadPanel).toHaveBeenLastCalledWith({ actionId: "bot-info", title: "Bot info" });
-
-  state.data = { bot_thread_owner: { botId: null } };
-  await show(<BotInfoHeaderAction threadId="thr_regular" projectId="proj_personal" isCompactViewport={false} />);
-  expect(container.querySelector('[data-testid="bot-info-header"]')).toBeNull();
+test("the thread header Bot info button opens the Bot info tab, on Bot threads only", async () => {
+  const { botInfoHeaderAction } = await import("../thread-header");
+  state.call.mockImplementation((async (method: string, input: { threadId: string }) => method === "bot_thread_owner" ? { botId: input.threadId === "thr_bot" ? "bot_main" : null } : {}) as never);
+  let data: unknown;
+  function Header({ ids }: { ids: string[] }) { data = botInfoHeaderAction.useData!({ threadIds: ids }); return null; }
+  await show(<Header ids={["thr_bot", "thr_regular"]} />);
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const panel = { openTab: vi.fn((_options: unknown) => true) };
+  const item = (threadId: string) => botInfoHeaderAction.item({ thread: { id: threadId } as never, data: data as never, sdk: null as never, navigate: null as never, experimental_panel: panel as never });
+  const action = item("thr_bot")!;
+  expect(action.label).toBe("Bot info");
+  act(() => { void action.run({ requestRename: () => {} }); });
+  expect(panel.openTab).toHaveBeenLastCalledWith({ tab: { id: "bot-info", context: { kind: "thread" }, availability: "action" }, title: "Bot info" });
+  // No side panel: the Bot page, which is its Info.
+  panel.openTab.mockReturnValue(false);
+  const { openAppPath } = await import("../../kit/app/index");
+  act(() => { void action.run({ requestRename: () => {} }); });
+  expect(openAppPath).toHaveBeenLastCalledWith("/plugins/studio/studio/bot/bot_main");
+  expect(item("thr_regular")).toBeNull();
+  state.call.mockImplementation(async () => ({}));
 });
 
 test("the cache header shows a Clock and time, turns amber near expiry, and dims cold or disabled states", async () => {
@@ -636,7 +649,7 @@ test("the cache header shows a Clock and time, turns amber near expiry, and dims
   expect(cacheLabel(off, now)).toBe("Warming off");
   expect(cacheIndicator(off, now)).toMatchObject({ text: null, label: "Prompt cache: Warming off", tone: "dim" });
   state.data = { bot_cache_state: warm };
-  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  await show(<BotCacheChip threadId="thr_bot" />);
   const chip = container.querySelector('[data-testid="bot-cache-chip"]') as HTMLButtonElement;
   expect(chip.title).toBe("Prompt cache: 59m left");
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: 59m left");
@@ -646,12 +659,12 @@ test("the cache header shows a Clock and time, turns amber near expiry, and dims
   expect(container.querySelector('[role="menu"]')?.textContent).toContain("warming ≈");
 
   state.data = { bot_cache_state: { ...warm, warmUntil: now } };
-  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  await show(<BotCacheChip threadId="thr_bot" />);
   expect(chip.textContent).toBe("cold");
   expect((chip.querySelector('[data-icon="Clock"]') as HTMLElement).className).toContain("text-muted-foreground/40");
 
   state.data = { bot_cache_state: off };
-  await show(<BotCacheChip threadId="thr_bot" projectId="proj_personal" isCompactViewport={false} />);
+  await show(<BotCacheChip threadId="thr_bot" />);
   expect(chip.textContent).toBe("");
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warming off");
 });
@@ -722,14 +735,14 @@ test("on a Bot's thread the Bots list expands the thread's owner; its ⓘ opens 
   state.pathname = "/threads/thr_s1";
   state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: "bot_scout" } : {}) as never);
   state.data = { bot_list: { bots: [{ ...dot, primary: true }, scout] }, bot_thread_owner: { botId: "bot_scout" }, bot_get: { bot: scout, run: null }, bot_activity: empty };
-  await show(<BotThreadList {...listProps} activeThreadId="thr_s1" />);
+  await show(<><BotThreadList {...listProps} activeThreadId="thr_s1" /><Chat threadId="thr_s1" /></>);
   expect(state.inputs).toContainEqual(["bot_thread_owner", { threadId: "thr_s1" }]);
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_scout" }]);
   const nav = container.querySelector('nav[aria-label="Bots"]')!;
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Scout");
   // Not its chat: Bot info doesn't open by itself.
   expect(state.openThreadPanel).not.toHaveBeenCalled();
-  act(() => click(nav.querySelector('[aria-label="Open Scout info"]')));
+  await act(async () => { click(nav.querySelector('[aria-label="Open Scout info"]')); await Promise.resolve(); });
   expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "bot-info", title: "Bot info" });
   expect(sessionStorage.getItem("studio.bot.lastSelected")).toBe("bot_scout");
   state.call.mockImplementation(async () => ({}));
@@ -739,18 +752,18 @@ test("Bot info opens beside a Bot's chat once each time the chat opens, not agai
   state.pathname = "/threads/thr_scout";
   state.call.mockImplementation((async (method: string) => method === "bot_thread_owner" ? { botId: "bot_scout" } : {}) as never);
   state.data = { bot_list: { bots: [scout] }, bot_thread_owner: { botId: "bot_scout" }, bot_get: { bot: scout, run: null }, bot_activity: empty, bot_chain: { threadIds: ["thr_old", "thr_scout"] } };
-  await show(<BotThreadList {...listProps} activeThreadId="thr_scout" />);
+  await show(<><BotThreadList {...listProps} activeThreadId="thr_scout" /><Chat threadId="thr_scout" /></>);
   expect(state.openThreadPanel).toHaveBeenCalledTimes(1);
   expect(state.openThreadPanel).toHaveBeenCalledWith({ actionId: "bot-info", title: "Bot info" });
   // The user closes it; the list re-renders on the same chat: it stays closed.
-  await show(<BotThreadList {...listProps} activeThreadId="thr_scout" searchQuery="x" />);
+  await show(<><BotThreadList {...listProps} activeThreadId="thr_scout" searchQuery="x" /><Chat threadId="thr_scout" /></>);
   expect(state.openThreadPanel).toHaveBeenCalledTimes(1);
   // Another thread, then an earlier conversation of the chain: it opens again.
   state.pathname = "/threads/thr_s1";
-  await show(<BotThreadList {...listProps} activeThreadId="thr_s1" />);
+  await show(<><BotThreadList {...listProps} activeThreadId="thr_s1" /><Chat threadId="thr_s1" /></>);
   expect(state.openThreadPanel).toHaveBeenCalledTimes(1);
   state.pathname = "/threads/thr_old";
-  await show(<BotThreadList {...listProps} activeThreadId="thr_old" />);
+  await show(<><BotThreadList {...listProps} activeThreadId="thr_old" /><Chat threadId="thr_old" /></>);
   expect(state.openThreadPanel).toHaveBeenCalledTimes(2);
   state.call.mockImplementation(async () => ({}));
 });

@@ -1,6 +1,6 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, readPullRequest, workspaceBlock } from "./bot-maintenance";
+import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, pullRequestMerged, readWorkspaceStatus, workspaceBlock } from "./bot-maintenance";
 import { MIGRATIONS } from "./migrations";
 import { SkillLearning, type SkillState } from "./skill-learning";
 const DAY = 86_400_000;
@@ -18,14 +18,19 @@ async function setup() {
   const events: Record<string, unknown>[] = [];
   const archive = vi.fn(async () => ({ ok: true }));
   const send = vi.fn(async () => ({ ok: true }));
-  const status = vi.fn(async () => clean());
+  const status = vi.fn(async (_input: unknown) => clean());
+  const pullRequests = vi.fn(async (_input: unknown): Promise<Record<string, unknown>> => ({}));
   const rpcCalls: { method: string; input: unknown }[] = [];
   const pause = vi.fn(async () => {}), del = vi.fn(async () => {}), curate = vi.fn(async () => ({ result: "Nothing to retire" })), alert = vi.fn(async () => {}), refreshOwned = vi.fn(async () => {});
   const runs: { status: string; output: string }[] = [];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: { listRunning: async () => [], get: (async ({ threadId }: { threadId: string }) => { const t = rows.find((t) => t.id === threadId); if (!t) throw Object.assign(new Error("Not found"), { status: 404 }); return t; }) as never, list: (async ({ offset }: { offset?: number }) => offset ? [] : rows) as never, archive: archive as never, send: send as never, interactions: { list: (async () => interactions) as never }, events: { list: (async () => events) as never } },
-    environments: { status: status as never, pullRequest: (async () => ({ outcome: "not_applicable" })) as never },
-    plugins: { callRpc: (async ({ method, input }: { method: string; input: unknown }) => { rpcCalls.push({ method, input }); return method === "automations_overview" ? { automations: targets } : { runs }; }) as never },
+    plugins: { callRpc: (async ({ pluginId, method, input }: { pluginId: string; method: string; input: unknown }) => {
+      rpcCalls.push({ method, input });
+      if (pluginId === "bb--git" && method === "workspaceStatus") return status(input);
+      if (pluginId === "bb--github-pr-status" && method === "pullRequests") return pullRequests(input);
+      return method === "automations_overview" ? { automations: targets } : { runs };
+    }) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database(); bb.storage.migrate(db, MIGRATIONS);
@@ -35,7 +40,7 @@ async function setup() {
   const maintenance = new BotMaintenance({ db, sdk: bb.sdk, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
   const enable = async () => { await maintenance.set("bot", { enabled: true }, now - DAY); archive.mockClear(); curate.mockClear(); };
   const local = (id: string, kind: string, state = "active", age = 1, target = "main", instruction = "report") => db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, state, schedule_json, project_id, created_at, updated_at, target, instruction, bb_ids) VALUES (?, 'bot', ?, ?, ?, '{}', 'proj', 0, ?, ?, ?, '[\"a\"]')").run(id, kind, id, state, now - age * DAY, target, instruction);
-  return { bb, harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
+  return { bb, harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, pullRequests, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
 }
 it("defaults off and waits one day before going live", () => {
   const s = maintenanceDefaults(); expect(s.enabled).toBe(false); expect(s.memoryWords).toBe(8000);
@@ -171,10 +176,26 @@ it("keeps a parent while a child thread is still open, since archiving cascades"
   x.rows.splice(1, 1); await x.maintenance.run("bot", { now: now + 2 });
   expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid", "child"]);
 });
-it("treats a missing environments.pullRequest (stable 0.47) as no pull request instead of failing", async () => {
-  expect(await readPullRequest({}, "env")).toBeNull();
-  expect(await readPullRequest({ pullRequest: () => { throw new Error("sync boom"); } }, "env")).toBeNull();
-  expect(await readPullRequest({ pullRequest: async () => ({ outcome: "available" }) } as never, "env")).toEqual({ outcome: "available" });
+it("reads git status through the Git plugin, and null (fails closed) when it can't", async () => {
+  const call = vi.fn(async () => clean());
+  expect(await readWorkspaceStatus({ callRpc: call as never }, "env", "origin/bb/child")).toMatchObject({ outcome: "available" });
+  expect(call).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "bb--git", method: "workspaceStatus", input: { environmentId: "env", mergeBaseBranch: "origin/bb/child" } }));
+  expect(await readWorkspaceStatus({ callRpc: (() => { throw new Error("plugin off"); }) as never }, "env")).toBeNull();
+  expect(await readWorkspaceStatus({ callRpc: (async () => ({ outcome: "something new" })) as never }, "env")).toBeNull();
+  expect(workspaceBlock(await readWorkspaceStatus({ callRpc: (async () => { throw new Error("offline"); }) as never }, "env"))).toBe("Couldn't read the workspace's git status.");
+});
+it("reads a merged pull request through the GitHub PR plugin, and none when it can't", async () => {
+  const merged = { env: { outcome: "available", pullRequest: { attention: "merged" } } };
+  expect(await pullRequestMerged({ callRpc: (async () => merged) as never }, "env")).toBe(true);
+  expect(await pullRequestMerged({ callRpc: (async () => ({ env: { outcome: "absent" } })) as never }, "env")).toBe(false);
+  expect(await pullRequestMerged({ callRpc: (() => { throw new Error("sync boom"); }) as never }, "env")).toBe(false);
+});
+it("archives a merged pull request's thread at 3 days", async () => {
+  const x = await setup(); await x.enable(); Object.assign(x.rows[0]!, { environmentId: "env", updatedAt: now - 4 * DAY });
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  x.pullRequests.mockResolvedValue({ env: { outcome: "available", pullRequest: { attention: "merged" } } });
+  await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce();
+  expect(x.pullRequests).toHaveBeenCalledWith({ keys: ["env"] });
 });
 it("allows a confirmed clean, pushed workspace", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";

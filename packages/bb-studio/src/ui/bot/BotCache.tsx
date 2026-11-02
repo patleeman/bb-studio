@@ -4,7 +4,7 @@
 import { GHOST_BUTTON } from "../../kit/app/index";
 import { errorMessage } from "../../kit/format";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
-import { useComposer, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
+import { useComposer } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { BotCacheStateView } from "../../contract";
 import { formatTokens, formatUsd } from "../../bot-cache-format";
@@ -56,7 +56,7 @@ export function costLine(state: BotCacheStateView): string | null {
 const clock = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 /** The header chip on a Bot's chat; nothing on other threads. */
-export function BotCacheChip({ threadId }: PluginThreadHeaderActionProps) {
+export function BotCacheChip({ threadId }: { threadId: string }) {
   const live = useLive("bot_cache_state", { threadId }, { pollMs: POLL_MS });
   const call = useCall();
   const [error, setError] = useState<string | null>(null);

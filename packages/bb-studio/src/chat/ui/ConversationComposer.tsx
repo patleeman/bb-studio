@@ -9,6 +9,7 @@ import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";
 import { CHAT_ICON, CONVERSATION_STARTED, draftRoute, quoteDrafts } from "./conversation-drafts";
 import { ThreadPicker } from "./ThreadPicker";
+import { toReasoningLevel } from "../../kit/reasoning";
 
 interface Loaded {
   item: Viewed | null;
@@ -109,7 +110,8 @@ export function ConversationPage({ subPath }: Pick<PluginNavPanelProps, "subPath
         onSubmit={async request => {
           setError(null);
           try {
-            const sent = quote?.image ? { ...request, input: [...request.input, { type: "image" as const, url: quote.image }] } : request;
+            const leveled = { ...request, reasoningLevel: toReasoningLevel(request.reasoningLevel) };
+            const sent = quote?.image ? { ...leveled, input: [...leveled.input, { type: "image" as const, url: quote.image }] } : leveled;
             const { threadId } = await rpc.call("chat.start", { item: item ? { pluginId: item.pluginId, id: item.id } : null, request: sent });
             if (quoteId) void quoteDrafts.remove(quoteId).catch(() => {});
             started(item, threadId);

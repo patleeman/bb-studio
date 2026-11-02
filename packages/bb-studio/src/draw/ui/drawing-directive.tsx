@@ -4,12 +4,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard, THUMBNAIL, remember, openAppPath } from "../../kit/app/index";
 import { relativeTime } from "../../kit/format";
-import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import { DRAW_ICON, DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref, isDrawingId, thumbnailUrl } from "../shared";
 import { drawingName } from "./drawing-card";
 import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
+import { useOpenThreadTab } from "../../kit/app/thread-panel";
 
 type DrawingMeta = NonNullable<z.infer<(typeof rpcContract)["drawings.getDrawingMeta"]["output"]>["drawing"]>;
 
@@ -33,7 +34,7 @@ function useDrawingMeta(id: string): DrawingMeta | null | undefined {
 }
 
 export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const id = attributes.id ?? "";
   const valid = isDrawingId(id);
   const drawing = remember(`drawing:${id}`, useDrawingMeta(valid ? id : ""));
@@ -54,7 +55,7 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
       details={`Drawing · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
       onOpen={() => {
         // The workbench when there is one; Studio otherwise.
-        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title: name, params: itemParams("drawing", id) }))
+        if (!openTab({ actionId: STUDIO_TAB, title: name, params: itemParams("drawing", id) }))
           openAppPath(drawingHref(id));
       }}
     />

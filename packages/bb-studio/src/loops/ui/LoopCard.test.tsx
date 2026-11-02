@@ -19,7 +19,8 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSettings: () => ({ values: { loopsEnabled: state.enabled } }),
-  useBbNavigate: () => ({ toThread: state.toThread, openThreadPanel: state.openPanel }),
+  useBbNavigate: () => ({ toThread: state.toThread }),
+  experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => ({ projects: { list: async () => [{ id: "proj_k", name: "Kensico" }] } }),
 }));
 vi.mock("../../ui/live", () => ({

@@ -176,7 +176,7 @@ The Bot page has Info | Loops at `bot/<botId>/loops` for the primary Bot, and
 the sidebar has an All loops row under it.
 
 The Loops pane (`src/loops/ui/LoopsPane.tsx`) is the same list in the thread's
-side panel, a `threadPanelAction` with id `loops`, so it stays up beside the
+side panel, a thread tab (`experimental_tab`) with id `loops`, so it stays up beside the
 Bot's chat. It has the tab's sections, area chips, Owner and Add a loop; each
 row is a title, one line of detail and a ⋯ menu with the row's actions (Done,
 Snooze, Hand off, a decision's options, Got it, Surface now, Take it back,
@@ -188,11 +188,17 @@ read closes as Got it): one click closes it, and the row stays in place, done
 with Undo, until the pane closes. Decide and waiting rows keep their icon. Its header opens the
 full Loops tab. It opens from:
 
-- the Loops button in the Bot chat's header (`experimental_threadHeaderAction`,
-  only on the primary Bot's chat), badged with what needs Patrick now;
-- `::loops{open="pane"}` and `::loops{more}` in the chat (`openThreadPanel`;
-  where there is no side panel they open the Loops tab);
-- All loops in the sidebar, which opens the Bot's chat with the pane beside it;
+- the Loops button in the Bot chat's header (a thread action with
+  `placement: "header"`, only on the primary Bot's chat), labelled with what
+  needs Patrick now ("Loops · 2");
+- `::loops{open="pane"}` and `::loops{more}` in the chat
+  (`experimental_useAppPanel().openTab`; where there is no side panel they
+  open the Loops tab);
+- All loops in the sidebar, which opens the Bot's chat with the pane beside it.
+  The sidebar isn't in the thread view, so it asks the chat
+  (`requestThreadTab`, `src/kit/app/thread-panel.tsx`): the chat's composer
+  opens the tab once and answers whether it opened. No retries; when it
+  didn't open, a toast says so and offers the Loops page;
 - the Bot row: opening the chat opens Loops beside it instead of Bot info
   while the badge counts something, since Needs you now lists the same items;
 - the side panel's launcher (Loops), on any thread. Every saved loop change publishes

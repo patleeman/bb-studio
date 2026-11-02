@@ -43,7 +43,7 @@ it("draws the reply count under a Bot reply with side threads, and asks to open 
   const opened = vi.fn();
   window.addEventListener(OPEN_SIDE_THREAD_EVENT, (event) => opened((event as CustomEvent).detail));
   rowOf("thr_bot:assistant:a1")!.click();
-  expect(opened).toHaveBeenCalledWith({ threadId: "fork1" });
+  expect(opened).toHaveBeenCalledWith({ threadId: "fork1", sourceThreadId: "thr_bot" });
 
   // Another thread: no rows.
   history.replaceState(null, "", "/threads/thr_other");

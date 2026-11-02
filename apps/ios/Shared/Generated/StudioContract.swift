@@ -10951,6 +10951,33 @@ public enum Studio {
     }
   }
 
+  public enum BotSideThreadsForBotOutputThreadsItemMenuParentNotifications: Sendable, Hashable, Codable {
+    case auto
+    case off
+    case stuck
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "off": self = .off
+      case "stuck": self = .stuck
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .off: try container.encode("off")
+      case .stuck: try container.encode("stuck")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSideThreadsForBotOutputThreadsItemMenu: Sendable, Hashable, Codable {
     public var projectId: String?
     public var parentThreadId: String?
@@ -10958,14 +10985,16 @@ public enum Studio {
     public var sectionId: String?
     public var status: String?
     public var isUnread: Bool?
+    public var parentNotifications: BotSideThreadsForBotOutputThreadsItemMenuParentNotifications?
 
-    public init(projectId: String? = nil, parentThreadId: String? = nil, pinnedAt: Double? = nil, sectionId: String? = nil, status: String? = nil, isUnread: Bool? = nil) {
+    public init(projectId: String? = nil, parentThreadId: String? = nil, pinnedAt: Double? = nil, sectionId: String? = nil, status: String? = nil, isUnread: Bool? = nil, parentNotifications: BotSideThreadsForBotOutputThreadsItemMenuParentNotifications? = nil) {
       self.projectId = projectId
       self.parentThreadId = parentThreadId
       self.pinnedAt = pinnedAt
       self.sectionId = sectionId
       self.status = status
       self.isUnread = isUnread
+      self.parentNotifications = parentNotifications
     }
   }
 

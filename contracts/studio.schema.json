@@ -12160,6 +12160,14 @@
                     },
                     "isUnread": {
                       "type": "boolean"
+                    },
+                    "parentNotifications": {
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "off",
+                        "stuck"
+                      ]
                     }
                   },
                   "required": [
@@ -12168,7 +12176,8 @@
                     "pinnedAt",
                     "sectionId",
                     "status",
-                    "isUnread"
+                    "isUnread",
+                    "parentNotifications"
                   ],
                   "additionalProperties": false
                 }

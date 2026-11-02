@@ -2,12 +2,8 @@
 // wakes this thread on a schedule, read from the built-in automations plugin.
 // Degrades to a short notice when that plugin is disabled or unreachable.
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  useBbNavigate,
-  useSdk,
-  type PluginThreadHeaderActionProps,
-  type PluginThreadPanelProps,
-} from "@get-bb/plugin-sdk/app";
+import { useSdk } from "@get-bb/plugin-sdk/app";
+import { useOpenThreadTab, type ThreadTabProps } from "../../kit/app/thread-panel";
 import { openAppPath } from "../../kit/app/index";
 import { cn, Icon } from "../../kit/ui/index";
 import { useLive } from "../live";
@@ -122,7 +118,7 @@ export function useThreadAutomations(threadId: string, knownProjectId: string | 
   return { state, refresh, setEnabled };
 }
 
-export function ThreadAutomationsPanel({ threadId }: PluginThreadPanelProps) {
+export function ThreadAutomationsPanel({ threadId }: ThreadTabProps) {
   const { state, setEnabled } = useThreadAutomations(threadId, null);
   return <AutomationsView state={state} onToggle={setEnabled} />;
 }
@@ -200,14 +196,14 @@ function AutomationRow({ row, now, onToggle }: { row: ThreadAutomation; now: num
 }
 
 /** The automation clock remains on regular threads; Bot threads use their Bot info button instead. */
-export function ThreadAutomationsBadge(props: PluginThreadHeaderActionProps) {
+export function ThreadAutomationsBadge(props: { threadId: string; projectId: string }) {
   const owner = useLive("bot_thread_owner", { threadId: props.threadId }, { pollMs: 120_000 });
   if (owner.loading || owner.data?.botId) return null;
   return <RegularThreadAutomationsBadge {...props} />;
 }
 
-function RegularThreadAutomationsBadge({ threadId, projectId }: PluginThreadHeaderActionProps) {
-  const navigate = useBbNavigate();
+function RegularThreadAutomationsBadge({ threadId, projectId }: { threadId: string; projectId: string }) {
+  const openTab = useOpenThreadTab();
   const { state } = useThreadAutomations(threadId, projectId);
   if (state.kind !== "ready" || state.rows.length === 0) return null;
   const active = state.rows.filter(r => r.enabled).length;
@@ -217,7 +213,7 @@ function RegularThreadAutomationsBadge({ threadId, projectId }: PluginThreadHead
       type="button"
       title={label}
       aria-label={label}
-      onClick={() => navigate.openThreadPanel({ actionId: AUTOMATIONS_TAB, title: "Automations" })}
+      onClick={() => openTab({ actionId: AUTOMATIONS_TAB, title: "Automations" })}
       className="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-background px-1.5 text-xs text-muted-foreground shadow-sm outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5"
     >
       <Icon name="Clock" aria-hidden />

@@ -2,7 +2,7 @@
 // header that opens it in the thread's workbench, beside the chat.
 import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
 import { untitled } from "../../kit/format";
-import { Markdown, useBbNavigate, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { Markdown, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract } from "../contract";
 import { chatMarkdown } from "./page-preview";
@@ -10,6 +10,7 @@ import { usePanelPage } from "./use-panel-page";
 import { isPageId, pagePath } from "../constants";
 import { relativeTime } from "./shared";
 import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
+import { useOpenThreadTab } from "../../kit/app/thread-panel";
 
 
 export { isPageId };
@@ -51,7 +52,7 @@ function PageBody({ markdown }: { markdown: string | null | undefined }) {
 }
 
 export function PageCard({ attributes }: PluginMessageDirectiveProps) {
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const id = attributes.id ?? "";
   const valid = isPageId(id);
   const page = remember(`page:${id}`, usePanelPage(valid ? id : null).page);
@@ -69,7 +70,7 @@ export function PageCard({ attributes }: PluginMessageDirectiveProps) {
       body={<PageBody markdown={markdown} />}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
-        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title, params: itemParams("page", id) }))
+        if (!openTab({ actionId: STUDIO_TAB, title, params: itemParams("page", id) }))
           openAppPath(pagePath(id));
       }}
     />

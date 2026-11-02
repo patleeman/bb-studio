@@ -108,7 +108,7 @@ export function grokModels(value: unknown): AvailableModel[] {
   if (!parsed.success) throw new AgentConnectionError("xAI returned an invalid model list.");
   // Image and embedding models are listed too; only chat models fit a thread.
   const chat = parsed.data.data.filter(m => !/image|embed|vision-only/i.test(m.id));
-  return chat.map((m, i) => ({ id: m.id, model: m.id, displayName: m.id, description: "xAI model", isDefault: i === 0, defaultReasoningEffort: "none", supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Model default" }] }));
+  return chat.map((m, i) => ({ id: m.id, model: m.id, displayName: m.id, description: "xAI model", isDefault: i === 0, defaultReasoningEffort: "none", reasoningDiscovery: "known" as const, supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Model default" }] }));
 }
 
 export async function grokHealth(connection: Connection) {

@@ -9,7 +9,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
   const rpc = { call: state.call };
   return {
     useRpc: () => rpc,
-    useBbNavigate: () => ({ openThreadPanel: () => true }),
+    experimental_useAppPanel: () => ({ openTab: () => true }),
     useRealtime: (_channel: string, handler: (payload: unknown) => void) => { state.realtime.push(handler); },
   };
 });

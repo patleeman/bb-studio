@@ -17,7 +17,7 @@ type Session = {
 export function modelCatalog(value: unknown): AvailableModel[] {
   const parsed = z.object({ data: z.array(z.object({ id: z.string().min(1) }).passthrough()) }).safeParse(value);
   if (!parsed.success) throw new AgentConnectionError("Hermes returned an invalid model catalog.");
-  return parsed.data.data.map((m, i) => ({ id: m.id, model: m.id, displayName: m.id, description: "Hermes model", isDefault: i === 0, defaultReasoningEffort: "none", supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Agent default" }] }));
+  return parsed.data.data.map((m, i) => ({ id: m.id, model: m.id, displayName: m.id, description: "Hermes model", isDefault: i === 0, defaultReasoningEffort: "none", reasoningDiscovery: "known" as const, supportedReasoningEfforts: [{ reasoningEffort: "none", description: "Agent default" }] }));
 }
 export async function hermesHealth(connection: Connection) {
   try {

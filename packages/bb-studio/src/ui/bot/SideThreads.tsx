@@ -1,11 +1,12 @@
 // Side threads on the desktop (src/bot-side-threads.ts): the tab beside the
 // chat that shows one, and the overlay that opens it when a reply's
 // "2 replies" row (reply-in-thread.ts) is clicked.
-import { ThreadChat, useBbNavigate, type PluginMessageDirectiveProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { ThreadChat, useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { requestThreadTab, type ThreadTabProps } from "../../kit/app/thread-panel";
 import { useEffect } from "react";
 import { OPEN_SIDE_THREAD_EVENT } from "./reply-in-thread";
 
-/** The thread panel action that shows a side thread (app.tsx). */
+/** The thread tab that shows a side thread (app.tsx). */
 export const SIDE_THREAD_ACTION = "bot-side-thread";
 
 /**
@@ -18,7 +19,7 @@ export function BotThreadDirective(_props: PluginMessageDirectiveProps) {
 }
 
 /** A side thread in a tab beside the Bot's chat. */
-export function SideThreadPanel({ params }: PluginThreadPanelProps) {
+export function SideThreadPanel({ params }: ThreadTabProps) {
   const threadId = params && typeof params === "object" && !Array.isArray(params) && typeof params.threadId === "string" ? params.threadId : null;
   if (!threadId) {
     return <p className="p-4 text-sm text-muted-foreground">Open a side thread from the replies row under one of your Bot’s replies.</p>;
@@ -28,17 +29,18 @@ export function SideThreadPanel({ params }: PluginThreadPanelProps) {
 
 /**
  * Opens a side thread when a reply's row asks (the content script can't
- * navigate): beside the chat, or as the thread where there's no side panel.
- * It's a thread header action that draws nothing: openThreadPanel only
- * works from inside the thread view.
+ * navigate): beside the chat it's on, or as the thread where the tab
+ * couldn't open. An app overlay that draws nothing; the chat's own view
+ * opens the tab (requestThreadTab).
  */
 export function SideThreadOpener() {
   const navigate = useBbNavigate();
   useEffect(() => {
     const open = (event: Event) => {
-      const threadId = (event as CustomEvent<{ threadId?: string }>).detail?.threadId;
+      const { threadId, sourceThreadId } = (event as CustomEvent<{ threadId?: string; sourceThreadId?: string | null }>).detail ?? {};
       if (!threadId) return;
-      if (!navigate.openThreadPanel({ actionId: SIDE_THREAD_ACTION, title: "Thread", params: { threadId } })) navigate.toThread(threadId);
+      if (!sourceThreadId) { navigate.toThread(threadId); return; }
+      void requestThreadTab(sourceThreadId, { actionId: SIDE_THREAD_ACTION, title: "Thread", params: { threadId } }).then((opened) => { if (!opened) navigate.toThread(threadId); });
     };
     window.addEventListener(OPEN_SIDE_THREAD_EVENT, open);
     return () => window.removeEventListener(OPEN_SIDE_THREAD_EVENT, open);

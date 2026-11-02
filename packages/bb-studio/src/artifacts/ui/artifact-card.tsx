@@ -3,12 +3,13 @@
 // are previewed inline, as in the viewer.
 import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
-import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import { ArtifactBody } from "./artifact-body";
 import { ARTIFACT_ICON, ARTIFACT_UPDATE_TYPE, REALTIME_CHANNEL, artifactHref, TYPE_ICONS, TYPE_LABELS, formatBytes, isArtifactId } from "../shared";
 import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
+import { useOpenThreadTab } from "../../kit/app/thread-panel";
 
 type Artifact = NonNullable<z.infer<(typeof rpcContract)["artifacts.get"]["output"]>["artifact"]>;
 
@@ -16,7 +17,7 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
   const id = attributes.id ?? "";
   const valid = isArtifactId(id);
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
+  const openTab = useOpenThreadTab();
   const [loaded, setArtifact] = useState<Artifact | null | undefined>(undefined);
   const artifact = remember(`artifact:${id}`, valid ? loaded : null);
 
@@ -45,7 +46,7 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
       title={artifact.title}
       onOpen={() => {
         // The workbench when there is one; the main area otherwise.
-        if (!navigate.openThreadPanel({ actionId: STUDIO_TAB, title: artifact.title, params: itemParams("artifact", artifact.id) }))
+        if (!openTab({ actionId: STUDIO_TAB, title: artifact.title, params: itemParams("artifact", artifact.id) }))
           openAppPath(artifactHref(artifact.id));
       }}
       body={version.type === "other" ? undefined : (

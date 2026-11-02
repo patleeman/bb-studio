@@ -19,7 +19,7 @@ const headerForTest = vi.hoisted(() => ({ owner: { data: null as unknown, loadin
 vi.mock("@get-bb/plugin-sdk/app", async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useSdk: () => sdkForTest.current,
-  useBbNavigate: () => ({ openThreadPanel: headerForTest.openThreadPanel }),
+  experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (headerForTest.openThreadPanel)({ actionId: tab.id, ...rest }) }),
 }));
 vi.mock("../live", () => ({ useLive: () => headerForTest.owner }));
 
@@ -261,13 +261,13 @@ describe("ThreadAutomationsBadge", () => {
     const { ThreadAutomationsBadge } = await import("./ThreadAutomations");
 
     headerForTest.owner = { data: { botId: "bot_1" }, loading: false };
-    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" isCompactViewport={false} />);
+    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" />);
     expect(document.querySelector("button")).toBeNull();
     expect(callRpc).not.toHaveBeenCalled();
     cleanup();
 
     headerForTest.owner = { data: { botId: null }, loading: false };
-    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" isCompactViewport={false} />);
+    render(<ThreadAutomationsBadge threadId="thr_1" projectId="proj_1" />);
     await waitFor(() => expect(callRpc).toHaveBeenCalled());
     await waitFor(() => expect(document.querySelector('button[aria-label="1 automation wake this thread"]')).not.toBeNull());
     fireEvent.click(document.querySelector('button[aria-label="1 automation wake this thread"]')!);

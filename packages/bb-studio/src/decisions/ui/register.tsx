@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import type { rpcContract } from "../contract";
 
 import { errorMessage as errorText } from "../../kit/format";
+import { toReasoningLevelOrNull } from "../../kit/reasoning";
 
 /** Matches the host-rendered settings rows above: copy on the left, control on the right. */
 function Row({ label, description, children }: { label: string; description: ReactNode; children: ReactNode }) {
@@ -199,7 +200,7 @@ function FallbackModel() {
                 mode: "model",
                 providerId: next.providerId,
                 model: next.model,
-                reasoningLevel: next.reasoningLevel,
+                reasoningLevel: toReasoningLevelOrNull(next.reasoningLevel),
                 ...(next.serviceTier ? { serviceTier: next.serviceTier } : {}),
               })
             }

@@ -361,7 +361,7 @@ function AllLoopsRow({ botId, chatId, active, onNavigate }: { botId: string; cha
   const open = list.data ? list.data.needsYouNow.length + list.data.comingUp.length + list.data.agentsOnIt.length + list.data.waitingOnOthers.length : 0;
   const current = isLoopsPath(pathname) && pathname.includes(`/${encodeURIComponent(botId)}/`);
   return (
-    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { if (!openBeside(chatId, active)) openAppPath(loopsPath(botId)); onNavigate(); }}
+    <button type="button" data-testid="bot-all-loops" aria-current={current ? "page" : undefined} onClick={() => { if (!openBeside(chatId, active, botId)) openAppPath(loopsPath(botId)); onNavigate(); }}
       className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[13px] text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">
       <Icon name="ListTodo" className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">All loops</span>
