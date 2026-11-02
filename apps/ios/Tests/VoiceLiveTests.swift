@@ -278,3 +278,133 @@ final class VoiceAudioSessionTests: XCTestCase {
         XCTAssertTrue(session.categoryOptions.contains(.allowBluetoothHFP))
     }
 }
+
+/// Barge-in by level (BargeInGate) and the machine's provisional mute.
+final class VoiceLiveBargeInGateTests: XCTestCase {
+    private let t0: TimeInterval = 1_800_000_000
+
+    /// `level` every 20 ms from `start` for `seconds`.
+    private func feed(_ gate: inout BargeInGate, level: Float, playback: Float, playing: Bool = true, from start: TimeInterval, seconds: TimeInterval) -> TimeInterval? {
+        var at = start
+        while at < start + seconds {
+            if gate.feed(level: level, playback: playback, voicePlaying: playing, at: at) { return at }
+            at += 0.02
+        }
+        return nil
+    }
+
+    func testSustainedSpeechTriggersAfterTheMinimumDuration() {
+        var gate = BargeInGate()
+        let fired = feed(&gate, level: 0.15, playback: 0.1, from: t0, seconds: 1)
+        XCTAssertNotNil(fired)
+        XCTAssertEqual(fired! - t0, 0.12, accuracy: 0.021)
+    }
+
+    func testABriefSpikeDoesNot() {
+        var gate = BargeInGate()
+        XCTAssertNil(feed(&gate, level: 0.3, playback: 0.1, from: t0, seconds: 0.08), "a click or a bump")
+        XCTAssertNil(feed(&gate, level: 0, playback: 0.1, from: t0 + 0.08, seconds: 0.1))
+        XCTAssertNil(feed(&gate, level: 0.3, playback: 0.1, from: t0 + 0.18, seconds: 0.08), "the count starts again after a dip")
+    }
+
+    func testTheVoicesOwnEchoDoesNotTriggerIt() {
+        var gate = BargeInGate()
+        // What's left after echo cancellation: up to half the playback level.
+        for playback: Float in [0.05, 0.1, 0.2, 0.4] {
+            XCTAssertNil(feed(&gate, level: playback * 0.45, playback: playback, from: t0, seconds: 2), "echo at playback \(playback)")
+        }
+        // The user over the echo does.
+        XCTAssertNotNil(feed(&gate, level: 0.4 * 0.45 + 0.15, playback: 0.4, from: t0 + 10, seconds: 1))
+    }
+
+    func testTheBarIsHigherWhileTheVoicePlays() {
+        let gate = BargeInGate()
+        XCTAssertEqual(gate.threshold(playback: 0, voicePlaying: false), 0.02)
+        XCTAssertEqual(gate.threshold(playback: 0, voicePlaying: true), 0.035)
+        XCTAssertEqual(gate.threshold(playback: 0.2, voicePlaying: true), 0.12, accuracy: 0.0001)
+        var quiet = BargeInGate()
+        XCTAssertNotNil(feed(&quiet, level: 0.03, playback: 0, playing: false, from: t0, seconds: 1), "a quiet line takes a softer voice")
+        var playing = BargeInGate()
+        XCTAssertNil(feed(&playing, level: 0.03, playback: 0, from: t0, seconds: 1))
+    }
+
+    // MARK: The machine
+
+    private func speaking() -> LiveSessionMachine {
+        var machine = LiveSessionMachine(endsLinesOnPause: true)
+        _ = machine.start(now: t0)
+        _ = machine.handle(.started, now: t0 + 0.1)
+        _ = machine.handle(.agentText("First, reply to Dana about the pricing deck, then renew the domain"), now: t0 + 1)
+        XCTAssertEqual(machine.phase, .agentSpeaking)
+        return machine
+    }
+
+    private func frames(_ level: Float, from start: TimeInterval, count: Int) -> [(level: Float, at: TimeInterval)] {
+        (0..<count).map { (level: level, at: start + Double($0) * 0.02) }
+    }
+
+    func testTheLevelMutesAtOnceAndWordsConfirmIt() {
+        var machine = speaking()
+        XCTAssertEqual(machine.micLevels(frames(0.05, from: t0 + 1.5, count: 10), playback: 0.1), [], "below the echo bar")
+        let effects = machine.micLevels(frames(0.2, from: t0 + 2, count: 10), playback: 0.1)
+        XCTAssertEqual(effects, [.muteAgentAudio(true)], "muted, no note yet: words must confirm")
+        XCTAssertNotNil(machine.provisionalSince)
+        XCTAssertEqual(machine.provisionalSince!, t0 + 2.12, accuracy: 0.001)
+        // The voice keeps sending words meanwhile; it stays muted and the turn stays open.
+        XCTAssertEqual(machine.handle(.agentText(" before Friday."), now: t0 + 2.3), [])
+        XCTAssertEqual(machine.tick(now: t0 + 2.6), [])
+        XCTAssertEqual(machine.phase, .agentSpeaking)
+        // Words within the window: a barge-in, with the note.
+        let confirmed = machine.handle(.userText("Okay, stop"), now: t0 + 2.9)
+        XCTAssertTrue(confirmed.contains { if case .send(.note(let text, spoken: false)) = $0 { return text.contains("interrupted") } else { return false } })
+        XCTAssertNil(machine.provisionalSince)
+        XCTAssertEqual(machine.phase, .userSpeaking)
+        XCTAssertEqual(machine.interruptions, 1)
+        XCTAssertEqual(machine.falseTriggers, 0)
+        XCTAssertTrue(machine.drain().contains { if case .interrupted = $0 { return true } else { return false } })
+    }
+
+    func testMutedWhileTheUserKeepsTalkingEvenBeforeWords() {
+        var machine = speaking()
+        _ = machine.micLevels(frames(0.2, from: t0 + 2, count: 10), playback: 0.1)
+        // GPT-Live's transcript lags ~2.4 s while the voice talks: the user is still loud at 3.5 s.
+        _ = machine.micLevels(frames(0.2, from: t0 + 2.2, count: 70), playback: 0.1)
+        XCTAssertEqual(machine.tick(now: t0 + 3.5), [], "still talking: stays muted")
+        XCTAssertTrue(machine.agentMuted)
+        // Words at 4.4 s confirm it.
+        let confirmed = machine.handle(.userText("Okay, stop there"), now: t0 + 4.4)
+        XCTAssertTrue(confirmed.contains { if case .send(.note(_, spoken: false)) = $0 { return true } else { return false } })
+        XCTAssertEqual(machine.falseTriggers, 0)
+    }
+
+    func testNoWordsWithinASecondLetsTheVoiceCarryOn() {
+        var machine = speaking()
+        _ = machine.micLevels(frames(0.2, from: t0 + 2, count: 10), playback: 0.1)
+        // A cough: loud for 0.2 s, then quiet.
+        _ = machine.micLevels(frames(0.01, from: t0 + 2.2, count: 10), playback: 0.1)
+        XCTAssertTrue(machine.agentMuted)
+        XCTAssertEqual(machine.tick(now: t0 + 2.9), [], "still inside the window")
+        XCTAssertEqual(machine.tick(now: t0 + 3.2), [.muteAgentAudio(false)])
+        XCTAssertFalse(machine.agentMuted)
+        XCTAssertNil(machine.provisionalSince)
+        XCTAssertEqual(machine.falseTriggers, 1)
+        XCTAssertEqual(machine.interruptions, 0)
+        XCTAssertEqual(machine.phase, .agentSpeaking, "the voice carries on")
+        XCTAssertFalse(machine.drain().contains { if case .interrupted = $0 { return true } else { return false } })
+    }
+
+    func testLevelsDoNothingWhenTheVoiceIsQuiet() {
+        var machine = LiveSessionMachine(endsLinesOnPause: true)
+        _ = machine.start(now: t0)
+        _ = machine.handle(.started, now: t0 + 0.1)
+        XCTAssertEqual(machine.micLevels(frames(0.5, from: t0 + 1, count: 20), playback: 0), [], "the user just talking isn't a barge-in")
+        XCTAssertNil(machine.provisionalSince)
+    }
+
+    func testTheTranscriptAloneStillBargesInWithoutLevels() {
+        var machine = speaking()
+        let effects = machine.handle(.userText("Wait"), now: t0 + 2)
+        XCTAssertEqual(effects.first, .muteAgentAudio(true))
+        XCTAssertEqual(machine.phase, .userSpeaking)
+    }
+}

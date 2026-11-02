@@ -166,6 +166,14 @@ final class VoiceLiveController: ObservableObject {
 
     private func attach(_ transport: LiveTransport) {
         transport.onMessage = { [weak self] data in self?.handle(data) }
+        transport.onLevels = { [weak self] mic, playback in
+            guard let self else { return }
+            // The frames arrived together; space them 20 ms apart, newest now.
+            let now = Self.now
+            let frames = mic.enumerated().map { (level: $0.element, at: now - Double(mic.count - 1 - $0.offset) * 0.02) }
+            let effects = self.machine.micLevels(frames, playback: playback)
+            if !effects.isEmpty { self.apply(effects) }
+        }
         transport.onClosed = { [weak self] reason in
             guard let self, self.machine.isLive else { return }
             self.apply(self.machine.fail(reason ?? "The voice connection closed.", now: Self.now))

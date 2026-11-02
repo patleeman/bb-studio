@@ -83,6 +83,17 @@ struct LiveSessionMachine: Sendable {
     private(set) var card: LiveToolCard?
     private(set) var agentMuted = false
     private(set) var interruptions = 0
+    /// Level triggers the transcript didn't confirm: the voice was unmuted and carried on.
+    private(set) var falseTriggers = 0
+    /// When the level gate muted the voice, until words confirm it or the window passes.
+    private(set) var provisionalSince: TimeInterval?
+    var gate = BargeInGate()
+    /// Words must arrive this soon after the user's level drops back, or the voice comes back.
+    /// It counts from the end of the loud part, not the trigger: while the voice talks, GPT-Live's
+    /// transcript of the user lags ~2.4 s (live run, Nov 1), longer than a cough lasts.
+    var confirmWindow: TimeInterval = 1.0
+    /// The last mic frame above the gate's bar during a provisional mute.
+    private var loudUntil: TimeInterval = 0
 
     /// GPT-Live and the mock have no end-of-line events: a pause ends a line.
     var endsLinesOnPause: Bool
@@ -217,14 +228,45 @@ struct LiveSessionMachine: Sendable {
         }
     }
 
+    /// Mic frames (linear RMS, oldest first, with their times) and the voice's playback level.
+    /// While the voice talks, the user's voice above its echo mutes it at once (BargeInGate);
+    /// the transcript then confirms (userHeard) or the window cancels it (tick).
+    mutating func micLevels(_ frames: [(level: Float, at: TimeInterval)], playback: Float) -> [LiveEffect] {
+        // While muted provisionally, keep track of whether the user is still talking.
+        if let since = provisionalSince {
+            let bar = gate.threshold(playback: 0, voicePlaying: true)
+            for frame in frames where frame.at >= since && frame.level > bar { loudUntil = max(loudUntil, frame.at) }
+            return []
+        }
+        guard isLive, phase == .agentSpeaking, !agentMuted else {
+            if phase != .agentSpeaking { gate.reset() }
+            return []
+        }
+        for frame in frames where gate.feed(level: frame.level, playback: playback, voicePlaying: true, at: frame.at) {
+            provisionalSince = frame.at
+            loudUntil = frame.at
+            agentMuted = true
+            gate.reset()
+            return [.muteAgentAudio(true)]
+        }
+        return []
+    }
+
     /// Ends lines on a pause (GPT-Live, the mock), and the voice's turn when its audio should be done.
     mutating func tick(now: TimeInterval) -> [LiveEffect] {
         guard isLive else { return [] }
         var effects: [LiveEffect] = []
+        // A level trigger with no words after it: a false alarm (a cough, the car). Let the voice carry on.
+        if let since = provisionalSince, now - max(since, loudUntil) > confirmWindow {
+            provisionalSince = nil
+            agentMuted = false
+            falseTriggers += 1
+            effects.append(.muteAgentAudio(false))
+        }
         if endsLinesOnPause, phase == .userSpeaking, !userText.isEmpty, now - lastUserAt > userPause {
             effects += finishUser(now: now)
         }
-        if phase == .agentSpeaking, now > agentUntil, endsLinesOnPause || agentText.isEmpty {
+        if phase == .agentSpeaking, provisionalSince == nil, now > agentUntil, endsLinesOnPause || agentText.isEmpty {
             finishAgent(now: now)
         }
         return effects
@@ -307,9 +349,10 @@ struct LiveSessionMachine: Sendable {
 
     private mutating func userHeard(_ delta: String, now: TimeInterval) -> [LiveEffect] {
         var effects: [LiveEffect] = []
-        if phase == .agentSpeaking {
+        if phase == .agentSpeaking || provisionalSince != nil {
             // The voice's own words leaking into the mic aren't the user.
             if Self.isEcho(userText + delta, of: recentAgent + " " + agentText) { return [] }
+            // Words: a level trigger is confirmed, or (without one) the transcript barges in on its own.
             effects += bargeIn(now: now)
         }
         if case .paused = phase { return [] }
@@ -325,6 +368,12 @@ struct LiveSessionMachine: Sendable {
         if awaitingTurn { return [] }
         var effects: [LiveEffect] = []
         if phase == .userSpeaking { effects += finishUser(now: now) }
+        // Muted by a level trigger that's waiting for words: the voice stays quiet meanwhile.
+        if provisionalSince != nil {
+            agentText += delta
+            agentUntil = max(agentUntil, now + agentPause) + Self.speakingTime(delta)
+            return effects
+        }
         if agentMuted {
             agentMuted = false
             effects.append(.muteAgentAudio(false))
@@ -342,6 +391,8 @@ struct LiveSessionMachine: Sendable {
         finishAgent(now: now)
         reports.append(.interrupted(heard: heard, atMs: Self.ms(now)))
         interruptions += 1
+        // Already silent when the level gate triggered: this confirms it.
+        provisionalSince = nil
         agentMuted = true
         awaitingTurn = true
         agentUntil = 0

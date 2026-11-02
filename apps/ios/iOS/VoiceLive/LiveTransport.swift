@@ -10,6 +10,8 @@ private let log = Logger(subsystem: "nyc.plee.bbgo", category: "voice-live")
 protocol LiveTransport: AnyObject {
     var onMessage: ((Data) -> Void)? { get set }
     var onClosed: ((String?) -> Void)? { get set }
+    /// Mic frames (linear RMS, oldest first) and the voice's playback level, for barge-in by level.
+    var onLevels: (([Float], Float) -> Void)? { get set }
     func send(_ data: Data)
     /// Barge-in: off silences the voice at once; on lets its next reply play.
     func setAgentAudio(enabled: Bool)
@@ -27,6 +29,8 @@ protocol LiveTransport: AnyObject {
 final class WebRTCLiveTransport: NSObject, LiveTransport {
     var onMessage: ((Data) -> Void)?
     var onClosed: ((String?) -> Void)?
+    var onLevels: (([Float], Float) -> Void)?
+    private var meter: Task<Void, Never>?
 
     private static let factory: RTCPeerConnectionFactory = {
         RTCInitializeSSL()
@@ -79,6 +83,31 @@ final class WebRTCLiveTransport: NSObject, LiveTransport {
 
     func setAnswer(_ sdp: String) async throws {
         try await peer?.setRemoteDescription(RTCSessionDescription(type: .answer, sdp: sdp))
+        startMeter()
+    }
+
+    /// The mic's and the voice's levels every 50 ms, from WebRTC's stats (`audioLevel`, linear 0–1):
+    /// media-source is the mic after echo cancellation, inbound-rtp the voice as played.
+    private func startMeter() {
+        meter?.cancel()
+        meter = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                guard let self, let peer = self.peer else { return }
+                let levels: (Float, Float) = await withCheckedContinuation { continuation in
+                    peer.statistics { report in
+                        var mic: Float = 0, voice: Float = 0
+                        for stats in report.statistics.values where (stats.values["kind"] as? String) == "audio" {
+                            let level = (stats.values["audioLevel"] as? NSNumber)?.floatValue ?? 0
+                            if stats.type == "media-source" { mic = level }
+                            if stats.type == "inbound-rtp" { voice = level }
+                        }
+                        continuation.resume(returning: (mic, voice))
+                    }
+                }
+                self.onLevels?([levels.0], self.agentAudio ? levels.1 : 0)
+            }
+        }
     }
 
     /// Realtime: post the offer to OpenAI with the client secret; returns the answer.
@@ -115,6 +144,7 @@ final class WebRTCLiveTransport: NSObject, LiveTransport {
     }
 
     func close() {
+        meter?.cancel()
         channel?.close()
         peer?.close()
         peer = nil
@@ -182,6 +212,7 @@ extension WebRTCLiveTransport: RTCPeerConnectionDelegate, RTCDataChannelDelegate
 final class MockLiveTransport: LiveTransport {
     var onMessage: ((Data) -> Void)?
     var onClosed: ((String?) -> Void)?
+    var onLevels: (([Float], Float) -> Void)?
 
     private let socket: URLSessionWebSocketTask
     private let engine = AVAudioEngine()
@@ -222,11 +253,16 @@ final class MockLiveTransport: LiveTransport {
     }
 
     private func handle(_ data: Data) {
-        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           object["type"] as? String == "mock.audio.delta", let base64 = object["audio"] as? String,
-           let pcm = Data(base64Encoded: base64) {
-            if agentAudio { play(pcm) }
-            return
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if object["type"] as? String == "mock.audio.delta", let base64 = object["audio"] as? String, let pcm = Data(base64Encoded: base64) {
+                if agentAudio { play(pcm) }
+                return
+            }
+            // The phone's mic as the bridge hears it (the script's speech plus the voice's echo).
+            if object["type"] as? String == "mock.levels", let mic = object["mic"] as? [NSNumber] {
+                onLevels?(mic.map(\.floatValue), agentAudio ? ((object["playback"] as? NSNumber)?.floatValue ?? 0) : 0)
+                return
+            }
         }
         onMessage?(data)
     }
@@ -250,8 +286,11 @@ final class MockLiveTransport: LiveTransport {
     }
 
     func setAgentAudio(enabled: Bool) {
+        guard enabled != agentAudio else { return }
         agentAudio = enabled
         if enabled { player.play() } else { player.stop() }
+        // So the bridge can time the mute (and drop the voice from its recording meanwhile).
+        send(Data(#"{"type":"\#(enabled ? "mock.unmuted" : "mock.muted")"}"#.utf8))
     }
 
     func setMicMuted(_ muted: Bool) {}
