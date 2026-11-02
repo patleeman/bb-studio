@@ -28,6 +28,8 @@ a macOS microphone prompt.
 | iOS app: WebRTC and mock transports, controller, screen, `-qaVoiceLive` demo states | [`apps/ios/iOS/VoiceLive/`](../../apps/ios/iOS/VoiceLive/) |
 | Talk dictation's Bluetooth fix (HFP) | [`TalkRecorder.swift`](../../apps/ios/iOS/Talk/TalkRecorder.swift) |
 | Scripted GPT-Live mock with Studio's real tool layer | [`packages/bb-studio/scripts/voice-mock/server.ts`](../../packages/bb-studio/scripts/voice-mock/server.ts) |
+| **Desktop:** the panel, session, transports, and the same machine and barge-in gate in TypeScript | [`packages/bb-studio/src/voice/live/ui/`](../../packages/bb-studio/src/voice/live/ui/) |
+| Desktop staged capture (renders, recording, trace, CSP check) | [`scripts/capture/voice-desktop.mjs`](../../scripts/capture/voice-desktop.mjs) |
 
 Entry: a waveform button in the Bot tab's header, or `bbstudio://handsfree`.
 You tap Start once. After that, nothing needs a tap until End.
@@ -335,6 +337,93 @@ shares:
 - **WebRTC binary.** About 46 MB added to the app, from a third-party build of
   Google's WebRTC.
 
+## Desktop
+
+Patrick tests it first at the Mac, in the BB window, before any TestFlight.
+It uses the same voice agent, Studio relay, tool layer, eyes-free rules, cost
+cap and voice-thread posting as the iPhone.
+
+- **Surface: a Studio app overlay** (`experimental_appOverlay`). It's a
+  floating panel at the right, over every page, that stays while the session
+  runs, so you can keep looking at the Bot chat or anything else. A thread side
+  panel would close when you leave the thread.
+- **Entry points:** a waveform button in the Bot chat's header
+  (`experimental_threadHeaderAction`, beside the Loops button), and "Studio:
+  Hands-free voice" in the command palette.
+- **UI:** the same language as iOS:
+  - the talking orb (teal for you, the accent for the voice, purple while
+    thinking);
+  - live subtitles, with "✓ Sent to …" under them for a relay;
+  - "Waiting for your yes" only for destructive actions;
+  - the model, cost and mic name in the header;
+  - one Start/End button.
+- **Transport: browser WebRTC in the BB window.** It uses
+  `RTCPeerConnection` and `getUserMedia` with `echoCancellation: true`. Studio
+  exchanges gpt-live-1's SDP, and Realtime posts its offer with a client
+  secret. The staged mock is a WebSocket with Web Audio playback.
+- **Barge-in by level:** Web Audio `AnalyserNode`s on the mic (after echo
+  cancellation) and on the voice's stream feed the same gate and machine as
+  iOS, ported to TypeScript with the same tests
+  (`machine.test.ts`, `session.test.ts`).
+- **Anything in BB blocking it?** Nothing found in the BB web UI.
+  - It sends no `Content-Security-Policy` header or meta tag, and no
+    `Permissions-Policy`.
+  - In both staged runs, the page's console errors, unhandled rejections and
+    `securitypolicyviolation` events were recorded. There were none from the
+    mic, WebRTC or the socket; the only messages were an unrelated
+    `experimental_ThreadActionsMenu` className warning.
+  - Not checked: the Electron desktop shell's own permission handler and any
+    CSP it adds, because staged tests run in Chrome against the web UI. Studio's
+    Talk recorder already uses `getUserMedia` there, but WebRTC to OpenAI hasn't
+    been tried in the shell.
+
+### Staged runs
+
+Both runs were in a staged BB from `scripts/staged-bb.mjs` (stable 0.48.1),
+with Studio installed from this branch (`git:<worktree>@<commit>`). The Bot was
+created there with `bot_create`, and three loops were seeded in its database.
+The capture Chrome drove the real header button and panel
+(`scripts/capture/voice-desktop.mjs`).
+
+- **Mock.** The staged BB ran with `STUDIO_VOICE_MOCK_URL`, and the voice mock
+  ran with `--script desktop`. The panel called the staged Studio's real
+  `voiceLive.tool`. The relay landed in the seeded thread "Review the launch
+  checklist", and dropping "Remove the stale Tailscale node" needed the spoken
+  yes. Tool round trips were 3–20 ms. No real mic was used: the script plays
+  the user's side, including the mic levels.
+- **Live, gpt-live-1.** The staged BB had `OPENAI_API_KEY` from the staged
+  dotenv. Chrome's fake mic played a synthetic voice file
+  (`--use-file-for-fake-audio-capture`, macOS `say`, six lines at fixed
+  times), and the panel talked WebRTC to GPT-Live. Times are measured from when
+  the mic opened, against the file's word onsets:
+
+| What | Live, desktop (3rd run, after the fixes) |
+| --- | --- |
+| Mic open → `session.started` | 1.4 s (SDP through Studio, then WebRTC) |
+| **Barge-in: first word → voice muted** | **0.23–0.50 s** (four cut-ins: 0.50, 0.23, 0.47, 0.39). The transcript confirmed each about 1.2 s after the first word. |
+| User's first word → first transcript word | 1.1–1.4 s |
+| End of speech → the voice's first words (transcript), **turn latency** | 0.76–2.28 s, tool calls included |
+| Tool calls through Studio's real tool layer | 5 per run (loops_list ×2, send_to_thread, loops_act drop, confirm) |
+| Session cost | ≈ $0.06 for about 1 min |
+
+**Found in the staged live runs, and fixed:**
+- **The voice thread never opened.** It was spawned with a host environment
+  and no host id: "hostId is required unless workspace.type is personal". It
+  now uses the personal project's default environment, like the Bot's chat. The
+  third run's voice thread is saved as `live/live-voice-thread.md`.
+- **One barge-in muted and unmuted three times.** GPT-Live's transcript of the
+  user comes in bursts while the voice talks, so the 0.9 s pause ended the
+  user's line too early, and the voice's next words unmuted it. A line now ends
+  only when the mic is quiet too (desktop and iOS).
+- **The voice offered "undo" after a confirmed drop.** Studio's result now says
+  it can't be undone by voice.
+
+**Noticed and not changed.** Because a relay sets `senderThreadId`, BB delivers
+the target thread's reply into the voice thread as a message. That's one more
+short `[PASS]` turn there per relay; the agent did pass each time. Dropping
+`senderThreadId` would save the turn but lose "from the voice thread" in the
+target.
+
 ## How to run it
 
 - Studio: `cd packages/bb-studio && ./node_modules/.bin/tsc --noEmit && ./node_modules/.bin/vitest run src/voice/live`
@@ -351,10 +440,32 @@ shares:
   `live-timings.json`, `live-audio.wav` (both sides) and `live-events.jsonl`.
 - Live, on a phone: put the key in Studio's settings and set "Hands-free voice:
   model". Not tried yet.
+- Desktop, staged:
+  1. Run `node scripts/staged-bb.mjs start` with `STUDIO_VOICE_MOCK_URL` (mock)
+     or `OPENAI_API_KEY` from the staged dotenv (live) in the environment.
+  2. Install Studio from the branch: `bb plugin install git:<worktree>@<commit> --plugin studio`.
+  3. Run `bot_create`, and seed loops.
+  4. `VOICE_DESKTOP_OUT=<dir> node scripts/capture/voice-desktop.mjs mock|live`.
+     For live, add `BB_CAPTURE_CHROME_ARGS="--use-file-for-fake-audio-capture=<wav>"`
+     and `VOICE_DESKTOP_END_AFTER=85`.
 
 ## Deliverables
 
-In `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
+Desktop, in `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-desktop/`:
+
+- **The header button:** `header-button.png` and `-dark`, with its tooltip.
+- **Renders from the mock run,** each in light and dark (`-dark`): idle (the
+  panel before Start), listening, speaking with subtitles, the confirm card (a
+  destructive drop), sent, and ended.
+- **`handsfree-desktop-mock.mp4`:** the 44 s mock session.
+- **`trace-mock.json`, `problems-mock.json` and `mock-server.log`.**
+- **`live/`:** the third live gpt-live-1 run, with the same renders,
+  `handsfree-desktop-live.mp4` (87 s, no sound: the capture Chrome runs with
+  `--mute-audio`), `trace-live.json`, `problems-live.json`,
+  `live-voice-thread.md`, and the synthetic voice (`user-voice.wav` and
+  `user-voice-onsets.json`).
+
+iPhone, in `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-spike/`:
 
 - **`before/`** has today's voice mode in the Bot chat: idle, hands-free
   listening, and the Bot speaking. They were taken from this build, so the
