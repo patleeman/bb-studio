@@ -92,12 +92,6 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
-      "file": "apps/ios/Shared/BBClient+DrawingEditing.swift",
-      "plugin": "studio",
-      "method": "drawings.createDrawing",
-      "coverage": "generated method"
-    },
-    {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
       "method": "searchAll",

@@ -165,7 +165,7 @@ struct RouteDestination: View {
     // was close to what Xcode 26 gives up on.
     var body: some View {
         switch route {
-        case .thread, .pages, .page, .automations, .automation, .usage, .archived, .drawings: threadsAndTools
+        case .thread, .pages, .page, .automations, .automation, .usage, .archived: threadsAndTools
         default: studioItems
         }
     }
@@ -179,7 +179,6 @@ struct RouteDestination: View {
         case .automation(let automation): AutomationView(automation: automation).id(automation.id)
         case .usage: UsageView()
         case .archived: ArchivedView()
-        case .drawings: DrawingsView()
         default: EmptyView()
         }
     }

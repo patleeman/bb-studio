@@ -11,7 +11,6 @@ enum Route: Hashable {
     case automation(Automation)
     case usage
     case archived
-    case drawings
     case drawing(id: String)
     case recording(id: String)
     case artifact(id: String)

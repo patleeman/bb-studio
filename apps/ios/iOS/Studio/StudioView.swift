@@ -189,7 +189,7 @@ final class StudioStore: ObservableObject {
         update(item) { $0.projectId = projectId }
     }
 
-    /// Kinds Studio's New can make, like pages and drawings.
+    /// Kinds Studio's New can make, like pages. (Whiteboards have no create mode: pages make them.)
     var creatable: [StudioKindInfo] { kindInfo.filter { $0.createMode == "rpc" } }
 
     func create(_ kind: StudioKindInfo, projectId: String?, client: BBClient) async throws -> StudioItem {
@@ -310,7 +310,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "page", label: "Page", plural: "Pages", symbol: "doc.richtext", tint: .blue),
         StudioKind(id: "recording", label: "Recording", plural: "Recordings", symbol: "waveform", tint: .red),
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
-        StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
+        StudioKind(id: "drawing", label: "Whiteboard", plural: "Whiteboards", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
         StudioKind(id: "dashboard", label: "Dashboard", plural: "Dashboards", symbol: "square.grid.2x2", tint: .indigo),
@@ -977,12 +977,12 @@ struct StudioView: View {
         switch kind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
-        case "drawing": "Ask an agent to sketch something, or draw in BB web."
+        case "drawing": "Whiteboards live in pages. Add one with /whiteboard in a page on BB web, or ask an agent to sketch in a page."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
         case "dashboard": "Ask an agent for a dashboard, or make one in BB on the desktop. Widgets refresh while it's open."
         case "mini": "Ask an agent for a mini app: a small app with its own data, such as a tracker or a board."
-        default: "Pages, recordings, dictations, drawings and artifacts show up here."
+        default: "Pages, recordings, dictations, whiteboards and artifacts show up here."
         }
     }
 
