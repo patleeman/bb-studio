@@ -62,8 +62,8 @@ enum Sheet: Identifiable, Hashable {
     case dictation(threadId: String?, autoStart: Bool)
     case recording
     case write
-    /// Hands-free voice (iOS/VoiceLive).
-    case handsFree
+    /// Hands-free voice (iOS/VoiceLive); `autoStart` starts the session as it opens (Talk to Bot).
+    case handsFree(autoStart: Bool = false)
 
     var id: String {
         switch self {
@@ -96,8 +96,6 @@ final class AppModel: ObservableObject {
     @Published var tab: Tab = .bot
     @Published var path: [Route] = []
     @Published var studioPath: [Route] = []
-    /// Set by the Action button until the Bot tab starts or stops talking.
-    @Published var botTalkPending = false
     /// What the Bots tab should show next, set by links and the Action button.
     @Published var botRoute: BotRoute?
     /// The Studio tab's kind filter; nil for everything.
@@ -148,7 +146,6 @@ final class AppModel: ObservableObject {
         PhoneRelay.shared.pushStatus([])
         studioKind = nil
         sheet = nil
-        botTalkPending = false
         realtime.stop()
         client = BBClient(baseURL: url)
         realtime = BBRealtime(client: client)
@@ -177,16 +174,11 @@ final class AppModel: ObservableObject {
 
     /// The socket keeps the radio awake, and nothing shows its updates in the
     /// background: close it there and reconnect (which refetches) on return.
-    /// An open thread in voice mode keeps it, since it waits on replies to speak
-    /// with the screen locked, until it has been quiet a while.
     func scenePhaseChanged(_ phase: ScenePhase) {
         switch phase {
         case .background:
-            let realtime = realtime
-            if VoiceBackground.shared.enteredBackground(release: { realtime.stop() }) { return }
             realtime.stop()
         case .active:
-            VoiceBackground.shared.becameActive()
             realtime.start()
         default:
             break
@@ -204,7 +196,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://dashboard[/<id>]`, `bbstudio://mini[/<id>]`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`), `bbstudio://loops` (the Bot's Loops).
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://handsfree`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`, hands-free voice started at once), `bbstudio://loops` (the Bot's Loops).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
@@ -230,8 +222,7 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
-        case "handsfree", "hands-free": sheet = .handsFree
-        case "voice": if let id { openWithVoice(id) }
+        case "handsfree", "hands-free": sheet = .handsFree()
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)
@@ -293,10 +284,14 @@ final class AppModel: ObservableObject {
         sheet = .dictation(threadId: threadId, autoStart: true)
     }
 
+    /// Talk to Bot (the Action button, Siri, `bbstudio://bot-talk`): a hands-free
+    /// voice session with the Bot, started at once. Run again, it ends the session.
     func toggleBotTalk() {
-        sheet = nil
-        openBots(.primary)
-        botTalkPending = true
+        if case .handsFree = sheet {
+            sheet = nil
+            return
+        }
+        sheet = .handsFree(autoStart: true)
     }
 
     /// The Bot's Loops screen.
@@ -315,16 +310,5 @@ final class AppModel: ObservableObject {
     func openBots(_ route: BotRoute) {
         botRoute = route
         tab = .bot
-    }
-
-    /// `bbstudio://voice/<id>`: the thread, with voice mode turned on.
-    func openWithVoice(_ threadId: String) {
-        sheet = nil
-        let client = client
-        Task {
-            if (try? await client.setVoice(threadId, on: true))?.on == true { ThreadVoice.startedOn.insert(threadId) }
-            guard client.baseURL == serverURL else { return }
-            openThread(threadId)
-        }
     }
 }

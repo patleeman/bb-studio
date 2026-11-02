@@ -454,64 +454,6 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars.staticTexts["BB Studio renamed scratch"].waitForExistence(timeout: 10), "new title")
     }
 
-    /// Voice mode end to end, against a staged BB whose Studio can speak
-    /// (`TEST_RUNNER_BBGO_QA_SERVER=http://127.0.0.1:<port>` and a scratch
-    /// thread there, `TEST_RUNNER_BBGO_QA_VOICE_THREAD`, which it sends to).
-    /// `bbstudio://voice/<id>` turns voice mode on; a typed message's reply
-    /// plays and is lit up as it's read; Read Aloud reads a reply again; the
-    /// speaker's menu opens the voice settings.
-    func testVoiceChat() throws {
-        try requireQAServer()
-        app.launchStaged(server: qaServer)
-        let env = ProcessInfo.processInfo.environment
-        let server = qaServer
-        guard let thread = env["BBGO_QA_VOICE_THREAD"] else { throw XCTSkip("no staged voice server and thread") }
-        app.terminate()
-        app.launchArguments += ["-skipPushPrompt", "YES", "-serverURL", server, "-openURL", "bbstudio://voice/\(thread)"]
-        app.launchStaged(server: qaServer)
-        let composer = app.textViews["Message"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 30), "the thread opens")
-        let voice = app.descendants(matching: .any)["composerVoice"].firstMatch
-        XCTAssertTrue(voice.waitForExistence(timeout: 15), "the speaker beside the mic")
-        XCTAssertTrue(wait(15) { voice.value as? String == "On" }, "the voice link turns voice mode on")
-        let speaking = app.descendants(matching: .any)["voiceSpeaking"].firstMatch
-
-        composer.tap()
-        composer.typeText("In two short sentences: what is a haiku, and how many syllables does it have?")
-        app.buttons["Send"].tap()
-        XCTAssertTrue(speaking.waitForExistence(timeout: 120), "the reply plays")
-        XCTAssertTrue(wait(60) { speaking.label == "Speaking" }, "the reply's audio loaded")
-        sleep(1)
-        shot("voice-reply")
-        // Stop cuts it off.
-        app.buttons["voiceStop"].tap()
-        XCTAssertTrue(wait(5) { !speaking.exists }, "Stop ends it")
-
-        // Read Aloud from the reply's menu.
-        let reply = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'syllable'")).allElementsBoundByIndex.last
-        let replyText = try XCTUnwrap(reply, "the reply is in the thread")
-        replyText.press(forDuration: 1)
-        let readAloud = app.buttons["Read Aloud"]
-        XCTAssertTrue(readAloud.waitForExistence(timeout: 5), "Read Aloud in the message menu")
-        readAloud.tap()
-        XCTAssertTrue(speaking.waitForExistence(timeout: 60), "Read Aloud plays")
-        XCTAssertTrue(wait(60) { speaking.label == "Reading aloud" }, "Read Aloud's audio loaded")
-        shot("voice-read-aloud")
-        app.buttons["voiceStop"].tap()
-
-        // The speaker's menu, and the voice settings.
-        voice.press(forDuration: 1)
-        let settings = app.buttons["Voice Settings…"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5), "the voice menu")
-        shot("voice-menu")
-        settings.tap()
-        XCTAssertTrue(app.navigationBars["Voice"].waitForExistence(timeout: 10), "voice settings")
-        XCTAssertTrue(app.buttons["speechPlaySample"].waitForExistence(timeout: 15), "speech settings loaded")
-        sleep(2)
-        shot("voice-settings")
-        app.buttons["Done"].tap()
-    }
-
     /// Taps a file path in a reply and checks the file viewer opens. Scratch
     /// thread only, named by `TEST_RUNNER_BBGO_QA_FILE_THREAD`, whose last reply
     /// mentions `README.md`, or the file named by `TEST_RUNNER_BBGO_QA_FILE_NAME`

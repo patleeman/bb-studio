@@ -78,7 +78,7 @@ struct StudioTab: View {
 struct SettingsTab: View {
     @Environment(\.duoLayout) private var layout
     @State private var section = "Server"
-    private let sections = ["Server", "Plugins", "Archived threads", "Voice"]
+    private let sections = ["Server", "Plugins", "Archived threads"]
 
     var body: some View {
         RegularPages {
@@ -104,8 +104,7 @@ struct SettingsTab: View {
                 Group {
                     if !layout.twoPages || section == "Server" { SettingsView() }
                     else if section == "Plugins" { PluginStatusView() }
-                    else if section == "Archived threads" { ArchivedView() }
-                    else { SpeechSettingsView() }
+                    else { ArchivedView() }
                 }
                 .modifier(RegularScrollingSurface())
                 // Its grouped background runs under the status column, but the

@@ -4,8 +4,12 @@ The old voice mode turns on in any thread: speech to text, then the thread,
 then text to speech of its reply. Hands-free voice
 ([spike.md](spike.md)) replaces it. **Dictation stays.**
 
-This list is for Patrick to confirm. **Nothing has been removed yet.** It was
-made from `origin/main` at `6848aa94`.
+Patrick approved this list as recommended, and it was **removed on Nov 1**,
+Read aloud included. The speech-only OpenRouter key went with it (Jev keeps
+its own `openRouterApiKey`), and iOS Talk to Bot (the Action button,
+`TalkToChiefIntent`, `bbstudio://bot-talk` and `chief-talk`) now opens
+hands-free voice and starts the session at once. `docs/ios/no-voice-chat/`
+stays as history. The list was made from `origin/main` at `6848aa94`.
 
 ## What hands-free voice shares with it
 

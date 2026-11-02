@@ -146,7 +146,7 @@ struct CaptureIntent: AppIntent {
 /// Kept under its old type name so shortcuts people made still run.
 struct TalkToChiefIntent: AppIntent {
     static let title: LocalizedStringResource = "Talk to Bot"
-    static let description = IntentDescription("Start talking to your Bot; run it again to send.")
+    static let description = IntentDescription("Start a hands-free voice session with your Bot; run it again to end it.")
     static let openAppWhenRun = true
 
     @MainActor

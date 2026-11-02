@@ -26,7 +26,7 @@ are unchanged, and old `bbgo://` links still open.
 | Drafts are kept per thread, and Home marks threads that have one | `iOS/Thread/Drafts.swift` |
 | `@` suggests threads, recordings, pages, drawings, and artifacts, and sends them as real BB mentions | `iOS/Thread/MentionSuggestions.swift`, `Shared/Mentions.swift` |
 | `/` searches the project's commands and skills and inserts the chosen command as a BB command mention | `iOS/Thread/CommandSuggestions.swift`, `Shared/ComposerCommands.swift` |
-| The composer is one card, as in ChatGPT: attachments, the field at full width, then + (attach), the model button (model and reasoning level; opens Model & permissions), dictate, and send. Tap the mic to dictate inline, as on desktop: no sheet; the mic turns active and Listening (time, level, ✓ finish, ✕ cancel) shows over the composer while your words stream into the field after what you typed, in short segments as Talk transcribes them. Tap the mic again or ✓ to finish: the full transcript replaces the streamed words and stays in the field to edit and send. ✕ puts back what you typed. Leaving the thread or the app, or a sheet opening, finishes it into the field rather than losing words. Hold the mic to talk and send as before. In voice mode push to talk takes the mic's place (see [Voice mode](#voice-mode)); a talk's status always shows in the one pill over the composer, never in the field. It grows with the message, then offers a full-screen editor. While dictation has words on the way (the mic's dictation or talk, or the keyboard's own mic), Send and ⌘↩ are off (VoiceOver reads "Listening…" or "Transcribing…" beside Send) until the text is in the field; an error, cancel or closing the sheet frees it. The keyboard's dictation is read from UIKit's input mode ("dictation"), its recording-ended, failed and result-placeholder callbacks on the field, and the next text change; the same input-mode check holds Send in New thread, Write, Capture note, page comments, Work with this page, Chat About This and queued-message edits | `iOS/Thread/Composer.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/DictationGate.swift` |
+| The composer is one card, as in ChatGPT: attachments, the field at full width, then + (attach), the model button (model and reasoning level; opens Model & permissions), dictate, and send. Tap the mic to dictate inline, as on desktop: no sheet; the mic turns active and Listening (time, level, ✓ finish, ✕ cancel) shows over the composer while your words stream into the field after what you typed, in short segments as Talk transcribes them. Tap the mic again or ✓ to finish: the full transcript replaces the streamed words and stays in the field to edit and send. ✕ puts back what you typed. Leaving the thread or the app, or a sheet opening, finishes it into the field rather than losing words. Hold the mic to talk and send as before. A talk's status always shows in the one pill over the composer, never in the field. It grows with the message, then offers a full-screen editor. While dictation has words on the way (the mic's dictation or talk, or the keyboard's own mic), Send and ⌘↩ are off (VoiceOver reads "Listening…" or "Transcribing…" beside Send) until the text is in the field; an error, cancel or closing the sheet frees it. The keyboard's dictation is read from UIKit's input mode ("dictation"), its recording-ended, failed and result-placeholder callbacks on the field, and the next text change; the same input-mode check holds Send in New thread, Write, Capture note, page comments, Work with this page, Chat About This and queued-message edits | `iOS/Thread/Composer.swift`, `iOS/Thread/ThreadView.swift`, `iOS/Thread/DictationGate.swift` |
 | Change a thread's model, reasoning level, and permissions (Accept edits, Auto, Full access, up to the machine's ceiling) for its next turns. BB takes permissions with each message, so the choice goes out with the next one you send. Until then a card over the composer shows it, with Undo. A Provider picker (BB's available providers) moves the thread to another provider: BB can't change a thread's provider, so Hand off calls Studio's `thread_handoff_to_model`, "Handing off to <provider>…" shows over the composer while Studio summarizes the thread into a new one (permissions carry over), and the app then follows the new thread (in the Bot chat, the bot's next thread) | `iOS/Thread/ExecutionSheet.swift`, `Shared/ModelHandoff.swift` |
 | File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
@@ -59,7 +59,7 @@ are unchanged, and old `bbgo://` links still open.
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, images (`![alt](path)`: files on the thread's host, absolute or from the workspace root, as BB web loads them, or web URLs; tap for full screen), and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/MarkdownImage.swift`, `iOS/Thread/Messages.swift` |
 | Image attachments in a thread show three to a row; tap one to view it full size | `iOS/Thread/Messages.swift` |
 | Emoji reactions from `::reactions{items="…"}`, and Pages' Next row (`::next{reply="…" btw="…" do="…"}`) as a "What next?" card with labeled Reply, Ask for and By the way rows, as in BB web. Replies are capsules; requests and note actions are dashed rounded squares. Every note has Tell me more, which drafts "💬 Tell me more: <note>" so the agent explains it in the thread, as on the web, and 🐛 notes have Fix this. Tapping any chip drafts it (it doesn't send). Long-press a reply for the server's configured reactions; select text to react with its quote | `iOS/Thread/Messages.swift`, `Shared/ReactionSettings.swift` |
-| Long-press a message: when it was sent, Copy, Select Text, Quote, Share, Read Aloud (with Studio's voice mode). Long-press an edit or file read in the steps for Open File and Copy Path, or a command for Copy Command | `iOS/Thread/Messages.swift` |
+| Long-press a message: when it was sent, Copy, Select Text, Quote, Share. Long-press an edit or file read in the steps for Open File and Copy Path, or a command for Copy Command | `iOS/Thread/Messages.swift` |
 | Tool activity collapses into one row per run ("3 commands, 2 edits"). Tap for each step and its output | `iOS/Thread/Messages.swift` |
 | Edit a queued message or draft before it sends. Attachments stay, @-mentions stay while their text does, and the edit is refused if the message sent or changed meanwhile | `iOS/Tools/QueuedMessageEditor.swift`, `BBClient.editQueued` |
 | The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (tap to edit, send now, remove). Two or more queued messages fold into one "N queued" row; expanded, hold and drag to reorder, or use Move to Top / Up / Down | `iOS/Thread/ThreadShelf.swift` |
@@ -74,8 +74,8 @@ are unchanged, and old `bbgo://` links still open.
 | Item chat (with the Studio plugin): Chat About This on a drawing, artifact or recording starts a thread with the project's default agent that knows the item, or continues the item's last chat | `Shared/StudioChat.swift`, `iOS/Studio/StudioChatSheet.swift` |
 | Artifacts (in Studio): files agents save from threads. Markdown rendered (or as source), code and text in monospace, images zoomable, HTML, PDF, audio and video in a sandboxed web view (WebKit plays media with its own controls). Versions, share the file, copy text, New Thread with This, Save as Page, open the source thread, rename, move, delete. `::artifact{…}` cards in replies and Studio links in messages open natively. `::inline-vis{…}` previews in replies (BB's built-in inline-vis plugin): HTML visualizations from the workspace or thread storage run in a sandboxed web view at the reply's height, Markdown files render natively, with collapse, full screen, and the web app's errors for a missing file or bad height. Save Files to Studio (from the thread menu or a reply's long-press) lists the files a reply made plus the thread's storage, and saves the chosen ones as artifacts or new versions | `iOS/Studio/ArtifactView.swift`, `iOS/Studio/SaveToStudioSheet.swift`, `iOS/Thread/InlineVis.swift` |
 | Dictation and recordings through Studio, with an offline segment outbox. Dictating from a page or a note puts the text straight into that field when you tap the check mark (the thread and New thread composers dictate inline instead). A standalone dictation can be saved as a page, and recordings open to their transcript with share, copy, new thread, rename, retry of failed transcription, and delete. Play a recording: segments play back to back as one timeline with a scrub bar, back and forward 15 seconds, 0.75× to 2× speed, and lock-screen controls; the transcript comes in paragraphs with their start times, the sentence playing is highlighted, and tapping any sentence plays from there. Browser recordings are WebM/Opus, which iOS can't open, so the app demuxes them and decodes the Opus itself | `iOS/Talk` |
-| Voice mode, Studio's (see [Voice mode](#voice-mode)): a speaker beside the mic speaks a thread's replies in Studio's voice, holding the mic sends what you say, and Read Aloud on any message | `iOS/Voice`, `Shared/BBClient+Voice.swift` |
-| Bot tab (first in the tab bar: Bot, Threads, Studio, Settings; was Chief of Staff; replaces Web). The app opens on it at every launch, with or without a Bot or Studio; a link, notification tap, widget, quick action or Siri opens its own target instead: with one bot it opens that bot's chat (‹ goes to the list); with several, a list (`bot_list`) of avatar, name, status and latest reply, primary first then by name; a bot that needs you says why in its status line ("Asked you a question", in orange) with a count badge (`bot_attention`); + New bot opens the same welcome as below (external bots are imported on desktop). With no bot, the tab is a welcome (see Bot: first-time setup). Each chat scopes every call by `botId`; external bots hide Memory and Skills. The bot chat's composer has the same model button as any thread (see Model & Permissions). Widgets, Siri and the watch stay on the primary bot. The primary bot's thread is the lead of BB's personal project; its emoji menu shows its state and offers Automations… (one list of check-ins, reminders, watchers and runners from `bot_automations`: swipe to pause or delete, tap for its schedule, instruction or script, recent runs with outcomes, Run now and Edit; + makes any kind with a native schedule editor of presets, day chips, several times, every N in a window, quiet hours, end date, timezone or raw cron, or a date for a reminder; Turn off check-ins pauses every check-in; `bot_automation_*`, `iOS/Bot/BotAutomationsSheet.swift`, `Shared/BotAutomations.swift`), Pause / Resume and Stop… (confirmed: stops the threads it started and its automations), all on `bot_get`, `bot_set_run`, `bot_pause`, `bot_resume`, `bot_stop`. Only the Bot itself needs you: `bot_activity`'s `attention` (its chat asked a question, wants an approval, or has replies you haven't read; cleared on the server when you read or answer it) badges the bell with its count, the chat header's status line says why ("Asked you a question", "1 thing for you") and otherwise shows what it did before, and the Activity sheet then leads with the Bot's chat row saying why ("Asked you a question") with the count. Activity lists the bot's sub-threads as the desktop Bots sidebar does: Running, Runners, Recurring, Recent and Earlier conversations, a worker nested under the thread that started it, each with the desktop status dot (running, waiting, failed, done) and age. A thread held by a question the Bot owns stays under Running with an amber ring and what it waits for under its title ("Waiting for approval", its `waitingFor`); runners show their schedule and next run in plain English ("Daily 7:05 AM and 5:05 PM · Next run Tue 7:05 AM", a port of desktop `describeCron`) and their state only (running, next run, quiet, reported, failed, paused; an urgent report is "reported", for the Bot to pass on), and swipe for Pause / Resume and Run now; Earlier conversations is the Bot's handoff chain with titles and starts collapsed (collapsed groups are remembered). A tap opens the thread in the normal thread view. It refreshes with the tab's Activity (BB's thread changes) and on pull, with no timers of its own (`bot_activity`, `bot_runners`, `bot_chain`, `bot_runner_*`; `iOS/Bot/BotThreadsSheet.swift`, `Shared/BotThreads.swift`); a paused or stopped Bot shows a banner with Resume. A thread's ⋯ menu has Make this my Bot (`bot_set_thread`); on the Bot's thread it reads "<emoji> <name> · your Bot" with Check-ins…. Hold the composer's mic to talk and send on release; slide left or tap Cancel to cancel, which never sends and deletes the recording from the phone and from Talk on the server it was recorded to (later, if that server is offline). The Action button, `bbstudio://bot-talk` (also `chief-talk`) and the "Talk to my bot" shortcut start a hands-free talk, and the next press or a tap on the mic sends it; `bbstudio://bot` (also `chief`) opens the tab. Talking ends unsent and deleted when the thread closes, the app backgrounds, a call interrupts, or dictation opens. The Bot's thread, name and emoji are kept per server; with no Bot, or a server without Studio, the tab, widget, Siri and watch say so instead of sending. "Tell my bot" sends a message and reads the reply | `iOS/Thread/HoldToTalk.swift`, `iOS/App/RootView.swift`, `Shared/Bot.swift`, `iOS/Thread/BotMenu.swift`, `iOS/App/BotHeartbeat.swift`, `Widgets/BotWidget.swift`, `Watch/WatchApp.swift` |
+| Hands-free voice with the Bot (see [Dictation and hands-free voice](#dictation-and-hands-free-voice)): GPT-Live over WebRTC from the Bot tab's waveform, or Talk to Bot | `iOS/VoiceLive` |
+| Bot tab (first in the tab bar: Bot, Threads, Studio, Settings; was Chief of Staff; replaces Web). The app opens on it at every launch, with or without a Bot or Studio; a link, notification tap, widget, quick action or Siri opens its own target instead: with one bot it opens that bot's chat (‹ goes to the list); with several, a list (`bot_list`) of avatar, name, status and latest reply, primary first then by name; a bot that needs you says why in its status line ("Asked you a question", in orange) with a count badge (`bot_attention`); + New bot opens the same welcome as below (external bots are imported on desktop). With no bot, the tab is a welcome (see Bot: first-time setup). Each chat scopes every call by `botId`; external bots hide Memory and Skills. The bot chat's composer has the same model button as any thread (see Model & Permissions). Widgets, Siri and the watch stay on the primary bot. The primary bot's thread is the lead of BB's personal project; its emoji menu shows its state and offers Automations… (one list of check-ins, reminders, watchers and runners from `bot_automations`: swipe to pause or delete, tap for its schedule, instruction or script, recent runs with outcomes, Run now and Edit; + makes any kind with a native schedule editor of presets, day chips, several times, every N in a window, quiet hours, end date, timezone or raw cron, or a date for a reminder; Turn off check-ins pauses every check-in; `bot_automation_*`, `iOS/Bot/BotAutomationsSheet.swift`, `Shared/BotAutomations.swift`), Pause / Resume and Stop… (confirmed: stops the threads it started and its automations), all on `bot_get`, `bot_set_run`, `bot_pause`, `bot_resume`, `bot_stop`. Only the Bot itself needs you: `bot_activity`'s `attention` (its chat asked a question, wants an approval, or has replies you haven't read; cleared on the server when you read or answer it) badges the bell with its count, the chat header's status line says why ("Asked you a question", "1 thing for you") and otherwise shows what it did before, and the Activity sheet then leads with the Bot's chat row saying why ("Asked you a question") with the count. Activity lists the bot's sub-threads as the desktop Bots sidebar does: Running, Runners, Recurring, Recent and Earlier conversations, a worker nested under the thread that started it, each with the desktop status dot (running, waiting, failed, done) and age. A thread held by a question the Bot owns stays under Running with an amber ring and what it waits for under its title ("Waiting for approval", its `waitingFor`); runners show their schedule and next run in plain English ("Daily 7:05 AM and 5:05 PM · Next run Tue 7:05 AM", a port of desktop `describeCron`) and their state only (running, next run, quiet, reported, failed, paused; an urgent report is "reported", for the Bot to pass on), and swipe for Pause / Resume and Run now; Earlier conversations is the Bot's handoff chain with titles and starts collapsed (collapsed groups are remembered). A tap opens the thread in the normal thread view. It refreshes with the tab's Activity (BB's thread changes) and on pull, with no timers of its own (`bot_activity`, `bot_runners`, `bot_chain`, `bot_runner_*`; `iOS/Bot/BotThreadsSheet.swift`, `Shared/BotThreads.swift`); a paused or stopped Bot shows a banner with Resume. A thread's ⋯ menu has Make this my Bot (`bot_set_thread`); on the Bot's thread it reads "<emoji> <name> · your Bot" with Check-ins…. Hold the composer's mic to talk and send on release; slide left or tap Cancel to cancel, which never sends and deletes the recording from the phone and from Talk on the server it was recorded to (later, if that server is offline). The Action button, `bbstudio://bot-talk` (also `chief-talk`) and the "Talk to Bot" shortcut open hands-free voice with the Bot and start it at once, and the next press ends it; `bbstudio://bot` (also `chief`) opens the tab. Talking ends unsent and deleted when the thread closes, the app backgrounds, a call interrupts, or dictation opens. The Bot's thread, name and emoji are kept per server; with no Bot, or a server without Studio, the tab, widget, Siri and watch say so instead of sending. "Tell my bot" sends a message and reads the reply | `iOS/Thread/HoldToTalk.swift`, `iOS/App/RootView.swift`, `Shared/Bot.swift`, `iOS/Thread/BotMenu.swift`, `iOS/App/BotHeartbeat.swift`, `Widgets/BotWidget.swift`, `Watch/WatchApp.swift` |
 | Action button and Siri shortcuts: Dictate, Open thread, New thread, Write, "Ask BB" (Siri waits for the reply and reads it). Home Screen quick actions (long-press the icon): Dictate, Write, New Thread; `bbstudio://write` opens the same sheet | `iOS/App/Intents.swift`, `iOS/App/BBStudioApp.swift` |
 | Capture to BB opens one sheet for voice, dictation, a note, a photo or file, or a new thread. Add it in Settings → Action Button → Controls; it is also available in Control Center, Shortcuts, and Siri. | `iOS/Capture/CaptureSheet.swift`, `Widgets/Controls.swift` |
 | Control Center and lock screen controls: Dictate, New thread | `Widgets/Controls.swift` |
@@ -85,7 +85,7 @@ are unchanged, and old `bbgo://` links still open.
 | Work widget: the Bot's attention (its reason, opening the Bot; BB's waiting threads on an older Studio) and approvals, and running agents. Tap a thread or review link to open it | `Widgets/WorkWidget.swift` |
 | Spotlight indexes open threads and Studio pages, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbstudio://thread/<id>`, `reply/<id>` (opens the thread and its reply), `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`), `drawing[/<id>]` (also `drawings`), `artifact/<id>`, `design/<id>`, `recording/<id>`, `new`, `capture`, `dictate`, `record`, `write`, `voice/<id>` (the thread with voice mode on), `bots` (the list), `bot[/<id>]` (also `chief`, and the old `web`, for the primary bot), `bot-talk` (also `chief-talk`; starts or sends a hands-free talk), `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
+| URL scheme `bbstudio://thread/<id>`, `reply/<id>` (opens the thread and its reply), `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`), `drawing[/<id>]` (also `drawings`), `artifact/<id>`, `design/<id>`, `recording/<id>`, `new`, `capture`, `dictate`, `record`, `write`, `handsfree` (hands-free voice), `bots` (the list), `bot[/<id>]` (also `chief`, and the old `web`, for the primary bot), `bot-talk` (also `chief-talk`; opens hands-free voice and starts it, or ends it), `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
 | A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads and pages; open a page, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
@@ -249,98 +249,43 @@ server: `-qaDashboardDemo -openURL bbstudio://dashboard/qa-demo`
 `-qaDashboardWidgets w_signups,w_plans` to keep only some widgets; the IDs are
 in `iOS/Studio/DashboardDemo.swift`.
 
-## Voice mode
-
-Studio's voice mode, as on desktop. The speaker beside a thread's mic turns
-it on (`voice.set`); touch and hold it for Conversational Replies, the
-speed, and Voice Settings (engine, model, voice, speed and a sample, from
-`speech.*`; also in Settings → Voice while Studio is running). It's hidden
-when the server's Studio has no voice mode.
-
-When a voice thread's agent finishes, Studio makes the audio and announces
-it on the `studio-voice` signal. The open thread plays it through the app's
-one player (`VoicePlayer`): each piece downloads whole and plays in
-AVAudioPlayer at Speech's speed (0.5× to 2×) while the next one downloads,
-and a new reply cuts off the one speaking. Over the composer, Speaking shows
-the level, the speed (tap for the next) and Stop, and the piece being spoken
-is lit up in its message. Read Aloud in a message's menu reads it the same
-way (`speech.prepare` per piece, after the ported `speakable` and
-`speechChunks`). With a voice thread open, the app keeps its socket and plays
-silence with the screen locked, so replies still play, until a minute after
-the thread stops working and nothing is speaking.
-
-### One mic, one indicator
+## Dictation and hands-free voice
 
 The composer has one mic and one indicator, as on desktop (Studio's page
-"Composer: one recording surface"): at most one timer and one level at a
-time, always in the same spot over the composer. Your voice is a red dot and
-red bars; the Bot's is a blue speaker and blue bars, shown only while it speaks.
-Input and output never show together. "Listening…" and "Speaking…" go in
-the field's placeholder, not beside the buttons (`iOS/Voice/ComposerVoice.swift`).
-
-- **Idle:** the mic (dictate) and the speaker (voice mode), no timers.
-- **Dictating:** one red recorder pill with a timer, ✕ and ✓.
-- **Voice mode on:** voice mode owns the mic, so the dictation mic is hidden
-  and push to talk (a waveform) takes its place. Turning voice mode on while
-  dictating finishes the dictation into the draft first. No timer.
-- **The Bot speaking:** the same spot shows the speaker, its level, the speed
-  and Stop.
-
-Push to talk is the default: hold to talk, let go to send (slide left to
-cancel). Pressing while the Bot speaks stops it. Hold without speaking for
-a second (a long press) and it switches to hands-free: it listens all the
-time, sends each turn after 1.5 s of quiet once you've spoken, and listens
-again. Talking over the Bot stops it (barge-in): the mic's level (Talk's
-`LevelTracker`, 0–1) above 0.45 for 0.3 s while it speaks, higher than the
-0.35 that counts as speech, and the capture runs in the voice-chat audio mode
-so its own echo is cancelled. A reply that plays out with nobody talking over
-it drops what the mic heard meanwhile and listens afresh. Tap the red pill
-(or push to talk) to go back to push to talk; VoiceOver has a Hands-free
-action. The first time voice mode is on, "Hold to talk · long-press for
-hands-free" shows for a few seconds, once (tapping push to talk shows it
-again).
-
-Voice mode's talks cut phrase-length segments (2.5 s target, 8 s max, 300 ms
-pause), put the words in the field as Talk transcribes them, and send with
-Studio's agent-only conversational note when Conversational Replies is on.
+"Composer: one recording surface"): one red recorder pill over the composer
+with the time, your level, ✕ and ✓, and "Listening…" in the field's
+placeholder, not beside the buttons (`iOS/Thread/TalkIndicator.swift`). Tap
+the mic to dictate inline; hold it to talk and send (`iOS/Thread/HoldToTalk.swift`).
+Inline dictation cuts phrase-length segments (2.5 s target, 8 s max, 300 ms
+pause), so the words land in the field as Talk transcribes them.
 
 The meters and the mic's polling share one 10 Hz clock (`VoiceClock`) that
-runs only while something is listening or speaking and stops while the app
-is inactive; there are no per-frame animations. Debug builds show each state
-with no server or mic: `-qaBotDemo chat -openURL bbstudio://bot -qaVoice
-idle|dictating|ptt|handsfree|speaking|hint` (`-qaDictation listening` also
-shows the dictating pill).
+runs only while something is listening and stops while the app is inactive;
+there are no per-frame animations. Debug builds show the dictating pill with
+no server or mic: `-qaBotDemo chat -openURL bbstudio://bot -qaDictation listening`.
 
-| | Idle | Dictating | Push to talk, held | Hands-free | The Bot speaking | First-time hint |
-| --- | --- | --- | --- | --- | --- | --- |
-| Light | ![Idle: the mic and the muted speaker, no timer](docs/voice/composer-idle-light.png) | ![Dictating: a red dot, 0:26, red bars, ✕ and ✓ over the composer](docs/voice/composer-dictating-light.png) | ![Push to talk held: a red dot and red bars, no timer, Listening… in the field, the red waveform button](docs/voice/composer-ptt-light.png) | ![Hands-free: the red listening pill, Listening… in the field](docs/voice/composer-handsfree-light.png) | ![The Bot speaking: a blue speaker, blue bars, 1× and Stop, Speaking… in the field](docs/voice/composer-speaking-light.png) | ![The hint: Hold to talk · long-press for hands-free](docs/voice/composer-hint-light.png) |
-| Dark | ![Idle, dark](docs/voice/composer-idle-dark.png) | ![Dictating, dark](docs/voice/composer-dictating-dark.png) | ![Push to talk held, dark](docs/voice/composer-ptt-dark.png) | ![Hands-free, dark](docs/voice/composer-handsfree-dark.png) | ![The Bot speaking, dark](docs/voice/composer-speaking-dark.png) | ![The hint, dark](docs/voice/composer-hint-dark.png) |
+| | Idle | Dictating | Settings |
+| --- | --- | --- | --- |
+| Light | ![Idle: the attach, model, mic and send buttons, and no speaker](docs/dictation/composer-idle-light.png) | ![Dictating: a red dot, the time, red bars, ✕ and ✓ over the composer](docs/dictation/composer-dictating-light.png) | ![Settings with no Voice section](docs/dictation/settings-light.png) |
+| Dark | ![Idle, dark](docs/dictation/composer-idle-dark.png) | ![Dictating, dark](docs/dictation/composer-dictating-dark.png) | ![Settings, dark](docs/dictation/settings-dark.png) |
 
-The app has no New voice chat: turn voice mode on in any thread with the
-speaker beside the mic, or open `bbstudio://voice/<id>`.
-Before and after: [docs/ios/no-voice-chat](../../docs/ios/no-voice-chat/README.md).
+Talking with the Bot out loud is hands-free voice (`iOS/VoiceLive`, the
+waveform in the Bot tab's header): GPT-Live over WebRTC, with Studio's tool
+layer. Talk to Bot (the Action button, the Siri shortcut, `bbstudio://bot-talk`)
+opens it and starts the session at once; run it again to end it. See
+[docs/voice/spike.md](../../docs/voice/spike.md).
 
-| Speaking, with the piece lit up | The speaker's menu | Voice settings |
-| --- | --- | --- |
-| ![A voice chat reply being spoken, its text highlighted, with Speaking, 1× and Stop over the composer](docs/voice/speaking.png) | ![The speaker's menu: Voice Settings, Speed, Conversational Replies and Voice Mode](docs/voice/menu.png) | ![Voice settings: Conversational Replies, engine, model, voice and speed](docs/voice/settings.png) |
+The old in-thread voice mode (a speaker beside the mic that spoke replies in
+Studio's voice, push to talk, Read Aloud and Settings → Voice) was removed on
+Nov 1; [docs/voice/removal-list.md](../../docs/voice/removal-list.md) lists
+what went. Before that, New voice chat was removed:
+[docs/ios/no-voice-chat](../../docs/ios/no-voice-chat/README.md).
 
 Tapping the mic in any composer dictates inline the same way (see the
 composer row above); here in New thread, the words streaming in after what
 was typed:
 
-![Inline dictation: Listening, 0:04, a level, ✕ and ✓ over the composer, with "Typed first You looking for" in the field](docs/voice/dictation.png)
-
-`testVoiceChat` runs this against a staged BB whose Studio can speak (start
-it with `OPENROUTER_API_KEY` set) and a scratch thread there: it opens the
-thread with `bbstudio://voice/<id>`, sends a message and waits for the reply
-to play, reads it aloud again, and opens the voice settings. It sends to the
-staged server.
-
-```sh
-BB_STAGED_DIR=$TMPDIR/bb-staged-ios-voice BB_STAGED_PORT=49550 node ../../scripts/staged-bb.mjs start
-TEST_RUNNER_BBGO_QA_SERVER="$STAGED_SERVER_URL" TEST_RUNNER_BBGO_QA_VOICE_THREAD=thr_... xcodebuild test -scheme BBStudio \
-  -destination 'id=<your-private-simulator-id>' -only-testing:BBStudioUITests/ThreadUITests/testVoiceChat
-```
+![Inline dictation: Listening, 0:04, a level, ✕ and ✓ over the composer, with "Typed first You looking for" in the field](docs/dictation/new-thread.png)
 
 ## Connection
 
@@ -399,7 +344,7 @@ Their launches, relaunches, and API/RPC helpers use that same staged origin.
 Never point this variable at your personal BB.
 
 Offline demo tests run without the variable. This includes the transcript,
-keyboard, Duo layout, draft attachment, scroll log, and voice-menu fixtures.
+keyboard, Duo layout, draft attachment and scroll log fixtures.
 `launchOffline()` pins them to `https://offline-fixtures.invalid`, even when a
 QA variable or saved server is present. They never use the staged or personal
 BB. Mixed suites gate only their server-backed test methods.

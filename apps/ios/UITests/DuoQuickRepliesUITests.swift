@@ -4,7 +4,7 @@ import XCTest
 final class DuoQuickRepliesUITests: ServerIsolatedUITestCase {
     func testRepliesClipAtComposerAndKeepSystemSafeAreas() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-qaNotesDemo", "draft", "-qaVoice", "idle", "-skipPushPrompt", "YES",
+        app.launchArguments = ["-qaNotesDemo", "draft", "-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong", "-qaDark",
             "-openURL", "bbstudio://bot"]
         app.launchOffline()
@@ -13,7 +13,6 @@ final class DuoQuickRepliesUITests: ServerIsolatedUITestCase {
         let composer = app.otherElements["threadComposer"].firstMatch
         XCTAssertTrue(composer.exists)
         XCTAssertTrue(app.buttons["composerExpandToPage"].exists)
-        XCTAssertTrue(app.buttons["Voice mode"].exists)
         waitForValue("More replies to the right", on: replies)
         command("layout")
         let value = try XCTUnwrap(app.windows.firstMatch.value as? String)

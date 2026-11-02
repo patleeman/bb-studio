@@ -13,7 +13,7 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         let prefix = light ? "qa-v8-light-" : "v8-"
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoColdWide", "-qaDuoLong",
-            "-qaNotesDemo", "draft", "-qaVoice", "idle", "-qaStudioDemo", "-openURL", "bbstudio://bot"] + (light ? [] : ["-qaDark"])
+            "-qaNotesDemo", "draft", "-qaStudioDemo", "-openURL", "bbstudio://bot"] + (light ? [] : ["-qaDark"])
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try assertEdges(composer: true)
@@ -85,7 +85,7 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDuoLong", "-qaDark", "-qaNotesDemo", "draft",
-            "-qaVoice", "idle", "-openURL", "bbstudio://bot"]
+            "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(app.otherElements["threadComposer"].firstMatch.waitForExistence(timeout: 30))
         try assertEdges(composer: true)

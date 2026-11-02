@@ -65,9 +65,8 @@ final class TalkRecorder: ObservableObject {
         }
     }
 
-    /// `policy` decides where segments are cut: voice mode cuts short ones so the words show up while you talk.
-    /// `echoCancelling` records in the voice-chat mode, which takes the app's own playback out of the mic,
-    /// so a spoken reply isn't heard as you talking over it.
+    /// `policy` decides where segments are cut: an inline dictation cuts short ones so the words show up while you talk.
+    /// `echoCancelling` records in the voice-chat mode, which takes the app's own playback out of the mic.
     func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil, policy: SegmentPolicy = .talk,
                echoCancelling: Bool = false) async {
         guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
@@ -164,8 +163,8 @@ final class TalkRecorder: ObservableObject {
         }
     }
 
-    /// Reads what Talk has transcribed so far, while recording. Voice mode
-    /// streams it into the composer; `finish()` still waits for all of it.
+    /// Reads what Talk has transcribed so far, while recording. An inline
+    /// dictation streams it into the composer; `finish()` still waits for all of it.
     func refreshTranscript() async {
         guard phase == .recording, let id = recordingId, let detail = try? await client.recording(id),
             recordingId == id, phase == .recording
@@ -582,7 +581,7 @@ struct SegmentPolicy: Equatable, Sendable {
 
     /// Talk's default: 25s target, 40s hard max, 350ms of quiet counts as a pause.
     static let talk = SegmentPolicy(targetMs: 25_000, maxMs: 40_000, pauseMs: 350)
-    /// Voice mode's dictations, a phrase at a time (`VOICE_SEGMENT_POLICY`).
+    /// Inline dictations, a phrase at a time, so the words land in the draft while you talk.
     static let voice = SegmentPolicy(targetMs: 2_500, maxMs: 8_000, pauseMs: 300)
 
     func shouldCut(elapsedMs: Double, quietMs: Double) -> Bool {

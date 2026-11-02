@@ -16,18 +16,16 @@ final class HoldToTalkTests: XCTestCase {
         XCTAssertEqual(HoldToTalk.tapAction(for: .cancelling), .none)
     }
 
-    func testDictationGoesIntoTheDraftExceptInVoiceMode() {
-        XCTAssertEqual(HoldToTalk.delivery(for: .dictating, voice: false), .insert)
-        XCTAssertEqual(HoldToTalk.delivery(for: .dictating, voice: true), .send)
-        XCTAssertEqual(HoldToTalk.delivery(for: .recording, voice: false), .send)
-        XCTAssertEqual(HoldToTalk.delivery(for: .handsFree, voice: false), .send)
+    func testDictationGoesIntoTheDraftAndATalkIsSent() {
+        XCTAssertEqual(HoldToTalk.delivery(for: .dictating), .insert)
+        XCTAssertEqual(HoldToTalk.delivery(for: .recording), .send)
+        XCTAssertEqual(HoldToTalk.delivery(for: .handsFree), .send)
     }
 
-    func testInlineDictationAndVoiceModeStreamAPlainHoldDoesNot() {
-        XCTAssertTrue(HoldToTalk.streams(.dictating, voice: false))
-        XCTAssertTrue(HoldToTalk.streams(.recording, voice: true))
-        XCTAssertFalse(HoldToTalk.streams(.recording, voice: false))
-        XCTAssertFalse(HoldToTalk.streams(.handsFree, voice: false))
+    func testInlineDictationStreamsAPlainHoldDoesNot() {
+        XCTAssertTrue(HoldToTalk.streams(.dictating))
+        XCTAssertFalse(HoldToTalk.streams(.recording))
+        XCTAssertFalse(HoldToTalk.streams(.handsFree))
     }
 
     func testDictatingHoldsSendUntilTheWordsLand() {

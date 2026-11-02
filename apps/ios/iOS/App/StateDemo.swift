@@ -91,7 +91,7 @@ struct StateDemoSheets: ViewModifier {
                 related = StateDemo.variant == "related"
                 chat = StateDemo.variant == "studio-chat"
                 widgets = StateDemo.variant == "widgets"
-                if VoiceLiveDemo.variant != nil { AppModel.shared.sheet = .handsFree }
+                if VoiceLiveDemo.variant != nil { AppModel.shared.sheet = .handsFree() }
             }
             // Outermost, so the sheets above it get the app too.
             .environmentObject(AppModel.shared)

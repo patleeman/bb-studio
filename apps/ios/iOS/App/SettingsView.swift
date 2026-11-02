@@ -97,23 +97,10 @@ struct SettingsView: View {
                     }
                 }
             }
-            if runningPlugins.split(separator: ",").contains("studio") {
-                Section {
-                    NavigationLink { SpeechSettingsView() } label: {
-                        Label("Voice", systemImage: "speaker.wave.2")
-                    }
-                    .accessibilityIdentifier("settingsVoice")
-                } header: {
-                    Text("Voice").foregroundStyle(Color.primary.opacity(0.75))
-                } footer: {
-                    Text("Replies in voice threads are spoken in Studio's voice. Turn voice mode on in any thread with the speaker beside the mic.")
-                        .foregroundStyle(Color.primary.opacity(0.75))
-                }
-            }
             ScrollLogSection()
             Section("Action button") {
                 Text(
-                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB or Open BB thread."
+                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, Talk to Bot (hands-free voice) or Open BB thread."
                 )
                 .font(.footnote)
             }

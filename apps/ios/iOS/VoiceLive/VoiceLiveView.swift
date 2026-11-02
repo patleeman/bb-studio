@@ -6,9 +6,12 @@ import SwiftUI
 struct VoiceLiveView: View {
     @StateObject private var controller: VoiceLiveController
     @Environment(\.dismiss) private var dismiss
+    /// Talk to Bot: start as soon as the sheet shows, with no tap on Start.
+    private let autoStart: Bool
 
-    init(controller: @autoclosure @escaping () -> VoiceLiveController) {
+    init(controller: @autoclosure @escaping () -> VoiceLiveController, autoStart: Bool = false) {
         _controller = StateObject(wrappedValue: controller())
+        self.autoStart = autoStart
     }
 
     var body: some View {
@@ -37,6 +40,7 @@ struct VoiceLiveView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(VoiceLiveBackground(speaker: controller.machine.speaking))
         .interactiveDismissDisabled(controller.isLive)
+        .onAppear { if autoStart, controller.phase == .idle { controller.start() } }
         .onDisappear { if controller.isLive { controller.stop() } }
     }
 }

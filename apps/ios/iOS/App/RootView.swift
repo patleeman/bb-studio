@@ -112,8 +112,8 @@ struct RootView: View {
                 DictationView(threadId: nil, autoStart: true, kind: "recording")
             case .write:
                 QuickWriteView()
-            case .handsFree:
-                VoiceLiveView(controller: VoiceLiveController.make(client: model.client))
+            case .handsFree(let autoStart):
+                VoiceLiveView(controller: VoiceLiveController.make(client: model.client), autoStart: autoStart)
                     .presentationDragIndicator(.hidden)
             }
         }

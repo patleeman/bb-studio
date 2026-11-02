@@ -55,7 +55,6 @@ struct ThreadTranscriptActions {
     var edit: (String) -> Void
     var sideChat: ((String) -> Void)?
     var saveFiles: ((Int?) -> Void)?
-    var readAloud: ((_ rowId: String, _ text: String) -> Void)?
     var openThread: (String) -> Void
     var replyInThread: (String) -> Void
     var resolve: (PendingInteraction, JSONValue) async -> Bool
@@ -86,8 +85,6 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var unread = false
         var match = false
         var editable = false
-        var reading = false
-        var piece: String?
     }
 
     var id: String {
@@ -142,15 +139,12 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
 
     /// A thread: its messages and activity, the outbox, questions, and the working line.
     static func thread(items: [TimelineItem], hasOlder: Bool, unread: String?, match: String?, editableId: String?,
-                       reading: (String) -> Bool, readAlong: (row: String, piece: String?)?,
                        pending: [Outbox.Message], interactions: [PendingInteraction], working: Bool, thinking: String?) -> [Self] {
         var result: [Self] = hasOlder ? [.older] : []
         for item in items {
             var state = ItemState(unread: item.id == unread, match: item.id == match)
             if case .message(let row) = item {
                 state.editable = row.id == editableId
-                state.reading = reading(row.id)
-                if readAlong?.row == row.id { state.piece = readAlong?.piece }
             }
             result.append(.item(item, state))
         }
@@ -188,10 +182,7 @@ struct ThreadTranscriptRowView: View {
                             row: row, projectId: actions.projectId, react: actions.draftReply,
                             reactionItems: actions.reactionItems, quote: actions.quote, select: actions.select,
                             sideChat: actions.sideChat, edit: state.editable ? actions.edit : nil,
-                            saveFiles: actions.saveFiles,
-                            readAloud: actions.readAloud.map { read in { read(row.id, $0) } },
-                            reading: state.reading)
-                        .environment(\.readAlongPiece, state.piece)
+                            saveFiles: actions.saveFiles)
                     case .activity(let rows):
                         ActivityGroup(rows: rows)
                     }

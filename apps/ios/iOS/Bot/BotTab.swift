@@ -194,7 +194,7 @@ struct BotTab: View {
         case .bot(let bot):
             if let id = bot.lead.threadId {
                 ZStack {
-                    ThreadView(threadId: id, hidesTabBar: false, answersActionButton: botId == nil, botChrome: chrome(bot))
+                    ThreadView(threadId: id, hidesTabBar: false, botChrome: chrome(bot))
                         .id("\(model.serverURL.absoluteString)|\(id)")
                         // Under the Loops, the chat is out of reach for VoiceOver too.
                         .accessibilityHidden(showsLoops && loopsOn && !duoLayout.twoPages)
@@ -260,7 +260,7 @@ struct BotTab: View {
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button { model.sheet = .handsFree } label: { Image(systemName: "waveform") }
+            Button { model.sheet = .handsFree() } label: { Image(systemName: "waveform") }
                 .accessibilityLabel("Hands-free")
                 .accessibilityHint("Talk with your voice assistant without looking")
             Button { sheet = .activity } label: {
@@ -391,8 +391,6 @@ struct BotTab: View {
         }
         if bot?.lead.threadId != nil, let ids = try? await client.botChain(botId: botId), ids != chain { chain = ids }
         if client.baseURL == model.serverURL { remember(client.baseURL) }
-        // An Action button press with nothing to talk to must not start recording later.
-        if botId == nil, bot?.lead.threadId == nil { model.botTalkPending = false }
         await loadActivity()
     }
 

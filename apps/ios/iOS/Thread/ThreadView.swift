@@ -11,16 +11,8 @@ struct ThreadView: View {
     @StateObject private var bot = BotModel()
     /// "Expand to page": the thread's open note and its editor.
     @StateObject private var notes: ThreadNotes
-    /// Voice mode: the speaker beside the mic, and spoken replies.
-    @StateObject private var voice: ThreadVoice
-    /// The composer's one mic and one indicator, across dictation and voice mode.
-    @StateObject private var composerVoice = ComposerVoice()
-    @ObservedObject private var player = VoicePlayer.shared
-    /// What was typed before an inline dictation or a talk in voice mode; what you say goes in after it.
+    /// What was typed before an inline dictation; what you say goes in after it.
     @State private var talkTyped: String?
-    /// The message the piece being spoken is lit up in.
-    @State private var readAlongRow: String?
-    @State private var editingVoice = false
     @State private var draft = ""
     @State private var mentions: [Mention] = []
     @ObservedObject private var outbox = Outbox.shared
@@ -92,8 +84,6 @@ struct ThreadView: View {
     /// Hides the tab bar on iPhone, for a thread pushed from a list; a tab's
     /// own thread keeps it.
     private let hidesTabBar: Bool
-    /// The Bot's thread: the Action button talks to it.
-    private let answersActionButton: Bool
 
     /// Set for the Bot tab: draws the thread as the Bot's chat.
     private let botChrome: BotChrome?
@@ -102,14 +92,12 @@ struct ThreadView: View {
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
     @State private var transcriptV2 = TranscriptHandle()
 
-    init(threadId: String, hidesTabBar: Bool = true, answersActionButton: Bool = false, botChrome: BotChrome? = nil) {
+    init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil) {
         self.hidesTabBar = hidesTabBar
-        self.answersActionButton = answersActionButton
         self.botChrome = botChrome
         _talk = StateObject(wrappedValue: HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _notes = StateObject(wrappedValue: ThreadNotes(threadId: threadId))
-        _voice = StateObject(wrappedValue: ThreadVoice(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
 
@@ -143,18 +131,15 @@ struct ThreadView: View {
         activity.targetContentIdentifier = thread.id
     }
 
-    /// Voice, talk and the Action button.
+    /// Dictation and hold to talk.
     private var withTalk: some View {
         withLoading
-        .modifier(VoiceHooks(voice: voice, talk: talk, player: player, rows: model.rows, running: model.thread?.isRunning == true,
-                             readAlongRow: $readAlongRow, editingVoice: $editingVoice))
         .modifier(TalkDraft(talk: talk, draft: $draft, typed: $talkTyped))
         .onChange(of: canUseNotes) { _, can in if can { notes.attach(app) } }
         .modifier(TalkLifecycle(talk: talk))
         .onAppear {
             ScrollLog.observeKeyboard()
-            talk.send = { [model, voice] text in
-                if voice.on { return sendSpoken(text) }
+            talk.send = { [model] text in
                 Task { if await !model.send(text, mentions: [], attachments: []) { restoreDraft(text, []) } }
             }
             talk.insert = { [model] text in
@@ -163,9 +148,7 @@ struct ThreadView: View {
                 // Saved here too: a dictation finished as the thread closes lands after its view is gone.
                 Drafts.save(model.threadId, text: next, mentions: mentions, serverURL: model.serverURL)
             }
-            takeActionButton()
         }
-        .onChange(of: app.botTalkPending) { _, _ in takeActionButton() }
         .onChange(of: talk.error) { _, error in
             if let error { app.flash(error) }
         }
@@ -315,19 +298,12 @@ struct ThreadView: View {
             #endif
             model.attach(app)
             if canUseNotes { notes.attach(app) }
-            voice.isListening = { [composerVoice] in composerVoice.blocksPlayback }
-            voice.flash = { [app] in app.flash($0) }
-            composerVoice.attach(talk: talk, voice: voice)
             #if DEBUG
-            if let variant = ComposerVoice.qaVariant {
-                composerVoice.qaApply(variant, talk: talk, voice: voice)
+            if TalkIndicator.qaDictating {
+                talk.qaPretend(.dictating)
                 // Set every time: a draft is saved, and would hide the placeholder in the next fixture.
-                draft = variant == "dictating" ? "All right, so the test notification worked" : ""
-            } else {
-                voice.attach(client: app.client, realtime: app.realtime)
+                draft = "All right, so the test notification worked"
             }
-            #else
-            voice.attach(client: app.client, realtime: app.realtime)
             #endif
             Task { await muted.refresh() }
             Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
@@ -822,10 +798,7 @@ struct ThreadView: View {
                         select: { selecting = SelectionText(text: $0) },
                         sideChat: sideChat,
                         edit: row.id == editable ? startEditing : nil,
-                        saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-                        readAloud: voice.available == true ? { voice.readAloud(rowId: row.id, text: $0) } : nil,
-                        reading: player.isReading(row.id))
-                    .environment(\.readAlongPiece, row.id == readAlongRow ? player.piece : nil)
+                        saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil)
                 case .activity(let rows):
                     ActivityGroup(rows: rows)
                 }
@@ -1114,14 +1087,6 @@ struct ThreadView: View {
             && !dictation.blocksSend
     }
 
-    private func takeActionButton() {
-        guard answersActionButton, app.botTalkPending else { return }
-        app.botTalkPending = false
-        // A sheet over the thread owns the microphone while it's open.
-        guard app.sheet == nil else { return }
-        talk.toggleHandsFree()
-    }
-
     /// Sends a quick reply or starter as it is.
     private func send(text: String) {
         sends += 1
@@ -1144,23 +1109,6 @@ struct ThreadView: View {
                 DraftAttachments.restore(files, threadId: model.threadId, serverURL: model.serverURL)
                 if attachments.isEmpty { attachments = files }
             }
-        }
-    }
-
-    /// Voice mode: what you said goes after what was typed, and is sent at
-    /// once, with the conversational note for the agent. Mentions and files
-    /// can't go that way, so then it waits in the composer for Send.
-    private func sendSpoken(_ heard: String) {
-        let text = TalkDraft.finished(heard, typed: &talkTyped, draft: draft).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard mentions.isEmpty, attachments.isEmpty else {
-            draft = text
-            return
-        }
-        draft = ""
-        sends += 1
-        Task {
-            let note = await voice.agentNote()
-            if await !model.send(text, agentNote: note) { restoreDraft(text, []) }
         }
     }
 
@@ -1368,7 +1316,7 @@ struct ThreadView: View {
             if let note = notes.note, !editing {
                 NotesInProgressChip(note: note) { notes.editing = note }
             }
-            VoiceIndicator(composer: composerVoice, talk: talk, voice: voice, player: player)
+            TalkIndicator(talk: talk)
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
                 MentionSuggestions(query: query, threadId: model.threadId, projectId: model.thread?.projectId, pick: insert)
             } else if composerFocused, let query = CommandSuggestions.query(in: draft),
@@ -1378,14 +1326,12 @@ struct ThreadView: View {
             }
             ComposerBar(
                 text: $draft, focused: $composerFocused, attachments: $attachments,
-                placeholder: composerVoice.shown.placeholder ?? botChrome.map { "Message \($0.bot.name)" } ?? "Message",
+                placeholder: TalkIndicator.placeholder(talk) ?? botChrome.map { "Message \($0.bot.name)" } ?? "Message",
                 dictate: { talk.startDictation() }, talk: talk, expand: draftIsLong ? { editingFull = true } : nil,
                 clear: true, dictation: dictation,
                 toPage: canUseNotes && !editing ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
-                    busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
-                voice: voice.available == true && !editing ? VoiceModeButton(voice: voice) { editingVoice = true } : nil,
-                pushToTalk: voice.available == true && composerVoice.shown.voiceOn ? PushToTalkButton(composer: composerVoice, talk: talk) : nil
+                    busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .disabled(handoffStatus?.working == true)
@@ -1688,45 +1634,6 @@ struct ChatSkeleton: View {
     }
 }
 
-/// Voice mode's links to the rest of the thread: talking cuts off a reply;
-/// the piece being spoken is lit up in
-/// its message; an open voice thread keeps going with the screen locked.
-private struct VoiceHooks: ViewModifier {
-    @ObservedObject var voice: ThreadVoice
-    @ObservedObject var talk: HoldToTalk
-    @ObservedObject var player: VoicePlayer
-    let rows: [TimelineRow]
-    let running: Bool
-    @Binding var readAlongRow: String?
-    @Binding var editingVoice: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .sheet(isPresented: $editingVoice) {
-                NavigationStack {
-                    SpeechSettingsView(voice: voice)
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { editingVoice = false } } }
-                }
-                .presentationDetents([.medium, .large])
-            }
-            .onDisappear {
-                voice.detach()
-                // Replies play only where their thread is open.
-                if player.threadId == voice.threadId { player.stop() }
-            }
-            .onChange(of: voice.on, initial: true) { _, on in talk.voice = on }
-            .onChange(of: player.piece) { _, piece in readAlongRow = target(piece) }
-            .task(id: "\(voice.on) \(voice.available == true) \(running)") { voice.report(running: running) }
-    }
-
-    /// The message being read aloud, or else the newest reply that holds the piece.
-    private func target(_ piece: String?) -> String? {
-        guard let piece, player.threadId == voice.threadId else { return nil }
-        if let rowId = player.rowId { return rowId }
-        return rows.last { $0.isConversation && !$0.isUser && ReadAlong.contains($0.text ?? "", piece: piece) }?.id
-    }
-}
-
 // MARK: - The new chat transcript (Settings ▸ Diagnostics ▸ New chat transcript)
 
 /// The same thread on the UIKit transcript: the rows, composer, header and
@@ -1863,8 +1770,7 @@ extension ThreadView {
         }
         let items = model.shownItems
         return ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
-            editableId: lastUserRowId, reading: { player.isReading($0) },
-            readAlong: readAlongRow.map { ($0, player.piece) }, pending: pending, interactions: model.interactions,
+            editableId: lastUserRowId, pending: pending, interactions: model.interactions,
             working: showsWorking, thinking: model.shelf.thinking)
     }
 
@@ -1875,7 +1781,6 @@ extension ThreadView {
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing, sideChat: sideChat,
             saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-            readAloud: voice.available == true ? { voice.readAloud(rowId: $0, text: $1) } : nil,
             openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
             resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true })
     }

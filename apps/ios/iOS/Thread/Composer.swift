@@ -123,8 +123,7 @@ struct ComposerField: UIViewRepresentable {
 /// at full width, and a row under it with + (attach), the agent's settings,
 /// dictation and `send`. With a `dictation` gate, VoiceOver hears "Listening…"
 /// or "Transcribing…" beside `send` while words are on the way; the caller
-/// disables `send` on `dictation.blocksSend`. In voice mode `pushToTalk`
-/// takes the dictation mic's place.
+/// disables `send` on `dictation.blocksSend`.
 struct ComposerBar<Settings: View, Send: View>: View {
     @Binding var text: String
     @Binding var focused: Bool
@@ -141,10 +140,6 @@ struct ComposerBar<Settings: View, Send: View>: View {
     var dictation: DictationGate? = nil
     /// "Expand to page": the draft into a Notes page linked to the thread. Beside the mic.
     var toPage: ComposerPageAction? = nil
-    /// Voice mode's speaker, just before the mic; nil where Studio has no voice mode.
-    var voice: VoiceModeButton? = nil
-    /// Voice mode's mic; when set, the dictation mic is hidden.
-    var pushToTalk: PushToTalkButton? = nil
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
 
@@ -192,10 +187,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                     .accessibilityIdentifier("composerExpandToPage")
                     .help(toPage.label)
                 }
-                if let voice { voice }
-                if let pushToTalk {
-                    pushToTalk
-                } else if let talk {
+                if let talk {
                     HoldToTalkMic(talk: talk)
                 } else {
                     Button(action: dictate) {
@@ -227,7 +219,7 @@ struct ComposerPageAction {
 
 /// Tells the dictation gate what a talk is doing, so Send waits for its words.
 /// Every talk's status shows over the composer, in the one indicator spot
-/// (`TalkStatusBar`, `VoiceIndicator`), never inside the field.
+/// (`TalkIndicator`), never inside the field.
 private struct TalkOverlay: View {
     @ObservedObject var talk: HoldToTalk
     /// Holds Send while a talk records or transcribes.

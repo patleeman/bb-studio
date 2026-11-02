@@ -289,7 +289,8 @@ they run on that thread's own model.
 ## What the old voice mode still provides
 
 The old in-thread voice mode (speech to text, then the thread, then text to
-speech) is due to be removed, while dictation stays. **The new agent doesn't
+speech) was removed on Nov 1 ([removal-list.md](removal-list.md)); dictation
+stays. **The new agent doesn't
 use that mode's code paths.** To keep the removal list accurate, here is all it
 shares:
 

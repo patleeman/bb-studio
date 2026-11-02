@@ -576,7 +576,7 @@ final class ThreadModel: ObservableObject {
         }
     }
 
-    /// `agentNote`, when set, goes along unseen by the user (voice mode's turn note).
+    /// `agentNote`, when set, goes along unseen by the user.
     func send(_ text: String, mentions: [Mention] = [], attachments: [PendingAttachment] = [], agentNote: String? = nil) async -> Bool {
         guard let client else { return false }
         sending = true

@@ -189,7 +189,7 @@ final class HeaderTapUITests: ServerIsolatedUITestCase {
     private func launch(bot: Bool = false) {
         let variant = bot && layout == "phone" ? "chat" : "duo"
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", variant, "-qaDuoWideTitles",
-                               "-qaVoice", "idle", "-qaDark", "-openURL", "bbstudio://bot"]
+                               "-qaDark", "-openURL", "bbstudio://bot"]
         if layout != "phone" { app.launchArguments += ["-qaDuoPhone"] }
         if layout == "inner" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()

@@ -223,7 +223,7 @@ to the same `ThreadView`, so all of them get the new transcript.
 | Edit, quote, select in threads | Done. `testThreadParity`. |
 | Question pill in a thread from the Threads list | Done. The demo now tells every open view of the thread (it told only the last one). |
 | Header buttons in the status-bar strip | Done. The transcript's scroll view gives up scroll-to-top beside two pages, as the old path's scroll views do. |
-| Voice mode and read-aloud | Same composer and rows. `NoVoiceChatUITests` passes on the new path; read-aloud has no offline test. |
+| Voice mode and read-aloud | Removed on Nov 1 (docs/voice/removal-list.md). `NoVoiceChatUITests` passes on the new path. |
 | Scroll log and breadcrumbs | `v2 geo` lines like the old `geo` lines, ids through `ScrollLog.id`; tap-to-close writes its breadcrumb. `ScrollLogUITests` passes on the new path. |
 | Mini cards with real content | Done. `MiniCardUITests` passes on the new path against a staged BB seeded by `apps/ios/scripts/seed-staged-minis.py`. |
 | Side threads with real content | Done. `BotSideThreadUITests` passes on the new path (iPhone simulator) against a staged BB: a Bot made from a seeded thread (`bot_create`), a follow-up, `bot_side_thread_open` on the newest reply and one message in it. |

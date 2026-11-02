@@ -16,12 +16,9 @@ final class HoldToTalk: ObservableObject {
     /// The mic's level, read by the meters on the voice clock; not published, so views don't redraw ten times a second.
     private(set) var level: Float = 0
     @Published var error: String?
-    /// What Talk has heard so far, while talking in voice mode.
+    /// What Talk has heard so far, while dictating inline.
     @Published private(set) var heard = ""
-    /// Voice mode: short segments, and `heard` follows the transcript while you talk.
-    var voice = false
-    /// This talk streams into the draft (an inline dictation, or any talk in voice mode)
-    /// instead of covering the field.
+    /// This talk streams into the draft (an inline dictation) instead of covering the field.
     @Published private(set) var inline = false
     /// The last talk ended with Cancel (or ✕): the draft goes back to what was typed.
     @Published private(set) var cancelled = false
@@ -54,8 +51,7 @@ final class HoldToTalk: ObservableObject {
 
     var isActive: Bool { state != .idle && state != .sending }
 
-    /// A tap on the mic: dictate inline, into the draft. In voice mode it's
-    /// sent when finished, like a hold.
+    /// A tap on the mic: dictate inline, into the draft.
     func startDictation() {
         start(.dictating)
     }
@@ -72,27 +68,25 @@ final class HoldToTalk: ObservableObject {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         startReturned = false
         heard = ""
-        let voice = Self.streams(mode, voice: self.voice)
-        inline = voice
+        let streams = Self.streams(mode)
+        inline = streams
         let send = send, insert = insert
-        delivery = Self.delivery(for: mode, voice: self.voice) == .insert ? { insert($0) } : { send($0) }
-        // Voice mode's capture cancels the reply's echo, so talking over it can stop it.
-        let echo = self.voice
-        VoiceAudioSession.shared.capturing = true
+        delivery = Self.delivery(for: mode) == .insert ? { insert($0) } : { send($0) }
         starting = Task { [weak self] in
             guard let self else { return }
-            await recorder.start(kind: "dictation", threadId: threadId, policy: voice ? .voice : .talk, echoCancelling: echo)
+            // An inline dictation cuts short segments, so its words show up while you talk.
+            await recorder.start(kind: "dictation", threadId: threadId, policy: streams ? .voice : .talk)
             startReturned = true
         }
         ticks = 0
         if let watching { VoiceClock.shared.unsubscribe(watching) }
         // The app's one voice clock, not a loop of its own; it pauses while the app is inactive.
-        watching = VoiceClock.shared.subscribe { [weak self] in self?.tick(streaming: voice) }
+        watching = VoiceClock.shared.subscribe { [weak self] in self?.tick(streaming: streams) }
     }
 
     private var ticks = 0
 
-    private func tick(streaming voice: Bool) {
+    private func tick(streaming: Bool) {
         guard isActive else {
             if let watching { VoiceClock.shared.unsubscribe(watching) }
             watching = nil
@@ -108,8 +102,8 @@ final class HoldToTalk: ObservableObject {
         if startedAt != recorder.startedAt { startedAt = recorder.startedAt }
         level = recorder.level
         ticks += 1
-        // About once a second: segments are cut every few seconds in voice mode.
-        if voice, ticks % 10 == 0 {
+        // About once a second: an inline dictation's segments are cut every few seconds.
+        if streaming, ticks % 10 == 0 {
             Task { [weak self] in
                 guard let self else { return }
                 await self.recorder.refreshTranscript()
@@ -123,22 +117,13 @@ final class HoldToTalk: ObservableObject {
         }
     }
 
-    /// A quiet long press in voice mode: the hold becomes hands-free listening,
-    /// so letting go no longer sends.
-    func goHandsFree() {
-        guard state == .recording || state == .cancelling else { return }
-        state = .handsFree
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-    }
-
     #if DEBUG
-    /// `-qaVoice`: a talk caught mid-way, with no recorder, for screenshots.
+    /// `-qaDictation listening`: a talk caught mid-way, with no recorder, for screenshots.
     private var qaPinned = false
 
-    func qaPretend(_ mode: State, voice: Bool, seconds: TimeInterval = 22) {
-        self.voice = voice
+    func qaPretend(_ mode: State, seconds: TimeInterval = 22) {
         state = mode
-        inline = Self.streams(mode, voice: voice)
+        inline = Self.streams(mode)
         startedAt = Date(timeIntervalSinceNow: -seconds)
         qaPinned = true
         level = Self.qaWave(0)
@@ -184,7 +169,7 @@ final class HoldToTalk: ObservableObject {
     }
 
     /// Stops without sending and deletes the recording: its audio stays off
-    /// the phone and off Talk. Dictation and voice chat still keep theirs.
+    /// the phone and off Talk. Dictation still keeps its own.
     func cancel() {
         guard isActive else { return }
         cancelled = true
@@ -201,16 +186,15 @@ final class HoldToTalk: ObservableObject {
 
     enum Delivery: Equatable { case send, insert }
 
-    /// Where a talk's words go: an inline dictation's into the draft, except in
-    /// voice mode, where finishing it sends like letting go of a hold.
-    static func delivery(for mode: State, voice: Bool) -> Delivery {
-        mode == .dictating && !voice ? .insert : .send
+    /// Where a talk's words go: an inline dictation's into the draft; a hold's are sent.
+    static func delivery(for mode: State) -> Delivery {
+        mode == .dictating ? .insert : .send
     }
 
     /// Whether a talk streams into the draft, in short segments: inline
-    /// dictations and every talk in voice mode. A plain hold covers the field.
-    static func streams(_ mode: State, voice: Bool) -> Bool {
-        voice || mode == .dictating
+    /// dictations only. A plain hold covers the field.
+    static func streams(_ mode: State) -> Bool {
+        mode == .dictating
     }
 
     enum TapAction: Equatable { case dictate, finish, none }
@@ -234,7 +218,7 @@ final class HoldToTalk: ObservableObject {
     }
 
     /// Leaving the thread or the app, or a sheet over it: an inline dictation
-    /// finishes into the draft (it isn't sent, even in voice mode), so no words
+    /// finishes into the draft (it isn't sent), so no words
     /// are lost; a talk ends unsent and deleted, as before.
     func end() {
         guard isActive else { return }
@@ -266,7 +250,6 @@ final class HoldToTalk: ObservableObject {
     private func stop() {
         if let watching { VoiceClock.shared.unsubscribe(watching) }
         watching = nil
-        VoiceAudioSession.shared.capturing = false
         #if DEBUG
         qaPinned = false
         #endif
@@ -314,7 +297,7 @@ struct TalkDraft: ViewModifier {
             }
             .onChange(of: talk.heard) { _, heard in
                 guard let typed, !heard.isEmpty else { return }
-                draft = VoiceText.join(typed: typed, heard: heard)
+                draft = Self.join(typed: typed, heard: heard)
             }
     }
 
@@ -322,7 +305,14 @@ struct TalkDraft: ViewModifier {
     static func finished(_ text: String, typed: inout String?, draft: String) -> String {
         let before = typed ?? draft
         typed = nil
-        return VoiceText.join(typed: before, heard: text)
+        return join(typed: before, heard: text)
+    }
+
+    /// What was typed, then what was said, with one space between (desktop `joinText`).
+    static func join(typed: String, heard: String) -> String {
+        if heard.isEmpty { return typed }
+        if typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return heard }
+        return typed.last?.isWhitespace == true ? typed + heard : typed + " " + heard
     }
 }
 
