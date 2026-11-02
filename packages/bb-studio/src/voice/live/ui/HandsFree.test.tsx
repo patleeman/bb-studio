@@ -7,7 +7,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
   const rpc = { call: vi.fn() };
   return { experimental_Icon: () => null, useSdk: () => ({}), useComposer: () => ({ scope: { kind: "thread", threadId: "thr_1" } }), useRpc: () => rpc, useBbNavigate: () => ({}), useRealtime: () => {} };
 });
-vi.mock("../../../kit/ui", () => ({
+vi.mock("../../../kit/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../kit/ui")>()),
   Icon: ({ name, className }: { name: string; className?: string }) => <span data-icon={name} className={className} />,
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
 }));

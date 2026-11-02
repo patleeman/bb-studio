@@ -280,7 +280,7 @@ of silence, and both fixes have tests.
 | gpt-live-1 | $0.05/min of voice, billed per second (a WebRTC session bills 15 s at start, credited once it runs), plus the backend's tokens | **≈ $0.05/min**. The backend `gpt-5.6-luna` costs about $0.0001 per tool turn at about 900 tokens in and 40 out. The 47 s mock session came to ≈ $0.04. |
 | gpt-realtime-2.1 | By token: audio $32 in and $64 out per million, plus transcription | ≈ $0.07/min, the retired Call's Oct 20 estimate |
 
-The monthly cap defaults to $20 (setting: "Hands-free voice: monthly cap"),
+The monthly cap defaults to $20 (setting: "Hands-free voice: monthly cap (USD)"),
 which is about 400 minutes of GPT-Live. Studio refuses to start a session at the
 cap. `voiceLive.event` returns `stop` once a running session crosses it, and the
 phone says why and hangs up. The voice thread's "[PASS]" turns aren't counted:
@@ -369,6 +369,43 @@ cap and voice-thread posting as the iPhone.
     included, so Studio's "Search everything" finds voice threads in their
     transcripts, sends and replies instead (`VoiceLive.search`).
   - Tested: `bot-owned.test.ts` and `live.test.ts`; renders in `voice-desktop-v2/`.
+- **Placement: Expand, waveform, mic, send.** BB renders every plugin's
+  composer actions just before its own mic, grouped by plugin and in
+  registration order within a plugin. The action has only `id` and
+  `component`: no order or priority, on SDK 0.6.37 or 0.6.104. So Studio
+  registers the waveform after Notes' Expand, which puts it right next to the
+  mic. BB orders plugin groups by how often each is clicked, so another
+  plugin's composer action can end up between Studio's group and the mic.
+  Studio can't change that.
+- **Quick settings: right-click the waveform.** A composer action has no menu
+  of its own on either SDK, so it's a context menu (Studio's kit, Radix) on
+  Studio's own button (`ui/QuickSettings.tsx`). It shows the model (gpt-live-1
+  or gpt-realtime-2.1), the voice from that model's own list, the backend model
+  (gpt-live-1 only), this month's spend against the cap (read only), and
+  "Voice settings…". Each choice is saved through `voiceLive.configure` as a
+  Studio setting. Sessions read settings when they start, so a change applies
+  to the next session, and the menu says so: OpenAI fixes a session's voice
+  and models when it's created. "Voice settings…" opens Studio's settings page
+  and scrolls to its "Hands-free voice" section. That section shows what the
+  next session will use and the month's spend. The fields are in BB's form
+  just above it, because a plugin can't link to a field in that form.
+- **Settings** (Studio's settings page, the "Hands-free voice: …" fields):
+  | Key | Label | Default |
+  | --- | --- | --- |
+  | `voiceLiveModel` | Hands-free voice: model | gpt-live-1 |
+  | `voiceLiveVoice` | Hands-free voice: voice | marin |
+  | `voiceLiveBackendModel` | Hands-free voice: backend model | gpt-5.6-luna |
+  | `voiceLiveMonthlyCapUsd` | Hands-free voice: monthly cap (USD) | 20 |
+
+  The cap and model keep their first keys, so saved values carry over. BB's
+  select can't filter the voice by model, so it lists both models' voices. A
+  voice the chosen model doesn't have falls back to marin, and the menu only
+  offers the model's own voices. GPT-Live's voices are marin, quartz, ripple,
+  vesper, willow, stone, gleam, meridian, bossa, tempo, beacon, delta, cinder,
+  nuri, juni, flitz, brise, sillage, nira, harema, shida and noeul. Realtime's
+  are marin, cedar, alloy, ash, ballad, coral, echo, sage, shimmer and verse
+  (OpenAI's docs, checked Nov 1). The backend can be gpt-5.6-luna, -terra or
+  -sol, and a session's backend tokens are priced by the one it used.
 - **Transport: browser WebRTC in the BB window.** It uses
   `RTCPeerConnection` and `getUserMedia` with `echoCancellation: true`. Studio
   exchanges gpt-live-1's SDP, and Realtime posts its offer with a client

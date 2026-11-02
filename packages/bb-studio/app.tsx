@@ -37,6 +37,7 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
+import { VoiceSettingsSection } from "./src/voice/live/ui/QuickSettings";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoHeaderAction, BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
@@ -172,11 +173,11 @@ export default definePluginApp((app) => {
   // the Bot chat's header.
   app.slots.threadPanelAction({ id: LOOPS_PANE, title: "Loops", icon: "ListTodo", layout: "flush", component: LoopsPane });
   app.slots.experimental_threadHeaderAction({ id: "loops-pane", title: "Loops", component: LoopsHeaderAction });
-  // Hands-free voice (src/voice/live/ui): a session is its own thread. The
-  // composer's waveform button (beside the mic) starts it; its pill floats
+  // Hands-free voice (src/voice/live/ui): a session is its own thread. Its
+  // composer button is registered below, after Notes' Expand; its pill floats
   // over every page and thread until End.
-  app.composer.customize({ id: "handsfree", scopes: ["thread"], actions: [{ id: "handsfree", component: HandsFreeComposerButton }] });
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
+  app.slots.settingsSection({ id: "voice", title: "Hands-free voice", component: VoiceSettingsSection });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
   // opens them through: a header action, since only components inside the thread
@@ -226,6 +227,11 @@ export default definePluginApp((app) => {
       banners: [{ id: "in-progress", chrome: "bare", component: NotesInProgress }],
     });
   }
+  // The waveform button. BB puts a plugin's composer actions just before its
+  // mic, in registration order (no order or priority field, SDK 0.6.37 or
+  // 0.6.104), so it's Studio's last action: Expand, waveform, mic, send. It
+  // starts a session; right-click for its quick settings.
+  app.composer.customize({ id: "handsfree", scopes: ["thread"], actions: [{ id: "handsfree", component: HandsFreeComposerButton }] });
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
   // Explore (built in, as it was in Pages): the Next row and "along the way" findings.
   registerExploreApp(app);

@@ -14,6 +14,7 @@ import { useDraggable } from "../../../talk/ui/draggable";
 import type { voiceLiveContract } from "../contract";
 import { usd, VOICE_LIVE_CHANNEL, type VoiceLiveSignal } from "../shared";
 import type { Phase, Speaker, ToolCard } from "./machine";
+import { HandsFreeQuickSettings } from "./QuickSettings";
 import { LiveSession, type LiveServer } from "./session";
 
 type Rpc = { call(method: string, input: unknown): Promise<unknown> };
@@ -64,7 +65,11 @@ function useSession(session: LiveSession | null) {
 export const handsFreeButtonClass = (live: boolean) =>
   cn(COMPOSER_BUTTON, live && "text-orange-600 hover:text-orange-600 dark:text-orange-400 dark:hover:text-orange-400");
 
-/** The composer's waveform button: starts a session (or opens the running one's pill). */
+/**
+ * The composer's waveform button: starts a session (or opens the running
+ * one's pill). BB renders plugin composer actions just before its mic, in
+ * registration order, so app.tsx registers this last: Expand, waveform, mic, send.
+ */
 export function HandsFreeComposerButton() {
   const composer = useComposer();
   const rpc = useRpc<typeof voiceLiveContract>();
@@ -73,12 +78,15 @@ export function HandsFreeComposerButton() {
   if (composer.scope.kind !== "thread") return null;
   const live = !!session?.machine.isLive;
   const label = live ? "Hands-free voice is on" : "Hands-free voice";
+  // Right-click: the next session's model, voice and backend, and this month's spend (QuickSettings.tsx).
   return (
-    <button type="button" data-testid="handsfree-composer" aria-label={label} title={label} aria-pressed={live}
-      className={handsFreeButtonClass(live)}
-      onClick={() => startHandsFree(rpc as unknown as Rpc, composer.scope.kind === "thread" ? composer.scope.threadId : null)}>
-      <Icon name="studio/handsfree" className="size-4" aria-hidden />
-    </button>
+    <HandsFreeQuickSettings live={live}>
+      <button type="button" data-testid="handsfree-composer" aria-label={label} title={`${label} (right-click for settings)`} aria-pressed={live}
+        className={handsFreeButtonClass(live)}
+        onClick={() => startHandsFree(rpc as unknown as Rpc, composer.scope.kind === "thread" ? composer.scope.threadId : null)}>
+        <Icon name="studio/handsfree" className="size-4" aria-hidden />
+      </button>
+    </HandsFreeQuickSettings>
   );
 }
 

@@ -67,3 +67,11 @@ export function ContextMenuItem({
     />
   );
 }
+
+/** A heading or a read-only line inside a context menu: not focusable, not an action. */
+export function ContextMenuLabel({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Label>) {
+  return <Primitive.Label className={cn("px-2 py-1 text-xs", className)} {...props} />;
+}
