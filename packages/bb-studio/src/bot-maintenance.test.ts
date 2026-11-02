@@ -67,7 +67,9 @@ it("blocks only tracked uncommitted changes and unpushed commits", () => {
   const ahead = clean(); ahead.workspace.mergeBase.aheadCount = 2; ahead.workspace.mergeBase.files.push({ path: "src/a.ts", status: "M" }); expect(workspaceBlock(ahead as never)).toBe("2 unpushed commits.");
   const scratch = clean(); scratch.workspace.workingTree.state = "untracked"; scratch.workspace.workingTree.hasUncommittedChanges = true; scratch.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); expect(workspaceBlock(scratch as never)).toBeNull();
   const detached = clean(); detached.workspace.checkout.kind = "detached"; detached.workspace.mergeBase.aheadCount = 1; detached.workspace.mergeBase.files.push({ path: "a", status: "M" }); expect(workspaceBlock(detached as never)).toBeNull();
-  for (const s of [null, { outcome: "not_applicable" }, { outcome: "unavailable" }]) expect(workspaceBlock(s as never)).toBeNull();
+  for (const s of [{ outcome: "not_applicable" }, { outcome: "unavailable" }]) expect(workspaceBlock(s as never)).toBeNull();
+  // A status call that failed (null) fails closed: real work may be there.
+  expect(workspaceBlock(null)).toBe("Couldn't read the workspace's git status.");
 });
 it("checks Memory word budget and old entries", () => {
   expect(memoryNeedsTidy("one two three", 2, now, now)).toBe(true);
@@ -107,10 +109,15 @@ it.each(["dirty", "ahead"])("sends a %s workspace to Needs your call", async (mo
   x.status.mockResolvedValue(s);
   const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall).toHaveLength(1); expect(x.alert).toHaveBeenCalledOnce();
 });
-it.each(["error", "not_applicable", "scratch"])("archives a %s workspace that holds no real work", async (mode) => {
+it("does not archive when the workspace status can't be read (fails closed)", async () => {
   const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
-  if (mode === "error") x.status.mockRejectedValue(new Error("offline"));
-  else if (mode === "not_applicable") x.status.mockResolvedValue({ outcome: "not_applicable" } as never);
+  x.status.mockRejectedValue(new Error("offline"));
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  expect(r?.needsCall).toEqual([expect.objectContaining({ reason: "Couldn't read the workspace's git status." })]);
+});
+it.each(["not_applicable", "scratch"])("archives a %s workspace that holds no real work", async (mode) => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  if (mode === "not_applicable") x.status.mockResolvedValue({ outcome: "not_applicable" } as never);
   else { const s = clean(); s.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); x.status.mockResolvedValue(s); }
   const r = await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce(); expect(r?.needsCall).toHaveLength(0);
 });

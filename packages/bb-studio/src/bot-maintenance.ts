@@ -25,10 +25,12 @@ export function archiveAge(worker: boolean, captured: boolean, ownerReplied: boo
  * Why a workspace must not be archived, or null. Only real work blocks:
  * uncommitted changes to tracked files, or commits ahead of this branch's
  * own remote-tracking ref. Untracked scratch files, non-git workspaces and
- * statuses that can't be confirmed don't block.
+ * workspaces that are gone don't block. A status that couldn't be read at
+ * all (the call failed: null) does block: it fails closed.
  */
 export function workspaceBlock(status: Awaited<ReturnType<Sdk["environments"]["status"]>> | null): string | null {
-  if (status?.outcome !== "available") return null;
+  if (status === null) return "Couldn't read the workspace's git status.";
+  if (status.outcome !== "available") return null;
   const { checkout, mergeBase, workingTree } = status.workspace;
   const tracked = workingTree.files.filter((f) => f.status !== "??" && f.status !== "?");
   if (tracked.length) return `Uncommitted changes to ${count(tracked.length, "tracked file")}.`;
@@ -170,7 +172,8 @@ export class BotMaintenance {
         const live = await this.deps.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: null, outputSchema: overview });
         if (live.automations.some((a) => a.automation.enabled && a.automation.execution.targetThreadId === id)) continue;
         if (thread.environmentId) {
-          const status = await this.deps.sdk.environments.status({ environmentId: thread.environmentId, ...thread.environmentBranchName ? { mergeBaseBranch: `origin/${thread.environmentBranchName}` } : {} }).catch(() => null);
+          // A missing or failing status call reads as null, which blocks (fails closed).
+          const status = await Promise.resolve().then(() => this.deps.sdk.environments.status({ environmentId: thread.environmentId!, ...thread.environmentBranchName ? { mergeBaseBranch: `origin/${thread.environmentBranchName}` } : {} })).catch(() => null);
           const reason = workspaceBlock(status);
           if (reason) { result.needsCall.push({ threadId: id, title: thread.title || thread.titleFallback || id, reason }); continue; }
         }
