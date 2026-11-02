@@ -343,20 +343,31 @@ Patrick tests it first at the Mac, in the BB window, before any TestFlight.
 It uses the same voice agent, Studio relay, tool layer, eyes-free rules, cost
 cap and voice-thread posting as the iPhone.
 
-- **Surface: a Studio app overlay** (`experimental_appOverlay`). It's a
-  floating panel at the right, over every page, that stays while the session
-  runs, so you can keep looking at the Bot chat or anything else. A thread side
-  panel would close when you leave the thread.
-- **Entry points:** a waveform button in the Bot chat's header
-  (`experimental_threadHeaderAction`, beside the Loops button), and "Studio:
-  Hands-free voice" in the command palette.
-- **UI:** the same language as iOS:
-  - the talking orb (teal for you, the accent for the voice, purple while
-    thinking);
-  - live subtitles, with "✓ Sent to …" under them for a relay;
-  - "Waiting for your yes" only for destructive actions;
-  - the model, cost and mic name in the header;
-  - one Start/End button.
+- **v2 (Nov 1): a floating pill, started from the composer.** A session is
+  its own thread, so it isn't docked anywhere.
+  - **Start:** a waveform button in the composer's bottom row, via
+    `app.composer.customize` actions, the slot voice mode's speaker uses today.
+    "Studio: Hands-free voice" in the command palette does the same. The first
+    version's big panel and header button are gone.
+  - **The pill:** a Studio app overlay (`experimental_appOverlay`) that floats
+    over every page and thread until End. Like Talk's dictation pill, it's
+    draggable and remembers its own spot (`useDraggable` takes a storage key).
+    It shows the small talking orb (teal for you, the accent for the voice,
+    purple while thinking), the current subtitle line, "✓ Sent to …" inline,
+    and End.
+  - **Expanded:** it opens by itself for a destructive action's "Waiting for
+    your yes" and closes again once that's answered. On demand (the chevron)
+    it shows the transcript, the model, cost and mic, the last tool result, and
+    "Open the voice thread".
+  - **The voice thread lives under the Bot.** When it opens, Studio claims it
+    for the Bot (`BotOwnedThreads.claim`, the mechanism the Bot's other threads
+    use, but quiet: no line in its chat). It's hidden from BB's main Threads
+    list, and listed under the Bot in Recent (Running while live), so Recent
+    under Chief of Staff rather than a separate group.
+  - **Search:** BB's thread search skips hidden threads, the Bot's own chat
+    included, so Studio's "Search everything" finds voice threads in their
+    transcripts, sends and replies instead (`VoiceLive.search`).
+  - Tested: `bot-owned.test.ts` and `live.test.ts`; renders in `voice-desktop-v2/`.
 - **Transport: browser WebRTC in the BB window.** It uses
   `RTCPeerConnection` and `getUserMedia` with `echoCancellation: true`. Studio
   exchanges gpt-live-1's SDP, and Realtime posts its offer with a client
@@ -451,7 +462,14 @@ target.
 
 ## Deliverables
 
-Desktop, in `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-desktop/`:
+Desktop v2 (the floating pill), in `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-desktop-v2/`:
+the composer button; the pill appearing, listening, speaking and sent; the
+expanded yes question and transcript; the pill over a Studio page and over
+another thread; the ended pill's transcript; the voice thread opened from its
+link; voice threads under the Bot in the sidebar; and
+`handsfree-desktop-pill.mp4`. Each render is in light and dark (`-dark`).
+
+Desktop v1 (the panel), in `/Users/patrick/.bb/thread-storage/thr_9s7rehr925-adviser/voice-desktop/`:
 
 - **The header button:** `header-button.png` and `-dark`, with its tooltip.
 - **Renders from the mock run,** each in light and dark (`-dark`): idle (the
