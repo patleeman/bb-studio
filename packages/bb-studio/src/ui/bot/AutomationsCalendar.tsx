@@ -20,7 +20,7 @@ import { describeCron } from "../../schedule";
 import { useCall, useLive } from "../live";
 import { useRunners } from "./Runners";
 import { sidebarAgenda } from "./sidebarAgenda";
-import { areaColor, areaColors, clockAt, outcomeWords } from "./pageModel";
+import { areaColor, areaColors, clockAt, inSentence, outcomeWords } from "./pageModel";
 import { calendarWeek, chainGroups, groupName, isGroup, minuteOfDay, pausedSources, placeBlocks, windowDays, windowStart, type CalendarBand, type CalendarEvent, type CalendarGroup, type CalendarItem, type CalendarSource, type FoldChip, RUNS_LIMIT } from "./calendar";
 
 /** An hour's height on the page, where the week shows whole; beside a thread it scrolls. */
@@ -40,7 +40,15 @@ const dayTime = (at: number) => new Date(at).toLocaleString(undefined, { weekday
 const dayHeader = (at: number) => `${new Date(at).toLocaleDateString(undefined, { weekday: "short" })} ${new Date(at).getDate()}`;
 const hourLabel = (hour: number) => new Date(2026, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
 
-type RunnerLike = Pick<RunnerView, "id" | "name" | "threadId" | "lastRunAt"> & { lastRunStatus?: string | null; running?: boolean; runningSince?: number | null };
+type RunnerLike = Pick<RunnerView, "id" | "name" | "threadId" | "lastRunAt"> & { lastRunStatus?: string | null; running?: boolean; runningSince?: number | null; lastReport?: string | null; lastReportAt?: number | null };
+
+/** A runner reports through the Bot, not its run: the run its last report came from (within 30 minutes before it) says what it found. */
+function withReport(runs: BotAutomationRunView[], runner: RunnerLike | undefined): BotAutomationRunView[] {
+  const at = runner?.lastReportAt, report = runner?.lastReport;
+  if (!at || !report) return runs;
+  const run = runs.filter((each) => each.at <= at && at - each.at < 30 * 60_000 && each.status !== "failed").sort((a, b) => b.at - a.at)[0];
+  return run ? runs.map((each) => each === run ? { ...each, outcome: `Woke it: ${report}` } : each) : runs;
+}
 
 /**
  * The Bot's jobs as calendar sources: Studio automations (runners included)
@@ -59,7 +67,7 @@ export function calendarSources(automations: BotAutomationView[], scheduled: Par
       state: item.state, nextRunAt: item.nextRunAt, threadId: runner?.threadId ?? studio?.threadId ?? null,
       // A plain BB job has only its cron: say it in words. A cron words can't say stays out of sight.
       scheduleText: plainSchedule(studio ? item.scheduleText : item.scheduleText ? describeCron(item.scheduleText) : ""),
-      runs: studio ? runs[item.id] ?? [] : null,
+      runs: studio ? withReport(runs[item.id] ?? [], runner) : null,
       lastRun: runner?.lastRunAt ? { at: runner.lastRunAt, status: runner.lastRunStatus ?? "succeeded" } : null,
       runningSince: runner?.running ? runner.runningSince ?? null : null,
       area: item.kind === "runner" ? { id: item.id, name: item.name } : woken,
@@ -385,7 +393,7 @@ function GroupList({ group, name, byId, colorOf, now, onOpen, onRunNow, onRename
               <span className={event.status === "failed" ? "text-destructive" : "text-muted-foreground"}>{event.status === "failed" ? "Failed" : outcomeWords(event, now)}</span></li>
           ))}
         </ul>
-        <p className="text-muted-foreground">{failedSource.name} {failure.error ?? "failed"}.</p>
+        <p className="text-muted-foreground">{failedSource.name} {inSentence(failure.error ?? "failed").replace(/\.$/, "")}.</p>
         <div className="flex flex-wrap gap-1.5">
           {failure.threadId ? <button type="button" className={OUTLINE_BUTTON} onClick={() => onOpen(failure.threadId!)}>Open {failedSource.name}'s thread</button> : null}
           {onRunNow ? <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={() => onRunNow(failedSource.id)}><Icon name="Repeat" />Run again</button> : null}

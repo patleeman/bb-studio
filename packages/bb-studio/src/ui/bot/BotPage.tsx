@@ -72,6 +72,8 @@ export function useBotPageModel(view: BotView) {
   // Working now: what's running, runners by name.
   const working: WorkItem[] = [];
   for (const thread of activity?.inProgress ?? []) {
+    // Its own chat waiting on Patrick is a question in Needs you, not work.
+    if (thread.relation === "self" && thread.waitingFor) continue;
     const runner = runners.find((each) => each.threadId === thread.id);
     working.push({
       id: thread.id, threadId: thread.id, since: thread.runningSince ?? null, waiting: thread.waitingFor ?? null, providerId: thread.providerId ?? null,
@@ -130,7 +132,8 @@ export function useBotPageModel(view: BotView) {
   const reports = runners.filter((runner) => runner.lastReport && runner.lastReportAt).map((runner) => ({ sourceId: runner.id, at: runner.lastReportAt!, text: runner.lastReport! }));
   const runnerThreads = new Set(runners.map((runner) => runner.threadId));
   const finished = (activity?.completed ?? []).filter((thread) => thread.relation === "started" && !runnerThreads.has(thread.id) && now - thread.updatedAt < 2 * DAY).map((thread) => ({ id: thread.id, title: thread.title, at: thread.updatedAt }));
-  const recent = recentEntries({ events, sources, frequent, reports, finished, maintenance: maintenance.data?.runs ?? [], names, now, zone: tz });
+  // Maintenance's runs are "Daily cleanup" lines of their own.
+  const recent = recentEntries({ events: events.filter((event) => event.sourceId !== "maintenance"), sources, frequent, reports, finished, maintenance: maintenance.data?.runs ?? [], names, now, zone: tz });
   const status = statusSentence({ state: bot.state, working: working.length, needs: needs.length, next: next[0] ? { name: next[0].name, at: next[0].at } : null, lastRunAt: lastItem?.at ?? null, now, zone: tz });
   return { bot, jobs, working, needs, next, recent, status, lastItem, loopsOn, loops: loops.data, now, tz, automations, loopError: actions.error };
 }
