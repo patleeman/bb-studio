@@ -124,6 +124,11 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     ...both("before-automations", async (client, mode) => { await botPage(client, mode); await toAutomations(client); await client.waitForSelector('[data-automation]', 30000); }),
     ...both("after-sidebar", async (client, mode) => { await botPage(client, mode); await sidebarHas(client, false); }),
     ...both("after-week", week),
+    // A wider window: the week grows with the page.
+    { id: "studio-bot-calendar-after-week-1728-dark", packageDir: "bb-studio", fileName: "bot-calendar/after/week-1728-dark.png", showSidebar: true, setup: async (client) => {
+      await client.command("Emulation.setDeviceMetricsOverride", { width: 1728, height: 1000, deviceScaleFactor: 1, mobile: false });
+      try { await week(client, "dark"); } catch (error) { await scheme(client, ""); throw error; }
+    } },
     ...both("after-hover", async (client, mode) => { await botPage(client, mode); await toWeek(client); await hover(client, '[data-testid=automations-calendar] [data-source][data-status="scheduled"][aria-label^="Lunch check"]'); }),
     ...both("after-failed", async (client, mode) => { await botPage(client, mode); await toWeek(client); await hover(client, '[data-testid=automations-calendar] [data-status="failed"]'); await client.waitForText("connection refused", 5000); }),
     ...both("after-list", async (client, mode) => {
