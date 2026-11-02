@@ -19,13 +19,6 @@ const GROUP_TITLES: Record<string, string> = {
 
 const show = (value: unknown) => (typeof value === "string" ? JSON.stringify(value) : String(value));
 
-function describe(setting: StudioSetting): string {
-  if (setting.type === "select") return `one of: ${setting.options.join(", ")}`;
-  if (setting.type === "number") return `${setting.integer ? "a whole number" : "a number"} from ${setting.min} to ${setting.max}`;
-  if (setting.type === "boolean") return "true or false";
-  return `text, up to ${setting.maxLength} characters`;
-}
-
 export async function settingsCli(argv: string[], store: StudioSettingsStore): Promise<CliResult> {
   const json = argv.includes("--json");
   const args = argv.filter((arg) => arg !== "--json");
@@ -69,7 +62,7 @@ export async function settingsCli(argv: string[], store: StudioSettingsStore): P
       if (!key || !rest.length) return usage();
       if (!Object.hasOwn(STUDIO_SETTINGS, key)) return unknown(key);
       const parsed = parseSettingText(key, rest.join(" "));
-      if (!parsed.ok) return { exitCode: 1, stderr: `${parsed.error} ${key} takes ${describe(STUDIO_SETTINGS[key as keyof typeof STUDIO_SETTINGS])}.\n` };
+      if (!parsed.ok) return { exitCode: 1, stderr: `${parsed.error}\n` };
       const next = await store.set({ [key]: parsed.value }) as Record<string, unknown>;
       return { exitCode: 0, stdout: json ? `${JSON.stringify({ key, value: next[key] })}\n` : `${key} = ${show(next[key])}\n` };
     }

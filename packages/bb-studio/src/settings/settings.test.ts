@@ -312,7 +312,7 @@ describe("bb studio settings", () => {
     expect(await settingsCli(["reset", "autoTitle"], store)).toEqual({ exitCode: 0, stdout: "autoTitle = true (default)\n" });
     const bad = await settingsCli(["set", "loopQuietStart", "25"], store);
     expect(bad).toMatchObject({ exitCode: 1 });
-    expect(bad.stderr).toContain("loopQuietStart goes from 0 to 23. loopQuietStart takes a whole number from 0 to 23.");
+    expect(bad.stderr).toBe("loopQuietStart goes from 0 to 23.\n");
     expect((await settingsCli(["set", "callAudioRetention", "1 day"], store)).stderr).toContain("one of: 7 days, 30 days, Forever");
     expect((await settingsCli(["get", "openaiApiKey"], store)).stderr).toContain("There's no Studio setting called openaiApiKey.");
     expect((await settingsCli(["frob"], store))).toMatchObject({ exitCode: 1 });
