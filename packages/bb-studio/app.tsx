@@ -39,6 +39,7 @@ import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { registerVoiceApp } from "./src/voice/ui/register";
+import { HandsFreeHeaderAction, HandsFreeOverlay, toggleHandsFree } from "./src/voice/live/ui/HandsFree";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotInfoHeaderAction, BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner, BotCacheChip } from "./src/ui/bot/BotCache";
@@ -174,6 +175,10 @@ export default definePluginApp((app) => {
   // the Bot chat's header.
   app.slots.threadPanelAction({ id: LOOPS_PANE, title: "Loops", icon: "ListTodo", layout: "flush", component: LoopsPane });
   app.slots.experimental_threadHeaderAction({ id: "loops-pane", title: "Loops", component: LoopsHeaderAction });
+  // Hands-free voice (src/voice/live/ui): the Bot chat's header button opens
+  // its panel, an overlay that stays over every page while a session runs.
+  app.slots.experimental_threadHeaderAction({ id: "handsfree", title: "Hands-free voice", component: HandsFreeHeaderAction });
+  app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreeOverlay });
   app.slots.threadPanelAction({ id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel });
   // "2 replies · 5m" under each Bot reply with side threads, and what its click
   // opens them through: a header action, since only components inside the thread
@@ -275,4 +280,5 @@ export default definePluginApp((app) => {
     defaultShortcut: { key: "k", mod: true, shift: true },
     run: toggleQuickOpen,
   });
+  app.commands.register({ id: "handsfree", title: "Studio: Hands-free voice", run: toggleHandsFree });
 });
