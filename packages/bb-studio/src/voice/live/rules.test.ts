@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classify, confirmPrompt, hallucinated, outwardKinds, relayText, spokenAnswer } from "./rules";
+import { classify, confirmPrompt, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer } from "./rules";
 import { resolveTarget } from "./targets";
 
 describe("spokenAnswer", () => {
@@ -84,4 +84,14 @@ describe("resolveTarget", () => {
     expect(resolveTarget("launch review", candidates)).toEqual([{ threadId: "thr_1", title: "Launch review" }]);
     expect(resolveTarget("nothing like it", candidates)).toEqual([]);
   });
+});
+
+it("answer relay notes request a full speakable reply and preserve outward warnings", () => {
+  expect(relayNote([], "answer")).toContain("Answer the question fully");
+  expect(relayNote([], "answer")).toContain("no markdown, tables, links or code");
+  for (const intent of ["answer", "do", "fyi"] as const) {
+    expect(relayNote(["spending money"], intent)).toContain("This request involves spending money: ask first.");
+    expect(relayNote([], intent)).toContain("don't spend money");
+  }
+  expect(relayNote([], "fyi")).toContain("short plain summary");
 });

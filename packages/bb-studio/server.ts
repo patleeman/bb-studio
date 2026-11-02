@@ -27,7 +27,7 @@ import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
-import { gatherSeed, RECENT_MESSAGES, type SeedMessage } from "./src/voice/live/identity";
+import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
 import { subcommand, usage } from "./src/kit/cli";
@@ -1292,7 +1292,7 @@ export default async function plugin(bb: BbPluginApi) {
             }
           };
           visit(page.rows ?? []);
-          return messages.slice(-RECENT_MESSAGES);
+          return messages;
         },
         loops: () => {
           if (!loopsEnabled()) return null;

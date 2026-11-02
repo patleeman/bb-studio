@@ -123,7 +123,7 @@ not just in the prompt. Tests are in `live.test.ts` and `rules.test.ts`.
 | Class | Tools | How Studio enforces it |
 | --- | --- | --- |
 | **Read**, free | `loops_list`, `read_replies` | Read-only; tests check they write nothing. |
-| **At once**, said briefly | Relays: `send_to_cos`, `send_to_thread`. Loop actions: done, snooze, hand off (`loops_act`), add (`loops_add`) | A relay is sent right away, visible in the target thread **from the voice thread** (`senderThreadId`), and posted in the voice thread. Studio answers "Sent to the Kensico lead." and the voice says just that; the phone shows "✓ Sent to the Kensico lead" under the subtitles. Loop actions run at once with a **spoken 10 s undo** (`undo` restores status, trigger and owner; undoing an add removes the loop). |
+| **At once**, said briefly | Relays: `send_to_cos`, `send_to_thread`. Loop actions: done, snooze, hand off (`loops_act`), add (`loops_add`) | A relay is sent right away, visible in the target thread **from the voice thread** (`senderThreadId`), and posted in the voice thread. For `answer` intent the voice says “Asking the Kensico lead now.” and waits, then reads the full reply in chunks (see [identity.md](identity.md)). For `do` or `fyi`, Studio answers "Sent to the Kensico lead." and the voice says that; the phone shows "✓ Sent to the Kensico lead" under the subtitles. Loop actions run at once with a **spoken 10 s undo** (`undo` restores status, trigger and owner; undoing an add removes the loop). |
 | **Confirm**, destructive or hard to undo | Drop a loop (`loops_act` drop), `stop_thread`, `archive_thread`, `pause_automation`, `delete_automation` | Nothing happens yet. Studio returns one question ("Drop the loop 'Remove the stale Tailscale node'? Say yes to drop."), the voice asks it, and the phone shows **"Waiting for your yes"**, the only place that card appears. `confirm` acts only if Studio's own transcript has a **user line after the question** that is a short, clear yes ("Yes, drop it" counts). A yes said before the question doesn't count. A no or a change cancels. Whisper's filler ("Thank you for watching") and the voice's own question echoed into the mic aren't a yes. It expires after 45 s. The model saying "they said yes" counts for nothing. |
 | **Never by voice** | Spending money, email or messages to people outside BB, posting publicly, approving credentials | No such tools exist, and an unknown tool name gets a refusal. A relay that *asks* for one is still sent, as a request. It's marked "⚠️ Voice can't approve this: ask me here first", and an agent-only note on every relay tells the target not to act on the voice's word for any of them. |
 
@@ -139,12 +139,15 @@ kept to the minimum:
   words in order, interruptions, what was sent and what came back, the loop
   actions ("✓ Loop done: …") and anything done after a spoken yes ("⚠️ Done
   after a spoken yes: Dropped the loop '…'.").
-- **A reply that arrives after hang-up:** one line, plus the phone push.
+- **A reply that arrives after hang-up:** the full speakable reply, plus a short phone push.
 
 Nothing else is posted while the session runs: no transcript batches, and
 replies during the session go into the end transcript (`live.test.ts`, "the
-voice thread"). A session with one relay costs two short turns there. The
-voice thread from the recorded mock session is saved as `mock-voice-thread.md`
+voice thread"). A session with one relay costs two record turns there. The
+launching chat also gets one compact context message at hang-up when the user
+spoke and the session relayed or the voice spoke. It links to the full voice
+thread; replies in this context message are limited to 300 characters. See
+[identity.md](identity.md#at-hang-up). The voice thread from the recorded mock session is saved as `mock-voice-thread.md`
 in the deliverables folder.
 
 ## Barge-in and the subtitle UI
@@ -323,7 +326,8 @@ shares:
 - **Tool calls go through the phone.** If iOS throttles the app's networking,
   tools stall. Studio receiving them over the server sideband is the fix.
 - **Voice thread cost.** Each relay and the end transcript each run one
-  "[PASS]" turn there. An SDK "append without a turn" would remove them, but
+  "[PASS]" turn there. The launching thread also gets one compact context turn
+  at hang-up. An SDK "append without a turn" would remove them, but
   nothing goes upstream for now. If the app dies before End, the transcript
   isn't posted (the lines are still in Studio's tables).
 - **Reply matching.** The first finished turn on a target thread after a send

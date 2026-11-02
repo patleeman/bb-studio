@@ -27,13 +27,16 @@ building it makes no LLM call.
 | Source | Chief of Staff | Any other thread |
 | --- | --- | --- |
 | Name and role | The Bot's name and role (Studio's Bot record) | The thread's title, and its role from Studio's records: a Bot's role, "Lead of the X project", or a runner's job |
-| Memory | The Bot's Memory page, without its "## Check-in" list, cut to its first ~1,500 characters | — |
+| Memory | The Bot's Memory page, without its "## Check-in" list, cut to its first ~1,100 characters | — |
+| Latest reply | The latest assistant reply in this chat, made speakable, up to ~1,500 characters | The same, from that thread |
 | Recent context | The chat's last 6 messages (BB's thread timeline), each cut to ~280 characters | The same, from that thread |
 | Open loops | Needs you now (up to 6) and Coming up (up to 4), titles only | — |
 | Project | — | The thread's project name |
 
 **Size cap:** about 1,500 tokens, counted as 6,000 characters. Each section
-has its own budget (role 600, memory 1,500, loops 900, recent 2,200), and the
+has its own budget (role 400, memory 1,100, loops 800, recent 1,700, latest reply
+1,500). The latest reply appears in its own “Your latest reply in this chat” section. It comes
+from the same timeline read, before the recent-message window is applied. The
 whole seed is cut at 6,000. It reaches OpenAI as data, not instructions.
 
 **Speed:** the sources are Studio's own tables and one timeline read, fetched
@@ -59,8 +62,54 @@ extractive.
   still resolve as before ("the Kensico lead"), and `send_to_cos` still
   reaches the Chief of Staff.
 
-The voice thread stays hidden under the Bot. It gets the transcript as
-before, and relays still land in their target thread.
+The voice thread stays hidden under the Bot. Relays land in their target
+thread immediately, from the voice thread.
+
+Both relay tools require an `intent`:
+
+- `answer`: questions and requests such as “run through”, “walk me through”,
+  “what's the status”, or “tell me about”. The message preserves the request:
+  “Patrick asks you to run through the changes you're working on.” The target
+  is told to answer fully in plain speakable sentences, leading with the answer.
+- `do`: a task to carry out.
+- `fyi`: information to pass on.
+
+Missing or invalid intent defaults to `answer`. This does not change the
+confirmation rules or the warning about actions voice cannot approve.
+
+For `answer`, the voice says “Asking <name> now.” and waits without guessing.
+Studio delivers the full reply through the server's poll `note`, made
+speakable, in chunks of at most `ANSWER_CHUNK_CHARS` (1,800 characters,
+roughly two minutes). Chunks end at a sentence boundary; an oversized single
+sentence falls back to a word boundary. The note tells the voice to read the
+reply in full, in its own spoken words, without shortening. If cut, it marks
+`Reply cut: true`, tells the voice to ask if the user wants the rest, and gives
+the next `read_replies` `part` (starting at 1). With no target, `read_replies`
+reads the latest session reply; with a target, it reads that thread's session
+reply, or its latest reply if none was relayed. `do` and `fyi` keep the
+600-character summary and one-to-two-sentence read-back.
+
+Both iOS and desktop pass the poll `note` unchanged to the model. No client
+change is needed. There is no timed “Still waiting” reminder; that needs a
+client timer to trigger speech.
+
+## At hang-up
+
+The voice thread keeps the full transcript, including full replies rather
+than summaries. Replies arriving later also land there in full.
+
+If the user spoke and the session relayed or the voice spoke, Studio posts
+one compact message to the launching identity thread, from the voice thread
+(`senderThreadId`). It starts “🎙 Voice session · N min”, includes You / Voice /
+→ sent / ← answered lines, and links to the full voice thread with a thread
+mention. Replies are summarized to 300 characters in this message; the whole
+message stays under about 4,000 characters. Empty sessions and sessions without
+user words do not post there. Repeated or concurrent hang-ups do not post twice.
+
+The agent-only note says this is context from a voice conversation the thread
+was part of. It must act only on requests that weren't already relayed and
+answered; otherwise it replies exactly `[PASS]`. The full voice transcript is
+still posted only in the voice thread.
 
 ## When a source is missing
 

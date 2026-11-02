@@ -9,7 +9,7 @@ import { speakable } from "./speakable";
 export const SEED_TOKEN_CAP = 1500;
 export const SEED_CHAR_CAP = SEED_TOKEN_CAP * 4;
 /** Each section's budget, in characters; together under the cap. */
-export const SEED_BUDGET = { role: 600, memory: 1500, loops: 900, recent: 2200 } as const;
+export const SEED_BUDGET = { role: 400, memory: 1100, loops: 800, recent: 1700, latestReply: 1500 } as const;
 export const RECENT_MESSAGES = 6;
 const MESSAGE_CHARS = 280;
 const NEEDS_YOU_NOW = 6;
@@ -97,6 +97,9 @@ export function buildSeed(input: SeedInput): VoiceSeed {
       sections.push(`Open loops (titles):\n${clip(loops, SEED_BUDGET.loops)}`);
     } else missing.push("loops");
   }
+  const latest = (input.recent ?? []).filter((message) => message.role === "assistant" && message.text.trim()).at(-1);
+  if (latest) sections.push(`Your latest reply in this chat:
+${clip(speakable(latest.text), SEED_BUDGET.latestReply)}`);
   const messages = (input.recent ?? []).filter((message) => message.text.trim()).slice(-RECENT_MESSAGES)
     .map((message) => `${message.role === "user" ? "User" : input.name}: ${clip(oneLine(speakable(message.text)), MESSAGE_CHARS)}`);
   if (input.recent === null) missing.push("recent");

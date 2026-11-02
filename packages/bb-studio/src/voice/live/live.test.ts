@@ -1,8 +1,9 @@
+import { writeFileSync } from "node:fs";
 import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../../migrations";
 import { voiceLiveContract } from "./contract";
-import { VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
+import { ANSWER_CHUNK_CHARS, replyChunk, VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, VOICE_TOOL_DEFINITIONS } from "./session";
 import { LIVE_VOICES, REALTIME_CALLS_URL, VOICE_TOOLS } from "./shared";
 import { DRAFT_MS, UNDO_MS } from "./rules";
@@ -179,7 +180,7 @@ describe("eyes-free rules in the tool layer", () => {
   it("a relay goes at once, with no read-back, visibly from the voice thread", async () => {
     const { live, send } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
-    const output = await live.tool(sessionId, "send_to_thread", JSON.stringify({ target: "the Kensico lead", message: "Pause the eBay fetcher until Monday." }));
+    const output = await live.tool(sessionId, "send_to_thread", JSON.stringify({ target: "the Kensico lead", intent: "do", message: "Pause the eBay fetcher until Monday." }));
     expect(output).toBe(`Sent to the Kensico lead. Say just that ("Sent to the Kensico lead."); its answer will come back here.`);
     const relay = send.mock.calls.find(([input]) => input.threadId === KENSICO.threadId)![0];
     expect(relay).toMatchObject({ senderThreadId: "thr_voice", mode: "auto", text: "🎙 From voice: Pause the eBay fetcher until Monday" });
@@ -325,7 +326,7 @@ describe("replies, interruptions and hang-up", () => {
     const ended = await live.end(sessionId, [{ type: "interrupted", heard: "The fetcher is" }, { type: "transcript", role: "assistant", text: "Bye." }]);
     expect(ended.endedAt).not.toBeNull();
     expect(ended.sent).toEqual([expect.objectContaining({ title: "the Kensico lead", message: "Pause the eBay fetcher" })]);
-    const last = send.mock.calls.at(-1)![0];
+    const last = send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0];
     expect(last.threadId).toBe("thr_voice");
     expect(last.text).toMatch(/^🎙 \*\*Voice session · \d+ s\*\* · ≈\$0\.00 · sent 1 message/);
     expect(last.text).toContain("**You:** Tell the Kensico lead to pause the eBay fetcher");
@@ -538,4 +539,131 @@ describe("hands-free voice's settings: the next session's model, voice, backend 
     const { live } = setup({}, withStore({ voiceLiveMonthlyCapUsd: 5 }));
     expect(live.state()).toMatchObject({ capUsd: 5, monthUsd: 0, ready: true });
   });
+});
+
+
+describe("hands-free answer intent", () => {
+  it.each(["answer", "invalid", undefined])("preserves full answers for %s intent", async (intent) => {
+    const { live, send, db } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    const message = "Patrick asks you to run through the changes you're working on";
+    const result = await live.tool(sessionId, "send_to_cos", JSON.stringify({ intent, message }), [said("run through the changes you're working on")]);
+    expect(result).toContain('Asking Dot now.');
+    expect(result).not.toContain("Say just that");
+    const target = send.mock.calls[0]![0];
+    expect(target.text).toBe(`🎙 From voice: ${message}`);
+    expect(target.note).toContain("Answer the question fully");
+    const sent = db.prepare("SELECT data FROM voice_call_events WHERE kind = 'sent'").get() as { data: string };
+    expect(JSON.parse(sent.data).intent).toBe("answer");
+    const reply = [
+      "I am fixing the hands-free voice relays so your questions reach the right thread with their meaning intact. When you ask for a run-through, the target receives that request and answers it fully.",
+      "The second change is reading the whole answer aloud. Previously the server clipped replies and told the voice to give a sentence or two. Now it keeps the full reply and reads it in parts when needed.",
+      "The seed now includes the latest reply from the launching chat. At hang-up, that chat also gets a compact record of the conversation, with a link to the full voice transcript. These changes keep the thread informed without repeating work it already handled.",
+    ].join("\n\n");
+    await live.idle(COS.threadId, reply);
+    const note = live.poll(sessionId).replies[0]!.note;
+    expect(note).toContain(`<reply>${reply.replace(/\n{2,}/g, "\n")}</reply>`);
+    expect(note).toContain("without shortening");
+    expect(note).not.toContain("Then ask");
+    expect(await live.tool(sessionId, "read_replies", "{}")).toBe(note);
+    live.record(sessionId, [{ type: "transcript", role: "assistant", text: reply }]);
+    await Promise.all([live.end(sessionId), live.end(sessionId)]);
+    await live.end(sessionId);
+    const home = send.mock.calls.filter(([input]) => input.threadId === COS.threadId && input.text.startsWith("🎙 Voice session"));
+    expect(home).toHaveLength(1);
+    expect(home[0]![0]).toMatchObject({ senderThreadId: "thr_voice", mode: "queue-if-active" });
+    expect(home[0]![0].text.length).toBeLessThanOrEqual(4000);
+    expect(home[0]![0].text).toContain("@thread:thr_voice");
+    expect(home[0]![0].note).toContain("otherwise reply exactly [PASS]");
+    expect(send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text).toContain(reply.replace(/\n{2,}/g, "\n"));
+    if (intent === "answer" && process.env.BB_THREAD_STORAGE) writeFileSync(`${process.env.BB_THREAD_STORAGE}/voice-test-transcript.md`, [
+      "# LiveVoice test session (real class, in-memory database, fake dependencies)",
+      "User: run through the changes you're working on", "Relay tool: send_to_cos; intent: answer", "## Target message", target.text,
+      "## Target agent-only note", target.note, "## Target reply", reply,
+      "## Exact note delivered to voice", note, "## Hang-up post to launching thread", home[0]![0].text,
+      "## Hang-up agent-only note", home[0]![0].note,
+      "No live OpenAI session was run. This fixture uses fake transport and agent replies.",
+    ].join("\n\n"));
+  });
+
+  it("chunks at sentences and retrieves every part without losing words", async () => {
+    const { live } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    await live.tool(sessionId, "send_to_thread", JSON.stringify({ target: "Kensico", intent: "answer", message: "Walk me through the changes" }));
+    const reply = Array.from({ length: 80 }, (_, i) => `Change ${i} preserves the user's request and gives the complete answer.`).join(" ");
+    await live.idle(KENSICO.threadId, reply);
+    expect(live.poll(sessionId).replies[0]!.note).toContain("Reply cut: true");
+    let part = 1;
+    const chunks: string[] = [];
+    for (;;) {
+      const chunk = replyChunk(reply, part);
+      expect(chunk.text.length).toBeLessThanOrEqual(ANSWER_CHUNK_CHARS);
+      expect(chunk.text).toMatch(/\.$/);
+      const note = await live.tool(sessionId, "read_replies", JSON.stringify({ target: "Kensico", part }));
+      expect(note).toContain(`<reply>${chunk.text}</reply>`);
+      chunks.push(chunk.text);
+      if (!chunk.cut) break;
+      expect(note).toContain(`part ${part + 1}`);
+      part++;
+    }
+    expect(chunks.join(" ")).toBe(reply);
+    expect(replyChunk("word ".repeat(500)).text.length).toBeLessThanOrEqual(ANSWER_CHUNK_CHARS);
+  });
+
+  it.each(["do", "fyi"])("keeps %s replies short", async (intent) => {
+    const { live } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    await live.tool(sessionId, "send_to_cos", JSON.stringify({ intent, message: "Check the backups" }));
+    await live.idle(COS.threadId, "All fine. ".repeat(400));
+    const note = live.poll(sessionId).replies[0]!.note;
+    expect(note.length).toBeLessThan(800);
+    expect(note).toContain("sentence or two");
+    expect(await live.tool(sessionId, "read_replies", "{}")).toBe(note);
+  });
+
+  it("posts to the launching identity, and skips sessions without user words", async () => {
+    const { live, send } = setup({}, { seed: async () => ({ kind: "thread", name: "Launch", threadId: "thr_launch", role: null, recent: [] }) });
+    const { sessionId } = await live.start({ sdp: "x", threadId: "thr_launch" });
+    live.record(sessionId, [said("What changed?"), { type: "transcript", role: "assistant", text: "The build is ready." }]);
+    await live.end(sessionId);
+    expect(send.mock.calls.filter(([input]) => input.threadId === "thr_launch")).toHaveLength(1);
+    for (const silent of [[], [{ type: "transcript" as const, role: "assistant" as const, text: "Hello." }]]) {
+      const fixture = setup();
+      const start = await fixture.live.start({ sdp: "x" });
+      await fixture.live.end(start.sessionId, silent);
+      expect(fixture.send.mock.calls.filter(([input]) => input.threadId === COS.threadId)).toHaveLength(0);
+    }
+  });
+});
+
+it("declares relay intent and read-back rules in both model instructions", async () => {
+  for (const name of ["send_to_cos", "send_to_thread"]) {
+    const tool = VOICE_TOOL_DEFINITIONS.find((tool) => tool.name === name)!;
+    expect(tool.parameters.required).toContain("intent");
+    expect((tool.parameters.properties as Record<string, { enum?: string[] }>).intent!.enum).toEqual(["answer", "do", "fyi"]);
+  }
+  const { live, fetch } = setup();
+  await live.start({ sdp: "x" });
+  const request = JSON.parse(String(fetch.mock.calls[0]![1]!.body));
+  for (const instructions of [request.session.instructions, request.session.delegation.responses.instructions]) {
+    expect(instructions).toContain("run through / walk me through / what's the status / tell me about");
+    expect(instructions).toContain("Never reframe a request as a suggestion");
+    expect(instructions).toContain("without shortening");
+    expect(instructions).toContain("Don't fill silence with guesses");
+  }
+});
+
+it("caps the launching transcript while keeping the full reply in the voice thread", async () => {
+  const { live, send } = setup();
+  const { sessionId } = await live.start({ sdp: "x" });
+  const reply = "Here is another change. ".repeat(1000);
+  await live.tool(sessionId, "send_to_cos", JSON.stringify({ intent: "answer", message: "Run through the changes" }), [said("Run through the changes")]);
+  await live.idle(COS.threadId, reply);
+  const ended = await live.end(sessionId);
+  const home = send.mock.calls.find(([input]) => input.threadId === COS.threadId && input.text.startsWith("🎙 Voice session"))![0];
+  expect(home.text).not.toContain(reply.trim());
+  expect(home.text.match(/← Dot answered: ([^\n]+)/)![1]!.length).toBeLessThanOrEqual(300);
+  expect(home.text.length).toBeLessThanOrEqual(4000);
+  expect(ended.replies[0]!.text).toBe(reply.trim());
+  expect(send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text).toContain(reply.trim());
 });

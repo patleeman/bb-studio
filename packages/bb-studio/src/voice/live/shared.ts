@@ -71,8 +71,14 @@ export function sessionLength(ms: number): string {
   return seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
 }
 
+export type RelayIntent = "answer" | "do" | "fyi";
+/** Old callers and malformed tool arguments must still hear the answer. */
+export const relayIntent = (value: unknown): RelayIntent => value === "do" || value === "fyi" ? value : "answer";
+
 /** The note the phone adds to the conversation when a relayed thread answers. */
-export function replyNote(title: string, summary: string): string {
+export function replyNote(title: string, summary: string, intent: RelayIntent = "do", nextPart?: number): string {
+  if (intent === "answer") return `(Studio, not the user:) ${title} answered. Read it to the user in full, in your own spoken words, without shortening: <reply>${summary}</reply>${nextPart ? `
+Reply cut: true. Then ask if they want the rest. If yes, call read_replies with target "${title}" and part ${nextPart}.` : ""}`;
   return `(Studio, not the user:) ${title} answered: ${summary}\nTell the user in a sentence or two, then let them talk.`;
 }
 

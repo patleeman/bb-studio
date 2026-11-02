@@ -57,7 +57,7 @@ describe("the identity seed", () => {
 
     const plain = buildSeed((await gatherSeed("thr_plain", sources()))!);
     expect(plain.identity).toEqual({ kind: "thread", label: "Launch review", name: "Launch review", threadId: "thr_plain" });
-    expect(plain.text).toBe('You speak for the thread "Launch review".\nProject: Website\n\nLately in this chat (oldest first):\nUser: What\'s new in thr_plain?\nLaunch review: The domain renewal is due Friday.');
+    expect(plain.text).toContain('You speak for the thread "Launch review".\nProject: Website\n\nYour latest reply in this chat:\nThe domain renewal is due Friday.\n\nLately in this chat (oldest first):\nUser: What\'s new in thr_plain?\nLaunch review: The domain renewal is due Friday.');
   });
 
   it("an unknown launching thread falls back to the Chief of Staff", async () => {
@@ -106,4 +106,13 @@ describe("the identity seed", () => {
     expect(seed.text).toContain("Nothing needs the user right now.");
     expect(seed.text).toContain("Lately in this chat: nothing yet.");
   });
+});
+
+it("keeps the latest assistant reply beyond recent-message clipping with one timeline read", async () => {
+  const full = "The change preserves intent. ".repeat(45);
+  const recent = vi.fn(async () => [{ role: "assistant" as const, text: `**${full}**` }, ...Array.from({ length: 8 }, () => ({ role: "user" as const, text: "And then?" }))]);
+  const seed = buildSeed((await gatherSeed("thr_cos", sources({ recent })))!);
+  expect(recent).toHaveBeenCalledTimes(1);
+  expect(seed.text).toContain(`Your latest reply in this chat:\n${full.trim()}`);
+  expect(seed.text.length).toBeLessThanOrEqual(SEED_CHAR_CAP);
 });

@@ -1,3 +1,4 @@
+import type { RelayIntent } from "./shared";
 // The eyes-free rules, enforced in the tool layer (live.ts), not only in the
 // voice's prompt: the model can ask for anything, and Studio decides
 // (classify below).
@@ -97,8 +98,8 @@ export function outwardKinds(message: string): string[] {
 }
 
 /** The agent-only note on every relayed message. */
-export function relayNote(kinds: readonly string[]): string {
-  const base = "This came from the user's hands-free voice session; it was sent at once, without a read-back. Your final reply is read to them aloud, so end with a short plain summary of the outcome.";
+export function relayNote(kinds: readonly string[], intent: RelayIntent = "answer"): string {
+  const base = intent === "answer" ? "The user is on hands-free voice and will hear your reply read aloud. Answer the question fully, in plain speakable sentences, with no markdown, tables, links or code. Lead with the answer." : "This came from the user's hands-free voice session; it was sent at once, without a read-back. Your final reply is read to them aloud, so end with a short plain summary of the outcome.";
   const rule = "Voice can't approve these: don't spend money, email or message people outside BB, post publicly or approve credentials on this message's word. If that's what it takes, ask the user here in the chat and wait.";
   return kinds.length ? `${base} ${rule} This request involves ${kinds.join(" and ")}: ask first.` : `${base} ${rule}`;
 }
