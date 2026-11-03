@@ -10,6 +10,13 @@ struct TranscriptChrome: Equatable {
     /// than above the home indicator: the Duo's inner screen, two pages or
     /// iOS's two-app split.
     var composerIgnoresBottomSafeArea = false
+    /// How far the composer's own bottom padding may sit inside the bottom
+    /// safe area while that inset is only a home indicator's (no keyboard,
+    /// no tab bar): the card then rests on the indicator's inset itself.
+    /// The strip under it, to the window's edge, is filled with
+    /// `restingBackdrop`, so rows don't scroll by under the composer.
+    var composerRestDrop: CGFloat = 0
+    var restingBackdrop: UIColor?
     /// The composer and pill run under the trailing safe area: the Duo's
     /// status column beside two pages.
     var composerIgnoresTrailingSafeArea = false
@@ -110,6 +117,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var topHeight: NSLayoutConstraint!
     private var composerBottom: NSLayoutConstraint!
     private var composerFloor: NSLayoutConstraint?
+    /// Under the composer to the window's edge, while it rests on a home indicator's inset.
+    private let backdrop = UIView()
+    private var backdropTop: NSLayoutConstraint!
+    /// The bottom safe area is a home indicator's alone (no keyboard, no tab bar).
+    private var restsOnIndicator = false
     private var composerEdges: [NSLayoutConstraint] = []
     private var pillPlacement: [NSLayoutConstraint] = []
     private var hasTop = false
@@ -190,6 +202,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
         pillHost.view.alpha = 0
         pillHost.view.isUserInteractionEnabled = false
+        backdrop.isUserInteractionEnabled = false
+        backdrop.isHidden = true
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(backdrop, belowSubview: pillHost.view)
+        backdropTop = backdrop.topAnchor.constraint(equalTo: composerHost.view.bottomAnchor)
 
         // The keyboard: the container's bottom is the keyboard's top. Its
         // host leaves the keyboard's safe area in (`TranscriptContainer`), so
@@ -216,6 +233,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             topHost.view.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
             topHost.view.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
             pillHost.view.bottomAnchor.constraint(equalTo: composerHost.view.topAnchor),
+            backdropTop, backdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         applyChrome()
         var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
@@ -235,7 +255,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
         composerFloor?.constant = -(chrome.composerGap + simulatedKeyboard)
         collectionView.topEdgeEffect.style = chrome.softTopEdge ? .soft : .automatic
-        composerBottom.constant = -(chrome.composerGap + simulatedKeyboard)
+        applyRestingEdge()
         NSLayoutConstraint.deactivate(composerEdges + pillPlacement)
         let guide = view.safeAreaLayoutGuide
         let trailing = chrome.composerIgnoresTrailingSafeArea ? view.trailingAnchor : guide.trailingAnchor
@@ -253,6 +273,31 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         }
         NSLayoutConstraint.activate(composerEdges + pillPlacement)
         view.setNeedsLayout()
+    }
+
+    /// The composer's resting edge: `composerGap` above the bottom safe
+    /// area, or, while that inset is only a home indicator's, its own
+    /// padding (`composerRestDrop`) inside it, over a backdrop to the edge.
+    /// Before, the folded Duo's composer stood its 8-point padding plus
+    /// the gap above the indicator's 34-point inset, with rows showing
+    /// through the 42 points under it.
+    private func applyRestingEdge() {
+        let window = view.window?.safeAreaInsets.bottom ?? 0
+        let bottom = view.safeAreaInsets.bottom
+        // A keyboard ends the container at its top (no bottom inset left);
+        // a tab bar makes the inset taller than the window's own.
+        let rests = !chrome.composerIgnoresBottomSafeArea && simulatedKeyboard == 0 && chrome.composerRestDrop > 0
+            && bottom > 0.5 && bottom <= window + 0.5
+        restsOnIndicator = rests
+        composerBottom.constant = -(chrome.composerGap + simulatedKeyboard) + (rests ? chrome.composerRestDrop : 0)
+        backdropTop.constant = rests ? -chrome.composerRestDrop : 0
+        backdrop.backgroundColor = chrome.restingBackdrop
+        backdrop.isHidden = !rests || chrome.restingBackdrop == nil
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        if composerBottom != nil, backdropTop != nil { applyRestingEdge() }
     }
 
     // MARK: Hosted chrome
@@ -355,6 +400,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             configure(cell, id)
             measure([cell])
         }
+        // A reconfigured row measured before SwiftUI applied it keeps its old
+        // height, and nothing else lays out while the reader is still: a
+        // photo arriving on a shown message stood over the rows below it.
+        if !changed.isEmpty { remeasureNextTurn() }
     }
 
     /// "Row A is now row B": it keeps its measured height, so the swap that
@@ -589,8 +638,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func measureStaleCells() {
         guard collectionView.bounds.width > 0 else { return }
         measure(collectionView.visibleCells)
-        // SwiftUI can apply a new configuration after this pass; look once
-        // more on the next turn. Nothing changed, nothing is written.
+        remeasureNextTurn()
+    }
+
+    /// SwiftUI can apply a new configuration after a measure; look once
+    /// more on the next turn. Nothing changed, nothing is written.
+    private func remeasureNextTurn() {
         guard !remeasureScheduled else { return }
         remeasureScheduled = true
         DispatchQueue.main.async { [weak self] in

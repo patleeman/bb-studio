@@ -1791,6 +1791,10 @@ extension ThreadView {
         chrome.composerGap = 0
         // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).
         chrome.composerIgnoresBottomSafeArea = duoLayout.innerScreen
+        // Over a home indicator alone (the folded Duo, a phone's thread),
+        // the card rests on its inset: its own 8 pt padding goes inside it.
+        chrome.composerRestDrop = 8
+        chrome.restingBackdrop = .systemBackground
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin(bot: botChrome != nil)
         chrome.rows.readableWidth = Self.readableWidth

@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 
 struct MessageBubble: View {
@@ -174,32 +175,119 @@ struct ClampedText: View {
     }
 }
 
-/// A sent photo. Tap to see it full screen.
+/// A sent photo. Tap to see it full screen; after a failed load, tap to try again.
+///
+/// Not `AsyncImage`: it started a fresh download each time its view was
+/// built again (a transcript cell reconfigured, scrolled away and back),
+/// kept nothing (URLSession's shared cache skips a multi-megabyte camera
+/// photo), and decoded the full photo (a 4194 × 6102 JPEG is 100 MB) to
+/// show it 200 points wide. Over a slow link the box could spin for good.
+/// `AttachmentImages` shares one download per photo, outliving the cell,
+/// keeps a thumbnail at the size shown, and gives up after a timeout.
 struct AttachmentImage: View {
     let url: URL
     let side: CGFloat
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
+    @State private var failed = false
+    @State private var attempt = 0
     @State private var viewing = false
 
+    init(url: URL, side: CGFloat) {
+        self.url = url
+        self.side = side
+        _image = State(initialValue: AttachmentImages.shared.cached(url, pixels: AttachmentImages.pixels(side)))
+    }
+
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFill()
-            case .failure:
-                Image(systemName: "photo").foregroundStyle(.secondary)
-            default:
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else if failed {
+                Image(systemName: "arrow.clockwise").foregroundStyle(.secondary)
+                    .accessibilityLabel("Couldn't load the photo. Try again")
+            } else {
                 ProgressView()
             }
         }
         .frame(width: side, height: side)
         .background(.fill.tertiary)
         .clipShape(.rect(cornerRadius: 14))
-        .onTapGesture { viewing = true }
+        .contentShape(.rect)
+        .onTapGesture {
+            if failed { failed = false; attempt += 1 } else { viewing = true }
+        }
+        .task(id: attempt) {
+            guard image == nil else { return }
+            if let loaded = await AttachmentImages.shared.image(url, pixels: AttachmentImages.pixels(side)) {
+                image = loaded
+            } else if !Task.isCancelled {
+                failed = true
+            }
+        }
         .fullScreenCover(isPresented: $viewing) {
             ImageViewer(url: url)
         }
         .accessibilityLabel("Attached image")
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Sent photos, loaded once each and kept as thumbnails.
+@MainActor
+final class AttachmentImages {
+    static let shared = AttachmentImages()
+
+    /// Twice the points shown, at 3x: sharp in the box and in a zoomed preview.
+    static func pixels(_ side: CGFloat) -> Int { Int(side * 3 * 2) }
+
+    private let cache = NSCache<NSString, UIImage>()
+    private var loads: [NSString: Task<UIImage?, Never>] = [:]
+    private nonisolated let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        // A stalled transfer fails rather than spinning for good; the box offers a retry.
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 180
+        config.urlCache = URLCache(memoryCapacity: 8 << 20, diskCapacity: 200 << 20)
+        return URLSession(configuration: config)
+    }()
+
+    private init() { cache.totalCostLimit = 64 << 20 }
+
+    private static func key(_ url: URL, _ pixels: Int) -> NSString { "\(pixels)|\(url.absoluteString)" as NSString }
+
+    func cached(_ url: URL, pixels: Int) -> UIImage? { cache.object(forKey: Self.key(url, pixels)) }
+
+    /// The photo as a thumbnail, or nil if it can't be had. One download per
+    /// photo at a time, kept going when the view that asked goes away.
+    func image(_ url: URL, pixels: Int) async -> UIImage? {
+        let key = Self.key(url, pixels)
+        if let hit = cache.object(forKey: key) { return hit }
+        let load = loads[key] ?? Task.detached(priority: .userInitiated) { [session] in
+            guard let (data, response) = try? await session.data(from: url) else { return nil }
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            return Self.thumbnail(data, pixels: pixels)
+        }
+        loads[key] = load
+        let image = await load.value
+        loads[key] = nil
+        if let image {
+            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4))
+        }
+        return image
+    }
+
+    /// Decoded straight to `pixels` on its long side, never at full size.
+    nonisolated static func thumbnail(_ data: Data, pixels: Int) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
     }
 }
 
