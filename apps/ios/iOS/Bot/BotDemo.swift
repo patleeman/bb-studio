@@ -300,6 +300,19 @@ enum BotDemo {
             notify()
         }
 
+        /// QA: the photo arrives on `-qaDuoSpaceLate`'s message, as when BB
+        /// fills in a sent message's attachments after it first showed it.
+        func addSpacePhoto() {
+            let arguments = ProcessInfo.processInfo.arguments
+            let image = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+                ?? "https://offline-fixtures.invalid/photo.png"
+            lock.withLock {
+                guard let index = rows.firstIndex(where: { $0.id == "sp1" }) else { return }
+                rows[index].attachments = BotDemo.decode(#"{"imageUrls":["\#(image)"]}"#) as TimelineRow.Attachments
+            }
+            notify()
+        }
+
         private func notify() {
             Task { @MainActor in observers.values.forEach { $0() } }
         }
@@ -437,7 +450,10 @@ enum BotDemo {
         func work(_ id: String, _ tool: String, _ at: Double, status: String = "completed", output: String = "") -> String {
             #"{"id":"\#(id)","kind":"work","workKind":"tool","toolName":"\#(tool)","title":"\#(tool)","status":"\#(status)","output":"\#(output)","createdAt":\#(at)}"#
         }
-        if let long { return decode("[" + longChat(long, message: message, work: work).joined(separator: ",") + "]") }
+        if let long {
+            let space = spaceFixture ? spaceRows(today + 60_000, message: message, work: work) : []
+            return decode("[" + (longChat(long, message: message, work: work) + space).joined(separator: ",") + "]")
+        }
         var items = [
             message("m1", "assistant", "Good morning! Three things today:\n\n- **Design review** at 10:00, the deck is ready\n- Two PRs waiting on you\n- Your flight to Lisbon checks in tonight", yesterday),
             message("m2", "user", "Thanks. Can you get the PRs moving?", yesterday + 60_000),
@@ -458,7 +474,34 @@ enum BotDemo {
         default:
             items.append(message("m5", "assistant", "Just one thing: the **Lisbon offsite budget** needs your sign-off by 3pm. The PRs are merged and the deck is final.\n\nWant me to draft the approval note?\n\n::next{reply=\"👍 Draft it|🕒 Remind me at 2|🙅 Not today\" do=\"📅 Block focus time\"}", today + 30_000))
         }
+        if spaceFixture { items += spaceRows(today + 60_000, message: message, work: work) }
         return decode("[" + items.joined(separator: ",") + "]")
+    }
+
+    /// `-qaDuoSpace`: the end of the chat as in the folded-Duo report: a photo
+    /// you sent with a long message, the Bot's two steps, and its reply.
+    /// `-qaDuoSpaceImage <url>` serves the photo (a local fixture server);
+    /// without it the photo's URL can't be reached.
+    static var spaceFixture: Bool { ProcessInfo.processInfo.arguments.contains("-qaDuoSpace") }
+
+    private static func spaceRows(_ at: Double, message: (String, String, String, Double) -> String,
+                                  work: (String, String, Double, String, String) -> String) -> [String] {
+        let arguments = ProcessInfo.processInfo.arguments
+        let image = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+            ?? "https://offline-fixtures.invalid/photo.png"
+        let text = "Mobile app, get rid of this chat / loops bar on top. Loops should not be a tab. Maybe an icon on the right rail but maybe just in the three dot menu"
+        return [
+            // `-qaDuoSpaceLate`: the photo comes in later, on the same row (`addSpacePhoto`).
+            arguments.contains("-qaDuoSpaceLate") ? message("sp1", "user", text, at)
+                : #"{"id":"sp1","kind":"conversation","role":"user","text":"\#(text)","attachments":{"imageUrls":["\#(image)"]},"createdAt":\#(at)}"#,
+            work("sp2", "pages_read", at + 5_000, "completed", ""),
+            work("sp3", "bb_thread_start", at + 8_000, "completed", ""),
+            message("sp4", "assistant", "Done. Loops moved into the ⋯ menu, and the Chat | Loops bar at the top of the bot chat goes away, so the chat fills the screen.", at + 20_000),
+        ] + (arguments.contains("-qaDuoSpaceTail") ? (1...8).flatMap { index in
+            // `-qaDuoSpaceTail`: more after it, so the photo's row starts above the view, unmeasured.
+            [message("spt\(index)u", "user", "Follow-up \(index): and the thread view?", at + 30_000 + Double(index) * 10_000),
+             message("spt\(index)a", "assistant", "Follow-up \(index): the thread view keeps its own header, composer and rows, with the same insets.", at + 35_000 + Double(index) * 10_000)]
+        } : [])
     }
 
     /// A long chat for timing: `count` messages of Markdown, lists, tables,
