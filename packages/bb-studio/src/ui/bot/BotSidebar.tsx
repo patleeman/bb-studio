@@ -13,11 +13,11 @@
 // Threads comes back to the user (ThreadsSection.tsx).
 import { Icon } from "../../kit/ui/index";
 import { openAppPath, usePathname } from "../../kit/app/index";
-import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, experimental_useProviders as useProviders, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_ThreadActionsMenu as ThreadActionsMenu, experimental_ThreadStatusGlyph as ThreadStatusGlyph, experimental_useProviders as useProviders, experimental_useSidebarThreads, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
-import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotActivityView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -29,6 +29,7 @@ import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sideba
 
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName } from "./sidebarAgenda";
+import { botRowState, STATE_INDICATOR, type BotAttentionSummary, type ThreadState } from "./rowState";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -194,26 +195,51 @@ function useThreadDrop(bot: BotSummary): { over: boolean; props: { onDragOver(ev
 const QUIET_ROW = "flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground";
 const DROP_RING = "ring-2 ring-inset ring-[var(--bot-accent,var(--ring))]";
 
-type Attention = BotActivityView["attention"];
 
 /**
- * The Bot's one "needs you" signal (src/bot-attention.ts): a dot on its
- * avatar, and its count beside the name. The Bot triages everything else
- * (runners, alerts, its threads' questions); this says its chat has
- * something for the user.
+ * A Bot's row state (rowState.ts) from BB's live view of its chat (a hidden
+ * thread) and the threads the chat spawned, Studio's bot_attention and, on
+ * the selected Bot, its threads in progress. `refresh` re-reads attention
+ * when the chat changes (a turn ends, the user reads it), so the row doesn't
+ * wait for the next poll.
  */
-function AttentionDot({ attention }: { attention: Attention }) {
-  return attention ? <span data-testid="bot-attention" className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-warning ring-2 ring-background" aria-label={attention.reason} /> : null;
+function useBotRowState(bot: BotSummary, attention: BotAttentionSummary, refresh: () => void, running?: number): ThreadState {
+  const threads = experimental_useSidebarThreads().threads;
+  const chatId = bot.threadId;
+  const chat = chatId ? threads.find((thread) => thread.id === chatId) ?? null : null;
+  const children = chatId ? threads.filter((thread) => !thread.isArchived && (thread.parentThreadId === chatId || thread.lifecycleOwnerThreadId === chatId)) : [];
+  const changed = chat ? `${chat.status}:${chat.isUnread}:${chat.hasPendingInteraction}:${chat.lastReadAt}` : "";
+  const seen = useRef(changed);
+  useEffect(() => {
+    if (seen.current === changed) return;
+    seen.current = changed;
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
+  return botRowState({ chat, children, attention, running });
 }
-function AttentionCount({ attention }: { attention: Attention }) {
-  return attention ? <span aria-hidden className="shrink-0 rounded-full bg-warning/20 px-1.5 text-[10px] leading-4 text-foreground tabular-nums">{attention.count}</span> : null;
+
+/**
+ * The Bot row's status, drawn as BB's own thread rows draw theirs (its status
+ * glyph): the spinner while it works, the unread dot, the needs-you mark.
+ */
+function BotStatusMark({ state, label }: { state: ThreadState; label?: string }) {
+  if (state === "idle") return null;
+  return (
+    <span data-testid="bot-status" data-state={state} title={label} className="flex shrink-0 items-center">
+      <ThreadStatusGlyph indicator={STATE_INDICATOR[state]} />
+    </span>
+  );
 }
 
 /** A Bot that isn't selected: one row that opens its chat, and its ⓘ; with what waits on the user in its chat. */
 function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
   const openBot = useOpenBot(onNavigate);
   const drop = useThreadDrop(bot);
-  const attention = useLive("bot_attention", { botId: bot.id }, { pollMs: 30_000 }).data?.attention ?? null;
+  const live = useLive("bot_attention", { botId: bot.id }, { pollMs: 30_000 });
+  const attention = live.data?.attention ?? null;
+  const state = useBotRowState(bot, attention, live.refresh);
+  const loud = state === "needs-you" || state === "error" || state === "unread";
   return (
     <div {...drop.props} data-drop-over={drop.over || undefined} style={{ "--bot-accent": bot.color ?? colorForName(bot.name) } as CSSProperties}
       className={`group/bot flex min-w-0 items-center rounded-md pr-1 hover:bg-state-hover ${drop.over ? DROP_RING : ""}`}>
@@ -221,11 +247,10 @@ function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left">
         <span className="relative shrink-0">
           <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={22} provider={botProvider(bot)} />
-          <AttentionDot attention={attention} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
-        <AttentionCount attention={attention} />
+        <span className={`min-w-0 flex-1 truncate text-sm ${loud ? "font-semibold" : ""}`}>{bot.name}</span>
         {bot.state !== "active" ? <span className="shrink-0 text-[11px] text-muted-foreground">{bot.state}</span> : null}
+        <BotStatusMark state={state} label={attention?.reason} />
       </button>
       <InfoButton bot={bot} onThread={false} onNavigate={onNavigate} />
     </div>
@@ -264,6 +289,8 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(onOpen);
   const attention = activity.data?.attention ?? null;
+  const state = useBotRowState(bot, attention, activity.refresh, running);
+  const loud = state === "needs-you" || state === "error" || state === "unread";
   const sdk = useSdk();
   // The Bot's chat open and on screen is read: its badge clears. BB may not
   // mark a hidden chat read on view, so Studio does, each time something new
@@ -286,15 +313,15 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
         className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left hover:brightness-110">
         <span className="relative shrink-0">
           <BotAvatar shape={bot.shape ?? null} color={bot.color ?? null} emoji={bot.avatar} image={bot.avatarImageUrl} size={28} working={running > 0} provider={botProvider(bot)} />
-          <AttentionDot attention={attention} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5"><span className="truncate text-sm font-medium">{bot.name}</span><AttentionCount attention={attention} /></span>
+          <span className="flex min-w-0 items-center gap-1.5"><span className={`truncate text-sm ${loud ? "font-semibold" : "font-medium"}`}>{bot.name}</span></span>
           {/* Why it needs you, while something does; else what it's doing. */}
           {attention
             ? <span data-testid="bot-attention-reason" className="truncate text-[11px] text-foreground/80">{attention.reason}</span>
             : <span className="truncate text-[11px] text-muted-foreground">{status}</span>}
         </span>
+        <BotStatusMark state={state} label={attention?.reason ?? status} />
       </button>
       <InfoButton bot={bot} onThread={onThread} onNavigate={onNavigate} always />
       </div>

@@ -24,24 +24,14 @@ import {
 import { useMemo, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import { useCall, useLive } from "../live";
+import { threadState, type ThreadState } from "./rowState";
 
 type Thread = PluginSidebarThread;
 /** The drag type of a thread row: its id, dropped on a Bot to hand it over (BotSidebar.tsx). */
 export const THREAD_DRAG = "application/x-studio-thread";
 /** Set as well on a row from a Bot's list: only those drop on Threads. */
 export const BOT_THREAD_DRAG = "application/x-studio-bot-thread";
-export type ThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
-
-const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
-
-/** What a thread asks of the user, most urgent first. */
-export function threadState(thread: Pick<Thread, "status" | "runtimeStatus" | "indicator" | "hasPendingInteraction" | "isUnread">): ThreadState {
-  if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "needs-you";
-  if (BUSY.has(thread.status) || BUSY.has(thread.runtimeStatus) || thread.indicator === "runtime") return "working";
-  if (thread.indicator === "unread-error") return "error";
-  if (thread.indicator === "unread-success" || thread.isUnread) return "unread";
-  return "idle";
-}
+export { threadState, type ThreadState } from "./rowState";
 
 const recency = (thread: Thread) => Math.max(thread.updatedAt, thread.latestAttentionAt);
 
@@ -117,6 +107,14 @@ const PILL: Partial<Record<ThreadState, { className: string; label: string }>> =
   "needs-you": { className: "bg-warning text-neutral-950", label: "Needs you" },
   error: { className: "bg-destructive text-white", label: "Failed" },
 };
+
+/** A thread row's mark for its state: a pill (Needs you, Failed) or a dot (working, unread); nothing when idle. */
+export function ThreadStateMark({ state }: { state: ThreadState }) {
+  const pill = PILL[state];
+  if (pill) return <span className={cn("whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", pill.className)}>{pill.label}</span>;
+  const dot = DOT[state];
+  return dot.label ? <span role="img" aria-label={dot.label} title={dot.label} className={cn("mr-1 block size-[7px] rounded-full", dot.className)} /> : null;
+}
 
 const PAGE = 10;
 
@@ -263,11 +261,9 @@ function ThreadRow({ thread, project, active, open }: { thread: Thread; project:
           )}
           {shortcut ? <span aria-hidden className="shrink-0 rounded bg-state-hover px-1 text-[10px] text-muted-foreground">{shortcut.label}</span> : null}
           <span className={cn("shrink-0", menuOpen ? "hidden" : "group-hover/thread-row:hidden")}>
-            {pill
-              ? <span className={cn("whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold uppercase leading-4 tracking-wide", pill.className)}>{pill.label}</span>
-              : dot.label
-                ? <span role="img" aria-label={dot.label} title={dot.label} className={cn("mr-1 block size-[7px] rounded-full", dot.className)} />
-                : thread.isPinned
+            {pill || dot.label
+              ? <ThreadStateMark state={state} />
+              : thread.isPinned
                   ? <Icon name="Pin" aria-label="Pinned" className="size-3 text-muted-foreground" />
                   : <time dateTime={new Date(at).toISOString()} className="text-[11px] tabular-nums text-muted-foreground">{compactAge(at)}</time>}
           </span>

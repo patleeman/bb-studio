@@ -39,6 +39,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (state.openThreadPanel)({ actionId: tab.id, ...rest }) }),
   useSdk: () => sdk,
   experimental_useSidebarThreads: () => state.sidebarThreads,
+  experimental_ThreadStatusGlyph: ({ indicator }: { indicator: string }) => React.createElement("i", { "data-glyph": indicator }),
   experimental_ThreadActionsContextMenu: ({ children, requestRename, thread }: { children: React.ReactNode; requestRename(id: string): void; thread: { id: string } }) =>
     React.createElement("div", { "data-menu-for": thread.id }, children, React.createElement("button", { type: "button", "data-rename": thread.id, onClick: () => requestRename(thread.id) }, "rename")),
   experimental_ThreadActionsMenu: ({ trigger }: { trigger(props: object): React.ReactNode }) => trigger({}),
@@ -186,9 +187,12 @@ test("the Bots list: the bot on top saying what waits on you, no Needs you, star
   expect(nav.querySelector("[data-testid=bot-main]")?.textContent).toContain("Dot");
   const groups = [...nav.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
   expect(groups).toEqual(["Running", "Recent", "Earlier conversations"]);
-  // The Bot's row is the one "needs you" signal: a dot, its count, and why.
+  // The Bot's row is the one "needs you" signal: BB's needs-you glyph, and why.
   const main = nav.querySelector("[data-testid=bot-main]")!;
-  expect(main.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("Asked you a question");
+  const mark = main.querySelector("[data-testid=bot-status]")!;
+  expect(mark.getAttribute("data-state")).toBe("needs-you");
+  expect(mark.getAttribute("title")).toBe("Asked you a question");
+  expect(mark.querySelector("[data-glyph]")?.getAttribute("data-glyph")).toBe("waiting-for-input");
   expect(main.querySelector("[data-testid=bot-attention-reason]")?.textContent).toBe("Asked you a question");
   expect(main.getAttribute("title")).toBe("Dot: Asked you a question");
   // Not read until its chat is the open thread; then Studio marks it read, so the badge clears.
@@ -695,8 +699,8 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
   // Another Bot's row still says when its chat has something for you (bot_attention).
   expect(state.inputs).toContainEqual(["bot_attention", { botId: "bot_main" }]);
   const dotRow = nav.querySelector('[data-testid=bot-row][data-bot="bot_main"]')!;
-  expect(dotRow.querySelector("[data-testid=bot-attention]")?.getAttribute("aria-label")).toBe("2 things for you");
-  expect(dotRow.textContent).toContain("2");
+  expect(dotRow.querySelector("[data-testid=bot-status]")?.getAttribute("data-state")).toBe("needs-you");
+  expect(dotRow.querySelector("[data-testid=bot-status]")?.getAttribute("title")).toBe("2 things for you");
   expect(dotRow.getAttribute("title")).toBe("Dot: 2 things for you");
   expect(state.inputs).toContainEqual(["bot_get", { botId: "bot_scout" }]);
   expect(state.inputs).toContainEqual(["bot_activity", { botId: "bot_scout" }]);
@@ -1018,6 +1022,36 @@ test("Attention Router on: no tabs; Needs you has the due loop with one action, 
   expect(container.querySelector("[data-testid=bot-page]")).toBeNull();
 });
 
+test("Bot rows draw BB's thread status glyph: working off its hidden chat, unread and needs you off bot_attention", async () => {
+  state.pathname = "/plugins/studio/studio/bot/bot_scout";
+  const nova = { ...dot, id: "bot_nova", name: "Nova", threadId: "thr_nova", primary: false };
+  const quiet = { ...dot, id: "bot_quiet", name: "Quiet", threadId: "thr_quiet", primary: false };
+  const attention: Record<string, unknown> = {
+    bot_main: { attention: null },
+    bot_nova: { attention: { reason: "1 thing for you", count: 1, unread: 1, since: 1 } },
+    bot_quiet: { attention: null },
+  };
+  state.data = {
+    bot_list: { bots: [{ ...dot, primary: true }, nova, quiet, scout] }, bot_get: { bot: scout, run: null },
+    bot_activity: { ...empty, attention: { reason: "Asked you a question", count: 1, unread: 0, since: 1 } },
+    bot_attention: (input: { botId: string }) => attention[input.botId],
+  };
+  const chat = (id: string, extra: Record<string, unknown>) => ({ id, projectId: "p", parentThreadId: null, lifecycleOwnerThreadId: null, isHidden: true, isArchived: false, isUnread: false, hasPendingInteraction: false, indicator: "none", status: "idle", runtimeStatus: "idle", lastReadAt: 0, ...extra });
+  state.sidebarThreads = { ...state.sidebarThreads, threads: [
+    chat("thr_bot", { status: "active", runtimeStatus: "active", indicator: "runtime" }),
+    // A [PASS] check-in leaves Quiet's chat unread in BB; bot_attention has nothing, so it stays quiet.
+    chat("thr_quiet", { isUnread: true, indicator: "unread-success" }),
+  ] };
+  await show(<BotThreadList {...listProps} />);
+  const mark = (selector: string) => container.querySelector(`${selector} [data-testid=bot-status]`);
+  expect(mark('[data-bot="bot_main"]')?.getAttribute("data-state")).toBe("working");
+  expect(mark('[data-bot="bot_main"]')?.querySelector("[data-glyph]")?.getAttribute("data-glyph")).toBe("runtime");
+  expect(mark('[data-bot="bot_nova"]')?.getAttribute("data-state")).toBe("unread");
+  expect(mark('[data-bot="bot_nova"]')?.querySelector("[data-glyph]")?.getAttribute("data-glyph")).toBe("unread-success");
+  expect(mark('[data-bot="bot_quiet"]')).toBeNull();
+  expect(mark("[data-testid=bot-main]")?.getAttribute("data-state")).toBe("needs-you");
+});
+
 test("the sidebar has an All loops row under the primary Bot, with its open count, and no Needs you list", async () => {
   state.settings = { loopsEnabled: true };
   state.data = { bot_get: { bot: dot, run: null }, bot_activity: { ...empty, attention: { reason: "1 loop needs you", count: 1, since: Date.now() } }, "loops.list": loopGroups };
@@ -1025,7 +1059,7 @@ test("the sidebar has an All loops row under the primary Bot, with its open coun
   const row = container.querySelector("[data-testid=bot-all-loops]")!;
   expect(row.textContent).toBe("All loops2");
   expect(container.querySelector('section[aria-label="Needs you"]')).toBeNull();
-  expect(container.querySelector("[data-testid=bot-main] [data-testid=bot-attention]")).not.toBeNull();
+  expect(container.querySelector("[data-testid=bot-main] [data-testid=bot-status]")?.getAttribute("data-state")).toBe("needs-you");
   const { openAppPath } = await import("../../kit/app/index");
   act(() => click(row));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main/loops");

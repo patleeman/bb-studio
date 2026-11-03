@@ -1740,10 +1740,22 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **The Bot is the triage layer** (docs/needs-you/REDO.md): runner
   reports, urgent alerts, failures and its threads' questions go to the
   Bot, which handles them or tells you in its own chat. There's no Needs
-  you list. The one signal is on the Bot's row: a dot, a count and why
-  ("Asked you a question", "1 thing for you") while its chat has a pending
-  question or approval, or replies you haven't read; it clears when you
-  read or answer the chat (`bot_activity`'s `attention`, `bot_attention`).
+  you list. The one signal is on the Bot's row: BB's own thread status
+  glyph at its right end (`experimental_ThreadStatusGlyph`, the one BB's
+  thread rows draw), with why in its tooltip ("Asked you a question",
+  "1 thing for you") and on the selected Bot's second line
+  (`src/ui/bot/rowState.ts`). Most urgent first: **needs you** while its
+  chat has a pending question or approval, or a released loop
+  (`bot_activity`'s `attention`, `bot_attention`); the **spinner** while its
+  chat, a thread its chat spawned, or (on the selected Bot) a thread in
+  progress is working; **failed** when its chat's last turn failed unread;
+  the **unread** dot for replies you haven't read. The Bot's chat is a
+  hidden thread, which BB keeps out of its list but still carries live in
+  the sidebar's thread view, so busy and waiting show at once; unread comes
+  from `bot_attention` (refreshed when the chat changes), since BB marks the
+  chat unread after a check-in's `[PASS]` too. It clears when you read or
+  answer the chat. The icon rail has no Bot entries, so nothing shows
+  there: a plugin can't add per-Bot rail items with SDK 0.6.104.
   A thread the Bot started that waits on a question or approval shows
   under Running as **waiting**; it's the Bot's to handle.
 
