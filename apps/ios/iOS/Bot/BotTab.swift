@@ -11,6 +11,8 @@ struct BotTab: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.duoLayout) private var duoLayout
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
     @State private var path: [Route] = []
     @State private var lead = BotLead.loading
     @State private var activity: BotActivity?
@@ -27,7 +29,7 @@ struct BotTab: View {
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Each chat thread's environment, as its ThreadView loads it, for Terminals.
     @State private var chatEnvironments: [String: String] = [:]
-    /// Chat | Loops: the Loops instead of the chat (the left pane, beside it, on the unfolded Duo).
+    /// The Loops instead of the chat, from the ⋯ menu (the left pane, beside it, on the unfolded Duo).
     @State private var showsLoops = false
     @State private var loops = LoopsModel.shared
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
@@ -204,12 +206,7 @@ struct BotTab: View {
                             .transition(.opacity)
                     }
                 }
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 6) {
-                        if loopsOn && !duoLayout.twoPages { BotChatLoopsSwitch(showsLoops: $showsLoops, count: loopsCount) }
-                        banner(bot)
-                    }
-                }
+                .safeAreaInset(edge: .top, spacing: 0) { banner(bot) }
             } else {
                 ContentUnavailableView {
                     Label { Text("\(bot.name) has no chat") } icon: { BotAvatar(bot.look, size: 56) }
@@ -252,7 +249,14 @@ struct BotTab: View {
 
     @ToolbarContentBuilder
     private func toolbar(_ bot: BotInfo) -> some ToolbarContent {
-        if let back, !duoLayout.twoPages {
+        if showsLoops && loopsOn && !duoLayout.twoPages {
+            // Over the chat, back goes to the chat first.
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showsLoops = false } label: { Image(systemName: "chevron.backward") }
+                    .accessibilityLabel("Back to \(bot.name)")
+                    .accessibilityIdentifier("loops-back")
+            }
+        } else if let back, !duoLayout.twoPages {
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: back) { Image(systemName: "chevron.backward") }
                     .accessibilityLabel("Bots")
@@ -290,7 +294,15 @@ struct BotTab: View {
     }
 
     private func menu(_ bot: BotInfo) -> some View {
-        Menu {
+        let badge = BotLoopsMenu.badge(loopsOn: loopsOn, count: loopsCount)
+        return Menu {
+            if loopsOn {
+                Section {
+                    Button { showsLoops = true } label: {
+                        Label(BotLoopsMenu.title(count: loopsCount), systemImage: "checklist")
+                    }
+                }
+            }
             Section {
                 Button { sheet = .profile } label: { Label("Edit profile", systemImage: "person.crop.circle") }
                 if bot.external {
@@ -320,9 +332,13 @@ struct BotTab: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
+            // Loops that need you, on the ⋯ as on the bell. One image, so the
+            // toolbar keeps it a bar button (the folded Duo's rail places those).
+            BotMenuBadge.glyph(count: badge, colorScheme: colorScheme, scale: displayScale)
+                .modifier(DuoHeaderMenuLabel())
         }
-        .accessibilityLabel("\(bot.name) options")
+        .accessibilityLabel(BotLoopsMenu.accessibilityLabel(name: bot.name, badge: badge))
+        .accessibilityIdentifier("bot-menu")
     }
 
     @ViewBuilder
@@ -546,46 +562,57 @@ extension BotActivity {
     var running: Bool { !inProgress.isEmpty || !(waiting ?? []).isEmpty }
 }
 
-/// Chat | Loops, under the Bot's header on the phone and the folded Duo.
-/// Loops carries its count: Needs you now, a pending question counted once.
-struct BotChatLoopsSwitch: View {
-    @Binding var showsLoops: Bool
-    let count: Int
+/// Loops in the Bot's ⋯ menu: its item, and the ⋯'s badge while loops need you
+/// (Needs you now, a pending question counted once). With Loops off, neither.
+enum BotLoopsMenu {
+    static func badge(loopsOn: Bool, count: Int) -> Int { loopsOn ? max(0, count) : 0 }
 
-    var body: some View {
-        HStack(spacing: 4) {
-            segment("Chat", selected: !showsLoops) { showsLoops = false }
-            segment("Loops", selected: showsLoops, badge: count) { showsLoops = true }
+    static func title(count: Int) -> String { count > 0 ? "Loops  \(count)" : "Loops" }
+
+    static func accessibilityLabel(name: String, badge: Int) -> String {
+        switch badge {
+        case ...0: "\(name) options"
+        case 1: "\(name) options, 1 loop needs you"
+        default: "\(name) options, \(badge) loops need you"
         }
-        .padding(3)
-        .background(.fill.tertiary, in: .rect(cornerRadius: 14, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        // Frosted like the header above it, so the chat blurs under both.
-        .background(.ultraThinMaterial)
-        .animation(.smooth(duration: 0.2), value: showsLoops)
+    }
+}
+
+/// The ⋯ with its count: a red capsule like the bell's toolbar badge, drawn
+/// into the image. A view over it would make the toolbar host a custom view,
+/// and `.badge` on a toolbar Menu draws nothing.
+@MainActor
+enum BotMenuBadge {
+    private static var cache: [String: UIImage] = [:]
+
+    static func glyph(count: Int, colorScheme: ColorScheme, scale: CGFloat) -> Image {
+        guard count > 0 else { return Image(systemName: "ellipsis") }
+        let text = count > 99 ? "99+" : "\(count)"
+        let key = "\(text)|\(colorScheme)|\(scale)"
+        if let image = cache[key] { return Image(uiImage: image).renderingMode(.original) }
+        let renderer = ImageRenderer(content: content(text).environment(\.colorScheme, colorScheme))
+        renderer.scale = scale
+        guard let image = renderer.uiImage else { return Image(systemName: "ellipsis") }
+        cache[key] = image
+        return Image(uiImage: image).renderingMode(.original)
     }
 
-    private func segment(_ title: String, selected: Bool, badge: Int = 0, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text(title).font(.subheadline.weight(.semibold))
-                if badge > 0 {
-                    Text("\(badge)")
-                        .font(.caption2.weight(.bold)).foregroundStyle(.black)
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(Color.accentColor, in: .circle)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 34)
-            .background {
-                if selected { RoundedRectangle(cornerRadius: 11, style: .continuous).fill(.fill.secondary) }
-            }
-            .contentShape(.rect)
+    /// No taller than the bar draws an image unscaled (about 26 points), and
+    /// narrow enough to keep the button round: the ellipsis a little low, the
+    /// count in the top-trailing corner, clear of its last dot.
+    private static func content(_ text: String) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: "ellipsis").font(.system(size: 20, weight: .medium)).foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(y: 3)
+            Text(text)
+                .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(.white)
+                .padding(.horizontal, 3.5)
+                .frame(minWidth: 13, minHeight: 13)
+                .background(.red, in: .capsule)
+                .fixedSize()
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityLabel(badge > 0 ? "\(title), \(badge)" : title)
-        .accessibilityIdentifier("bot-switch-\(title.lowercased())")
+        .frame(width: text.count > 1 ? 34 : 30, height: 26)
     }
 }

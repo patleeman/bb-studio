@@ -318,4 +318,21 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopFormat.trigger(.event("reply:yassine")), "When Yassine replies")
         XCTAssertEqual(LoopFormat.trigger(.none), "At the next good moment")
     }
+
+    // MARK: The Bot's ⋯ menu
+
+    func testMenuBadgeShowsOnlyWhileLoopsNeedYou() {
+        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: 6), 6)
+        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: 0), 0, "Hidden at 0")
+        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: false, count: 6), 0, "No badge with Loops off")
+        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: -1), 0)
+    }
+
+    func testMenuItemAndLabelCarryTheCount() {
+        XCTAssertEqual(BotLoopsMenu.title(count: 6), "Loops  6")
+        XCTAssertEqual(BotLoopsMenu.title(count: 0), "Loops")
+        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 0), "Juniper options")
+        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 1), "Juniper options, 1 loop needs you")
+        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 6), "Juniper options, 6 loops need you")
+    }
 }

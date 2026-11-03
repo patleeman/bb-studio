@@ -2,7 +2,7 @@ import XCTest
 
 /// The Attention Router, offline: `-qaLoopsDemo` answers `loops.*` from a
 /// local store with the mockups' loops, in the `-qaBotDemo` chat. Cards and
-/// their actions, the Chat | Loops switch and the Loops screen, the setting
+/// their actions, Loops in the Bot's ⋯ menu and the Loops screen, the setting
 /// turned off, Places, and the Duo's folded and unfolded layouts. Set
 /// `TEST_RUNNER_BBGO_STATES_OUT` to a folder to keep a PNG of each state.
 @MainActor
@@ -96,7 +96,7 @@ final class LoopsUITests: ServerIsolatedUITestCase {
 
     func testDiscussPhone() throws {
         try launchPhone()
-        app.buttons["bot-switch-loops"].tap()
+        openLoopsFromMenu()
         XCTAssertTrue(header("Needs you now").waitForExistence(timeout: 10))
         loopsScreen.staticTexts["Reply to Yassine about the FDE referral"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Hand off"].waitForExistence(timeout: 5))
@@ -130,10 +130,16 @@ final class LoopsUITests: ServerIsolatedUITestCase {
 
     func testLoopsScreenPhone() throws {
         try launchPhone(extra: ["-qaPlacesDemo"])
-        let loopsSwitch = app.buttons["bot-switch-loops"]
-        XCTAssertTrue(loopsSwitch.waitForExistence(timeout: 20))
-        XCTAssertTrue(loopsSwitch.label.contains("6"), "Needs you now count: \(loopsSwitch.label)")
-        loopsSwitch.tap()
+        // The ⋯ carries the Needs you now count, and so does its Loops item.
+        let menu = app.buttons["bot-menu"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        XCTAssertTrue(menu.label.contains("6 loops need you"), "Needs you now count: \(menu.label)")
+        XCTAssertFalse(app.descendants(matching: .any)["bot-switch-loops"].exists, "No Chat | Loops bar")
+        menu.tap()
+        let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Loops")).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(item.label.contains("6"), "Loops item count: \(item.label)")
+        item.tap()
         XCTAssertTrue(header("Needs you now").waitForExistence(timeout: 10))
         shot("iphone-loops")
         let plumber = app.staticTexts["Call the plumber about the slow drain"]
@@ -172,15 +178,15 @@ final class LoopsUITests: ServerIsolatedUITestCase {
         scrollTo(added, older: false)
         XCTAssertTrue(added.exists, "A new loop goes to the Chief of Staff, under Agents on it")
         scrollTo(app.textFields["loops-add"])
-        // Chat goes back.
-        app.buttons["bot-switch-chat"].tap()
+        // Back goes to the chat.
+        app.buttons["loops-back"].tap()
         XCTAssertFalse(app.descendants(matching: .any)["loops-screen"].waitForExistence(timeout: 2))
         scrollTo(card("loop_kensico"))
     }
 
     func testEmptyLoopsPhone() throws {
         try launchPhone(extra: ["-qaLoopsEmpty"])
-        app.buttons["bot-switch-loops"].tap()
+        openLoopsFromMenu()
         XCTAssertTrue(app.staticTexts["No open loops"].waitForExistence(timeout: 10))
         shot("iphone-loops-empty")
     }
@@ -188,7 +194,13 @@ final class LoopsUITests: ServerIsolatedUITestCase {
     func testAttentionRouterOffPhone() throws {
         try launchPhone(mode: "off")
         XCTAssertTrue(app.descendants(matching: .any)["loop-card-off"].firstMatch.waitForExistence(timeout: 20))
-        XCTAssertFalse(app.buttons["bot-switch-loops"].exists, "No Loops switch while it's off")
+        let menu = app.buttons["bot-menu"].firstMatch
+        XCTAssertTrue(menu.exists)
+        XCTAssertFalse(menu.label.contains("need you"), "No badge while it's off: \(menu.label)")
+        menu.tap()
+        XCTAssertTrue(app.buttons["Edit profile"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Loops")).firstMatch.exists, "No Loops in the menu while it's off")
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6)).tap()
         XCTAssertFalse(app.buttons["Done"].exists)
         shot("iphone-off")
     }
@@ -226,18 +238,16 @@ final class LoopsUITests: ServerIsolatedUITestCase {
 
     func testDuoFolded() throws {
         try launchDuo()
-        let loopsSwitch = app.buttons["bot-switch-loops"]
-        XCTAssertTrue(loopsSwitch.waitForExistence(timeout: 20), "Chat | Loops under the header on the folded Duo")
         let deck = card("loop_deck")
         scrollTo(deck)
         duoShot("duo-folded-cards")
-        loopsSwitch.tap()
+        openLoopsFromMenu()
         XCTAssertTrue(header("Needs you now").waitForExistence(timeout: 10))
         duoShot("duo-folded-loops")
         loopsScreen.staticTexts["Reply to Yassine about the FDE referral"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Hand off"].waitForExistence(timeout: 5))
         duoShot("duo-folded-row")
-        app.buttons["bot-switch-chat"].tap()
+        app.buttons["loops-back"].tap()
         let yassine = card("loop_yassine")
         scrollTo(yassine)
         yassine.buttons["Done"].tap()
@@ -252,7 +262,6 @@ final class LoopsUITests: ServerIsolatedUITestCase {
         let window = app.windows.firstMatch
         expectation(for: NSPredicate { _, _ in abs(window.frame.width - 951) < 1 }, evaluatedWith: nil)
         waitForExpectations(timeout: 10)
-        XCTAssertFalse(app.buttons["bot-switch-loops"].exists, "Beside the chat, Loops is a row in the left pane")
         let allLoops = app.buttons["bot-all-loops"]
         XCTAssertTrue(allLoops.waitForExistence(timeout: 20))
         duoShot("duo-unfolded-cards")
@@ -289,6 +298,16 @@ final class LoopsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch.waitForExistence(timeout: 25))
     }
 
+    /// Loops from the Bot's ⋯ menu.
+    private func openLoopsFromMenu() {
+        let menu = app.buttons["bot-menu"].firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 20))
+        menu.tap()
+        let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Loops")).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "Loops is in the ⋯ menu")
+        item.tap()
+    }
+
     private func card(_ id: String) -> XCUIElement {
         app.descendants(matching: .any)["loop-\(id)"].firstMatch
     }
@@ -316,7 +335,7 @@ final class LoopsUITests: ServerIsolatedUITestCase {
         }
         // Look the way it should be first, then the other way.
         for attempt in 0..<24 {
-            // Clear of the header and Chat | Loops above, and the composer and tab bar below.
+            // Clear of the header above, and the composer and tab bar below.
             if element.exists, element.frame.minY > 150, element.frame.maxY < height - bottom {
                 // Let the scroll come to rest: a tap while it glides only stops it.
                 usleep(800_000)
