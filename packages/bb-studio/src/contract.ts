@@ -517,7 +517,8 @@ export const rpcContract = defineRpcContract({
   bot_activity: { input: forBot, output: botActivity },
   /** Just the Bot's attention (bot_activity's), for a Bot row that isn't expanded. */
   /** hasBot false: no such Bot (or it has no chat yet), so a client counts what waits on the user some other way. */
-  bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable(), hasBot: z.boolean().optional() }) },
+  /** `working`: the Bot's chat is busy (starting, active or stopping); its row's spinner. */
+  bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable(), hasBot: z.boolean().optional(), working: z.boolean().optional() }) },
   /** The Bot page's saved state (src/bot-page-state.ts): calendar group names by group key, and failed runs dismissed from Needs you ("<automationId>:<runId>"). */
   bot_page_state: { input: forBot, output: botPageState },
   /** Names a calendar group (its key: window and jobs); an empty name goes back to the automatic one. */

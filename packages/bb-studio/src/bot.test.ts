@@ -267,11 +267,24 @@ it("the Bot's attention: a question in its hidden chat, until it's answered", as
 
 it("bot_attention says when there's no Bot, so widgets fall back to BB's own count", async () => {
   const x = await setup();
-  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: false });
-  expect(await x.bots.attentionView("bot_gone")).toEqual({ attention: null, hasBot: false });
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: false, working: false });
+  expect(await x.bots.attentionView("bot_gone")).toEqual({ attention: null, hasBot: false, working: false });
   x.add({ id: "bot1", status: "idle" });
   await x.bots.setThread("bot1");
-  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: true });
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: true, working: false });
+});
+
+it("bot_attention says when the Bot's hidden chat is busy, which BB's sidebar view leaves out", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", visibility: "hidden", status: "active" });
+  await x.bots.setThread("bot1");
+  expect(await x.bots.attentionView()).toMatchObject({ hasBot: true, working: true });
+  x.add({ id: "bot1", visibility: "hidden", status: "starting" });
+  expect((await x.bots.attentionView()).working).toBe(true);
+  x.add({ id: "bot1", visibility: "hidden", status: "idle" });
+  expect((await x.bots.attentionView()).working).toBe(false);
+  x.add({ id: "bot1", visibility: "hidden", status: "error" });
+  expect((await x.bots.attentionView()).working).toBe(false);
 });
 
 it("the Bot's attention: its replies the user hasn't read, not [PASS], until the chat is read", async () => {

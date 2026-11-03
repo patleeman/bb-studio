@@ -32,6 +32,7 @@ import { z } from "zod";
 import { SIDE_CHAT_PLUGIN } from "./bot-side-threads";
 import type { BotActivityView, BotAvatarHistoryView, BotProfileChangeView, BotScheduledView, BotSkillView, BotThreadView, BotView, HeartbeatRun } from "./contract";
 import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-providers";
+
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
@@ -39,6 +40,9 @@ import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
 import { AvatarImages, avatarImageUrl, type AvatarImageMeta, type AvatarImageRow } from "./bot-avatar";
+
+/** Thread statuses that mean a turn is under way. */
+const BUSY_CHAT = new Set(["starting", "active", "stopping"]);
 
 type Sdk = BbPluginApi["sdk"];
 type ListedThread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -1171,9 +1175,18 @@ export class Bots {
     return this.attention(bot.threadId, thread);
   }
 
-  /** bot_attention: the Bot's attention, and whether there's a Bot with a chat at all (no Bot: clients fall back to BB's own count). */
-  async attentionView(botId?: string): Promise<{ attention: BotAttention | null; hasBot: boolean }> {
-    return { attention: await this.botAttention(botId), hasBot: !!this.stored(botId)?.threadId };
+  /**
+   * bot_attention: the Bot's attention, whether there's a Bot with a chat at
+   * all (no Bot: clients fall back to BB's own count), and whether its chat is
+   * busy. The chat is a hidden thread, which BB leaves out of the sidebar's
+   * live thread view, so its row reads busy here; thread.active and
+   * thread.idle publish Studio's realtime signal, which refreshes it.
+   */
+  async attentionView(botId?: string): Promise<{ attention: BotAttention | null; hasBot: boolean; working: boolean }> {
+    const bot = this.stored(botId);
+    if (!bot?.threadId) return { attention: null, hasBot: false, working: false };
+    const thread = await this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => undefined) as { status?: string; lastReadAt?: number | null } | undefined;
+    return { attention: await this.attention(bot.threadId, thread), hasBot: true, working: BUSY_CHAT.has(thread?.status ?? "") };
   }
 
   async activity(botId?: string): Promise<BotActivityView> {

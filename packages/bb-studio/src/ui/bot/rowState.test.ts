@@ -17,6 +17,10 @@ test("working: its chat is busy, a thread its chat spawned is, or bot_activity c
   expect(botRowState({ chat: idle, children: [{ status: "active", runtimeStatus: "active", indicator: "runtime" } as never], attention: null })).toBe("working");
   expect(botRowState({ chat: idle, children: [{ status: "idle", runtimeStatus: "idle", indicator: "unread-success" } as never], attention: null })).toBe("idle");
   expect(botRowState({ chat: idle, attention: null, running: 2 })).toBe("working");
+  // BB's live view leaves the hidden chat out: bot_attention says it's busy.
+  expect(botRowState({ chat: null, attention: null, chatWorking: true })).toBe("working");
+  expect(botRowState({ chat: null, attention: { count: 1, unread: 1 }, chatWorking: true })).toBe("working");
+  expect(botRowState({ chat: null, attention: { count: 1, unread: 0 }, chatWorking: true })).toBe("needs-you");
   expect(STATE_INDICATOR.working).toBe("runtime");
 });
 

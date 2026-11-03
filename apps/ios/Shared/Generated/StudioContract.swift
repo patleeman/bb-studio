@@ -10555,10 +10555,12 @@ public enum Studio {
   public struct BotAttentionOutput: Sendable, Hashable, Codable {
     public var attention: BotAttentionOutputAttention?
     public var hasBot: Bool?
+    public var working: Bool?
 
-    public init(attention: BotAttentionOutputAttention? = nil, hasBot: Bool? = nil) {
+    public init(attention: BotAttentionOutputAttention? = nil, hasBot: Bool? = nil, working: Bool? = nil) {
       self.attention = attention
       self.hasBot = hasBot
+      self.working = working
     }
   }
 

@@ -2,13 +2,16 @@
 // in the Threads section (ThreadsSection.tsx), and a Bot's row in the Bots
 // section (BotSidebar.tsx), which draws BB's own status glyph for it.
 //
-// A Bot's chat is a hidden thread, so BB's list never shows it, but
-// experimental_useSidebarThreads still carries it live (status, pending
-// interactions, unread). Its row folds in:
+// A Bot's chat is a hidden thread. BB's live sidebar view
+// (experimental_useSidebarThreads) leaves hidden threads out on stable BB
+// 0.48 although the SDK says it carries them, so the row reads the chat from
+// Studio's bot_attention (refreshed on thread.active and thread.idle) and
+// also from the live view when it's there. Its row folds in:
 // - needs you: the chat waits on an answer or approval, or Studio's
 //   bot_attention has a pending question or a released loop for the user;
-// - working: the chat is busy, a thread the chat spawned is, or (on the
-//   selected Bot) bot_activity counts threads in progress;
+// - working: the chat is busy (bot_attention's `working`, or the live view),
+//   a thread the chat spawned is (live view), or (on the selected Bot)
+//   bot_activity counts threads in progress;
 // - error: the chat's last turn failed and the user hasn't read it;
 // - unread: a reply the user hasn't read. Read off bot_attention, not BB's
 //   isUnread: BB marks the chat unread after every turn, including the
@@ -43,6 +46,8 @@ export function botRowState(input: {
   /** Threads the chat spawned (live view): one working makes the Bot working. */
   children?: readonly Pick<PluginSidebarThread, "status" | "runtimeStatus" | "indicator">[];
   attention: BotAttentionSummary;
+  /** bot_attention's `working`: the chat is busy. */
+  chatWorking?: boolean;
   /** Threads in progress per bot_activity (the selected Bot only). */
   running?: number;
 }): ThreadState {
@@ -50,7 +55,7 @@ export function botRowState(input: {
   const unread = input.attention?.unread ?? 0;
   const waiting = (input.attention?.count ?? 0) - unread;
   if (chat === "needs-you" || waiting > 0) return "needs-you";
-  if (chat === "working" || (input.running ?? 0) > 0 || (input.children ?? []).some(isBusy)) return "working";
+  if (chat === "working" || input.chatWorking || (input.running ?? 0) > 0 || (input.children ?? []).some(isBusy)) return "working";
   if (chat === "error") return "error";
   if (unread > 0) return "unread";
   return "idle";

@@ -11296,6 +11296,9 @@
           },
           "hasBot": {
             "type": "boolean"
+          },
+          "working": {
+            "type": "boolean"
           }
         },
         "required": [

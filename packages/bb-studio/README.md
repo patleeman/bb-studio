@@ -1750,10 +1750,11 @@ of Staff", with the same thread and check-ins; rename it from its page.
   chat, a thread its chat spawned, or (on the selected Bot) a thread in
   progress is working; **failed** when its chat's last turn failed unread;
   the **unread** dot for replies you haven't read. The Bot's chat is a
-  hidden thread, which BB keeps out of its list but still carries live in
-  the sidebar's thread view, so busy and waiting show at once; unread comes
-  from `bot_attention` (refreshed when the chat changes), since BB marks the
-  chat unread after a check-in's `[PASS]` too. It clears when you read or
+  hidden thread, which stable BB (0.48) leaves out of the sidebar's live
+  thread view, so `bot_attention` also says whether the chat is busy
+  (`working`); Studio's realtime signal on `thread.active` and `thread.idle`
+  refreshes it at once. Unread comes from `bot_attention` too, since BB marks
+  the chat unread after a check-in's `[PASS]`. It clears when you read or
   answer the chat. The icon rail has no Bot entries, so nothing shows
   there: a plugin can't add per-Bot rail items with SDK 0.6.104.
   A thread the Bot started that waits on a question or approval shows

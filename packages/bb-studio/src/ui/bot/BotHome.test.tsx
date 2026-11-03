@@ -1026,13 +1026,17 @@ test("Bot rows draw BB's thread status glyph: working off its hidden chat, unrea
   state.pathname = "/plugins/studio/studio/bot/bot_scout";
   const nova = { ...dot, id: "bot_nova", name: "Nova", threadId: "thr_nova", primary: false };
   const quiet = { ...dot, id: "bot_quiet", name: "Quiet", threadId: "thr_quiet", primary: false };
+  const rex = { ...dot, id: "bot_rex", name: "Rex", threadId: "thr_rex", primary: false };
   const attention: Record<string, unknown> = {
     bot_main: { attention: null },
     bot_nova: { attention: { reason: "1 thing for you", count: 1, unread: 1, since: 1 } },
     bot_quiet: { attention: null },
+    // Stable BB leaves hidden chats out of the sidebar view: Studio says it's busy.
+    bot_rex: { attention: null, working: true },
+    bot_scout: { attention: { reason: "Asked you a question", count: 1, unread: 0, since: 1 } },
   };
   state.data = {
-    bot_list: { bots: [{ ...dot, primary: true }, nova, quiet, scout] }, bot_get: { bot: scout, run: null },
+    bot_list: { bots: [{ ...dot, primary: true }, nova, quiet, rex, scout] }, bot_get: { bot: scout, run: null },
     bot_activity: { ...empty, attention: { reason: "Asked you a question", count: 1, unread: 0, since: 1 } },
     bot_attention: (input: { botId: string }) => attention[input.botId],
   };
@@ -1049,6 +1053,7 @@ test("Bot rows draw BB's thread status glyph: working off its hidden chat, unrea
   expect(mark('[data-bot="bot_nova"]')?.getAttribute("data-state")).toBe("unread");
   expect(mark('[data-bot="bot_nova"]')?.querySelector("[data-glyph]")?.getAttribute("data-glyph")).toBe("unread-success");
   expect(mark('[data-bot="bot_quiet"]')).toBeNull();
+  expect(mark('[data-bot="bot_rex"]')?.getAttribute("data-state")).toBe("working");
   expect(mark("[data-testid=bot-main]")?.getAttribute("data-state")).toBe("needs-you");
 });
 

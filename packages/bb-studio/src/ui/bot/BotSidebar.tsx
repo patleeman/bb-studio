@@ -17,7 +17,7 @@ import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, expe
 import { botPath, forBot, lastBot, NEW_BOT_PATH, rememberBot, useBotSelection } from "./selection";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { BotSideThreadListView, BotThreadView, BotView } from "../../contract";
+import type { BotActivityView, BotSideThreadListView, BotThreadView, BotView } from "../../contract";
 import { useCall, useLive } from "../live";
 import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, BotAvatar, botProvider, colorForName } from "./BotAvatar";
@@ -29,7 +29,7 @@ import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sideba
 
 import { isLoopsPath, loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName } from "./sidebarAgenda";
-import { botRowState, STATE_INDICATOR, type BotAttentionSummary, type ThreadState } from "./rowState";
+import { botRowState, STATE_INDICATOR, type ThreadState } from "./rowState";
 
 const LAYOUT_KEY = "studio.bot.sidebar";
 type Layout = { closed: string[] };
@@ -197,13 +197,18 @@ const DROP_RING = "ring-2 ring-inset ring-[var(--bot-accent,var(--ring))]";
 
 
 /**
- * A Bot's row state (rowState.ts) from BB's live view of its chat (a hidden
- * thread) and the threads the chat spawned, Studio's bot_attention and, on
- * the selected Bot, its threads in progress. `refresh` re-reads attention
- * when the chat changes (a turn ends, the user reads it), so the row doesn't
- * wait for the next poll.
+ * A Bot's row state (rowState.ts): Studio's bot_attention (what waits on the
+ * user, and whether the chat is busy; refreshed on Studio's realtime signal),
+ * BB's live view of the chat and the threads it spawned when the view has
+ * them, and on the selected Bot its threads in progress. `refresh` re-reads
+ * attention when the live chat changes, so the row doesn't wait for a poll.
  */
-function useBotRowState(bot: BotSummary, attention: BotAttentionSummary, refresh: () => void, running?: number): ThreadState {
+function useBotRowState(bot: BotSummary, selected?: { attention: Attention; running: number; refresh(): void }): { state: ThreadState; attention: Attention } {
+  const live = useLive("bot_attention", { botId: bot.id }, { pollMs: 30_000 });
+  // The selected Bot's attention is bot_activity's, which its row shows already.
+  const attention = selected ? selected.attention : live.data?.attention ?? null;
+  const refresh = () => { live.refresh(); selected?.refresh(); };
+  const running = selected?.running;
   const threads = experimental_useSidebarThreads().threads;
   const chatId = bot.threadId;
   const chat = chatId ? threads.find((thread) => thread.id === chatId) ?? null : null;
@@ -216,8 +221,10 @@ function useBotRowState(bot: BotSummary, attention: BotAttentionSummary, refresh
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [changed]);
-  return botRowState({ chat, children, attention, running });
+  return { state: botRowState({ chat, children, attention, chatWorking: live.data?.working, running }), attention };
 }
+
+type Attention = NonNullable<BotActivityView["attention"]> | null;
 
 /**
  * The Bot row's status, drawn as BB's own thread rows draw theirs (its status
@@ -236,9 +243,7 @@ function BotStatusMark({ state, label }: { state: ThreadState; label?: string })
 function BotRow({ bot, onNavigate }: { bot: BotSummary; onNavigate(): void }) {
   const openBot = useOpenBot(onNavigate);
   const drop = useThreadDrop(bot);
-  const live = useLive("bot_attention", { botId: bot.id }, { pollMs: 30_000 });
-  const attention = live.data?.attention ?? null;
-  const state = useBotRowState(bot, attention, live.refresh);
+  const { state, attention } = useBotRowState(bot);
   const loud = state === "needs-you" || state === "error" || state === "unread";
   return (
     <div {...drop.props} data-drop-over={drop.over || undefined} style={{ "--bot-accent": bot.color ?? colorForName(bot.name) } as CSSProperties}
@@ -289,7 +294,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const runners = useRunners(bot.id);
   const openRunner = useOpenRunner(onOpen);
   const attention = activity.data?.attention ?? null;
-  const state = useBotRowState(bot, attention, activity.refresh, running);
+  const { state } = useBotRowState(bot, { attention, running, refresh: activity.refresh });
   const loud = state === "needs-you" || state === "error" || state === "unread";
   const sdk = useSdk();
   // The Bot's chat open and on screen is read: its badge clears. BB may not
