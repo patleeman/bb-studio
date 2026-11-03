@@ -138,4 +138,66 @@ describe("session machine", () => {
     const run = effects.find((effect) => effect.type === "runTool") as Extract<Effect, { type: "runTool" }>;
     expect(transcripts(run.reports)).toEqual(["user: Yes."]);
   });
+
+  describe("still waiting on an answer relay", () => {
+    const NOTE = `(Studio, not the user:) the Kensico lead hasn't answered yet. Say only, briefly: "Still waiting on the Kensico lead." Then wait; don't guess.`;
+    const waiting = { note: NOTE, ms: 20_000 };
+    const notes = (effects: Effect[]) => effects.filter((effect) => effect.type === "send" && effect.outgoing.type === "note");
+    const relayed = () => {
+      const machine = live();
+      machine.toolFinished("c1", "send_to_thread", `Sent to the Kensico lead. Say briefly "Asking the Kensico lead now."`);
+      machine.waitForReply(waiting, t0 + 1);
+      return machine;
+    };
+
+    it("says it once, 20 s after the relay, when the voice is free", () => {
+      const machine = relayed();
+      expect(machine.phase.kind).toBe("listening");
+      expect(notes(machine.tick(t0 + 20.9))).toEqual([]);
+      expect(notes(machine.tick(t0 + 21))).toEqual([{ type: "send", outgoing: { type: "note", text: NOTE, spoken: true } }]);
+      expect(machine.waitingOnReply).toBe(false);
+      expect(notes(machine.tick(t0 + 45))).toEqual([]);
+    });
+
+    it("waits for the voice or the user to finish talking", () => {
+      const machine = relayed();
+      machine.handle({ type: "agentText", text: "Asking the Kensico lead now." }, t0 + 20);
+      expect(notes(machine.tick(t0 + 21))).toEqual([]);
+      expect(notes(machine.tick(t0 + 30))).toHaveLength(1);
+      expect(machine.phase.kind).toBe("listening");
+      expect(notes(machine.tick(t0 + 30.05))).toEqual([]);
+    });
+
+    it("is cancelled by the reply", () => {
+      const machine = relayed();
+      machine.reply("the Kensico lead", "Paused.", "(Studio, not the user:) the Kensico lead answered: Paused.");
+      expect(notes(machine.tick(t0 + 30))).toEqual([]);
+    });
+
+    it("is cancelled by the user's next request", () => {
+      const machine = relayed();
+      machine.handle({ type: "userText", text: "And what's on my calendar?" }, t0 + 5);
+      machine.tick(t0 + 6.5);
+      expect(machine.waitingOnReply).toBe(false);
+      expect(notes(machine.tick(t0 + 30))).toEqual([]);
+    });
+
+    it("is cancelled when the session ends", () => {
+      const machine = relayed();
+      machine.stop(t0 + 5);
+      expect(machine.waitingOnReply).toBe(false);
+      expect(machine.tick(t0 + 30)).toEqual([]);
+      const failed = relayed();
+      failed.fail("The connection was lost", t0 + 5);
+      expect(failed.waitingOnReply).toBe(false);
+    });
+
+    it("a newer relay restarts the wait, still once", () => {
+      const machine = relayed();
+      machine.waitForReply({ note: NOTE.replaceAll("the Kensico lead", "Dot"), ms: 20_000 }, t0 + 15);
+      expect(notes(machine.tick(t0 + 21))).toEqual([]);
+      expect(notes(machine.tick(t0 + 35))).toEqual([{ type: "send", outgoing: { type: "note", text: expect.stringContaining("Still waiting on Dot."), spoken: true } }]);
+      expect(notes(machine.tick(t0 + 60))).toEqual([]);
+    });
+  });
 });

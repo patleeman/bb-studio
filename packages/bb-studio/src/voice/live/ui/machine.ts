@@ -150,6 +150,13 @@ export class SessionMachine {
   private loudUntil = 0;
   /** The last mic frame that sounded like the user (above the gate's bar), for ending lines. */
   private lastLoudAt = 0;
+  /** After an "answer" relay: the one "still waiting" note Studio wrote, and when it's due (epoch seconds). */
+  private stillWaiting: { note: string; due: number } | null = null;
+
+  /** Whether a "still waiting" note is due later (tests, the pill's trace). */
+  get waitingOnReply(): boolean {
+    return this.stillWaiting !== null;
+  }
 
   /** GPT-Live and the mock have no end-of-line events: a pause ends a line. */
   constructor(public endsLinesOnPause = true) {}
@@ -178,6 +185,7 @@ export class SessionMachine {
     this.finishAgent(now);
     this.phase = { kind: "ended", why: null };
     this.confirmation = null;
+    this.stillWaiting = null;
     return [{ type: "send", outgoing: { type: "close" } }, { type: "hangUp", reports: this.drain() }, { type: "earcon", earcon: "end" }];
   }
 
@@ -187,6 +195,7 @@ export class SessionMachine {
     this.finishAgent(now);
     this.phase = { kind: "failed", why };
     this.confirmation = null;
+    this.stillWaiting = null;
     return [...(wasLive ? [{ type: "hangUp" as const, reports: this.drain() }] : []), { type: "earcon", earcon: "error" }];
   }
 
@@ -245,6 +254,7 @@ export class SessionMachine {
         this.finishAgent(now);
         this.phase = { kind: "ended", why: closedReason(signal.reason) };
         this.confirmation = null;
+        this.stillWaiting = null;
         return [{ type: "hangUp", reports: this.drain() }, { type: "earcon", earcon: "end" }];
       case "error":
         this.card = { kind: "notice", title: "Voice service", detail: signal.message };
@@ -296,6 +306,11 @@ export class SessionMachine {
     // GPT-Live's transcript of the user comes in bursts while the voice talks: a line ends on a pause in the words and in the mic.
     if (this.endsLinesOnPause && this.phase.kind === "userSpeaking" && this.userText && now - this.lastUserAt > this.userPause && now - this.lastLoudAt > this.userPause) effects.push(...this.finishUser(now));
     if (this.phase.kind === "agentSpeaking" && this.provisionalSince === null && now > this.agentUntil && (this.endsLinesOnPause || !this.agentText)) this.finishAgent(now);
+    // No reply yet to an "answer" relay: the voice says so once, when neither it nor the user is talking.
+    if (this.stillWaiting && now >= this.stillWaiting.due && (this.phase.kind === "listening" || this.phase.kind === "thinking") && this.provisionalSince === null) {
+      effects.push({ type: "send", outgoing: { type: "note", text: this.stillWaiting.note, spoken: true } });
+      this.stillWaiting = null;
+    }
     return effects;
   }
 
@@ -353,9 +368,21 @@ export class SessionMachine {
     return effects;
   }
 
+  /**
+   * After an "answer" relay (voiceLive.tool's waitFor): if no reply comes
+   * within `ms`, tick adds Studio's note once so the voice says it's still
+   * waiting. A reply, the user's next line or the end of the session cancels
+   * it; a newer relay replaces it.
+   */
+  waitForReply(waitFor: { note: string; ms: number }, now: number): void {
+    if (!this.isLive) return;
+    this.stillWaiting = { note: waitFor.note, due: now + waitFor.ms / 1000 };
+  }
+
   /** A relayed thread answered: the voice says it now. */
   reply(title: string, summary: string, note: string): Effect[] {
     if (!this.isLive) return [];
+    this.stillWaiting = null;
     this.card = { kind: "reply", title: `${title} answered`, detail: summary };
     return [{ type: "earcon", earcon: "sent" }, { type: "send", outgoing: { type: "note", text: note, spoken: true } }];
   }
@@ -420,6 +447,8 @@ export class SessionMachine {
     this.lastAgentLine = "";
     if (this.phase.kind === "userSpeaking") this.phase = { kind: "thinking" };
     if (isEcho(text, this.recentAgent)) return [];
+    // The user moved on: a new request, not a wait to remind them of.
+    this.stillWaiting = null;
     this.reports.push({ type: "transcript", role: "user", text, at: ms(now) });
     this.line({ speaker: "user", text });
     return [{ type: "earcon", earcon: "heard" }];

@@ -32,7 +32,7 @@ import { pickSettings } from "../../settings/schema";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest } from "./session";
-import { BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, relayIntent, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, type RelayIntent, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
+import { BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, relayIntent, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, waitFor, type VoiceWaitFor, type RelayIntent, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
 
 export { DEFAULT_CAP_USD };
 /** Most a tool answers with, in characters (it all goes to OpenAI). */
@@ -72,6 +72,8 @@ export const VOICE_LIVE_SETTINGS = pickSettings(["voiceLiveModel", "voiceLiveVoi
 export interface VoiceLiveChoice { model?: LiveModel; voice?: string; backendModel?: BackendModel }
 
 export interface VoiceTarget { threadId: string; title: string }
+/** voiceLive.tool's reply: the function_call_output text, and after an "answer" relay what to wait for. */
+export interface ToolReply { output: string; waitFor?: VoiceWaitFor }
 export interface VoiceLoop { id: string; title: string; kind: string; status: string; priority: string; due: number | null; trigger: unknown; owner?: string }
 /** What undo puts back. */
 export interface LoopBefore { status: string; trigger: unknown; owner?: string }
@@ -385,28 +387,34 @@ export class VoiceLive {
 
   /** Runs one of the voice's tool calls, after saving the events that came with it. */
   async tool(sessionId: string, name: string, args: string | undefined, events: readonly LiveEvent[] = []): Promise<string> {
+    return (await this.toolReply(sessionId, name, args, events)).output;
+  }
+
+  /** voiceLive.tool: the output, and for an "answer" relay what the client waits for (waitFor). */
+  async toolReply(sessionId: string, name: string, args: string | undefined, events: readonly LiveEvent[] = []): Promise<ToolReply> {
     const row = this.live(sessionId);
     if (events.length) this.save(sessionId, events);
     if (!(VOICE_TOOLS as readonly string[]).includes(name)) {
-      return `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${this.identity(row.id)?.name ?? row.bot_name} instead.`;
+      return { output: `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${this.identity(row.id)?.name ?? row.bot_name} instead.` };
     }
     let parsed: Record<string, unknown> = {};
     if (args?.trim()) {
       try {
         const value = JSON.parse(args) as unknown;
-        if (!value || typeof value !== "object" || Array.isArray(value)) return "The arguments must be a JSON object.";
+        if (!value || typeof value !== "object" || Array.isArray(value)) return { output: "The arguments must be a JSON object." };
         parsed = value as Record<string, unknown>;
-      } catch { return "The arguments weren't valid JSON."; }
+      } catch { return { output: "The arguments weren't valid JSON." }; }
     }
     const string = (key: string) => ((typeof parsed[key] === "number" && key === "part") ? String(parsed[key]) : typeof parsed[key] === "string" ? (parsed[key] as string).trim() : "");
     try {
-      return clip(await this.run(row, name as VoiceToolName, string), TOOL_OUTPUT_CHARS);
+      const result = await this.run(row, name as VoiceToolName, string);
+      return typeof result === "string" ? { output: clip(result, TOOL_OUTPUT_CHARS) } : { ...result, output: clip(result.output, TOOL_OUTPUT_CHARS) };
     } catch (error) {
-      return `That didn't work: ${clip(error instanceof Error ? error.message : String(error), 300)}`;
+      return { output: `That didn't work: ${clip(error instanceof Error ? error.message : String(error), 300)}` };
     }
   }
 
-  private run(row: SessionRow, name: VoiceToolName, arg: (key: string) => string): Promise<string> | string {
+  private run(row: SessionRow, name: VoiceToolName, arg: (key: string) => string): Promise<string | ToolReply> | string {
     switch (name) {
       case "loops_list": return this.loopsList();
       case "read_replies": return this.readReplies(row, arg("target"), arg("part"));
@@ -469,7 +477,7 @@ export class VoiceLive {
   }
 
   /** No target: the thread the session speaks for (the CoS chat for the Chief of Staff). */
-  private async relayTo(row: SessionRow, target: string, message: string, intent: RelayIntent): Promise<string> {
+  private async relayTo(row: SessionRow, target: string, message: string, intent: RelayIntent): Promise<string | ToolReply> {
     if (!target) {
       const home = this.identity(row.id);
       const cos = this.deps.cos();
@@ -482,7 +490,7 @@ export class VoiceLive {
   }
 
   /** A relay happens at once: visible in the target thread (from the voice thread) and in the voice thread. */
-  private async relay(row: SessionRow, target: VoiceTarget, message: string, intent: RelayIntent): Promise<string> {
+  private async relay(row: SessionRow, target: VoiceTarget, message: string, intent: RelayIntent): Promise<string | ToolReply> {
     const text = relayText(message);
     if (!text) return "Say what to send: the message is empty.";
     if (text.length > SEND_CHARS) return `That message is ${text.length} characters; the most is ${SEND_CHARS}. Shorten it.`;
@@ -496,7 +504,7 @@ export class VoiceLive {
     this.append(row.id, "sent", { text, data: { threadId: target.threadId, title: target.title, kinds, intent } });
     await this.postToVoiceThread(row, `→ **Sent to ${target.title}:** ${text}`);
     const warning = kinds.length ? ` It asks for ${kinds.join(" and ")}, which voice can't approve: ${target.title} will ask in its chat first. Say so.` : "";
-    if (intent === "answer") return `Sent to ${target.title}. Say briefly "Asking ${target.title} now." Then wait for the reply; don't guess.${warning}`;
+    if (intent === "answer") return { output: `Sent to ${target.title}. Say briefly "Asking ${target.title} now." Then wait for the reply; don't guess.${warning}`, waitFor: waitFor(target.title) };
     return `Sent to ${target.title}. Say just that ("Sent to ${target.title}."); its answer will come back here.${warning}`;
   }
 

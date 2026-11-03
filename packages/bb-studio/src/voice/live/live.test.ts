@@ -5,7 +5,7 @@ import { MIGRATIONS } from "../../migrations";
 import { voiceLiveContract } from "./contract";
 import { ANSWER_CHUNK_CHARS, replyChunk, VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, VOICE_TOOL_DEFINITIONS } from "./session";
-import { LIVE_VOICES, REALTIME_CALLS_URL, VOICE_TOOLS } from "./shared";
+import { LIVE_VOICES, REALTIME_CALLS_URL, STILL_WAITING_MS, VOICE_TOOLS, waitingNote } from "./shared";
 import { DRAFT_MS, UNDO_MS } from "./rules";
 
 const KEY = "sk-test-secret-key";
@@ -190,6 +190,18 @@ describe("eyes-free rules in the tool layer", () => {
     // To the CoS too, at once.
     expect(await live.tool(sessionId, "send_to_cos", JSON.stringify({ message: "Book the car service" }))).toMatch(/^Sent to Dot\./);
     expect(send.mock.calls.filter(([input]) => input.threadId === COS.threadId)).toHaveLength(1);
+  });
+
+  it("tells the client to wait on an \"answer\" relay, and only on one", async () => {
+    const { live } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    const asked = await live.toolReply(sessionId, "send_to_thread", JSON.stringify({ target: "the Kensico lead", intent: "answer", message: "What's the status?" }));
+    expect(asked.output).toMatch(/^Sent to the Kensico lead\. Say briefly "Asking the Kensico lead now\."/);
+    expect(asked.waitFor).toEqual({ title: "the Kensico lead", ms: STILL_WAITING_MS, note: waitingNote("the Kensico lead") });
+    expect(asked.waitFor!.note).toContain(`"Still waiting on the Kensico lead."`);
+    expect((await live.toolReply(sessionId, "send_to_cos", JSON.stringify({ intent: "do", message: "Book the car service" }))).waitFor).toBeUndefined();
+    expect((await live.toolReply(sessionId, "loops_list", "{}")).waitFor).toBeUndefined();
+    expect((await live.toolReply(sessionId, "send_to_thread", JSON.stringify({ target: "nowhere", message: "hi" }))).waitFor).toBeUndefined();
   });
 
   it("asks which thread when a name matches more than one, and sends nothing", async () => {

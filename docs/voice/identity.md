@@ -7,7 +7,9 @@ to send what it can't answer.
 
 ## Who it is
 
-`voiceLive.start` takes the launching thread (`threadId`). The desktop
+`voiceLive.start` takes the launching thread (`threadId`) and returns the
+session's `identity` (`kind`, `label`, `name`, `threadId`). The desktop pill
+and the iOS hands-free header both show `label`. The desktop
 composer's waveform button passes its thread. iOS's Talk to Bot and the Bot
 tab pass none, which means the Chief of Staff.
 
@@ -89,9 +91,27 @@ reads the latest session reply; with a target, it reads that thread's session
 reply, or its latest reply if none was relayed. `do` and `fyi` keep the
 600-character summary and one-to-two-sentence read-back.
 
-Both iOS and desktop pass the poll `note` unchanged to the model. No client
-change is needed. There is no timed “Still waiting” reminder; that needs a
-client timer to trigger speech.
+Both iOS and desktop pass the poll `note` unchanged to the model.
+
+### “Still waiting on X.”
+
+For an `answer` relay, `voiceLive.tool` returns a `waitFor` next to its
+`output`: `{ title, ms, note }`. `ms` is `STILL_WAITING_MS` (20 s) and `note`
+is Studio's wording (`waitingNote(title)` in `src/voice/live/shared.ts`). The
+voice is told to say only, briefly, “Still waiting on X.” `do` and `fyi`
+relays, and every other tool, return no `waitFor`.
+
+Each client starts one timer per relay (desktop: `SessionMachine.waitForReply`
+in `ui/machine.ts`; iOS: `LiveSessionMachine.waitForReply`). When it's due and
+neither the voice nor the user is talking, the client adds the note once, as a
+spoken note. These cancel it:
+
+- a reply for the session arrives (the poll),
+- the user finishes a new line (a new request),
+- the session ends, fails or is closed.
+
+A newer `answer` relay replaces the pending one, so the voice still says it at
+most once per relay.
 
 ## At hang-up
 

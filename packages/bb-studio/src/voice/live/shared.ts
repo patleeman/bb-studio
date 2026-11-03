@@ -89,3 +89,17 @@ export function interruptedNote(heard: string): string {
     ? `(Studio, not the user:) The user interrupted you. They heard up to: "${said.slice(-200)}". Don't repeat it; answer what they said next.`
     : "(Studio, not the user:) The user interrupted you before you said anything. Answer what they said.";
 }
+
+/** How long the client waits for an "answer" relay's reply before the voice says it's still waiting, once. */
+export const STILL_WAITING_MS = 20_000;
+
+/** What the client is told to wait for after an "answer" relay (voiceLive.tool's `waitFor`). */
+export interface VoiceWaitFor { title: string; ms: number; note: string }
+
+/** The note the client adds, once, when an "answer" relay has had no reply for STILL_WAITING_MS. */
+export function waitingNote(title: string): string {
+  return `(Studio, not the user:) ${title} hasn't answered yet. Say only, briefly: "Still waiting on ${title}." Then wait; don't guess.`;
+}
+
+/** The waitFor an "answer" relay to `title` returns. */
+export const waitFor = (title: string): VoiceWaitFor => ({ title, ms: STILL_WAITING_MS, note: waitingNote(title) });

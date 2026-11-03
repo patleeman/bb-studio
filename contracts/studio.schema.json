@@ -36240,6 +36240,28 @@
         "properties": {
           "output": {
             "type": "string"
+          },
+          "waitFor": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title",
+              "ms",
+              "note"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

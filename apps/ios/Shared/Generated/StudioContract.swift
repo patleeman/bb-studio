@@ -26966,11 +26966,25 @@ public enum Studio {
     }
   }
 
+  public struct VoiceLiveToolOutputWaitFor: Sendable, Hashable, Codable {
+    public var title: String?
+    public var ms: Int?
+    public var note: String?
+
+    public init(title: String? = nil, ms: Int? = nil, note: String? = nil) {
+      self.title = title
+      self.ms = ms
+      self.note = note
+    }
+  }
+
   public struct VoiceLiveToolOutput: Sendable, Hashable, Codable {
     public var output: String?
+    public var waitFor: VoiceLiveToolOutputWaitFor?
 
-    public init(output: String? = nil) {
+    public init(output: String? = nil, waitFor: VoiceLiveToolOutputWaitFor? = nil) {
       self.output = output
+      self.waitFor = waitFor
     }
   }
 

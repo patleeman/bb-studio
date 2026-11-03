@@ -14,7 +14,7 @@ export interface LiveIdentity { kind: string; label: string; name: string; threa
 export interface LiveServer {
   state(): Promise<{ ready: boolean; problem: string | null; model: string; cosName: string | null }>;
   start(input: { model?: string; sdp?: string; threadId?: string }): Promise<{ sessionId: string; model: string; transport: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null; mockUrl: string | null; cosName: string; identity?: LiveIdentity }>;
-  tool(input: { sessionId: string; name: string; args: string; events: Report[] }): Promise<{ output: string }>;
+  tool(input: { sessionId: string; name: string; args: string; events: Report[] }): Promise<{ output: string; waitFor?: { title: string; ms: number; note: string } }>;
   event(input: { sessionId: string; events: Report[] }): Promise<{ costUsd: number | null; replies: number; stop: string | null; voiceThreadId?: string | null }>;
   poll(input: { sessionId: string }): Promise<{ replies: { id: number; title: string; summary: string; note: string }[] }>;
   end(input: { sessionId: string; events: Report[] }): Promise<unknown>;
@@ -214,12 +214,18 @@ export class LiveSession {
     if (!this.sessionId) return;
     this.log(`tool ${name}`);
     let output: string;
+    let waitFor: { title: string; ms: number; note: string } | undefined;
     try {
-      output = (await this.server.tool({ sessionId: this.sessionId, name, args, events: reports })).output;
+      ({ output, waitFor } = await this.server.tool({ sessionId: this.sessionId, name, args, events: reports }));
     } catch (error) {
       output = `Studio couldn't run that: ${error instanceof Error ? error.message : String(error)}`;
     }
-    this.apply(this.machine.toolFinished(callId, name, output));
+    const effects = this.machine.toolFinished(callId, name, output);
+    if (waitFor) {
+      this.log(`waiting on ${waitFor.title}`);
+      this.machine.waitForReply(waitFor, this.now());
+    }
+    this.apply(effects);
   }
 
   private async hangUp(reports: Report[]) {

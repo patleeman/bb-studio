@@ -119,9 +119,18 @@ export const voiceLiveContract = defineRpcContract({
     }),
   },
   "voiceLive.tool": {
-    experimental_description: "Run one of the voice's tools (loops_list, read_replies, send_to_cos, send_to_thread, loops_act, loops_add, undo, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). Relays and loop actions happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text.",
+    experimental_description: "Run one of the voice's tools (loops_list, read_replies, send_to_cos, send_to_thread, loops_act, loops_add, undo, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). Relays and loop actions happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text, and for an \"answer\" relay a waitFor: the one \"still waiting\" note to add if no reply comes in time.",
     input: z.object({ sessionId, name: z.string().min(1).max(64), args: z.string().max(20_000).optional(), events: z.array(liveEventSchema).max(200).optional() }).strict(),
-    output: z.object({ output: z.string() }),
+    output: z.object({
+      output: z.string(),
+      /**
+       * After an "answer" relay: if no reply for this session comes within `ms`,
+       * add `note` to the conversation once (spoken), so the voice says "Still
+       * waiting on <title>." Cancel it when a reply arrives, the user says
+       * something new, or the session ends. Absent for every other tool.
+       */
+      waitFor: z.object({ title: z.string(), ms: z.number().int().min(0), note: z.string() }).optional(),
+    }),
   },
   "voiceLive.event": {
     experimental_description: "Report what happened: finished transcript lines, interruptions and usage. Returns the running cost, how many replies wait for voiceLive.poll, and whether to stop (the monthly cap).",
