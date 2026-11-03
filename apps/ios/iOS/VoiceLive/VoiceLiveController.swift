@@ -10,7 +10,7 @@ private let log = Logger(subsystem: "nyc.plee.bbgo", category: "voice-live")
 protocol VoiceLiveStudio: AnyObject {
     func voiceLiveState() async throws -> VoiceLiveState
     func voiceLiveStart(model: String?, sdp: String?) async throws -> VoiceLiveStart
-    func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> String
+    func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult
     func voiceLiveEvent(sessionId: String, reports: [LiveReport]) async throws -> Studio.VoiceLiveEventOutput
     func voiceLivePoll(sessionId: String) async throws -> [VoiceLiveReply]
     func voiceLiveEnd(sessionId: String, reports: [LiveReport]) async throws
@@ -29,6 +29,8 @@ final class VoiceLiveController: ObservableObject {
     @Published private(set) var costUsd: Double?
     @Published private(set) var model: String = "gpt-live-1"
     @Published private(set) var route: String = ""
+    /// Who the session speaks as, once Studio has started it (the header shows `label`, like the desktop pill).
+    @Published private(set) var identity: VoiceLiveIdentity?
     /// Milliseconds, for the spike's write-up: connect, first words, each tool round trip.
     private(set) var timings: [String: [Int]] = [:]
 
@@ -51,6 +53,7 @@ final class VoiceLiveController: ObservableObject {
     var isLive: Bool { machine.isLive }
 
     func start() {
+        if !machine.isLive { identity = nil }
         apply(machine.start(now: Self.now))
     }
 
@@ -121,6 +124,7 @@ final class VoiceLiveController: ObservableObject {
                 started = try await studio.voiceLiveStart(model: chosen, sdp: nil)
             }
             sessionId = started.sessionId
+            identity = started.identity
             protocolKind = chosen == "gpt-live-1" ? .live : .realtime
             switch started.transport {
             case .mock:
@@ -243,14 +247,19 @@ final class VoiceLiveController: ObservableObject {
     private func runTool(callId: String, name: String, arguments: String, reports: [LiveReport]) async {
         guard let sessionId else { return }
         let started = Date()
-        let output: String
+        var result: VoiceLiveToolResult
         do {
-            output = try await studio.voiceLiveTool(sessionId: sessionId, name: name, arguments: arguments, reports: reports)
+            result = try await studio.voiceLiveTool(sessionId: sessionId, name: name, arguments: arguments, reports: reports)
         } catch {
-            output = "Studio couldn't run that: \(error.localizedDescription)"
+            result = VoiceLiveToolResult(output: "Studio couldn't run that: \(error.localizedDescription)")
         }
         time("tool", since: started)
-        apply(machine.toolFinished(callId: callId, name: name, output: output))
+        let effects = machine.toolFinished(callId: callId, name: name, output: result.output ?? "")
+        // An "answer" relay: if no reply comes in time, the voice says once that it's still waiting.
+        if let wait = result.waitFor, let note = wait.note, let ms = wait.ms {
+            machine.waitForReply(note: note, ms: ms, now: Self.now)
+        }
+        apply(effects)
     }
 
     private func startLoops() {
@@ -317,8 +326,9 @@ final class VoiceLiveController: ObservableObject {
 
     #if DEBUG
     /// `-qaVoiceLive <state>`: the screen caught in one state, driven through the real machine.
-    func qaShow(_ machine: LiveSessionMachine) {
+    func qaShow(_ machine: LiveSessionMachine, identity: VoiceLiveIdentity? = nil) {
         self.machine = machine
+        self.identity = identity
         costUsd = 0.04
         route = "iPhone Microphone"
     }

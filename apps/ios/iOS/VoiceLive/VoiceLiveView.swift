@@ -16,7 +16,7 @@ struct VoiceLiveView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VoiceLiveHeader(model: controller.model, costUsd: controller.costUsd, route: controller.route, live: controller.isLive) {
+            VoiceLiveHeader(model: controller.model, costUsd: controller.costUsd, route: controller.route, identity: controller.identity, live: controller.isLive) {
                 if controller.isLive { controller.stop() }
                 dismiss()
             }
@@ -49,13 +49,26 @@ private struct VoiceLiveHeader: View {
     let model: String
     let costUsd: Double?
     let route: String
+    /// Who the session speaks as: "Chief of Staff" or the thread's title, like the desktop pill.
+    let identity: VoiceLiveIdentity?
     let live: Bool
     let close: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Hands-free").font(.headline)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Hands-free").font(.headline).layoutPriority(1)
+                    if let label = identity?.label, !label.isEmpty {
+                        Text(label)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.tint)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityLabel("Talking with \(identity?.name ?? label)")
+                            .accessibilityIdentifier("voiceLive.identity")
+                    }
+                }
                 Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer()

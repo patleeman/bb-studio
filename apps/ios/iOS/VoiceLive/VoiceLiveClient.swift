@@ -4,6 +4,8 @@ import Foundation
 typealias VoiceLiveState = Studio.VoiceLiveStateOutput
 typealias VoiceLiveStart = Studio.VoiceLiveStartOutput
 typealias VoiceLiveReply = Studio.VoiceLivePollOutputRepliesItem
+typealias VoiceLiveToolResult = Studio.VoiceLiveToolOutput
+typealias VoiceLiveIdentity = Studio.VoiceLiveStartOutputIdentity
 
 extension BBClient {
     func voiceLiveState() async throws -> VoiceLiveState {
@@ -15,11 +17,10 @@ extension BBClient {
         try await rpc("studio", Studio.Method.voiceLive_start, .object(omittingNil: ["model": model.map(JSONValue.string), "sdp": sdp.map(JSONValue.string)]))
     }
 
-    func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> String {
-        let result: Studio.VoiceLiveToolOutput = try await rpc("studio", Studio.Method.voiceLive_tool, .object([
+    func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult {
+        try await rpc("studio", Studio.Method.voiceLive_tool, .object([
             "sessionId": .string(sessionId), "name": .string(name), "args": .string(arguments), "events": Self.json(reports),
         ]))
-        return result.output ?? ""
     }
 
     func voiceLiveEvent(sessionId: String, reports: [LiveReport]) async throws -> Studio.VoiceLiveEventOutput {

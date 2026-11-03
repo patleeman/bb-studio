@@ -2,6 +2,89 @@ import AVFAudio
 import XCTest
 @testable import BBStudio
 
+/// After an "answer" relay, the voice says once that it's still waiting (voiceLive.tool's waitFor).
+final class VoiceLiveStillWaitingTests: XCTestCase {
+    private let t0: TimeInterval = 1_800_000_000
+    private let note = #"(Studio, not the user:) the Kensico lead hasn't answered yet. Say only, briefly: "Still waiting on the Kensico lead." Then wait; don't guess."#
+
+    private func relayed() -> LiveSessionMachine {
+        var machine = LiveSessionMachine(endsLinesOnPause: true)
+        _ = machine.start(now: t0)
+        _ = machine.handle(.started, now: t0 + 0.5)
+        _ = machine.toolFinished(callId: "c1", name: "send_to_thread", output: #"Sent to the Kensico lead. Say briefly "Asking the Kensico lead now.""#)
+        machine.waitForReply(note: note, ms: 20_000, now: t0 + 1)
+        return machine
+    }
+
+    private func notes(_ effects: [LiveEffect]) -> [LiveEffect] {
+        effects.filter { if case .send(.note) = $0 { true } else { false } }
+    }
+
+    func testSaysItOnce20SecondsAfterTheRelay() {
+        var machine = relayed()
+        XCTAssertTrue(machine.waitingOnReply)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 20.9)), [])
+        XCTAssertEqual(notes(machine.tick(now: t0 + 21)), [.send(.note(note, spoken: true))])
+        XCTAssertFalse(machine.waitingOnReply)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 45)), [], "only once per relay")
+    }
+
+    func testWaitsForTheVoiceToFinishTalking() {
+        var machine = relayed()
+        _ = machine.handle(.agentText("Asking the Kensico lead now."), now: t0 + 20)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 21)), [])
+        XCTAssertEqual(notes(machine.tick(now: t0 + 30)).count, 1)
+        XCTAssertEqual(machine.phase, .listening)
+    }
+
+    func testTheReplyCancelsIt() {
+        var machine = relayed()
+        _ = machine.reply(title: "the Kensico lead", summary: "Paused.", note: "(Studio, not the user:) the Kensico lead answered: Paused.")
+        XCTAssertFalse(machine.waitingOnReply)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 30)), [])
+    }
+
+    func testTheUsersNextRequestCancelsIt() {
+        var machine = relayed()
+        _ = machine.handle(.userText("And what's on my calendar?"), now: t0 + 5)
+        _ = machine.tick(now: t0 + 6.5)
+        XCTAssertFalse(machine.waitingOnReply)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 30)), [])
+    }
+
+    func testTheEndOfTheSessionCancelsIt() {
+        var stopped = relayed()
+        _ = stopped.stop(now: t0 + 5)
+        XCTAssertFalse(stopped.waitingOnReply)
+        XCTAssertEqual(stopped.tick(now: t0 + 30), [])
+        var failed = relayed()
+        _ = failed.fail("The connection was lost", now: t0 + 5)
+        XCTAssertFalse(failed.waitingOnReply)
+        var closed = relayed()
+        _ = closed.handle(.closed(reason: "remote_hangup"), now: t0 + 5)
+        XCTAssertFalse(closed.waitingOnReply)
+    }
+
+    func testANewerRelayRestartsTheWait() {
+        var machine = relayed()
+        let dot = note.replacingOccurrences(of: "the Kensico lead", with: "Dot")
+        machine.waitForReply(note: dot, ms: 20_000, now: t0 + 15)
+        XCTAssertEqual(notes(machine.tick(now: t0 + 21)), [])
+        XCTAssertEqual(notes(machine.tick(now: t0 + 35)), [.send(.note(dot, spoken: true))])
+        XCTAssertEqual(notes(machine.tick(now: t0 + 60)), [])
+    }
+
+    func testDecodesWaitForAndTheIdentity() throws {
+        let tool = try JSONDecoder().decode(VoiceLiveToolResult.self, from: Data(#"{"output":"Sent to Dot.","waitFor":{"title":"Dot","ms":20000,"note":"Still waiting on Dot."}}"#.utf8))
+        XCTAssertEqual(tool.waitFor?.ms, 20_000)
+        XCTAssertEqual(tool.waitFor?.title, "Dot")
+        XCTAssertNil(try JSONDecoder().decode(VoiceLiveToolResult.self, from: Data(#"{"output":"ok"}"#.utf8)).waitFor)
+        let start = try JSONDecoder().decode(VoiceLiveStart.self, from: Data(#"{"sessionId":"vl_0123456789abcdef","identity":{"kind":"thread","label":"Kensico launch","name":"Kensico launch","threadId":"thr_k"}}"#.utf8))
+        XCTAssertEqual(start.identity?.label, "Kensico launch")
+        XCTAssertEqual(start.identity?.kind, .thread)
+    }
+}
+
 /// Hands-free voice (iOS/VoiceLive/Core): the session machine, barge-in, the
 /// wire events and the audio session (HFP).
 final class VoiceLiveMachineTests: XCTestCase {

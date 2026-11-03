@@ -116,6 +116,11 @@ struct LiveSessionMachine: Sendable {
     private var awaitingTurn = false
     /// The voice's last finished line: what was heard when the user cuts in while its audio still plays.
     private var lastAgentLine = ""
+    /// After an "answer" relay: the one "still waiting" note Studio wrote, and when it's due.
+    private var stillWaiting: (note: String, due: TimeInterval)?
+
+    /// Whether a "still waiting" note is due later.
+    var waitingOnReply: Bool { stillWaiting != nil }
 
     init(endsLinesOnPause: Bool) {
         self.endsLinesOnPause = endsLinesOnPause
@@ -153,6 +158,7 @@ struct LiveSessionMachine: Sendable {
         finishAgent(now: now)
         phase = .ended(nil)
         confirmation = nil
+        stillWaiting = nil
         return [.send(.close), .hangUp(drain()), .earcon(.end)]
     }
 
@@ -162,6 +168,7 @@ struct LiveSessionMachine: Sendable {
         finishAgent(now: now)
         phase = .failed(message)
         confirmation = nil
+        stillWaiting = nil
         return (wasLive ? [.hangUp(drain())] : []) + [.earcon(.error)]
     }
 
@@ -223,6 +230,7 @@ struct LiveSessionMachine: Sendable {
             finishAgent(now: now)
             phase = .ended(Self.closedReason(reason))
             confirmation = nil
+            stillWaiting = nil
             return [.hangUp(drain()), .earcon(.end)]
         case .error(let message):
             card = LiveToolCard(kind: .notice, title: "Voice service", detail: message)
@@ -274,6 +282,11 @@ struct LiveSessionMachine: Sendable {
         }
         if phase == .agentSpeaking, provisionalSince == nil, now > agentUntil, endsLinesOnPause || agentText.isEmpty {
             finishAgent(now: now)
+        }
+        // No reply yet to an "answer" relay: the voice says so once, when neither it nor the user is talking.
+        if let waiting = stillWaiting, now >= waiting.due, phase == .listening || phase == .thinking, provisionalSince == nil {
+            effects.append(.send(.note(waiting.note, spoken: true)))
+            stillWaiting = nil
         }
         return effects
     }
@@ -332,9 +345,18 @@ struct LiveSessionMachine: Sendable {
         return effects
     }
 
+    /// After an "answer" relay (voiceLive.tool's waitFor): if no reply comes within `ms`,
+    /// tick adds Studio's note once so the voice says it's still waiting. A reply, the user's
+    /// next line or the end of the session cancels it; a newer relay replaces it.
+    mutating func waitForReply(note: String, ms: Int, now: TimeInterval) {
+        guard isLive else { return }
+        stillWaiting = (note, now + Double(ms) / 1000)
+    }
+
     /// A relayed thread answered: the voice says it now.
     mutating func reply(title: String, summary: String, note: String) -> [LiveEffect] {
         guard isLive else { return [] }
+        stillWaiting = nil
         card = LiveToolCard(kind: .reply, title: "\(title) answered", detail: summary)
         return [.earcon(.sent), .send(.note(note, spoken: true))]
     }
@@ -422,6 +444,8 @@ struct LiveSessionMachine: Sendable {
         lastAgentLine = ""
         if phase == .userSpeaking { phase = .thinking }
         if Self.isEcho(text, of: recentAgent) { return [] }
+        // The user moved on: a new request, not a wait to remind them of.
+        stillWaiting = nil
         reports.append(.transcript(role: .user, text: text, atMs: Self.ms(now)))
         return [.earcon(.heard)]
     }

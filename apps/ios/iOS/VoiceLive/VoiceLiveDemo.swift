@@ -15,6 +15,8 @@ extension VoiceLiveController {
 /// - `-qaVoiceLive idle|listening|user|speaking|tool|sent|confirm|dropped|reply` opens
 ///   hands-free caught in that state, driven through the real session machine
 ///   with Studio's real tool outputs, with no server or mic, for screenshots.
+///   It speaks as the Chief of Staff; `-qaVoiceLiveIdentity "<title>"` makes it a
+///   thread's, and `-qaVoiceLiveIdentity none` shows no identity.
 /// - `-qaVoiceLive script -qaVoiceLiveStudio http://127.0.0.1:8790` runs a whole
 ///   session against `scripts/voice-mock` (Studio's tool layer and a scripted
 ///   GPT-Live), the screen recording's setup. `-qaVoiceLiveAutostart` taps Start.
@@ -50,8 +52,17 @@ enum VoiceLiveDemo {
             return controller
         }
         let controller = VoiceLiveController(studio: BBClient())
-        controller.qaShow(machine(variant))
+        controller.qaShow(machine(variant), identity: identity)
         return controller
+    }
+
+    /// Who the demo speaks as: Studio's identity for the Chief of Staff, or a thread's.
+    static var identity: VoiceLiveIdentity? {
+        switch argument("-qaVoiceLiveIdentity") {
+        case "none": nil
+        case let title?: VoiceLiveIdentity(kind: .thread, label: title, name: title, threadId: "thr_demo")
+        case nil: VoiceLiveIdentity(kind: .cos, label: "Chief of Staff", name: "Dot", threadId: "thr_cos")
+        }
     }
 
     static let loopsOutput = """
