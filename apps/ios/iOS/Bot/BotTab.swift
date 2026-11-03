@@ -272,7 +272,8 @@ struct BotTab: View {
             }
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            Button { model.sheet = .handsFree() } label: { Image(systemName: "waveform") }
+            // Speaks as this Bot: its chat thread (the primary Bot's is the Chief of Staff's).
+            Button { model.sheet = .handsFree(threadId: bot.lead.threadId) } label: { Image(systemName: "waveform") }
                 .accessibilityLabel("Hands-free")
                 .accessibilityHint("Talk with your voice assistant without looking")
             Button { sheet = .activity } label: {

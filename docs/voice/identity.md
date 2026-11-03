@@ -10,8 +10,10 @@ to send what it can't answer.
 `voiceLive.start` takes the launching thread (`threadId`) and returns the
 session's `identity` (`kind`, `label`, `name`, `threadId`). The desktop pill
 and the iOS hands-free header both show `label`. The desktop
-composer's waveform button passes its thread. iOS's Talk to Bot and the Bot
-tab pass none, which means the Chief of Staff.
+composer's waveform button passes its thread. iOS's Bot tab waveform passes
+that Bot's chat thread, and the `bbstudio://handsfree/<thread>` link its
+thread. Talk to Bot (Action button, Siri) passes none, which means the Chief
+of Staff. iOS has no thread-view launch.
 
 | Launched from | It speaks as | The pill shows |
 | --- | --- | --- |

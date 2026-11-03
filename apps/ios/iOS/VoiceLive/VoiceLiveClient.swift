@@ -13,8 +13,9 @@ extension BBClient {
     }
 
     /// gpt-live-1 takes the SDP offer and answers with Studio's SDP answer; Realtime answers with a client secret.
-    func voiceLiveStart(model: String?, sdp: String?) async throws -> VoiceLiveStart {
-        try await rpc("studio", Studio.Method.voiceLive_start, .object(omittingNil: ["model": model.map(JSONValue.string), "sdp": sdp.map(JSONValue.string)]))
+    /// `threadId`: the launching thread, which the session speaks as; nil means the Chief of Staff.
+    func voiceLiveStart(model: String?, sdp: String?, threadId: String?) async throws -> VoiceLiveStart {
+        try await rpc("studio", Studio.Method.voiceLive_start, .object(omittingNil: ["model": model.map(JSONValue.string), "sdp": sdp.map(JSONValue.string), "threadId": threadId.map(JSONValue.string)]))
     }
 
     func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult {

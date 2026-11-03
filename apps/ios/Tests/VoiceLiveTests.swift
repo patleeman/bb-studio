@@ -2,6 +2,51 @@ import AVFAudio
 import XCTest
 @testable import BBStudio
 
+/// The session speaks as the thread it was launched from: start sends it to Studio.
+@MainActor
+final class VoiceLiveLaunchThreadTests: XCTestCase {
+    private final class FakeStudio: VoiceLiveStudio {
+        var starts: [(model: String?, sdp: String?, threadId: String?)] = []
+        func voiceLiveState() async throws -> VoiceLiveState { VoiceLiveState(ready: true, model: .gpt_live_1) }
+        func voiceLiveStart(model: String?, sdp: String?, threadId: String?) async throws -> VoiceLiveStart {
+            starts.append((model, sdp, threadId))
+            // No transport: the controller fails right after, which is all this test needs.
+            return VoiceLiveStart(sessionId: "vl_0123456789abcdef", transport: .mock)
+        }
+        func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult { VoiceLiveToolResult(output: "ok") }
+        func voiceLiveEvent(sessionId: String, reports: [LiveReport]) async throws -> Studio.VoiceLiveEventOutput { Studio.VoiceLiveEventOutput() }
+        func voiceLivePoll(sessionId: String) async throws -> [VoiceLiveReply] { [] }
+        func voiceLiveEnd(sessionId: String, reports: [LiveReport]) async throws {}
+    }
+
+    private func started(threadId: String?) async throws -> FakeStudio {
+        let studio = FakeStudio()
+        let controller = VoiceLiveController(studio: studio, threadId: threadId)
+        controller.qaUseMock()
+        controller.start()
+        for _ in 0..<100 where studio.starts.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+        return studio
+    }
+
+    func testStartSendsTheLaunchingThread() async throws {
+        let studio = try await started(threadId: "thr_kensico_bot")
+        XCTAssertEqual(studio.starts.count, 1)
+        XCTAssertEqual(studio.starts.first?.threadId, "thr_kensico_bot")
+    }
+
+    func testNoThreadMeansTheChiefOfStaff() async throws {
+        let studio = try await started(threadId: nil)
+        XCTAssertEqual(studio.starts.count, 1)
+        XCTAssertNil(studio.starts.first?.threadId)
+    }
+
+    func testTheSheetCarriesTheThread() {
+        XCTAssertEqual(Sheet.handsFree(threadId: "thr_a").id, "hands-free:thr_a")
+        XCTAssertNotEqual(Sheet.handsFree(threadId: "thr_a"), Sheet.handsFree(threadId: "thr_b"))
+        XCTAssertEqual(Sheet.handsFree(autoStart: true).id, "hands-free:")
+    }
+}
+
 /// After an "answer" relay, the voice says once that it's still waiting (voiceLive.tool's waitFor).
 final class VoiceLiveStillWaitingTests: XCTestCase {
     private let t0: TimeInterval = 1_800_000_000

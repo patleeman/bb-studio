@@ -9,7 +9,7 @@ private let log = Logger(subsystem: "nyc.plee.bbgo", category: "voice-live")
 @MainActor
 protocol VoiceLiveStudio: AnyObject {
     func voiceLiveState() async throws -> VoiceLiveState
-    func voiceLiveStart(model: String?, sdp: String?) async throws -> VoiceLiveStart
+    func voiceLiveStart(model: String?, sdp: String?, threadId: String?) async throws -> VoiceLiveStart
     func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult
     func voiceLiveEvent(sessionId: String, reports: [LiveReport]) async throws -> Studio.VoiceLiveEventOutput
     func voiceLivePoll(sessionId: String) async throws -> [VoiceLiveReply]
@@ -35,6 +35,8 @@ final class VoiceLiveController: ObservableObject {
     private(set) var timings: [String: [Int]] = [:]
 
     private let studio: VoiceLiveStudio
+    /// The thread it was launched from: the session speaks as it. Nil: the Chief of Staff.
+    let threadId: String?
     private var transport: LiveTransport?
     private var sessionId: String?
     private var protocolKind: LiveProtocol = .live
@@ -45,8 +47,9 @@ final class VoiceLiveController: ObservableObject {
     private let audio = VoiceAudioConfig.handsFree
     private var usesMic = true
 
-    init(studio: VoiceLiveStudio) {
+    init(studio: VoiceLiveStudio, threadId: String? = nil) {
         self.studio = studio
+        self.threadId = threadId
     }
 
     var phase: LivePhase { machine.phase }
@@ -118,10 +121,10 @@ final class VoiceLiveController: ObservableObject {
                 try await prepareAudio()
                 let peer = WebRTCLiveTransport()
                 let offer = try await peer.makeOffer()
-                started = try await studio.voiceLiveStart(model: chosen, sdp: offer)
+                started = try await studio.voiceLiveStart(model: chosen, sdp: offer, threadId: threadId)
                 rtc = peer
             } else {
-                started = try await studio.voiceLiveStart(model: chosen, sdp: nil)
+                started = try await studio.voiceLiveStart(model: chosen, sdp: nil, threadId: threadId)
             }
             sessionId = started.sessionId
             identity = started.identity

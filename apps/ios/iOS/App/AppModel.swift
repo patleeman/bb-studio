@@ -62,7 +62,8 @@ enum Sheet: Identifiable, Hashable {
     case recording
     case write
     /// Hands-free voice (iOS/VoiceLive); `autoStart` starts the session as it opens (Talk to Bot).
-    case handsFree(autoStart: Bool = false)
+    /// `threadId`: the thread it was launched from, which the session speaks as; none means the Chief of Staff.
+    case handsFree(autoStart: Bool = false, threadId: String? = nil)
 
     var id: String {
         switch self {
@@ -70,7 +71,7 @@ enum Sheet: Identifiable, Hashable {
         case .dictation(let threadId, _): "dictation:\(threadId ?? "")"
         case .recording: "recording"
         case .write: "write"
-        case .handsFree: "hands-free"
+        case .handsFree(_, let threadId): "hands-free:\(threadId ?? "")"
         }
     }
 }
@@ -221,7 +222,7 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
-        case "handsfree", "hands-free": sheet = .handsFree()
+        case "handsfree", "hands-free": sheet = .handsFree(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)

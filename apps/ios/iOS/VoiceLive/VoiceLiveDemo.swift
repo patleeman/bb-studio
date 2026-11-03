@@ -1,12 +1,12 @@
 import Foundation
 
 extension VoiceLiveController {
-    /// The app's controller, or in debug builds the `-qaVoiceLive` one.
-    static func make(client: BBClient) -> VoiceLiveController {
+    /// The app's controller, or in debug builds the `-qaVoiceLive` one. `threadId`: the launching thread.
+    static func make(client: BBClient, threadId: String? = nil) -> VoiceLiveController {
         #if DEBUG
         if let demo = VoiceLiveDemo.controller() { return demo }
         #endif
-        return VoiceLiveController(studio: client)
+        return VoiceLiveController(studio: client, threadId: threadId)
     }
 }
 
@@ -16,7 +16,8 @@ extension VoiceLiveController {
 ///   hands-free caught in that state, driven through the real session machine
 ///   with Studio's real tool outputs, with no server or mic, for screenshots.
 ///   It speaks as the Chief of Staff; `-qaVoiceLiveIdentity "<title>"` makes it a
-///   thread's, and `-qaVoiceLiveIdentity none` shows no identity.
+///   thread's, `-qaVoiceLiveIdentity "bot:<name>"` another Bot's, and
+///   `-qaVoiceLiveIdentity none` shows no identity.
 /// - `-qaVoiceLive script -qaVoiceLiveStudio http://127.0.0.1:8790` runs a whole
 ///   session against `scripts/voice-mock` (Studio's tool layer and a scripted
 ///   GPT-Live), the screen recording's setup. `-qaVoiceLiveAutostart` taps Start.
@@ -60,6 +61,8 @@ enum VoiceLiveDemo {
     static var identity: VoiceLiveIdentity? {
         switch argument("-qaVoiceLiveIdentity") {
         case "none": nil
+        case let bot? where bot.hasPrefix("bot:"):
+            VoiceLiveIdentity(kind: .bot, label: String(bot.dropFirst(4)), name: String(bot.dropFirst(4)), threadId: "thr_demo_bot")
         case let title?: VoiceLiveIdentity(kind: .thread, label: title, name: title, threadId: "thr_demo")
         case nil: VoiceLiveIdentity(kind: .cos, label: "Chief of Staff", name: "Dot", threadId: "thr_cos")
         }
