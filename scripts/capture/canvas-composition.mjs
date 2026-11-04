@@ -189,14 +189,18 @@ try {
   } else {
     const results = [];
     let threadId = null;
+    let opened = false;
+    // CANVAS_COMPOSITION_PROMPTS=election,showcase runs only those (numbered as in the full list).
+    const pick = process.env.CANVAS_COMPOSITION_PROMPTS ? new Set(process.env.CANVAS_COMPOSITION_PROMPTS.split(",")) : null;
     for (const [index, prompt] of PROMPTS.entries()) {
+      if (pick && !pick.has(prompt.id)) continue;
       const n = index + 1;
       log(`turn ${n}: ${prompt.text.split("\n")[0]}`);
       const before = threadId ? (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas : null;
       const started = Date.now();
       if (!threadId) ({ threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: prompt.text }));
       else await pluginRpc("studio-canvas", "canvas.send", { threadId, text: prompt.text });
-      if (n === 1) await open(threadId);
+      if (!opened) { await open(threadId); opened = true; }
       const turnBefore = before?.turn ?? 0;
       const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
       const seconds = Math.round((Date.now() - started) / 1000);
