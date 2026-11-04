@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { CANVAS_MIGRATIONS } from "./migrations";
 import { CANVAS_LIMITS } from "./shared";
-import { CanvasStore, clipCaption } from "./store";
+import { CanvasStore, clipCaption, dropBoardTalk } from "./store";
 
 function memory() {
   const db = new Database(":memory:");
@@ -183,4 +183,13 @@ describe("canvas store", () => {
     expect(() => store.setPage(id, "x".repeat(300 * 1024), "agent")).toThrow(/over 200 KB/);
   });
 
+
+  it("drops caption sentences that describe the board, and keeps the rest", () => {
+    expect(clipCaption("The board has the overview. I built it from the tools this session exposes, so some details may be off.")).toBe("I built it from the tools this session exposes, so some details may be off.");
+    expect(dropBoardTalk("I've laid out a proposed week on the board. Book the dentist before Wednesday.")).toBe("Book the dentist before Wednesday.");
+    expect(dropBoardTalk("Fix chat first. The page shows both queues. In-app needs an owner too.")).toBe("Fix chat first. In-app needs an owner too.");
+    expect(dropBoardTalk("Democrats took the House; check AP before quoting it.")).toBe("Democrats took the House; check AP before quoting it.");
+    // Nothing but board talk stays, rather than an empty caption.
+    expect(dropBoardTalk("The board shows the results.")).toBe("The board shows the results.");
+  });
 });

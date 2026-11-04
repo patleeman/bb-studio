@@ -401,7 +401,22 @@ export function mergeOptions(base: Record<string, unknown>, patch: Record<string
 }
 
 /** One line for the page: the reply's first paragraph, clipped. */
+/**
+ * Sentences that describe the board ("The board shows…", "I've laid it out on the board…"): the user is
+ * looking at it, so the caption drops them. A caption that's nothing but board talk stays as it is.
+ */
+const BOARD_TALK = [
+  /^(the|this|that|your) (board|page|canvas)\b/i,
+  /\b(on|onto|in|to|across) (the|this|your) (board|page|canvas)\b/i,
+  /^(here'?s|here is|below is|above is)\b/i,
+];
+export function dropBoardTalk(text: string): string {
+  const sentences = text.split(/(?<=[.!?…])\s+(?=["“'(]?[A-Z0-9])/);
+  const kept = sentences.filter((sentence) => !BOARD_TALK.some((pattern) => pattern.test(sentence.trim())));
+  return kept.length ? kept.join(" ") : text;
+}
+
 export function clipCaption(text: string): string {
-  const flat = text.replace(/```[\s\S]*?```/g, " ").replace(/::\w+\{[^}]*\}/g, "").replace(/\s+/g, " ").trim();
+  const flat = dropBoardTalk(text.replace(/```[\s\S]*?```/g, " ").replace(/::\w+\{[^}]*\}/g, "").replace(/\s+/g, " ").trim());
   return flat.length > CANVAS_LIMITS.captionChars ? `${flat.slice(0, CANVAS_LIMITS.captionChars - 1).trimEnd()}…` : flat;
 }
