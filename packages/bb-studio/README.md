@@ -1495,7 +1495,7 @@ open in the background, so it's as you left it when you come back.
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
 - **Bot.** Your always-on agent (it replaces the Chief of Staff): a name, a
-  drawn avatar, and a workspace of its own (the **Bot** rail item): its
+  drawn avatar, and a workspace of its own (no rail item; the Bots list in the sidebar): its
   Info page, a Bots list in BB's sidebar with the threads it started, and its
   chat as a normal BB thread. See [Bot](#bot).
 - **Project leads.** A BB project can have a lead thread, which a
@@ -1619,13 +1619,8 @@ the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Workspace**: the Bot page lives under the Studio panel
-  (`/plugins/studio/studio/bot`). The rail has a **Bots** item
-  (`src/ui/bot/BotsRail.tsx`, a nav panel at `/plugins/studio/bots` that
-  goes straight on to the Bot page), so the Bots stay in reach with the
-  sidebar collapsed. Its badge counts the Bots that need you (critical: a
-  pending question or approval, or a released loop), or shows a dot while
-  one has a reply you haven't read (neutral); nothing while they're idle or
-  just working (`bot_attention_all`). The bare page opens the last Bot thread you had open in this window: the bot's chat, or a
+  (`/plugins/studio/studio/bot`); the rail has no Bot item, since the Bots
+  list is always in the sidebar. The bare page opens the last Bot thread you had open in this window: the bot's chat, or a
   runner or worker thread you opened from the Bots list (kept in session
   storage beside the sidebar mode, updated on every thread page shown in
   **bots** mode). With none, or once that thread is gone, it opens the
@@ -1770,8 +1765,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (`working`); Studio's realtime signal on `thread.active` and `thread.idle`
   refreshes it at once. Unread comes from `bot_attention` too, since BB marks
   the chat unread after a check-in's `[PASS]`. It clears when you read or
-  answer the chat. The icon rail has one Bots item with a badge (above),
-  not a row per Bot: a plugin can't add per-Bot rail items with SDK 0.6.104.
+  answer the chat. The icon rail has no Bot item.
   A thread the Bot started that waits on a question or approval shows
   under Running as **waiting**; it's the Bot's to handle.
 

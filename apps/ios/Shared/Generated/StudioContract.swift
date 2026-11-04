@@ -87,7 +87,6 @@ public enum Studio {
     public static let bot_maintenance_run = "bot_maintenance_run"
     public static let bot_activity = "bot_activity"
     public static let bot_attention = "bot_attention"
-    public static let bot_attention_all = "bot_attention_all"
     public static let bot_page_state = "bot_page_state"
     public static let bot_calendar_group_rename = "bot_calendar_group_rename"
     public static let bot_run_dismiss = "bot_run_dismiss"
@@ -531,8 +530,6 @@ public enum Studio {
   public typealias BotActivity = BotActivityOutput
 
   public typealias BotAttention = BotAttentionOutput
-
-  public typealias BotAttentionAll = BotAttentionAllOutput
 
   public typealias BotPageState = BotPageStateOutput
 
@@ -10564,48 +10561,6 @@ public enum Studio {
       self.attention = attention
       self.hasBot = hasBot
       self.working = working
-    }
-  }
-
-  public struct BotAttentionAllInput: Sendable, Hashable, Codable {
-
-
-    public init() {}
-  }
-
-  public struct BotAttentionAllOutputBotsItemAttention: Sendable, Hashable, Codable {
-    public var reason: String?
-    public var count: Double?
-    public var since: Double?
-    public var unread: Double?
-
-    public init(reason: String? = nil, count: Double? = nil, since: Double? = nil, unread: Double? = nil) {
-      self.reason = reason
-      self.count = count
-      self.since = since
-      self.unread = unread
-    }
-  }
-
-  public struct BotAttentionAllOutputBotsItem: Sendable, Hashable, Codable {
-    public var botId: String?
-    public var name: String?
-    public var attention: BotAttentionAllOutputBotsItemAttention?
-    public var working: Bool?
-
-    public init(botId: String? = nil, name: String? = nil, attention: BotAttentionAllOutputBotsItemAttention? = nil, working: Bool? = nil) {
-      self.botId = botId
-      self.name = name
-      self.attention = attention
-      self.working = working
-    }
-  }
-
-  public struct BotAttentionAllOutput: Sendable, Hashable, Codable {
-    public var bots: [BotAttentionAllOutputBotsItem]?
-
-    public init(bots: [BotAttentionAllOutputBotsItem]? = nil) {
-      self.bots = bots
     }
   }
 

@@ -38,7 +38,6 @@ import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
 import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
-import { BOTS_PANEL, BotsPanel, useBotsBadge } from "./src/ui/bot/BotsRail";
 import { BotInfoPanel, BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
 import { BOT_INFO_ACTION } from "./src/ui/bot/workspace";
@@ -163,9 +162,6 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "item-gestures", component: ItemGestures });
   app.slots.experimental_appOverlay({ id: "legacy-chats", component: LegacyChats });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
-  // The rail's Bots item: its badge counts the Bots that need you, or a dot
-  // for unread replies; it opens the Bot page (src/ui/bot/BotsRail.tsx).
-  app.slots.navPanel({ id: BOTS_PANEL, title: "Bots", icon: "Bot", path: BOTS_PANEL, component: BotsPanel, experimental_useBadge: useBotsBadge });
   // Studio's tabs beside a thread (src/kit/app/thread-panel.tsx). Code
   // outside the thread view (the sidebar, content scripts) asks the thread to
   // open one; this bare banner in every thread's composer takes the request.

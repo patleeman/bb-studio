@@ -519,8 +519,6 @@ export const rpcContract = defineRpcContract({
   /** hasBot false: no such Bot (or it has no chat yet), so a client counts what waits on the user some other way. */
   /** `working`: the Bot's chat is busy (starting, active or stopping); its row's spinner. */
   bot_attention: { input: forBot, output: z.object({ attention: botAttention.nullable(), hasBot: z.boolean().optional(), working: z.boolean().optional() }) },
-  /** Every Bot's bot_attention at once, for the rail's Bots badge (src/ui/bot/rowState.ts railBadge). */
-  bot_attention_all: { input: z.object({}), output: z.object({ bots: z.array(z.object({ botId: z.string(), name: z.string(), attention: botAttention.nullable(), working: z.boolean() })) }) },
   /** The Bot page's saved state (src/bot-page-state.ts): calendar group names by group key, and failed runs dismissed from Needs you ("<automationId>:<runId>"). */
   bot_page_state: { input: forBot, output: botPageState },
   /** Names a calendar group (its key: window and jobs); an empty name goes back to the automatic one. */

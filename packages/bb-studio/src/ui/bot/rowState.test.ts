@@ -51,13 +51,3 @@ test("error: the chat's last turn failed and isn't read", () => {
   expect(botRowState({ chat: chat({ isUnread: true, indicator: "unread-error" }), attention: { count: 1, unread: 0 } })).toBe("needs-you");
   expect(STATE_INDICATOR.error).toBe("unread-error");
 });
-
-test("the rail's Bots badge: a critical count of Bots that need you, else a neutral dot for unread replies, else nothing", async () => {
-  const { railBadge } = await import("./rowState");
-  expect(railBadge([])).toBeNull();
-  expect(railBadge([{ name: "Ivy", attention: null }, { name: "Rex", attention: undefined }])).toBeNull();
-  expect(railBadge([{ name: "Uma", attention: { count: 1, unread: 1 } }])).toEqual({ tone: "neutral", label: "Uma has a reply you haven't read" });
-  expect(railBadge([{ name: "Uma", attention: { count: 1, unread: 1 } }, { name: "Ada", attention: { count: 2, unread: 2 } }])).toMatchObject({ tone: "neutral", label: "2 Bots have replies you haven't read" });
-  expect(railBadge([{ name: "Uma", attention: { count: 1, unread: 1 } }, { name: "Nia", attention: { count: 2, unread: 1 } }])).toEqual({ count: 1, tone: "critical", label: "Nia needs you" });
-  expect(railBadge([{ name: "Nia", attention: { count: 1, unread: 0 } }, { name: "Kit", attention: { count: 3 } }])).toEqual({ count: 2, tone: "critical", label: "2 Bots need you" });
-});

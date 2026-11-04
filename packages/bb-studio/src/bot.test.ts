@@ -287,18 +287,6 @@ it("bot_attention says when the Bot's hidden chat is busy, which BB's sidebar vi
   expect((await x.bots.attentionView()).working).toBe(false);
 });
 
-it("bot_attention_all: every Bot with a chat, with its attention and whether its chat is busy, for the rail's badge", async () => {
-  const x = await setup();
-  expect(await x.bots.attentionAll()).toEqual({ bots: [] });
-  x.add({ id: "bot1", visibility: "hidden", status: "active" });
-  await x.bots.setThread("bot1");
-  x.pending.set("bot1", [{ id: "q1", status: "pending", payload: { kind: "user_question" } } as never]);
-  const { bots } = await x.bots.attentionAll();
-  expect(bots).toHaveLength(1);
-  expect(bots[0]).toMatchObject({ working: true, attention: { reason: "Asked you a question", count: 1 } });
-  expect(bots[0]).not.toHaveProperty("hasBot");
-});
-
 it("the Bot's attention: its replies the user hasn't read, not [PASS], until the chat is read", async () => {
   const x = await setup();
   x.add({ id: "bot1", status: "idle", lastReadAt: 100 });

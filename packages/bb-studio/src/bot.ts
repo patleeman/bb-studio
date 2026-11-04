@@ -1189,12 +1189,6 @@ export class Bots {
     return { attention: await this.attention(bot.threadId, thread), hasBot: true, working: BUSY_CHAT.has(thread?.status ?? "") };
   }
 
-  /** bot_attention_all: each Bot with a chat, and what its chat has for the user. */
-  async attentionAll(): Promise<{ bots: { botId: string; name: string; attention: BotAttention | null; working: boolean }[] }> {
-    const bots = this.list().filter((bot) => bot.threadId);
-    return { bots: await Promise.all(bots.map(async (bot) => ({ botId: bot.id, name: bot.name, ...await this.attentionView(bot.id) }))).then((views) => views.map(({ hasBot: _hasBot, ...view }) => view)) };
-  }
-
   async activity(botId?: string): Promise<BotActivityView> {
     const { bot, run } = await this.get(botId);
     if (!bot?.threadId) return { attention: null, inProgress: [], waiting: [], scheduled: [], completed: [], latest: null };
