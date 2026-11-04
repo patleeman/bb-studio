@@ -36,7 +36,7 @@ BUILDING BLOCKS (optional; they save markup): an element with data-block and a f
 - data-block="side": a column of a comparison. data-label, data-title, data-value + data-unit, data-points ("a | b | c"), data-verdict ("Pick") on the winner.
 - data-block="quote": data-text, data-by, data-role.
 - data-block="placeholder": data-label (in a draft).
-Containers: cv-wall (a grid of cards that fills its row; --cv-cols sets the columns; data-span="2" on a card takes two rows, data-wide two columns), cv-steps (steps in a row; cv-steps cv-steps-col for a column), cv-sides (sides next to each other).
+Containers: cv-wall (a grid of cards that fills its row in two rows; --cv-cols sets the columns; data-span="2" on a card takes two rows, data-wide two columns. Count the cells: with --cv-cols:4, two rows hold 8 cards, or 7 with one card on data-span="2"; more cards need more columns), cv-steps (steps in a row; cv-steps cv-steps-col for a column), cv-sides (sides next to each other).
 `.trim();
 
 const FILL = `
