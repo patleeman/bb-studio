@@ -41,16 +41,30 @@ hands-free button.
 - **The board** is in this plugin's own database: one per canvas thread,
   with a short log of what changed in each turn.
 - **The canvas tools** (`canvas_read`, `canvas_add`, `canvas_update`,
-  `canvas_remove`, `canvas_clear`, `canvas_set`) are this plugin's agent
-  tools. Only canvas threads get them, with the canvas rules and the
-  `canvas` skill, and each works only on the calling thread's board.
-- **Items** are a headline, a caption, or one of Studio's Dashboards
-  widget types: stat, line, bar, area, pie, table, list, ticker, progress,
-  image, and custom HTML in a sandboxed frame.
-- **Layout:** Canvas packs items by importance (1–5) and size (s, m, l,
-  xl). The most important, most recently changed item is the biggest, at
-  the top left. Items that don't change keep their place, and the board
-  reflows for narrow windows.
+  `canvas_remove`, `canvas_clear`, `canvas_set`, `canvas_guide`) are this
+  plugin's agent tools. Only canvas threads get them, with the canvas rules
+  and the `canvas` skill, and each works only on the calling thread's board.
+- **Looks (prototype):** a new canvas starts in the look picked in the top
+  bar, and keeps it. **Editorial** is a newspaper front, **Field notes** a
+  whiteboard of cards and sticky notes, **Instrument** a dense control
+  panel. Canvases made before looks stay **Classic**, the round 1 slide
+  grid. Each look has its design tokens (`src/looks.ts`), its layout rules
+  (`src/organic.ts`) and a design guide with examples for the agent
+  (`src/guides.ts`).
+- **Items** are a headline, a caption, a quote, a note, a timeline, a US
+  map, small multiples, one of Studio's Dashboards widget types (stat,
+  line, bar, area, pie, table, list, ticker, progress, image), or custom
+  HTML in a sandboxed frame. In a look, custom frames get the look's tokens
+  and a helper kit (`window.cv`: sparklines, charts, seat splits, tile
+  maps, timelines, small multiples; `src/ui/kit.ts`), and grow to their
+  content. Any item can name `relatedTo` items (connectors) and an
+  `anchor` with a `point` (a note placed beside it, pointing there).
+- **Layout:** in Classic, Canvas packs items on a grid by importance (1–5)
+  and size (s, m, l, xl). In a look, items are as tall as their content
+  and settle around the focus without a grid: lanes beside a lead story
+  (Editorial, Instrument) or a cluster around the middle (Field notes).
+  The most important, most recently changed item is the focus. Items that
+  don't change keep their place, and the board reflows for narrow windows.
 
 ## With Studio
 
@@ -70,4 +84,5 @@ node build-ui.mjs   # after changing src/ui or the Studio files it uses
 ```
 
 `scripts/capture/canvas-demo.mjs` records four text turns and a hands-free
-turn in a staged BB.
+turn in a staged BB. `scripts/capture/canvas-directions.mjs` runs the same
+three turns in a canvas per look and saves light and dark stills.
