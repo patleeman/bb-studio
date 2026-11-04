@@ -25,7 +25,7 @@ export const CANVAS_INSTRUCTIONS = `${CANVAS_RULES}\n\nItem kinds: ${CANVAS_KIND
 export function canvasInstructions(look: Look): string {
   if (look === "classic") return CANVAS_INSTRUCTIONS;
   // A rich look replaces "keep the board small" with "rich but focused".
-  const rules = CANVAS_RULES.replace(/- Keep the board small:[^\n]*/, `- Rich but focused: one dominant focus and 5–12 dense supporting items (your own custom components, stats with sparklines, maps, timelines, quotes, notes). At most ${CANVAS_LIMITS.items} items.`)
+  const rules = CANVAS_RULES.replace(/- Keep the board small:[^\n]*/, `- Rich but focused: one dominant focus and 5–12 dense supporting items (your own custom components, stats with sparklines, maps, timelines, quotes). At most ${CANVAS_LIMITS.items} items.`)
     .replace(" The highest importance, most recently changed item is the focus: biggest, top-left.", " The highest importance, most recently changed item is the focus: it dominates and the rest orbit it.");
   return `${rules}\n\n${lookInstruction(look)}\n\nItem kinds: ${CANVAS_KINDS.join(", ")}. The canvas skill has each kind's data shape. canvas_read shows the board and its recent changes.`;
 }

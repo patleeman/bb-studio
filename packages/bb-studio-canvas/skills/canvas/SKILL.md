@@ -3,7 +3,7 @@ name: canvas
 description: >-
   Use in a canvas thread, where you talk with the user on a board instead of in
   a transcript. It covers editing the board each turn with the canvas_* tools,
-  each item kind's data, importance, size and relations, choosing the board's
+  each item kind's data, importance and size, choosing the board's
   style and its design guide, and keeping the reply to a short spoken caption.
 ---
 
@@ -33,7 +33,7 @@ out. You steer it with `importance` and `size`.
 You pick each board's style from what it shows; the user never has to.
 
 - **editorial** (a newspaper front): news, results, stories, explainers.
-- **field** (a whiteboard of cards and sticky notes): brainstorming,
+- **field** (a whiteboard of loose hand-drawn cards): brainstorming,
   planning, ideas, decisions.
 - **instrument** (a dense control panel): dense data, monitoring, many
   numbers to compare.
@@ -42,9 +42,7 @@ You pick each board's style from what it shows; the user never has to.
   it for follow-ups; switch on a topic change of another kind, in that
   `canvas_set` or with `canvas_style`. The switch animates, and the top bar
   shows the style.
-- Borrow accents across styles: a note takes `options.accent` `sticky`,
-  `margin` or `callout`; a quote `pull`, `sticky` or `bar`. In HTML,
-  `cv-sticky`, `cv-margin-note` and `cv-callout` work in every style.
+- A quote takes `options.accent` `pull` or `bar` in any style.
 
 The first message has the design guide with examples; `canvas_guide`
 returns it again (or one style's part, with `style`). In every style:
@@ -57,12 +55,12 @@ returns it again (or one style's part, with `style`). In every style:
   charts, seat splits, US tile maps, timelines, small multiples). Draw with
   `cv.render((data, options) => html)` so updates to `data` redraw it. The
   frame grows to its content: never set a height on it.
-- Annotate: a `note` with `anchor` (an item id) and `point` (`{x, y}`, 0–1
-  inside that item) sits beside it with a line to that spot. `relatedTo`
-  (ids) draws connectors; only the few most important draw.
+- Say what matters inside the item itself: a takeaway line in a custom
+  component, chart marks, a `==highlight==`, a stat's caption, or a short
+  caption item. Canvas has no notes, stickies or connectors.
 - Charts are honest: bars start at zero; for tiny differences set
   `options.max` to a meaningful scale.
-- Inline marks in captions and notes: `{spark:3,5,4}`, `{delta:+2.1}`,
+- Inline marks in captions: `{spark:3,5,4}`, `{delta:+2.1}`,
   `==highlight==`.
 
 Canvases from before styles are **Classic** (the slide grid) and stay so.
@@ -97,13 +95,9 @@ Canvases from before styles are **Classic** (the slide grid) and stay so.
 | image | an http(s) URL | `url`, `alt`, `fit` |
 | custom | anything (`window.bbWidget.data`) | anything; pass `html` too |
 | quote | `{text, by?, role?}` or a string | none |
-| note | a short string, or `{text, tone?}`; with `anchor` and `point` it points at that item | none |
 | timeline | `[{date, label, note?, tone?}]` | `layout` (column, row), `highlight` |
 | map | US states: `{PA: 2.1}`, `{PA: {value, label?, color?}}` or `[{state, value}]` | `scale` (diverging, sequential), `legend` [low, high], `show` (abbr, value, label), `low`, `high` |
 | multiples | `[{label, values, value?, delta?, note?}]` | `unit`, `shared`, `invert` |
-
-Any item also takes `relatedTo` (ids it connects to), `anchor` (the id it
-annotates) and `point` (`{x, y}` on the anchor).
 
 Generated widgets: a `custom` item's `html` runs in a sandboxed frame with no
 network, and gets `window.bbWidget.data`, `.options` and `.theme` (listen for

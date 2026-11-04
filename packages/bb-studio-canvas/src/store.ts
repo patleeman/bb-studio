@@ -8,6 +8,7 @@ import {
   CANVAS_KIND_INFO,
   CANVAS_LIMITS,
   checkItem,
+  isCanvasKind,
   slugId,
   type CanvasChange,
   type CanvasExecution,
@@ -44,16 +45,15 @@ export interface EditResult { rev: number; changes: CanvasChange[]; items: Canva
 const parse = (text: string | null): unknown => (text === null ? null : JSON.parse(text));
 const DEFAULT_IMPORTANCE = 3;
 
-type Rel = Pick<CanvasItem, "relatedTo" | "anchor" | "point">;
-function relOf(text: string | null): Rel {
-  const rel = (text ? parse(text) : null) as Partial<Rel> | null;
-  return { relatedTo: Array.isArray(rel?.relatedTo) ? rel.relatedTo : [], anchor: typeof rel?.anchor === "string" ? rel.anchor : null, point: rel?.point ?? null };
-}
-const relText = (item: Rel) => (item.relatedTo.length || item.anchor || item.point ? JSON.stringify({ relatedTo: item.relatedTo, anchor: item.anchor, point: item.point }) : null);
+// Retired: note items (and any other kind Canvas no longer has) are left out
+// wherever the board is read, and the next edit drops their rows. The rel
+// column (relatedTo, anchor, point: connectors) is no longer read or written.
+const shownKinds = (rows: ItemRow[]) => rows.filter((row) => isCanvasKind(row.kind));
+/** A change line about a note item, from before notes were retired. */
+const NOTE_CHANGE = /^(Added|Updated|Removed) note "/;
 
 function toItem(row: ItemRow): CanvasItem {
   return {
-    ...relOf(row.rel),
     id: row.id, kind: row.kind as CanvasKind, title: row.title, data: parse(row.data), options: (parse(row.options) as Record<string, unknown>) ?? {},
     html: row.html, size: row.size as SizeHint, importance: row.importance, createdAt: row.created_at, updatedAt: row.updated_at, rev: row.rev,
   };
@@ -126,18 +126,18 @@ export class CanvasStore {
   }
 
   private meta(row: CanvasRow): CanvasMeta {
-    const count = (this.db.prepare("SELECT COUNT(*) AS n FROM canvas_items WHERE canvas_id = ?").get(row.id) as { n: number }).n;
+    const count = shownKinds(this.db.prepare("SELECT kind FROM canvas_items WHERE canvas_id = ?").all(row.id) as ItemRow[]).length;
     return { id: row.id, threadId: row.thread_id ?? "", title: row.title || "Untitled canvas", createdAt: row.created_at, updatedAt: row.updated_at, itemCount: count, look: lookOf(row.look) };
   }
 
   items(canvasId: string): CanvasItem[] {
-    return (this.db.prepare("SELECT * FROM canvas_items WHERE canvas_id = ? ORDER BY importance DESC, created_at, id").all(canvasId) as ItemRow[]).map(toItem);
+    return shownKinds(this.db.prepare("SELECT * FROM canvas_items WHERE canvas_id = ? ORDER BY importance DESC, created_at, id").all(canvasId) as ItemRow[]).map(toItem);
   }
 
   /** The latest changes, oldest first. */
   changes(canvasId: string, limit = 40): CanvasChange[] {
     const rows = this.db.prepare("SELECT * FROM canvas_changes WHERE canvas_id = ? ORDER BY seq DESC LIMIT ?").all(canvasId, limit) as { seq: number; rev: number; turn: number; op: string; item_id: string | null; summary: string; by: string; at: number }[];
-    return rows.reverse().map((row) => ({ seq: row.seq, rev: row.rev, turn: row.turn, op: row.op as CanvasChange["op"], itemId: row.item_id, summary: row.summary, by: row.by, at: row.at }));
+    return rows.reverse().filter((row) => !NOTE_CHANGE.test(row.summary)).map((row) => ({ seq: row.seq, rev: row.rev, turn: row.turn, op: row.op as CanvasChange["op"], itemId: row.item_id, summary: row.summary, by: row.by, at: row.at }));
   }
 
   history(canvasId: string, limit = 12): CanvasTurn[] {
@@ -209,7 +209,6 @@ export class CanvasStore {
           id, kind: input.kind, title: input.title?.trim() || null, data: input.data ?? null, options: input.options ?? {},
           html: input.kind === "custom" ? input.html ?? null : null, size: input.size ?? CANVAS_KIND_INFO[input.kind].size,
           importance: input.importance ?? DEFAULT_IMPORTANCE, createdAt: at, updatedAt: at, rev,
-          relatedTo: [...new Set(input.relatedTo ?? [])].filter((other) => other !== id), anchor: input.anchor && input.anchor !== id ? input.anchor : null, point: input.point ?? null,
         };
         checkItem(item);
         board.set(id, item);
@@ -229,14 +228,11 @@ export class CanvasStore {
           html: kind !== "custom" ? null : patch.html === undefined ? before.html : patch.html,
           size: patch.size ?? before.size,
           importance: patch.importance ?? before.importance,
-          relatedTo: patch.relatedTo === undefined ? before.relatedTo : [...new Set(patch.relatedTo)].filter((other) => other !== before.id),
-          anchor: patch.anchor === undefined ? before.anchor : patch.anchor && patch.anchor !== before.id ? patch.anchor : null,
-          point: patch.point === undefined ? before.point : patch.point,
           updatedAt: at, rev,
         };
         checkItem(next);
         board.set(next.id, next);
-        const fields = (["kind", "title", "data", "options", "html", "size", "importance", "relatedTo", "anchor", "point"] as const).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(next[key]));
+        const fields = (["kind", "title", "data", "options", "html", "size", "importance"] as const).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(next[key]));
         record("update", next.id, `Updated ${label(next)}${fields.length ? ` (${fields.join(", ")})` : " (no change)"}`);
       };
       const remove = (id: string) => {
@@ -268,7 +264,7 @@ export class CanvasStore {
             }
             for (const id of [...board.keys()]) if (!ids.has(id)) remove(id);
             for (const input of op.items) {
-              if (input.id && board.has(input.id)) update({ ...input, id: input.id, replaceOptions: true, options: input.options ?? {}, data: input.data ?? null, title: input.title ?? null, html: input.html ?? undefined, relatedTo: input.relatedTo ?? [], anchor: input.anchor ?? null, point: input.point ?? null });
+              if (input.id && board.has(input.id)) update({ ...input, id: input.id, replaceOptions: true, options: input.options ?? {}, data: input.data ?? null, title: input.title ?? null, html: input.html ?? undefined });
               else add(input);
             }
             break;
@@ -278,9 +274,9 @@ export class CanvasStore {
       if (board.size > CANVAS_LIMITS.items) throw new Error(`A board holds at most ${CANVAS_LIMITS.items} items; it would have ${board.size}. Remove what no longer matters.`);
 
       this.db.prepare("DELETE FROM canvas_items WHERE canvas_id = ?").run(canvasId);
-      const insert = this.db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev, rel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      const insert = this.db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       for (const item of board.values()) {
-        insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev, relText(item));
+        insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev);
       }
       this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ? WHERE id = ?").run(rev, at, look, canvasId);
       const write = this.db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");

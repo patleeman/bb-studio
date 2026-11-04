@@ -20,27 +20,30 @@ describe("canvas store", () => {
     expect(store.list().map((each) => [each.threadId, each.look]).sort()).toEqual([["thr_a", "instrument"], ["thr_b", "classic"]]);
   });
 
-  it("keeps relations: related items, the anchor and its point; set and update replace them", () => {
-    const { store } = memory();
+  it("leaves out note items and link fields saved before notes were removed, and drops them on the next edit", () => {
+    const { db, store } = memory();
     const { id } = store.create({ threadId: "thr_a" });
-    store.edit(id, [
-      { op: "add", item: { id: "map", kind: "map", data: { PA: 2 } } },
-      { op: "add", item: { id: "why", kind: "note", data: "Flipped", anchor: "map", point: { x: 0.7, y: 0.4 }, relatedTo: ["map", "why", "map"] } },
-    ], "agent");
-    expect(store.items(id).find((item) => item.id === "why")).toMatchObject({ anchor: "map", point: { x: 0.7, y: 0.4 }, relatedTo: ["map"] });
-    expect(store.items(id).find((item) => item.id === "map")).toMatchObject({ anchor: null, point: null, relatedTo: [] });
-    const updated = store.edit(id, [{ op: "update", patch: { id: "why", anchor: null } }], "agent");
-    expect(updated.items.find((item) => item.id === "why")).toMatchObject({ anchor: null, point: { x: 0.7, y: 0.4 } });
-    expect(updated.changes[0]!.summary).toContain("anchor");
-    const set = store.edit(id, [{ op: "set", items: [{ id: "why", kind: "note", data: "Flipped" }, { id: "map", kind: "map", data: { PA: 2 } }] }], "agent");
-    expect(set.items.find((item) => item.id === "why")).toMatchObject({ relatedTo: [], anchor: null, point: null });
+    store.edit(id, [{ op: "add", item: { id: "map", kind: "map", data: { PA: 2 } } }], "agent");
+    // Rows as an older Canvas wrote them: a note anchored to the map, and the map's connectors.
+    db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev, rel) VALUES (?, 'why', 'note', NULL, '\"Flipped\"', '{}', NULL, 's', 2, 1, 1, 1, ?)").run(id, JSON.stringify({ anchor: "map", point: { x: 0.7, y: 0.4 }, relatedTo: [] }));
+    db.prepare("UPDATE canvas_items SET rel = ? WHERE id = 'map'").run(JSON.stringify({ relatedTo: ["why"], anchor: null, point: null }));
+    db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, 1, 0, 'add', 'why', 'Added note \"why\"', 'agent', 1)").run(id);
+    expect(store.items(id).map((item) => item.id)).toEqual(["map"]);
+    expect(Object.keys(store.items(id)[0]!)).not.toEqual(expect.arrayContaining(["relatedTo"]));
+    expect(store.items(id)[0]).not.toHaveProperty("anchor");
+    const view = store.view(id)!;
+    expect(view.items.map((item) => item.id)).toEqual(["map"]);
+    expect(view.itemCount).toBe(1);
+    expect(view.changes.some((change) => change.summary.includes("note"))).toBe(false);
+    // An item can take the old note's id; the next edit drops the old rows and links.
+    store.edit(id, [{ op: "add", item: { id: "why", kind: "caption", data: "It flipped" } }], "agent");
+    expect((db.prepare("SELECT id, kind, rel FROM canvas_items WHERE canvas_id = ? ORDER BY id").all(id))).toEqual([{ id: "map", kind: "map", rel: null }, { id: "why", kind: "caption", rel: null }]);
   });
 
   it("checks the new kinds' data", () => {
     const { store } = memory();
     const { id } = store.create({ threadId: "thr_a" });
     expect(() => store.edit(id, [{ op: "add", item: { kind: "quote", data: { by: "nobody" } } }], "agent")).toThrow(/quote needs data/);
-    expect(() => store.edit(id, [{ op: "add", item: { kind: "note", data: "" } }], "agent")).toThrow(/note needs data/);
     expect(() => store.edit(id, [{ op: "add", item: { kind: "timeline" } }], "agent")).toThrow(/timeline needs data/);
     expect(store.edit(id, [{ op: "add", item: { kind: "quote", data: "Every vote counts" } }], "agent").items[0]).toMatchObject({ kind: "quote", size: "m" });
   });

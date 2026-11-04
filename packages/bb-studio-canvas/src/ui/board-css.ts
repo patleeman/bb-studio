@@ -15,12 +15,6 @@ ${S} .cvt-rot{transform-origin:50% 35%}
 ${S} .cvt-card{position:relative;color:var(--cv-ink)}
 ${S} .cvt-head{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);font-weight:700;letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-ink);margin-bottom:var(--cv-s-3);display:flex;align-items:center;gap:8px}
 ${S} .cvt-head span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-${S} .cvt-links{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
-${S} .cvt-link{fill:none;transition:d .56s cubic-bezier(.2,.8,.2,1)}
-${S} .cvt-link-new{stroke-dasharray:1;stroke-dashoffset:1;animation:cvt-draw .8s .3s cubic-bezier(.4,0,.2,1) forwards}
-${S} .cvt-link-label{font-family:var(--cv-font-label);font-size:10.5px;fill:var(--cv-muted)}
-@keyframes cvt-draw{to{stroke-dashoffset:0}}
-@media (prefers-reduced-motion: reduce){${S} .cvt-link-new{animation:none;stroke-dasharray:none;stroke-dashoffset:0}${S} .cvt-link{transition:none}}
 ${S} .cvi-chart svg{display:block}
 ${S} .cvi-stat-spark{margin-top:8px;line-height:0}
 ${S} .cvi-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--cv-s-3)}
@@ -29,8 +23,6 @@ ${S} .cvi-list-n{font-family:var(--cv-font-num);font-size:var(--cv-t-lg);color:v
 ${S} .cvi-list-title{font-weight:600;color:var(--cv-ink);line-height:1.3}
 ${S} .cvi-ticker{display:flex;flex-wrap:wrap;gap:var(--cv-s-2) var(--cv-s-5);align-items:baseline}
 ${S} .cvi-ticker-item{display:inline-flex;align-items:baseline;gap:8px}
-${S} .cvi-note-text p{margin:0}
-${S} .cvi-note-text p + p{margin-top:4px}
 ${S} .cv-body p{margin:0 0 var(--cv-s-3)}
 ${S} .cv-body p:last-child{margin-bottom:0}
 `;
@@ -50,8 +42,7 @@ ${S} .cvt[data-kind=caption] .cv-body{font-size:var(--cv-t-lg)}
 ${S} .cvt-card{background:var(--cv-surface);border-radius:var(--cv-radius);box-shadow:var(--cv-shadow)}
 ${S} .cvt[data-kind=headline] .cvt-card{background:transparent;box-shadow:none}
 ${S} .cvt[data-focus]:not([data-kind=headline]) .cvt-card::after{content:"";position:absolute;top:-8px;left:50%;width:15px;height:15px;margin-left:-7px;border-radius:99px;background:radial-gradient(circle at 35% 35%,#ff8a80,var(--cv-red) 60%);box-shadow:0 2px 3px rgb(0 0 0/.35)}
-${S} .cvt[data-kind=caption] .cvt-card{background:var(--cv-sticky-3);color:var(--cv-sticky-ink);border-radius:2px}
-${S} .cvt[data-kind=caption] .cv-body{color:var(--cv-sticky-ink);font-family:var(--cv-font-hand);font-size:var(--cv-t-lg);font-weight:600;line-height:1.35}
+${S} .cvt[data-kind=caption] .cv-body{font-family:var(--cv-font-hand);font-size:var(--cv-t-lg);font-weight:600;line-height:1.35}
 ${S} .cvt-head{font-family:var(--cv-font-hand);font-size:var(--cv-t-lg);letter-spacing:0;text-transform:none;color:var(--cv-accent);margin-bottom:6px}
 ${S} .cvi-underline{background:linear-gradient(100deg,transparent 1%,var(--cv-highlight) 2%,var(--cv-highlight) 97%,transparent 99%) 0 88%/100% 0.32em no-repeat;padding:0 0.08em}
 ${S} .cv-stat-label{font-family:var(--cv-font-hand)}
@@ -68,19 +59,8 @@ ${S} .cvt-head .cvt-kind{margin-left:auto;opacity:.7;flex:none}
 };
 
 const ACCENTS = `
-/* Accents: a note or quote looks the same in every style, so styles can borrow each other's. */
+/* Accents: a quote's pull or bar form looks the same in every style. */
 ${S} .cvt[data-accent] .cvt-card{border:0;box-shadow:none;border-radius:0;padding:0;background:transparent}
-${S} .cvt[data-accent=sticky] .cvt-card{background:var(--cv-sticky);color:var(--cv-sticky-ink);border-radius:2px;padding:0;box-shadow:0 1px 0 rgb(0 0 0/.06),0 12px 20px -12px rgb(60 50 0/.5)}
-${S} .cvt[data-kind=note][data-accent=sticky] .cvt-card::before{content:"";position:absolute;top:-9px;left:50%;width:58px;height:18px;transform:translateX(-50%) rotate(-3deg);background:color-mix(in oklab,var(--cv-paper) 60%,transparent);border:1px solid color-mix(in oklab,var(--cv-ink) 8%,transparent)}
-${S} .cvt[data-kind=note][data-accent=sticky] .cv-note{font-family:var(--cv-font-sticky);color:var(--cv-sticky-ink);font-size:var(--cv-t-lg);font-weight:600;line-height:1.3}
-${S} .cvt[data-kind=quote][data-accent=sticky] .cvt-card{background:var(--cv-sticky-2)}
-${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote{font-family:var(--cv-font-sticky);color:var(--cv-sticky-ink);font-style:normal;font-size:var(--cv-t-xl);font-weight:600;line-height:1.25}
-${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote::before{content:none}
-${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote cite{color:color-mix(in oklab,var(--cv-sticky-ink) 70%,transparent);font-family:var(--cv-font-sticky);text-transform:none;letter-spacing:0}
-${S} .cvt[data-accent=margin] .cvt-card{background:var(--cv-paper);border-left:2px solid var(--cv-accent)}
-${S} .cvt[data-kind=note][data-accent=margin] .cv-note{font-family:var(--cv-font-margin);font-style:italic;font-size:var(--cv-t-sm);color:var(--cv-ink-2);line-height:1.4;font-weight:400}
-${S} .cvt[data-accent=callout] .cvt-card{border:1px dashed var(--cv-accent);border-radius:2px;background:color-mix(in oklab,var(--cv-accent) 8%,var(--cv-surface))}
-${S} .cvt[data-kind=note][data-accent=callout] .cv-note{font-family:var(--cv-font-callout);font-size:var(--cv-t-xs);line-height:1.45;color:var(--cv-ink);font-weight:400}
 ${S} .cvt[data-accent=pull] .cvt-card{background:var(--cv-paper)}
 ${S} .cvt[data-kind=quote][data-accent=pull] .cv-quote{font-family:var(--cv-font-margin);font-style:italic;font-size:var(--cv-t-2xl);line-height:1.12;font-weight:500;color:var(--cv-ink)}
 ${S} .cvt[data-kind=quote][data-accent=pull] .cv-quote::before{content:"“";display:block;font-size:2.2em;line-height:0.6;color:var(--cv-accent);margin-bottom:0.08em;font-style:normal}

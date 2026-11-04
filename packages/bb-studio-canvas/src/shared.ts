@@ -51,8 +51,12 @@ export const CANVAS_LIMITS = {
  * renderers. Not Dashboards' embed: it reads Studio's RPCs, which a canvas
  * (another plugin) can't call from its page.
  */
-export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "custom", "quote", "note", "timeline", "map", "multiples"] as const;
+export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "custom", "quote", "timeline", "map", "multiples"] as const;
 export type CanvasKind = (typeof CANVAS_KINDS)[number];
+export const isCanvasKind = (value: unknown): value is CanvasKind => typeof value === "string" && (CANVAS_KINDS as readonly string[]).includes(value);
+/** Canvas had sticky and margin notes; they're gone. Older turns may still ask for one. */
+export const NOTES_REFUSED = "notes aren't supported; put the point in a caption or the item itself";
+const kindSchema = z.enum(CANVAS_KINDS, { error: (issue) => (issue.input === "note" ? NOTES_REFUSED : undefined) });
 export const SIZE_HINTS = ["s", "m", "l", "xl"] as const;
 export type SizeHint = (typeof SIZE_HINTS)[number];
 
@@ -72,7 +76,6 @@ export const CANVAS_KIND_INFO: Record<CanvasKind, { data: string; options: strin
   image: { data: "a URL string, or none", options: "url, alt?, fit? (cover|contain)", size: "m" },
   custom: { data: "anything; the HTML reads window.bbWidget.data (cv.render)", options: "anything the HTML reads (window.bbWidget.options)", size: "m" },
   quote: { data: "{text, by?, role?} or a string", options: "none", size: "m" },
-  note: { data: "a short string, or {text, tone?: accent|good|bad}; with anchor (and point) it points at that item", options: "none", size: "s" },
   timeline: { data: "[{date, label, note?, tone?: good|bad|accent|warn}]", options: "layout? (column|row), highlight? (index or date)", size: "m" },
   map: { data: "US states: {PA: 2.1, ...} or {PA: {value, label?, color?}} or [{state, value, label?, color?}]", options: "scale? (diverging|sequential), legend? [low, high], show? (abbr|value|label), low?, high?", size: "m" },
   multiples: { data: "[{label, values: number[], value?, delta?, note?}]", options: "unit?, shared? (one scale), invert?", size: "l" },
@@ -92,7 +95,7 @@ export const ITEM_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 export const itemInputSchema = z.object({
   /** Optional: Studio makes one from the kind and title when left out. */
   id: z.string().regex(ITEM_ID, "Use a short id of lowercase letters, digits, - and _.").optional(),
-  kind: z.enum(CANVAS_KINDS),
+  kind: kindSchema,
   title: z.string().max(CANVAS_LIMITS.title).nullable().optional(),
   data: z.unknown().optional(),
   options: z.record(z.string(), z.unknown()).optional(),
@@ -101,12 +104,7 @@ export const itemInputSchema = z.object({
   size: z.enum(SIZE_HINTS).optional(),
   /** 5: the point of the board right now; 1: background. */
   importance: z.number().int().min(1).max(5).optional(),
-  /** Items this one relates to: the board draws a connector to each. */
-  relatedTo: z.array(z.string().regex(ITEM_ID)).max(6).optional(),
-  /** The item this one annotates: a note is placed beside it, pointing at `point`. */
-  anchor: z.string().regex(ITEM_ID).nullable().optional(),
-  /** Where on the anchor to point, 0–1 from its top-left. */
-  point: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().optional(),
+  // Unknown fields (relatedTo, anchor and point from older turns) are stripped.
 });
 export type ItemInput = z.infer<typeof itemInputSchema>;
 
@@ -127,9 +125,6 @@ export const canvasItemSchema = z.object({
   html: z.string().nullable(),
   size: z.enum(SIZE_HINTS),
   importance: z.number(),
-  relatedTo: z.array(z.string()),
-  anchor: z.string().nullable(),
-  point: z.object({ x: z.number(), y: z.number() }).nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
   /** The board revision that last changed it. */
@@ -241,9 +236,6 @@ export function checkItem(item: { kind: CanvasKind; data?: unknown; options?: Re
     case "quote":
       if (!quoteOf(item.data)) throw new Error("A quote needs data: a string, or {text, by?, role?}.");
       return;
-    case "note":
-      if (!noteOf(item.data)) throw new Error("A note needs data: a short string, or {text, tone?}.");
-      return;
     case "image": {
       const url = typeof item.data === "string" ? item.data : item.options?.url;
       if (typeof url !== "string" || !/^https?:\/\//.test(url)) throw new Error("An image needs an http(s) URL in data or options.url.");
@@ -274,15 +266,6 @@ export function quoteOf(data: unknown): { text: string; by: string | null; role:
   const str = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
   const text = str(row.text) ?? str(row.quote);
   return text ? { text, by: str(row.by) ?? str(row.author), role: str(row.role) } : null;
-}
-
-export function noteOf(data: unknown): { text: string; tone: "accent" | "good" | "bad" | "neutral" } | null {
-  if (typeof data === "string") return data.trim() ? { text: data.trim(), tone: "neutral" } : null;
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const row = data as Record<string, unknown>;
-  const text = typeof row.text === "string" ? row.text.trim() : "";
-  const tone = row.tone === "good" || row.tone === "bad" || row.tone === "accent" ? row.tone : "neutral";
-  return text ? { text, tone } : null;
 }
 
 export function captionOf(data: unknown): string | null {

@@ -20,7 +20,7 @@ export const DEFAULT_LOOK: OrganicLook = "editorial";
 
 export const LOOK_INFO: Record<Look, { name: string; line: string }> = {
   editorial: { name: "Editorial", line: "A newspaper front: a big lead story with sidebars orbiting it, serif type, rules instead of cards, pull quotes and inline sparklines." },
-  field: { name: "Field notes", line: "A whiteboard: cards and sticky notes loosely pinned around the focus, hand-drawn connectors and arrows that point at things." },
+  field: { name: "Field notes", line: "A whiteboard: hand-drawn cards loosely pinned around the focus, in a loose cluster with a slight tilt." },
   instrument: { name: "Instrument", line: "A dense control panel: tight hairline panels, small multiples, maps and timelines, mono labels and big tabular numbers." },
   classic: { name: "Classic", line: "Round 1: the slide grid with Studio's widget cards." },
 };
@@ -92,7 +92,6 @@ export const LOOK_TOKENS: Record<OrganicLook, LookTokens> = {
       accent: "#2463eb", "accent-ink": "#ffffff", good: "#1c9a5a", bad: "#e0402f", warn: "#f08c00", highlight: "#fff19a",
       blue: "#2463eb", red: "#e0402f", green: "#1c9a5a", amber: "#f08c00", purple: "#7b4fd6", teal: "#0f9aa8", gray: "#8a8f96",
       c1: "#2463eb", c2: "#e0402f", c3: "#1c9a5a", c4: "#f08c00", c5: "#7b4fd6", c6: "#0f9aa8", c7: "#8a8f96", c8: "#d6409f",
-      sticky: "#fff3a6", "sticky-2": "#ffd6e0", "sticky-3": "#d4ecff", "sticky-ink": "#2b2a24",
       shadow: "0 1px 0 rgb(0 0 0 / 0.04), 0 10px 22px -12px rgb(40 36 20 / 0.35)",
     },
     dark: {
@@ -100,7 +99,6 @@ export const LOOK_TOKENS: Record<OrganicLook, LookTokens> = {
       accent: "#7aa7ff", "accent-ink": "#11161c", good: "#5fd394", bad: "#ff7a6b", warn: "#ffb547", highlight: "#5b5220",
       blue: "#7aa7ff", red: "#ff7a6b", green: "#5fd394", amber: "#ffb547", purple: "#b597ff", teal: "#4fd1dc", gray: "#a0a7ab",
       c1: "#7aa7ff", c2: "#ff7a6b", c3: "#5fd394", c4: "#ffb547", c5: "#b597ff", c6: "#4fd1dc", c7: "#a0a7ab", c8: "#ff8cc6",
-      sticky: "#e9d96a", "sticky-2": "#f0a9bb", "sticky-3": "#9fcff5", "sticky-ink": "#1f1e18",
       shadow: "0 1px 0 rgb(0 0 0 / 0.2), 0 12px 26px -12px rgb(0 0 0 / 0.7)",
     },
   },
@@ -130,26 +128,17 @@ export const LOOK_TOKENS: Record<OrganicLook, LookTokens> = {
   },
 };
 
-/** Sticky-note papers for every style (field notes tunes its own). */
-const ACCENT_PALETTE: Record<"light" | "dark", Palette> = {
-  light: { sticky: "#fff3a6", "sticky-2": "#ffd6e0", "sticky-3": "#d4ecff", "sticky-ink": "#2b2a24" },
-  dark: { sticky: "#e9d96a", "sticky-2": "#f0a9bb", "sticky-3": "#9fcff5", "sticky-ink": "#1f1e18" },
-};
-
-/** The accents notes and quotes can take in any style, and each style's own. */
-export const NOTE_ACCENTS = ["sticky", "margin", "callout"] as const;
-export const QUOTE_ACCENTS = ["pull", "sticky", "bar"] as const;
-export type NoteAccent = (typeof NOTE_ACCENTS)[number];
+/** The accents quotes take in any style, and each style's own. A retired "sticky" falls back to the style's own. */
+export const QUOTE_ACCENTS = ["pull", "bar"] as const;
 export type QuoteAccent = (typeof QUOTE_ACCENTS)[number];
-export const NATIVE_ACCENT: Record<OrganicLook, { note: NoteAccent; quote: QuoteAccent }> = {
-  editorial: { note: "margin", quote: "pull" },
-  field: { note: "sticky", quote: "sticky" },
-  instrument: { note: "callout", quote: "bar" },
+export const NATIVE_ACCENT: Record<OrganicLook, { quote: QuoteAccent }> = {
+  editorial: { quote: "pull" },
+  field: { quote: "pull" },
+  instrument: { quote: "bar" },
 };
 /** An item's accent: its options.accent when it's one its kind takes, else the style's own. */
 export function accentOf(kind: string, options: Record<string, unknown> | undefined, look: OrganicLook): string | null {
   const asked = options?.accent;
-  if (kind === "note") return typeof asked === "string" && (NOTE_ACCENTS as readonly string[]).includes(asked) ? asked : NATIVE_ACCENT[look].note;
   if (kind === "quote") return typeof asked === "string" && (QUOTE_ACCENTS as readonly string[]).includes(asked) ? asked : NATIVE_ACCENT[look].quote;
   return null;
 }
@@ -164,9 +153,9 @@ export function tokenDeclarations(look: OrganicLook, mode: "light" | "dark"): st
   const tokens = LOOK_TOKENS[look];
   const palette = tokens[mode];
   const lines: string[] = [];
-  // Accents any style can borrow (a sticky note, a margin note, a callout) keep their own faces and paper.
-  for (const [name, value] of Object.entries({ ...ACCENT_PALETTE[mode], ...palette })) lines.push(`--cv-${name}:${value}`);
-  lines.push(`--cv-font-sticky:${HAND}`, `--cv-font-marker:${MARKER}`, `--cv-font-margin:${SERIF}`, `--cv-font-callout:${MONO}`);
+  for (const [name, value] of Object.entries(palette)) lines.push(`--cv-${name}:${value}`);
+  // A pull quote keeps its serif face in every style.
+  lines.push(`--cv-font-margin:${SERIF}`);
   for (const [name, value] of Object.entries(tokens.fonts)) lines.push(`--cv-font-${name}:${value}`);
   tokens.scale.forEach((px, index) => lines.push(`--cv-t-${SCALE_NAMES[index]}:${px}px`));
   tokens.space.forEach((px, index) => lines.push(`--cv-s-${index + 1}:${px}px`));
@@ -183,6 +172,6 @@ export function chartColors(look: OrganicLook, mode: "light" | "dark"): string[]
 /** The token names an agent can use, for the guide. */
 export const TOKEN_HELP = [
   "Colors: --cv-paper (board ground), --cv-surface (card), --cv-ink, --cv-ink-2, --cv-muted, --cv-rule, --cv-rule-strong, --cv-accent, --cv-accent-ink, --cv-good, --cv-bad, --cv-warn, --cv-highlight; hues --cv-blue, --cv-red, --cv-green, --cv-amber, --cv-purple, --cv-teal, --cv-gray; chart series --cv-c1 … --cv-c8.",
-  "Type: --cv-font-display, --cv-font-text, --cv-font-label, --cv-font-num, --cv-font-hand; borrowed accents' faces --cv-font-sticky, --cv-font-marker, --cv-font-margin, --cv-font-callout; sticky papers --cv-sticky, --cv-sticky-2, --cv-sticky-3, --cv-sticky-ink; sizes --cv-t-xs, -sm, -md, -lg, -xl, -2xl, -3xl, -4xl; --cv-display-weight.",
+  "Type: --cv-font-display, --cv-font-text, --cv-font-label, --cv-font-num, --cv-font-hand; sizes --cv-t-xs, -sm, -md, -lg, -xl, -2xl, -3xl, -4xl; --cv-display-weight.",
   "Space and shape: --cv-s-1 … --cv-s-6, --cv-radius, --cv-radius-sm.",
 ].join("\n");

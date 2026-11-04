@@ -5,7 +5,7 @@
 // frames get, so built-ins and the agent's components match.
 import { Fragment, type ReactNode } from "react";
 import type { OrganicLook } from "../looks";
-import { captionOf, headlineOf, noteOf, quoteOf, type CanvasItem } from "../shared";
+import { captionOf, headlineOf, quoteOf, type CanvasItem } from "../shared";
 import { CanvasFrame } from "./frame";
 import { canvasKit } from "./kit";
 import { columnLabel, imageSrc, listItems, readProgress, readStat, tableOf } from "./studio";
@@ -14,11 +14,11 @@ export const kit = canvasKit();
 
 /** Inner padding of a tile, per look and kind (px, each side). */
 export function tilePadding(look: OrganicLook, kind: CanvasItem["kind"], accent: string | null = null): number {
-  if (accent) return accent === "sticky" ? 14 : accent === "pull" ? 4 : accent === "margin" ? 8 : 10;
+  if (accent) return accent === "pull" ? 4 : 10;
   if (kind === "headline") return look === "field" ? 4 : 0;
   if (look === "editorial") return 0;
-  if (look === "field") return kind === "note" ? 14 : 16;
-  return kind === "note" ? 8 : 10;
+  if (look === "field") return 16;
+  return 10;
 }
 
 const Html = ({ html, className }: { html: string; className?: string }) => (html ? <div className={className} dangerouslySetInnerHTML={{ __html: html }} /> : null);
@@ -199,12 +199,6 @@ function Quote({ item }: { item: CanvasItem }) {
   );
 }
 
-function Note({ item }: { item: CanvasItem }) {
-  const note = noteOf(item.data);
-  if (!note) return null;
-  return <div className="cv-note cvi-note-text" data-canvas-body="note" data-tone={note.tone} style={note.tone !== "neutral" ? { color: TONE[note.tone] } : undefined}><RichText text={note.text} /></div>;
-}
-
 /** The item's content at its natural height, for a content box this wide. */
 export function OrganicBody({ item, width, focus, look, mode, onFrameHeight }: { item: CanvasItem; width: number; focus: boolean; look: OrganicLook; mode: "light" | "dark"; onFrameHeight?(height: number): void }): ReactNode {
   const o = item.options;
@@ -227,7 +221,6 @@ export function OrganicBody({ item, width, focus, look, mode, onFrameHeight }: {
     case "progress": { const progress = readProgress(item.data, o); return progress ? <Html html={kit.meter(progress.value, { min: progress.min, max: progress.max, label: progress.label || undefined, unit: o.unit, marks: o.marks })} /> : null; }
     case "image": return <Photo item={item} width={width} look={look} />;
     case "quote": return <Quote item={item} />;
-    case "note": return <Note item={item} />;
     case "timeline": return <Html html={kit.timeline(item.data, { ...o, layout: o.layout ?? (look === "instrument" && width >= 520 ? "row" : "column") })} />;
     case "map": return <Html html={kit.tilemap(item.data, { ...o, cell: Math.max(14, Math.min(46, width / 11.9)) })} />;
     case "multiples": return <Html html={kit.multiples(item.data, { ...o, min: o.min ?? (look === "instrument" ? 104 : 124) })} />;
@@ -238,7 +231,7 @@ export function OrganicBody({ item, width, focus, look, mode, onFrameHeight }: {
 
 /** The label over an item's content, when its kind shows one. */
 export function organicLabel(item: CanvasItem): string | null {
-  if (item.kind === "headline" || item.kind === "stat" || item.kind === "quote" || item.kind === "note") return null;
+  if (item.kind === "headline" || item.kind === "stat" || item.kind === "quote") return null;
   if (item.kind === "image") return null;
   return item.title;
 }

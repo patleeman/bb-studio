@@ -63,21 +63,20 @@ hands-free button.
 - **Styles (prototype):** the agent picks each board's style from what it
   shows, and can switch it on a topic change (the switch animates):
   **Editorial** (a newspaper front, for news and stories), **Field notes**
-  (a whiteboard of cards and sticky notes, for planning and ideas) or
+  (a whiteboard of loose hand-drawn cards, for planning and ideas) or
   **Instrument** (a dense panel, for data and monitoring). A style you ask
-  for wins. The top bar shows the current one. Notes and quotes can borrow
-  another style's accent (a sticky note on a dashboard). Canvases made
+  for wins. The top bar shows the current one. Canvases made
   before styles stay **Classic**, the round 1 slide grid. Each style has
   its design tokens (`src/looks.ts`), its layout rules (`src/organic.ts`)
   and a part of the agent's design guide (`src/guides.ts`).
-- **Items** are a headline, a caption, a quote, a note, a timeline, a US
+- **Items** are a headline, a caption, a quote, a timeline, a US
   map, small multiples, one of Studio's Dashboards widget types (stat,
   line, bar, area, pie, table, list, ticker, progress, image), or custom
   HTML in a sandboxed frame. In a style, custom frames get the style's tokens
   and a helper kit (`window.cv`: sparklines, charts, seat splits, tile
   maps, timelines, small multiples; `src/ui/kit.ts`), and grow to their
-  content. Any item can name `relatedTo` items (connectors) and an
-  `anchor` with a `point` (a note placed beside it, pointing there).
+  content. Canvas has no notes, stickies or connectors; boards saved
+  with them show without them.
 - **Layout:** in Classic, Canvas packs items on a grid by importance (1–5)
   and size (s, m, l, xl). In a style, items are as tall as their content
   and settle around the focus without a grid: lanes beside a lead story

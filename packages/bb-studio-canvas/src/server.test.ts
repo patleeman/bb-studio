@@ -120,7 +120,7 @@ describe("canvas threads", () => {
     expect((await call("canvas.get", { threadId: first.threadId })).canvas.look).toBe("editorial");
     expect((await call("canvas.get", { threadId: second.threadId })).canvas.look).toBe("field");
     const note = (spawned[1]!.input as { text: string }[])[1]!.text;
-    for (const style of ["Style: Editorial.", "Style: Field notes.", "Style: Instrument.", "CHOOSING THE STYLE", "Borrowing:", "Switching:"]) expect(note).toContain(style);
+    for (const style of ["Style: Editorial.", "Style: Field notes.", "Style: Instrument.", "CHOOSING THE STYLE", "Singling out:", "Switching:"]) expect(note).toContain(style);
     expect(note).toContain("cv.render(");
     expect(note).not.toContain("@@");
     expect(canvas.instructionsFor(second.threadId)).toContain("This board is field (Field notes) now.");
@@ -278,6 +278,39 @@ describe("canvas tools", () => {
     // Dashboards' embed reads Studio's RPCs, which the canvas plugin's page can't: not a canvas kind.
     await expect(tool("canvas_add", { items: [{ kind: "embed", options: { href: "/plugins/studio/studio/minis/mini_1" } }] }, threadId)).rejects.toThrow();
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ rev: 0, items: [] });
+  });
+
+  it("refuses a note with a clear error, and strips leftover anchor, point and relatedTo fields", async () => {
+    const { call, tool, canvas } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    await expect(tool("canvas_add", { items: [{ kind: "note", data: "Flipped" }] }, threadId)).rejects.toThrow(/notes aren't supported; put the point in a caption or the item itself/);
+    await expect(tool("canvas_set", { items: [{ id: "why", kind: "note", data: "Flipped", anchor: "map" }] }, threadId)).rejects.toThrow(/notes aren't supported/);
+    expect(canvas.voice.run(threadId, "canvas_add", { items: [{ kind: "note", data: "Flipped" }] })).toMatch(/^Nothing changed: items\.0\.kind: notes aren't supported/);
+    expect(canvas.voice.run(threadId, "canvas_update", { items: [{ id: "map", kind: "note" }] })).toMatch(/notes aren't supported/);
+    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ rev: 0, items: [] });
+    // An older turn's item with link fields still lands, without them.
+    await tool("canvas_add", { items: [{ id: "map", kind: "map", data: { PA: 2 } }, { id: "quote", kind: "quote", data: "Every vote", relatedTo: ["map"], anchor: "map", point: { x: 0.5, y: 0.5 } }] }, threadId);
+    expect(canvas.voice.run(threadId, "canvas_update", { items: [{ id: "map", anchor: "quote", relatedTo: ["quote"] }] })).toContain("Updated map");
+    const item = (await call("canvas.get", { threadId })).canvas.items.find((each: { id: string }) => each.id === "quote");
+    expect(Object.keys(item)).not.toEqual(expect.arrayContaining(["anchor"]));
+    expect(item).not.toHaveProperty("relatedTo");
+    expect(item).not.toHaveProperty("point");
+    const read = text(await tool("canvas_read", {}, threadId));
+    expect(read).not.toMatch(/anchored|related to|note/);
+  });
+
+  it("doesn't list or show note items saved before notes were removed", async () => {
+    const { call, tool, host } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    await tool("canvas_add", { items: [{ id: "map", kind: "map", data: { PA: 2 } }] }, threadId);
+    const db = host.bb.storage.database();
+    db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev, rel) SELECT canvas_id, 'why', 'note', 'Why', '\"Flipped\"', '{}', NULL, 's', 2, 1, 1, 1, '{\"anchor\":\"map\"}' FROM canvas_items WHERE id = 'map'").run();
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.items.map((each: { id: string }) => each.id)).toEqual(["map"]);
+    expect((await call("canvas.list", null)).canvases[0].itemCount).toBe(1);
+    const read = text(await tool("canvas_read", {}, threadId));
+    expect(read).toContain("1 item(s)");
+    expect(read).not.toMatch(/why|note/);
   });
 
   it("replaces the board in one step with canvas_set, and reads it back", async () => {

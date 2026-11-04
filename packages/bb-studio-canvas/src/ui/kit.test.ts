@@ -7,14 +7,16 @@ const kit = canvasKit();
 const EVIL = `<img src=x onerror="alert(1)">`;
 
 describe("accents", () => {
-  it("default to the style's own and can be borrowed in any style", () => {
-    expect(accentOf("note", {}, "editorial")).toBe("margin");
-    expect(accentOf("note", {}, "field")).toBe("sticky");
-    expect(accentOf("note", {}, "instrument")).toBe("callout");
-    expect(accentOf("note", { accent: "sticky" }, "instrument")).toBe("sticky");
+  it("give quotes the style's own or a pull or bar, and nothing else an accent", () => {
+    expect(accentOf("quote", {}, "editorial")).toBe("pull");
+    expect(accentOf("quote", {}, "field")).toBe("pull");
+    expect(accentOf("quote", {}, "instrument")).toBe("bar");
     expect(accentOf("quote", { accent: "bar" }, "field")).toBe("bar");
-    expect(accentOf("quote", { accent: "callout" }, "field")).toBe("sticky");
-    expect(accentOf("stat", { accent: "sticky" }, "field")).toBeNull();
+    // A retired sticky (or any unknown accent) falls back to the style's own.
+    expect(accentOf("quote", { accent: "sticky" }, "instrument")).toBe("bar");
+    expect(accentOf("quote", { accent: "callout" }, "field")).toBe("pull");
+    expect(accentOf("note", { accent: "sticky" }, "field")).toBeNull();
+    expect(accentOf("stat", { accent: "pull" }, "field")).toBeNull();
   });
 });
 

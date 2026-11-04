@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { canvasContract } from "../contract";
-import { CANVAS_CHANNEL, CANVAS_UPDATE_TYPE, type CanvasSignal, type CanvasView } from "../shared";
+import { CANVAS_CHANNEL, CANVAS_UPDATE_TYPE, isCanvasKind, type CanvasSignal, type CanvasView } from "../shared";
 
 export function useCanvas(threadId: string | null) {
   const rpc = useRpc<typeof canvasContract>();
@@ -25,7 +25,8 @@ export function useCanvas(threadId: string | null) {
       if (view && view.rev < scope.seen) return;
       if (view && view.rev === scope.seen && ticket !== scope.ticket) return;
       scope.seen = view?.rev ?? scope.seen;
-      setCanvas(view);
+      // Only kinds this build draws: retired ones (notes) never reach a board.
+      setCanvas(view && { ...view, items: view.items.filter((item) => isCanvasKind(item.kind)) });
     } catch {
       if (latest.current === scope && scope.seen < 0) setCanvas(null);
     }

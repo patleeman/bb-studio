@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { canvasFirstNote, canvasInstructions } from "./instructions";
 import { ORGANIC_LOOKS } from "./looks";
-import { edgeToward, layoutOrganic, linkEnds, organicWidths, type OrganicItem, type Placed } from "./organic";
+import { readFileSync } from "node:fs";
+import { layoutOrganic, organicWidths, type OrganicItem, type Placed } from "./organic";
 
 let clock = 0;
 const item = (id: string, kind: OrganicItem["kind"], size: OrganicItem["size"], importance = 3, extra: Partial<OrganicItem> = {}): OrganicItem => ({ id, kind, size, importance, createdAt: ++clock, updatedAt: clock, ...extra });
@@ -11,20 +12,19 @@ const board = () => [
   item("seats", "stat", "s", 4),
   item("turnout", "stat", "s", 4),
   item("map", "map", "m", 3),
-  item("quote", "quote", "m", 3, { relatedTo: ["lead"] }),
+  item("quote", "quote", "m", 3),
   item("races", "table", "l", 3),
-  item("why", "note", "s", 2, { anchor: "map", point: { x: 0.8, y: 0.3 } }),
   item("timeline", "timeline", "m", 2),
 ];
 const heights = (items: readonly OrganicItem[]) => new Map(items.map((each, index) => [each.id, 90 + ((index * 37) % 140)]));
 const overlap = (a: Placed, b: Placed) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 describe("organic layout", () => {
-  it.each(ORGANIC_LOOKS)("%s: flowing items never overlap and stay on the board; the focus is the widest", (look) => {
+  it.each(ORGANIC_LOOKS)("%s: items never overlap and stay on the board; the focus is the widest", (look) => {
     const items = board();
     for (const width of [1400, 900, 420]) {
       const layout = layoutOrganic(items, width, look, heights(items));
-      const flow = [...layout.rects.entries()].filter(([, rect]) => !rect.floating);
+      const flow = [...layout.rects.entries()];
       for (const [, rect] of layout.rects) {
         expect(rect.x).toBeGreaterThanOrEqual(0);
         expect(rect.x + rect.w).toBeLessThanOrEqual(width + 0.5);
@@ -50,7 +50,7 @@ describe("organic layout", () => {
     const field = layoutOrganic(items, 1400, "field", tall).rects.get("lead")!;
     expect(Math.abs(field.x + field.w / 2 - 700)).toBeLessThan(120);
     // Items orbit a tall focus: some to its left, some to its right, beside it.
-    const top = [...layoutOrganic(items, 1400, "field", tall).rects.values()].filter((rect) => rect.y < field.h + 60 && !rect.floating && rect.x !== field.x);
+    const top = [...layoutOrganic(items, 1400, "field", tall).rects.values()].filter((rect) => rect.y < field.h + 60 && rect.x !== field.x);
     expect(top.some((rect) => rect.x + rect.w <= field.x + 20)).toBe(true);
     expect(top.some((rect) => rect.x >= field.x + field.w - 20)).toBe(true);
   });
@@ -76,32 +76,20 @@ describe("organic layout", () => {
     for (const id of items.map((each) => each.id)) expect(c.rects.get(id), id).toEqual(a.rects.get(id));
   });
 
-  it("floats a note beside its anchor, pointing at its point, and links related items", () => {
+  it("draws no connectors: the layout has no links, and leftover relation fields change nothing", () => {
     const items = board();
+    // Boards saved before connectors were removed may still carry these fields.
+    const old = items.map((each) => ({ ...each, relatedTo: ["lead"], anchor: "map", point: { x: 0.5, y: 0.5 } }) as OrganicItem);
     for (const look of ORGANIC_LOOKS) {
-      const layout = layoutOrganic(items, 1400, look, heights(items));
-      const note = layout.rects.get("why")!;
-      const map = layout.rects.get("map")!;
-      expect(note.floating).toBe(true);
-      // Beside the map: touching it, or across one gutter.
-      expect(note.x + note.w).toBeGreaterThanOrEqual(map.x - 40);
-      expect(note.x).toBeLessThanOrEqual(map.x + map.w + 40);
-      expect(layout.links).toEqual(expect.arrayContaining([{ from: "why", to: "map", kind: "anchor", point: { x: 0.8, y: 0.3 } }]));
-      // A related pair gets a line unless the two already touch.
-      const quote = layout.rects.get("quote")!, lead = layout.rects.get("lead")!;
-      const apart = (() => { const e = linkEnds(quote, lead, null); return Math.hypot(e.x2 - e.x1, e.y2 - e.y1) >= 96; })();
-      expect(layout.links.some((link) => link.from === "quote" && link.to === "lead")).toBe(apart);
-      const ends = linkEnds(note, map, { x: 0.8, y: 0.3 });
-      expect(ends.x2).toBe(Math.round(map.x + 0.8 * map.w));
-      expect(ends.y2).toBe(Math.round(map.y + 0.3 * map.h));
+      const layout = layoutOrganic(old, 1400, look, heights(items));
+      expect(Object.keys(layout).sort()).toEqual(["focusId", "height", "rects", "units"]);
+      expect([...layout.rects.entries()].sort()).toEqual([...layoutOrganic(items, 1400, look, heights(items)).rects.entries()].sort());
     }
   });
 
-  it("drops links to items that left, and treats an unanchored note as a normal item", () => {
-    const items = [item("a", "headline", "xl", 5), item("b", "table", "xl", 4), item("c", "table", "xl", 4), item("n", "note", "s", 2, { anchor: "gone", relatedTo: ["gone", "a"] })];
-    const layout = layoutOrganic(items, 1200, "editorial", new Map());
-    expect(layout.rects.get("n")!.floating).toBe(false);
-    expect(layout.links).toEqual([{ from: "n", to: "a", kind: "related", point: null }]);
+  it("ships no connector layer in the built page", () => {
+    const bundle = readFileSync(new URL("../bundle/canvas-ui.js", import.meta.url), "utf8");
+    for (const gone of ["data-canvas-links", "cvt-link", "cvt-arrow", "cv-sticky", "cv-margin-note", "cv-callout"]) expect(bundle, gone).not.toContain(gone);
   });
 
   it("gives widths before heights are known, the same the layout uses", () => {
@@ -120,52 +108,13 @@ describe("rough spots", () => {
     expect(layoutOrganic(railed, 1400, "editorial", new Map()).rects.get("lead")!.w).toBeLessThan(1000);
   });
 
-  it("puts a note on the lead at the top of the rail, not down by its point", () => {
-    const items = [item("lead", "custom", "xl", 5), item("n", "note", "s", 2, { anchor: "lead", point: { x: 0.9, y: 0.9 } }), item("s", "stat", "s", 3)];
-    const layout = layoutOrganic(items, 1400, "editorial", new Map([["lead", 600], ["n", 80], ["s", 120]]));
-    expect(layout.rects.get("n")!.y).toBe(0);
-  });
-
-  it("draws at most a few related connectors, two per item, the important ones first", () => {
-    const items = [item("lead", "custom", "xl", 5), ...["a", "b", "c", "d", "e", "f", "g"].map((id, index) => item(id, "stat", "s", 4 - (index % 3), { relatedTo: ["lead", "a", "b"].filter((other) => other !== id) }))];
+  it("tilts nothing in editorial, and never an accented quote", () => {
+    const items = [item("lead", "custom", "xl", 5), item("s", "stat", "s", 3), item("q", "quote", "m", 2, { accent: "pull" })];
     for (const look of ORGANIC_LOOKS) {
       const layout = layoutOrganic(items, 1400, look, new Map());
-      const related = layout.links.filter((link) => link.kind === "related");
-      expect(related.length).toBeLessThanOrEqual(4);
-      const degree = new Map<string, number>();
-      for (const link of related) for (const id of [link.from, link.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
-      expect(Math.max(0, ...degree.values())).toBeLessThanOrEqual(2);
+      expect(layout.rects.get("q")!.rotate).toBe(0);
+      if (look === "editorial") for (const rect of layout.rects.values()) expect(rect.rotate).toBe(0);
     }
-  });
-
-  it("keeps field-notes stickies off their anchor's content (only its padding)", () => {
-    const items = [item("lead", "custom", "xl", 5), item("t", "table", "m", 4), item("n", "note", "s", 2, { anchor: "t", point: { x: 0.5, y: 0.5 }, accent: "sticky" })];
-    const layout = layoutOrganic(items, 1400, "field", new Map([["lead", 300], ["t", 260], ["n", 110]]));
-    const note = layout.rects.get("n")!, table = layout.rects.get("t")!;
-    const ox = Math.max(0, Math.min(note.x + note.w, table.x + table.w) - Math.max(note.x, table.x));
-    const oy = Math.max(0, Math.min(note.y + note.h, table.y + table.h) - Math.max(note.y, table.y));
-    expect(Math.min(ox, oy)).toBeLessThanOrEqual(14);
-  });
-
-  it("tilts a borrowed sticky in any style, and nothing else in editorial", () => {
-    const items = [item("lead", "custom", "xl", 5), item("s", "stat", "s", 3), item("n", "note", "s", 2, { anchor: "lead", accent: "sticky" }), item("m", "note", "s", 2, { anchor: "s", accent: "margin" })];
-    const layout = layoutOrganic(items, 1400, "editorial", new Map());
-    expect(layout.rects.get("n")!.rotate).not.toBe(0);
-    expect(layout.rects.get("m")!.rotate).toBe(0);
-    expect(layout.rects.get("lead")!.rotate).toBe(0);
-  });
-});
-
-describe("leaders", () => {
-  it("keeps a lane note level with a lower anchor, never above it", () => {
-    const items = [item("lead", "custom", "xl", 5), item("s", "stat", "s", 4), item("t", "table", "l", 3), item("n", "note", "s", 2, { anchor: "t", point: { x: 0.5, y: 0.8 } })];
-    const layout = layoutOrganic(items, 1400, "editorial", new Map([["lead", 500], ["s", 120], ["t", 300], ["n", 80]]));
-    expect(layout.rects.get("n")!.y).toBeGreaterThanOrEqual(layout.rects.get("t")!.y);
-  });
-
-  it("finds where a leader meets its anchor's edge", () => {
-    expect(edgeToward({ x: 100, y: 100, w: 200, h: 100 }, { x: 50, y: 150 }, { x: 200, y: 150 })).toEqual({ x: 100, y: 150 });
-    expect(edgeToward({ x: 100, y: 100, w: 200, h: 100 }, { x: 200, y: 40 }, { x: 200, y: 150 })).toEqual({ x: 200, y: 100 });
   });
 });
 

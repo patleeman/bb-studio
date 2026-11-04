@@ -29,7 +29,7 @@ export const CANVAS_TOOL_PARAMS = {
   canvas_guide: z.object({ style: style.optional() }),
 } satisfies Record<CanvasToolName, z.ZodType>;
 
-const ITEM_HELP = `Each item: id? (short, like "turnout-chart"; made from the title when left out), kind, title?, data, options?, html? (custom only), size? (s|m|l|xl), importance? (1–5, default 3), relatedTo? (ids: connectors), anchor? (an id: a note points at it), point? ({x, y} 0–1 on the anchor). Kinds:\n${KIND_LINES}`;
+const ITEM_HELP = `Each item: id? (short, like "turnout-chart"; made from the title when left out), kind, title?, data, options?, html? (custom only), size? (s|m|l|xl), importance? (1–5, default 3). Kinds:\n${KIND_LINES}`;
 
 export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_read: "Read this canvas: each item's id, kind, title, size, importance and data, the focus item, and the latest changes. Read it before editing when you're unsure what's on the board.",
@@ -39,7 +39,7 @@ export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_clear: "Clear the board, for a topic change; style (and styleReason) switches its style at the same time. Then add the new items (or use canvas_set to do both in one step).",
   canvas_set: `Replace the whole board in one step: items whose id is already there update in place, new ones appear, the rest leave. Use it on a topic change, or to rebuild. style picks the board's style: editorial (news, stories, explainers), field (brainstorming, planning, ideas), instrument (dense data, monitoring, comparisons); give styleReason in a few words. Set it on your first board and when the topic changes kind; the switch animates. ${ITEM_HELP}`,
   canvas_style: "Switch the board's style without rebuilding it: editorial, field or instrument, with the reason in a few words. Use it when the user asks for a style (\"make this a whiteboard\" is field) or the content changes kind.",
-  canvas_guide: "The design guide: how to choose a style, what makes a rich board, the tokens, the kit (window.cv) for custom components, borrowed accents, and examples. style narrows it to one style's rules and examples.",
+  canvas_guide: "The design guide: how to choose a style, what makes a rich board, the tokens, the kit (window.cv) for custom components, quote accents, and examples. style narrows it to one style's rules and examples.",
 };
 
 /** For the voice session (session.ts): OpenAI function tools with the same parameters. */
@@ -62,8 +62,7 @@ export function describeBoard(store: CanvasStore, canvasId: string): string {
   const lines = board.map((item) => {
     const data = jsonBytes(item.data) > 1500 ? `${JSON.stringify(item.data).slice(0, 1500)}… (clipped)` : JSON.stringify(item.data);
     const options = Object.keys(item.options).length ? ` options=${JSON.stringify(item.options).slice(0, 400)}` : "";
-    const rel = `${item.relatedTo.length ? `, related to ${item.relatedTo.join(", ")}` : ""}${item.anchor ? `, anchored to ${item.anchor}${item.point ? ` at ${item.point.x},${item.point.y}` : ""}` : ""}`;
-    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}, size ${item.size}, importance ${item.importance}${item.id === focus?.id ? " (focus)" : ""}${rel}${item.html ? `, html ${item.html.length} chars` : ""}\n  data=${data}${options}`;
+    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}, size ${item.size}, importance ${item.importance}${item.id === focus?.id ? " (focus)" : ""}${item.html ? `, html ${item.html.length} chars` : ""}\n  data=${data}${options}`;
   });
   const changes = store.changes(canvasId, 12).map((change) => `- turn ${change.turn}, rev ${change.rev} (${change.by}): ${change.summary}`);
   return [`Board (revision ${row.rev}, turn ${row.turn}), ${board.length} item(s).${styleLine}`, ...lines, "", "Latest changes:", ...changes].join("\n");

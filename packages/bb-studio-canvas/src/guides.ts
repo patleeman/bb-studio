@@ -11,17 +11,17 @@ const ex = (source: string) => source.replace(/@@/g, "`").replace(/\$\[/g, "${")
 
 const COMMON = `
 Make the board RICH and dense, like a great front page or a briefing someone designed for this exact question. Not a slide, not a grid of plain cards.
-- One focus dominates: importance 5 on the lead (often your own lead component, or a headline). Supporting items get 3–4 and orbit it; detail 1–2. The layout places everything automatically: varied sizes, organic clusters, connectors. Never arrange or position things yourself.
-- Fewer, denser components beat many sparse ones. Each says something specific: a number with its trend and context, a map that shows where, a timeline that shows when, small multiples that compare, a quote with a voice, a note that points at what matters.
+- One focus dominates: importance 5 on the lead (often your own lead component, or a headline). Supporting items get 3–4 and orbit it; detail 1–2. The layout places everything automatically: varied sizes, organic clusters. Never arrange or position things yourself.
+- Fewer, denser components beat many sparse ones. Each says something specific: a number with its trend and context, a map that shows where, a timeline that shows when, small multiples that compare, a quote with a voice, a caption that says what it means.
 - Generated components come first: kind "custom" with html. It runs in a sandboxed frame that already has this look's tokens (CSS variables), the kit CSS classes and window.cv. The frame grows to its content's height, so never set a height on your outer element and don't leave empty space; its width is the item's width (use cv.width() for charts). No network: no external images, fonts, or scripts.
 - Put the numbers in the item's data and draw them with cv.render((data, options) => html), so canvas_update can change data and the user sees it change in place.
-- Built-ins when they fit: headline, stat (series → sparkline), quote, note, map, timeline, multiples, line, bar, area, pie, table, list, image (with options.headline: a photo with a headline).
-- Relations: relatedTo: ["other-id"] draws a connector to a related item. A note with anchor: "item-id" and point: {x, y} (0–1 inside that item) is placed beside it with a leader line pointing at that spot. Add 1–3 such annotations per board, on the most interesting thing.
+- Built-ins when they fit: headline, stat (series → sparkline), quote, caption, map, timeline, multiples, line, bar, area, pie, table, list, image (with options.headline: a photo with a headline).
+- Say what matters inside the item: a takeaway line in a custom component, marks on a chart (cv.line marks, highlight), a cv-hl highlight, a stat's caption, or a short caption item. There are no notes, stickies or connectors.
 - Inline sparklines: in a caption write {spark:3,5,4,8}; in HTML use cv.spark([3,5,4,8]) or <span data-spark="3,5,4,8"></span>. Deltas: {delta:+2.1} in a caption, cv.delta(2.1) in HTML.
 - Type: kicker → headline → dek → body, with the cv-* classes or the --cv-t-* scale. Color only with tokens (var(--cv-…)); --cv-blue and --cv-red for the two sides of a race, --cv-good/--cv-bad for change, --cv-c1…--cv-c8 for series.
 - size is a hint: s about a quarter of the width, m a third, l half, xl two-thirds. The focus grows.
-- Every board: at least 6 items: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), evidence (stats with sparklines, a table), and 1–3 anchored notes. A board of only a headline, a list and text is a failure.
-- Every follow-up changes the board: a question about what's there ("which of these matters?", "why?") gets notes, highlights or a new item on the board, and a short reply. Never answer only in the reply.
+- Every board: at least 6 items: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), evidence (stats with sparklines, a table), and a line that says what it means (a takeaway or caption). A board of only a headline, a list and text is a failure.
+- Every follow-up changes the board: a question about what's there ("which of these matters?", "why?") gets highlights, a takeaway, a raised importance or a new item on the board, and a short reply. Never answer only in the reply.
 - Charts are honest: bars start at zero. When differences are tiny (margins of a few tenths), set options.max to a meaningful scale (e.g. 5 points) or show the numbers in a table instead, so 0.1 doesn't look like a landslide.
 - Example numbers below are placeholders: never reuse them. Use real data (search) and label estimates.
 `.trim();
@@ -51,17 +51,17 @@ Style: Editorial. ${LOOK_INFO.editorial.line}
 `.trim(),
   field: `
 Style: Field notes. ${LOOK_INFO.field.line}
-- Think out loud at a whiteboard: the focus is the big sketch in the middle, and the evidence is pinned around it on cards and sticky notes.
+- Think out loud at a whiteboard: the focus is the big sketch in the middle, and the evidence is pinned around it on small cards.
 - Headlines are short and handwritten (the display font is a marker). Use cv-hl to highlight the key words.
-- Annotate generously: 2–4 notes with anchor + point, pointing at the exact bar, state or moment that matters ("this flipped!"). Connect cause and effect with relatedTo.
-- Cards are small and loose (size s or m); one bigger sketch (a chart or map) as the focus. Notes say one thing in a few words.
+- Mark what matters inside the sketch itself: chart marks ("this flipped!"), cv-hl on the key words, an arrow (→) and a takeaway line in a custom card.
+- Cards are small and loose (size s or m); one bigger sketch (a chart or map) as the focus. Each card says one thing in a few words.
 `.trim(),
   instrument: `
 Style: Instrument. ${LOOK_INFO.instrument.line}
 - Maximum information per pixel: compact panels, small multiples instead of one big chart, tabular numbers, mono labels, units everywhere.
 - The focus is a wide panel (a map, a timeline or a small-multiples grid); around it, rows of tight readouts (stat, size s) with deltas and sparklines.
 - Prefer cv.multiples, cv.tilemap with show: "value", cv.timeline with layout "row", cv-table with td.n, and inline cv.bars.
-- Labels are terse and uppercase-friendly ("MARGIN, PTS"). Notes are technical callouts: a value and a reason.
+- Labels are terse and uppercase-friendly ("MARGIN, PTS"). Put the reason next to the value: a stat's caption or a row in a table.
 `.trim(),
 };
 
@@ -98,8 +98,8 @@ cv.render((rows) => rows.map((r, i) => @@
 </script>
 
 Example 3, built-ins (as canvas_set items):
-{"id": "voice", "kind": "quote", "data": {"text": "We rebuilt the schedule around nurses, not tourists.", "by": "Ana Ruiz", "role": "Transit director"}, "size": "m", "importance": 3, "relatedTo": ["lead"]}
-{"id": "why-march", "kind": "note", "data": "The fare cut started here", "anchor": "lead", "point": {"x": 0.72, "y": 0.55}}
+{"id": "voice", "kind": "quote", "data": {"text": "We rebuilt the schedule around nurses, not tourists.", "by": "Ana Ruiz", "role": "Transit director"}, "size": "m", "importance": 3}
+{"id": "why-march", "kind": "caption", "data": "Ridership turned in **March**, the month the fare cut started.", "size": "s", "importance": 2}
 {"id": "where", "kind": "map", "title": "Change by state, pts", "data": {"PA": 2.1, "GA": -0.6, "AZ": 1.4}, "options": {"scale": "diverging", "legend": ["Fell", "Rose"]}, "size": "m", "importance": 3}
 `),
   field: ex(`
@@ -125,8 +125,8 @@ cv.render((d) => @@
 </script>
 
 Example 3, built-ins pinned around it (as canvas_set items):
-{"id": "so-what", "kind": "note", "data": "Saturday is the pick: dry till 4", "anchor": "sketch", "point": {"x": 0.35, "y": 0.4}}
-{"id": "heard", "kind": "quote", "data": {"text": "Bring a layer after dark.", "by": "NWS forecaster"}, "size": "s", "importance": 2, "relatedTo": ["sketch"]}
+{"id": "so-what", "kind": "caption", "data": "Saturday is the pick: ==dry till 4==.", "size": "s", "importance": 4}
+{"id": "heard", "kind": "quote", "data": {"text": "Bring a layer after dark.", "by": "NWS forecaster"}, "size": "s", "importance": 2}
 {"id": "sun", "kind": "stat", "title": "UV index", "data": {"value": 6, "series": [3, 4, 6, 5], "caption": "high at noon"}, "size": "s", "importance": 3}
 `),
   instrument: ex(`
@@ -158,29 +158,29 @@ cv.render((d) => @@
 Example 3, built-ins (as canvas_set items):
 {"id": "by-state", "kind": "map", "title": "Margin by state, pts", "data": {"PA": 2.1, "GA": -0.6}, "options": {"scale": "diverging", "show": "value", "legend": ["−", "+"]}, "size": "l", "importance": 4}
 {"id": "events", "kind": "timeline", "data": [{"date": "06:10", "label": "Feed lag", "tone": "bad"}], "options": {"layout": "row"}, "size": "xl", "importance": 2}
-{"id": "lag-note", "kind": "note", "data": "p95 320 ms: cache miss storm", "anchor": "by-state", "point": {"x": 0.8, "y": 0.3}}
+{"id": "p95", "kind": "stat", "title": "p95 latency", "data": {"value": 320, "series": [180, 190, 240, 320], "caption": "cache miss storm"}, "options": {"unit": " ms", "invert": true}, "size": "s", "importance": 3}
 `),
 };
 
 const CHOOSING = `
 CHOOSING THE STYLE. You pick the board's style, per board, from what the content is; the user never has to.
 - editorial: news, results, events, stories, explainers ("what happened", "how did X go"). A lead story with the evidence around it.
-- field: brainstorming, planning, trips, ideas, decisions with options ("help me plan / think through / decide"). Cards and stickies around a central sketch.
+- field: brainstorming, planning, trips, ideas, decisions with options ("help me plan / think through / decide"). Cards around a central sketch.
 - instrument: dense data, monitoring, metrics, many numbers to compare ("how is X doing right now", a table of figures). Tight panels and small multiples.
 - If the user names one, use it: "make this a whiteboard" is field, "like a newspaper" is editorial, "as a dashboard" is instrument.
 - Set it with style (and styleReason, a few words) on your first canvas_set. Keep it for follow-ups on the same topic. When the topic changes kind, switch in the same canvas_set (or canvas_style alone): the switch animates.
-- Borrow accents across styles when one helps: a note takes options.accent sticky, margin or callout; a quote takes pull, sticky or bar. In HTML, the classes cv-sticky, cv-margin-note and cv-callout work in every style.
+- A quote can take options.accent pull or bar in any style.
 Examples:
 - "How did yesterday's election go?" → editorial: it's news; lead with the result and put the evidence around it.
-- "Help me plan a weekend in Vermont with the kids" → field: it's planning; days, options and constraints as cards, decisions as stickies.
+- "Help me plan a weekend in Vermont with the kids" → field: it's planning; days, options and constraints as cards, the decision highlighted on the lead.
 - "Here are our API's latency and error numbers for the last day" → instrument: dense metrics; readouts, small multiples, a timeline of incidents.
 - "Should I take the Denver job or stay?" → field: a decision with trade-offs (instrument only if it's mostly numbers).
-- Borrowing: "which of these should I worry about?" on an instrument board of server metrics: keep the style, and mark the one to fix with a sticky, which stands out among the callouts: {"kind": "note", "data": "Fix this first", "anchor": "p95", "point": {"x": 0.9, "y": 0.3}, "options": {"accent": "sticky"}}. A sticky on a dashboard draws the eye.
+- Singling out: "which of these should I worry about?" on an instrument board of server metrics: keep the style, raise the one to fix to importance 5 so it becomes the focus, and say why in its caption: canvas_update({"items": [{"id": "p95", "importance": 5, "data": {"value": 320, "series": [180, 190, 240, 320], "caption": "Fix this first: cache miss storm"}}]}).
 - Switching: after an editorial election board, "Help me plan my week around the recount hearings" is planning: canvas_set({"style": "field", "styleReason": "planning a week", "items": [...]}).
 `.trim();
 
 const ACCENTS = `
-Borrowed accents (any style): note options.accent "sticky" (a taped sticky note, hand-written), "margin" (an italic margin note on a rule), "callout" (a dashed technical callout); quote options.accent "pull" (big italic pull quote), "sticky" (a pink sticky), "bar" (a quote with an accent bar). Each style's own is the default. In HTML: <div class="cv-sticky">…</div>, <aside class="cv-margin-note">…</aside>, <div class="cv-callout">…</div>.
+Quote accents (any style): options.accent "pull" (a big italic pull quote) or "bar" (a quote with an accent bar). Each style's own is the default.
 `.trim();
 
 const NAMES: Record<OrganicLook, string> = { editorial: "Editorial", field: "Field notes", instrument: "Instrument" };
@@ -201,5 +201,5 @@ export function designGuide(only: OrganicLook | null = null): string {
 
 /** The configure hook's line about styles: the current one and how to choose. */
 export function lookInstruction(look: OrganicLook): string {
-  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). Borrow accents across styles with options.accent on notes and quotes. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: at least 6 items: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) stats with sparklines or a table for the evidence; (4) 1–3 notes with anchor + point on what matters. Every follow-up changes the board (add, update, annotate, highlight); never answer only in the reply. To single out what matters most on a dense board, borrow a sticky (note options.accent "sticky"). The design guide with examples is in this thread's first message; canvas_guide returns it.`;
+  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). A quote takes options.accent pull or bar. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: at least 6 items: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) stats with sparklines or a table for the evidence; (4) a takeaway that says what it means, inside the lead or a caption. There are no notes, stickies or connectors. Every follow-up changes the board (add, update, highlight); never answer only in the reply. To single out what matters most, raise its importance and say why in its caption or takeaway. The design guide with examples is in this thread's first message; canvas_guide returns it.`;
 }
