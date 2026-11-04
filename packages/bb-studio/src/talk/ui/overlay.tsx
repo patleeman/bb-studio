@@ -13,13 +13,13 @@ import { useStudioSettings } from "../../settings/ui/use-settings";
 import type { TalkRpcContract } from "../shared/contract";
 import { HTTP_ROOT, NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
 import type { StudioCreateEventDetail } from "../../kit/contract";
-import { Icon } from "../../kit/ui/index";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
 import { openAppPath, useOpenMain } from "../../kit/app/index";
 import { cn } from "../../kit/ui/index";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { SEGMENT_SECONDS } from "./segmenter";
 import { useDraggable } from "./draggable";
-import { useInlineDictation } from "./inline-dictation";
+import { useDockLayout, useInlineDictation, type TuckedAction } from "./inline-dictation";
 
 // BB's page header is a window drag region in the desktop app, and the OS
 // swallows clicks there. The pill opts out, as BB's own popups do.
@@ -183,6 +183,58 @@ function PillButton({
   );
 }
 
+/** The ▾ of a compact docked pill: the transcript, the less-used controls, and the composer actions tucked away for it. */
+function CompactMenu({ status, label, hideStatus, onExpand, dictation, canPause, tucked }: {
+  status: string;
+  label: string;
+  hideStatus: boolean;
+  onExpand: () => void;
+  dictation: boolean;
+  canPause: boolean;
+  tucked: readonly TuckedAction[];
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="More dictation controls"
+          title="More dictation controls"
+          className="flex min-w-6 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground"
+        >
+          {status && !hideStatus ? <span className="truncate">{status}</span> : <span className="sr-only">{label}</span>}
+          <Icon name="ChevronDown" className="size-3.5 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top" className="min-w-64" data-talk-compact-menu="">
+        <DropdownMenuItem onSelect={onExpand}>
+          <Icon name="ChevronUp" className="size-4" />
+          Show transcript
+        </DropdownMenuItem>
+        {dictation ? (
+          <DropdownMenuItem onSelect={() => talk.setCleanup(!talk.cleanupEnabled)} role="menuitemcheckbox" aria-checked={talk.cleanupEnabled}>
+            <Icon name="AiContentGenerator01" className="size-4" />
+            <span className="flex-1 whitespace-nowrap">Clean up text before inserting</span>
+            {talk.cleanupEnabled ? <Icon name="Check" className="size-4" /> : null}
+          </DropdownMenuItem>
+        ) : null}
+        {canPause ? (
+          <DropdownMenuItem onSelect={() => void talk.pause()}>
+            <Icon name="Pause" className="size-4" />
+            Pause
+          </DropdownMenuItem>
+        ) : null}
+        {tucked.length > 0 ? <DropdownMenuSeparator /> : null}
+        {tucked.map((action, index) => (
+          <DropdownMenuItem key={`${index}:${action.label}`} disabled={action.button.disabled} onSelect={() => action.button.click()}>
+            <span className="truncate">{action.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function statusLabel(state: TalkState, online: boolean): string {
   switch (state.phase) {
     case "starting":
@@ -218,6 +270,7 @@ export function TalkOverlay() {
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
   const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);
+  const { layout, tucked } = useDockLayout(dock);
   const drag = useDraggable<HTMLDivElement>();
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
@@ -247,6 +300,15 @@ export function TalkOverlay() {
   const title = state.recording?.titleSource === "pending" ? null : state.recording?.title;
   const away = !talk.isAtSource();
   const text = state.transcript.trim();
+  // Docked in a narrow composer: the timer, cancel and stop-and-insert stay;
+  // the rest is in the ▾ menu, so the composer keeps one row.
+  const compact = dock !== null && layout !== "wide";
+  const expand = () => {
+    toggleExpanded();
+    // Moving between the portal and overlay remounts this button.
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-talk-inline] button[aria-expanded], [data-talk-overlay] button[aria-expanded]')?.focus());
+  };
+  const status = visibleStatus(state, online);
 
   const pill = (
     <div
@@ -278,21 +340,29 @@ export function TalkOverlay() {
           )}
         />
         <span className="font-mono text-sm tabular-nums">{formatClock(elapsed)}</span>
-        <LevelMeter live={capturing} />
-        <button
-          type="button"
-          onClick={() => {
-            toggleExpanded();
-            // Moving between the portal and overlay remounts this button.
-            requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-talk-inline] button[aria-expanded], [data-talk-overlay] button[aria-expanded]')?.focus());
-          }}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${dictation ? "dictation" : "recording"} transcript`}
-          aria-expanded={expanded}
-          className={cn("flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground", dock && "min-w-6")}
-        >
-          {visibleStatus(state, online) ? <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{visibleStatus(state, online)}</span> : <span className="sr-only">{statusLabel(state, online)}</span>}
-          <Icon name={expanded ? "ChevronUp" : "ChevronDown"} className="size-3.5 shrink-0" />
-        </button>
+        {compact && layout === "tight" ? null : <LevelMeter live={capturing} />}
+        {compact ? (
+          <CompactMenu
+            status={status}
+            label={statusLabel(state, online)}
+            hideStatus={canStop}
+            onExpand={expand}
+            dictation={dictation}
+            canPause={canPause}
+            tucked={tucked}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={expand}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${dictation ? "dictation" : "recording"} transcript`}
+            aria-expanded={expanded}
+            className={cn("flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground", dock && "min-w-6")}
+          >
+            {status ? <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{status}</span> : <span className="sr-only">{statusLabel(state, online)}</span>}
+            <Icon name={expanded ? "ChevronUp" : "ChevronDown"} className="size-3.5 shrink-0" />
+          </button>
+        )}
         {state.uploadError && online ? (
           <span title={`Upload will retry: ${state.uploadError}`}>
             <Icon name="AlertTriangle" className="size-4 text-amber-500" />
@@ -305,7 +375,7 @@ export function TalkOverlay() {
             onClick={() => talk.goToSource()}
           />
         ) : null}
-        {dictation ? (
+        {dictation && !compact ? (
           <PillButton
             icon="AiContentGenerator01"
             label={talk.cleanupEnabled ? "Clean up text before inserting: on" : "Clean up text before inserting: off"}
@@ -313,7 +383,7 @@ export function TalkOverlay() {
             onClick={() => talk.setCleanup(!talk.cleanupEnabled)}
           />
         ) : null}
-        {canPause ? <PillButton icon="Pause" label="Pause" onClick={() => void talk.pause()} /> : null}
+        {canPause && !compact ? <PillButton icon="Pause" label="Pause" onClick={() => void talk.pause()} /> : null}
         {canResume ? (
           <PillButton icon="Mic" label="Resume recording" tone="primary" onClick={() => void talk.resume()} />
         ) : null}

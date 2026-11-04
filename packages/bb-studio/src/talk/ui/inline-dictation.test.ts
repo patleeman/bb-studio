@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { talk } from "./controller";
-import { inlineMic, mountInlineDock, useInlineDictation } from "./inline-dictation";
+import { dockLayout, inlineMic, mountInlineDock, readDockLayout, useInlineDictation } from "./inline-dictation";
 
 vi.mock("./controller", () => ({ talk: { dictationComposer: vi.fn(), subscribe: vi.fn() } }));
 
@@ -42,6 +42,41 @@ afterEach(async () => {
 });
 
 describe("inline dictation placement", () => {
+  it("picks the layout from the composer's width", () => {
+    expect(dockLayout(800)).toBe("wide");
+    expect(dockLayout(640)).toBe("wide");
+    expect(dockLayout(600)).toBe("compact");
+    expect(dockLayout(439)).toBe("tight");
+  });
+
+  it("tucks the composer's other actions away in a narrow composer, keeping the mic and send", () => {
+    const source = document.createElement("form");
+    source.setAttribute("data-promptbox", "");
+    source.innerHTML = '<div data-promptbox-action-row><div data-promptbox-standard-actions><button aria-label="Expand composer">E</button><span data-plugin-action><button title="Hands-free voice">H</button></span><span><button aria-label="Start voice input">Mic</button></span><div data-promptbox-submit-group><button type="submit" aria-label="Submit">Send</button></div></div></div>';
+    document.body.append(source);
+    const before = source.innerHTML;
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(() => ({ ...rect, width: 568, right: 578 }));
+    const dock = mountInlineDock(source.querySelector<HTMLButtonElement>('[aria-label="Start voice input"]')!);
+    const { layout, tucked } = readDockLayout(dock.host);
+    expect(layout).toBe("compact");
+    expect(tucked.map((action) => action.label)).toEqual(["Expand composer", "Hands-free voice"]);
+    expect(source.querySelector("[data-promptbox-action-row]")!.hasAttribute("data-talk-inline-narrow")).toBe(true);
+    expect(source.querySelectorAll("[data-talk-inline-tucked]")).toHaveLength(2);
+    expect(source.querySelector("[data-promptbox-submit-group]")!.hasAttribute("data-talk-inline-tucked")).toBe(false);
+    expect(dock.host.getAttribute("data-talk-inline-layout")).toBe("compact");
+    dock.remove();
+    expect(source.innerHTML).toBe(before);
+  });
+
+  it("keeps every action in a wide composer", () => {
+    const source = composer();
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(() => ({ ...rect, width: 900, right: 910 }));
+    const dock = mountInlineDock(source.querySelector("button")!);
+    expect(readDockLayout(dock.host)).toEqual({ layout: "wide", tucked: [] });
+    expect(source.querySelector("[data-talk-inline-narrow]")).toBeNull();
+    dock.remove();
+  });
+
   it("uses only the visible source input, never another input on screen", () => {
     const source = composer(); composer();
     expect(inlineMic(source)).toBe(source.querySelector("button"));

@@ -2,14 +2,48 @@ import { useLayoutEffect, useState } from "react";
 import { BUILT_IN_MIC_SELECTOR } from "./composer-dom";
 import { talk } from "./controller";
 
+// While dictation is docked, the composer keeps one row at every width. The
+// dock reads the composer's own width (not the window's): below
+// COMPACT_BELOW, Talk's less-used controls and the composer's other actions
+// (expand, hands-free…) move into the pill's ▾ menu ("tucked"); below
+// TIGHT_BELOW the level meter goes too. Only when even that can't fit does the
+// row wrap.
 const CSS = `
 [data-talk-inline-mic] { display: none !important; }
+[data-talk-inline-tucked] { display: none !important; }
 [data-talk-inline-row] { flex-wrap: wrap; }
 [data-talk-inline-row][data-talk-inline-narrow] { position: relative !important; inset: auto !important; }
-[data-talk-inline-narrow] [data-talk-inline-actions] { flex: 1 1 100%; width: 100%; min-width: 0; justify-content: flex-end; }
+[data-talk-inline-narrow] [data-talk-inline-actions] { min-width: 0; margin-left: auto; flex-wrap: nowrap; }
 [data-talk-inline-host] { display: flex; min-width: 0; max-width: 100%; }
-[data-talk-inline-narrow] [data-talk-inline-host] { flex: 1; }
 `;
+
+export const COMPACT_BELOW = 640;
+export const TIGHT_BELOW = 440;
+export const LAYOUT_EVENT = "bb-talk:inline-layout";
+
+/** wide: every control shows. compact: the ▾ menu holds the rest. tight: no meter either. */
+export type DockLayout = "wide" | "compact" | "tight";
+
+/** A composer action hidden while the dock is compact; the ▾ menu clicks it. */
+export interface TuckedAction {
+  label: string;
+  button: HTMLButtonElement;
+}
+
+export function dockLayout(width: number): DockLayout {
+  return width < TIGHT_BELOW ? "tight" : width < COMPACT_BELOW ? "compact" : "wide";
+}
+
+const layouts = new WeakMap<HTMLElement, { layout: DockLayout; tucked: TuckedAction[] }>();
+
+/** The dock's current layout, kept on its host element. */
+export function readDockLayout(host: HTMLElement | null): { layout: DockLayout; tucked: TuckedAction[] } {
+  return (host && layouts.get(host)) ?? { layout: "wide", tucked: [] };
+}
+
+function buttonLabel(button: HTMLButtonElement): string {
+  return (button.getAttribute("aria-label") || button.title || button.textContent || "").trim();
+}
 
 /** Dock only into the source input, and only while its controls are on screen. */
 export function inlineMic(composer: HTMLElement | null): HTMLButtonElement | null {
@@ -43,24 +77,63 @@ export function mountInlineDock(mic: HTMLButtonElement) {
   mic.setAttribute("data-talk-inline-mic", "");
   actions.setAttribute("data-talk-inline-actions", "");
   row.setAttribute("data-talk-inline-row", "");
-  const resize = () => {
-    const narrow = composer.getBoundingClientRect().width < 640;
-    if (row.hasAttribute("data-talk-inline-narrow") !== narrow) row.toggleAttribute("data-talk-inline-narrow", narrow);
+  // The dock, the mic and the send controls stay; any other action tucks away.
+  const stays = (child: Element) =>
+    child.contains(host) || child.contains(mic) || child.matches("[data-promptbox-submit-group]") || !!child.querySelector('[data-promptbox-submit-action], [type="submit"]');
+  let current = "";
+  const layout = () => {
+    const next = dockLayout(composer.getBoundingClientRect().width);
+    row.toggleAttribute("data-talk-inline-narrow", next !== "wide");
+    const tucked: TuckedAction[] = [];
+    for (const child of Array.from(actions.children)) {
+      const tuck = next !== "wide" && !stays(child);
+      if (child.hasAttribute("data-talk-inline-tucked") !== tuck) child.toggleAttribute("data-talk-inline-tucked", tuck);
+      if (!tuck) continue;
+      const buttons = child instanceof HTMLButtonElement ? [child] : Array.from(child.querySelectorAll("button"));
+      for (const button of buttons) {
+        const label = buttonLabel(button);
+        if (label && !button.closest("[hidden]")) tucked.push({ label, button });
+      }
+    }
+    const key = `${next}\n${tucked.map((action) => action.label).join("\n")}`;
+    layouts.set(host, { layout: next, tucked });
+    if (key === current) return;
+    current = key;
+    host.setAttribute("data-talk-inline-layout", next);
+    host.dispatchEvent(new CustomEvent(LAYOUT_EVENT));
   };
-  resize();
-  const observer = new ResizeObserver(resize);
+  layout();
+  const observer = new ResizeObserver(layout);
   observer.observe(composer);
+  // The composer adds and removes its own actions (expand, plugin buttons).
+  const children = new MutationObserver(layout);
+  children.observe(actions, { childList: true });
   return {
     mic, host,
     remove: () => {
       observer.disconnect();
+      children.disconnect();
       host.remove();
+      for (const child of Array.from(actions.children)) child.removeAttribute("data-talk-inline-tucked");
       mic.removeAttribute("data-talk-inline-mic");
       actions.removeAttribute("data-talk-inline-actions");
       row.removeAttribute("data-talk-inline-row");
       row.removeAttribute("data-talk-inline-narrow");
     },
   };
+}
+
+/** The docked pill's layout: it follows the composer's width, not the window's. */
+export function useDockLayout(host: HTMLElement | null): { layout: DockLayout; tucked: TuckedAction[] } {
+  const [, setVersion] = useState(0);
+  useLayoutEffect(() => {
+    if (!host) return;
+    const update = () => setVersion((value) => value + 1);
+    host.addEventListener(LAYOUT_EVENT, update);
+    update();
+    return () => host.removeEventListener(LAYOUT_EVENT, update);
+  }, [host]);
+  return readDockLayout(host);
 }
 
 /** Follow navigation, input remounts, scroll visibility, and toolbar changes. */
