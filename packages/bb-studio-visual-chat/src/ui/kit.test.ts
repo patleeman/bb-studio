@@ -161,3 +161,19 @@ describe("the kit's building blocks", () => {
     expect(kit.block("nope", {}, "<b>kept</b>")).toBe("<b>kept</b>");
   });
 });
+
+describe("big numbers", () => {
+  it("print a year as a year when there's no unit or currency, and group everything else", () => {
+    expect(kit.bignum(1998)).toContain(">1998<");
+    expect(kit.bignum("2001")).toContain(">2001<");
+    expect(kit.block("stat", { value: "1998", label: "Released" })).toContain(">1998<");
+    // A unit or a currency makes it an amount; outside 1900–2100, or with a fraction, it's a number.
+    expect(kit.bignum(1998, { unit: " users" })).toContain(">1,998<");
+    expect(kit.bignum(1998, { prefix: "$" })).toContain(">1,998<");
+    expect(kit.bignum(2500)).toContain(">2,500<");
+    expect(kit.bignum(1899)).toContain(">1,899<");
+    expect(kit.bignum(1998.4, { decimals: 1 })).toContain(">1,998.4<");
+    // Elsewhere numbers keep their commas.
+    expect(kit.fmt(1998)).toBe("1,998");
+  });
+});

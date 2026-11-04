@@ -90,7 +90,9 @@ export function canvasKit(win?: unknown): CanvasKit {
     const abs = Math.abs(n);
     const decimals = num(o.decimals) ?? (abs >= 100 || Number.isInteger(n) ? 0 : abs >= 10 ? 1 : 2);
     const compact = o.compact === true || (o.compact !== false && abs >= 1e6);
-    const body = new Intl.NumberFormat("en-US", compact ? { notation: "compact", maximumFractionDigits: 1 } : { minimumFractionDigits: o.fixed ? decimals : 0, maximumFractionDigits: decimals }).format(abs);
+    // year: true (bignum without a unit or currency) prints a year as a year: 1998, not 1,998.
+    const year = o.year === true && Number.isInteger(n) && n >= 1900 && n <= 2100;
+    const body = new Intl.NumberFormat("en-US", compact ? { notation: "compact", maximumFractionDigits: 1 } : { minimumFractionDigits: o.fixed ? decimals : 0, maximumFractionDigits: decimals, useGrouping: !year }).format(abs);
     const sign = n < 0 ? "−" : o.signed && n > 0 ? "+" : "";
     return `${sign}${esc(o.prefix ?? "")}${body}${esc(o.unit ?? "")}`;
   };
@@ -498,7 +500,8 @@ export function canvasKit(win?: unknown): CanvasKit {
     const size = num(o.size);
     const color = o.color ? paint(o.color) : "var(--cv-ink)";
     const n = num(value);
-    const body = n === null ? esc(value) : fmt(n, { decimals: o.decimals, compact: o.compact });
+    // A whole number from 1900 to 2100 with no unit or currency is a year: no thousands comma.
+    const body = n === null ? esc(value) : fmt(n, { decimals: o.decimals, compact: o.compact, year: !o.unit && !o.prefix });
     return `<div class="cv-bignum">${o.label ? `<div class="cv-bignum-label">${esc(o.label)}</div>` : ""}<div class="cv-bignum-n" style="color:${color}${size ? `;font-size:${size}px` : ""}">${o.prefix ? `<span class="cv-bignum-unit">${esc(o.prefix)}</span>` : ""}${body}${o.unit ? `<span class="cv-bignum-unit">${esc(o.unit)}</span>` : ""}</div>${o.delta !== undefined ? delta(o.delta, { invert: o.invert, unit: o.deltaUnit }) : ""}${o.sub ? `<div class="cv-bignum-sub">${esc(o.sub)}</div>` : ""}</div>`;
   };
 
