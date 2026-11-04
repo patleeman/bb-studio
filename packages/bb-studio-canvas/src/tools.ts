@@ -74,6 +74,31 @@ export function describeBoard(store: CanvasStore, canvasId: string): string {
   return [head, "", "This board is from before pages: these items show as they are. canvas_page replaces them with a page.", ...lines, ...tail].join("\n");
 }
 
+const norm = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * When most of the last version's parts lost their ids while their content is still on the page, the agent
+ * renamed them, so they come in fresh instead of gliding. The result says which old ids to put back, so it can
+ * redo the page.
+ */
+export function renamedParts(before: string | null, after: string): string {
+  if (!before) return "";
+  const old = outline(before), now = outline(after);
+  if (old.length < 3) return "";
+  const ids = new Set(now.map((part) => part.id));
+  const gone = old.filter((part) => !ids.has(part.id));
+  if (gone.length / old.length <= 0.5) return "";
+  const pairs: string[] = [];
+  for (const part of gone) {
+    const words = norm(part.text).split(" ").slice(0, 6).join(" ");
+    if (words.length < 8) continue;
+    const match = now.find((each) => !old.some((o) => o.id === each.id) && norm(each.text).includes(words));
+    if (match) pairs.push(`"${match.id}" → "${part.id}"`);
+  }
+  if (pairs.length < 2) return "";
+  return ` Most parts got new ids though their content is still here, so they came in fresh instead of gliding. Keep the old id for anything that persists and send the page again: ${pairs.join(", ")}.`;
+}
+
 /**
  * Runs one canvas tool on one canvas. Returns the text the model gets;
  * `changed` says whether the board moved (so the caller publishes).
@@ -91,8 +116,9 @@ export async function runCanvasTool(store: CanvasStore, canvasId: string, name: 
           if (parsed.style !== store.get(canvasId)?.look || !store.changes(canvasId, 200).some((change) => change.op === "style")) store.edit(canvasId, [{ op: "style", look: parsed.style, reason: parsed.styleReason ?? null }], by);
           styled = ` Style: ${LOOK_INFO[parsed.style].name}.`;
         }
+        const before = store.get(canvasId)?.page ?? null;
         const { rev, parts } = store.setPage(canvasId, parsed.html, by, parsed.title ?? null);
-        const advice = parts ? "" : " No part has a data-cv-id, so the next version can't animate part by part: mark the main parts.";
+        const advice = parts ? renamedParts(before, parsed.html) : " No part has a data-cv-id, so the next version can't animate part by part: mark the main parts.";
         return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${advice}`, changed: true };
       }
       case "canvas_patch": {

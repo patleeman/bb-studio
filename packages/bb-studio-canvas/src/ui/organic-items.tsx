@@ -196,7 +196,7 @@ function Photo({ item, width, focus, look }: { item: CanvasItem; width: number; 
         <figcaption style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
           {!overlay && kicker && !broken ? <div className="cv-kicker">{kicker}</div> : null}
           {!overlay && headline && !broken ? <div className="cv-h3" style={{ fontSize: name }}>{headline}</div> : null}
-          {rating !== null ? <Html html={kit.stars(rating, { max: item.options.ratingMax, size: focus ? 22 : 15 })} /> : null}
+          {rating !== null ? <Html html={kit.stars(rating, { max: item.options.ratingMax, size: focus ? 22 : 15, source: item.options.ratingSource })} /> : null}
           {caption ? <div className="cv-small">{caption}</div> : null}
         </figcaption>
       ) : null}

@@ -60,7 +60,7 @@ describe("canvas threads", () => {
     const input = spawned[0]!.input as { text: string; visibility?: string }[];
     expect(input[0]).toMatchObject({ text: "How did yesterday's election go?" });
     expect(input[1]!.visibility).toBe("agent-only");
-    for (const words of ["ONE page you design", "DESIGN GUIDE", "Decide the ONE point", "data-chart", "canvas_image", "Never restate or describe the board"]) expect(input[1]!.text).toContain(words);
+    for (const words of ["ONE page you design", "DESIGN GUIDE", "Decide the ONE point", "data-chart", "canvas_image", "Never describe the board", "FILL THE SCREEN", "my pick"]) expect(input[1]!.text).toContain(words);
     const { canvas } = await call("canvas.get", { threadId });
     expect(canvas).toMatchObject({ threadId, status: "working", turn: 1, items: [], page: null });
   });
@@ -180,6 +180,21 @@ describe("canvas tools", () => {
     expect(read).toContain("Parts (data-cv-id):");
     expect(read).toContain("Page source:");
     expect(read).toContain("Style: editorial (Editorial)");
+  });
+
+  it("tells the agent when it renamed parts that are still on the page, so it can keep their ids", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Support" });
+    const first = '<h1 data-cv-id="verdict">Fix chat first</h1><section data-cv-id="chat">Chat queue grew to 1,010 a week</section><section data-cv-id="inapp">In-app tickets grew five times since W32</section>';
+    await tool("canvas_page", { html: first }, threadId);
+    const renamed = '<h1 data-cv-id="title">Fix chat first, then in-app</h1><div data-cv-id="left">Chat queue grew to 1,010 a week</div><div data-cv-id="right">In-app tickets grew five times since W32</div>';
+    const result = text(await tool("canvas_page", { html: renamed }, threadId));
+    expect(result).toContain("Most parts got new ids");
+    expect(result).toContain('"left" → "chat"');
+    expect(result).toContain('"right" → "inapp"');
+    // Kept ids, or genuinely new content, say nothing.
+    expect(text(await tool("canvas_page", { html: renamed }, threadId))).not.toContain("new ids");
+    expect(text(await tool("canvas_page", { html: '<h1 data-cv-id="a">Weather</h1><p data-cv-id="b">Sunny all weekend in the city</p><p data-cv-id="c">Rain on Monday morning</p>' }, threadId))).not.toContain("new ids");
   });
 
   it("says when a page has no parts to animate, and refuses an empty or oversized page", async () => {

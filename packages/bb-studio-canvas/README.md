@@ -57,10 +57,16 @@ hands-free button.
   with the style's tokens (`--cv-*`), the kit's classes and declarative
   charts (`data-chart`: line, columns, bars, stars, US tile maps, timelines
   and more; `src/ui/kit.ts`). It scrolls when it's taller than the screen.
+- **Filling the screen:** in a page the type scale grows with the screen,
+  `cv-fill` is a full-height layout (header, a stretching middle row,
+  footer), and `cv.viewport()` gives the screen's size. A page that stops
+  short is zoomed up (at most 1.4×) as far as it still fits.
 - **Motion:** the agent marks parts with `data-cv-id`. When a new version
   arrives, the frame keeps its document and morphs the page: parts with the
   same id glide (FLIP) to their new place, changed ones fade their new
-  content in, new ones enter and gone ones leave from where they were.
+  content in, new ones enter and gone ones leave from where they were. A
+  part whose id changed but shows the same picture or text glides too, and
+  `canvas_page` tells the agent when it renamed most parts.
 - **The canvas tools:** `canvas_page` (the whole board), `canvas_patch` (one
   part by id), `canvas_read`, `canvas_style`, `canvas_image` and
   `canvas_guide`. Only canvas threads get them, with the canvas rules and
@@ -69,8 +75,11 @@ hands-free button.
 - **Pictures:** `canvas_image` returns an https address with alt text and
   its source. With an Exa API key it searches; without one it takes the
   main picture of a page the agent found (og:image, else the largest
-  image). Server-side fetches go only to public http(s) addresses (checked
-  on every redirect), with a time limit and a size cap.
+  image). Server-side fetches go only to public http(s) addresses: each
+  hop's host is resolved once, every address checked, and the connection
+  pinned to that address (so a resolver can't switch it after the check),
+  with a time limit and a size cap. Picture addresses lose tracking
+  parameters. Stars without a source read "my pick".
 - **Exa API key:** a BB secret setting on this plugin, `exaApiKey`
   (**Settings → Plugins → BB Studio Canvas**, or `bb plugin config
   studio-canvas`). It's only sent to Exa: never logged, returned or put in
@@ -80,7 +89,8 @@ hands-free button.
   picks one per board, a style you ask for wins, and the top bar shows it.
 - **Title and caption:** the canvas's title is the topic the agent names,
   else the page's first heading. The caption is the agent's reply, written
-  to add what the board doesn't say.
+  to add what the board doesn't say; sentences that describe the board
+  ("The board shows…") are dropped from it.
 - **Boards from before pages** (items placed by Canvas's layout) still open
   and show as they were. The agent's next page replaces them.
 

@@ -42,8 +42,12 @@ export interface CanvasKit {
   height?(): number;
   /** Draws every [data-chart] under root from its data-rows / data-value and data-options. */
   charts?(root?: unknown): void;
-  /** Shows a new page in root, animating parts by data-cv-id. */
+  /** Shows a new page in root, animating parts by data-cv-id (or, when an id changed, by the same picture or text). */
   morph?(root: unknown, html: string, animate?: boolean): void;
+  /** The screen the page has, in px. */
+  viewport?(): { width: number; height: number };
+  /** Zooms a page that stops short of the screen up to fill it (at most 1.4x). Returns the zoom. */
+  fit?(root?: unknown): number;
 }
 
 /** Builds the kit. With a window, it also becomes window.cv with render and hydrate. Self-contained: its source runs in frames. */
@@ -518,7 +522,11 @@ export function canvasKit(win?: unknown): CanvasKit {
     return `<div class="cv-callout-pin" style="left:${round(x * 100)}%;top:${round(y * 100)}%;--cv-callout-color:${color}"><svg class="cv-callout-leader" width="${ax + 2}" height="${ay + 2}" style="left:${dx < 0 ? -ax - 1 : -1}px;top:${dy < 0 ? -ay - 1 : -1}px" aria-hidden="true"><line x1="${dx < 0 ? ax + 1 : 1}" y1="${dy < 0 ? ay + 1 : 1}" x2="${dx < 0 ? 1 : ax + 1}" y2="${dy < 0 ? 1 : ay + 1}"/></svg><i class="cv-callout-dot"></i><span class="cv-callout-text" style="left:${round(left)}px;top:${round(top)}px;width:${round(lw)}px;text-align:${dx < 0 ? "right" : "left"};${dy < 0 ? "transform:translateY(-100%)" : ""}">${esc(text)}</span></div>`;
   };
 
-  /** A rating as five stars (partly filled), from a score out of max (5, 10 or 100). options: max, size (px), color, label (true: the number beside it). */
+  /**
+   * A rating as five stars (partly filled), from a score out of max (5, 10 or 100). options: max, size (px),
+   * color, label (false: no number), source (who gave the score, shown beside it). Without a source the stars
+   * say "my pick" (or options.note): a score nobody published is labelled as the agent's own.
+   */
   const stars = (value: unknown, options?: Record<string, unknown>): string => {
     const o = opt(options);
     const n = num(value);
@@ -533,7 +541,10 @@ export function canvasKit(win?: unknown): CanvasKit {
     for (let i = 0; i < 5; i++) shapes += `<path d="${star}" transform="translate(${i * 21} 0)"/>`;
     const w = 5 * 21 - 1;
     const label = o.label === false ? "" : `<b class="cv-stars-n">${esc(fmt(n, { decimals: max === 100 ? 0 : 1 }))}<small>/${esc(max)}</small></b>`;
-    return `<span class="cv-stars" role="img" aria-label="${esc(`${fmt(n)} out of ${max}`)}"><svg width="${round((size * w) / 20)}" height="${size}" viewBox="0 0 ${w} 20"><defs><clipPath id="${id}"><rect width="${round(w * share)}" height="20"/></clipPath></defs><g fill="var(--cv-rule)">${shapes}</g><g fill="${color}" clip-path="url(#${id})">${shapes}</g></svg>${label}</span>`;
+    const source = typeof o.source === "string" && o.source.trim() ? o.source.trim() : null;
+    const note = source ?? (o.note === false ? null : typeof o.note === "string" && o.note.trim() ? o.note.trim() : "my pick");
+    const tail = note ? `<small class="cv-stars-note">${esc(note)}</small>` : "";
+    return `<span class="cv-stars" role="img" aria-label="${esc(`${fmt(n)} out of ${max}${source ? `, ${source}` : note ? `, ${note}` : ""}`)}"><svg width="${round((size * w) / 20)}" height="${size}" viewBox="0 0 ${w} 20"><defs><clipPath id="${id}"><rect width="${round(w * share)}" height="20"/></clipPath></defs><g fill="var(--cv-rule)">${shapes}</g><g fill="${color}" clip-path="url(#${id})">${shapes}</g></svg>${label}${tail}</span>`;
   };
 
   const kit: CanvasKit = { esc, num, paint, fmt, spark, bars, line, columns, hbars, split, donut, meter, tilemap, timeline, waffle, multiples, delta, legend, bignum, quote, callout, stars, states };
@@ -604,16 +615,74 @@ export function canvasKit(win?: unknown): CanvasKit {
       }).observe(doc.documentElement);
     }
 
+    // The screen the page has: its width and height in px (also --cv-vw and --cv-vh on <html>).
+    kit.viewport = () => ({ width: doc.documentElement.clientWidth || w.innerWidth || 0, height: w.innerHeight || doc.documentElement.clientHeight || 0 });
+    const setViewport = () => { const v = kit.viewport!(); doc.documentElement.style?.setProperty("--cv-vw", `${v.width}px`); doc.documentElement.style?.setProperty("--cv-vh", `${v.height}px`); };
+    setViewport();
+    w.addEventListener("resize", setViewport);
+
+    /**
+     * A safety net for a page that stops short of the screen: its content (the boxes that hold text, pictures
+     * or charts) is zoomed up, at most 1.4x, as far as it still fits, so the screen isn't left with an empty
+     * bottom or right side. A page that already reaches the bottom, or scrolls, is left alone.
+     */
+    const extent = (root: HTMLElement) => {
+      let right = 0, bottom = 0;
+      const top = w.scrollY || 0;
+      root.querySelectorAll<HTMLElement>("*").forEach((el) => {
+        const tag = el.tagName.toLowerCase();
+        if (el.closest("svg") && tag !== "svg") return;
+        const leaf = tag === "svg" || tag === "img" || tag === "canvas" || Array.from(el.childNodes).some((node) => node.nodeType === 3 && node.textContent!.trim());
+        if (!leaf) return;
+        const rect = el.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        right = Math.max(right, rect.right);
+        bottom = Math.max(bottom, rect.bottom + top);
+      });
+      return { right, bottom };
+    };
+    kit.fit = (rootArg?: unknown) => {
+      const root = (rootArg as HTMLElement | undefined) ?? doc.getElementById("cv-page");
+      if (!root) return 1;
+      root.style.zoom = "";
+      const view = kit.viewport!();
+      const roomW = view.width - 24, roomH = view.height - 24;
+      const at1 = extent(root);
+      // Already reaching the bottom (or scrolling) and most of the width: nothing to fill.
+      if (!at1.bottom || at1.bottom > roomH || (at1.bottom > roomH * 0.8 && at1.right > roomW * 0.75)) { root.dataset.cvZoom = "1"; return 1; }
+      const fits = (z: number) => { root.style.zoom = String(z); const e = extent(root); return e.bottom <= roomH && e.right <= roomW + 1; };
+      let lo = 1, hi = 1.4;
+      if (fits(hi)) lo = hi;
+      else for (let i = 0; i < 6; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+      const z = Math.round(lo * 100) / 100;
+      root.style.zoom = z > 1.02 ? String(z) : "";
+      root.dataset.cvZoom = String(z > 1.02 ? z : 1);
+      if (z > 1.02) kit.charts!(root);
+      return z;
+    };
+    // Pictures change the page's height as they load: fit again.
+    doc.addEventListener?.("load", (event) => { if ((event.target as Element | null)?.tagName === "IMG") { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 120); } }, true);
+    w.addEventListener("resize", () => { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 150); });
+
+    // What a part shows, to match a part that was given a new id: its picture, else its text.
+    const contentKey = (el: Element): string | null => {
+      const img = el.tagName === "IMG" ? el : el.querySelector("img");
+      const src = img?.getAttribute("src");
+      if (src) return `img:${src}`;
+      const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+      return text.length >= 8 && text.length <= 400 ? `text:${text}` : null;
+    };
+
     // A new page, animated by part: parts (data-cv-id) that stay glide from where they were, relative to the
     // part they sit in; new ones come in; gone ones leave from where they were. FLIP, with the Web Animations API.
     const reduced = () => typeof w.matchMedia === "function" && w.matchMedia("(prefers-reduced-motion: reduce)").matches;
     kit.morph = (rootArg: unknown, html: string, animate = true) => {
       const root = rootArg as HTMLElement;
-      const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null }>();
+      const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null; key: string | null }>();
       const sx = w.scrollX || 0, sy = w.scrollY || 0;
       if (animate) root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
         const parent = el.parentElement?.closest<HTMLElement>("[data-cv-id]")?.dataset.cvId ?? null;
-        before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent });
+        before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent, key: contentKey(el) });
       });
       root.innerHTML = html;
       // Scripts in the page run (innerHTML doesn't run them).
@@ -625,15 +694,25 @@ export function canvasKit(win?: unknown): CanvasKit {
       });
       kit.hydrate!(root);
       kit.charts!(root);
+      kit.fit!(root);
       if (!animate || reduced() || typeof root.animate !== "function") return;
       const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
       const after = new Map<string, DOMRect>();
       const els = Array.from(root.querySelectorAll<HTMLElement>("[data-cv-id]"));
       for (const el of els) after.set(el.dataset.cvId!, el.getBoundingClientRect());
+      // Parts that lost their id but show the same picture or text: matched by content, so they glide too.
+      const byContent = new Map<string, string>();
+      for (const [id, entry] of before) if (!after.has(id) && entry.key && !byContent.has(entry.key)) byContent.set(entry.key, id);
+      const matched = new Set<string>();
       let entering = 0;
       for (const el of els) {
         const id = el.dataset.cvId!;
-        const was = before.get(id);
+        let was = before.get(id);
+        if (!was) {
+          const key = contentKey(el);
+          const old = key ? byContent.get(key) : undefined;
+          if (old && !matched.has(old)) { matched.add(old); was = before.get(old); }
+        }
         const now = after.get(id)!;
         if (!was) {
           // Inside a part that's new too, the part's own entrance carries it.
@@ -653,7 +732,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       }
       // Gone parts leave from where they were (only the outermost one of a gone group).
       for (const [id, was] of before) {
-        if (after.has(id) || (was.parent && !after.has(was.parent) && before.has(was.parent))) continue;
+        if (after.has(id) || matched.has(id) || (was.parent && !after.has(was.parent) && before.has(was.parent))) continue;
         const ghost = was.clone;
         ghost.removeAttribute("data-cv-id");
         Object.assign(ghost.style, { position: "absolute", left: `${was.r.left + sx}px`, top: `${was.r.top + sy}px`, width: `${was.r.width}px`, height: `${was.r.height}px`, margin: "0", pointerEvents: "none", zIndex: "50", boxSizing: "border-box" });

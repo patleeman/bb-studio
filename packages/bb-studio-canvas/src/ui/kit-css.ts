@@ -122,6 +122,7 @@ ${S} .cv-stars{display:inline-flex;align-items:center;gap:0.45em;vertical-align:
 ${S} .cv-stars svg{display:block}
 ${S} .cv-stars-n{font-family:var(--cv-font-num);font-weight:var(--cv-display-weight);font-size:var(--cv-t-md);color:var(--cv-ink);font-variant-numeric:tabular-nums}
 ${S} .cv-stars-n small{font-size:0.7em;color:var(--cv-muted);font-weight:500}
+${S} .cv-stars-note{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-muted)}
 ${S} .cv-callout-pin{position:absolute;width:0;height:0;color:var(--cv-callout-color,var(--cv-ink))}
 ${S} .cv-callout-leader{position:absolute;overflow:visible;pointer-events:none}
 ${S} .cv-callout-leader line{stroke:var(--cv-callout-color,var(--cv-ink));stroke-width:1.1}

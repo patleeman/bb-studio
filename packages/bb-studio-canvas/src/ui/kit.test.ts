@@ -40,6 +40,11 @@ describe("the canvas kit", () => {
     // Stars fill to the share of the score.
     expect(kit.stars(86, { max: 100 })).toContain("86 out of 100");
     expect(kit.stars("n/a")).toBe("");
+    // A score nobody published says so; a sourced one names its source.
+    expect(kit.stars(4, { max: 5 })).toContain(">my pick<");
+    expect(kit.stars(9, { max: 10, source: "IGN" })).toContain(">IGN<");
+    expect(kit.stars(9, { max: 10, source: "IGN" })).not.toContain("my pick");
+    expect(kit.stars(9, { max: 10, note: "editor's pick, not a review score" })).toContain("editor&#39;s pick, not a review score");
   });
 
   it("runs from its own source, as a custom frame gets it", () => {

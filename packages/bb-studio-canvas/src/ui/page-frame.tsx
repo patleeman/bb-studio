@@ -26,13 +26,22 @@ if(d.type==="${STYLE_MESSAGE}"){document.getElementById("cv-style").textContent=
 if(d.type==="${PAGE_MESSAGE}"){window.cv.morph(document.getElementById("cv-page"),d.html,!!d.animate);document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
 addEventListener("load",function(){parent.postMessage({type:"${PAGE_READY_MESSAGE}"},"*")});})();`;
 
+/**
+ * In a page, the type scale follows the screen: --cv-t-* become fluid (vw and vh), so a page set in the
+ * style's sizes grows on a big screen instead of leaving it half empty. --cv-f-hero is for one huge figure.
+ * cv-fill is a full-screen layout: header, a middle row that takes the rest, footer.
+ */
+const FLUID = `:root{--cv-t-xs:clamp(11px,0.5vw + 0.35vh,15px);--cv-t-sm:clamp(13px,0.62vw + 0.45vh,18px);--cv-t-md:clamp(15px,0.75vw + 0.6vh,22px);--cv-t-lg:clamp(17px,0.95vw + 0.8vh,28px);--cv-t-xl:clamp(21px,1.3vw + 1.1vh,38px);--cv-t-2xl:clamp(28px,1.9vw + 1.7vh,58px);--cv-t-3xl:clamp(38px,2.8vw + 2.5vh,90px);--cv-t-4xl:clamp(52px,3.8vw + 3.4vh,124px);--cv-f-hero:clamp(80px,7vw + 7vh,260px)}
+.cv-fill{min-height:calc(100vh - 60px);display:grid;grid-template-rows:auto 1fr auto;gap:clamp(16px,3vh,44px)}
+.cv-fill > *{min-width:0}`;
+
 const BASE = `html,body{margin:0;padding:0;background:var(--cv-paper);color:var(--cv-ink);font-family:var(--cv-font-text);font-size:var(--cv-t-md);line-height:1.45;-webkit-font-smoothing:antialiased;transition:background-color .6s ease,color .6s ease}
 *{box-sizing:border-box}img,svg{max-width:100%}img{display:block}
 body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}`;
 
 /** The page's CSS for a style and mode: its tokens, a base, the kit's classes. */
 export function pageCss(look: OrganicLook, mode: "light" | "dark"): string {
-  return `:root{${tokenDeclarations(look, mode)};color-scheme:${mode}}${BASE}${kitCss(look, "")}`;
+  return `:root{${tokenDeclarations(look, mode)};color-scheme:${mode}}${FLUID}${BASE}${kitCss(look, "")}`;
 }
 
 /** The frame's document: CSP, an empty style (sent on ready), the boot script and the kit. */
