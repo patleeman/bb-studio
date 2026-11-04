@@ -162,22 +162,25 @@ describe("canvas store", () => {
     expect(store.get(id)!.title).toBe("Week plan");
   });
 
-  it("refuses the same composition on two boards in a row, unless asked", () => {
+  it("keeps the board as one page: a new page replaces old items, its heading titles it, and parts patch by id", () => {
     const { store } = memory();
-    const { id } = store.create({ threadId: "thr_a", look: "editorial" });
-    store.edit(id, [{ op: "set", items: [{ id: "a", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit" }], "agent");
-    expect(store.view(id)?.composition).toBe("orbit");
-    // A follow-up on the same board may keep it.
-    store.edit(id, [{ op: "set", items: [{ id: "a", kind: "stat", data: 2 }, { id: "b", kind: "stat", data: 3 }] }, { op: "board", composition: "orbit" }], "agent");
-    // A new board may not repeat it...
-    expect(() => store.edit(id, [{ op: "set", items: [{ id: "c", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit" }], "agent")).toThrow(/composition too/);
-    expect(store.items(id).map((item) => item.id)).toEqual(["a", "b"]);
-    // ...unless the user asked; another composition is fine.
-    store.edit(id, [{ op: "set", items: [{ id: "c", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit", sameComposition: true }], "agent");
-    store.edit(id, [{ op: "set", items: [{ id: "d", kind: "map", data: { PA: 1 } }] }, { op: "board", composition: "map" }], "agent");
-    expect(store.view(id)?.composition).toBe("map");
-    // A new board without one drops the old (the page infers it).
-    store.edit(id, [{ op: "set", items: [{ id: "e", kind: "stat", data: 1 }] }], "agent");
-    expect(store.view(id)?.composition).toBeNull();
+    const { id } = store.create({ threadId: "thr_a", title: "give me a rundown", look: "editorial" });
+    store.edit(id, [{ op: "add", item: { id: "old", kind: "stat", data: 1 } }], "agent");
+    const page = '<header data-cv-id="title"><h1>Democrats take the House</h1></header><section data-cv-id="seats"><b>221</b></section>';
+    expect(store.setPage(id, page, "agent")).toMatchObject({ parts: 2 });
+    const view = store.view(id)!;
+    expect(view).toMatchObject({ page, title: "Democrats take the House", items: [] });
+    expect(view.changes.at(-1)).toMatchObject({ op: "page", summary: "New page (2 parts)" });
+    // A part changes in place; a missing one lists the parts there are.
+    store.patchPage(id, "seats", '<section data-cv-id="seats"><b>223</b></section>', "agent");
+    expect(store.view(id)!.page).toContain("<b>223</b>");
+    expect(() => store.patchPage(id, "nope", "<p>x</p>", "agent")).toThrow(/Its parts: title, seats/);
+    // "" removes it; the agent's title wins over the heading.
+    store.patchPage(id, "seats", "", "agent");
+    expect(store.view(id)!.page).not.toContain("seats");
+    store.setPage(id, "<h1>Next</h1>", "agent", "Election 2026");
+    expect(store.get(id)!.title).toBe("Election 2026");
+    expect(() => store.setPage(id, "x".repeat(300 * 1024), "agent")).toThrow(/over 200 KB/);
   });
+
 });

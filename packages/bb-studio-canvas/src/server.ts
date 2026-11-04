@@ -13,6 +13,7 @@ import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instru
 import { DEFAULT_LOOK, lookOf } from "./looks";
 import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
+import type { ImageDeps } from "./image";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
 
 export { CANVAS_TOOL_NAMES as CANVAS_TOOLS } from "./tools";
@@ -26,7 +27,7 @@ export interface BuiltinCanvas {
   /** For a hands-free session launched from a canvas thread: Studio's voice calls these over RPC (canvas.voice, canvas.voiceRun). */
   voice: {
     tools(threadId: string | null): ReturnType<typeof canvasVoiceTools>;
-    run(threadId: string, name: string, args: Record<string, unknown>): string | null;
+    run(threadId: string, name: string, args: Record<string, unknown>): Promise<string | null>;
   };
 }
 
@@ -78,7 +79,7 @@ export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.provi
 const PERSONAL_PROJECT_ID = "proj_personal";
 
 /** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
-export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number } = {}): BuiltinCanvas {
+export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
   /** Canvases whose thread is being made: a tool call that races the spawn waits for it. */
   const pending = new Set<Promise<unknown>>();
@@ -98,8 +99,8 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     return row;
   };
 
-  const run = (canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor) => {
-    const result = runCanvasTool(store, canvasId, name, input, by);
+  const run = async (canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor) => {
+    const result = await runCanvasTool(store, canvasId, name, input, by, options.images);
     if (result.changed) publish(canvasId);
     return result;
   };
@@ -112,7 +113,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       async execute(input: unknown, ctx: { threadId: string }) {
         const row = await forThread(ctx.threadId);
         if (!row) return { content: [{ type: "text" as const, text: "This thread isn't a canvas, so there's no board to edit. Canvas tools work only in a canvas's own thread." }], isError: true };
-        const result = run(row.id, name, input, "agent");
+        const result = await run(row.id, name, input, "agent");
         return result.error ? { content: [{ type: "text" as const, text: result.text }], isError: true } : result.text;
       },
     } as never);
@@ -145,7 +146,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   const handoffNote = (canvasId: string) => {
     const talk = store.history(canvasId, 8).map((line) => `- ${line.role === "agent" ? "You" : line.role === "user" ? "User" : line.role}: ${line.text.replace(/\s+/g, " ").slice(0, 300)}`).join("\n");
     return [
-      "This canvas moved to this thread from another model; the board stays as it is. Carry on from it: update items in place, keep the style unless the topic changes kind.",
+      "This canvas moved to this thread from another model; the board stays as it is. Carry on from it: change parts in place by their data-cv-id, keep the style unless the topic changes kind.",
       describeBoard(store, canvasId),
       talk ? `Recent conversation (oldest first):\n${talk}` : "",
     ].filter(Boolean).join("\n\n");
@@ -199,11 +200,11 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     "canvas.voice"({ threadId }) {
       return store.byThread(threadId) ? { tools: canvasVoiceTools(), instructions: CANVAS_VOICE_NOTE } : { tools: [], instructions: null };
     },
-    "canvas.voiceRun"({ threadId, name, args }) {
+    async "canvas.voiceRun"({ threadId, name, args }) {
       if (!isCanvasTool(name)) return { output: null };
       const row = store.byThread(threadId);
       if (!row) return { output: "This session isn't speaking for a canvas, so there's no board to edit." };
-      return { output: run(row.id, name, args, "voice").text };
+      return { output: (await run(row.id, name, args, "voice")).text };
     },
     async "canvas.send"({ threadId, text }) {
       const row = store.byThread(threadId);
@@ -280,11 +281,11 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     },
     voice: {
       tools: (threadId) => (threadId && store.byThread(threadId) ? canvasVoiceTools() : []),
-      run(threadId, name, args) {
+      async run(threadId, name, args) {
         if (!isCanvasTool(name)) return null;
         const row = store.byThread(threadId);
         if (!row) return "This session isn't speaking for a canvas, so there's no board to edit.";
-        return run(row.id, name, args, "voice").text;
+        return (await run(row.id, name, args, "voice")).text;
       },
     },
   };

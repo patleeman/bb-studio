@@ -19,9 +19,9 @@ export const ORGANIC_LOOKS: readonly OrganicLook[] = ["editorial", "field", "ins
 export const DEFAULT_LOOK: OrganicLook = "editorial";
 
 export const LOOK_INFO: Record<Look, { name: string; line: string }> = {
-  editorial: { name: "Editorial", line: "A newspaper front: a big lead story with sidebars orbiting it, serif type, rules instead of cards, pull quotes and inline sparklines." },
-  field: { name: "Field notes", line: "A whiteboard: hand-drawn cards loosely pinned around the focus, in a loose cluster with a slight tilt." },
-  instrument: { name: "Instrument", line: "A dense control panel: tight hairline panels, small multiples, maps and timelines, mono labels and big tabular numbers." },
+  editorial: { name: "Editorial", line: "a newspaper or magazine spread: serif type, hairline rules, generous margins, warm paper" },
+  field: { name: "Field notes", line: "a designer's whiteboard: marker headlines, hand-written words, bright highlights on a dotted ground" },
+  instrument: { name: "Instrument", line: "a control room: dense and precise, mono labels, big tabular numbers, hairline panels" },
   classic: { name: "Classic", line: "Round 1: the slide grid with Studio's widget cards." },
 };
 

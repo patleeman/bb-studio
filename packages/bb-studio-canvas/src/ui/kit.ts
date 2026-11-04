@@ -40,6 +40,10 @@ export interface CanvasKit {
   hydrate?(root?: unknown): void;
   width?(): number;
   height?(): number;
+  /** Draws every [data-chart] under root from its data-rows / data-value and data-options. */
+  charts?(root?: unknown): void;
+  /** Shows a new page in root, animating parts by data-cv-id. */
+  morph?(root: unknown, html: string, animate?: boolean): void;
 }
 
 /** Builds the kit. With a window, it also becomes window.cv with render and hydrate. Self-contained: its source runs in frames. */
@@ -556,6 +560,109 @@ export function canvasKit(win?: unknown): CanvasKit {
       if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", draw); else draw();
     };
     kit.width = () => Math.max(120, doc.documentElement.clientWidth || w.innerWidth || 480);
+
+    // Declarative charts for pages: <div data-chart="line" data-rows='[…]' data-options='{…}'></div>.
+    // data-value for one number (stars, meter, bignum, spark). Sized to the element's width (and its
+    // CSS height, when it has one); redrawn when the page's width changes.
+    const parse = (text: string | undefined, fallback: unknown) => { if (!text) return fallback; try { return JSON.parse(text); } catch { return fallback; } };
+    const CHARTS: Record<string, (el: HTMLElement, rows: unknown, o: Record<string, unknown>) => string> = {
+      line: (el, rows, o) => line(rows, { w: el.clientWidth, h: el.clientHeight > 40 ? el.clientHeight : undefined, ...o }),
+      area: (el, rows, o) => line(rows, { w: el.clientWidth, h: el.clientHeight > 40 ? el.clientHeight : undefined, area: true, ...o }),
+      columns: (el, rows, o) => columns(rows, { w: el.clientWidth, h: el.clientHeight > 40 ? el.clientHeight : undefined, ...o }),
+      bars: (_el, rows, o) => hbars(rows, o),
+      donut: (_el, rows, o) => donut(rows, o),
+      split: (_el, rows, o) => split(rows, o),
+      waffle: (_el, rows, o) => waffle(rows, o),
+      map: (el, rows, o) => tilemap(rows, { cell: Math.max(12, Math.min(64, el.clientWidth / (o.callouts ? 18 : 11.9))), ...o }),
+      timeline: (_el, rows, o) => timeline(rows, o),
+      multiples: (_el, rows, o) => multiples(rows, o),
+      legend: (_el, rows) => legend(rows),
+      spark: (el, rows, o) => spark(rows, { w: el.clientWidth || 80, h: el.clientHeight > 8 ? el.clientHeight : 20, ...o }),
+      stars: (_el, value, o) => stars(value, o),
+      meter: (_el, value, o) => meter(value, o),
+      bignum: (_el, value, o) => bignum(value, o),
+      delta: (_el, value, o) => delta(value, o),
+    };
+    kit.charts = (root?: unknown) => {
+      const scope = (root as ParentNode | undefined) ?? doc;
+      scope.querySelectorAll<HTMLElement>("[data-chart]").forEach((el) => {
+        const draw = CHARTS[el.dataset.chart ?? ""];
+        if (!draw) return;
+        const data = el.dataset.value !== undefined ? el.dataset.value : parse(el.dataset.rows, []);
+        try { el.innerHTML = draw(el, data, parse(el.dataset.options, {}) as Record<string, unknown>); } catch (error) { el.textContent = `Couldn't draw: ${(error as Error)?.message ?? error}`; }
+        el.dataset.drawnWidth = String(el.clientWidth);
+      });
+    };
+    const RO = (w as unknown as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    if (typeof RO === "function") {
+      let lastWidth = 0;
+      new RO(() => {
+        const width = doc.documentElement.clientWidth;
+        if (Math.abs(width - lastWidth) < 2) return;
+        lastWidth = width;
+        kit.charts!();
+      }).observe(doc.documentElement);
+    }
+
+    // A new page, animated by part: parts (data-cv-id) that stay glide from where they were, relative to the
+    // part they sit in; new ones come in; gone ones leave from where they were. FLIP, with the Web Animations API.
+    const reduced = () => typeof w.matchMedia === "function" && w.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    kit.morph = (rootArg: unknown, html: string, animate = true) => {
+      const root = rootArg as HTMLElement;
+      const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null }>();
+      const sx = w.scrollX || 0, sy = w.scrollY || 0;
+      if (animate) root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
+        const parent = el.parentElement?.closest<HTMLElement>("[data-cv-id]")?.dataset.cvId ?? null;
+        before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent });
+      });
+      root.innerHTML = html;
+      // Scripts in the page run (innerHTML doesn't run them).
+      root.querySelectorAll("script").forEach((old) => {
+        const script = doc.createElement("script");
+        for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
+        script.textContent = old.textContent;
+        old.replaceWith(script);
+      });
+      kit.hydrate!(root);
+      kit.charts!(root);
+      if (!animate || reduced() || typeof root.animate !== "function") return;
+      const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+      const after = new Map<string, DOMRect>();
+      const els = Array.from(root.querySelectorAll<HTMLElement>("[data-cv-id]"));
+      for (const el of els) after.set(el.dataset.cvId!, el.getBoundingClientRect());
+      let entering = 0;
+      for (const el of els) {
+        const id = el.dataset.cvId!;
+        const was = before.get(id);
+        const now = after.get(id)!;
+        if (!was) {
+          // Inside a part that's new too, the part's own entrance carries it.
+          const host = el.parentElement?.closest<HTMLElement>("[data-cv-id]");
+          if (host && !before.has(host.dataset.cvId!)) continue;
+          el.animate([{ opacity: 0, transform: "translateY(14px) scale(0.98)" }, { opacity: 1, transform: "none" }], { duration: 460, delay: 120 + entering++ * 60, easing: ease, fill: "backwards" });
+          continue;
+        }
+        let dx = was.r.left - now.left, dy = was.r.top - now.top;
+        // Relative to the part it sits in, which moves too.
+        const hostId = el.parentElement?.closest<HTMLElement>("[data-cv-id]")?.dataset.cvId;
+        if (hostId && before.has(hostId) && after.has(hostId)) { dx -= before.get(hostId)!.r.left - after.get(hostId)!.left; dy -= before.get(hostId)!.r.top - after.get(hostId)!.top; }
+        const scaleX = now.width ? was.r.width / now.width : 1, scaleY = now.height ? was.r.height / now.height : 1;
+        const moved = Math.abs(dx) > 1 || Math.abs(dy) > 1 || Math.abs(scaleX - 1) > 0.02 || Math.abs(scaleY - 1) > 0.02;
+        if (moved) el.animate([{ transformOrigin: "0 0", transform: `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})` }, { transformOrigin: "0 0", transform: "none" }], { duration: 620, easing: ease });
+        if (was.html !== el.innerHTML) el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 520, delay: moved ? 200 : 0, easing: "ease-out", fill: "backwards" });
+      }
+      // Gone parts leave from where they were (only the outermost one of a gone group).
+      for (const [id, was] of before) {
+        if (after.has(id) || (was.parent && !after.has(was.parent) && before.has(was.parent))) continue;
+        const ghost = was.clone;
+        ghost.removeAttribute("data-cv-id");
+        Object.assign(ghost.style, { position: "absolute", left: `${was.r.left + sx}px`, top: `${was.r.top + sy}px`, width: `${was.r.width}px`, height: `${was.r.height}px`, margin: "0", pointerEvents: "none", zIndex: "50", boxSizing: "border-box" });
+        doc.body.appendChild(ghost);
+        const out = ghost.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.96)" }], { duration: 360, easing: "ease-in", fill: "forwards" });
+        out.onfinish = () => ghost.remove();
+        w.setTimeout(() => ghost.remove(), 1200);
+      }
+    };
     // The height its place in the composition suggests: size the figure to it (never set it on the outer element).
     kit.height = () => { const room = num((w.bbWidget as { size?: { room?: unknown } } | undefined)?.size?.room); return Math.max(90, room && room > 0 ? room - 40 : Math.round(kit.width!() * 0.55)); };
     w.cv = kit;

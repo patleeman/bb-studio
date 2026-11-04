@@ -1,0 +1,80 @@
+// A canvas page: the agent's HTML for the whole board, in one sandboxed
+// frame the size of the board (scripts in an opaque origin; no network
+// except https images), with the style's tokens, the kit's CSS and
+// window.cv. The frame is loaded once: each new version of the page and
+// each style switch arrives as a message, and the kit morphs the page by
+// data-cv-id (parts that stay glide, new ones enter, gone ones leave). The
+// page scrolls inside the frame when it's taller than the screen.
+import { useEffect, useMemo, useRef, useState } from "react";
+import { tokenDeclarations, type OrganicLook } from "../looks";
+import { canvasKit } from "./kit";
+import { kitCss } from "./kit-css";
+
+export const PAGE_MESSAGE = "bb-canvas-page";
+export const STYLE_MESSAGE = "bb-canvas-style";
+export const PAGE_READY_MESSAGE = "bb-canvas-page-ready";
+/**
+ * Pictures load straight from https addresses (canvas_image finds them):
+ * the frame stays an opaque origin with no scripts, styles, fetches or
+ * frames from the network, and no referrer is sent. Nothing proxies them
+ * through BB's server, so there's no server-side fetch to aim inward.
+ */
+export const PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
+
+const BOOT = `(function(){addEventListener("message",function(event){if(event.source!==parent)return;var d=event.data;if(!d)return;
+if(d.type==="${STYLE_MESSAGE}"){document.getElementById("cv-style").textContent=d.css;document.documentElement.setAttribute("data-cv-look",d.look);document.documentElement.setAttribute("data-cv-mode",d.mode)}
+if(d.type==="${PAGE_MESSAGE}"){window.cv.morph(document.getElementById("cv-page"),d.html,!!d.animate);document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
+addEventListener("load",function(){parent.postMessage({type:"${PAGE_READY_MESSAGE}"},"*")});})();`;
+
+const BASE = `html,body{margin:0;padding:0;background:var(--cv-paper);color:var(--cv-ink);font-family:var(--cv-font-text);font-size:var(--cv-t-md);line-height:1.45;-webkit-font-smoothing:antialiased;transition:background-color .6s ease,color .6s ease}
+*{box-sizing:border-box}img,svg{max-width:100%}img{display:block}
+body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}`;
+
+/** The page's CSS for a style and mode: its tokens, a base, the kit's classes. */
+export function pageCss(look: OrganicLook, mode: "light" | "dark"): string {
+  return `:root{${tokenDeclarations(look, mode)};color-scheme:${mode}}${BASE}${kitCss(look, "")}`;
+}
+
+/** The frame's document: CSP, an empty style (sent on ready), the boot script and the kit. */
+export function pageSrcDoc(): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}"><meta name="referrer" content="no-referrer"><style id="cv-style"></style><script>${BOOT}</script><script>(${canvasKit.toString()})(window);</script></head><body><div id="cv-page"></div></body></html>`;
+}
+
+export function PageFrame({ html, rev, look, mode, title }: { html: string; rev: number; look: OrganicLook; mode: "light" | "dark"; title: string }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const srcDoc = useMemo(() => pageSrcDoc(), []);
+  const [ready, setReady] = useState(false);
+  const shown = useRef<string | null>(null);
+  const post = (message: unknown) => { try { frame.current?.contentWindow?.postMessage(message, "*"); } catch { /* the frame is gone */ } };
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!frame.current || event.source !== frame.current.contentWindow) return;
+      if ((event.data as { type?: unknown } | null)?.type === PAGE_READY_MESSAGE) setReady(true);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+  useEffect(() => {
+    if (ready) post({ type: STYLE_MESSAGE, css: pageCss(look, mode), look, mode });
+  }, [ready, look, mode]);
+  useEffect(() => {
+    if (!ready || shown.current === html) return;
+    // The first page shows at once; every later version animates.
+    post({ type: PAGE_MESSAGE, html, animate: shown.current !== null, rev });
+    shown.current = html;
+  }, [ready, html, rev]);
+  return (
+    <iframe
+      ref={frame}
+      title={title}
+      srcDoc={srcDoc}
+      sandbox="allow-scripts"
+      referrerPolicy="no-referrer"
+      className="block size-full border-0 bg-transparent"
+      style={{ colorScheme: mode }}
+      data-canvas-page-frame
+      data-page-rev={rev}
+      data-page-ready={ready || undefined}
+    />
+  );
+}

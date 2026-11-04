@@ -17,7 +17,7 @@ describe("the canvas plugin", () => {
     const canvasThread = await host.harness.behavior.resolveAgentConfiguration(context("thr_new", { canvas: "cnv_0123456789abcdef" }) as never);
     expect(canvasThread.tools.map((tool) => tool.name).sort()).toEqual([...CANVAS_TOOL_NAMES].sort());
     expect(canvasThread.skills).toEqual(["canvas"]);
-    expect(canvasThread.instructions).toContain("Remove what no longer matters.");
+    expect(canvasThread.instructions).toContain("ONE page you design");
     const other = await host.harness.behavior.resolveAgentConfiguration(context("thr_other") as never);
     expect(other.tools).toEqual([]);
     expect(other.skills).toEqual([]);

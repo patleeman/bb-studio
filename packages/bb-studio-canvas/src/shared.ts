@@ -37,6 +37,8 @@ export const CANVAS_LIMITS = {
   optionsBytes: 16 * 1024,
   /** A custom item's HTML. */
   htmlBytes: 100 * 1024,
+  /** A board's page (src/page.ts). */
+  pageBytes: 200 * 1024,
   /** The caption the page shows: the agent's reply, clipped. */
   captionChars: 600,
   /** A message the user sends. */
@@ -178,7 +180,7 @@ export const canvasItemSchema = z.object({
 });
 export type CanvasItem = z.infer<typeof canvasItemSchema>;
 
-export const CHANGE_OPS = ["add", "update", "remove", "clear", "style", "compose"] as const;
+export const CHANGE_OPS = ["add", "update", "remove", "clear", "style", "page", "patch"] as const;
 export const changeSchema = z.object({
   seq: z.number(),
   rev: z.number(),
@@ -211,8 +213,6 @@ export const canvasMetaSchema = z.object({
   itemCount: z.number(),
   /** The canvas's look (looks.ts); classic for canvases made before looks. */
   look: lookSchema,
-  /** The board's composition, when the agent named one (organic.ts). */
-  composition: z.enum(COMPOSITIONS).nullable().optional(),
 });
 
 /** What a canvas's agent runs on: a provider, a model and, when the model has levels, a reasoning level. */
@@ -223,8 +223,8 @@ export const executionSchema = z.object({
 });
 export type CanvasExecution = z.infer<typeof executionSchema>;
 
-/** What a new canvas runs on unless the user picks another: Haiku, for speed. */
-export const CANVAS_DEFAULT_EXECUTION: CanvasExecution = { providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: null };
+/** What a new canvas runs on unless the user picks another: Sonnet, which designs a page well and still answers in a turn. */
+export const CANVAS_DEFAULT_EXECUTION: CanvasExecution = { providerId: "claude-code", model: "claude-sonnet-5-5", reasoningLevel: null };
 
 /** A provider in the model picker, with its models (BB's own listing). */
 export const pickerProviderSchema = z.object({
@@ -252,6 +252,8 @@ export const canvasViewSchema = canvasMetaSchema.extend({
   rev: z.number(),
   turn: z.number(),
   status: z.enum(CANVAS_STATUSES),
+  /** The board as one HTML page (src/page.ts), when the agent has written one; boards from before are items. */
+  page: z.string().nullable().optional(),
   /** The agent's latest reply, clipped: one spoken-style line. */
   caption: z.string().nullable(),
   items: z.array(canvasItemSchema),

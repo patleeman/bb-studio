@@ -1,50 +1,48 @@
 // The canvas tools: one definition for the canvas thread's agent (zod, via
 // bb.agents.registerTool) and for the hands-free voice (JSON Schema, in the
 // OpenAI session). Both run through runCanvasTool, scoped to one canvas.
+//
+// The agent writes the whole board as one HTML page (canvas_page) and
+// changes parts of it by their data-cv-id (canvas_patch). canvas_image
+// finds a picture's address for the page. Boards of items from before
+// pages still show; canvas_page replaces them.
 import { z } from "zod";
 import { designGuide } from "./guides";
-import { KIND_LINES } from "./instructions";
+import { findImage, type ImageDeps } from "./image";
 import { LOOK_INFO, lookOf, ORGANIC_LOOKS, type OrganicLook } from "./looks";
-import { focusOf } from "./layout";
-import { CANVAS_LIMITS, COMPOSITION_INFO, COMPOSITIONS, itemInputSchema, itemPatchSchema, jsonBytes, ITEM_ID } from "./shared";
-import type { CanvasActor, CanvasOp, CanvasStore, EditResult } from "./store";
+import { outline } from "./page";
+import { CANVAS_LIMITS, jsonBytes } from "./shared";
+import type { CanvasActor, CanvasStore } from "./store";
 
-export const CANVAS_TOOL_NAMES = ["canvas_read", "canvas_add", "canvas_update", "canvas_remove", "canvas_clear", "canvas_set", "canvas_style", "canvas_guide"] as const;
+export const CANVAS_TOOL_NAMES = ["canvas_read", "canvas_page", "canvas_patch", "canvas_style", "canvas_image", "canvas_guide"] as const;
 export type CanvasToolName = (typeof CANVAS_TOOL_NAMES)[number];
 export const isCanvasTool = (name: string): name is CanvasToolName => (CANVAS_TOOL_NAMES as readonly string[]).includes(name);
 
-const items = z.array(itemInputSchema).min(1).max(CANVAS_LIMITS.perCall);
 /** The board styles the agent picks from (looks.ts; classic isn't one). */
 const style = z.enum(ORGANIC_LOOKS as [OrganicLook, ...OrganicLook[]]);
-const styleReason = z.string().max(200).optional();
-/** The board's topic, for the canvas's title (a few words). */
-const title = z.string().trim().min(1).max(CANVAS_LIMITS.title).optional();
-const composition = z.enum(COMPOSITIONS).optional();
-const sameComposition = z.boolean().optional();
+const PART_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 export const CANVAS_TOOL_PARAMS = {
   canvas_read: z.object({}),
-  canvas_add: z.object({ items }),
-  canvas_update: z.object({ items: z.array(itemPatchSchema).min(1).max(CANVAS_LIMITS.perCall) }),
-  canvas_remove: z.object({ ids: z.array(z.string().regex(ITEM_ID)).min(1).max(CANVAS_LIMITS.items) }),
-  canvas_clear: z.object({ style: style.optional(), styleReason, title }),
-  canvas_set: z.object({ items: z.array(itemInputSchema).max(CANVAS_LIMITS.items), style: style.optional(), styleReason, title, composition, sameComposition }),
-  canvas_style: z.object({ style, reason: styleReason }),
-  canvas_guide: z.object({ style: style.optional() }),
+  canvas_page: z.object({
+    html: z.string().min(1).max(CANVAS_LIMITS.pageBytes),
+    title: z.string().trim().min(1).max(CANVAS_LIMITS.title).optional(),
+    style: style.optional(),
+    styleReason: z.string().max(200).optional(),
+  }),
+  canvas_patch: z.object({ id: z.string().regex(PART_ID), html: z.string().max(CANVAS_LIMITS.pageBytes) }),
+  canvas_style: z.object({ style, reason: z.string().max(200).optional() }),
+  canvas_image: z.object({ query: z.string().trim().min(1).max(200).optional(), pageUrl: z.string().url().max(2000).optional() }),
+  canvas_guide: z.object({}),
 } satisfies Record<CanvasToolName, z.ZodType>;
 
-const ITEM_HELP = `Each item: id? (short, like "turnout-chart"; made from the title when left out), kind, title?, data, options?, html? (custom only), importance? (1–5, default 3), size? (s|m|l|xl, a fallback for scale). Placement (rough; Studio composes it, never on a grid): scale? (hero|large|medium|small|tiny: one hero, the rest at clearly different scales), region? (top-left|top|top-right|left|center|right|bottom-left|bottom|bottom-right), pinnedTo? (an id: placed right next to it, nothing drawn between) with point? ({x, y} 0–1 on it) and side? (left|right|above|below), bleed? (true: runs off the edge). Kinds:\n${KIND_LINES}`;
-const COMPOSITION_HELP = `composition (each new board; never the same as the last board unless the user asks): ${COMPOSITIONS.map((name) => `${name} (${COMPOSITION_INFO[name]})`).join("; ")}.`;
-
 export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
-  canvas_read: "Read this canvas: each item's id, kind, title, size, importance and data, the focus item, and the latest changes. Read it before editing when you're unsure what's on the board.",
-  canvas_add: `Add items to this canvas's board. The user sees them appear at once; Studio places them by importance and size. ${ITEM_HELP}`,
-  canvas_update: "Change items in place: pass each item's id and the fields to change. data and html replace; options merge (null removes a key; replaceOptions replaces them). Raise importance to make an item the focus. The user sees the change highlighted.",
-  canvas_remove: "Remove items that no longer matter, by id.",
-  canvas_clear: "Clear the board, for a topic change; style (and styleReason) switches its style at the same time, and title names the new topic (a few words; the canvas's title). Then add the new items (or use canvas_set to do both in one step).",
-  canvas_set: `Replace the whole board in one step: items whose id is already there update in place, new ones appear, the rest leave. Use it on a topic change, or to rebuild. style picks the board's style: editorial (news, stories, explainers), field (brainstorming, planning, ideas), instrument (dense data, monitoring, comparisons); give styleReason in a few words. Set it on your first board and when the topic changes kind; the switch animates. title: the topic in a few words (the canvas's title); set it whenever the topic changes. ${COMPOSITION_HELP} ${ITEM_HELP}`,
-  canvas_style: "Switch the board's style without rebuilding it: editorial, field or instrument, with the reason in a few words. Use it when the user asks for a style (\"make this a whiteboard\" is field) or the content changes kind.",
-  canvas_guide: "The design guide: how to choose a style, what makes a rich board, the tokens, the kit (window.cv) for custom components, quote accents, and examples. style narrows it to one style's rules and examples.",
+  canvas_read: "Read this canvas: its style, title and the page's source (or, for a board from before pages, its items), with the ids of its parts, and the latest changes.",
+  canvas_page: "Show a new version of the whole board: one HTML page you design for this answer (HTML and CSS, no <html>/<head>; scripts allowed). It renders in a sandboxed frame the size of the screen, with the style's tokens (--cv-* CSS variables), the kit's classes and charts (data-chart), and no network except https images. Mark each part with a stable data-cv-id: between versions, parts with the same id glide to their new place, new ones come in, gone ones leave. title names the topic (else the page's first heading). style switches the board's style: editorial, field or instrument (with styleReason).",
+  canvas_patch: "Change one part of the page in place: id is its data-cv-id, html replaces that whole element (keep the data-cv-id on it so it animates); an empty html removes it.",
+  canvas_style: "Switch the board's style without rewriting the page: editorial, field or instrument, with the reason in a few words. The page's tokens change and it animates.",
+  canvas_image: "Find a picture for the page (box art, a cover, a product shot, a photo): returns {url, alt, source, width?, height?}, an https address the page can show in an <img>. query searches for it (when image search is set up); pageUrl takes the main picture of a page you found (a store, publisher or Wikipedia page). Call it once per picture.",
+  canvas_guide: "The design guide again: how to tell the story on one page, the style tokens, the kit and the examples.",
 };
 
 /** For the voice session (session.ts): OpenAI function tools with the same parameters. */
@@ -56,76 +54,64 @@ export function canvasVoiceTools(): { type: "function"; name: CanvasToolName; de
   });
 }
 
-/** The board as the agent reads it: compact JSON per item, big data clipped. */
+/** The board as the agent reads it: the page's source with its parts, or the old items. */
 export function describeBoard(store: CanvasStore, canvasId: string): string {
-  const board = store.items(canvasId);
   const row = store.get(canvasId)!;
   const look = lookOf(row.look);
-  const styleLine = look === "classic" ? "" : ` Style: ${look} (${LOOK_INFO[look].name}).${row.composition ? ` Composition: ${row.composition}.` : ""} Title: "${row.title}".`;
-  if (!board.length) return `The board is empty (revision ${row.rev}, turn ${row.turn}).${styleLine}`;
-  const focus = focusOf(board);
-  const lines = board.map((item) => {
-    const data = jsonBytes(item.data) > 1500 ? `${JSON.stringify(item.data).slice(0, 1500)}… (clipped)` : JSON.stringify(item.data);
-    const options = Object.keys(item.options).length ? ` options=${JSON.stringify(item.options).slice(0, 400)}` : "";
-    const place = `${item.scale ? `, scale ${item.scale}` : ""}${item.region ? `, region ${item.region}` : ""}${item.bleed ? ", bleeds" : ""}${item.pinnedTo ? `, pinned to ${item.pinnedTo}${item.point ? ` at ${item.point.x},${item.point.y}` : ""}${item.side ? ` (${item.side})` : ""}` : ""}`;
-    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}, size ${item.size}, importance ${item.importance}${item.id === focus?.id ? " (focus)" : ""}${place}${item.html ? `, html ${item.html.length} chars` : ""}\n  data=${data}${options}`;
-  });
+  const head = `Canvas (revision ${row.rev}, turn ${row.turn}). Style: ${look === "classic" ? "classic" : `${look} (${LOOK_INFO[look].name})`}. Title: "${row.title}".`;
   const changes = store.changes(canvasId, 12).map((change) => `- turn ${change.turn}, rev ${change.rev} (${change.by}): ${change.summary}`);
-  return [`Board (revision ${row.rev}, turn ${row.turn}), ${board.length} item(s).${styleLine}`, ...lines, "", "Latest changes:", ...changes].join("\n");
-}
-
-/** A request for something to look at: a showcase, a gallery, pictures. */
-const VISUAL_ASK = /\b(showcase|show me|gallery|pictures?|photos?|images?|what (does|do) .* look like)\b/i;
-
-/** After canvas_set in a style: what a thin or heroless board still needs (the board is already shown). */
-export function boardAdvice(items: readonly { kind: string; scale?: string | null }[], asked: string | null = null): string {
-  const advice: string[] = [];
-  if (asked && VISUAL_ASK.test(asked) && !items.some((item) => item.kind === "image")) advice.push("the user asked to see things: add image items with real pictures (covers, box art, photos) from web search; one that fails to load shows its name on a tile, so don't leave them out");
-  if (items.length && items.length < 5) advice.push(`it has only ${items.length} pieces: add 2–5 more that each say something specific (numbers with context, a chart, pictures, a quote), at different scales, so the board fills the screen`);
-  if (items.length && !items.some((item) => item.scale === "hero")) advice.push("no piece is the hero: give the one that answers the question scale \"hero\"");
-  return advice.length ? ` Still to do: ${advice.join("; ")}.` : "";
-}
-
-function summarize(result: EditResult, focus: { id: string } | null): string {
-  // (the style line, when it changed, is one of the changes)
-  const done = result.changes.map((change) => change.summary).join("; ") || "No change.";
-  const ids = result.items.map((item) => item.id).join(", ") || "nothing";
-  return `${done}. The board now shows ${result.items.length} item(s): ${ids}${focus ? `; the focus is ${focus.id}` : ""}.`;
-}
-
-/** The edits a tool call makes; validated input. */
-export function toolOps(name: Exclude<CanvasToolName, "canvas_read" | "canvas_guide">, input: unknown): CanvasOp[] {
-  const styled = (look: OrganicLook | undefined, reason: string | undefined): CanvasOp[] => (look ? [{ op: "style", look, reason: reason ?? null }] : []);
-  switch (name) {
-    case "canvas_add": return CANVAS_TOOL_PARAMS.canvas_add.parse(input).items.map((item) => ({ op: "add", item }));
-    case "canvas_update": return CANVAS_TOOL_PARAMS.canvas_update.parse(input).items.map((patch) => ({ op: "update", patch }));
-    case "canvas_remove": return CANVAS_TOOL_PARAMS.canvas_remove.parse(input).ids.map((id) => ({ op: "remove", id }));
-    case "canvas_clear": { const parsed = CANVAS_TOOL_PARAMS.canvas_clear.parse(input ?? {}); return [{ op: "clear" }, ...styled(parsed.style, parsed.styleReason), ...(parsed.title ? [{ op: "board" as const, title: parsed.title }] : [])]; }
-    case "canvas_set": {
-      const parsed = CANVAS_TOOL_PARAMS.canvas_set.parse(input);
-      const board: CanvasOp[] = parsed.title || parsed.composition ? [{ op: "board", title: parsed.title ?? null, composition: parsed.composition ?? null, sameComposition: parsed.sameComposition }] : [];
-      return [...styled(parsed.style, parsed.styleReason), { op: "set", items: parsed.items }, ...board];
-    }
-    case "canvas_style": { const parsed = CANVAS_TOOL_PARAMS.canvas_style.parse(input); return styled(parsed.style, parsed.reason); }
+  const tail = ["", "Latest changes:", ...(changes.length ? changes : ["- none"])];
+  if (row.page) {
+    const parts = outline(row.page).map((part) => `- ${part.id} <${part.tag}> ${part.text}`);
+    return [head, "", "Parts (data-cv-id):", ...(parts.length ? parts : ["- none: mark parts with data-cv-id so they animate"]), "", "Page source:", row.page, ...tail].join("\n");
   }
+  const items = store.items(canvasId);
+  if (!items.length) return [`${head} The board is empty: write it with canvas_page.`, ...tail].join("\n");
+  const lines = items.map((item) => {
+    const data = jsonBytes(item.data) > 1500 ? `${JSON.stringify(item.data).slice(0, 1500)}… (clipped)` : JSON.stringify(item.data);
+    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}\n  data=${data}`;
+  });
+  return [head, "", "This board is from before pages: these items show as they are. canvas_page replaces them with a page.", ...lines, ...tail].join("\n");
 }
 
 /**
  * Runs one canvas tool on one canvas. Returns the text the model gets;
  * `changed` says whether the board moved (so the caller publishes).
  */
-export function runCanvasTool(store: CanvasStore, canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor): { text: string; changed: boolean; error?: boolean } {
+export async function runCanvasTool(store: CanvasStore, canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor, images?: ImageDeps): Promise<{ text: string; changed: boolean; error?: boolean }> {
   try {
-    if (name === "canvas_read") return { text: describeBoard(store, canvasId), changed: false };
-    if (name === "canvas_guide") {
-      const look = lookOf(store.get(canvasId)?.look);
-      if (look === "classic") return { text: "This canvas uses the classic look: the canvas skill covers it.", changed: false };
-      const asked = CANVAS_TOOL_PARAMS.canvas_guide.parse(input ?? {}).style;
-      return { text: designGuide(asked ?? null), changed: false };
+    switch (name) {
+      case "canvas_read": return { text: describeBoard(store, canvasId), changed: false };
+      case "canvas_guide": return { text: designGuide(), changed: false };
+      case "canvas_page": {
+        const parsed = CANVAS_TOOL_PARAMS.canvas_page.parse(input);
+        let styled = "";
+        if (parsed.style) {
+          // The store logs a switch, and the agent's first pick with its reason.
+          if (parsed.style !== store.get(canvasId)?.look || !store.changes(canvasId, 200).some((change) => change.op === "style")) store.edit(canvasId, [{ op: "style", look: parsed.style, reason: parsed.styleReason ?? null }], by);
+          styled = ` Style: ${LOOK_INFO[parsed.style].name}.`;
+        }
+        const { rev, parts } = store.setPage(canvasId, parsed.html, by, parsed.title ?? null);
+        const advice = parts ? "" : " No part has a data-cv-id, so the next version can't animate part by part: mark the main parts.";
+        return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${advice}`, changed: true };
+      }
+      case "canvas_patch": {
+        const parsed = CANVAS_TOOL_PARAMS.canvas_patch.parse(input);
+        const { rev } = store.patchPage(canvasId, parsed.id, parsed.html, by);
+        return { text: `${parsed.html.trim() ? "Changed" : "Removed"} part "${parsed.id}" (revision ${rev}).`, changed: true };
+      }
+      case "canvas_style": {
+        const parsed = CANVAS_TOOL_PARAMS.canvas_style.parse(input);
+        store.edit(canvasId, [{ op: "style", look: parsed.style, reason: parsed.reason ?? null }], by);
+        return { text: `Style: ${LOOK_INFO[parsed.style].name}.`, changed: true };
+      }
+      case "canvas_image": {
+        const parsed = CANVAS_TOOL_PARAMS.canvas_image.parse(input ?? {});
+        if (!images) return { text: "Pictures can't be looked up here.", changed: false, error: true };
+        const image = await findImage(parsed, images);
+        return { text: JSON.stringify(image), changed: false };
+      }
     }
-    const result = store.edit(canvasId, toolOps(name, input), by);
-    const look = lookOf(store.get(canvasId)?.look);
-    return { text: summarize(result, focusOf(result.items)) + (name === "canvas_set" && look !== "classic" ? boardAdvice(result.items, [...store.history(canvasId, 6)].reverse().find((line) => line.role === "user" || line.role === "voice")?.text ?? null) : ""), changed: true };
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")

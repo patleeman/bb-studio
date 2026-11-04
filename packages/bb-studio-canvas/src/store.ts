@@ -17,15 +17,15 @@ import {
   type CanvasMeta,
   type CanvasTurn,
   type CanvasView,
-  type Composition,
   type ItemInput,
   type ItemPatch,
   type SizeHint,
 } from "./shared";
 import { LOOK_INFO, lookOf, type Look, type OrganicLook } from "./looks";
 import { organicFocus } from "./organic";
+import { outline, pageTitle, replacePart } from "./page";
 
-type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; composition: string | null; title_source: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
+type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; page: string | null; title_source: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
 type ItemRow = { canvas_id: string; id: string; kind: string; title: string | null; data: string | null; options: string; html: string | null; size: string; importance: number; created_at: number; updated_at: number; rev: number; rel: string | null };
 
 /** Who made an edit: the canvas thread's agent, the hands-free voice, or the user. */
@@ -41,8 +41,8 @@ export type CanvasOp =
   | { op: "set"; items: ItemInput[] }
   /** The board's style (the agent picks it), with why. */
   | { op: "style"; look: OrganicLook; reason?: string | null }
-  /** The board as a whole: its title (the topic) and composition; sameComposition allows repeating the last board's. */
-  | { op: "board"; title?: string | null; composition?: Composition | null; sameComposition?: boolean };
+  /** The board as a whole: its title (the topic). */
+  | { op: "board"; title?: string | null };
 
 export interface EditResult { rev: number; changes: CanvasChange[]; items: CanvasItem[] }
 
@@ -158,7 +158,7 @@ export class CanvasStore {
 
   private meta(row: CanvasRow): CanvasMeta {
     const count = shownKinds(this.db.prepare("SELECT kind FROM canvas_items WHERE canvas_id = ?").all(row.id) as ItemRow[]).length;
-    return { id: row.id, threadId: row.thread_id ?? "", title: row.title || "Untitled canvas", createdAt: row.created_at, updatedAt: row.updated_at, itemCount: count, look: lookOf(row.look), composition: (row.composition as Composition | null) ?? null };
+    return { id: row.id, threadId: row.thread_id ?? "", title: row.title || "Untitled canvas", createdAt: row.created_at, updatedAt: row.updated_at, itemCount: count, look: lookOf(row.look) };
   }
 
   items(canvasId: string): CanvasItem[] {
@@ -182,6 +182,7 @@ export class CanvasStore {
     return {
       ...this.meta(row), rev: row.rev, turn: row.turn, status: (row.status as CanvasView["status"]) ?? "idle", caption: row.caption,
       execution: this.execution(id), pendingExecution: this.pendingExecution(id),
+      page: row.page ?? null,
       items: this.items(id), changes: this.changes(id), history: this.history(id),
     };
   }
@@ -320,15 +321,7 @@ export class CanvasStore {
 
       // A new board: cleared, or none of what was there stays (a topic change).
       const fresh = cleared || !before.size || (board.size > 0 && ![...board.keys()].some((id) => before.has(id)));
-      let composition = fresh && before.size ? null : row.composition;
       const asked = boardOps.length ? Object.assign({}, ...boardOps) as Extract<CanvasOp, { op: "board" }> : null;
-      if (asked?.composition) {
-        if (fresh && before.size && asked.composition === row.composition && !asked.sameComposition) {
-          throw new Error(`The last board was a "${row.composition}" composition too. Compose this one another way (orbit, giant-number, map, spine, split, quote, close-up, essay: whichever fits this content), or pass sameComposition: true only if the user asked for the same layout.`);
-        }
-        if (asked.composition !== row.composition) record("compose", null, `Composition: ${asked.composition}`);
-        composition = asked.composition;
-      }
       // The title follows the topic: the agent's, else the board's headline or hero (on a new board, or until the agent names one).
       let title = row.title;
       let titleSource = row.title_source;
@@ -343,12 +336,57 @@ export class CanvasStore {
       for (const item of board.values()) {
         insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev, relText(item));
       }
-      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ?, composition = ?, title = ?, title_source = ? WHERE id = ?").run(rev, at, look, composition, title, titleSource, canvasId);
+      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ?, title = ?, title_source = ? WHERE id = ?").run(rev, at, look, title, titleSource, canvasId);
       const write = this.db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       const changes: CanvasChange[] = log.map((change) => ({ ...change, seq: Number(write.run(canvasId, change.rev, change.turn, change.op, change.itemId, change.summary, change.by, change.at).lastInsertRowid) }));
       this.db.prepare("DELETE FROM canvas_changes WHERE canvas_id = ? AND seq <= (SELECT seq FROM canvas_changes WHERE canvas_id = ? ORDER BY seq DESC LIMIT 1 OFFSET ?)").run(canvasId, canvasId, CANVAS_LIMITS.changesKept);
       return { rev, changes, items: this.items(canvasId) };
     }).immediate();
+  }
+
+  /**
+   * Replaces the board with a page (src/page.ts): one revision, logged. The
+   * title is the agent's when given, else the page's first heading. A page
+   * replaces any items left from before pages.
+   */
+  setPage(canvasId: string, html: string, by: CanvasActor, title: string | null = null): { rev: number; parts: number } {
+    if (new TextEncoder().encode(html).length > CANVAS_LIMITS.pageBytes) throw new Error(`The page is over ${CANVAS_LIMITS.pageBytes / 1024} KB; make it leaner.`);
+    if (!html.trim()) throw new Error("The page is empty.");
+    return this.db.transaction(() => {
+      const row = this.get(canvasId);
+      if (!row) throw new Error("That canvas is gone.");
+      const rev = row.rev + 1;
+      const named = title?.trim();
+      const derived = pageTitle(html);
+      const nextTitle = named ? named.slice(0, CANVAS_LIMITS.title) : derived ? derived.slice(0, CANVAS_LIMITS.title) : row.title;
+      const source = named ? "agent" : derived ? "page" : row.title_source;
+      this.db.prepare("DELETE FROM canvas_items WHERE canvas_id = ?").run(canvasId);
+      this.db.prepare("UPDATE canvases SET page = ?, rev = ?, updated_at = ?, title = ?, title_source = ? WHERE id = ?").run(html, rev, this.now(), nextTitle, source, canvasId);
+      const parts = outline(html).length;
+      this.logChange(canvasId, rev, row.turn, "page", null, `New page (${parts} part${parts === 1 ? "" : "s"})`, by);
+      return { rev, parts };
+    }).immediate();
+  }
+
+  /** Replaces one part of the page (by its data-cv-id); "" removes it. */
+  patchPage(canvasId: string, id: string, html: string, by: CanvasActor): { rev: number } {
+    return this.db.transaction(() => {
+      const row = this.get(canvasId);
+      if (!row) throw new Error("That canvas is gone.");
+      if (!row.page) throw new Error("There's no page yet: write one with canvas_page.");
+      const next = replacePart(row.page, id, html);
+      if (next === null) throw new Error(`The page has no part with data-cv-id="${id}". Its parts: ${outline(row.page).map((part) => part.id).join(", ") || "none"}.`);
+      if (new TextEncoder().encode(next).length > CANVAS_LIMITS.pageBytes) throw new Error(`The page would be over ${CANVAS_LIMITS.pageBytes / 1024} KB.`);
+      const rev = row.rev + 1;
+      this.db.prepare("UPDATE canvases SET page = ?, rev = ?, updated_at = ? WHERE id = ?").run(next, rev, this.now(), canvasId);
+      this.logChange(canvasId, rev, row.turn, "patch", id, html.trim() ? `Changed part "${id}"` : `Removed part "${id}"`, by);
+      return { rev };
+    }).immediate();
+  }
+
+  private logChange(canvasId: string, rev: number, turn: number, op: CanvasChange["op"], itemId: string | null, summary: string, by: CanvasActor): void {
+    this.db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(canvasId, rev, turn, op, itemId, summary, by, this.now());
+    this.db.prepare("DELETE FROM canvas_changes WHERE canvas_id = ? AND seq <= (SELECT seq FROM canvas_changes WHERE canvas_id = ? ORDER BY seq DESC LIMIT 1 OFFSET ?)").run(canvasId, canvasId, CANVAS_LIMITS.changesKept);
   }
 }
 

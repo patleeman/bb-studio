@@ -202,15 +202,12 @@ describe("pins", () => {
 
 describe("look instructions", () => {
   it("fit the configure hook's 4,096 characters, and the first note carries the guide", () => {
-    for (const look of [...ORGANIC_LOOKS, "classic" as const]) {
-      expect(canvasInstructions(look).length).toBeLessThan(4096);
-    }
+    for (const look of [...ORGANIC_LOOKS, "classic" as const]) expect(canvasInstructions(look).length).toBeLessThan(4096);
     for (const look of ORGANIC_LOOKS) {
       const note = canvasFirstNote(look);
       expect(note).toContain("DESIGN GUIDE");
-      expect(note).toContain("COMPOSITIONS");
-      expect(note).not.toContain("Keep the board small");
-      expect(note.length).toBeLessThan(30_000);
+      expect(note).toContain("EXAMPLES");
+      expect(note.length).toBeLessThan(16_000);
     }
   });
 });

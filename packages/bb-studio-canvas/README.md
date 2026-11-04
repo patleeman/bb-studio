@@ -40,59 +40,49 @@ hands-free button.
 
 - **The agent** is an ordinary BB thread, hidden, in your personal
   project. Canvas makes it when you start a canvas, on Claude Code's
-  Haiku 5.5 (`claude-haiku-5-5`) for speed. The thread is the canvas's
-  memory; you see the board.
-- **The model picker** in the top bar ("Haiku 5.5 ▾") lists the
-  providers and models BB has (as `bb provider models <id>` does), grouped
-  by provider, with reasoning levels when a model has more than one. The
-  pick is saved per canvas and applies from the next message:
-  - another model from the same provider changes the canvas's thread in
-    place (BB's thread update);
-  - another provider starts a fresh hidden thread on the next message,
-    because BB can't move a thread to another provider. The board stays (it's
-    Canvas's own), and the new thread gets the canvas rules, the design
-    guide, the board as it is and the last few lines of talk. The old
-    thread's address still opens the canvas.
-- **The board** is in this plugin's own database: one per canvas thread,
-  with a short log of what changed in each turn.
-- **The canvas tools** (`canvas_read`, `canvas_add`, `canvas_update`,
-  `canvas_remove`, `canvas_clear`, `canvas_set`, `canvas_style`,
-  `canvas_guide`) are this
-  plugin's agent tools. Only canvas threads get them, with the canvas rules
-  and the `canvas` skill, and each works only on the calling thread's board.
-- **Styles (prototype):** the agent picks each board's style from what it
-  shows, and can switch it on a topic change (the switch animates):
-  **Editorial** (a newspaper front, for news and stories), **Field notes**
-  (a whiteboard of loose hand-drawn cards, for planning and ideas) or
-  **Instrument** (a dense panel, for data and monitoring). A style you ask
-  for wins. The top bar shows the current one. Canvases made
-  before styles stay **Classic**, the round 1 slide grid. Each style has
-  its design tokens (`src/looks.ts`), its layout rules (`src/organic.ts`)
-  and a part of the agent's design guide (`src/guides.ts`).
-- **Items** are a headline, a caption, a quote, a timeline, a US
-  map, small multiples, one of Studio's Dashboards widget types (stat,
-  line, bar, area, pie, table, list, ticker, progress, image), or custom
-  HTML in a sandboxed frame. In a style, custom frames get the style's tokens
-  and a helper kit (`window.cv`: sparklines, charts, seat splits, tile
-  maps, timelines, small multiples; `src/ui/kit.ts`), and grow to their
-  content. Canvas has no notes, stickies or connectors; boards saved
-  with them show without them.
-- **Layout:** in Classic, Canvas packs items on a grid by importance (1–5)
-  and size (s, m, l, xl). In a style, Canvas composes the board for the
-  screen (`src/organic.ts`), with no grid: one hero, sized by the board's
-  composition (orbit, giant-number, map, spine, split, quote, close-up or
-  essay or gallery, which the agent picks and doesn't repeat on consecutive boards),
-  and the rest at clearly different scales. The agent places things
-  roughly (`scale`, a `region`, a pin to a spot on another item, `bleed`)
-  and each item goes to the free spot nearest that target, at any x and y,
-  so the board fills the screen on both axes and only scrolls when it must.
-  Nothing overlaps (a hero may bleed off the edge), and nothing is drawn
-  between items. Items that don't change keep their place; narrow windows
-  compose down the page.
-- **Title and caption:** the canvas's title follows the topic: the agent
-  names it with `canvas_set` or `canvas_clear`, else it's the board's
-  headline or hero. The caption is the agent's reply, written to add what
-  the board doesn't say.
+  Sonnet 5.5 (`claude-sonnet-5-5`). The thread is the canvas's memory; you
+  see the board. Canvases made before keep the model their thread has.
+- **The model picker** in the top bar lists the providers and models BB has,
+  grouped by provider, with reasoning levels when a model has more than one.
+  The pick is saved per canvas and applies from the next message: another
+  model from the same provider changes the thread in place; another
+  provider starts a fresh hidden thread that gets the rules, the guide, the
+  board and the last few lines of talk.
+- **The board is one page** the agent designs for each answer: HTML and CSS
+  shaped by the content (a plan runs along a timeline, a showcase is a wall
+  of pictures, a comparison sits side by side). It's in this plugin's own
+  database, with a short log of what changed in each turn.
+- **The page** renders in a sandboxed frame the size of the board (scripts
+  in an opaque origin; nothing loads from the network but https pictures),
+  with the style's tokens (`--cv-*`), the kit's classes and declarative
+  charts (`data-chart`: line, columns, bars, stars, US tile maps, timelines
+  and more; `src/ui/kit.ts`). It scrolls when it's taller than the screen.
+- **Motion:** the agent marks parts with `data-cv-id`. When a new version
+  arrives, the frame keeps its document and morphs the page: parts with the
+  same id glide (FLIP) to their new place, changed ones fade their new
+  content in, new ones enter and gone ones leave from where they were.
+- **The canvas tools:** `canvas_page` (the whole board), `canvas_patch` (one
+  part by id), `canvas_read`, `canvas_style`, `canvas_image` and
+  `canvas_guide`. Only canvas threads get them, with the canvas rules and
+  the `canvas` skill, and each works only on the calling thread's board.
+  Hands-free voice gets the same tools.
+- **Pictures:** `canvas_image` returns an https address with alt text and
+  its source. With an Exa API key it searches; without one it takes the
+  main picture of a page the agent found (og:image, else the largest
+  image). Server-side fetches go only to public http(s) addresses (checked
+  on every redirect), with a time limit and a size cap.
+- **Exa API key:** a BB secret setting on this plugin, `exaApiKey`
+  (**Settings → Plugins → BB Studio Canvas**, or `bb plugin config
+  studio-canvas`). It's only sent to Exa: never logged, returned or put in
+  an error.
+- **Styles:** Editorial (a magazine spread), Field notes (a designer's
+  whiteboard) and Instrument (a control room) are token sets. The agent
+  picks one per board, a style you ask for wins, and the top bar shows it.
+- **Title and caption:** the canvas's title is the topic the agent names,
+  else the page's first heading. The caption is the agent's reply, written
+  to add what the board doesn't say.
+- **Boards from before pages** (items placed by Canvas's layout) still open
+  and show as they were. The agent's next page replaces them.
 
 ## With Studio
 
@@ -115,9 +105,8 @@ node build-ui.mjs   # after changing src/ui or the Studio files it uses
 turn in a staged BB. `scripts/capture/canvas-directions.mjs` runs real turns in
 one canvas and saves light and dark stills after each, with the style the
 agent picked. `scripts/capture/canvas-composition.mjs` runs real turns at two
-window sizes and renders a hand-placed reference board for each beside it
-(the page's `bb-studio-canvas:preview` event shows a board JSON in place of
-the canvas's own; items with `fixed: {x, y, w}` are placed by hand).
+window sizes, light and dark, and can pause a page's morph for a
+mid-animation still.
 
 ## Moving from the old Canvas plugin
 

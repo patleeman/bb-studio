@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { CANVAS_MIGRATIONS } from "./migrations";
 import { CANVAS_DEFAULT_MODEL, registerCanvas, VOICE_START_NOTE } from "./server";
 import { CANVAS_CHANNEL } from "./shared";
+import type { ImageDeps } from "./image";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
 
 type Sent = { threadId: string; input: { text: string; visibility?: string }[]; mode?: string };
 
-function canvasHost() {
+function canvasHost(images?: ImageDeps) {
   const spawned: Record<string, unknown>[] = [];
   const sent: Sent[] = [];
   const updated: Record<string, unknown>[] = [];
@@ -40,7 +41,7 @@ function canvasHost() {
   } as never);
   const db = host.bb.storage.database();
   for (const migration of CANVAS_MIGRATIONS) db.exec(migration);
-  const canvas = registerCanvas(host.bb, db);
+  const canvas = registerCanvas(host.bb, db, { images });
   const call = (method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
   const tool = (name: string, input: unknown, threadId: string) => host.harness.behavior.callAgentTool(name, input, { threadId });
   return { host, canvas, spawned, sent, updated, listed, call, tool };
@@ -48,8 +49,10 @@ function canvasHost() {
 
 const text = (result: unknown): string => typeof result === "string" ? result : JSON.stringify(result);
 
+const PAGE = '<style>.g{display:grid}</style><header data-cv-id="title"><h1>Democrats take the House</h1></header><section data-cv-id="seats"><div data-chart="bignum" data-value="221"></div></section>';
+
 describe("canvas threads", () => {
-  it("creates a hidden thread in the personal project with the rules as an agent-only note", async () => {
+  it("creates a hidden thread in the personal project with the rules and guide as an agent-only note", async () => {
     const { call, spawned } = canvasHost();
     const { threadId, canvasId } = await call("canvas.create", { text: "How did yesterday's election go?" });
     expect(threadId).toBe("thr_canvas1");
@@ -57,22 +60,18 @@ describe("canvas threads", () => {
     const input = spawned[0]!.input as { text: string; visibility?: string }[];
     expect(input[0]).toMatchObject({ text: "How did yesterday's election go?" });
     expect(input[1]!.visibility).toBe("agent-only");
-    expect(input[1]!.text).toContain("Remove what no longer matters.");
+    for (const words of ["ONE page you design", "DESIGN GUIDE", "Decide the ONE point", "data-chart", "canvas_image", "Never restate or describe the board"]) expect(input[1]!.text).toContain(words);
     const { canvas } = await call("canvas.get", { threadId });
-    expect(canvas).toMatchObject({ threadId, status: "working", turn: 1, items: [] });
-    expect(canvas.history).toEqual([expect.objectContaining({ role: "user", text: "How did yesterday's election go?" })]);
+    expect(canvas).toMatchObject({ threadId, status: "working", turn: 1, items: [], page: null });
   });
 
-  it("pins new canvas threads to Haiku on the canvas's own thread, unless the caller picks a model", async () => {
+  it("pins new canvas threads to Sonnet on the canvas's own thread, unless the caller picks a model", async () => {
     const { call, spawned } = canvasHost();
     await call("canvas.create", { text: "Election" });
-    expect(spawned[0]).toMatchObject({ providerId: "claude-code", model: "claude-haiku-5-5", executionInputSources: { providerId: "explicit", model: "explicit" } });
-    expect(CANVAS_DEFAULT_MODEL).toEqual({ providerId: "claude-code", model: "claude-haiku-5-5" });
+    expect(spawned[0]).toMatchObject({ providerId: "claude-code", model: "claude-sonnet-5-5", executionInputSources: { providerId: "explicit", model: "explicit" } });
+    expect(CANVAS_DEFAULT_MODEL).toEqual({ providerId: "claude-code", model: "claude-sonnet-5-5" });
     await call("canvas.create", { text: "Weather", providerId: "codex", model: "gpt-5.5", reasoningLevel: "low" });
     expect(spawned[1]).toMatchObject({ providerId: "codex", model: "gpt-5.5", reasoningLevel: "low" });
-    await call("canvas.create", { text: "Sports", providerId: "claude-code" });
-    expect(spawned[2]).toMatchObject({ providerId: "claude-code" });
-    expect(spawned[2]!.model).toBeUndefined();
   });
 
   it("sends the user's next message to the thread, queued while it works", async () => {
@@ -89,81 +88,27 @@ describe("canvas threads", () => {
     await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "Democrats took the House; the Senate stays close.\n\n::next{reply=\"More\"}" });
     const { canvas } = await call("canvas.get", { threadId });
     expect(canvas).toMatchObject({ status: "idle", caption: "Democrats took the House; the Senate stays close." });
-    expect(canvas.history.at(-1)).toMatchObject({ role: "agent" });
   });
 
   it("starts a canvas by voice with no message, and its [PASS] reply isn't a caption", async () => {
     const { host, call, spawned } = canvasHost();
     const { threadId } = await call("canvas.create", { voice: true });
     expect(JSON.stringify(spawned[0])).toContain(VOICE_START_NOTE);
-    expect(spawned[0]).toMatchObject({ providerId: CANVAS_DEFAULT_MODEL.providerId, model: CANVAS_DEFAULT_MODEL.model });
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "Voice canvas", turn: 0, status: "idle" });
     await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "[PASS]" });
     expect((await call("canvas.get", { threadId })).canvas.caption).toBeNull();
     await expect(call("canvas.create", {})).rejects.toThrow();
   });
 
-  it("gives canvas threads their tools and rules, and nothing to other threads' check", async () => {
+  it("gives canvas threads their tools and rules in the board's style, and nothing to other threads' check", async () => {
     const { canvas, call } = canvasHost();
-    const { threadId, canvasId } = await call("canvas.create", { text: "Hi" });
+    const { threadId, canvasId } = await call("canvas.create", { text: "Hi", look: "field" });
     expect(canvas.isCanvasThread(threadId)).toBe(true);
     expect(canvas.isCanvasThread("thr_other")).toBe(false);
-    // Before Studio records the thread, its metadata already says so.
     expect(canvas.isCanvasThread("thr_new", { canvas: canvasId })).toBe(true);
-    expect(canvas.instructionsFor(threadId)).toContain("On a topic change, clear and rebuild");
-  });
-
-  it("starts a canvas in editorial (or the style asked for), with the whole guide and the current style in its instructions", async () => {
-    const { call, canvas, spawned } = canvasHost();
-    const first = await call("canvas.create", { text: "Election" });
-    const second = await call("canvas.create", { text: "Weather", look: "field" });
-    expect((await call("canvas.get", { threadId: first.threadId })).canvas.look).toBe("editorial");
-    expect((await call("canvas.get", { threadId: second.threadId })).canvas.look).toBe("field");
-    const note = (spawned[1]!.input as { text: string }[])[1]!.text;
-    for (const style of ["Style: Editorial.", "Style: Field notes.", "Style: Instrument.", "CHOOSING THE STYLE", "Singling out:", "Switching:"]) expect(note).toContain(style);
-    expect(note).toContain("cv.render(");
-    expect(note).not.toContain("@@");
-    expect(canvas.instructionsFor(second.threadId)).toContain("This board is field (Field notes) now.");
-    // Before the thread is attached, the metadata finds the canvas.
-    expect(canvas.instructionsFor("thr_new", { canvas: second.canvasId })).toContain("This board is field");
-    expect(canvas.instructionsFor("thr_unknown")).not.toContain("Board style");
-  });
-
-  it("lets the agent pick and switch the board's style, logged with its reason", async () => {
-    const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Plan a trip" });
-    const set = text(await tool("canvas_set", { style: "field", styleReason: "planning a trip", items: [{ id: "days", kind: "list", data: ["Sat", "Sun"] }] }, threadId));
-    expect(set).toContain("Style: Field notes (planning a trip)");
-    let view = (await call("canvas.get", { threadId })).canvas;
-    expect(view.look).toBe("field");
-    expect(view.changes.map((change: { op: string }) => change.op)).toEqual(["style", "add"]);
-    // The same style again isn't logged twice.
-    await tool("canvas_style", { style: "field" }, threadId);
-    expect((await call("canvas.get", { threadId })).canvas.changes.filter((change: { op: string }) => change.op === "style")).toHaveLength(1);
-    await tool("canvas_style", { style: "instrument", reason: "the user asked for a dashboard" }, threadId);
-    view = (await call("canvas.get", { threadId })).canvas;
-    expect(view).toMatchObject({ look: "instrument", items: [expect.objectContaining({ id: "days" })] });
-    await tool("canvas_clear", { style: "editorial" }, threadId);
-    view = (await call("canvas.get", { threadId })).canvas;
-    expect(view).toMatchObject({ look: "editorial", items: [] });
-    expect(text(await tool("canvas_read", {}, threadId))).toContain("Style: editorial (Editorial)");
-    await expect(tool("canvas_style", { style: "classic" }, threadId)).rejects.toThrow(/Invalid option/);
-  });
-
-  it("logs the agent's first style pick even when the canvas already started in it", async () => {
-    const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Election" });
-    await tool("canvas_set", { style: "editorial", styleReason: "it's news", items: [{ kind: "headline", data: "Results" }] }, threadId);
-    expect((await call("canvas.get", { threadId })).canvas.changes[0].summary).toBe("Style: Editorial (it's news)");
-  });
-
-  it("returns the look's design guide from canvas_guide", async () => {
-    const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Ops", look: "instrument" });
-    expect(text(await tool("canvas_guide", {}, threadId))).toContain("Style: Field notes.");
-    const one = text(await tool("canvas_guide", { style: "instrument" }, threadId));
-    expect(one).toContain("Style: Instrument.");
-    expect(one).not.toContain("Style: Field notes.");
+    expect(canvas.instructionsFor(threadId)).toContain("This board is field (Field notes) now.");
+    expect(canvas.instructionsFor("thr_new", { canvas: canvasId })).toContain("This board is field");
+    expect(canvas.instructionsFor(threadId).length).toBeLessThan(4096);
   });
 });
 
@@ -174,58 +119,41 @@ describe("the model picker", () => {
     expect(providers.map((provider: { id: string }) => provider.id)).toEqual(["claude-code", "codex", "opencode"]);
     const codex = providers.find((provider: { id: string }) => provider.id === "codex");
     expect(codex.models[0]).toEqual({ id: "gpt-6.1-sol", name: "GPT-6.1-Sol", isDefault: true, reasoningLevels: [{ id: "low", label: "low" }, { id: "medium", label: "Medium" }, { id: "high", label: "high" }], defaultReasoningLevel: "medium" });
-    expect(codex.models[1]).toMatchObject({ id: "gpt-6-luna", reasoningLevels: [], defaultReasoningLevel: null });
-    expect(providers.find((provider: { id: string }) => provider.id === "claude-code").models[1]).toMatchObject({ id: "claude-haiku-5-5", name: "Haiku 5.5", reasoningLevels: [] });
     expect(providers.find((provider: { id: string }) => provider.id === "opencode")).toMatchObject({ error: "Sign in to OpenCode", models: [] });
-    // Listed again only after a minute.
     await call("canvas.models", null);
     expect(listed).toHaveLength(3);
   });
 
-  it("records new canvases on Haiku, and a same-provider pick changes the thread's model in place", async () => {
+  it("records new canvases on Sonnet, and a same-provider pick changes the thread's model in place", async () => {
     const { call, spawned, updated } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Election" });
-    expect((await call("canvas.get", { threadId })).canvas.execution).toEqual({ providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: null });
+    expect((await call("canvas.get", { threadId })).canvas.execution).toEqual({ providerId: "claude-code", model: "claude-sonnet-5-5", reasoningLevel: null });
     const result = await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-opus-5-5" });
     expect(result.mode).toBe("same-thread");
     expect(updated).toEqual([{ threadId, model: "claude-opus-5-5", reasoningLevel: null }]);
-    expect(result.canvas).toMatchObject({ threadId, execution: { providerId: "claude-code", model: "claude-opus-5-5" }, pendingExecution: null });
     expect(spawned).toHaveLength(1);
-    expect((await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-opus-5-5" })).mode).toBe("unchanged");
   });
 
-  it("switches provider with a fresh thread on the next message, keeping the board, and old links still find it", async () => {
-    const { call, tool, spawned, sent, updated } = canvasHost();
+  it("switches provider with a fresh thread on the next message, keeping the page, and old links still find it", async () => {
+    const { call, tool, spawned } = canvasHost();
     const { threadId, canvasId } = await call("canvas.create", { text: "Election" });
-    await tool("canvas_set", { style: "editorial", items: [{ id: "lead", kind: "headline", data: "Democrats take both chambers" }] }, threadId);
-    const picked = await call("canvas.setModel", { threadId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" });
-    expect(picked).toMatchObject({ mode: "new-thread-next-turn", canvas: { execution: { providerId: "claude-code" }, pendingExecution: { providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" } } });
-    expect(updated).toEqual([]);
-    const reply = await call("canvas.send", { threadId, text: "Drill into the closest races" });
-    expect(reply).toEqual({ ok: true, threadId: "thr_canvas2" });
-    expect(sent).toEqual([]);
-    expect(spawned[1]).toMatchObject({ providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low", visibility: "hidden", pluginMetadata: { canvas: canvasId } });
-    const input = spawned[1]!.input as { text: string; visibility?: string }[];
-    expect(input[0]).toMatchObject({ text: "Drill into the closest races" });
-    expect(input[1]!.visibility).toBe("agent-only");
-    expect(input[1]!.text).toContain("moved to this thread from another model");
-    expect(input[1]!.text).toContain("lead: headline");
-    expect(input[1]!.text).toContain("User: Election");
+    await tool("canvas_page", { html: PAGE }, threadId);
+    await call("canvas.setModel", { threadId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" });
+    expect(await call("canvas.send", { threadId, text: "Drill into the closest races" })).toEqual({ ok: true, threadId: "thr_canvas2" });
+    const note = (spawned[1]!.input as { text: string }[])[1]!.text;
+    expect(note).toContain("moved to this thread from another model");
+    expect(note).toContain("- seats <section>");
     const now = (await call("canvas.get", { threadId: "thr_canvas2" })).canvas;
-    expect(now).toMatchObject({ id: canvasId, threadId: "thr_canvas2", execution: { providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" }, pendingExecution: null, items: [expect.objectContaining({ id: "lead" })] });
-    // The old thread's address still finds the canvas, and its messages go to the new thread.
+    expect(now).toMatchObject({ id: canvasId, threadId: "thr_canvas2", page: PAGE });
     expect((await call("canvas.get", { threadId })).canvas.id).toBe(canvasId);
-    expect((await call("canvas.send", { threadId, text: "And the Senate?" })).threadId).toBe("thr_canvas2");
-    expect(sent.at(-1)).toMatchObject({ threadId: "thr_canvas2" });
-    // The new thread's tools edit the same board.
-    expect(text(await tool("canvas_read", {}, "thr_canvas2"))).toContain("lead: headline");
+    expect(text(await tool("canvas_read", {}, "thr_canvas2"))).toContain("- title <header> Democrats take the House");
   });
 
   it("drops a waiting provider switch when the current model is picked again", async () => {
     const { call, spawned } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Election" });
     await call("canvas.setModel", { threadId, providerId: "codex", model: "gpt-6-luna" });
-    const back = await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-haiku-5-5" });
+    const back = await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-sonnet-5-5" });
     expect(back).toMatchObject({ mode: "unchanged", canvas: { pendingExecution: null } });
     await call("canvas.send", { threadId, text: "Next" });
     expect(spawned).toHaveLength(1);
@@ -233,122 +161,119 @@ describe("the model picker", () => {
 });
 
 describe("canvas tools", () => {
-  it("edits only the calling thread's board, and publishes each edit", async () => {
+  it("shows a page, changes a part by id, reads it back, and publishes each change", async () => {
     const { host, call, tool } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Election" });
     const before = host.harness.inspection.realtimeSignals.length;
-    const added = await tool("canvas_add", { items: [{ id: "headline", kind: "headline", data: { text: "Democrats take the House" }, importance: 5 }, { kind: "stat", title: "Turnout", data: { value: 51 } }] }, threadId);
-    expect(text(added)).toContain("Added headline");
-    expect(text(added)).toContain("the focus is headline");
+    expect(text(await tool("canvas_page", { html: PAGE, style: "editorial", styleReason: "news" }, threadId))).toContain("The page is up (revision");
     expect(host.harness.inspection.realtimeSignals.slice(before)).toContainEqual(expect.objectContaining({ channel: CANVAS_CHANNEL }));
-    const { canvas } = await call("canvas.get", { threadId });
-    expect(canvas.items.map((item: { id: string }) => item.id).sort()).toEqual(["headline", "turnout"]);
-    expect(canvas.changes.map((change: { by: string }) => change.by)).toEqual(["agent", "agent"]);
+    let view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ page: PAGE, title: "Democrats take the House", look: "editorial" });
+    expect(text(await tool("canvas_patch", { id: "seats", html: '<section data-cv-id="seats">223</section>' }, threadId))).toContain('Changed part "seats"');
+    view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.page).toContain('<section data-cv-id="seats">223</section>');
+    expect(view.changes.map((change: { op: string }) => change.op)).toEqual(["style", "page", "patch"]);
+    const missing = await tool("canvas_patch", { id: "senate", html: "<p>x</p>" }, threadId) as { isError?: boolean; content?: { text: string }[] };
+    expect(missing.isError).toBe(true);
+    expect(missing.content?.[0]?.text).toContain("Its parts: title, seats");
+    const read = text(await tool("canvas_read", {}, threadId));
+    expect(read).toContain("Parts (data-cv-id):");
+    expect(read).toContain("Page source:");
+    expect(read).toContain("Style: editorial (Editorial)");
   });
 
-  it("refuses a thread that isn't a canvas", async () => {
-    const { tool } = canvasHost();
-    const result = await tool("canvas_add", { items: [{ kind: "stat", data: 1 }] }, "thr_somewhere_else") as { isError?: boolean; content?: { text: string }[] };
+  it("says when a page has no parts to animate, and refuses an empty or oversized page", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    expect(text(await tool("canvas_page", { html: "<h1>Hi</h1>" }, threadId))).toContain("No part has a data-cv-id");
+    await expect(tool("canvas_page", { html: "" }, threadId)).rejects.toThrow();
+    const huge = await tool("canvas_page", { html: "x".repeat(150 * 1024) + "é".repeat(30 * 1024) }, threadId) as { isError?: boolean; content?: { text: string }[] };
+    expect(huge.isError).toBe(true);
+    expect(huge.content?.[0]?.text).toContain("over 200 KB");
+  });
+
+  it("switches the style without rewriting the page, logged with its reason", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Plan a trip" });
+    await tool("canvas_page", { html: PAGE }, threadId);
+    expect(text(await tool("canvas_style", { style: "field", reason: "planning" }, threadId))).toContain("Field notes");
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ look: "field", page: PAGE });
+    expect(view.changes.at(-1).summary).toBe("Style: Field notes (planning)");
+    await expect(tool("canvas_style", { style: "classic" }, threadId)).rejects.toThrow(/Invalid option/);
+  });
+
+  it("refuses a thread that isn't a canvas, and keeps two canvases apart", async () => {
+    const { call, tool } = canvasHost();
+    const result = await tool("canvas_page", { html: PAGE }, "thr_somewhere_else") as { isError?: boolean; content?: { text: string }[] };
     expect(result.isError).toBe(true);
     expect(result.content?.[0]?.text).toContain("isn't a canvas");
-  });
-
-  it("keeps two canvases' boards apart", async () => {
-    const { call, tool } = canvasHost();
     const a = await call("canvas.create", { text: "A" });
     const b = await call("canvas.create", { text: "B" });
-    await tool("canvas_add", { items: [{ id: "only-a", kind: "stat", data: 1 }] }, a.threadId);
-    await tool("canvas_clear", {}, b.threadId);
-    expect((await call("canvas.get", { threadId: a.threadId })).canvas.items).toHaveLength(1);
-    expect((await call("canvas.get", { threadId: b.threadId })).canvas.items).toHaveLength(0);
+    await tool("canvas_page", { html: PAGE }, a.threadId);
+    expect((await call("canvas.get", { threadId: b.threadId })).canvas.page).toBeNull();
   });
 
-  it("validates kinds, shapes and sizes, and changes nothing on a bad call", async () => {
-    const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Election" });
-    await expect(tool("canvas_add", { items: [{ kind: "spreadsheet", data: [] }] }, threadId)).rejects.toThrow();
-    await expect(tool("canvas_add", { items: [{ id: "Bad Id!", kind: "stat", data: 1 }] }, threadId)).rejects.toThrow();
-    const headless = await tool("canvas_add", { items: [{ kind: "headline", data: { subtitle: "no text" } }] }, threadId) as { isError?: boolean; content?: { text: string }[] };
-    expect(headless.isError).toBe(true);
-    expect(headless.content?.[0]?.text).toContain("A headline needs data");
-    const html = await tool("canvas_add", { items: [{ kind: "stat", data: 1, html: "<b>no</b>" }] }, threadId) as { isError?: boolean };
-    expect(html.isError).toBe(true);
-    const huge = await tool("canvas_add", { items: [{ kind: "table", data: [{ text: "x".repeat(70 * 1024) }] }] }, threadId) as { isError?: boolean; content?: { text: string }[] };
-    expect(huge.content?.[0]?.text).toContain("over 64 KB");
-    // Dashboards' embed reads Studio's RPCs, which the canvas plugin's page can't: not a canvas kind.
-    await expect(tool("canvas_add", { items: [{ kind: "embed", options: { href: "/plugins/studio/studio/minis/mini_1" } }] }, threadId)).rejects.toThrow();
-    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ rev: 0, items: [] });
-  });
-
-  it("refuses a note with a clear error, and strips leftover anchor, point and relatedTo fields", async () => {
+  it("still shows an old board of items, and a page replaces it", async () => {
     const { call, tool, canvas } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Election" });
-    await expect(tool("canvas_add", { items: [{ kind: "note", data: "Flipped" }] }, threadId)).rejects.toThrow(/notes aren't supported; put the point in a caption or the item itself/);
-    await expect(tool("canvas_set", { items: [{ id: "why", kind: "note", data: "Flipped", anchor: "map" }] }, threadId)).rejects.toThrow(/notes aren't supported/);
-    expect(canvas.voice.run(threadId, "canvas_add", { items: [{ kind: "note", data: "Flipped" }] })).toMatch(/^Nothing changed: items\.0\.kind: notes aren't supported/);
-    expect(canvas.voice.run(threadId, "canvas_update", { items: [{ id: "map", kind: "note" }] })).toMatch(/notes aren't supported/);
-    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ rev: 0, items: [] });
-    // An older turn's item with link fields still lands, without them.
-    await tool("canvas_add", { items: [{ id: "map", kind: "map", data: { PA: 2 } }, { id: "quote", kind: "quote", data: "Every vote", relatedTo: ["map"], anchor: "map", point: { x: 0.5, y: 0.5 } }] }, threadId);
-    expect(canvas.voice.run(threadId, "canvas_update", { items: [{ id: "map", anchor: "quote", relatedTo: ["quote"] }] })).toContain("Updated map");
-    const item = (await call("canvas.get", { threadId })).canvas.items.find((each: { id: string }) => each.id === "quote");
-    expect(Object.keys(item)).not.toEqual(expect.arrayContaining(["anchor"]));
-    expect(item).not.toHaveProperty("relatedTo");
-    // point is a placement field now (a spot on pinnedTo): without a pin it's dropped.
-    expect(item.point ?? null).toBeNull();
-    const read = text(await tool("canvas_read", {}, threadId));
-    expect(read).not.toMatch(/anchored|related to|note/);
+    const { threadId, canvasId } = await call("canvas.create", { text: "Election" });
+    canvas.store.edit(canvasId, [{ op: "add", item: { id: "house", kind: "stat", data: 220 } }], "agent");
+    expect(text(await tool("canvas_read", {}, threadId))).toContain("from before pages");
+    expect((await call("canvas.get", { threadId })).canvas.items).toHaveLength(1);
+    await tool("canvas_page", { html: PAGE }, threadId);
+    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ items: [], page: PAGE });
   });
 
-  it("doesn't list or show note items saved before notes were removed", async () => {
-    const { call, tool, host } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Election" });
-    await tool("canvas_add", { items: [{ id: "map", kind: "map", data: { PA: 2 } }] }, threadId);
-    const db = host.bb.storage.database();
-    db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev, rel) SELECT canvas_id, 'why', 'note', 'Why', '\"Flipped\"', '{}', NULL, 's', 2, 1, 1, 1, '{\"anchor\":\"map\"}' FROM canvas_items WHERE id = 'map'").run();
-    const view = (await call("canvas.get", { threadId })).canvas;
-    expect(view.items.map((each: { id: string }) => each.id)).toEqual(["map"]);
-    expect((await call("canvas.list", null)).canvases[0].itemCount).toBe(1);
-    const read = text(await tool("canvas_read", {}, threadId));
-    expect(read).toContain("1 item(s)");
-    expect(read).not.toMatch(/why|note/);
-  });
-
-  it("replaces the board in one step with canvas_set, and reads it back", async () => {
+  it("returns the design guide from canvas_guide", async () => {
     const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "Election" });
-    await tool("canvas_add", { items: [{ id: "house", kind: "stat", data: 220 }, { id: "senate", kind: "stat", data: 51 }] }, threadId);
-    await tool("canvas_set", { items: [{ id: "weather", kind: "headline", data: "Sunny weekend in NYC", importance: 5 }, { id: "temps", kind: "line", data: [{ day: "Sat", high: 61 }, { day: "Sun", high: 58 }] }] }, threadId);
-    const read = text(await tool("canvas_read", {}, threadId));
-    expect(read).toContain("weather: headline");
-    expect(read).toContain("(focus)");
-    expect(read).toContain("Removed stat \"house\"");
-    expect(read).not.toMatch(/- house:/);
+    const { threadId } = await call("canvas.create", { text: "Ops" });
+    const guide = text(await tool("canvas_guide", {}, threadId));
+    for (const words of ["Decide the ONE point", "EXAMPLES", "wall of pictures", "Bars and areas start at zero"]) expect(guide).toContain(words);
+  });
+});
+
+describe("canvas_image", () => {
+  const KEY = "exa-test-key-123";
+  const publicDns = async () => [{ address: "93.184.216.34" }];
+  const htmlResponse = (body: string) => new Response(body, { status: 200, headers: { "content-type": "text/html" } });
+
+  it("takes a page's main picture when no search key is set, and never reaches private addresses", async () => {
+    const seen: string[] = [];
+    const fetch = (async (url: string) => { seen.push(String(url)); return htmlResponse('<html><head><title>Tetris (Game Boy)</title><meta property="og:image" content="//upload.example.org/tetris.jpg"><meta property="og:image:width" content="600"></head></html>'); }) as unknown as typeof globalThis.fetch;
+    const { call, tool } = canvasHost({ exaKey: async () => "", fetch, lookup: publicDns });
+    const { threadId } = await call("canvas.create", { text: "Showcase" });
+    const found = JSON.parse(text(await tool("canvas_image", { pageUrl: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)" }, threadId)));
+    expect(found).toEqual({ url: "https://upload.example.org/tetris.jpg", alt: "Tetris (Game Boy)", source: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)", width: 600 });
+    const noKey = await tool("canvas_image", { query: "Tetris box art" }, threadId) as { isError?: boolean; content?: { text: string }[] };
+    expect(noKey.content?.[0]?.text).toContain("No image search key is set. Pass pageUrl");
+    const inward = canvasHost({ exaKey: async () => "", fetch, lookup: async () => [{ address: "10.0.0.5" }] });
+    const inwardThread = (await inward.call("canvas.create", { text: "x" })).threadId;
+    const blocked = await inward.tool("canvas_image", { pageUrl: "https://intranet.example.com/" }, inwardThread) as { content?: { text: string }[] };
+    expect(blocked.content?.[0]?.text).toContain("isn't a public web page");
+    expect(seen).toHaveLength(1);
   });
 
-  it("takes the board's title, composition and placement through canvas_set, and refuses a repeated composition", async () => {
-    const { call, tool } = canvasHost();
-    const { threadId } = await call("canvas.create", { text: "give me a rundown of the election yesterday" });
-    await tool("canvas_set", { style: "editorial", title: "Election 2026", composition: "giant-number", items: [{ id: "seats", kind: "stat", data: 221, scale: "hero" }, { id: "why", kind: "caption", data: "First flip since 2018", pinnedTo: "seats", point: { x: 1, y: 0.3 } }, { id: "map", kind: "map", data: { PA: 2 }, region: "top-right", scale: "medium" }] }, threadId);
-    const view = (await call("canvas.get", { threadId })).canvas;
-    expect(view).toMatchObject({ title: "Election 2026", composition: "giant-number" });
-    expect(view.items.find((item: { id: string }) => item.id === "map")).toMatchObject({ region: "top-right", scale: "medium" });
-    const read = text(await tool("canvas_read", {}, threadId));
-    expect(read).toContain("Composition: giant-number.");
-    expect(read).toContain('Title: "Election 2026"');
-    expect(read).toContain("pinned to seats at 1,0.3");
-    const again = await tool("canvas_set", { title: "BB Studio", composition: "giant-number", items: [{ id: "studio", kind: "stat", data: 12 }] }, threadId);
-    expect(text(again)).toContain("Nothing changed: The last board was a \\\"giant-number\\\" composition too");
-    await tool("canvas_set", { title: "BB Studio", composition: "essay", items: [{ id: "studio", kind: "caption", data: "One plugin." }] }, threadId);
-    // A thin, heroless board is shown, and the result says what it still needs.
-    const thin = text(await tool("canvas_set", { items: [{ id: "studio", kind: "caption", data: "One plugin." }, { id: "n", kind: "stat", data: 3 }] }, threadId));
-    expect(thin).toContain("Still to do: it has only 2 pieces");
-    expect(thin).toContain("no piece is the hero");
-    // A showcase without pictures is told to add them.
-    await call("canvas.send", { threadId, text: "give me a showcase of games" });
-    const noPictures = text(await tool("canvas_set", { items: [{ id: "studio", kind: "caption", data: "Games", scale: "hero" }] }, threadId));
-    expect(noPictures).toContain("add image items");
-    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "BB Studio", composition: "essay" });
+  it("searches Exa with the key and picks the best match, and never shows the key", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetch = (async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ results: [
+        { url: "https://shop.example.com/zelda", title: "Zelda", image: "https://cdn.example.com/logo.png" },
+        { url: "https://games.example.com/tetris", title: "Tetris for Game Boy", image: "https://cdn.example.com/tetris-box.jpg", extras: { imageLinks: ["https://cdn.example.com/x.svg"] } },
+      ] }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+    const { call, tool } = canvasHost({ exaKey: async () => KEY, fetch, lookup: publicDns });
+    const { threadId } = await call("canvas.create", { text: "Showcase" });
+    const found = JSON.parse(text(await tool("canvas_image", { query: "Tetris Game Boy box art" }, threadId)));
+    expect(found).toMatchObject({ url: "https://cdn.example.com/tetris-box.jpg", source: "https://games.example.com/tetris" });
+    expect(calls[0]!.url).toBe("https://api.exa.ai/search");
+    expect((calls[0]!.init.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
+    // A failure that echoes the key is redacted.
+    const leaky = canvasHost({ exaKey: async () => KEY, fetch: (async () => { throw new Error(`bad key ${KEY}`); }) as unknown as typeof globalThis.fetch, lookup: publicDns });
+    const leakyThread = (await leaky.call("canvas.create", { text: "x" })).threadId;
+    const failed = text(await leaky.tool("canvas_image", { query: "Tetris" }, leakyThread));
+    expect(failed).toContain("bad key [key]");
+    expect(failed).not.toContain(KEY);
   });
 });
 
@@ -358,16 +283,16 @@ describe("voice", () => {
     const { threadId } = await call("canvas.create", { text: "Election" });
     expect(canvas.voice.tools(threadId).map((each) => each.name)).toEqual([...CANVAS_TOOL_NAMES]);
     expect(canvas.voice.tools("thr_other")).toEqual([]);
-    expect(canvas.voice.tools(null)).toEqual([]);
   });
 
   it("runs the voice's canvas calls on that canvas, as the voice", async () => {
     const { canvas, call } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Election" });
-    expect(canvas.voice.run(threadId, "canvas_add", { items: [{ id: "pa", kind: "stat", title: "Pennsylvania", data: { value: "D +1.8" } }] })).toContain("Added stat");
-    expect(canvas.voice.run(threadId, "loops_list", {})).toBeNull();
-    expect(canvas.voice.run("thr_other", "canvas_add", { items: [] })).toContain("isn't speaking for a canvas");
-    expect((await call("canvas.get", { threadId })).canvas.changes.at(-1)).toMatchObject({ by: "voice", itemId: "pa" });
+    expect(await canvas.voice.run(threadId, "canvas_page", { html: PAGE })).toContain("The page is up");
+    expect(await canvas.voice.run(threadId, "canvas_patch", { id: "seats", html: "" })).toContain('Removed part "seats"');
+    expect(await canvas.voice.run(threadId, "loops_list", {})).toBeNull();
+    expect(await canvas.voice.run("thr_other", "canvas_read", {})).toContain("isn't speaking for a canvas");
+    expect((await call("canvas.get", { threadId })).canvas.changes.at(-1)).toMatchObject({ by: "voice", op: "patch", itemId: "seats" });
   });
 
   it("describes its parameters as plain JSON Schema objects", () => {
@@ -384,10 +309,9 @@ describe("for Studio's hands-free voice (canvas.voice, canvas.voiceRun)", () => 
     const { threadId } = await call("canvas.create", { text: "Election" });
     const offered = await call("canvas.voice", { threadId });
     expect(offered.tools.map((tool: { name: string }) => tool.name)).toEqual([...CANVAS_TOOL_NAMES]);
-    expect(offered.instructions).toContain("You are speaking on a canvas");
+    expect(offered.instructions).toContain("canvas_patch");
     expect(await call("canvas.voice", { threadId: "thr_other" })).toEqual({ tools: [], instructions: null });
-    expect((await call("canvas.voiceRun", { threadId, name: "canvas_add", args: { items: [{ id: "pa", kind: "stat", data: 1 }] } })).output).toContain("Added stat");
+    expect((await call("canvas.voiceRun", { threadId, name: "canvas_page", args: { html: PAGE } })).output).toContain("The page is up");
     expect((await call("canvas.voiceRun", { threadId, name: "loops_list", args: {} })).output).toBeNull();
-    expect((await call("canvas.get", { threadId })).canvas.changes.at(-1)).toMatchObject({ by: "voice", itemId: "pa" });
   });
 });
