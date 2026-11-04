@@ -3,8 +3,7 @@
 // needs no DOM reads: the last frame's rects are the "first" of each move.
 // Removed items linger as ghosts while they fade out.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cn } from "../../kit/ui/index";
-import type { WidgetTheme } from "../../dashboards/ui/custom-frame";
+import { cn, type WidgetTheme } from "./studio";
 import { columnsFor, packBoard, type Cell } from "../layout";
 import type { CanvasItem } from "../shared";
 import { BARE_KINDS, ItemBody, itemLabel } from "./items";

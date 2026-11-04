@@ -1,12 +1,12 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { CANVAS_MIGRATIONS } from "./migrations";
 import { CANVAS_LIMITS } from "./shared";
 import { CanvasStore, clipCaption } from "./store";
 
 function memory() {
   const db = new Database(":memory:");
-  db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE canvases"))!);
+  db.exec(CANVAS_MIGRATIONS[0]!);
   let clock = 1_000;
   const store = new CanvasStore(db, () => clock);
   return { db, store, tick: (ms = 1000) => { clock += ms; } };

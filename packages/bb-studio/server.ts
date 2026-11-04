@@ -9,7 +9,6 @@ import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, moveOrphanDrawings, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
-import { CANVAS_TOOLS, registerCanvas } from "./src/canvas/server";
 import { MINI_INSTRUCTIONS, MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
@@ -34,6 +33,7 @@ import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
 import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
+import { CANVAS_PLUGIN_ID, canvasVoiceOutput, canvasVoiceRunOutput } from "./src/voice/live/canvas-plugin";
 import { subcommand, usage } from "./src/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -158,8 +158,6 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => designs.dispose());
   const dashboards = registerDashboards(bb, db, services, notifyBuiltin);
   bb.onDispose(() => dashboards.dispose());
-  // Canvas (prototype, src/canvas): a board the agent edits each turn, backed by a hidden thread.
-  const canvas = registerCanvas(bb, db);
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
     artifactSource: (id) => {
@@ -306,10 +304,6 @@ export default async function plugin(bb: BbPluginApi) {
     tools.push(...CODE_TOOLS);
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
-    // A canvas's hidden thread edits its board: the canvas tools and rules, and mini apps for generated widgets.
-    if (canvas.isCanvasThread(context.thread.id, context.pluginMetadata)) {
-      return { tools: [...CANVAS_TOOLS, ...(off.has("mini") ? [] : MINI_TOOLS)], skills: ["canvas"], instructions: canvas.instructions };
-    }
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // A side thread (a fork at one of its replies) runs as the Bot too.
     // BB sets a fork's session up while it's made, before Studio records it:
@@ -1359,8 +1353,15 @@ export default async function plugin(bb: BbPluginApi) {
       });
     },
     publish: (signal) => bb.realtime.publish(VOICE_LIVE_CHANNEL, signal),
-    // Started from a canvas, the voice edits that canvas's board while it talks (src/canvas).
-    canvas: canvas.voice,
+    // Started from a Canvas plugin thread, the voice edits that canvas's board while it talks,
+    // through the plugin's RPCs (its own data; nothing of it lives in Studio).
+    canvas: {
+      tools: async (threadId) => {
+        const answer = await bb.sdk.plugins.callRpc({ pluginId: CANVAS_PLUGIN_ID, method: "canvas.voice", input: { threadId }, outputSchema: canvasVoiceOutput, signal: AbortSignal.timeout(5000) });
+        return { tools: answer.tools, note: answer.instructions };
+      },
+      run: async (threadId, name, args) => (await bb.sdk.plugins.callRpc({ pluginId: CANVAS_PLUGIN_ID, method: "canvas.voiceRun", input: { threadId, name, args: args as never }, outputSchema: canvasVoiceRunOutput, signal: AbortSignal.timeout(10_000) })).output,
+    },
     // Staged BBs only: a scripted mock server stands in for OpenAI (scripts/voice-mock).
     mockUrl: () => process.env.STUDIO_VOICE_MOCK_URL?.trim() || null,
     warn: (message) => bb.log.warn(message),

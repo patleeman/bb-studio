@@ -54,13 +54,11 @@ out. You steer it with `importance` and `size`.
 | ticker | `[{label, value?, delta?}]` or strings | `speed` |
 | progress | a number, or `{value, max?, label?}` | `style` (bar, gauge), `max`, `unit` |
 | image | an http(s) URL | `url`, `alt`, `fit` |
-| embed | none | `href`: a mini app link, `/plugins/studio/studio/minis/<id>` |
 | custom | anything (`window.bbWidget.data`) | anything; pass `html` too |
 
 Generated widgets: a `custom` item's `html` runs in a sandboxed frame with no
 network, and gets `window.bbWidget.data`, `.options` and `.theme` (listen for
-the `bbwidget` event). For something interactive with its own data, make a
-mini app with `minis_create` and add it as an `embed`.
+the `bbwidget` event).
 
 ## Data
 

@@ -12,7 +12,7 @@ import { COMPOSER_BUTTON, ICON_BUTTON } from "../../../kit/app/index";
 import { Icon, cn } from "../../../kit/ui";
 import { useDraggable } from "../../../talk/ui/draggable";
 import type { voiceLiveContract } from "../contract";
-import { usd, VOICE_LIVE_CHANNEL, type VoiceLiveSignal } from "../shared";
+import { HANDSFREE_START_EVENT, usd, VOICE_LIVE_CHANNEL, type VoiceLiveSignal } from "../shared";
 import type { Phase, Speaker, ToolCard } from "./machine";
 import { HandsFreeQuickSettings } from "./QuickSettings";
 import { LiveSession, type LiveServer } from "./session";
@@ -112,6 +112,16 @@ export function HandsFreePill() {
   const { session, expanded } = useStore();
   const rpc = useRpc<typeof voiceLiveContract>();
   windowRpc = rpc as unknown as Rpc;
+  // Another plugin's page (the Canvas plugin) starts a session speaking for
+  // one of its threads with a window event, as Talk's dictation fields do.
+  useEffect(() => {
+    const start = (event: Event) => {
+      const threadId = (event as CustomEvent<{ threadId?: unknown }>).detail?.threadId;
+      startHandsFree(rpc as unknown as Rpc, typeof threadId === "string" && threadId ? threadId : null);
+    };
+    window.addEventListener(HANDSFREE_START_EVENT, start);
+    return () => window.removeEventListener(HANDSFREE_START_EVENT, start);
+  }, [rpc]);
   if (!session) return null;
   return <Pill key={session.trace[0]?.at ?? 0} session={session} expanded={expanded} />;
 }

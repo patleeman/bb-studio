@@ -1,16 +1,15 @@
 // Canvas (prototype): the agent talks on a board it edits each turn, backed
-// by a hidden BB thread (docs: README "Canvas (prototype)").
+// by a hidden BB thread (docs: README).
 //
-// - The board is in Studio's database (store.ts), one per canvas thread.
+// - The board is in the canvas plugin's database (store.ts), one per canvas thread.
 // - The canvas_* tools edit it, scoped to the calling thread: a tool call
 //   from any other thread is refused. Each edit publishes at once, so the
 //   page animates while the agent (or the hands-free voice) is still talking.
 // - The thread's reply becomes the page's caption when it goes idle.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
-import { PERSONAL_PROJECT_ID } from "../project-lead";
 import { canvasContract } from "./contract";
-import { CANVAS_FIRST_NOTE, CANVAS_INSTRUCTIONS } from "./instructions";
+import { CANVAS_FIRST_NOTE, CANVAS_INSTRUCTIONS, CANVAS_VOICE_NOTE } from "./instructions";
 import { CANVAS_CHANNEL, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasSignal } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
@@ -22,7 +21,7 @@ export interface BuiltinCanvas {
   /** Whether a thread backs a canvas: its metadata says so, or the store has it. */
   isCanvasThread(threadId: string, metadata?: Readonly<Record<string, unknown>>): boolean;
   instructions: string;
-  /** For a hands-free session launched from a canvas thread (src/voice/live). */
+  /** For a hands-free session launched from a canvas thread: Studio's voice calls these over RPC (canvas.voice, canvas.voiceRun). */
   voice: {
     tools(threadId: string | null): ReturnType<typeof canvasVoiceTools>;
     run(threadId: string, name: string, args: Record<string, unknown>): string | null;
@@ -30,8 +29,10 @@ export interface BuiltinCanvas {
 }
 
 const PENDING_WAIT_MS = 5000;
+/** BB's personal project: canvas threads live there, as the Bot's do. */
+const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** Registers the canvas RPCs, agent tools and thread events. Studio has run the migrations. */
+/** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
 export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
   /** Canvases whose thread is being made: a tool call that races the spawn waits for it. */
@@ -112,6 +113,16 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       } finally {
         pending.delete(spawning);
       }
+    },
+    // Studio's hands-free voice asks these when a session's launching thread is a canvas thread.
+    "canvas.voice"({ threadId }) {
+      return store.byThread(threadId) ? { tools: canvasVoiceTools(), instructions: CANVAS_VOICE_NOTE } : { tools: [], instructions: null };
+    },
+    "canvas.voiceRun"({ threadId, name, args }) {
+      if (!isCanvasTool(name)) return { output: null };
+      const row = store.byThread(threadId);
+      if (!row) return { output: "This session isn't speaking for a canvas, so there's no board to edit." };
+      return { output: run(row.id, name, args, "voice").text };
     },
     async "canvas.send"({ threadId, text }) {
       const row = store.byThread(threadId);

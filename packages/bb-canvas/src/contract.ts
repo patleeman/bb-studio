@@ -1,5 +1,6 @@
-// Studio's canvas RPC methods, `canvas.*` (prototype). Desktop only for now:
-// not in public-contract.ts, so no Swift is generated for them.
+// The canvas plugin's RPC methods, `canvas.*` (prototype). The page calls
+// them; Studio's hands-free voice calls canvas.voice and canvas.voiceRun
+// (bb.sdk.plugins.callRpc) for a session launched from a canvas thread.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema } from "./shared";
@@ -22,6 +23,16 @@ export const canvasContract = defineRpcContract({
     experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules.",
     input: z.object({ text, providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional() }),
     output: z.object({ canvasId: z.string(), threadId: z.string() }),
+  },
+  "canvas.voice": {
+    experimental_description: "For Studio's hands-free voice: the canvas tools (OpenAI function tools) and a note for the voice, when the thread backs a canvas; none otherwise.",
+    input: z.object({ threadId }),
+    output: z.object({ tools: z.array(z.object({ type: z.literal("function"), name: z.string(), description: z.string(), parameters: z.record(z.string(), z.unknown()) })), instructions: z.string().nullable() }),
+  },
+  "canvas.voiceRun": {
+    experimental_description: "For Studio's hands-free voice: run one canvas tool on the board of the session's canvas thread. null output: not a canvas tool.",
+    input: z.object({ threadId, name: z.string().min(1).max(64), args: z.record(z.string(), z.unknown()) }),
+    output: z.object({ output: z.string().nullable() }),
   },
   "canvas.send": {
     experimental_description: "A message to the canvas's thread; queued while it works.",

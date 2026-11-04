@@ -723,16 +723,17 @@ it("caps the launching transcript while keeping the full reply in the voice thre
   expect(send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text).toContain(reply.trim());
 });
 
-describe("a session launched from a canvas (src/canvas)", () => {
+describe("a session launched from a canvas thread (the Canvas plugin)", () => {
   const CANVAS_THREAD = "thr_canvas";
   const canvasTool = { type: "function" as const, name: "canvas_add", description: "Add items", parameters: { type: "object", properties: {} } };
   function canvasSetup(model = "gpt-live-1") {
     const runs: { threadId: string; name: string; args: Record<string, unknown> }[] = [];
     const harness = setup({ model }, {
       seed: async (threadId) => ({ kind: "thread", name: "Canvas: Election", threadId, role: null, recent: [] }),
+      // The Canvas plugin's RPCs, as Studio's server calls them.
       canvas: {
-        tools: (threadId) => (threadId === CANVAS_THREAD ? [canvasTool] : []),
-        run: (threadId, name, args) => { if (!name.startsWith("canvas_")) return null; runs.push({ threadId, name, args }); return `Added ${String((args.items as { id: string }[])[0]?.id)}.`; },
+        tools: async (threadId) => (threadId === CANVAS_THREAD ? { tools: [canvasTool], note: "You are speaking on a canvas." } : { tools: [], note: null }),
+        run: async (threadId, name, args) => { if (!name.startsWith("canvas_")) return null; runs.push({ threadId, name, args }); return `Added ${String((args.items as { id: string }[])[0]?.id)}.`; },
       },
     });
     return { ...harness, runs };
@@ -768,6 +769,12 @@ describe("a session launched from a canvas (src/canvas)", () => {
     expect(output).toBe("Added pa.");
     expect(runs).toEqual([{ threadId: CANVAS_THREAD, name: "canvas_add", args: { items: [{ id: "pa", kind: "stat", data: 1 }] } }]);
     expect(await live.tool(sessionId, "canvas_add", "not json")).toBe("The arguments weren't valid JSON.");
+  });
+
+  it("starts without canvas tools when the Canvas plugin isn't there", async () => {
+    const { live, fetch } = setup({}, { seed: async (threadId) => ({ kind: "thread", name: "x", threadId, role: null, recent: [] }), canvas: { tools: async () => { throw new Error("no plugin canvas"); }, run: async () => null } });
+    await live.start({ sdp: "v=0 offer", threadId: CANVAS_THREAD });
+    expect(body(fetch).session.delegation.responses.tools).toEqual(VOICE_TOOL_DEFINITIONS);
   });
 
   it("refuses canvas calls from a session that doesn't speak for a canvas", async () => {

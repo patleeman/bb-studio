@@ -1,16 +1,11 @@
-// The canvas page: /plugins/studio/studio/canvas/<threadId>, or /canvas for a
+// The canvas page: /plugins/canvas/canvas/<threadId>, or /canvas for a
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { openAppPath } from "../../kit/app/index";
-import { errorMessage } from "../../kit/format";
-import { Icon, cn } from "../../kit/ui/index";
-import { useWidgetTheme } from "../../dashboards/ui/theme";
-import { INSERT_EVENT, TOGGLE_EVENT, STATE_EVENT } from "../../talk/ui/fields";
-import { startHandsFree } from "../../voice/live/ui/HandsFree";
+import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
 import { canvasHref, CANVAS_LIMITS, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
 import { Board } from "./board";
@@ -131,7 +126,6 @@ function History({ lines }: { lines: readonly CanvasTurn[] }) {
 
 /** The chat, as one faint line: the latest caption over a borderless field. */
 function ChatLine({ threadId, canvas, pending, working, onSubmit }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void> }) {
-  const voiceRpc = useRpc();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState(false);
@@ -199,7 +193,7 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit }: { threadId: 
             <Icon name="Mic" className="size-4" />
           </button>
           <button type="button" className={FAINT_BUTTON} aria-label="Hands-free voice" title={threadId ? "Hands-free voice: talk, and the board changes as it answers" : "Start the canvas first"} disabled={!threadId}
-            onClick={() => threadId && startHandsFree(voiceRpc as never, threadId)} data-canvas-handsfree>
+            onClick={() => threadId && window.dispatchEvent(new CustomEvent(HANDSFREE_START_EVENT, { detail: { threadId } }))} data-canvas-handsfree>
             <Icon name="studio/handsfree" className="size-4" />
           </button>
         </form>

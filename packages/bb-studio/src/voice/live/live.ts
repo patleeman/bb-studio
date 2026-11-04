@@ -120,13 +120,15 @@ export interface VoiceLiveDeps {
   push(input: { title: string; body: string; threadId: string; coalesceKey: string }): Promise<void>;
   publish(signal: VoiceLiveSignal): void;
   /**
-   * Canvas (src/canvas): a session launched from a canvas thread gets the
-   * canvas tools, scoped to that thread, and edits its board while it talks.
+   * The Canvas plugin (its canvas.voice and canvas.voiceRun RPCs): a session
+   * launched from a canvas thread gets its canvas tools, scoped to that
+   * thread, and edits the board while it talks. null: not a canvas thread,
+   * or the plugin isn't installed.
    */
   canvas?: {
-    tools(threadId: string | null): readonly ExtraTool[];
+    tools(threadId: string): Promise<{ tools: readonly ExtraTool[]; note: string | null } | null>;
     /** The tool's output; null when it isn't a canvas tool. */
-    run(threadId: string, name: string, args: Record<string, unknown>): string | null;
+    run(threadId: string, name: string, args: Record<string, unknown>): Promise<string | null>;
   };
   /** A staged BB's scripted mock server (STUDIO_VOICE_MOCK_URL on the host): no key, no OpenAI. */
   mockUrl?(): string | null;
@@ -332,9 +334,11 @@ export class VoiceLive {
     const mockUrl = this.deps.mockUrl?.() ?? null;
     if (!mockUrl && model === "gpt-live-1" && !input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
     const { seed, ms } = await this.persona(input.threadId ?? null, cos);
-    const extraTools = this.deps.canvas?.tools(seed.identity.threadId) ?? [];
+    const launched = seed.identity.threadId;
+    const board = launched && this.deps.canvas ? await this.deps.canvas.tools(launched).catch(() => null) : null;
+    const extraTools = board?.tools ?? [];
     const canvas = extraTools.length > 0;
-    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name, canvas };
+    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name, canvasNote: canvas ? board?.note ?? null : null };
     let transport: LiveTransport = model === "gpt-live-1" ? "live-webrtc" : "realtime-webrtc";
     let answerSdp: string | null = null;
     let clientSecret: string | null = null;
@@ -405,7 +409,7 @@ export class VoiceLive {
   async toolReply(sessionId: string, name: string, args: string | undefined, events: readonly LiveEvent[] = []): Promise<ToolReply> {
     const row = this.live(sessionId);
     if (events.length) this.save(sessionId, events);
-    const canvasOutput = this.canvasTool(row, name, args);
+    const canvasOutput = await this.canvasTool(row, name, args);
     if (canvasOutput !== null) return { output: clip(canvasOutput, TOOL_OUTPUT_CHARS) };
     if (!(VOICE_TOOLS as readonly string[]).includes(name)) {
       return { output: `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${this.identity(row.id)?.name ?? row.bot_name} instead.` };
@@ -431,7 +435,7 @@ export class VoiceLive {
    * A canvas tool, when the session speaks for a canvas: it edits that
    * canvas's board (and only that one) at once. null: not a canvas tool here.
    */
-  private canvasTool(row: SessionRow, name: string, args: string | undefined): string | null {
+  private async canvasTool(row: SessionRow, name: string, args: string | undefined): Promise<string | null> {
     if (!name.startsWith("canvas_") || !this.deps.canvas) return null;
     const event = this.events(row.id).find((each) => each.kind === "identity");
     const identity = event ? data<{ identity: VoiceIdentity; canvas?: boolean }>(event) : null;
@@ -444,7 +448,8 @@ export class VoiceLive {
         parsed = value as Record<string, unknown>;
       } catch { return "The arguments weren't valid JSON."; }
     }
-    const output = this.deps.canvas.run(identity.identity.threadId, name, parsed);
+    let output: string | null;
+    try { output = await this.deps.canvas.run(identity.identity.threadId, name, parsed); } catch (error) { return `The canvas didn't answer: ${clip(error instanceof Error ? error.message : String(error), 300)}`; }
     if (output !== null && name !== "canvas_read") this.append(row.id, "canvas", { text: clip(output, 600), data: { tool: name } });
     return output;
   }

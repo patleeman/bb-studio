@@ -2,11 +2,7 @@
 // (src/dashboards/ui/widgets.tsx), fed the item's data as a static value; a
 // headline is big type straight on the board, a caption is Studio's markdown.
 import type { ReactNode } from "react";
-import { cn } from "../../kit/ui/index";
-import type { WidgetTheme } from "../../dashboards/ui/custom-frame";
-import { Markdown } from "../../dashboards/ui/markdown";
-import { WidgetBody } from "../../dashboards/ui/widgets";
-import type { WidgetType, WidgetView } from "../../dashboards/shared";
+import { cn, Markdown, WidgetBody, type WidgetTheme, type WidgetType, type WidgetView } from "./studio";
 import { captionOf, headlineOf, type CanvasItem } from "../shared";
 
 /** A canvas item as Dashboards' renderers read a widget. */

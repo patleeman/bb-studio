@@ -7,9 +7,9 @@
 // importance and size (layout.ts).
 import { z } from "zod";
 
-/** Studio's panel sub-path: /plugins/studio/studio/canvas/<threadId>. */
+/** The canvas plugin's panel: /plugins/canvas/canvas/<threadId>. */
 export const CANVAS_SEGMENT = "canvas";
-export const CANVAS_ROOT = `/plugins/studio/studio/${CANVAS_SEGMENT}`;
+export const CANVAS_ROOT = `/plugins/canvas/${CANVAS_SEGMENT}`;
 /** Realtime channel: a board or its caption changed. */
 export const CANVAS_CHANNEL = "studio-canvas";
 export const CANVAS_UPDATE_TYPE = "canvas:updated";
@@ -46,9 +46,11 @@ export const CANVAS_LIMITS = {
 
 /**
  * What an item can be: a headline, a caption, or one of Dashboards' widget
- * types (src/dashboards/shared.ts WIDGETS), rendered by its renderers.
+ * types (Studio's src/dashboards/shared.ts WIDGETS), rendered by its
+ * renderers. Not Dashboards' embed: it reads Studio's RPCs, which a canvas
+ * (another plugin) can't call from its page.
  */
-export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "embed", "custom"] as const;
+export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "custom"] as const;
 export type CanvasKind = (typeof CANVAS_KINDS)[number];
 export const SIZE_HINTS = ["s", "m", "l", "xl"] as const;
 export type SizeHint = (typeof SIZE_HINTS)[number];
@@ -67,7 +69,6 @@ export const CANVAS_KIND_INFO: Record<CanvasKind, { data: string; options: strin
   ticker: { data: "an array of {label, value?, delta?} or strings", options: "speed? (seconds per loop)", size: "xl" },
   progress: { data: "a number, or {value, max?, min?, label?}", options: "style? (bar|gauge), min?, max?, unit?, label?", size: "s" },
   image: { data: "a URL string, or none", options: "url, alt?, fit? (cover|contain)", size: "m" },
-  embed: { data: "none", options: "href: a Studio mini app link (/plugins/studio/studio/minis/<id>) for a generated widget", size: "l" },
   custom: { data: "anything; the HTML reads window.bbWidget.data", options: "anything the HTML reads (window.bbWidget.options)", size: "m" },
 };
 
@@ -188,11 +189,6 @@ export function checkItem(item: { kind: CanvasKind; data?: unknown; options?: Re
     case "custom":
       if (!item.html?.trim()) throw new Error("A custom item needs html.");
       return;
-    case "embed": {
-      const href = item.options?.href;
-      if (typeof href !== "string" || !/^\/plugins\/studio\/studio\/minis\/mini_[A-Za-z0-9_-]+$/.test(href)) throw new Error("An embed needs options.href: a mini app's link, /plugins/studio/studio/minis/<id>.");
-      return;
-    }
     case "image": {
       const url = typeof item.data === "string" ? item.data : item.options?.url;
       if (typeof url !== "string" || !/^https?:\/\//.test(url)) throw new Error("An image needs an http(s) URL in data or options.url.");

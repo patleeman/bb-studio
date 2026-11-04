@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
-import { MIGRATIONS } from "../migrations";
+import { CANVAS_MIGRATIONS } from "./migrations";
 import { registerCanvas } from "./server";
 import { CANVAS_CHANNEL } from "./shared";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
@@ -21,7 +21,7 @@ function canvasHost() {
     },
   });
   const db = host.bb.storage.database();
-  db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE canvases"))!);
+  db.exec(CANVAS_MIGRATIONS[0]!);
   const canvas = registerCanvas(host.bb, db);
   const call = (method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
   const tool = (name: string, input: unknown, threadId: string) => host.harness.behavior.callAgentTool(name, input, { threadId });
@@ -116,8 +116,8 @@ describe("canvas tools", () => {
     expect(html.isError).toBe(true);
     const huge = await tool("canvas_add", { items: [{ kind: "table", data: [{ text: "x".repeat(70 * 1024) }] }] }, threadId) as { isError?: boolean; content?: { text: string }[] };
     expect(huge.content?.[0]?.text).toContain("over 64 KB");
-    const embed = await tool("canvas_add", { items: [{ kind: "embed", options: { href: "https://example.com" } }] }, threadId) as { isError?: boolean };
-    expect(embed.isError).toBe(true);
+    // Dashboards' embed reads Studio's RPCs, which the canvas plugin's page can't: not a canvas kind.
+    await expect(tool("canvas_add", { items: [{ kind: "embed", options: { href: "/plugins/studio/studio/minis/mini_1" } }] }, threadId)).rejects.toThrow();
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ rev: 0, items: [] });
   });
 
@@ -157,5 +157,19 @@ describe("voice", () => {
       expect(each.parameters.type).toBe("object");
       expect(JSON.stringify(each.parameters)).not.toContain("$schema");
     }
+  });
+});
+
+describe("for Studio's hands-free voice (canvas.voice, canvas.voiceRun)", () => {
+  it("offers the tools and a note only for a canvas thread, and runs them on its board", async () => {
+    const { call } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    const offered = await call("canvas.voice", { threadId });
+    expect(offered.tools.map((tool: { name: string }) => tool.name)).toEqual([...CANVAS_TOOL_NAMES]);
+    expect(offered.instructions).toContain("You are speaking on a canvas");
+    expect(await call("canvas.voice", { threadId: "thr_other" })).toEqual({ tools: [], instructions: null });
+    expect((await call("canvas.voiceRun", { threadId, name: "canvas_add", args: { items: [{ id: "pa", kind: "stat", data: 1 }] } })).output).toContain("Added stat");
+    expect((await call("canvas.voiceRun", { threadId, name: "loops_list", args: {} })).output).toBeNull();
+    expect((await call("canvas.get", { threadId })).canvas.changes.at(-1)).toMatchObject({ by: "voice", itemId: "pa" });
   });
 });

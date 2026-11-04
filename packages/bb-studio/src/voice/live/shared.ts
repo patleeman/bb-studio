@@ -9,6 +9,13 @@
 /** Studio publishes `VoiceLiveSignal` here: a reply for a live session to pick up, or a session ended. */
 export const VOICE_LIVE_CHANNEL = "studio-voice-live";
 
+/**
+ * A window event any plugin's page can dispatch to start a hands-free
+ * session speaking for one of its threads: detail `{ threadId }`. The Canvas
+ * plugin's page does, for its canvas thread.
+ */
+export const HANDSFREE_START_EVENT = "bb-studio:handsfree-start";
+
 export interface VoiceLiveSignal {
   sessionId: string;
   kind: "reply" | "ended";
