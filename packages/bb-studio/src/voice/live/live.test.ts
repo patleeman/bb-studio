@@ -358,6 +358,39 @@ describe("replies, interruptions and hang-up", () => {
   });
 });
 
+describe("the phone's audio events", () => {
+  it("stores false mutes, route changes, interruptions and why it closed in voice_call_events, and shows none of them", async () => {
+    const { db, live, send } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    const at = NOW + 5_000;
+    const events = [
+      { type: "false_trigger", at, mic: 0.21, playback: 0.12, muted_ms: 490 },
+      { type: "route_change", at: at + 1, reason: "new_device", input: "BluetoothHFP (AirPods Pro)", output: "BluetoothHFP (AirPods Pro)" },
+      { type: "audio_interruption", at: at + 2, began: true },
+      { type: "audio_interruption", at: at + 3, began: false },
+      { type: "app_state", at: at + 4, state: "background" },
+    ] as const;
+    // Through the contract, as BB's RPC layer parses them.
+    const parsed = voiceLiveContract["voiceLive.event"].input.parse({ sessionId, events });
+    live.record(sessionId, parsed.events);
+    const close = voiceLiveContract["voiceLive.end"].input.parse({ sessionId, events: [{ type: "close", at: at + 5, reason: "transport", detail: "The connection was lost.", background: true }] });
+    await live.end(sessionId, close.events);
+    const rows = db.prepare("SELECT at, kind, data FROM voice_call_events WHERE call_id = ? AND kind IN ('false_trigger', 'route_change', 'audio_interruption', 'app_state', 'close') ORDER BY id").all(sessionId) as { at: number; kind: string; data: string }[];
+    expect(rows.map((row) => [row.at - at, row.kind, JSON.parse(row.data)])).toEqual([
+      [0, "false_trigger", { mic: 0.21, playback: 0.12, muted_ms: 490 }],
+      [1, "route_change", { reason: "new_device", input: "BluetoothHFP (AirPods Pro)", output: "BluetoothHFP (AirPods Pro)" }],
+      [2, "audio_interruption", { began: true }],
+      [3, "audio_interruption", { began: false }],
+      [4, "app_state", { state: "background" }],
+      [5, "close", { reason: "transport", detail: "The connection was lost.", background: true }],
+    ]);
+    // Not in the voice thread's transcript.
+    for (const [input] of send.mock.calls) expect(input.text).not.toMatch(/false_trigger|route|AirPods|transport/);
+    expect(() => voiceLiveContract["voiceLive.event"].input.parse({ sessionId, events: [{ type: "close", reason: "gone" }] })).toThrow();
+    expect(() => voiceLiveContract["voiceLive.event"].input.parse({ sessionId, events: [{ type: "false_trigger", mic: 2, playback: 0, muted_ms: 1 }] })).toThrow();
+  });
+});
+
 describe("the voice thread", () => {
   it("gets each relay as it happens and the whole transcript once, at hang-up: no posting turns in between", async () => {
     const { live, send } = setup();

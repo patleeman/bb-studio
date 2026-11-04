@@ -637,7 +637,12 @@ export class VoiceLive {
         } else if (event.type === "interrupted") this.append(sessionId, "interrupted", { text: event.heard, at: event.at });
         else if (event.type === "usage" || event.type === "transcription_usage") this.append(sessionId, event.type, { data: event.usage });
         else if (event.type === "live_usage") this.append(sessionId, "live_usage", { data: { seconds: event.seconds } });
-        else this.append(sessionId, "backend_usage", { data: { input_tokens: event.input_tokens, cached_tokens: event.cached_tokens, output_tokens: event.output_tokens } });
+        else if (event.type === "backend_usage") this.append(sessionId, "backend_usage", { data: { input_tokens: event.input_tokens, cached_tokens: event.cached_tokens, output_tokens: event.output_tokens } });
+        else {
+          // The phone's audio (false mutes, route changes, interruptions, why it closed): kept for diagnosis.
+          const { type, at, ...fields } = event;
+          this.append(sessionId, type, { at, data: fields });
+        }
       }
     })();
   }

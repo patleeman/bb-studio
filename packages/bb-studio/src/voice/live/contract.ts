@@ -15,6 +15,10 @@ import { BACKEND_MODELS, LIVE_MODELS } from "./shared";
 const sessionId = z.string().regex(/^vl_[a-f0-9]{16}$/);
 const text = z.string().max(20_000);
 const tokens = z.number().int().min(0).max(100_000_000).optional();
+/** When, in ms since the epoch (the phone's clock). */
+const at = z.number().int().min(0).optional();
+/** A linear RMS level, 0 to 1. */
+const level = z.number().min(0).max(1);
 
 /** A Realtime response.done event's usage, as OpenAI sends it. */
 export const realtimeUsageSchema = z.object({
@@ -43,6 +47,17 @@ export const liveEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("live_usage"), seconds: z.number().min(0).max(1_000_000) }),
   /** GPT-Live: one backend Responses turn's tokens (response.completed). */
   z.object({ type: z.literal("backend_usage"), input_tokens: tokens, cached_tokens: tokens, output_tokens: tokens }),
+  // The phone's audio, for diagnosing dropouts (stored, not shown).
+  /** The level gate muted the voice and no words followed: the mic and playback levels then, and how long it was silent. */
+  z.object({ type: z.literal("false_trigger"), at, mic: level, playback: level, muted_ms: z.number().int().min(0).max(3_600_000) }),
+  /** The audio route changed: AVAudioSession's reason, and the new input and output ports. */
+  z.object({ type: z.literal("route_change"), at, reason: z.string().max(64), input: z.string().max(200), output: z.string().max(200) }),
+  /** A phone call or Siri took the audio (began), or gave it back. */
+  z.object({ type: z.literal("audio_interruption"), at, began: z.boolean() }),
+  /** The app went to the background or came back. */
+  z.object({ type: z.literal("app_state"), at, state: z.enum(["background", "foreground"]) }),
+  /** Why the session ended: End (user), the screen closing, an error, the connection dropping, the cap, or the voice service. */
+  z.object({ type: z.literal("close"), at, reason: z.enum(["user", "dismissed", "error", "transport", "cap", "server"]), detail: z.string().max(500).optional(), background: z.boolean().optional() }),
 ]);
 export type LiveEvent = z.infer<typeof liveEventSchema>;
 

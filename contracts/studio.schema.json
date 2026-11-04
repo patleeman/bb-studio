@@ -36226,6 +36226,155 @@
                   "required": [
                     "type"
                   ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
+                  ]
                 }
               ]
             }
@@ -36500,6 +36649,155 @@
                   },
                   "required": [
                     "type"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
                   ]
                 }
               ]
@@ -36831,6 +37129,155 @@
                   },
                   "required": [
                     "type"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
                   ]
                 }
               ]
@@ -37375,6 +37822,155 @@
                   "required": [
                     "type"
                   ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
+                  ]
                 }
               ]
             }
@@ -37627,6 +38223,155 @@
                   },
                   "required": [
                     "type"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
                   ]
                 }
               ]
@@ -38133,6 +38878,155 @@
                   },
                   "required": [
                     "type"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "false_trigger"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mic": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "playback": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "muted_ms": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3600000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "mic",
+                    "playback",
+                    "muted_ms"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "route_change"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "input": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason",
+                    "input",
+                    "output"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "audio_interruption"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "began": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "began"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "app_state"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "background",
+                        "foreground"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "state"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "close"
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "dismissed",
+                        "error",
+                        "transport",
+                        "cap",
+                        "server"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "background": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "reason"
                   ]
                 }
               ]
