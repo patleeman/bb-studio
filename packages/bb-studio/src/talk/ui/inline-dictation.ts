@@ -1,7 +1,13 @@
 import { useLayoutEffect, useState } from "react";
 import { BUILT_IN_MIC_SELECTOR } from "./composer-dom";
 import { talk } from "./controller";
+import { FIELD_ATTR, FIELD_DOCK_ATTR, findField } from "./fields";
 
+// Dictation docks into the input it types into: BB's composer (beside its
+// mic), or another plugin's dictation field that offers a dock
+// (`data-talk-field-dock`, fields.ts). Anywhere else, or off screen, the
+// floating recorder shows instead.
+//
 // While dictation is docked, the composer keeps one row at every width. The
 // dock reads the composer's own width (not the window's): below
 // COMPACT_BELOW, Talk's less-used controls and the composer's other actions
@@ -45,22 +51,71 @@ function buttonLabel(button: HTMLButtonElement): string {
   return (button.getAttribute("aria-label") || button.title || button.textContent || "").trim();
 }
 
-/** Dock only into the source input, and only while its controls are on screen. */
-export function inlineMic(composer: HTMLElement | null): HTMLButtonElement | null {
-  if (!composer?.isConnected || composer.closest('[hidden], [inert], [aria-hidden="true"]')) return null;
-  const mic = composer.querySelector<HTMLButtonElement>(BUILT_IN_MIC_SELECTOR);
-  if (!mic || mic.closest('[hidden], [inert], [aria-hidden="true"]')) return null;
-  const anchor = mic.hasAttribute("data-talk-inline-mic") ? mic.parentElement?.querySelector<HTMLElement>("[data-talk-inline-host]") : mic;
-  if (!anchor) return null;
-  const rect = anchor.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0 || rect.top < 0 || rect.bottom > innerHeight || rect.left < 0 || rect.right > innerWidth) return null;
-  for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+const HIDDEN = '[hidden], [inert], [aria-hidden="true"]';
+
+/** Whether the element is laid out, inside the viewport, and not clipped by a scrolling or clipping ancestor. */
+function onScreen(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0 || rect.top < 0 || rect.bottom > innerHeight || rect.left < 0 || rect.right > innerWidth) return false;
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
     const style = getComputedStyle(parent);
     const bounds = parent.getBoundingClientRect();
-    if (/hidden|clip|auto|scroll/.test(style.overflowX || style.overflow) && (rect.left < bounds.left || rect.right > bounds.right)) return null;
-    if (/hidden|clip|auto|scroll/.test(style.overflowY || style.overflow) && (rect.top < bounds.top || rect.bottom > bounds.bottom)) return null;
+    if (/hidden|clip|auto|scroll/.test(style.overflowX || style.overflow) && (rect.left < bounds.left || rect.right > bounds.right)) return false;
+    if (/hidden|clip|auto|scroll/.test(style.overflowY || style.overflow) && (rect.top < bounds.top || rect.bottom > bounds.bottom)) return false;
   }
-  return mic;
+  return true;
+}
+
+/** Dock only into the source input, and only while its controls are on screen. */
+export function inlineMic(composer: HTMLElement | null): HTMLButtonElement | null {
+  if (!composer?.isConnected || composer.closest(HIDDEN)) return null;
+  const mic = composer.querySelector<HTMLButtonElement>(BUILT_IN_MIC_SELECTOR);
+  if (!mic || mic.closest(HIDDEN)) return null;
+  const anchor = mic.hasAttribute("data-talk-inline-mic") ? mic.parentElement?.querySelector<HTMLElement>("[data-talk-inline-host]") : mic;
+  return anchor && onScreen(anchor) ? mic : null;
+}
+
+/** A dictation field's dock, while the field is on screen. */
+export function fieldDock(key: string): HTMLElement | null {
+  const field = findField(key);
+  if (!field || field.closest(HIDDEN)) return null;
+  const dock = field.querySelector<HTMLElement>(`[${FIELD_DOCK_ATTR}]`);
+  if (!dock || dock.closest(HIDDEN)) return null;
+  return onScreen(field) ? dock : null;
+}
+
+function dockHost(): HTMLSpanElement {
+  const host = document.createElement("span");
+  host.setAttribute("data-talk-inline-host", "");
+  host.setAttribute("data-bb-plugin", "studio");
+  host.setAttribute("data-bb-plugin-root", "");
+  return host;
+}
+
+/** Talk's controls inside a field's dock, sized by the field's width. */
+export function mountFieldDock(dock: HTMLElement) {
+  const field = dock.closest<HTMLElement>(`[${FIELD_ATTR}]`) ?? dock;
+  const host = dockHost();
+  dock.append(host);
+  let current: DockLayout | null = null;
+  const layout = () => {
+    const next = dockLayout(field.getBoundingClientRect().width);
+    layouts.set(host, { layout: next, tucked: [] });
+    if (next === current) return;
+    current = next;
+    host.setAttribute("data-talk-inline-layout", next);
+    host.dispatchEvent(new CustomEvent(LAYOUT_EVENT));
+  };
+  layout();
+  const observer = new ResizeObserver(layout);
+  observer.observe(field);
+  return {
+    anchor: dock as Element, host,
+    remove: () => {
+      observer.disconnect();
+      host.remove();
+    },
+  };
 }
 
 /** A portal beside the mic; removing it restores the native toolbar exactly. */
@@ -69,10 +124,7 @@ export function mountInlineDock(mic: HTMLButtonElement) {
   const actions = mic.closest<HTMLElement>("[data-promptbox-standard-actions]") ?? parent;
   const row = mic.closest<HTMLElement>("[data-promptbox-action-row]") ?? actions.parentElement!;
   const composer = mic.closest<HTMLElement>("[data-promptbox]")!;
-  const host = document.createElement("span");
-  host.setAttribute("data-talk-inline-host", "");
-  host.setAttribute("data-bb-plugin", "studio");
-  host.setAttribute("data-bb-plugin-root", "");
+  const host = dockHost();
   parent.insertBefore(host, mic);
   mic.setAttribute("data-talk-inline-mic", "");
   actions.setAttribute("data-talk-inline-actions", "");
@@ -109,7 +161,7 @@ export function mountInlineDock(mic: HTMLButtonElement) {
   const children = new MutationObserver(layout);
   children.observe(actions, { childList: true });
   return {
-    mic, host,
+    mic, anchor: mic as Element, host,
     remove: () => {
       observer.disconnect();
       children.disconnect();
@@ -144,12 +196,13 @@ export function useInlineDictation(enabled: boolean): HTMLElement | null {
     const style = document.createElement("style");
     style.textContent = CSS;
     document.head.append(style);
-    let dock: ReturnType<typeof mountInlineDock> | null = null;
+    let dock: { anchor: Element; host: HTMLElement; remove(): void } | null = null;
     const sync = () => {
-      const mic = inlineMic(talk.dictationComposer());
-      if (mic === dock?.mic && dock.host.isConnected) return;
+      const field = talk.getState().field;
+      const anchor = field ? fieldDock(field.key) : inlineMic(talk.dictationComposer());
+      if (anchor === dock?.anchor && dock.host.isConnected) return;
       dock?.remove();
-      dock = mic ? mountInlineDock(mic) : null;
+      dock = !anchor ? null : field ? mountFieldDock(anchor) : mountInlineDock(anchor as HTMLButtonElement);
       setSlot(dock?.host ?? null);
     };
     let frame = 0;

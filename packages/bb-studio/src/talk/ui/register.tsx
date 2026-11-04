@@ -16,6 +16,7 @@
 // set again (docs/merging-add-ons.md).
 import { openAppPath } from "../../kit/app/index";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { interceptBuiltInMic, findComposer } from "./composer-dom";
 import { talk } from "./controller";
 import { TOGGLE_EVENT, clearStatus, fieldAt, publishStatus } from "./fields";
@@ -69,7 +70,8 @@ export function registerTalkApp(app: PluginAppBuilder): void {
       const unsubscribe = talk.subscribe(publish);
       const onToggle = (event: Event) => {
         const found = fieldAt(event.target);
-        if (found) void talk.toggleFieldDictation(found.field);
+        // A field's button gives no feedback of its own: never fail silently.
+        if (found) talk.toggleFieldDictation(found.field).catch((error: unknown) => toast.error(`Talk could not start dictating: ${error instanceof Error ? error.message : String(error)}`));
       };
       document.addEventListener(TOGGLE_EVENT, onToggle);
       signal.addEventListener(

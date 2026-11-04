@@ -6,6 +6,12 @@
 //   same across reloads, for example `pages:pg_123`.
 // - Dispatch a bubbling `bb-talk:toggle` event from inside the field to
 //   start dictating into it, or to finish that dictation.
+// - Optionally put an empty element marked `data-talk-field-dock` inside the
+//   field. While Talk dictates into the field and it is on screen, Talk shows
+//   its dictation controls there (timer, cancel, stop-and-insert, and a ▾ menu
+//   with the rest), as it does inside BB's composer, instead of the floating
+//   recorder. The owner hides its own dictate button while the dock has
+//   content, for example with `[data-talk-field-dock]:not(:empty) ~ …`.
 // - Talk delivers the transcript as a cancelable `bb-talk:insert` event
 //   (detail `{ text }`) on the field. Insert the text and call
 //   preventDefault(). Otherwise the text waits until the field is back on
@@ -20,6 +26,7 @@
 
 export const FIELD_ATTR = "data-talk-field";
 export const FIELD_LABEL_ATTR = "data-talk-field-label";
+export const FIELD_DOCK_ATTR = "data-talk-field-dock";
 export const TOGGLE_EVENT = "bb-talk:toggle";
 export const INSERT_EVENT = "bb-talk:insert";
 export const OPEN_FIELD_EVENT = "bb-talk:open-field";

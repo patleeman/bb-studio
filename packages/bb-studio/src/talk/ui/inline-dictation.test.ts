@@ -3,9 +3,9 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { talk } from "./controller";
-import { dockLayout, inlineMic, mountInlineDock, readDockLayout, useInlineDictation } from "./inline-dictation";
+import { dockLayout, fieldDock, inlineMic, mountInlineDock, readDockLayout, useInlineDictation } from "./inline-dictation";
 
-vi.mock("./controller", () => ({ talk: { dictationComposer: vi.fn(), subscribe: vi.fn() } }));
+vi.mock("./controller", () => ({ talk: { dictationComposer: vi.fn(), subscribe: vi.fn(), getState: vi.fn(() => ({ field: null })) } }));
 
 let root: Root | undefined;
 let changed: () => void;
@@ -66,6 +66,24 @@ describe("inline dictation placement", () => {
     expect(dock.host.getAttribute("data-talk-inline-layout")).toBe("compact");
     dock.remove();
     expect(source.innerHTML).toBe(before);
+  });
+
+  it("docks into another plugin's dictation field that offers a dock", async () => {
+    const field = document.createElement("form");
+    field.setAttribute("data-talk-field", "canvas:new");
+    field.innerHTML = '<input><span data-talk-field-dock></span><button aria-label="Dictate">Mic</button>';
+    document.body.append(field);
+    expect(fieldDock("canvas:other")).toBeNull();
+    expect(fieldDock("canvas:new")).toBe(field.querySelector("[data-talk-field-dock]"));
+    vi.mocked(talk.getState).mockReturnValue({ field: { key: "canvas:new", label: "the new canvas" } } as never);
+    await render(true);
+    const host = field.querySelector("[data-talk-field-dock] > [data-talk-inline-host]") as HTMLElement | null;
+    expect(host).not.toBeNull();
+    expect(readDockLayout(host).layout).toBe("compact");
+    expect(document.querySelector("[data-test-docked]")?.getAttribute("data-test-docked")).toBe("true");
+    field.hidden = true; await sync();
+    expect(field.querySelector("[data-talk-inline-host]")).toBeNull();
+    vi.mocked(talk.getState).mockReturnValue({ field: null } as never);
   });
 
   it("keeps every action in a wide composer", () => {
