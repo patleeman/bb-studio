@@ -71,7 +71,7 @@ export const LOOK_RULES: Record<OrganicLook, Rules> = {
     noteTilt: 0,
     noteWidth: 210,
     noteOverlap: 0,
-    quoteHang: 0.35,
+    quoteHang: 0,
   },
   field: {
     gutter: 30,
@@ -240,6 +240,23 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
     rects.set(item.id, { x: Math.round(x), y: Math.round(y + dy), w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, floating: false, lane, units: u });
     const bottom = y + dy + h + rules.gap(item, isFocus, hash);
     for (let k = lane; k < lane + u; k++) tops[k] = bottom;
+    // Its notes take real room in the lanes beside it (or under it), never over another card.
+    for (const note of items.filter((each) => floating.has(each.id) && each.anchor === item.id).sort(byImportance)) {
+      const nw = widths.get(note.id)!;
+      const nu = Math.max(1, Math.min(units, Math.ceil((nw + rules.gutter) / (unit + rules.gutter))));
+      const nh = heightOf(note);
+      const point = note.point ?? { x: 1, y: 0.25 };
+      const want = point.x >= 0.5 ? lane + u : lane - nu;
+      let best = -1, bestY = Number.POSITIVE_INFINITY, bestDistance = Number.POSITIVE_INFINITY;
+      for (let candidate = Math.max(0, lane - nu); candidate <= Math.min(units - nu, lane + u); candidate++) {
+        const ty = Math.max(...tops.slice(candidate, candidate + nu));
+        const distance = Math.abs(candidate - want);
+        if (ty < bestY - 0.5 || (Math.abs(ty - bestY) <= 0.5 && distance < bestDistance)) { best = candidate; bestY = ty; bestDistance = distance; }
+      }
+      const ny = Math.max(bestY, Math.min(y + point.y * h - nh / 2, bestY + 400));
+      rects.set(note.id, { x: Math.round(laneX(best)), y: Math.round(ny), w: nw, h: nh, rotate: 0, z: 5, floating: true, lane: best, units: nu });
+      for (let k = best; k < best + nu; k++) tops[k] = ny + nh + rules.gap(note, false, hashOf(note.id));
+    }
   }
 
   // Floating notes: beside their anchor, on the side the point is nearer,

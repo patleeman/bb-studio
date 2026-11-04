@@ -83,9 +83,9 @@ describe("organic layout", () => {
       const note = layout.rects.get("why")!;
       const map = layout.rects.get("map")!;
       expect(note.floating).toBe(true);
-      // Beside the map: within a note's width of its edges.
-      expect(note.x + note.w).toBeGreaterThanOrEqual(map.x - 2);
-      expect(note.x).toBeLessThanOrEqual(map.x + map.w + 2);
+      // Beside the map: touching it, or across one gutter.
+      expect(note.x + note.w).toBeGreaterThanOrEqual(map.x - 40);
+      expect(note.x).toBeLessThanOrEqual(map.x + map.w + 40);
       expect(layout.links).toEqual(expect.arrayContaining([{ from: "why", to: "map", kind: "anchor", point: { x: 0.8, y: 0.3 } }]));
       // A related pair gets a line unless the two already touch.
       const quote = layout.rects.get("quote")!, lead = layout.rects.get("lead")!;

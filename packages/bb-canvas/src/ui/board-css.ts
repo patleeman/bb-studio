@@ -38,7 +38,7 @@ ${S} .cv-body p:last-child{margin-bottom:0}
 const LOOKS: Record<OrganicLook, string> = {
   editorial: `
 ${S}[data-cv-look=editorial] .canvas-scroll{background-image:none}
-${S} .cvt-card{border-top:1px solid var(--cv-rule-strong);padding-top:12px}
+${S} .cvt-card{border-top:1px solid var(--cv-rule-strong);padding-top:12px;background:var(--cv-paper)}
 ${S} .cvt[data-focus] .cvt-card{border-top-width:4px;padding-top:16px}
 ${S} .cvt[data-kind=headline] .cvt-card,${S} .cvt[data-kind=quote] .cvt-card,${S} .cvt[data-kind=note] .cvt-card{border-top:0;padding-top:0}
 ${S} .cvt[data-kind=headline][data-focus] .cvt-card{border-bottom:3px double var(--cv-rule-strong);padding-bottom:18px}

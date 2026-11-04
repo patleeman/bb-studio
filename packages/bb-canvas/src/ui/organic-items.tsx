@@ -70,7 +70,7 @@ function Headline({ item, width, focus, look }: { item: CanvasItem; width: numbe
   const headline = headlineOf(item.data);
   if (!headline) return null;
   // Big when there's room: a headline is read from across the room.
-  const px = Math.round(Math.max(26, Math.min(focus ? (look === "instrument" ? 46 : 68) : 40, width / (focus ? 11 : 13))));
+  const px = Math.round(Math.max(26, Math.min(focus ? (look === "instrument" ? 46 : 60) : 40, width / (focus ? 12 : 13))));
   return (
     <header className="cvi-headline" data-canvas-body="headline">
       {headline.kicker ? <div className="cv-kicker" style={{ marginBottom: 8 }}>{headline.kicker}</div> : null}

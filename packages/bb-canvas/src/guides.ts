@@ -20,6 +20,7 @@ Make the board RICH and dense, like a great front page or a briefing someone des
 - Inline sparklines: in a caption write {spark:3,5,4,8}; in HTML use cv.spark([3,5,4,8]) or <span data-spark="3,5,4,8"></span>. Deltas: {delta:+2.1} in a caption, cv.delta(2.1) in HTML.
 - Type: kicker → headline → dek → body, with the cv-* classes or the --cv-t-* scale. Color only with tokens (var(--cv-…)); --cv-blue and --cv-red for the two sides of a race, --cv-good/--cv-bad for change, --cv-c1…--cv-c8 for series.
 - size is a hint: s about a quarter of the width, m a third, l half, xl two-thirds. The focus grows.
+- Every board: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), and 1–3 anchored notes. A board of only headline, stats and text is a failure.
 - Example numbers below are placeholders: never reuse them. Use real data (search) and label estimates.
 `.trim();
 
@@ -166,5 +167,5 @@ export function designGuide(look: OrganicLook): string {
 
 /** A short line per look for the configure hook's instructions. */
 export function lookInstruction(look: OrganicLook): string {
-  return `This canvas's look is ${LOOK_INFO[look].name}: ${LOOK_INFO[look].line} Make the board rich and dense, not a slide: write your own custom HTML components with the look's tokens and the kit (window.cv), annotate with notes (anchor + point), and connect related items (relatedTo). The design guide with examples is in this thread's first message; canvas_guide returns it again.`;
+  return `This canvas's look is ${LOOK_INFO[look].name}: ${LOOK_INFO[look].line} Make the board rich and dense, not a slide. Every board needs: (1) a lead you write yourself as a custom HTML component with the look's tokens and the kit (window.cv), not just a headline; (2) at least one visual beyond numbers: a map (kind map) when places matter, a timeline when times matter, small multiples or a chart when things compare; (3) 1–3 notes with anchor + point on the most interesting thing; relatedTo connects related items. The design guide with examples is in this thread's first message; canvas_guide returns it again.`;
 }
