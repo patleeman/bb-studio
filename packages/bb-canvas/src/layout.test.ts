@@ -46,8 +46,21 @@ describe("columns", () => {
     expect(columnsFor(500)).toBe(4);
   });
 
+  it("widens a table to fit its columns, and leaves narrow tables to their hint", () => {
+    expect(cellSize("table", "m", 12, 2).w).toBe(6);
+    expect(cellSize("table", "m", 12, 5).w).toBe(7);
+    expect(cellSize("table", "l", 12, 7).w).toBe(10);
+    expect(cellSize("table", "s", 12, 9).w).toBe(12);
+    expect(cellSize("table", "s", 8, 9).w).toBe(8);
+    expect(cellSize("table", "l", 4, 9).w).toBe(4);
+    expect(cellSize("bar", "m", 12, 9).w).toBe(4);
+    const packed = packBoard([item("races", { kind: "table", size: "m", columns: 8 }), item("note", { kind: "caption", importance: 1 })], 12);
+    expect(packed.cells.get("races")!.w).toBe(12);
+    valid(packed.cells, 12);
+  });
+
   it("never makes a cell wider than the grid", () => {
-    for (const cols of COLUMN_STEPS) for (const kind of CANVAS_KINDS) for (const size of SIZE_HINTS) expect(cellSize(kind, size, cols).w).toBeLessThanOrEqual(cols);
+    for (const cols of COLUMN_STEPS) for (const kind of CANVAS_KINDS) for (const size of SIZE_HINTS) for (const columns of [0, 3, 20]) expect(cellSize(kind, size, cols, columns).w).toBeLessThanOrEqual(cols);
   });
 });
 

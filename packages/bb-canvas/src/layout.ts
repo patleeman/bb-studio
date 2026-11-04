@@ -20,6 +20,8 @@ export interface LayoutItem {
   importance: number;
   createdAt: number;
   updatedAt: number;
+  /** A table's column count: a wide table gets a wider cell, so it fits instead of scrolling. */
+  columns?: number;
 }
 
 export interface Cell { x: number; y: number; w: number; h: number }
@@ -54,9 +56,15 @@ const SHAPES: Partial<Record<CanvasKind, Record<SizeHint, [number, number]>>> = 
   table: { s: [4, 3], m: [6, 4], l: [6, 5], xl: [12, 5] },
 };
 
-/** An item's cell size for the column count. */
-export function cellSize(kind: CanvasKind, size: SizeHint, cols: number): { w: number; h: number } {
-  const [w12, h] = SHAPES[kind]?.[size] ?? BASE[size];
+/** The 12-column width a table needs to show this many columns without scrolling. */
+export function tableWidth(columns: number): number {
+  return Math.min(12, Math.ceil(columns * 1.4));
+}
+
+/** An item's cell size for the column count; a table is at least as wide as its columns need. */
+export function cellSize(kind: CanvasKind, size: SizeHint, cols: number, columns = 0): { w: number; h: number } {
+  const [hinted, h] = SHAPES[kind]?.[size] ?? BASE[size];
+  const w12 = kind === "table" && columns ? Math.max(hinted, tableWidth(columns)) : hinted;
   if (cols >= 12) return { w: Math.min(cols, w12), h };
   if (cols >= 8) return { w: Math.min(cols, Math.max(2, Math.round((w12 * 8) / 12))), h };
   // Narrow: small things two to a row, everything else full width.
@@ -115,16 +123,16 @@ export function packBoard(items: readonly LayoutItem[], cols: number, previous?:
   const cells = new Map<string, Cell>();
   if (!items.length) return { cells, focusId: null, rows: 0, cols };
   const focus = focusOf(items)!;
-  const sizes = new Map(items.map((item) => [item.id, cellSize(item.kind, item.size, cols)]));
+  const sizes = new Map(items.map((item) => [item.id, cellSize(item.kind, item.size, cols, item.columns)]));
   // The focus is the biggest: one size up, and up again until no other item
   // covers more cells (or it's as big as it gets).
   {
     let size = bigger(focus.size);
-    let cell = cellSize(focus.kind, size, cols);
+    let cell = cellSize(focus.kind, size, cols, focus.columns);
     const largest = Math.max(0, ...items.filter((item) => item.id !== focus.id).map((item) => { const s = sizes.get(item.id)!; return s.w * s.h; }));
     while (cell.w * cell.h < largest && size !== "xl") {
       size = bigger(size);
-      cell = cellSize(focus.kind, size, cols);
+      cell = cellSize(focus.kind, size, cols, focus.columns);
     }
     sizes.set(focus.id, cell);
   }
