@@ -17,5 +17,6 @@ describe("canvas tables", () => {
     expect(shortHeader("Estimated residents", 240)).toBe("Estimated residents");
     expect(shortHeader("Race", 60)).toBe("Race");
     expect(shortHeader("Outstanding ballots", 80)).toBe("Outst. ballots");
+    expect(shortHeader("Margin (percentage)", 80)).toBe("Margin (%)");
   });
 });

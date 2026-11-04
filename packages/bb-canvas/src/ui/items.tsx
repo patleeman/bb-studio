@@ -75,7 +75,8 @@ const SHORT: Record<string, string> = {
 /** A header as short as it can be while it still reads: only when the table is tight and the header long. */
 export function shortHeader(label: string, perColumn: number): string {
   if (label.length <= Math.max(8, Math.floor(perColumn / 8))) return label;
-  return label.split(/(\s+)/).map((word) => SHORT[word.toLowerCase()] ?? word).join("");
+  // Word by word, punctuation kept: "Margin (percentage)" reads "Margin (%)".
+  return label.replace(/[A-Za-z]+/g, (word) => SHORT[word.toLowerCase()] ?? word);
 }
 
 /**
