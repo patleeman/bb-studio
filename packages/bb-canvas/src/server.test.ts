@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
 import { CANVAS_MIGRATIONS } from "./migrations";
-import { registerCanvas } from "./server";
+import { CANVAS_DEFAULT_MODEL, registerCanvas } from "./server";
 import { CANVAS_CHANNEL } from "./shared";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
 
@@ -43,6 +43,18 @@ describe("canvas threads", () => {
     const { canvas } = await call("canvas.get", { threadId });
     expect(canvas).toMatchObject({ threadId, status: "working", turn: 1, items: [] });
     expect(canvas.history).toEqual([expect.objectContaining({ role: "user", text: "How did yesterday's election go?" })]);
+  });
+
+  it("pins new canvas threads to Haiku on the canvas's own thread, unless the caller picks a model", async () => {
+    const { call, spawned } = canvasHost();
+    await call("canvas.create", { text: "Election" });
+    expect(spawned[0]).toMatchObject({ providerId: "claude-code", model: "claude-haiku-5-5", executionInputSources: { providerId: "explicit", model: "explicit" } });
+    expect(CANVAS_DEFAULT_MODEL).toEqual({ providerId: "claude-code", model: "claude-haiku-5-5" });
+    await call("canvas.create", { text: "Weather", providerId: "codex", model: "gpt-5.5", reasoningLevel: "low" });
+    expect(spawned[1]).toMatchObject({ providerId: "codex", model: "gpt-5.5", reasoningLevel: "low" });
+    await call("canvas.create", { text: "Sports", providerId: "claude-code" });
+    expect(spawned[2]).toMatchObject({ providerId: "claude-code" });
+    expect(spawned[2]!.model).toBeUndefined();
   });
 
   it("sends the user's next message to the thread, queued while it works", async () => {

@@ -29,6 +29,13 @@ export interface BuiltinCanvas {
 }
 
 const PENDING_WAIT_MS = 5000;
+/**
+ * The model a new canvas thread runs on when the caller names none: Haiku,
+ * for speed (a canvas turn should land in seconds). Pinned on the canvas's
+ * own thread at creation, never on the user's global default; canvases made
+ * before keep the model their thread has.
+ */
+export const CANVAS_DEFAULT_MODEL = { providerId: "claude-code", model: "claude-haiku-5-5" } as const;
 /** BB's personal project: canvas threads live there, as the Bot's do. */
 const PERSONAL_PROJECT_ID = "proj_personal";
 
@@ -81,7 +88,10 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       const row = store.byThread(threadId);
       return { canvas: row ? store.view(row.id) : null };
     },
-    async "canvas.create"({ text, providerId, model, reasoningLevel }) {
+    async "canvas.create"(input) {
+      const { text, reasoningLevel } = input;
+      // A caller that names a provider or model gets exactly that; otherwise the canvas default.
+      const { providerId, model } = input.providerId || input.model ? input : CANVAS_DEFAULT_MODEL;
       const title = text.replace(/\s+/g, " ").trim().slice(0, 80);
       const row = store.create({ title });
       const spawning = bb.sdk.threads.spawn({

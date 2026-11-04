@@ -34,8 +34,10 @@ hands-free button.
 ## How it works
 
 - **The agent** is an ordinary BB thread, hidden, in your personal
-  project, on your normal BB provider. Canvas makes it when you start a
-  canvas. The thread is the canvas's memory; you see the board.
+  project. Canvas makes it when you start a canvas, on Claude Code's
+  Haiku 5.5 (`claude-haiku-5-5`) for speed: the model is set on the
+  canvas's own thread, not on your BB default, and a canvas keeps the
+  model it started with. The thread is the canvas's memory; you see the board.
 - **The board** is in this plugin's own database: one per canvas thread,
   with a short log of what changed in each turn.
 - **The canvas tools** (`canvas_read`, `canvas_add`, `canvas_update`,
