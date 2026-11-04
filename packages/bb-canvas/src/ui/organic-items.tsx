@@ -13,7 +13,8 @@ import { columnLabel, imageSrc, listItems, readProgress, readStat, tableOf } fro
 export const kit = canvasKit();
 
 /** Inner padding of a tile, per look and kind (px, each side). */
-export function tilePadding(look: OrganicLook, kind: CanvasItem["kind"]): number {
+export function tilePadding(look: OrganicLook, kind: CanvasItem["kind"], accent: string | null = null): number {
+  if (accent) return accent === "sticky" ? 14 : accent === "pull" ? 4 : accent === "margin" ? 8 : 10;
   if (kind === "headline") return look === "field" ? 4 : 0;
   if (look === "editorial") return 0;
   if (look === "field") return kind === "note" ? 14 : 16;

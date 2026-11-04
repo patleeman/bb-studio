@@ -3,8 +3,8 @@ name: canvas
 description: >-
   Use in a canvas thread, where you talk with the user on a board instead of in
   a transcript. It covers editing the board each turn with the canvas_* tools,
-  each item kind's data, importance, size and relations, the canvas's look and
-  its design guide, and keeping the reply to a short spoken caption.
+  each item kind's data, importance, size and relations, choosing the board's
+  style and its design guide, and keeping the reply to a short spoken caption.
 ---
 
 # Canvas
@@ -28,17 +28,30 @@ chat on their screen is one faint line: your latest reply.
 Never ask the user to arrange, move or resize anything. Studio lays the board
 out. You steer it with `importance` and `size`.
 
-## Looks
+## Styles
 
-A canvas has a look, picked when it starts: **Editorial** (a newspaper
-front), **Field notes** (a whiteboard of cards and sticky notes) or
-**Instrument** (a dense control panel); canvases from before looks are
-**Classic** (the slide grid). The first message has the look's design guide
-with examples; `canvas_guide` returns it again. In every look but Classic:
+You pick each board's style from what it shows; the user never has to.
+
+- **editorial** (a newspaper front): news, results, stories, explainers.
+- **field** (a whiteboard of cards and sticky notes): brainstorming,
+  planning, ideas, decisions.
+- **instrument** (a dense control panel): dense data, monitoring, many
+  numbers to compare.
+- A style the user names wins ("make this a whiteboard" is field).
+- Set `style` (and a short `styleReason`) on your first `canvas_set`. Keep
+  it for follow-ups; switch on a topic change of another kind, in that
+  `canvas_set` or with `canvas_style`. The switch animates, and the top bar
+  shows the style.
+- Borrow accents across styles: a note takes `options.accent` `sticky`,
+  `margin` or `callout`; a quote `pull`, `sticky` or `bar`. In HTML,
+  `cv-sticky`, `cv-margin-note` and `cv-callout` work in every style.
+
+The first message has the design guide with examples; `canvas_guide`
+returns it again (or one style's part, with `style`). In every style:
 
 - Make the board rich and dense, not a slide: one dominant focus and 5–12
   supporting items that each say something specific.
-- Write your own components first: a `custom` item's HTML gets the look's
+- Write your own components first: a `custom` item's HTML gets the style's
   tokens (`--cv-*` CSS variables), the kit's classes (`cv-kicker`, `cv-h1`,
   `cv-num`, `cv-float-right`, …) and `window.cv` (sparklines, line and bar
   charts, seat splits, US tile maps, timelines, small multiples). Draw with
@@ -46,9 +59,13 @@ with examples; `canvas_guide` returns it again. In every look but Classic:
   frame grows to its content: never set a height on it.
 - Annotate: a `note` with `anchor` (an item id) and `point` (`{x, y}`, 0–1
   inside that item) sits beside it with a line to that spot. `relatedTo`
-  (ids) draws connectors.
+  (ids) draws connectors; only the few most important draw.
+- Charts are honest: bars start at zero; for tiny differences set
+  `options.max` to a meaningful scale.
 - Inline marks in captions and notes: `{spark:3,5,4}`, `{delta:+2.1}`,
   `==highlight==`.
+
+Canvases from before styles are **Classic** (the slide grid) and stay so.
 
 ## Layout
 
@@ -59,7 +76,7 @@ with examples; `canvas_guide` returns it again. In every look but Classic:
   detail 3, background 1–2.
 - `size` s, m, l or xl is a hint. Stats are small, charts and tables large.
 - Classic: keep it small: a headline, three or four stats, one or two charts
-  or tables, a caption. Other looks: rich but focused (see Looks). At most 24
+  or tables, a caption. Other looks: rich but focused (see Styles). At most 24
   items.
 - Items that don't change keep their place, so prefer `canvas_update` over
   remove-and-add for the same thing.

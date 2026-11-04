@@ -36,7 +36,7 @@ export const CANVAS_FIRST_NOTE = `Canvas note (agent only): this thread backs a 
 /** The first note for a canvas in this look: the rules, and for an organic look, its whole design guide. */
 export function canvasFirstNote(look: Look): string {
   if (look === "classic") return CANVAS_FIRST_NOTE;
-  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look)}\n\n${designGuide(look)}`;
+  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look)}\n\n${designGuide()}`;
 }
 
 /** One line per kind: its data and options, for tool descriptions. */

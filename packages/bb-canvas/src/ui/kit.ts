@@ -129,7 +129,11 @@ export function canvasKit(win?: unknown): CanvasKit {
     const mag = Math.pow(10, Math.floor(Math.log10(step0)));
     const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) ?? mag * 10;
     const ticks: number[] = [];
-    for (let t = Math.ceil(min / step) * step; t <= max + step * 1e-6; t += step) ticks.push(Math.round(t / step) * step);
+    // From the first step at or below min, through the first at or above max, so every value is on the axis.
+    for (let t = Math.floor(min / step + 1e-9) * step; ticks.length < 50; t += step) {
+      ticks.push(Math.round(t / step) * step);
+      if (t >= max - step * 1e-6) break;
+    }
     return ticks;
   };
   const seriesColor = (o: Record<string, unknown>, key: string, index: number) => {
@@ -196,7 +200,8 @@ export function canvasKit(win?: unknown): CanvasKit {
     const m = { t: 16, r: 8, b: 22, l: 36 };
     const totals = list.map((row) => (o.stacked ? series.reduce((sum, key) => sum + Math.max(0, num(row[key]) ?? 0), 0) : Math.max(...series.map((key) => num(row[key]) ?? 0))));
     const mins = list.map((row) => Math.min(0, ...series.map((key) => num(row[key]) ?? 0)));
-    const ticks = niceTicks(Math.min(0, ...mins), Math.max(...totals, 0), 4);
+    // Honest: the axis always includes zero, and options.max sets a meaningful top (so 0.1 doesn't fill the chart).
+    const ticks = niceTicks(Math.min(0, ...mins), Math.max(...totals, num(o.max) ?? 0, 0), 4);
     const lo = ticks[0]!, hi = ticks.at(-1)!;
     const Y = (v: number) => m.t + (1 - (v - lo) / (hi - lo || 1)) * (h - m.t - m.b);
     const band = (w - m.l - m.r) / list.length;
@@ -204,7 +209,7 @@ export function canvasKit(win?: unknown): CanvasKit {
     const unit = { unit: o.unit, compact: o.compact };
     let out = `<svg class="cv-chart" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(`bar chart of ${series.join(", ")} by ${x}`)}">`;
     for (const t of ticks) out += `<line x1="${m.l}" x2="${w - m.r}" y1="${round(Y(t))}" y2="${round(Y(t))}" class="cv-grid-line"/><text x="${m.l - 6}" y="${round(Y(t)) + 3.5}" text-anchor="end" class="cv-axis">${fmt(t, unit)}</text>`;
-    const showValues = band >= 34 && series.length === 1;
+    const showValues = band / series.length >= 26;
     list.forEach((row, i) => {
       const x0 = m.l + i * band + (band - inner) / 2;
       let stack = 0;
@@ -223,6 +228,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       const step = Math.max(1, Math.ceil(list.length / Math.max(2, Math.floor((w - m.l - m.r) / 44))));
       if (i % step === 0) out += `<text x="${round(x0 + inner / 2)}" y="${h - 6}" text-anchor="middle" class="cv-axis">${esc(str(row[x]).slice(0, 10))}</text>`;
     });
+    if (lo < 0 || o.baseline !== false) out += `<line x1="${m.l}" x2="${w - m.r}" y1="${round(Y(0))}" y2="${round(Y(0))}" class="cv-zero-line"/>`;
     return `${out}</svg>`;
   };
 

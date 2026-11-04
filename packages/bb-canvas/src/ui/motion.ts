@@ -76,3 +76,13 @@ export function exit(element: Element | null, done: () => void, index = 0): void
   animation.onfinish = done;
   animation.oncancel = done;
 }
+
+/** A style switch: the card dips and comes back in its new style, one after another. */
+export function restyle(element: Element | null, index = 0): void {
+  if (!can(element)) return;
+  if (reducedMotion()) { element.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 200 }); return; }
+  element.animate(
+    [{ opacity: 0.35, filter: "saturate(0.4)" }, { opacity: 1, filter: "none" }],
+    { duration: 700, delay: 120 + index * 40, easing: EASE, fill: "backwards" },
+  );
+}

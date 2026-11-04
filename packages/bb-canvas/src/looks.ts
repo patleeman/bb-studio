@@ -130,6 +130,33 @@ export const LOOK_TOKENS: Record<OrganicLook, LookTokens> = {
   },
 };
 
+/** Sticky-note papers for every style (field notes tunes its own). */
+const ACCENT_PALETTE: Record<"light" | "dark", Palette> = {
+  light: { sticky: "#fff3a6", "sticky-2": "#ffd6e0", "sticky-3": "#d4ecff", "sticky-ink": "#2b2a24" },
+  dark: { sticky: "#e9d96a", "sticky-2": "#f0a9bb", "sticky-3": "#9fcff5", "sticky-ink": "#1f1e18" },
+};
+
+/** The accents notes and quotes can take in any style, and each style's own. */
+export const NOTE_ACCENTS = ["sticky", "margin", "callout"] as const;
+export const QUOTE_ACCENTS = ["pull", "sticky", "bar"] as const;
+export type NoteAccent = (typeof NOTE_ACCENTS)[number];
+export type QuoteAccent = (typeof QUOTE_ACCENTS)[number];
+export const NATIVE_ACCENT: Record<OrganicLook, { note: NoteAccent; quote: QuoteAccent }> = {
+  editorial: { note: "margin", quote: "pull" },
+  field: { note: "sticky", quote: "sticky" },
+  instrument: { note: "callout", quote: "bar" },
+};
+/** An item's accent: its options.accent when it's one its kind takes, else the style's own. */
+export function accentOf(kind: string, options: Record<string, unknown> | undefined, look: OrganicLook): string | null {
+  const asked = options?.accent;
+  if (kind === "note") return typeof asked === "string" && (NOTE_ACCENTS as readonly string[]).includes(asked) ? asked : NATIVE_ACCENT[look].note;
+  if (kind === "quote") return typeof asked === "string" && (QUOTE_ACCENTS as readonly string[]).includes(asked) ? asked : NATIVE_ACCENT[look].quote;
+  return null;
+}
+
+/** Color tokens, registered so a style switch cross-fades them. */
+export const COLOR_TOKENS = ["paper", "surface", "ink", "ink-2", "muted", "rule", "rule-strong", "accent", "accent-ink", "good", "bad", "warn", "highlight", "blue", "red", "green", "amber", "purple", "teal", "gray", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"];
+
 const SCALE_NAMES = ["xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"] as const;
 
 /** The token declarations for one look and mode, as CSS (no selector). */
@@ -137,7 +164,9 @@ export function tokenDeclarations(look: OrganicLook, mode: "light" | "dark"): st
   const tokens = LOOK_TOKENS[look];
   const palette = tokens[mode];
   const lines: string[] = [];
-  for (const [name, value] of Object.entries(palette)) lines.push(`--cv-${name}:${value}`);
+  // Accents any style can borrow (a sticky note, a margin note, a callout) keep their own faces and paper.
+  for (const [name, value] of Object.entries({ ...ACCENT_PALETTE[mode], ...palette })) lines.push(`--cv-${name}:${value}`);
+  lines.push(`--cv-font-sticky:${HAND}`, `--cv-font-marker:${MARKER}`, `--cv-font-margin:${SERIF}`, `--cv-font-callout:${MONO}`);
   for (const [name, value] of Object.entries(tokens.fonts)) lines.push(`--cv-font-${name}:${value}`);
   tokens.scale.forEach((px, index) => lines.push(`--cv-t-${SCALE_NAMES[index]}:${px}px`));
   tokens.space.forEach((px, index) => lines.push(`--cv-s-${index + 1}:${px}px`));
@@ -154,6 +183,6 @@ export function chartColors(look: OrganicLook, mode: "light" | "dark"): string[]
 /** The token names an agent can use, for the guide. */
 export const TOKEN_HELP = [
   "Colors: --cv-paper (board ground), --cv-surface (card), --cv-ink, --cv-ink-2, --cv-muted, --cv-rule, --cv-rule-strong, --cv-accent, --cv-accent-ink, --cv-good, --cv-bad, --cv-warn, --cv-highlight; hues --cv-blue, --cv-red, --cv-green, --cv-amber, --cv-purple, --cv-teal, --cv-gray; chart series --cv-c1 … --cv-c8.",
-  "Type: --cv-font-display, --cv-font-text, --cv-font-label, --cv-font-num, --cv-font-hand; sizes --cv-t-xs, -sm, -md, -lg, -xl, -2xl, -3xl, -4xl; --cv-display-weight.",
+  "Type: --cv-font-display, --cv-font-text, --cv-font-label, --cv-font-num, --cv-font-hand; borrowed accents' faces --cv-font-sticky, --cv-font-marker, --cv-font-margin, --cv-font-callout; sticky papers --cv-sticky, --cv-sticky-2, --cv-sticky-3, --cv-sticky-ink; sizes --cv-t-xs, -sm, -md, -lg, -xl, -2xl, -3xl, -4xl; --cv-display-weight.",
   "Space and shape: --cv-s-1 … --cv-s-6, --cv-radius, --cv-radius-sm.",
 ].join("\n");

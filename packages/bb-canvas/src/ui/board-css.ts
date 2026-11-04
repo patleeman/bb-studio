@@ -1,7 +1,7 @@
 // The page's CSS for an organic look: its tokens on the page (light, and
 // dark under data-cv-mode="dark"), the kit's classes, and each look's tile
 // chrome and ground. Scoped to .cv-scope, which the canvas page carries.
-import type { OrganicLook } from "../looks";
+import { COLOR_TOKENS, type OrganicLook } from "../looks";
 import { kitCss, tokenCss } from "./kit-css";
 
 const S = ".cv-scope";
@@ -40,11 +40,8 @@ const LOOKS: Record<OrganicLook, string> = {
 ${S}[data-cv-look=editorial] .canvas-scroll{background-image:none}
 ${S} .cvt-card{border-top:1px solid var(--cv-rule-strong);padding-top:12px;background:var(--cv-paper)}
 ${S} .cvt[data-focus] .cvt-card{border-top-width:4px;padding-top:16px}
-${S} .cvt[data-kind=headline] .cvt-card,${S} .cvt[data-kind=quote] .cvt-card,${S} .cvt[data-kind=note] .cvt-card{border-top:0;padding-top:0}
+${S} .cvt[data-kind=headline] .cvt-card{border-top:0;padding-top:0}
 ${S} .cvt[data-kind=headline][data-focus] .cvt-card{border-bottom:3px double var(--cv-rule-strong);padding-bottom:18px}
-${S} .cvt[data-kind=quote] .cvt-card{background:var(--cv-paper);padding:6px 10px 6px 0}
-${S} .cvt[data-kind=note] .cvt-card{background:var(--cv-paper);border-left:2px solid var(--cv-accent);padding:4px 0 4px 12px}
-${S} .cvt[data-kind=note] .cv-note{font-family:var(--cv-font-text);font-style:italic;font-size:var(--cv-t-sm);color:var(--cv-ink-2);line-height:1.4}
 ${S} .cvt-head{color:var(--cv-ink)}
 ${S} .cvt-head::before{content:"";width:7px;height:7px;background:var(--cv-accent);flex:none}
 ${S} .cvt[data-kind=caption] .cv-body{font-size:var(--cv-t-lg)}
@@ -53,12 +50,6 @@ ${S} .cvt[data-kind=caption] .cv-body{font-size:var(--cv-t-lg)}
 ${S} .cvt-card{background:var(--cv-surface);border-radius:var(--cv-radius);box-shadow:var(--cv-shadow)}
 ${S} .cvt[data-kind=headline] .cvt-card{background:transparent;box-shadow:none}
 ${S} .cvt[data-focus]:not([data-kind=headline]) .cvt-card::after{content:"";position:absolute;top:-8px;left:50%;width:15px;height:15px;margin-left:-7px;border-radius:99px;background:radial-gradient(circle at 35% 35%,#ff8a80,var(--cv-red) 60%);box-shadow:0 2px 3px rgb(0 0 0/.35)}
-${S} .cvt[data-kind=note] .cvt-card{background:var(--cv-sticky);color:var(--cv-sticky-ink);border-radius:2px;box-shadow:0 1px 0 rgb(0 0 0/.06),0 12px 20px -12px rgb(60 50 0/.5)}
-${S} .cvt[data-kind=note] .cvt-card::before{content:"";position:absolute;top:-9px;left:50%;width:58px;height:18px;transform:translateX(-50%) rotate(-3deg);background:color-mix(in oklab,var(--cv-paper) 60%,transparent);border:1px solid color-mix(in oklab,var(--cv-ink) 8%,transparent)}
-${S} .cvt[data-kind=note] .cv-note{color:var(--cv-sticky-ink);font-size:var(--cv-t-lg);font-weight:600}
-${S} .cvt[data-kind=quote] .cvt-card{background:var(--cv-sticky-2);color:var(--cv-sticky-ink);border-radius:2px}
-${S} .cvt[data-kind=quote] .cv-quote{color:var(--cv-sticky-ink)}
-${S} .cvt[data-kind=quote] .cv-quote cite{color:color-mix(in oklab,var(--cv-sticky-ink) 70%,transparent)}
 ${S} .cvt[data-kind=caption] .cvt-card{background:var(--cv-sticky-3);color:var(--cv-sticky-ink);border-radius:2px}
 ${S} .cvt[data-kind=caption] .cv-body{color:var(--cv-sticky-ink);font-family:var(--cv-font-hand);font-size:var(--cv-t-lg);font-weight:600;line-height:1.35}
 ${S} .cvt-head{font-family:var(--cv-font-hand);font-size:var(--cv-t-lg);letter-spacing:0;text-transform:none;color:var(--cv-accent);margin-bottom:6px}
@@ -73,15 +64,42 @@ ${S} .cvt[data-kind=headline] .cvt-card{background:transparent;border:0;box-shad
 ${S} .cvt-head{height:26px;margin:0;padding:0 10px;border-bottom:1px solid var(--cv-rule);font-size:10px;font-weight:500;color:var(--cv-muted)}
 ${S} .cvt-tag{color:var(--cv-accent);font-weight:700;flex:none}
 ${S} .cvt-head .cvt-kind{margin-left:auto;opacity:.7;flex:none}
-${S} .cvt[data-kind=note] .cvt-card{border:1px dashed var(--cv-accent);background:color-mix(in oklab,var(--cv-accent) 8%,var(--cv-surface))}
-${S} .cvt[data-kind=note] .cv-note{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);line-height:1.45;color:var(--cv-ink)}
-${S} .cvt[data-kind=quote] .cvt-card{border-left:2px solid var(--cv-accent)}
-${S} .cvt[data-kind=quote] .cv-quote{font-family:var(--cv-font-text);font-size:var(--cv-t-md);font-weight:500}
 `,
 };
+
+const ACCENTS = `
+/* Accents: a note or quote looks the same in every style, so styles can borrow each other's. */
+${S} .cvt[data-accent] .cvt-card{border:0;box-shadow:none;border-radius:0;padding:0;background:transparent}
+${S} .cvt[data-accent=sticky] .cvt-card{background:var(--cv-sticky);color:var(--cv-sticky-ink);border-radius:2px;padding:0;box-shadow:0 1px 0 rgb(0 0 0/.06),0 12px 20px -12px rgb(60 50 0/.5)}
+${S} .cvt[data-kind=note][data-accent=sticky] .cvt-card::before{content:"";position:absolute;top:-9px;left:50%;width:58px;height:18px;transform:translateX(-50%) rotate(-3deg);background:color-mix(in oklab,var(--cv-paper) 60%,transparent);border:1px solid color-mix(in oklab,var(--cv-ink) 8%,transparent)}
+${S} .cvt[data-kind=note][data-accent=sticky] .cv-note{font-family:var(--cv-font-sticky);color:var(--cv-sticky-ink);font-size:var(--cv-t-lg);font-weight:600;line-height:1.3}
+${S} .cvt[data-kind=quote][data-accent=sticky] .cvt-card{background:var(--cv-sticky-2)}
+${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote{font-family:var(--cv-font-sticky);color:var(--cv-sticky-ink);font-style:normal;font-size:var(--cv-t-xl);font-weight:600;line-height:1.25}
+${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote::before{content:none}
+${S} .cvt[data-kind=quote][data-accent=sticky] .cv-quote cite{color:color-mix(in oklab,var(--cv-sticky-ink) 70%,transparent);font-family:var(--cv-font-sticky);text-transform:none;letter-spacing:0}
+${S} .cvt[data-accent=margin] .cvt-card{background:var(--cv-paper);border-left:2px solid var(--cv-accent)}
+${S} .cvt[data-kind=note][data-accent=margin] .cv-note{font-family:var(--cv-font-margin);font-style:italic;font-size:var(--cv-t-sm);color:var(--cv-ink-2);line-height:1.4;font-weight:400}
+${S} .cvt[data-accent=callout] .cvt-card{border:1px dashed var(--cv-accent);border-radius:2px;background:color-mix(in oklab,var(--cv-accent) 8%,var(--cv-surface))}
+${S} .cvt[data-kind=note][data-accent=callout] .cv-note{font-family:var(--cv-font-callout);font-size:var(--cv-t-xs);line-height:1.45;color:var(--cv-ink);font-weight:400}
+${S} .cvt[data-accent=pull] .cvt-card{background:var(--cv-paper)}
+${S} .cvt[data-kind=quote][data-accent=pull] .cv-quote{font-family:var(--cv-font-margin);font-style:italic;font-size:var(--cv-t-2xl);line-height:1.12;font-weight:500;color:var(--cv-ink)}
+${S} .cvt[data-kind=quote][data-accent=pull] .cv-quote::before{content:"“";display:block;font-size:2.2em;line-height:0.6;color:var(--cv-accent);margin-bottom:0.08em;font-style:normal}
+${S} .cvt[data-accent=bar] .cvt-card{border-left:2px solid var(--cv-accent);background:var(--cv-surface)}
+${S} .cvt[data-kind=quote][data-accent=bar] .cv-quote{font-family:var(--cv-font-text);font-style:normal;font-size:var(--cv-t-md);font-weight:500}
+${S} .cvt[data-kind=quote][data-accent=bar] .cv-quote::before{content:none}
+`;
+
+/**
+ * A style switch cross-fades the palette: the color tokens are registered
+ * (so they interpolate) and transition on the page. Fonts and sizes switch
+ * at once, while the cards glide to their new places and fade back in.
+ */
+const SWITCH = COLOR_TOKENS.map((name) => `@property --cv-${name}{syntax:"<color>";inherits:true;initial-value:transparent}`).join("")
+  + `${S}{transition:${COLOR_TOKENS.map((name) => `--cv-${name} .7s ease`).join(",")}}`
+  + `@media (prefers-reduced-motion: reduce){${S}{transition:none}}`;
 
 /** Everything an organic look needs on the page, scoped to .cv-scope[data-cv-look=…]. */
 export function lookCss(look: OrganicLook): string {
   const scope = `${S}[data-cv-look=${look}]`;
-  return tokenCss(look, scope, `${scope}[data-cv-mode=dark]`) + kitCss(look, S) + COMMON + LOOKS[look];
+  return tokenCss(look, scope, `${scope}[data-cv-mode=dark]`) + kitCss(look, S) + COMMON + LOOKS[look] + ACCENTS + SWITCH;
 }

@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { ORGANIC_LOOKS } from "../looks";
+import { accentOf, ORGANIC_LOOKS } from "../looks";
 import { frameSrcDoc } from "./frame";
 import { canvasKit, type CanvasKit } from "./kit";
 
 const kit = canvasKit();
 const EVIL = `<img src=x onerror="alert(1)">`;
+
+describe("accents", () => {
+  it("default to the style's own and can be borrowed in any style", () => {
+    expect(accentOf("note", {}, "editorial")).toBe("margin");
+    expect(accentOf("note", {}, "field")).toBe("sticky");
+    expect(accentOf("note", {}, "instrument")).toBe("callout");
+    expect(accentOf("note", { accent: "sticky" }, "instrument")).toBe("sticky");
+    expect(accentOf("quote", { accent: "bar" }, "field")).toBe("bar");
+    expect(accentOf("quote", { accent: "callout" }, "field")).toBe("sticky");
+    expect(accentOf("stat", { accent: "sticky" }, "field")).toBeNull();
+  });
+});
 
 describe("the canvas kit", () => {
   it("runs from its own source, as a custom frame gets it", () => {
@@ -49,6 +61,21 @@ describe("the canvas kit", () => {
     expect(kit.paint("c3")).toBe("var(--cv-c3)");
     expect(kit.fmt(1234.5, { prefix: "$" })).toBe("$1,235");
     expect(kit.fmt(-2.25, { unit: " pts", signed: true })).toBe("−2.25 pts");
+  });
+
+  it("keeps column charts honest: zero on the axis, and options.max sets the top", () => {
+    const tiny = kit.columns([{ race: "A", m: 0.1 }, { race: "B", m: 0 }], { w: 400, h: 200, max: 5 });
+    expect(tiny).toContain("cv-zero-line");
+    expect(tiny).toMatch(/>6</);
+    // The 0.1 bar is a sliver of a 0–5 axis, not the whole height.
+    const heights = [...tiny.matchAll(/<rect [^>]*height="([0-9.]+)"/g)].map((match) => Number(match[1]));
+    expect(Math.max(...heights)).toBeLessThan(10);
+  });
+
+  it("puts every value on the axis: the top tick is at or above the largest bar", () => {
+    const svg = kit.columns([{ k: "a", v: 4.5 }, { k: "b", v: 1 }], { w: 400, h: 200 });
+    const ys = [...svg.matchAll(/<rect [^>]*y="([0-9.-]+)"/g)].map((match) => Number(match[1]));
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(15);
   });
 
   it("gives every frame the look's tokens and kit, and the agent's HTML after them", () => {

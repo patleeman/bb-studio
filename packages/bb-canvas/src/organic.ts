@@ -29,6 +29,8 @@ export interface OrganicItem {
   relatedTo?: readonly string[];
   anchor?: string | null;
   point?: { x: number; y: number } | null;
+  /** A note's or quote's accent (looks.ts accentOf): a sticky tilts in any style. */
+  accent?: string | null;
 }
 
 export interface Placed { x: number; y: number; w: number; h: number; rotate: number; z: number; floating: boolean; lane: number; units: number }
@@ -36,6 +38,8 @@ export interface Link { from: string; to: string; kind: "related" | "anchor"; po
 export interface OrganicLayout { rects: Map<string, Placed>; focusId: string | null; height: number; units: number; links: Link[] }
 
 const ORDER: readonly SizeHint[] = ["s", "m", "l", "xl"];
+/** Related-item connectors drawn per board, at most. */
+export const MAX_RELATED = 4;
 
 interface Rules {
   gutter: number;
@@ -103,6 +107,12 @@ export const LOOK_RULES: Record<OrganicLook, Rules> = {
   },
 };
 
+/** An item's tilt, in degrees: stickies tilt in every style; other accents never; cards as the style says (the focus less). */
+function tiltOf(item: OrganicItem, rules: Rules, isFocus: boolean, hash: number): number {
+  const range = item.accent === "sticky" ? 3.2 : item.accent ? 0 : isFocus ? rules.tilt * 0.4 : rules.tilt;
+  return range ? Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * range * 100) / 100 : 0;
+}
+
 /** Lanes for a board this wide. */
 export function unitsFor(width: number): number {
   return width >= 1100 ? 12 : width >= 700 ? 8 : 4;
@@ -151,6 +161,20 @@ function laneUnits(item: OrganicItem, rules: Rules, units: number, focus: boolea
 }
 
 /**
+ * Lane looks put a rail beside the focus. When nothing on the board fits
+ * that rail (everything else is wide, and no note), the focus takes the
+ * whole width instead of leaving the rail empty.
+ */
+function focusUnitsFor(items: readonly OrganicItem[], rules: Rules, units: number, focus: OrganicItem | null, floating: ReadonlySet<string>): number | null {
+  if (!focus) return null;
+  const own = laneUnits(focus, rules, units, true);
+  if (rules.focusAt !== "left" || own >= units) return own;
+  const rail = units - own;
+  const fits = items.some((item) => item.id !== focus.id && (floating.has(item.id) || laneUnits(item, rules, units, false) <= rail));
+  return fits ? own : units;
+}
+
+/**
  * Each item's width in px, before heights are known: the page renders items
  * at these widths and measures their heights.
  */
@@ -161,9 +185,10 @@ export function organicWidths(items: readonly OrganicItem[], width: number, look
   const focus = organicFocus(items);
   const floating = floats(items);
   const widths = new Map<string, number>();
+  const focusUnits = focusUnitsFor(items, rules, units, focus, floating);
   for (const item of items) {
     if (floating.has(item.id)) { widths.set(item.id, Math.min(rules.noteWidth, width)); continue; }
-    const u = laneUnits(item, rules, units, item.id === focus?.id);
+    const u = item.id === focus?.id ? focusUnits! : laneUnits(item, rules, units, false);
     widths.set(item.id, Math.round(u * unit + (u - 1) * rules.gutter));
   }
   return widths;
@@ -209,7 +234,7 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
   if (rules.focusAt === "center") placeAround(ordered, focus, rects, { width, units, unit, rules, widths, heightOf, previous, notes: items.filter((item) => floating.has(item.id)) });
   else for (const item of ordered) {
     const isFocus = item.id === focus?.id;
-    const u = laneUnits(item, rules, units, isFocus);
+    const u = isFocus ? focusUnitsFor(items, rules, units, focus, floating)! : laneUnits(item, rules, units, false);
     const h = heightOf(item);
     const hash = hashOf(item.id);
     const topAt = (lane: number) => Math.max(...tops.slice(lane, lane + u));
@@ -236,7 +261,7 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
     if (item.kind === "quote" && rules.quoteHang && lane > 0) x -= (rules.gutter + unit * rules.quoteHang) * 0.6;
     const w = widths.get(item.id)!;
     x = Math.max(0, Math.min(width - w, x));
-    const rotate = rules.tilt ? Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * (item.kind === "quote" ? rules.noteTilt : isFocus ? rules.tilt * 0.4 : rules.tilt) * 100) / 100 : 0;
+    const rotate = tiltOf(item, rules, isFocus, hash);
     rects.set(item.id, { x: Math.round(x), y: Math.round(y + dy), w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, floating: false, lane, units: u });
     const bottom = y + dy + h + rules.gap(item, isFocus, hash);
     for (let k = lane; k < lane + u; k++) tops[k] = bottom;
@@ -253,8 +278,9 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
         const distance = Math.abs(candidate - want);
         if (ty < bestY - 0.5 || (Math.abs(ty - bestY) <= 0.5 && distance < bestDistance)) { best = candidate; bestY = ty; bestDistance = distance; }
       }
-      const ny = Math.max(bestY, Math.min(y + point.y * h - nh / 2, bestY + 400));
-      rects.set(note.id, { x: Math.round(laneX(best)), y: Math.round(ny), w: nw, h: nh, rotate: 0, z: 5, floating: true, lane: best, units: nu });
+      // At the top of the free room beside it (the leader line reaches the point), so no empty rail is left above it.
+      const ny = bestY;
+      rects.set(note.id, { x: Math.round(laneX(best)), y: Math.round(ny), w: nw, h: nh, rotate: tiltOf(note, rules, false, hashOf(note.id)), z: 5, floating: true, lane: best, units: nu });
       for (let k = best; k < best + nu; k++) tops[k] = ny + nh + rules.gap(note, false, hashOf(note.id));
     }
   }
@@ -284,7 +310,7 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
       if (score < bestScore) { bestScore = score; best = at; }
     }
     const hash = hashOf(note.id);
-    const rotate = rules.noteTilt ? Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * rules.noteTilt * 100) / 100 : 0;
+    const rotate = tiltOf(note, rules, false, hash);
     rects.set(note.id, { x: Math.round(best!.x), y: Math.round(best!.y), w, h, rotate, z: 5, floating: true, lane: -1, units: 0 });
   }
 
@@ -297,11 +323,24 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
   }
   links.sort((a, b) => (a.from + a.to < b.from + b.to ? -1 : 1));
   // Related items that already touch need no line between them.
-  const drawn = links.filter((link) => {
-    if (link.kind === "anchor") return true;
+  // A few lines say more than many: at most MAX_RELATED related lines, two per item,
+  // the most important pairs first; leader lines from notes always draw.
+  const importance = new Map(items.map((item) => [item.id, item.importance]));
+  const degree = new Map<string, number>();
+  let related = 0;
+  const ranked = [...links].sort((a, b) => (importance.get(b.from)! + importance.get(b.to)!) - (importance.get(a.from)! + importance.get(a.to)!) || (a.from + a.to < b.from + b.to ? -1 : 1));
+  const keep = new Set<Link>();
+  for (const link of ranked) {
+    if (link.kind === "anchor") { keep.add(link); continue; }
     const ends = linkEnds(rects.get(link.from)!, rects.get(link.to)!, null);
-    return Math.hypot(ends.x2 - ends.x1, ends.y2 - ends.y1) >= 96;
-  });
+    if (Math.hypot(ends.x2 - ends.x1, ends.y2 - ends.y1) < 96) continue;
+    if (related >= MAX_RELATED || (degree.get(link.from) ?? 0) >= 2 || (degree.get(link.to) ?? 0) >= 2) continue;
+    keep.add(link);
+    related++;
+    degree.set(link.from, (degree.get(link.from) ?? 0) + 1);
+    degree.set(link.to, (degree.get(link.to) ?? 0) + 1);
+  }
+  const drawn = links.filter((link) => keep.has(link));
   let height = 0;
   for (const rect of rects.values()) height = Math.max(height, rect.y + rect.h);
   return { rects, focusId: focus?.id ?? null, height: Math.ceil(height), units, links: drawn };
@@ -333,19 +372,22 @@ function placeAround(ordered: readonly OrganicItem[], focus: OrganicItem | null,
       const ov = rules.noteOverlap;
       let spot: { x: number; y: number } | null = null;
       let best = Number.POSITIVE_INFINITY;
+      // Beside, under or over it, overlapping only its padding (14 px): a sticky never covers a row or a label.
+      const o = Math.min(ov, 12);
       const tries = [
-        [anchor.x + anchor.w - ov, py - h / 2], [anchor.x - w + ov, py - h / 2], [px - w / 2, anchor.y + anchor.h - ov], [px - w / 2, anchor.y - h + ov],
-        [anchor.x + anchor.w - ov, anchor.y - h * 0.3], [anchor.x - w + ov, anchor.y - h * 0.3], [anchor.x + anchor.w - ov, anchor.y + anchor.h - h * 0.7], [anchor.x - w + ov, anchor.y + anchor.h - h * 0.7],
+        [anchor.x + anchor.w - o, py - h / 2], [anchor.x - w + o, py - h / 2], [px - w / 2, anchor.y + anchor.h - o], [px - w / 2, anchor.y - h + o],
+        [anchor.x + anchor.w - o, anchor.y - h * 0.3], [anchor.x - w + o, anchor.y - h * 0.3], [anchor.x + anchor.w - o, anchor.y + anchor.h - h * 0.7], [anchor.x - w + o, anchor.y + anchor.h - h * 0.7],
+        [anchor.x + anchor.w + 18, py - h / 2], [anchor.x - w - 18, py - h / 2], [px - w / 2, anchor.y + anchor.h + 18],
       ];
       for (const [tx, ty] of tries) {
         const x = Math.round(Math.max(0, Math.min(width - w, tx!))), y = Math.round(Math.max(0, ty!));
-        if (!free(x, y, w, h, 14, anchor.id, ov + 2)) continue;
+        if (!free(x, y, w, h, 14, anchor.id, 14)) continue;
         const score = Math.hypot(x + w / 2 - px, y + h / 2 - py);
         if (score < best) { best = score; spot = { x, y }; }
       }
       if (!spot) continue; // no room beside it: it floats later
       const hash = hashOf(note.id);
-      const rotate = Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * rules.noteTilt * 100) / 100;
+      const rotate = tiltOf(note, rules, false, hash);
       boxes.push({ id: note.id, x: spot.x, y: spot.y, w, h, gap: 14 });
       rects.set(note.id, { x: spot.x, y: spot.y, w, h, rotate, z: 5, floating: true, lane: -1, units: 0 });
     }
@@ -384,7 +426,7 @@ function placeAround(ordered: readonly OrganicItem[], focus: OrganicItem | null,
     const placed = spot as { x: number; y: number };
     if (isFocus) center = { x: placed.x + w / 2, y: placed.y + h / 2 };
     boxes.push({ id: item.id, x: placed.x, y: placed.y, w, h, gap });
-    const rotate = Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * (item.kind === "quote" ? rules.noteTilt : isFocus ? rules.tilt * 0.4 : rules.tilt) * 100) / 100;
+    const rotate = tiltOf(item, rules, isFocus, hash);
     const lane = Math.max(0, Math.min(units - 1, Math.round(placed.x / (unit + rules.gutter))));
     rects.set(item.id, { x: placed.x, y: placed.y, w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, floating: false, lane, units: Math.round((w + rules.gutter) / (unit + rules.gutter)) });
     placeNotes(boxes.at(-1)!);

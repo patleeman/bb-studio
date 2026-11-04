@@ -137,7 +137,7 @@ export const canvasItemSchema = z.object({
 });
 export type CanvasItem = z.infer<typeof canvasItemSchema>;
 
-export const CHANGE_OPS = ["add", "update", "remove", "clear"] as const;
+export const CHANGE_OPS = ["add", "update", "remove", "clear", "style"] as const;
 export const changeSchema = z.object({
   seq: z.number(),
   rev: z.number(),

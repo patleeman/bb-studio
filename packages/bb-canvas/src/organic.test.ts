@@ -112,6 +112,50 @@ describe("organic layout", () => {
   });
 });
 
+describe("rough spots", () => {
+  it("gives the focus the whole width when nothing else could sit in the rail beside it", () => {
+    const wide = [item("lead", "custom", "xl", 5), item("t", "table", "xl", 3), item("m", "multiples", "xl", 2)];
+    expect(layoutOrganic(wide, 1400, "editorial", new Map()).rects.get("lead")!.w).toBe(1400);
+    const railed = [...wide, item("s", "stat", "s", 3)];
+    expect(layoutOrganic(railed, 1400, "editorial", new Map()).rects.get("lead")!.w).toBeLessThan(1000);
+  });
+
+  it("puts a note on the lead at the top of the rail, not down by its point", () => {
+    const items = [item("lead", "custom", "xl", 5), item("n", "note", "s", 2, { anchor: "lead", point: { x: 0.9, y: 0.9 } }), item("s", "stat", "s", 3)];
+    const layout = layoutOrganic(items, 1400, "editorial", new Map([["lead", 600], ["n", 80], ["s", 120]]));
+    expect(layout.rects.get("n")!.y).toBe(0);
+  });
+
+  it("draws at most a few related connectors, two per item, the important ones first", () => {
+    const items = [item("lead", "custom", "xl", 5), ...["a", "b", "c", "d", "e", "f", "g"].map((id, index) => item(id, "stat", "s", 4 - (index % 3), { relatedTo: ["lead", "a", "b"].filter((other) => other !== id) }))];
+    for (const look of ORGANIC_LOOKS) {
+      const layout = layoutOrganic(items, 1400, look, new Map());
+      const related = layout.links.filter((link) => link.kind === "related");
+      expect(related.length).toBeLessThanOrEqual(4);
+      const degree = new Map<string, number>();
+      for (const link of related) for (const id of [link.from, link.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
+      expect(Math.max(0, ...degree.values())).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps field-notes stickies off their anchor's content (only its padding)", () => {
+    const items = [item("lead", "custom", "xl", 5), item("t", "table", "m", 4), item("n", "note", "s", 2, { anchor: "t", point: { x: 0.5, y: 0.5 }, accent: "sticky" })];
+    const layout = layoutOrganic(items, 1400, "field", new Map([["lead", 300], ["t", 260], ["n", 110]]));
+    const note = layout.rects.get("n")!, table = layout.rects.get("t")!;
+    const ox = Math.max(0, Math.min(note.x + note.w, table.x + table.w) - Math.max(note.x, table.x));
+    const oy = Math.max(0, Math.min(note.y + note.h, table.y + table.h) - Math.max(note.y, table.y));
+    expect(Math.min(ox, oy)).toBeLessThanOrEqual(14);
+  });
+
+  it("tilts a borrowed sticky in any style, and nothing else in editorial", () => {
+    const items = [item("lead", "custom", "xl", 5), item("s", "stat", "s", 3), item("n", "note", "s", 2, { anchor: "lead", accent: "sticky" }), item("m", "note", "s", 2, { anchor: "s", accent: "margin" })];
+    const layout = layoutOrganic(items, 1400, "editorial", new Map());
+    expect(layout.rects.get("n")!.rotate).not.toBe(0);
+    expect(layout.rects.get("m")!.rotate).toBe(0);
+    expect(layout.rects.get("lead")!.rotate).toBe(0);
+  });
+});
+
 describe("look instructions", () => {
   it("fit the configure hook's 4,096 characters, and the first note carries the guide", () => {
     for (const look of [...ORGANIC_LOOKS, "classic" as const]) {
@@ -122,7 +166,7 @@ describe("look instructions", () => {
       expect(note).toContain("DESIGN GUIDE");
       expect(note).toContain("Rich but focused");
       expect(note).not.toContain("Keep the board small");
-      expect(note.length).toBeLessThan(16_000);
+      expect(note.length).toBeLessThan(24_000);
     }
   });
 });

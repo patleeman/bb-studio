@@ -84,26 +84,47 @@ describe("canvas threads", () => {
     expect(canvas.instructionsFor(threadId)).toContain("On a topic change, clear and rebuild");
   });
 
-  it("starts a canvas in the look the page picked (editorial by default), with that look's guide and instructions", async () => {
+  it("starts a canvas in editorial (or the style asked for), with the whole guide and the current style in its instructions", async () => {
     const { call, canvas, spawned } = canvasHost();
     const first = await call("canvas.create", { text: "Election" });
     const second = await call("canvas.create", { text: "Weather", look: "field" });
     expect((await call("canvas.get", { threadId: first.threadId })).canvas.look).toBe("editorial");
     expect((await call("canvas.get", { threadId: second.threadId })).canvas.look).toBe("field");
     const note = (spawned[1]!.input as { text: string }[])[1]!.text;
-    expect(note).toContain("Look: Field notes.");
+    for (const style of ["Style: Editorial.", "Style: Field notes.", "Style: Instrument.", "CHOOSING THE STYLE", "Borrowing:", "Switching:"]) expect(note).toContain(style);
     expect(note).toContain("cv.render(");
     expect(note).not.toContain("@@");
-    expect(canvas.instructionsFor(second.threadId)).toContain("look is Field notes");
+    expect(canvas.instructionsFor(second.threadId)).toContain("This board is field (Field notes) now.");
     // Before the thread is attached, the metadata finds the canvas.
-    expect(canvas.instructionsFor("thr_new", { canvas: second.canvasId })).toContain("look is Field notes");
-    expect(canvas.instructionsFor("thr_unknown")).not.toContain("look is");
+    expect(canvas.instructionsFor("thr_new", { canvas: second.canvasId })).toContain("This board is field");
+    expect(canvas.instructionsFor("thr_unknown")).not.toContain("Board style");
+  });
+
+  it("lets the agent pick and switch the board's style, logged with its reason", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Plan a trip" });
+    const set = text(await tool("canvas_set", { style: "field", styleReason: "planning a trip", items: [{ id: "days", kind: "list", data: ["Sat", "Sun"] }] }, threadId));
+    expect(set).toContain("Style: Field notes (planning a trip)");
+    let view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.look).toBe("field");
+    expect(view.changes.map((change: { op: string }) => change.op)).toEqual(["style", "add"]);
+    await tool("canvas_style", { style: "instrument", reason: "the user asked for a dashboard" }, threadId);
+    view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ look: "instrument", items: [expect.objectContaining({ id: "days" })] });
+    await tool("canvas_clear", { style: "editorial" }, threadId);
+    view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ look: "editorial", items: [] });
+    expect(text(await tool("canvas_read", {}, threadId))).toContain("Style: editorial (Editorial)");
+    await expect(tool("canvas_style", { style: "classic" }, threadId)).rejects.toThrow(/Invalid option/);
   });
 
   it("returns the look's design guide from canvas_guide", async () => {
     const { call, tool } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Ops", look: "instrument" });
-    expect(text(await tool("canvas_guide", {}, threadId))).toContain("Look: Instrument.");
+    expect(text(await tool("canvas_guide", {}, threadId))).toContain("Style: Field notes.");
+    const one = text(await tool("canvas_guide", { style: "instrument" }, threadId));
+    expect(one).toContain("Style: Instrument.");
+    expect(one).not.toContain("Style: Field notes.");
   });
 });
 

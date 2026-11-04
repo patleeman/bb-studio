@@ -19,7 +19,7 @@ import {
   type ItemPatch,
   type SizeHint,
 } from "./shared";
-import { lookOf, type Look } from "./looks";
+import { LOOK_INFO, lookOf, type Look, type OrganicLook } from "./looks";
 
 type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null };
 type ItemRow = { canvas_id: string; id: string; kind: string; title: string | null; data: string | null; options: string; html: string | null; size: string; importance: number; created_at: number; updated_at: number; rev: number; rel: string | null };
@@ -34,7 +34,9 @@ export type CanvasOp =
   | { op: "remove"; id: string }
   | { op: "clear" }
   /** Replace the whole board: ids already there are updated in place, the rest added, the others removed. */
-  | { op: "set"; items: ItemInput[] };
+  | { op: "set"; items: ItemInput[] }
+  /** The board's style (the agent picks it), with why. */
+  | { op: "style"; look: OrganicLook; reason?: string | null };
 
 export interface EditResult { rev: number; changes: CanvasChange[]; items: CanvasItem[] }
 
@@ -164,6 +166,7 @@ export class CanvasStore {
       const rev = row.rev + 1;
       const at = this.now();
       const board = new Map(this.items(canvasId).map((item) => [item.id, item]));
+      let look = row.look;
       const log: Omit<CanvasChange, "seq">[] = [];
       const record = (op: CanvasChange["op"], itemId: string | null, summary: string) => log.push({ rev, turn: row.turn, op, itemId, summary, by, at });
 
@@ -221,6 +224,10 @@ export class CanvasStore {
             if (board.size) record("clear", null, `Cleared ${board.size} item(s)`);
             board.clear();
             break;
+          case "style":
+            if (op.look !== lookOf(look)) record("style", null, `Style: ${LOOK_INFO[op.look].name}${op.reason?.trim() ? ` (${op.reason.trim().slice(0, 160)})` : ""}`);
+            look = op.look;
+            break;
           case "set": {
             const ids = new Set<string>();
             for (const input of op.items) {
@@ -243,7 +250,7 @@ export class CanvasStore {
       for (const item of board.values()) {
         insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev, relText(item));
       }
-      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ? WHERE id = ?").run(rev, at, canvasId);
+      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ? WHERE id = ?").run(rev, at, look, canvasId);
       const write = this.db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       const changes: CanvasChange[] = log.map((change) => ({ ...change, seq: Number(write.run(canvasId, change.rev, change.turn, change.op, change.itemId, change.summary, change.by, change.at).lastInsertRowid) }));
       this.db.prepare("DELETE FROM canvas_changes WHERE canvas_id = ? AND seq <= (SELECT seq FROM canvas_changes WHERE canvas_id = ? ORDER BY seq DESC LIMIT 1 OFFSET ?)").run(canvasId, canvasId, CANVAS_LIMITS.changesKept);

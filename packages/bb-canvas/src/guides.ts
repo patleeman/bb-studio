@@ -21,6 +21,7 @@ Make the board RICH and dense, like a great front page or a briefing someone des
 - Type: kicker → headline → dek → body, with the cv-* classes or the --cv-t-* scale. Color only with tokens (var(--cv-…)); --cv-blue and --cv-red for the two sides of a race, --cv-good/--cv-bad for change, --cv-c1…--cv-c8 for series.
 - size is a hint: s about a quarter of the width, m a third, l half, xl two-thirds. The focus grows.
 - Every board: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), and 1–3 anchored notes. A board of only headline, stats and text is a failure.
+- Charts are honest: bars start at zero. When differences are tiny (margins of a few tenths), set options.max to a meaningful scale (e.g. 5 points) or show the numbers in a table instead, so 0.1 doesn't look like a landslide.
 - Example numbers below are placeholders: never reuse them. Use real data (search) and label estimates.
 `.trim();
 
@@ -41,21 +42,21 @@ ${TOKEN_HELP}
 
 const LOOK_RULES: Record<OrganicLook, string> = {
   editorial: `
-Look: Editorial. ${LOOK_INFO.editorial.line}
+Style: Editorial. ${LOOK_INFO.editorial.line}
 - Write like an editor: a sharp headline (a finding, not a topic), a one-sentence dek, then evidence. Kickers are short ("Results · 6 a.m.").
 - The lead is a story component: headline, dek, a floated figure (cv-float-right) with body text wrapping around it, inline sparklines in the sentences. Give it importance 5, size xl.
 - Sidebars are narrow (size s or m): big serif numbers with a delta and a sparkline, separated by rules; a pull quote (kind quote); a small map or ranked list.
 - No boxes, no backgrounds: hierarchy comes from type size, rules (cv-rule) and whitespace. cv-dropcap on the first paragraph of the lead.
 `.trim(),
   field: `
-Look: Field notes. ${LOOK_INFO.field.line}
+Style: Field notes. ${LOOK_INFO.field.line}
 - Think out loud at a whiteboard: the focus is the big sketch in the middle, and the evidence is pinned around it on cards and sticky notes.
 - Headlines are short and handwritten (the display font is a marker). Use cv-hl to highlight the key words.
 - Annotate generously: 2–4 notes with anchor + point, pointing at the exact bar, state or moment that matters ("this flipped!"). Connect cause and effect with relatedTo.
 - Cards are small and loose (size s or m); one bigger sketch (a chart or map) as the focus. Notes say one thing in a few words.
 `.trim(),
   instrument: `
-Look: Instrument. ${LOOK_INFO.instrument.line}
+Style: Instrument. ${LOOK_INFO.instrument.line}
 - Maximum information per pixel: compact panels, small multiples instead of one big chart, tabular numbers, mono labels, units everywhere.
 - The focus is a wide panel (a map, a timeline or a small-multiples grid); around it, rows of tight readouts (stat, size s) with deltas and sparklines.
 - Prefer cv.multiples, cv.tilemap with show: "value", cv.timeline with layout "row", cv-table with td.n, and inline cv.bars.
@@ -160,12 +161,44 @@ Example 3, built-ins (as canvas_set items):
 `),
 };
 
-/** The whole guide for a look: rules, the shared guide, the kit, and examples. */
-export function designGuide(look: OrganicLook): string {
-  return [`DESIGN GUIDE`, LOOK_RULES[look], COMMON, KIT, `Examples to adapt (change the content; keep the craft):\n${EXAMPLES[look]}`].join("\n\n");
+const CHOOSING = `
+CHOOSING THE STYLE. You pick the board's style, per board, from what the content is; the user never has to.
+- editorial: news, results, events, stories, explainers ("what happened", "how did X go"). A lead story with the evidence around it.
+- field: brainstorming, planning, trips, ideas, decisions with options ("help me plan / think through / decide"). Cards and stickies around a central sketch.
+- instrument: dense data, monitoring, metrics, many numbers to compare ("how is X doing right now", a table of figures). Tight panels and small multiples.
+- If the user names one, use it: "make this a whiteboard" is field, "like a newspaper" is editorial, "as a dashboard" is instrument.
+- Set it with style (and styleReason, a few words) on your first canvas_set. Keep it for follow-ups on the same topic. When the topic changes kind, switch in the same canvas_set (or canvas_style alone): the switch animates.
+- Borrow accents across styles when one helps: a note takes options.accent sticky, margin or callout; a quote takes pull, sticky or bar. In HTML, the classes cv-sticky, cv-margin-note and cv-callout work in every style.
+Examples:
+- "How did yesterday's election go?" → editorial: it's news; lead with the result and put the evidence around it.
+- "Help me plan a weekend in Vermont with the kids" → field: it's planning; days, options and constraints as cards, decisions as stickies.
+- "Here are our API's latency and error numbers for the last day" → instrument: dense metrics; readouts, small multiples, a timeline of incidents.
+- "Should I take the Denver job or stay?" → field: a decision with trade-offs (instrument only if it's mostly numbers).
+- Borrowing: an instrument board of server metrics where one number is alarming gets a sticky: {"kind": "note", "data": "Fix this first", "anchor": "p95", "point": {"x": 0.9, "y": 0.3}, "options": {"accent": "sticky"}}. A sticky on a dashboard draws the eye.
+- Switching: after an editorial election board, "Help me plan my week around the recount hearings" is planning: canvas_set({"style": "field", "styleReason": "planning a week", "items": [...]}).
+`.trim();
+
+const ACCENTS = `
+Borrowed accents (any style): note options.accent "sticky" (a taped sticky note, hand-written), "margin" (an italic margin note on a rule), "callout" (a dashed technical callout); quote options.accent "pull" (big italic pull quote), "sticky" (a pink sticky), "bar" (a quote with an accent bar). Each style's own is the default. In HTML: <div class="cv-sticky">…</div>, <aside class="cv-margin-note">…</aside>, <div class="cv-callout">…</div>.
+`.trim();
+
+const NAMES: Record<OrganicLook, string> = { editorial: "Editorial", field: "Field notes", instrument: "Instrument" };
+const STYLES: readonly OrganicLook[] = ["editorial", "field", "instrument"];
+
+/** The guide: how to choose, the shared rules, the kit, accents, and each style's rules and examples (or one style's). */
+export function designGuide(only: OrganicLook | null = null): string {
+  const styles = only ? [only] : STYLES;
+  return [
+    "DESIGN GUIDE",
+    CHOOSING,
+    COMMON,
+    KIT,
+    ACCENTS,
+    ...styles.map((look) => `STYLE ${look} (${NAMES[look]})\n${LOOK_RULES[look]}\n\nExamples to adapt (change the content; keep the craft):\n${EXAMPLES[look]}`),
+  ].join("\n\n");
 }
 
-/** A short line per look for the configure hook's instructions. */
+/** The configure hook's line about styles: the current one and how to choose. */
 export function lookInstruction(look: OrganicLook): string {
-  return `This canvas's look is ${LOOK_INFO[look].name}: ${LOOK_INFO[look].line} Make the board rich and dense, not a slide. Every board needs: (1) a lead you write yourself as a custom HTML component with the look's tokens and the kit (window.cv), not just a headline; (2) at least one visual beyond numbers: a map (kind map) when places matter, a timeline when times matter, small multiples or a chart when things compare; (3) 1–3 notes with anchor + point on the most interesting thing; relatedTo connects related items. The design guide with examples is in this thread's first message; canvas_guide returns it again.`;
+  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). Borrow accents across styles with options.accent on notes and quotes. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) 1–3 notes with anchor + point on what matters. The design guide with examples is in this thread's first message; canvas_guide returns it.`;
 }

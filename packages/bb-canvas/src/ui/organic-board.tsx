@@ -6,9 +6,9 @@
 // updates flash and cross-fade, removals fade out where they were.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hashOf, layoutOrganic, linkEnds, organicWidths, type Link, type OrganicItem, type Placed } from "../organic";
-import type { OrganicLook } from "../looks";
+import { accentOf, type OrganicLook } from "../looks";
 import type { CanvasItem } from "../shared";
-import { enter, exit, fadeIn, fadeOut, highlight, move, type Rect } from "./motion";
+import { enter, exit, fadeIn, fadeOut, highlight, move, restyle, type Rect } from "./motion";
 import { OrganicBody, organicLabel, tilePadding } from "./organic-items";
 
 const versionOf = (item: CanvasItem) => `${item.rev}:${item.updatedAt}`;
@@ -28,7 +28,7 @@ function useWidth(ref: React.RefObject<HTMLElement | null>): number {
   return width;
 }
 
-export const toOrganic = (item: CanvasItem): OrganicItem => ({ id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt, relatedTo: item.relatedTo ?? [], anchor: item.anchor ?? null, point: item.point ?? null });
+export const toOrganic = (item: CanvasItem, look: OrganicLook): OrganicItem => ({ id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt, relatedTo: item.relatedTo ?? [], anchor: item.anchor ?? null, point: item.point ?? null, accent: accentOf(item.kind, item.options, look) });
 
 /** Panel tags for the instrument look: A1, A2, … in reading order. */
 function tagsOf(rects: ReadonlyMap<string, Placed>): Map<string, string> {
@@ -40,7 +40,8 @@ const KIND_TAG: Partial<Record<string, string>> = { line: "TREND", area: "TREND"
 
 /** An item's card: chrome by look, content cross-faded when it changes. */
 function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: CanvasItem; look: OrganicLook; mode: "light" | "dark"; width: number; focus: boolean; tag?: string; onMeasure?(height: number): void }) {
-  const pad = tilePadding(look, item.kind);
+  const accent = accentOf(item.kind, item.options, look);
+  const pad = tilePadding(look, item.kind, accent);
   const label = look === "instrument" && item.kind !== "headline" && item.kind !== "note" ? item.title ?? (item.kind === "custom" ? item.id : null) : organicLabel(item);
   const inner = Math.max(40, width - pad * 2 - (look === "instrument" ? 2 : 0));
   const measure = useRef<HTMLDivElement>(null);
@@ -160,13 +161,15 @@ function Links({ links, rects, look, width, height, layer, seen }: { links: read
 export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { items: readonly CanvasItem[]; look: OrganicLook; mode: "light" | "dark"; empty?: ReactNode; bottomPad?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const width = useWidth(ref);
-  const layoutItems = useMemo(() => items.map(toOrganic), [items]);
+  const layoutItems = useMemo(() => items.map((item) => toOrganic(item, look)), [items, look]);
   const widths = useMemo(() => organicWidths(layoutItems, width, look), [layoutItems, width, look]);
 
   // Measured heights, batched to one update per tick (a timer, not a frame:
   // a background tab runs no frames, and the board must settle there too). Keyed by id and width.
   const [heights, setHeights] = useState<Map<string, number>>(() => new Map());
   const pending = useRef(new Map<string, number>());
+  /** Each item's latest height at any width: its stand-in while it's re-measured (after a style switch or resize), so it glides instead of vanishing. */
+  const latest = useRef(new Map<string, number>());
   const frame = useRef<ReturnType<typeof setTimeout> | null>(null);
   const report = useCallback((id: string, w: number, height: number) => {
     pending.current.set(`${id}@${w}`, height);
@@ -175,6 +178,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
       frame.current = null;
       const batch = pending.current;
       pending.current = new Map();
+      for (const [key, value] of batch) latest.current.set(key.slice(0, key.lastIndexOf("@")), value);
       setHeights((current) => {
         let changed = false;
         const next = new Map(current);
@@ -184,10 +188,14 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
     }, 16);
   }, []);
   useEffect(() => () => { if (frame.current) clearTimeout(frame.current); }, []);
-  const measured = useMemo(() => {
+  const { measured, exact } = useMemo(() => {
     const map = new Map<string, number>();
-    for (const item of items) { const h = heights.get(`${item.id}@${widths.get(item.id)}`); if (h !== undefined) map.set(item.id, h); }
-    return map;
+    let count = 0;
+    for (const item of items) {
+      const h = heights.get(`${item.id}@${widths.get(item.id)}`);
+      if (h !== undefined) { map.set(item.id, h); count++; } else if (latest.current.has(item.id)) map.set(item.id, latest.current.get(item.id)!);
+    }
+    return { measured: map, exact: count };
   }, [heights, items, widths]);
 
   // Items that never report still show after a while.
@@ -205,7 +213,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   const tags = useMemo(() => (look === "instrument" ? tagsOf(layout.rects) : new Map<string, string>()), [layout, look]);
 
   const elements = useRef(new Map<string, HTMLElement>());
-  const last = useRef<{ rects: Map<string, Rect>; ready: Set<string>; versions: Map<string, string>; items: Map<string, CanvasItem>; width: number } | null>(null);
+  const last = useRef<{ rects: Map<string, Rect>; ready: Set<string>; versions: Map<string, string>; items: Map<string, CanvasItem>; width: number; look: OrganicLook } | null>(null);
   const [ghosts, setGhosts] = useState<{ key: string; item: CanvasItem; rect: Placed }[]>([]);
   const seenLinks = useRef(new Set<string>());
   const [, setLinksSeen] = useState(0);
@@ -214,12 +222,14 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   useLayoutEffect(() => {
     if (!width) return;
     // Only a settled layout (every item measured) is the next one's stability hint, so the first settle isn't stuck on estimates.
-    if (items.every((item) => measured.has(item.id))) previous.current = { width, rects: layout.rects };
+    if (exact === items.length) previous.current = { width, rects: layout.rects };
     const rects = new Map<string, Rect>();
     for (const [id, placed] of layout.rects) rects.set(id, rectOf(placed));
     const before = last.current;
     const nowReady = new Set(items.filter((item) => ready(item.id)).map((item) => item.id));
     let entering = 0;
+    let restyled = 0;
+    const switched = !!before && before.look !== look;
     const order = [...items].sort((a, b) => { const ra = layout.rects.get(a.id); const rb = layout.rects.get(b.id); return (ra?.y ?? 0) - (rb?.y ?? 0) || (ra?.x ?? 0) - (rb?.x ?? 0); });
     for (const item of order) {
       if (!nowReady.has(item.id)) continue;
@@ -229,13 +239,14 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
       const from = before?.rects.get(item.id);
       if (!before?.ready.has(item.id) || !from) { enter(element, entering++); continue; }
       if (before.width === width) move(element, from, to);
-      if (before.versions.get(item.id) !== versionOf(item)) highlight(element);
+      if (switched) restyle(element, restyled++);
+      else if (before.versions.get(item.id) !== versionOf(item)) highlight(element);
     }
     if (before) {
       const gone = [...before.items.values()].filter((item) => !layout.rects.has(item.id) && before.ready.has(item.id));
       if (gone.length) setGhosts((current) => [...current, ...gone.map((item) => { const r = before.rects.get(item.id)!; return { key: `${item.id}:${versionOf(item)}:${Date.now()}`, item, rect: { x: r.left, y: r.top, w: r.width, h: r.height, rotate: 0, z: 0, floating: false, lane: 0, units: 0 } }; })]);
     }
-    last.current = { rects, ready: nowReady, versions: new Map(items.map((item) => [item.id, versionOf(item)])), items: new Map(items.map((item) => [item.id, item])), width };
+    last.current = { rects, ready: nowReady, versions: new Map(items.map((item) => [item.id, versionOf(item)])), items: new Map(items.map((item) => [item.id, item])), width, look };
     // Links drawn this frame are no longer new after their draw-in.
     const keys = layout.links.map((link) => `${link.kind}:${link.from}>${link.to}`).filter((key) => !seenLinks.current.has(key) && nowReady.has(key.split(":")[1]!.split(">")[0]!));
     if (keys.length) { const timer = setTimeout(() => { keys.forEach((key) => seenLinks.current.add(key)); setLinksSeen((n) => n + 1); }, 1400); return () => clearTimeout(timer); }
@@ -252,7 +263,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   const ghostBottom = ghosts.reduce((max, ghost) => Math.max(max, ghost.rect.y + ghost.rect.h), 0);
   const height = Math.max(layout.height, ghostBottom);
   return (
-    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-items={items.length} data-measured={measured.size}>
+    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-items={items.length} data-measured={exact}>
       {width ? (
         <>
           <Links links={visibleLinks} rects={visibleRects} look={look} width={width} height={height} layer="under" seen={seenLinks.current} />
@@ -271,6 +282,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
                 data-canvas-item={item.id}
                 data-canvas-kind={item.kind}
                 data-kind={item.kind}
+                data-accent={accentOf(item.kind, item.options, look) ?? undefined}
                 data-focus={layout.focusId === item.id || undefined}
                 data-floating={placed.floating || undefined}
                 style={{ left: placed.x, top: placed.y, width: w, zIndex: placed.z, visibility: shown ? undefined : "hidden" }}
@@ -293,7 +305,7 @@ function Ghost({ ghost, index, look, mode, onDone }: { ghost: { item: CanvasItem
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { exit(ref.current, onDone, index); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div ref={ref} className="cvt" style={{ left: ghost.rect.x, top: ghost.rect.y, width: ghost.rect.w, zIndex: 0, pointerEvents: "none" }} aria-hidden data-canvas-ghost={ghost.item.id} data-kind={ghost.item.kind}>
+    <div ref={ref} className="cvt" style={{ left: ghost.rect.x, top: ghost.rect.y, width: ghost.rect.w, zIndex: 0, pointerEvents: "none" }} aria-hidden data-canvas-ghost={ghost.item.id} data-kind={ghost.item.kind} data-accent={accentOf(ghost.item.kind, ghost.item.options, look) ?? undefined}>
       <Card item={ghost.item} look={look} mode={mode} width={ghost.rect.w} focus={false} />
     </div>
   );
