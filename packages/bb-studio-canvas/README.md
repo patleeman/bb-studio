@@ -68,14 +68,27 @@ hands-free button.
   part whose id changed but shows the same picture or text glides too, and
   `canvas_page` tells the agent when it renamed most parts.
 - **The canvas tools:** `canvas_page` (the whole board), `canvas_patch` (one
-  part by id), `canvas_read`, `canvas_style`, `canvas_image` and
-  `canvas_guide`. Only canvas threads get them, with the canvas rules and
+  part by id), `canvas_read`, `canvas_style`, `canvas_image`,
+  `canvas_images` and `canvas_guide`. Only canvas threads get them, with the canvas rules and
   the `canvas` skill, and each works only on the calling thread's board.
   Hands-free voice gets the same tools.
-- **Pictures:** `canvas_image` returns an https address with alt text and
-  its source. With an Exa API key it searches; without one it takes the
-  main picture of a page the agent found (og:image, else the largest
-  image). Server-side fetches go only to public http(s) addresses: each
+- **Draft first:** the agent's first action on a turn is a quick draft page
+  (the real headline and the skeleton of the shape, with the final
+  `data-cv-id`s), sent with one `canvas_images` call for every picture. The
+  full page then replaces it with the same ids, so it glides. A tiny answer
+  skips the draft.
+- **Building blocks:** `data-block="card"` (a picture with its title,
+  rating with source and a line), `stat` (a big figure with its evidence),
+  `step` (a timeline row), `side` (a comparison column), `quote` and
+  `placeholder`, declared in a few `data-*` attributes the kit expands, in
+  the containers `cv-wall`, `cv-steps` and `cv-sides`. They're optional.
+- **Pictures:** `canvas_images` looks a batch up in one call, in parallel;
+  `canvas_image` finds one. Each returns an https address with alt text and
+  its source. A query goes to Exa when an Exa API key is set, else to
+  Wikipedia (its search API, then the best article's page image); a pageUrl
+  takes that page's main picture (og:image, else the largest image). Found
+  pictures are cached for a day, in memory and in the plugin's database.
+  Server-side fetches go only to public http(s) addresses: each
   hop's host is resolved once, every address checked, and the connection
   pinned to that address (so a resolver can't switch it after the check),
   with a time limit and a size cap. Picture addresses lose tracking
@@ -83,7 +96,12 @@ hands-free button.
 - **Exa API key:** a BB secret setting on this plugin, `exaApiKey`
   (**Settings → Plugins → BB Studio Canvas**, or `bb plugin config
   studio-canvas`). It's only sent to Exa: never logged, returned or put in
-  an error.
+  an error. Without it, pictures come from Wikipedia.
+- **Tool loading on Claude Code:** Claude Code defers plugin tools behind
+  its tool search, and BB gives a plugin no way to have them loaded up front
+  (the SDK's `registerTool` has no such option, and BB's `bb-bridge` MCP
+  server sets no `alwaysLoad`). So on Claude Code the instructions name the
+  exact tools, and loading them is one `select:` call.
 - **Styles:** Editorial (a magazine spread), Field notes (a designer's
   whiteboard) and Instrument (a control room) are token sets. The agent
   picks one per board, a style you ask for wins, and the top bar shows it.

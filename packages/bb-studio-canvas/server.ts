@@ -20,13 +20,13 @@ export default function plugin(bb: BbPluginApi) {
   } catch (error) {
     bb.log.warn(`Could not import the old Canvas plugin's canvases: ${error instanceof Error ? error.message : String(error)}`);
   }
-  // The Exa API key for canvas_image (a BB secret: Settings → Plugins → BB Studio Canvas). Read when a picture is
-  // looked up, never logged or sent anywhere but Exa.
+  // The Exa API key for canvas_image and canvas_images (a BB secret: Settings → Plugins → BB Studio Canvas). Read
+  // when a picture is looked up, never logged or sent anywhere but Exa. Without it, queries go to Wikipedia.
   const keys = bb.settings.define(CANVAS_KEY_SETTINGS);
   const canvas = registerCanvas(bb, db, { images: { exaKey: async () => exaKey(await keys.get()) } });
   // A canvas's hidden thread gets the canvas tools, rules and skill; other
   // threads get nothing from this plugin. pluginMetadata is this plugin's own.
   bb.agents.configure((context) => canvas.isCanvasThread(context.thread.id, context.pluginMetadata)
-    ? { tools: [...CANVAS_TOOLS], skills: ["canvas"], instructions: canvas.instructionsFor(context.thread.id, context.pluginMetadata) }
+    ? { tools: [...CANVAS_TOOLS], skills: ["canvas"], instructions: canvas.instructionsFor(context.thread.id, context.pluginMetadata, context.provider?.id) }
     : { tools: [], skills: [], instructions: "" });
 }

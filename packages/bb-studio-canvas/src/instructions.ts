@@ -9,6 +9,7 @@ import { LOOK_INFO, ORGANIC_LOOKS, type Look } from "./looks";
 export const CANVAS_RULES = [
   "You are talking with the user on a canvas, like someone at a whiteboard. The board is what they look at; this thread is your memory, and they never see it.",
   "- Every turn, show the answer on the board as ONE page you design: canvas_page with the HTML for the whole board, or canvas_patch to change one part. Never answer only in the reply.",
+  "- Draft first: unless the answer is tiny (one figure, a one-part change), your FIRST action, before any research or pictures, is a quick canvas_page draft: the real headline and the skeleton of the shape, each section with its final data-cv-id and a few words of placeholder (data-block=\"placeholder\", or a card with only its title). In that same response, call canvas_images ONCE for every picture the page needs. Then the full page replaces the draft with the same ids, so it glides.",
   "- Tell one story: decide the ONE point, pick the shape that tells it (a plan runs along a timeline, a showcase is a wall of pictures, two options sit side by side, one key figure is set huge with its evidence), give it a clear reading path, and cut what doesn't serve it.",
   "- Fill the screen: start from a full-height layout (class cv-fill) with the main content in its stretching row, type sized from the screen, columns edge to edge. No empty bottom third or right side.",
   "- Mark the main parts with stable data-cv-id values. In a follow-up, anything still on the board keeps its id (canvas_read lists them), so it glides instead of reappearing.",
@@ -19,16 +20,27 @@ export const CANVAS_RULES = [
 
 const STYLE_LINE = `Styles (you pick one per board with canvas_page's style; one the user names wins): ${ORGANIC_LOOKS.map((look) => `${look} (${LOOK_INFO[look].name}: ${LOOK_INFO[look].line})`).join("; ")}.`;
 
-/** The configure hook's instructions for a canvas in this look. */
-export function canvasInstructions(look: Look): string {
+/** The canvas tools by the names Claude Code gives them (BB's bridge MCP server is "bb-bridge"). */
+export const CLAUDE_CODE_CANVAS_TOOLS = ["canvas_page", "canvas_images", "canvas_patch", "canvas_read"].map((name) => `mcp__bb-bridge__${name}`);
+
+/**
+ * Claude Code defers plugin tools behind its tool search, and BB gives a plugin no way to have them loaded up front
+ * (the bridge's MCP server sets no alwaysLoad, and a registered tool has no such option). So the agent is told
+ * the exact names, and loading them is one quick select instead of a search.
+ */
+export const TOOL_LOADING_LINE = `If the canvas tools are deferred, load them all in ONE tool search before anything else, with exactly this query: select:${CLAUDE_CODE_CANVAS_TOOLS.join(",")}`;
+
+/** The configure hook's instructions for a canvas in this look; on Claude Code, how to load the tools. */
+export function canvasInstructions(look: Look, providerId?: string | null): string {
   const now = look === "classic" ? "This canvas is from before styles; give its next page a style." : `This board is ${look} (${LOOK_INFO[look].name}) now.`;
-  return `${CANVAS_RULES}\n\n${STYLE_LINE} ${now}\n\nThe design guide with examples is in this thread's first message; canvas_guide returns it. canvas_read shows the page's source and its parts.`;
+  const loading = providerId === "claude-code" ? `\n\n${TOOL_LOADING_LINE}` : "";
+  return `${CANVAS_RULES}\n\n${STYLE_LINE} ${now}${loading}\n\nThe design guide with examples is in this thread's first message; canvas_guide returns it. canvas_read shows the page's source and its parts.`;
 }
 export const CANVAS_INSTRUCTIONS = canvasInstructions("editorial");
 
 /** The first note for a canvas: the rules and the design guide. */
-export function canvasFirstNote(look: Look): string {
-  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look)}\n\n${designGuide()}`;
+export function canvasFirstNote(look: Look, providerId?: string | null): string {
+  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look, providerId)}\n\n${designGuide()}`;
 }
 export const CANVAS_FIRST_NOTE = canvasFirstNote("editorial");
 

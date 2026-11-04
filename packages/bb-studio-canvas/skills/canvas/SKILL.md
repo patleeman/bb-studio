@@ -15,6 +15,12 @@ user looks at the board. This thread is your memory; they never read it.
 
 ## Every turn
 
+0. **Draft first.** Unless the answer is tiny (one figure, a one-part
+   change), your first action, before any research or pictures, is a quick
+   `canvas_page` draft: the real headline and the skeleton of the shape, each
+   section with its final `data-cv-id` and a few words of placeholder. In the
+   same response, call `canvas_images` once for every picture. The full page
+   then replaces the draft with the same ids, so it glides.
 1. Decide the ONE point the user should see first and remember.
 2. Pick the shape that tells it. Let the content decide: a plan runs along a
    timeline, a showcase is a wall of pictures, two options sit side by side,
@@ -32,8 +38,11 @@ user looks at the board. This thread is your memory; they never read it.
 - `canvas_page({ html, title?, style?, styleReason? })`: the whole board.
 - `canvas_patch({ id, html })`: one part, by its `data-cv-id` (`""` removes it).
 - `canvas_read()`: the page's source and its parts.
-- `canvas_image({ query?, pageUrl? })`: a picture's https address, with alt
-  text and source. Call it once per picture.
+- `canvas_images({ items: [{ key, query?, pageUrl? }] })`: every picture
+  the page needs in ONE call, looked up in parallel (key: the part's
+  `data-cv-id`; query: the thing's exact name, found with Exa when a key is
+  set, else on Wikipedia; pageUrl: a page's main picture). Cached for a day.
+  `canvas_image({ query?, pageUrl? })` finds a single one.
 - `canvas_style({ style, reason? })` and `canvas_guide()`.
 
 ## The page
@@ -56,7 +65,17 @@ user looks at the board. This thread is your memory; they never read it.
 - Charts: `<div data-chart="line" data-rows='[…]' data-options='{…}'>` (also
   area, columns, bars, donut, split, map, timeline, multiples, waffle, spark,
   stars, meter, bignum, delta, legend), sized to the element.
-- No network but https pictures from `canvas_image`.
+- Building blocks save markup: `data-block="card"` (data-img, data-title,
+  data-rating, data-source, data-line), `stat`, `step`, `side`, `quote` and
+  `placeholder`, in the containers `cv-wall`, `cv-steps` and `cv-sides`. The
+  guide lists their attributes. They're optional.
+- No network but https pictures from `canvas_images`.
+
+## Claude Code
+
+Plugin tools are deferred there, and BB has no way to load them up front.
+Load them in one tool search before anything else:
+`select:mcp__bb-bridge__canvas_page,mcp__bb-bridge__canvas_images,mcp__bb-bridge__canvas_patch,mcp__bb-bridge__canvas_read`.
 
 ## Honest
 

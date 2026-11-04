@@ -202,12 +202,27 @@ describe("pins", () => {
 
 describe("look instructions", () => {
   it("fit the configure hook's 4,096 characters, and the first note carries the guide", () => {
-    for (const look of [...ORGANIC_LOOKS, "classic" as const]) expect(canvasInstructions(look).length).toBeLessThan(4096);
+    for (const look of [...ORGANIC_LOOKS, "classic" as const]) for (const provider of [null, "claude-code"]) expect(canvasInstructions(look, provider).length).toBeLessThan(4096);
     for (const look of ORGANIC_LOOKS) {
       const note = canvasFirstNote(look);
       expect(note).toContain("DESIGN GUIDE");
       expect(note).toContain("EXAMPLES");
       expect(note.length).toBeLessThan(16_000);
     }
+  });
+});
+
+describe("speed", () => {
+  it("has the agent draft first and look all pictures up in one call", () => {
+    const rules = canvasInstructions("editorial");
+    expect(rules).toContain("Draft first");
+    expect(rules).toContain("canvas_images ONCE");
+    expect(canvasFirstNote("editorial")).toContain("WORK FAST: DRAFT FIRST");
+  });
+
+  it("names the exact tools to load on Claude Code, where plugin tools are deferred, and only there", () => {
+    expect(canvasInstructions("field", "claude-code")).toContain("select:mcp__bb-bridge__canvas_page,mcp__bb-bridge__canvas_images,mcp__bb-bridge__canvas_patch,mcp__bb-bridge__canvas_read");
+    expect(canvasFirstNote("field", "claude-code")).toContain("select:mcp__bb-bridge__canvas_page");
+    expect(canvasInstructions("field", "codex")).not.toContain("mcp__bb-bridge");
   });
 });

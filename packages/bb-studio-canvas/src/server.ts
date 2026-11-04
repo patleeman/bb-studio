@@ -22,8 +22,8 @@ export interface BuiltinCanvas {
   store: CanvasStore;
   /** Whether a thread backs a canvas: its metadata says so, or the store has it. */
   isCanvasThread(threadId: string, metadata?: Readonly<Record<string, unknown>>): boolean;
-  /** The configure hook's instructions for a canvas thread, in its canvas's look. */
-  instructionsFor(threadId: string, metadata?: Readonly<Record<string, unknown>>): string;
+  /** The configure hook's instructions for a canvas thread, in its canvas's look (and for its provider: see canvasInstructions). */
+  instructionsFor(threadId: string, metadata?: Readonly<Record<string, unknown>>, providerId?: string | null): string;
   /** For a hands-free session launched from a canvas thread: Studio's voice calls these over RPC (canvas.voice, canvas.voiceRun). */
   voice: {
     tools(threadId: string | null): ReturnType<typeof canvasVoiceTools>;
@@ -186,7 +186,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         const first = text
           ? [{ type: "text", text, mentions: [] }]
           : [{ type: "text", text: "🎙 Started by voice.", mentions: [] }, { type: "text", text: VOICE_START_NOTE, mentions: [], visibility: "agent-only" }];
-        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [...first, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }]);
+        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [...first, { type: "text", text: canvasFirstNote(look, providerId), mentions: [], visibility: "agent-only" }]);
         if (text) {
           store.beginTurn(row.id, "user", text);
           store.setStatus(row.id, "working");
@@ -216,7 +216,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         // A provider switch: BB can't move a thread to another provider, so the canvas gets a
         // fresh backing thread on it. The board is Canvas's own, so it stays; the new thread
         // gets the rules, the guide, the board as it is and the last few lines of talk.
-        const note = `${canvasFirstNote(lookOf(row.look))}\n\n${handoffNote(row.id)}`;
+        const note = `${canvasFirstNote(lookOf(row.look), next.providerId)}\n\n${handoffNote(row.id)}`;
         const fresh = await spawnThread(row.id, row.title, next, [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }]);
         store.setExecution(row.id, next);
         store.beginTurn(row.id, "user", text);
@@ -276,10 +276,10 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   return {
     store,
     isCanvasThread: (threadId, metadata) => typeof metadata?.[CANVAS_METADATA_KEY] === "string" || !!store.byThread(threadId),
-    instructionsFor(threadId, metadata) {
+    instructionsFor(threadId, metadata, providerId) {
       const id = metadata?.[CANVAS_METADATA_KEY];
       const row = (typeof id === "string" ? store.get(id) : null) ?? store.byThread(threadId);
-      return canvasInstructions(lookOf(row?.look));
+      return canvasInstructions(lookOf(row?.look), providerId);
     },
     voice: {
       tools: (threadId) => (threadId && store.byThread(threadId) ? canvasVoiceTools() : []),
