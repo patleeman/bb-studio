@@ -1,4 +1,4 @@
-// The canvas page: /plugins/studio-canvas/canvas/<threadId>, or /canvas for a
+// The canvas page: /plugins/studio-visual-chat/canvas/<threadId>, or /canvas for a
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
@@ -177,7 +177,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : page && look !== "classic" ? (
-          <PageFrame html={page} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Canvas"} />
+          <PageFrame html={page} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Visual Chat"} />
         ) : look !== "classic" ? (
           <OrganicBoard
             key={preview ? "preview" : "board"}
@@ -216,7 +216,7 @@ function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: Can
     <div className="relative z-20 flex h-11 shrink-0 items-center gap-1 px-5 text-sm text-muted-foreground">
       <button type="button" className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu">
         <Icon name="GridView" className="size-3.5 shrink-0" />
-        <span className="truncate">{canvas?.title ?? "New canvas"}</span>
+        <span className="truncate">{canvas?.title ?? "New visual chat"}</span>
         <Icon name="ChevronDown" className="size-3.5 shrink-0 opacity-60" />
       </button>
       <span className="ml-1 rounded-full border border-border/70 px-2 py-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/70">Prototype</span>
@@ -224,7 +224,7 @@ function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: Can
       {/* Always shown: on a new canvas it picks the model the first message starts on. */}
       {canvas || isNew ? <ModelPicker canvas={canvas} onChanged={onModelChanged} draft={draft} onDraft={onDraft} /> : null}
       <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => openAppPath(canvasNewHref())}>
-        <Icon name="Plus" className="size-3.5" /> New canvas
+        <Icon name="Plus" className="size-3.5" /> New chat
       </button>
       {open ? (
         <div role="menu" className="absolute left-5 top-10 w-80 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg">
@@ -233,14 +233,14 @@ function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: Can
               <span className="min-w-0 flex-1 truncate">{each.title}</span>
               <span className="shrink-0 text-[11px] text-muted-foreground">{each.itemCount} items</span>
             </button>
-          )) : <p className="px-2 py-1.5 text-xs text-muted-foreground">No canvases yet.</p>}
+          )) : <p className="px-2 py-1.5 text-xs text-muted-foreground">No chats yet.</p>}
         </div>
       ) : null}
     </div>
   );
 }
 
-const ROLE: Record<string, string> = { user: "You", agent: "Canvas", voice: "Voice" };
+const ROLE: Record<string, string> = { user: "You", agent: "Visual Chat", voice: "Voice" };
 
 function History({ lines }: { lines: readonly CanvasTurn[] }) {
   return (
@@ -322,7 +322,7 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
             onChange={(event) => setText(event.target.value)}
             maxLength={CANVAS_LIMITS.messageChars}
             placeholder={threadId ? "Say what's next…" : "What should we look at?"}
-            aria-label="Message the canvas"
+            aria-label="Message Visual Chat"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/55"
             data-canvas-input
             autoFocus

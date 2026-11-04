@@ -1,16 +1,16 @@
 {
-  "name": "@bb-studio/studio-canvas",
+  "name": "@bb-studio/studio-visual-chat",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio (prototype). A canvas: an agent talks on a board it edits each turn, with charts, numbers, tables and captions that animate as they change. Off unless you install it.",
+  "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
   "engines": {
     "bb": ">=0.48.1",
     "bbPluginSdk": ">=0.6.104"
   },
   "bb": {
-    "name": "BB Studio Canvas",
-    "description": "Part of BB Studio (prototype). A canvas: an agent talks on a board it edits each turn, with charts, numbers, tables and captions that animate as they change. Off unless you install it.",
+    "name": "BB Studio Visual Chat",
+    "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
     "branding": {
       "icon": "GridView"
     },

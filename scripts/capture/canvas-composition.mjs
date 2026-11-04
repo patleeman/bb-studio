@@ -83,7 +83,7 @@ for (const [index, [size, mode]] of TABS.entries()) {
 
 async function open(threadId) {
   for (const client of Object.values(tabs)) {
-    await client.navigate(`/plugins/studio-canvas/canvas/${threadId}`);
+    await client.navigate(`/plugins/studio-visual-chat/canvas/${threadId}`);
     await client.waitForSelector("[data-canvas-board], [data-canvas-page-frame][data-page-ready]", 30_000);
     await client.evaluate(`(() => { const sidebar = document.querySelector('[data-sidebar="sidebar"]'); const state = sidebar?.closest('[data-state]')?.getAttribute('data-state'); if (sidebar && state !== 'collapsed' && state !== 'closed') document.querySelector('button[aria-label^="Toggle sidebar" i]')?.click(); return true; })()`);
   }
@@ -153,13 +153,13 @@ async function midMorph(threadId, text, n) {
   const { sessionId } = await client.command("Target.attachToTarget", { targetId: frame.targetId, flatten: true });
   const inFrame = (expression) => client.command("Runtime.evaluate", { expression, returnByValue: true }, 10_000, sessionId).then((result) => result.result?.value);
   await inFrame(`(() => { const root = document.getElementById("cv-page"); const observer = new MutationObserver(() => { observer.disconnect(); setTimeout(() => { document.getAnimations().forEach((a) => a.pause()); document.documentElement.dataset.captureMid = String(document.getAnimations().length); }, 260); }); observer.observe(root, { childList: true }); return true; })()`);
-  const before = (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas;
-  await pluginRpc("studio-canvas", "canvas.send", { threadId, text });
+  const before = (await pluginRpc("studio-visual-chat", "canvas.get", { threadId })).canvas;
+  await pluginRpc("studio-visual-chat", "canvas.send", { threadId, text });
   const paused = await until(() => inFrame(`document.documentElement.dataset.captureMid ?? null`), (value) => value !== null && value !== undefined, TURN_MS, "the page to change").catch(() => null);
   log(`mid-morph: ${paused} animations paused`);
   await client.capture(join(out, `turn-${n}-mid-animation-wide-light.png`));
   await inFrame(`(() => { document.getAnimations().forEach((a) => a.play()); delete document.documentElement.dataset.captureMid; return true; })()`);
-  const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > before.turn && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, "the follow-up");
+  const done = await until(() => pluginRpc("studio-visual-chat", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > before.turn && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, "the follow-up");
   const pages = await stills(`turn-${n}`, done.rev);
   await writeFile(join(out, `turn-${n}.json`), JSON.stringify({ turn: n, prompt: text, look: done.look, title: done.title, caption: done.caption, parts: [...(done.page ?? "").matchAll(/data-cv-id=["']?([^"'\s>]+)/g)].map((match) => match[1]), mid: paused, pages, view: done }, null, 2));
 }
@@ -171,7 +171,7 @@ try {
   } else if (refThread) {
     if (!refsDir) throw new Error("Set CANVAS_COMPOSITION_REFS to the folder with ref-<n>.json.");
     await open(refThread);
-    const rev = (await pluginRpc("studio-canvas", "canvas.get", { threadId: refThread })).canvas.rev;
+    const rev = (await pluginRpc("studio-visual-chat", "canvas.get", { threadId: refThread })).canvas.rev;
     const files = (await readdir(refsDir)).filter((name) => /^ref-\d+\.json$/.test(name)).sort();
     const report = {};
     for (const file of files) {
@@ -196,13 +196,13 @@ try {
       if (pick && !pick.has(prompt.id)) continue;
       const n = index + 1;
       log(`turn ${n}: ${prompt.text.split("\n")[0]}`);
-      const before = threadId ? (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas : null;
+      const before = threadId ? (await pluginRpc("studio-visual-chat", "canvas.get", { threadId })).canvas : null;
       const started = Date.now();
-      if (!threadId) ({ threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: prompt.text }));
-      else await pluginRpc("studio-canvas", "canvas.send", { threadId, text: prompt.text });
+      if (!threadId) ({ threadId } = await pluginRpc("studio-visual-chat", "canvas.create", { text: prompt.text }));
+      else await pluginRpc("studio-visual-chat", "canvas.send", { threadId, text: prompt.text });
       if (!opened) { await open(threadId); opened = true; }
       const turnBefore = before?.turn ?? 0;
-      const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
+      const done = await until(() => pluginRpc("studio-visual-chat", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
       const seconds = Math.round((Date.now() - started) / 1000);
       const compositionChanges = done.changes.filter((change) => change.turn === done.turn).map((change) => change.summary);
       log(`turn ${n}: ${seconds}s, ${done.look}, title "${done.title}", ${done.page ? `page ${done.page.length} chars` : `${done.items.length} items`}`);

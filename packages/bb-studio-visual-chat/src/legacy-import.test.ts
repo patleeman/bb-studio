@@ -4,19 +4,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { importLegacyCanvases, legacyDatabasePath, openLegacyReadOnly } from "./legacy-import";
+import { importLegacyCanvases, legacyDatabasePath, legacyDatabasePaths, openLegacyReadOnly } from "./legacy-import";
 import { CANVAS_MIGRATIONS } from "./migrations";
 import { CanvasStore } from "./store";
 
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
-/** A data dir with the old plugin's database at plugins/canvas/data.db, built with its first `upTo` migrations. */
-function legacyDataDir(upTo = 3): { dataDir: string; path: string } {
-  const dataDir = mkdtempSync(join(tmpdir(), "canvas-legacy-"));
+/** A data dir with the first Canvas plugin's database at plugins/canvas/data.db, built with its first `upTo` migrations. */
+function legacyDataDir(upTo = 3, dataDir = mkdtempSync(join(tmpdir(), "canvas-legacy-"))): { dataDir: string; path: string } {
   dirs.push(dataDir);
   mkdirSync(join(dataDir, "plugins", "canvas"), { recursive: true });
-  const path = legacyDatabasePath(dataDir);
+  const path = legacyDatabasePath(dataDir, "canvas");
   const db = new Database(path);
   for (const migration of CANVAS_MIGRATIONS.slice(0, upTo)) db.exec(migration);
   // This store writes the composition columns (migration 5), which the old plugin's file never had: add them for the fixture only.
@@ -105,5 +104,37 @@ describe("importing the old Canvas plugin's canvases", () => {
     const row = store.byThread("thr_old_c");
     expect(row?.title).toBe("Old schema");
     expect(row?.look).toBeNull();
+  });
+
+  it("imports BB Studio Canvas's file first, with its pages and found pictures, and falls back to Canvas's", () => {
+    // Both older plugins have files: BB Studio Canvas's (every migration, a page and a cached picture) wins.
+    const { dataDir, path: canvasPath } = legacyDataDir();
+    mkdirSync(join(dataDir, "plugins", "studio-canvas"), { recursive: true });
+    const studioPath = legacyDatabasePath(dataDir, "studio-canvas");
+    const old = new Database(studioPath);
+    for (const migration of CANVAS_MIGRATIONS) old.exec(migration);
+    const oldStore = new CanvasStore(old, () => 7_000);
+    const board = oldStore.create({ threadId: "thr_studio_a", title: "Chromatic", look: "editorial", execution: { providerId: "claude-code", model: "claude-sonnet-5-5", reasoningLevel: "low" } });
+    oldStore.setPage(board.id, '<h1 data-cv-id="title">Seven cartridges</h1>', "agent", "Chromatic");
+    oldStore.setCaption(board.id, "Start with Link's Awakening.");
+    old.prepare("INSERT INTO canvas_image_cache (key, image, at) VALUES ('q:tetris dx', '{\"url\":\"https://upload.wikimedia.org/t.jpg\",\"alt\":\"Tetris DX\",\"source\":\"https://en.wikipedia.org/wiki/Tetris_DX\"}', 7000)").run();
+    old.prepare("INSERT INTO canvas_legacy_import (id, source, at, counts) VALUES (1, 'its own import', 1, '{}')").run();
+    old.close();
+    const before = [digest(studioPath), digest(canvasPath)];
+    const { db, store } = fresh();
+    const result = importLegacyCanvases(db, legacyDatabasePaths(dataDir));
+    expect(result).toMatchObject({ status: "imported", source: studioPath, counts: { canvases: 1, canvas_image_cache: 1 } });
+    const view = store.byThread("thr_studio_a")!;
+    expect(view).toMatchObject({ title: "Chromatic", page: '<h1 data-cv-id="title">Seven cartridges</h1>', caption: "Start with Link's Awakening.", model: "claude-sonnet-5-5", reasoning_level: "low" });
+    expect(store.byThread("thr_old_a")).toBeNull();
+    // Its own record of the earlier import isn't copied: this store's says where these came from.
+    expect(db.prepare("SELECT source FROM canvas_legacy_import").all()).toEqual([{ source: studioPath }]);
+    expect([digest(studioPath), digest(canvasPath)]).toEqual(before);
+
+    // No BB Studio Canvas file: the first Canvas plugin's.
+    const { dataDir: onlyOld, path } = legacyDataDir();
+    const second = fresh();
+    expect(importLegacyCanvases(second.db, legacyDatabasePaths(onlyOld))).toMatchObject({ status: "imported", source: path, counts: { canvases: 2 } });
+    expect(second.store.byThread("thr_old_b")?.title).toBe("Weather");
   });
 });

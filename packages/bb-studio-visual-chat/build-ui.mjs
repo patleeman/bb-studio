@@ -9,7 +9,7 @@
 // The bundle is in the plugin's own files, so `bb plugin build` also finds
 // its Tailwind classes.
 //
-//   node build-ui.mjs   (in packages/bb-studio-canvas, after changing src/ui or the Studio files it uses)
+//   node build-ui.mjs   (in packages/bb-studio-visual-chat, after changing src/ui or the Studio files it uses)
 import { build } from "esbuild";
 import { statSync } from "node:fs";
 import { dirname, join } from "node:path";

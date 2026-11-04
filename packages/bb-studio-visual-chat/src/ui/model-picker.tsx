@@ -58,7 +58,7 @@ export function ModelPicker({ canvas, onChanged, draft, onDraft }: { canvas: Can
     try {
       const result = await rpc.call("canvas.setModel", { threadId: canvas.threadId, providerId, model, reasoningLevel });
       onChanged?.(result.canvas as CanvasView | null);
-      if (result.mode === "new-thread-next-turn") toast.message("The next message starts this canvas on the new provider. The board stays.");
+      if (result.mode === "new-thread-next-turn") toast.message("The next message starts this chat on the new provider. The board stays.");
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {

@@ -38,7 +38,7 @@ export interface SetupSdk {
 /** Add-ons left out of "Install all", and why. */
 const OPTIONAL: Record<string, string> = {
   mobile: "Only needed for the BB Studio iOS app.",
-  "studio-canvas": "A prototype, off unless you install it: an agent that talks on a board.",
+  "studio-visual-chat": "A prototype, off unless you install it: Visual Chat, an agent that answers on a board.",
 };
 
 export const installCommand = (id: string) => `bb plugin install ${id}@${MARKETPLACE_NAME} --yes`;

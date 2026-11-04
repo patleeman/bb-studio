@@ -1,11 +1,12 @@
-// BB Studio Canvas (prototype; plugin id "studio-canvas", formerly "canvas"):
+// BB Studio Visual Chat (prototype; plugin id "studio-visual-chat", formerly
+// "studio-canvas" and before that "canvas"):
 // its own plugin, off unless installed. An agent talks
 // on a board it edits each turn, backed by a hidden BB thread in the
 // personal project (src/server.ts). Studio is required (its hands-free
 // voice calls canvas.voice / canvas.voiceRun to edit the board while it
 // talks), but this plugin reads nothing of Studio's.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { importLegacyCanvases, legacyDatabasePath } from "./src/legacy-import";
+import { importLegacyCanvases, legacyDatabasePaths } from "./src/legacy-import";
 import { CANVAS_MIGRATIONS } from "./src/migrations";
 import { CANVAS_KEY_SETTINGS, exaKey } from "./src/settings";
 import { CANVAS_TOOLS, registerCanvas } from "./src/server";
@@ -13,14 +14,14 @@ import { CANVAS_TOOLS, registerCanvas } from "./src/server";
 export default function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, CANVAS_MIGRATIONS);
-  // Canvases made under the old plugin id ("canvas"), copied in once, read-only.
+  // Canvases made under the old plugin ids ("studio-canvas", else "canvas"), copied in once, read-only.
   try {
-    const result = importLegacyCanvases(db, legacyDatabasePath(bb.server.experimental_dataDir));
-    if (result.status === "imported") bb.log.info(`Imported the old Canvas plugin's canvases from ${result.source}: ${JSON.stringify(result.counts)}`);
+    const result = importLegacyCanvases(db, legacyDatabasePaths(bb.server.experimental_dataDir));
+    if (result.status === "imported") bb.log.info(`Imported the old plugin's canvases from ${result.source}: ${JSON.stringify(result.counts)}`);
   } catch (error) {
-    bb.log.warn(`Could not import the old Canvas plugin's canvases: ${error instanceof Error ? error.message : String(error)}`);
+    bb.log.warn(`Could not import the old plugin's canvases: ${error instanceof Error ? error.message : String(error)}`);
   }
-  // The Exa API key for canvas_image and canvas_images (a BB secret: Settings → Plugins → BB Studio Canvas). Read
+  // The Exa API key for canvas_image and canvas_images (a BB secret: Settings → Plugins → BB Studio Visual Chat). Read
   // when a picture is looked up, never logged or sent anywhere but Exa. Without it, queries go to Wikipedia.
   const keys = bb.settings.define(CANVAS_KEY_SETTINGS);
   const canvas = registerCanvas(bb, db, { images: { exaKey: async () => exaKey(await keys.get()) } });

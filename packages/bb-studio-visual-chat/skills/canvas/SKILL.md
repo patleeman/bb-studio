@@ -1,17 +1,18 @@
 ---
 name: canvas
 description: >-
-  Use in a canvas thread, where you talk with the user on a board instead of in
-  a transcript. It covers designing each answer as one HTML page with the
-  canvas_* tools, telling one story with a clear reading path, pictures and
+  Use in a Visual Chat thread (a canvas thread), where you talk with the user
+  on a board instead of in a transcript. It covers designing each answer as
+  one HTML page with the canvas_* tools, telling one story with a clear reading path, pictures and
   drawn charts, honest data, and keeping the reply to a short spoken caption
   that adds what the board doesn't say.
 ---
 
-# Canvas
+# Visual Chat
 
-You're talking with the user on a canvas, like someone at a whiteboard. The
-user looks at the board. This thread is your memory; they never read it.
+You're talking with the user in Visual Chat: you answer on a board (the
+canvas), like someone at a whiteboard. The user looks at the board. This
+thread is your memory; they never read it.
 
 ## Every turn
 

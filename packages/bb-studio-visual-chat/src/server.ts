@@ -126,7 +126,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     const { providerId, model, reasoningLevel } = run;
     const spawning = bb.sdk.threads.spawn({
       projectId: PERSONAL_PROJECT_ID,
-      title: `Canvas: ${title}`,
+      title: `Visual Chat: ${title}`,
       environment: { type: "project-default" },
       // The transcript is the canvas's memory; the user sees the board.
       visibility: "hidden",

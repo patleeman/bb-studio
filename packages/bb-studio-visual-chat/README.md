@@ -1,15 +1,15 @@
-# BB Studio Canvas (prototype)
+# BB Studio Visual Chat (prototype)
 
-Part of BB Studio. A canvas is a board an agent talks on, like someone at a
-whiteboard. It isn't a transcript. Each turn, the agent edits the board to
+Part of BB Studio. Visual Chat is a chat where the agent answers on a board
+(a canvas), like someone at a whiteboard. It isn't a transcript. Each turn, the agent edits the board to
 show what matters now: it adds, changes and removes charts, numbers,
 tables, captions and generated widgets. Every change animates, so you can
 see what moved. You never arrange the board.
 
-BB Studio Canvas is its own plugin (id `studio-canvas`) and is off unless
-you install it. It needs Studio. It was called Canvas (id `canvas`) until
-that id clashed with another store plugin; see
-[Moving from the old Canvas plugin](#moving-from-the-old-canvas-plugin).
+BB Studio Visual Chat is its own plugin (id `studio-visual-chat`) and is off
+unless you install it. It needs Studio. It was BB Studio Canvas (id
+`studio-canvas`), and before that Canvas (id `canvas`); see
+[Moving from BB Studio Canvas](#moving-from-bb-studio-canvas).
 
 ## Staged preview
 
@@ -21,7 +21,7 @@ and its short reply is the caption line at the bottom.
 
 ## Use it
 
-Open **Canvas** in BB's rail, or go to `/plugins/studio-canvas/canvas`. Type what
+Open **Visual Chat** in BB's rail, or go to `/plugins/studio-visual-chat/canvas`. Type what
 you want to look at. The chat is one faint line at the bottom: the agent's
 latest reply, a text field, Talk's dictation mic, a history peek and the
 hands-free button.
@@ -39,7 +39,7 @@ hands-free button.
 ## How it works
 
 - **The agent** is an ordinary BB thread, hidden, in your personal
-  project. Canvas makes it when you start a canvas, on Claude Code's
+  project. Visual Chat makes it when you start a canvas, on Claude Code's
   Sonnet 5.5 (`claude-sonnet-5-5`). The thread is the canvas's memory; you
   see the board. Canvases made before keep the model their thread has.
 - **The model picker** in the top bar lists the providers and models BB has,
@@ -94,8 +94,8 @@ hands-free button.
   with a time limit and a size cap. Picture addresses lose tracking
   parameters. Stars without a source read "my pick".
 - **Exa API key:** a BB secret setting on this plugin, `exaApiKey`
-  (**Settings → Plugins → BB Studio Canvas**, or `bb plugin config
-  studio-canvas`). It's only sent to Exa: never logged, returned or put in
+  (**Settings → Plugins → BB Studio Visual Chat**, or `bb plugin config
+  studio-visual-chat`). It's only sent to Exa: never logged, returned or put in
   an error. Without it, pictures come from Wikipedia.
 - **Tool loading on Claude Code:** Claude Code defers plugin tools behind
   its tool search, and BB gives a plugin no way to have them loaded up front
@@ -109,14 +109,14 @@ hands-free button.
   else the page's first heading. The caption is the agent's reply, written
   to add what the board doesn't say; sentences that describe the board
   ("The board shows…") are dropped from it.
-- **Boards from before pages** (items placed by Canvas's layout) still open
+- **Boards from before pages** (items placed by the old layout) still open
   and show as they were. The agent's next page replaces them.
 
 ## With Studio
 
 The page reuses Studio's widget renderers, markdown and theme. They're
 bundled into this plugin (`bundle/canvas-ui.js`, built by `node build-ui.mjs`),
-so Canvas reads nothing of Studio's at runtime except through these:
+so Visual Chat reads nothing of Studio's at runtime except through these:
 
 - Studio's hands-free voice asks this plugin's `canvas.voice` and
   `canvas.voiceRun` RPCs when a session starts from a canvas thread.
@@ -136,17 +136,22 @@ agent picked. `scripts/capture/canvas-composition.mjs` runs real turns at two
 window sizes, light and dark, and can pause a page's morph for a
 mid-animation still.
 
-## Moving from the old Canvas plugin
+## Moving from BB Studio Canvas
 
-A plugin's data is keyed by its id, so canvases made under the old id stay
-in `<BB data dir>/plugins/canvas/data.db`. The first time BB Studio Canvas
-starts with no canvases of its own and finds that file, it copies every
-canvas, item, change, history line and model choice in, keeping their ids.
-Each canvas keeps its hidden thread, so old links
-(`/plugins/canvas/canvas/<threadId>` becomes
-`/plugins/studio-canvas/canvas/<threadId>`) and hands-free voice find it.
+A plugin's data is keyed by its id, so canvases made under BB Studio Canvas
+stay in `<BB data dir>/plugins/studio-canvas/data.db` (and ones from the
+first Canvas plugin in `<BB data dir>/plugins/canvas/data.db`). The first
+time Visual Chat starts with no canvases of its own, it copies every canvas
+in from the BB Studio Canvas file, or, when that file isn't there, from the
+Canvas one: pages, items, changes, history, thread aliases, model choices
+and found pictures, keeping their ids. Each canvas keeps its hidden thread,
+so old links (`/plugins/studio-canvas/canvas/<threadId>` becomes
+`/plugins/studio-visual-chat/canvas/<threadId>`) and hands-free voice find
+it.
 
 - It opens the old file read-only and never changes or deletes it.
 - It runs once and records that it ran (`canvas_legacy_import`).
 - Disable the old plugin before installing this one, so the two don't both
   run. You can uninstall the old one once you've checked your canvases.
+- Settings don't move: they belong to the old plugin's id. Paste the Exa API
+  key (if you use one) into BB Studio Visual Chat's `exaApiKey` setting.

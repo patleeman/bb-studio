@@ -85,7 +85,7 @@ export const pinnedTransport: Transport = (url, address, signal) => new Promise(
     lookup: lookup as never,
     servername: isIP(url.hostname) ? undefined : url.hostname,
     signal,
-    headers: { "user-agent": "Mozilla/5.0 (BB Studio Canvas image finder)", accept: "text/html,application/xhtml+xml" },
+    headers: { "user-agent": "Mozilla/5.0 (BB Studio Visual Chat image finder)", accept: "text/html,application/xhtml+xml" },
   }, (response) => {
     resolve({
       status: response.statusCode ?? 0,

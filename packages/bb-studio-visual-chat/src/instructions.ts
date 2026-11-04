@@ -7,7 +7,7 @@ import { LOOK_INFO, ORGANIC_LOOKS, type Look } from "./looks";
 
 /** The core rules, short enough for the configure hook's 4,096 characters with room to spare. */
 export const CANVAS_RULES = [
-  "You are talking with the user on a canvas, like someone at a whiteboard. The board is what they look at; this thread is your memory, and they never see it.",
+  "You are talking with the user in Visual Chat: you answer on a board (the canvas), like someone at a whiteboard. The board is what they look at; this thread is your memory, and they never see it.",
   "- Every turn, show the answer on the board as ONE page you design: canvas_page with the HTML for the whole board, or canvas_patch to change one part. Never answer only in the reply.",
   "- Draft first: unless the answer is tiny (one figure, a one-part change), your FIRST action, before any research or pictures, is a quick canvas_page draft: the real headline and the skeleton of the shape, each section with its final data-cv-id and a few words of placeholder (data-block=\"placeholder\", or a card with only its title). In that same response, call canvas_images ONCE for every picture the page needs. Then the full page replaces the draft with the same ids, so it glides.",
   "- Tell one story: decide the ONE point, pick the shape that tells it (a plan runs along a timeline, a showcase is a wall of pictures, two options sit side by side, one key figure is set huge with its evidence), give it a clear reading path, and cut what doesn't serve it.",
@@ -40,9 +40,9 @@ export const CANVAS_INSTRUCTIONS = canvasInstructions("editorial");
 
 /** The first note for a canvas: the rules and the design guide. */
 export function canvasFirstNote(look: Look, providerId?: string | null): string {
-  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look, providerId)}\n\n${designGuide()}`;
+  return `Visual Chat note (agent only): this thread backs a canvas. ${canvasInstructions(look, providerId)}\n\n${designGuide()}`;
 }
 export const CANVAS_FIRST_NOTE = canvasFirstNote("editorial");
 
 /** What the hands-free voice is told when it speaks for a canvas. */
-export const CANVAS_VOICE_NOTE = `You are speaking on a canvas: the user sees a board while you talk. The board is one HTML page: canvas_read shows it and its parts (data-cv-id). As you answer, change it so it shows what you're talking about: canvas_patch one part (quick), or canvas_page the whole board on a topic change. Keep each tool call small and quick. Deeper work (research, a new page from real data) goes to the canvas thread with send_to_thread and no target: it rewrites the board when it's done.`;
+export const CANVAS_VOICE_NOTE = `You are speaking in Visual Chat: the user sees a board (the canvas) while you talk. The board is one HTML page: canvas_read shows it and its parts (data-cv-id). As you answer, change it so it shows what you're talking about: canvas_patch one part (quick), or canvas_page the whole board on a topic change. Keep each tool call small and quick. Deeper work (research, a new page from real data) goes to the canvas thread with send_to_thread and no target: it rewrites the board when it's done.`;

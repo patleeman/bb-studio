@@ -12,8 +12,8 @@
       "source": "./packages/bb-studio-mobile"
     },
     {
-      "name": "studio-canvas",
-      "source": "./packages/bb-studio-canvas"
+      "name": "studio-visual-chat",
+      "source": "./packages/bb-studio-visual-chat"
     }
   ]
 }

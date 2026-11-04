@@ -9,11 +9,11 @@
 import { z } from "zod";
 import { lookSchema } from "./looks";
 
-/** The canvas plugin's panel: /plugins/studio-canvas/canvas/<threadId>. */
+/** The canvas plugin's panel: /plugins/studio-visual-chat/canvas/<threadId>. */
 export const CANVAS_SEGMENT = "canvas";
-export const CANVAS_ROOT = `/plugins/studio-canvas/${CANVAS_SEGMENT}`;
+export const CANVAS_ROOT = `/plugins/studio-visual-chat/${CANVAS_SEGMENT}`;
 /** Realtime channel: a board or its caption changed. */
-export const CANVAS_CHANNEL = "studio-canvas";
+export const CANVAS_CHANNEL = "studio-visual-chat";
 export const CANVAS_UPDATE_TYPE = "canvas:updated";
 
 export interface CanvasSignal { type: typeof CANVAS_UPDATE_TYPE; canvasId: string; threadId: string; rev: number }
