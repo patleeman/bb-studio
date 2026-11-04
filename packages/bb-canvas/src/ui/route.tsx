@@ -256,17 +256,19 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
             data-canvas-input
             autoFocus
           />
+          {/* Talk shows its dictation controls here while dictating into this field, as in BB's composer (fields.ts). */}
+          <span className="flex min-w-0 items-center" data-talk-field-dock />
           {canvas ? (
             <button type="button" className={cn(FAINT_BUTTON, history && "bg-foreground/5 text-foreground")} aria-label="History" title="History" aria-pressed={history} onClick={() => setHistory((value) => !value)}>
               <Icon name="Clock" className="size-4" />
             </button>
           ) : null}
           <button type="button" className={cn(FAINT_BUTTON, dictating && "bg-red-500/10 text-red-600 dark:text-red-400")} aria-label={dictating ? "Finish dictation" : "Dictate"} title={dictating ? "Finish dictation" : "Dictate"} aria-pressed={dictating}
-            onClick={() => input.current?.dispatchEvent(new CustomEvent(TOGGLE_EVENT, { bubbles: true }))}>
+            onClick={() => input.current?.dispatchEvent(new CustomEvent(TOGGLE_EVENT, { bubbles: true }))} data-canvas-voice>
             <Icon name="Mic" className="size-4" />
           </button>
           <button type="button" className={FAINT_BUTTON} aria-label="Hands-free voice" title="Hands-free voice: talk, and the board changes as it answers" disabled={startingVoice}
-            onClick={() => void startVoice()} data-canvas-handsfree>
+            onClick={() => void startVoice()} data-canvas-handsfree data-canvas-voice>
             <Icon name="studio/handsfree" className="size-4" />
           </button>
         </form>

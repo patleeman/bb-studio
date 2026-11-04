@@ -13,3 +13,7 @@
 @media (prefers-reduced-motion: reduce) {
   .canvas-pulse { animation: none; }
 }
+/* Talk's dictation controls take the field's dock while dictating into it
+   (Studio's src/talk/ui/fields.ts), in place of the mic and hands-free. */
+[data-talk-field-dock]:empty { display: none; }
+[data-talk-field-dock]:not(:empty) ~ [data-canvas-voice] { display: none; }
