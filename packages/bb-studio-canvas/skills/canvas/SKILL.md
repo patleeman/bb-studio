@@ -4,7 +4,8 @@ description: >-
   Use in a canvas thread, where you talk with the user on a board instead of in
   a transcript. It covers editing the board each turn with the canvas_* tools,
   each item kind's data, importance and size, choosing the board's
-  style and its design guide, and keeping the reply to a short spoken caption.
+  style, composition and placement, its design guide, and keeping the reply to
+  a short spoken caption that adds what the board doesn't say.
 ---
 
 # Canvas
@@ -22,11 +23,14 @@ chat on their screen is one faint line: your latest reply.
    - `canvas_remove` for what no longer matters,
    - `canvas_set` to replace the whole board in one step,
    - `canvas_clear` on a topic change (or `canvas_set` with the new board).
-3. Reply with one short spoken-style caption: a sentence or two the user
-   could hear. No headings, lists, tables or links: those go on the board.
+3. Reply with the caption under the board: a sentence or two the user
+   could hear, adding what the board doesn't say (what to look at first,
+   what it means for them, what's next). Never restate the board. No
+   headings, lists, tables or links: those go on the board.
 
-Never ask the user to arrange, move or resize anything. Studio lays the board
-out. You steer it with `importance` and `size`.
+Never ask the user to arrange, move or resize anything. Studio composes the
+board. You steer it with each item's `scale` and, when you care, a rough
+`region` or a pin (`pinnedTo`, `point`, `side`).
 
 ## Styles
 
@@ -47,17 +51,24 @@ You pick each board's style from what it shows; the user never has to.
 The first message has the design guide with examples; `canvas_guide`
 returns it again (or one style's part, with `style`). In every style:
 
-- Make the board rich and dense, not a slide: one dominant focus and 5–12
-  supporting items that each say something specific.
+- Compose it, don't pack it: one hero (`scale: "hero"`) and 4–9 pieces at
+  clearly different scales, each saying something specific. No boxes: text
+  and charts sit on the board. Never the old template (kicker, headline,
+  dek, drop-cap paragraph, full-width table).
+- Pick a composition per board (`canvas_set` `composition`) and never repeat
+  the last board's unless the user asks; set `title` to the topic.
 - Write your own components first: a `custom` item's HTML gets the style's
   tokens (`--cv-*` CSS variables), the kit's classes (`cv-kicker`, `cv-h1`,
-  `cv-num`, `cv-float-right`, …) and `window.cv` (sparklines, line and bar
-  charts, seat splits, US tile maps, timelines, small multiples). Draw with
-  `cv.render((data, options) => html)` so updates to `data` redraw it. The
-  frame grows to its content: never set a height on it.
-- Say what matters inside the item itself: a takeaway line in a custom
-  component, chart marks, a `==highlight==`, a stat's caption, or a short
-  caption item. Canvas has no notes, stickies or connectors.
+  `cv-num`, `cv-annotated`, …) and `window.cv` (sparklines, line and bar
+  charts with callouts drawn on them, `cv.bignum`, `cv.quote`, `cv.callout`,
+  `cv.stars`, seat splits, US tile maps, timelines, small multiples). Draw
+  with `cv.render((data, options) => html)` so updates to `data` redraw it,
+  and size figures to `cv.width()` and `cv.height()`. The frame grows to its
+  content: never set a height on it.
+- Say what matters inside the item itself: a callout drawn on a chart
+  (`callouts`), a takeaway line in a custom component, a `==highlight==`, a
+  stat's caption, or a short caption item. Canvas has no notes, stickies or
+  connectors.
 - Charts are honest: bars start at zero; for tiny differences set
   `options.max` to a meaningful scale.
 - Inline marks in captions: `{spark:3,5,4}`, `{delta:+2.1}`,
@@ -67,17 +78,37 @@ Canvases from before styles are **Classic** (the slide grid) and stay so.
 
 ## Layout
 
-- `importance` 1–5. The highest importance, most recently changed item is the
-  focus: Studio makes it the biggest (top-left in Classic, Editorial and
-  Instrument; in the middle in Field notes) and the rest orbit it. Give the one thing
-  the board is about importance 5 (often the headline), supporting numbers 4,
-  detail 3, background 1–2.
-- `size` s, m, l or xl is a hint. Stats are small, charts and tables large.
-- Classic: keep it small: a headline, three or four stats, one or two charts
-  or tables, a caption. Other looks: rich but focused (see Styles). At most 24
-  items.
-- Items that don't change keep their place, so prefer `canvas_update` over
-  remove-and-add for the same thing.
+In a style, Studio composes the board for the screen it's on: no grid, no
+columns, no reading order.
+
+- **Compositions** (`composition` on `canvas_set`): `orbit` (a hero chart
+  with facts around it), `giant-number` (one number set huge, with
+  annotations), `map` (a map in the middle, facts in the corners), `spine`
+  (a timeline across the screen, moments above and below), `split` (two
+  heroes compared), `quote` (a frameless quote leads), `close-up` (one chart
+  full width, bleeding off the edge, annotated on itself), `essay` (a text
+  column with figures around it), `gallery` (pictures first: one big, the
+  rest smaller, each with its name and a rating as stars). Without one,
+  Studio picks from the hero.
+- **Go visual** for "showcase", "show me", products, games, places, people:
+  real pictures as `image` items (http(s) URLs from web search; custom
+  frames have no network), ratings drawn as stars, numerals or bars.
+- **`scale`**: `hero`, `large`, `medium`, `small` or `tiny`. One hero (two in
+  `split`). Without it, `size` (s, m, l, xl) and `importance` decide.
+- **`region`**: `top-left`, `top`, `top-right`, `left`, `center`, `right`,
+  `bottom-left`, `bottom`, `bottom-right`: roughly where it goes.
+- **`pinnedTo`** (an item id), with `point` (`{x, y}` on it) and `side`
+  (`left`, `right`, `above`, `below`): right next to that spot. Nothing is
+  drawn between them.
+- **`bleed: true`**: a hero chart, map or image runs off the board's edge.
+- `importance` 1–5 still ranks items: with no `scale: "hero"`, the highest,
+  most recently changed item is the hero.
+- Studio fills the screen on both axes, keeps text from overlapping, and
+  scrolls only when everything can't fit. Items that don't change keep
+  their place, so prefer `canvas_update` over remove-and-add.
+- Classic (canvases from before styles) still packs a slide grid by
+  `importance` and `size`; keep it small there: a headline, three or four
+  stats, one or two charts or tables, a caption. At most 24 items anywhere.
 
 ## Item kinds
 
@@ -98,6 +129,12 @@ Canvases from before styles are **Classic** (the slide grid) and stay so.
 | timeline | `[{date, label, note?, tone?}]` | `layout` (column, row), `highlight` |
 | map | US states: `{PA: 2.1}`, `{PA: {value, label?, color?}}` or `[{state, value}]` | `scale` (diverging, sequential), `legend` [low, high], `show` (abbr, value, label), `low`, `high` |
 | multiples | `[{label, values, value?, delta?, note?}]` | `unit`, `shared`, `invert` |
+
+Any item also takes `scale`, `region`, `pinnedTo`, `point`, `side` and
+`bleed` (placement, above). Nothing is drawn between pinned items.
+
+`canvas_set` also takes `title` (the topic, the canvas's title),
+`composition` and `sameComposition`; `canvas_clear` takes `title`.
 
 Generated widgets: a `custom` item's `html` runs in a sandboxed frame with no
 network, and gets `window.bbWidget.data`, `.options` and `.theme` (listen for

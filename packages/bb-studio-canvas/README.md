@@ -78,11 +78,21 @@ hands-free button.
   content. Canvas has no notes, stickies or connectors; boards saved
   with them show without them.
 - **Layout:** in Classic, Canvas packs items on a grid by importance (1–5)
-  and size (s, m, l, xl). In a style, items are as tall as their content
-  and settle around the focus without a grid: lanes beside a lead story
-  (Editorial, Instrument) or a cluster around the middle (Field notes).
-  The most important, most recently changed item is the focus. Items that
-  don't change keep their place, and the board reflows for narrow windows.
+  and size (s, m, l, xl). In a style, Canvas composes the board for the
+  screen (`src/organic.ts`), with no grid: one hero, sized by the board's
+  composition (orbit, giant-number, map, spine, split, quote, close-up or
+  essay or gallery, which the agent picks and doesn't repeat on consecutive boards),
+  and the rest at clearly different scales. The agent places things
+  roughly (`scale`, a `region`, a pin to a spot on another item, `bleed`)
+  and each item goes to the free spot nearest that target, at any x and y,
+  so the board fills the screen on both axes and only scrolls when it must.
+  Nothing overlaps (a hero may bleed off the edge), and nothing is drawn
+  between items. Items that don't change keep their place; narrow windows
+  compose down the page.
+- **Title and caption:** the canvas's title follows the topic: the agent
+  names it with `canvas_set` or `canvas_clear`, else it's the board's
+  headline or hero. The caption is the agent's reply, written to add what
+  the board doesn't say.
 
 ## With Studio
 
@@ -104,7 +114,10 @@ node build-ui.mjs   # after changing src/ui or the Studio files it uses
 `scripts/capture/canvas-demo.mjs` records four text turns and a hands-free
 turn in a staged BB. `scripts/capture/canvas-directions.mjs` runs real turns in
 one canvas and saves light and dark stills after each, with the style the
-agent picked.
+agent picked. `scripts/capture/canvas-composition.mjs` runs real turns at two
+window sizes and renders a hand-placed reference board for each beside it
+(the page's `bb-studio-canvas:preview` event shows a board JSON in place of
+the canvas's own; items with `fixed: {x, y, w}` are placed by hand).
 
 ## Moving from the old Canvas plugin
 

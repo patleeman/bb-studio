@@ -12,7 +12,7 @@ export const CANVAS_RULES = [
   "- Every turn, edit the board to show what's relevant now, with the canvas_* tools: add, update, remove. Use canvas_set to replace the whole board in one step.",
   "- Remove what no longer matters.",
   "- On a topic change, clear and rebuild (canvas_set with the new items, or canvas_clear then canvas_add).",
-  "- Your reply is one short spoken-style caption, not a report: a sentence or two the user could hear. No headings, lists, tables or links in the reply; those go on the board.",
+  "- Your reply is the caption under the board: one or two spoken sentences that add what the board doesn't say (what to look at first, what it means for the user, what's next). Never restate the board. No headings, lists, tables or links; those go on the board.",
   "- Never ask the user to arrange anything. Studio lays the board out: importance (1–5) and size (s, m, l, xl) decide where things go. The highest importance, most recently changed item is the focus: biggest, top-left.",
   "- Keep the board small: a headline, a few numbers, one or two charts or tables, a caption. At most " + CANVAS_LIMITS.items + " items.",
   "- Give items stable ids (like `turnout-chart`) and update them in place when the numbers change, so the user sees what moved.",
@@ -25,8 +25,8 @@ export const CANVAS_INSTRUCTIONS = `${CANVAS_RULES}\n\nItem kinds: ${CANVAS_KIND
 export function canvasInstructions(look: Look): string {
   if (look === "classic") return CANVAS_INSTRUCTIONS;
   // A rich look replaces "keep the board small" with "rich but focused".
-  const rules = CANVAS_RULES.replace(/- Keep the board small:[^\n]*/, `- Rich but focused: one dominant focus and 5–12 dense supporting items (your own custom components, stats with sparklines, maps, timelines, quotes). At most ${CANVAS_LIMITS.items} items.`)
-    .replace(" The highest importance, most recently changed item is the focus: biggest, top-left.", " The highest importance, most recently changed item is the focus: it dominates and the rest orbit it.");
+  const rules = CANVAS_RULES.replace(/- Keep the board small:[^\n]*/, `- Composed, not packed: one hero and 4–9 pieces at clearly different scales (your own custom components, huge numbers, annotated charts, maps, timelines, frameless quotes, pinned notes). At most ${CANVAS_LIMITS.items} items.`)
+    .replace("importance (1–5) and size (s, m, l, xl) decide where things go. The highest importance, most recently changed item is the focus: biggest, top-left.", "you give each piece a scale and, if you like, a rough region or a pin; it composes them to fill the screen.");
   return `${rules}\n\n${lookInstruction(look)}\n\nItem kinds: ${CANVAS_KINDS.join(", ")}. The canvas skill has each kind's data shape. canvas_read shows the board and its recent changes.`;
 }
 

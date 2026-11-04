@@ -10,127 +10,131 @@ import { LOOK_INFO, TOKEN_HELP, type OrganicLook } from "./looks";
 const ex = (source: string) => source.replace(/@@/g, "`").replace(/\$\[/g, "${").trim();
 
 const COMMON = `
-Make the board RICH and dense, like a great front page or a briefing someone designed for this exact question. Not a slide, not a grid of plain cards.
-- One focus dominates: importance 5 on the lead (often your own lead component, or a headline). Supporting items get 3–4 and orbit it; detail 1–2. The layout places everything automatically: varied sizes, organic clusters. Never arrange or position things yourself.
-- Fewer, denser components beat many sparse ones. Each says something specific: a number with its trend and context, a map that shows where, a timeline that shows when, small multiples that compare, a quote with a voice, a caption that says what it means.
-- Generated components come first: kind "custom" with html. It runs in a sandboxed frame that already has this look's tokens (CSS variables), the kit CSS classes and window.cv. The frame grows to its content's height, so never set a height on your outer element and don't leave empty space; its width is the item's width (use cv.width() for charts). No network: no external images, fonts, or scripts.
-- Put the numbers in the item's data and draw them with cv.render((data, options) => html), so canvas_update can change data and the user sees it change in place.
-- Built-ins when they fit: headline, stat (series → sparkline), quote, caption, map, timeline, multiples, line, bar, area, pie, table, list, image (with options.headline: a photo with a headline).
-- Say what matters inside the item: a takeaway line in a custom component, marks on a chart (cv.line marks, highlight), a cv-hl highlight, a stat's caption, or a short caption item. There are no notes, stickies or connectors.
-- Inline sparklines: in a caption write {spark:3,5,4,8}; in HTML use cv.spark([3,5,4,8]) or <span data-spark="3,5,4,8"></span>. Deltas: {delta:+2.1} in a caption, cv.delta(2.1) in HTML.
-- Type: kicker → headline → dek → body, with the cv-* classes or the --cv-t-* scale. Color only with tokens (var(--cv-…)); --cv-blue and --cv-red for the two sides of a race, --cv-good/--cv-bad for change, --cv-c1…--cv-c8 for series.
-- size is a hint: s about a quarter of the width, m a third, l half, xl two-thirds. The focus grows.
-- Every board: at least 6 items: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), evidence (stats with sparklines, a table), and a line that says what it means (a takeaway or caption). A board of only a headline, a list and text is a failure.
-- Every follow-up changes the board: a question about what's there ("which of these matters?", "why?") gets highlights, a takeaway, a raised importance or a new item on the board, and a short reply. Never answer only in the reply.
-- Charts are honest: bars start at zero. When differences are tiny (margins of a few tenths), set options.max to a meaningful scale (e.g. 5 points) or show the numbers in a table instead, so 0.1 doesn't look like a landslide.
-- Example numbers below are placeholders: never reuse them. Use real data (search) and label estimates.
+Compose the board like a designer laying out a front page or a poster for this exact question. Not a slide, not a grid, not a list of cards.
+- ONE HERO dominates: scale "hero" (importance 5). Often a big custom piece: a chart annotated on itself, a number set huge, a map, a timeline across the screen, a quote with no frame. The hero is the answer, not a title.
+- Everything else at CLEARLY DIFFERENT scales: one or two "large", a few "medium", the rest "small" or "tiny". Never several items of the same size in a row. 5–10 items in all; fewer, denser pieces beat many sparse ones.
+- Place things roughly; Studio composes them to fill the screen (no grid, no columns, no reading order): region ("top-right", "bottom-left", …) for where, pinnedTo (an id) with point ({x, y} 0–1 on it) and side for "right next to that spot" (nothing is drawn between them), bleed for a hero that runs off the edge. Leave out what you don't care about: the composition fills it in.
+- GO VISUAL when the ask is about things you can see: "showcase", "show me", products, games, albums, places, people, food. Imagery first: find real pictures (covers, box art, product shots, photos) by web search and use image items with their http(s) URLs (custom frames have no network, so pictures never go inside them). Ratings are drawn, not typed: stars (image options.rating, or cv.stars), a big numeral, or bars, never a column of numbers in a table. Use the gallery composition.
+- No boxes. Text and charts sit directly on the board; there are no cards or backgrounds to rely on. Hierarchy comes from scale, type and whitespace.
+- Shaped pieces, not rectangles: labels drawn on the chart itself (callouts: […] on cv.line, cv.columns and cv.tilemap; options.callouts on line, bar and area items), a number in huge type (cv.bignum, or a stat as the hero), a quote with no frame (cv.quote, or a quote item), a callout with a leader line inside your own figure (cv.callout).
+- Say what matters inside the pieces themselves: a callout on the chart at the moment it turned, a takeaway line in a custom component, a cv-hl highlight, a stat's caption, or a short caption item. There are no notes, stickies or connectors between items.
+- Do NOT use the old template: kicker, then big headline, then dek, then a drop-cap paragraph, then a full-width table. A headline item is optional; when there is one, it's medium or small, never the hero unless the words are the whole answer.
+- Generated components come first: kind "custom" with html, in a sandboxed frame that has this style's tokens (CSS variables), the kit classes and window.cv. The frame grows to its content's height: never set a height on your outer element. Size figures to cv.width() and cv.height() (the room its place in the composition gives it). No network: no external images, fonts or scripts. options.visual: true marks a custom chart or map, so labels may sit on it.
+- Put the numbers in the item's data and draw them with cv.render((data, options) => html), so canvas_update changes data and the user sees it change in place.
+- Built-ins when they fit: headline, stat (series → sparkline; as the hero it's set huge), quote, caption, map, timeline, multiples, line, bar, area, pie, table, list, image (options: headline, kicker, caption, rating, ratingMax, aspect "3 / 4" for covers and box art, fit "contain" to show all of it, focus for what stays when cropped; a failed address shows its name on a tile).
+- Inline marks in captions: {spark:3,5,4,8}, {delta:+2.1}, ==highlight==. In HTML: cv.spark, cv.delta.
+- Charts are honest: bars start at zero. When differences are tiny (margins of a few tenths), set options.max to a meaningful scale (e.g. 5 points) or show numbers instead, so 0.1 doesn't look like a landslide.
+- Every follow-up changes the board: a question about what's there gets callouts, highlights, a takeaway, a new piece or a recomposition, and a short reply. Never answer only in the reply.
+- title (canvas_set, canvas_clear): the topic in a few words; set it whenever the topic changes. Your reply (the caption under the board) adds what the board doesn't say: what to look at first, what it means for the user, or what's next. One or two spoken sentences. Never restate the board.
+- Example numbers below are placeholders: never reuse them. Use real data (search) and label samples and estimates.
 `.trim();
 
+const COMPOSITIONS_GUIDE = `
+COMPOSITIONS. Pick one per board from the content, and set it (canvas_set composition). Never use the same composition on two boards in a row unless the user asks for it (the tool refuses; sameComposition: true only when they asked). A follow-up on the same board can keep it, or recompose with a new one.
+- orbit: a hero chart or figure (center-left or center-right); facts orbit it at different scales, a callout on its key moment. For a trend, a result, a comparison over time.
+- giant-number: one number set huge (a stat or cv.bignum as the hero); two or three small facts pinned beside it; a small supporting chart and a line of context. For "how many / how much / did it pass".
+- map: the map in the middle (hero); facts in the corners (regions), callouts on the places that matter (cv.tilemap callouts or the map's options.callouts). For anything where "where" is the story.
+- spine: a timeline running across the screen (hero, scale hero, it spans the width); moments, quotes and numbers above and below it, pinned to their dates. For plans, histories, schedules, sequences.
+- split: two heroes side by side (both scale hero), each with its evidence under it; the verdict or the trade-off between them at the top or bottom. For "A or B", before/after, us vs them.
+- quote: a big quote with no frame leads (hero); the evidence beside and below it. For a story with a voice, a decision someone made.
+- close-up: one chart full width (hero, bleed: true), annotated on itself with callouts; three or four small facts under it. For one series that tells the story.
+- essay: a column of text on one side (a caption or custom text as the hero), the figures around it on the other. For explainers and overviews where the words carry it.
+- gallery: pictures first: one big image (hero) and four to eight smaller ones at different sizes, each an image item with its name (options.headline), a rating as stars (options.rating, ratingMax) and a one-line caption. For "showcase", "show me", products, games, places, people, food, anything you'd want to see.
+Choosing: what is the ONE thing the user should see? Make that the hero, then pick the composition that shows it best. Two boards about different things should look different.
+`.trim();
 const KIT = `
 Kit (window.cv in every custom frame; each returns an HTML or SVG string with values escaped):
-- cv.render((data, options) => html): draws into <div id="cv-app"> (or the body) and redraws when the item's data changes. cv.width(): the frame's width in px.
-- cv.spark(values, {w, h, color}) inline sparkline; cv.bars(values, {w, h}) mini bars; cv.delta(n, {invert, unit}) ▲/▼ chip; cv.fmt(n, {unit, prefix, decimals, signed}); cv.esc(text).
-- cv.line(rows, {x, series, w, h, unit, area, highlight, marks: [{x, label}]}): line chart with labels at the line ends and marked moments.
-- cv.columns(rows, {x, series, w, h, unit, stacked, highlight}); cv.hbars([{label, value, color, note}], {unit, max, sort}).
-- cv.split([{label, value, color}], {total, mark, markLabel}): one bar in parts with a threshold (seats and a majority).
-- cv.donut(parts, {size, center, sub}); cv.meter(value, {max, label, marks: [{at, label}]}); cv.waffle([{label, n, color}], {cols}).
-- cv.tilemap({PA: 2.1, GA: -0.4} or {PA: {value, label, color}}, {scale: "diverging"|"sequential", legend: [low, high], show: "abbr"|"value"|"label"}): US tile map; names or codes.
-- cv.timeline([{date, label, note, tone}], {layout: "column"|"row", highlight}); cv.multiples([{label, values, value, delta, note}], {unit, shared, invert}); cv.legend([{label, color}]).
+- cv.render((data, options) => html): draws into <div id="cv-app"> (or the body) and redraws when the item's data changes. cv.width(), cv.height(): the room this piece has, in px.
+- Shaped pieces: cv.bignum(value, {label, unit, prefix, delta, sub, size, color}) a number in huge type; cv.quote(text, {by, role, size}) a quote with no frame; cv.callout(text, {x, y, dx, dy, color, w}) a label with a leader line to the spot (x, y: 0–1) on your figure: wrap the figure and its callouts in <div class="cv-annotated">.
+- cv.stars(score, {max: 5|10|100, size, color, label}): a rating as stars with the number.
+- Charts: cv.line(rows, {x, series, w, h, unit, area, highlight, marks: [{x, label}], callouts: [{x, series?, text, dx?, dy?}]}) (callouts are labels drawn on the chart, at that point); cv.columns(rows, {x, series, w, h, unit, stacked, highlight, max, callouts: [{x, text}]}); cv.hbars([{label, value, color, note}], {unit, max, sort}); cv.split([{label, value, color}], {total, mark, markLabel}); cv.donut(parts, {size, center, sub}); cv.meter(value, {max, label, marks}); cv.waffle([{label, n, color}], {cols}).
+- cv.tilemap({PA: 2.1} or {PA: {value, label, color}}, {scale: "diverging"|"sequential", legend: [low, high], show: "abbr"|"value"|"label", callouts: [{state, text, side?}]}): US tile map; callouts sit beside the map with a leader to the state.
+- cv.timeline([{date, label, note, tone}], {layout: "column"|"row", highlight}); cv.multiples([{label, values, value, delta, note}], {unit, shared, invert}); cv.spark(values, {w, h, color}); cv.bars(values, {w, h}); cv.delta(n, {invert, unit}); cv.fmt(n, {unit, prefix, decimals, signed}); cv.legend([{label, color}]); cv.esc(text).
 - Colors: token names ("blue", "red", "good", "bad", "accent", "muted", "c3") or CSS colors.
-- Classes: cv-kicker, cv-label, cv-h1, cv-h2, cv-h3, cv-dek, cv-body, cv-small, cv-num, cv-num-sm, cv-unit, cv-delta (cv-up, cv-down), cv-chip, cv-hl (highlighter), cv-rule, cv-grid (auto columns, --cv-col), cv-row, cv-stack, cv-float-right / cv-float-left (text wraps around a figure; --cv-float-w), cv-figure, cv-caption, cv-quote, cv-table (td.n for numbers), cv-legend, cv-swatch.
+- Classes: cv-kicker, cv-label, cv-h1, cv-h2, cv-h3, cv-dek, cv-body, cv-small, cv-num, cv-unit, cv-delta, cv-chip, cv-hl (highlighter), cv-rule, cv-row, cv-stack, cv-grid, cv-float-right / cv-float-left, cv-figure, cv-caption, cv-table (td.n for numbers), cv-legend, cv-annotated.
 ${TOKEN_HELP}
 `.trim();
 
 const LOOK_RULES: Record<OrganicLook, string> = {
   editorial: `
 Style: Editorial. ${LOOK_INFO.editorial.line}
-- Write like an editor: a sharp headline (a finding, not a topic), a one-sentence dek, then evidence. Kickers are short ("Results · 6 a.m.").
-- The lead is a story component: headline, dek, a floated figure (cv-float-right) with body text wrapping around it, inline sparklines in the sentences. Give it importance 5, size xl.
-- Sidebars are narrow (size s or m): big serif numbers with a delta and a sparkline, separated by rules; a pull quote (kind quote); a small map or ranked list.
-- No boxes, no backgrounds: hierarchy comes from type size, rules (cv-rule) and whitespace. cv-dropcap on the first paragraph of the lead.
+- Write like an editor: a finding, not a topic. Short kickers ("Results · 6 a.m."); words that say what changed.
+- Heroes: a chart annotated on itself, a giant serif number, a frameless pull quote, a map with its places called out. Around it: big serif numbers with a delta, a ranked list, a short paragraph, a caption pinned beside what it explains.
+- Type and whitespace carry the hierarchy; a hairline rule only where two pieces need separating. Vary it board to board: giant-number for a vote, orbit for a trend, quote for a profile, map for a national story, essay for an explainer.
 `.trim(),
   field: `
 Style: Field notes. ${LOOK_INFO.field.line}
-- Think out loud at a whiteboard: the focus is the big sketch in the middle, and the evidence is pinned around it on small cards.
-- Headlines are short and handwritten (the display font is a marker). Use cv-hl to highlight the key words.
-- Mark what matters inside the sketch itself: chart marks ("this flipped!"), cv-hl on the key words, an arrow (→) and a takeaway line in a custom card.
-- Cards are small and loose (size s or m); one bigger sketch (a chart or map) as the focus. Each card says one thing in a few words.
+- Think out loud at a whiteboard: one big sketch (a timeline across the board, a split of two options, a map of the trip), with arrows (→) and highlights drawn into it at exactly what matters ("this one!").
+- Headlines are short and handwritten (the display font is a marker); cv-hl highlights key words. Small hand-written facts (stat, caption) sit loose around the sketch, each saying one thing in a few words.
+- Plans are a spine, decisions a split, places a map. Pieces are loose and at different sizes; a little tilt is fine, rows of equal cards are not.
 `.trim(),
   instrument: `
 Style: Instrument. ${LOOK_INFO.instrument.line}
-- Maximum information per pixel: compact panels, small multiples instead of one big chart, tabular numbers, mono labels, units everywhere.
-- The focus is a wide panel (a map, a timeline or a small-multiples grid); around it, rows of tight readouts (stat, size s) with deltas and sparklines.
-- Prefer cv.multiples, cv.tilemap with show: "value", cv.timeline with layout "row", cv-table with td.n, and inline cv.bars.
-- Labels are terse and uppercase-friendly ("MARGIN, PTS"). Put the reason next to the value: a stat's caption or a row in a table.
+- Maximum information per pixel, but still one hero: the series that matters full width (close-up, bleed), a small-multiples panel, or one status number huge. Around it: tight readouts (stat, small or tiny) with units, deltas and sparklines.
+- Prefer cv.multiples, cv.tilemap with show: "value", cv.timeline with layout "row", cv-table with td.n, inline cv.bars. Label the hero chart itself (callouts) at the incident, the threshold, the peak.
+- Labels are terse and uppercase-friendly ("P95, MS"). Put the reason next to the value: a stat's caption, or a callout on the chart.
 `.trim(),
 };
 
 const EXAMPLES: Record<OrganicLook, string> = {
   editorial: ex(`
-Example 1, the lead story (kind custom, size xl, importance 5; data: {kicker, title, dek, body, rides: [{month, riders}], weekday: [..]}):
+Example 1, giant-number (a vote result), as one canvas_set:
+{"composition": "giant-number", "title": "Transit levy passes", "items": [
+ {"id": "yes", "kind": "stat", "scale": "hero", "importance": 5, "title": "Yes on Measure 4", "data": {"value": 58.4, "delta": "+6.1", "caption": "Passes in 9 of 10 districts"}, "options": {"unit": "%"}},
+ {"id": "why", "kind": "caption", "scale": "tiny", "pinnedTo": "yes", "point": {"x": 1, "y": 0.4}, "side": "right", "data": "Widest transit-tax margin since 1998."},
+ {"id": "districts", "kind": "bar", "scale": "medium", "region": "right", "title": "Yes by district, %", "data": [{"district": "D1", "yes": 64}, {"district": "D4", "yes": 47}], "options": {"max": 100, "callouts": [{"x": "D4", "text": "the only no"}]}},
+ {"id": "voice", "kind": "quote", "scale": "medium", "region": "bottom-left", "data": {"text": "We rebuilt the schedule around nurses, not tourists.", "by": "Ana Ruiz", "role": "Transit director"}},
+ {"id": "next", "kind": "caption", "scale": "small", "region": "bottom-right", "data": "Bonds go to the council in March; fares stay frozen through 2028."}]}
+
+Example 2, orbit: a hero chart annotated on itself (kind custom, scale hero, options {"visual": true}; data: {title, rows: [{month, riders}], callouts: [{x, text}]}):
 <div id="cv-app"></div>
 <script>
 cv.render((d) => @@
   <div class="cv-kicker">$[cv.esc(d.kicker)]</div>
-  <h1 class="cv-h1" style="margin:6px 0 10px">$[cv.esc(d.title)]</h1>
-  <p class="cv-dek">$[cv.esc(d.dek)]</p>
-  <hr class="cv-rule">
-  <figure class="cv-figure cv-float-right" style="--cv-float-w:48%">
-    $[cv.line(d.rides, {x: "month", series: ["riders"], w: Math.round(cv.width() * 0.46), h: 170, unit: "M", marks: [{x: "Mar", label: "fare cut"}]})]
-    <figcaption class="cv-caption">Monthly riders, millions</figcaption>
-  </figure>
-  <div class="cv-body cv-dropcap"><p>$[cv.esc(d.body)] Weekday trips $[cv.spark(d.weekday, {w: 56, h: 14})] kept climbing.</p></div>
+  <h2 class="cv-h2" style="margin:4px 0 12px;max-width:22ch">$[cv.esc(d.title)]</h2>
+  $[cv.line(d.rows, {x: "month", series: ["riders"], w: cv.width(), h: cv.height() - 80, unit: "M", callouts: d.callouts})]
 @@);
 </script>
+Around it: two stats (scale small, regions top-right and right), a short caption (scale small, bottom-left).
 
-Example 2, a sidebar of figures (kind custom, size s, importance 4; data: [{label, value, unit, delta, series, note}]):
-<div id="cv-app"></div>
-<script>
-cv.render((rows) => rows.map((r, i) => @@
-  $[i ? '<hr class="cv-rule">' : ""]
-  <div class="cv-label">$[cv.esc(r.label)]</div>
-  <div class="cv-row" style="align-items:flex-end;margin-top:4px">
-    <span class="cv-num">$[cv.fmt(r.value)]<span class="cv-unit">$[cv.esc(r.unit || "")]</span></span>
-    $[cv.delta(r.delta)] $[cv.spark(r.series, {w: 64, h: 22})]
-  </div>
-  <div class="cv-small">$[cv.esc(r.note)]</div>
-@@).join(""));
-</script>
-
-Example 3, built-ins (as canvas_set items):
-{"id": "voice", "kind": "quote", "data": {"text": "We rebuilt the schedule around nurses, not tourists.", "by": "Ana Ruiz", "role": "Transit director"}, "size": "m", "importance": 3}
-{"id": "why-march", "kind": "caption", "data": "Ridership turned in **March**, the month the fare cut started.", "size": "s", "importance": 2}
-{"id": "where", "kind": "map", "title": "Change by state, pts", "data": {"PA": 2.1, "GA": -0.6, "AZ": 1.4}, "options": {"scale": "diverging", "legend": ["Fell", "Rose"]}, "size": "m", "importance": 3}
+Example 3, quote-led (as canvas_set items):
+{"id": "lead-quote", "kind": "quote", "scale": "hero", "importance": 5, "data": {"text": "Nobody planned for the river to do that twice.", "by": "Mayor Lin"}}
+{"id": "levels", "kind": "line", "scale": "large", "region": "bottom-right", "title": "River level, ft", "data": [{"day": "Mon", "ft": 12}], "options": {"callouts": [{"x": "Thu", "text": "crest, 1 ft over the wall"}]}}
+{"id": "homes", "kind": "stat", "scale": "small", "region": "top-right", "title": "Homes flooded", "data": {"value": 1240, "caption": "county estimate"}}
 `),
   field: ex(`
-Example 1, a ranked sketch card (kind custom, size m, importance 4; data: {title, items: [{label, value, color}], takeaway}):
+Example 1, spine (a plan), as one canvas_set:
+{"composition": "spine", "title": "Hudson Valley weekend", "items": [
+ {"id": "days", "kind": "timeline", "scale": "hero", "importance": 5, "data": [{"date": "Fri 6pm", "label": "Drive up"}, {"date": "Sat am", "label": "Apple picking", "tone": "good"}, {"date": "Sun", "label": "Walkway over the Hudson"}], "options": {"layout": "row"}},
+ {"id": "rain", "kind": "caption", "scale": "small", "pinnedTo": "days", "point": {"x": 0.62, "y": 0}, "side": "above", "data": "Rain Sat pm → ==museum backup=="},
+ {"id": "budget", "kind": "stat", "scale": "small", "region": "top-left", "title": "Budget", "data": {"value": 640, "caption": "lodging is half"}, "options": {"prefix": "$"}},
+ {"id": "drive", "kind": "stat", "scale": "tiny", "region": "bottom-right", "title": "Drive", "data": {"value": "2h 10m"}},
+ {"id": "pick", "kind": "list", "scale": "medium", "region": "bottom-left", "title": "Orchards, ranked", "data": ["Fishkill Farms", "Wilklow Orchards"]}]}
+
+Example 2, split (a decision): two heroes, each a custom sketch (scale hero) with its pros and cons, the verdict in big hand-written type at the top:
 <div id="cv-app"></div>
 <script>
 cv.render((d) => @@
-  <div class="cv-kicker">ranked, roughly</div>
-  <h3 class="cv-h3" style="margin:2px 0 10px">$[cv.esc(d.title)]</h3>
-  $[cv.hbars(d.items, {sort: true})]
-  <p class="cv-body" style="margin-top:10px">→ <span class="cv-hl">$[cv.esc(d.takeaway)]</span></p>
+  <h2 class="cv-h2"><span class="cv-hl">$[cv.esc(d.option)]</span></h2>
+  <div class="cv-annotated" style="margin-top:10px">
+    $[cv.columns(d.costs, {x: "year", series: ["cost"], w: cv.width(), h: Math.min(260, cv.height() - 120), unit: "k"})]
+    $[cv.callout(d.callout.text, {x: d.callout.x, y: d.callout.y, dx: -70, dy: -40})]
+  </div>
+  <p class="cv-body">→ $[cv.esc(d.takeaway)]</p>
 @@);
 </script>
+{"id": "verdict", "kind": "headline", "scale": "medium", "region": "top", "data": {"text": "Denver wins if the move is paid"}}
 
-Example 2, the big sketch in the middle (kind custom, size l, importance 5; data: {title, rows: [{day, temp, rain}], peak}):
-<div id="cv-app"></div>
-<script>
-cv.render((d) => @@
-  <h2 class="cv-h2">$[cv.esc(d.title)]</h2>
-  <div style="margin-top:8px">$[cv.line(d.rows, {x: "day", series: ["temp"], w: cv.width(), h: 190, unit: "°", marks: [{x: d.peak, label: "warmest ✶"}]})]</div>
-  <div class="cv-row" style="margin-top:6px">$[d.rows.map((r) => @@<span class="cv-chip">$[cv.esc(r.day)] $[cv.esc(r.rain)]% ☂</span>@@).join("")]</div>
-@@);
-</script>
-
-Example 3, built-ins pinned around it (as canvas_set items):
-{"id": "so-what", "kind": "caption", "data": "Saturday is the pick: ==dry till 4==.", "size": "s", "importance": 4}
-{"id": "heard", "kind": "quote", "data": {"text": "Bring a layer after dark.", "by": "NWS forecaster"}, "size": "s", "importance": 2}
-{"id": "sun", "kind": "stat", "title": "UV index", "data": {"value": 6, "series": [3, 4, 6, 5], "caption": "high at noon"}, "size": "s", "importance": 3}
+Example 3, map-centred (a trip): {"composition": "map"}, the map as the hero with callouts: [{state, text}] in its options, small facts in the corners (regions), the drive time as a giant number (scale small, region bottom-right).
 `),
   instrument: ex(`
-Example 1, a small-multiples panel (kind custom, size xl, importance 5; data: [{label, values, value, delta, note}]):
+Example 1, close-up: one series full width, annotated on itself, as canvas_set items:
+{"id": "p95", "kind": "area", "scale": "hero", "importance": 5, "bleed": true, "title": "P95 LATENCY, MS · 24H", "data": [{"hour": "06", "ms": 420}, {"hour": "08", "ms": 880}], "options": {"unit": "ms", "callouts": [{"x": "08", "text": "cache miss storm"}]}}
+{"id": "err", "kind": "stat", "scale": "small", "region": "bottom-left", "title": "ERRORS / MIN", "data": {"value": 6.1, "series": [0.4, 0.9, 1.8, 3.6, 6.1], "delta": "+4.3"}, "options": {"invert": true}}
+{"id": "agents", "kind": "stat", "scale": "tiny", "region": "bottom", "title": "ACTIVE AGENTS", "data": {"value": 17}}
+{"id": "fix", "kind": "caption", "scale": "small", "region": "top-right", "data": "Fix the ==cache warmer== first: it explains the 08:00 spike."}
+
+Example 2, orbit around small multiples (kind custom, scale hero; data: [{label, values, value, delta, note}]):
 <div id="cv-app"></div>
 <script>
 cv.render((rows) => @@
@@ -138,27 +142,15 @@ cv.render((rows) => @@
     <span class="cv-kicker">Throughput by region · 24h</span>
     $[cv.legend([{label: "rising", color: "good"}, {label: "falling", color: "bad"}])]
   </div>
-  $[cv.multiples(rows, {unit: "k", shared: true, min: 110})]
+  $[cv.multiples(rows, {unit: "k", shared: true, min: 120})]
 @@);
 </script>
 
-Example 2, a readout strip with a timeline (kind custom, size xl, importance 3; data: {kpis: [{label, value, unit, bars}], events: [{date, label, note, tone}]}):
+Example 3, giant-number status (kind custom, scale hero; data: {value, label, sub, delta}):
 <div id="cv-app"></div>
 <script>
-cv.render((d) => @@
-  <div class="cv-grid" style="--cv-col:120px;gap:10px">$[d.kpis.map((k) => @@
-    <div><div class="cv-label">$[cv.esc(k.label)]</div>
-    <div class="cv-num-sm">$[cv.fmt(k.value)]<span class="cv-unit">$[cv.esc(k.unit)]</span></div>
-    $[cv.bars(k.bars, {w: 90, h: 16})]</div>@@).join("")]
-  </div>
-  <div style="margin-top:22px">$[cv.timeline(d.events, {layout: "row", highlight: d.events.length - 1})]</div>
-@@);
+cv.render((d) => cv.bignum(d.value, {label: d.label, unit: "%", delta: d.delta, sub: d.sub, color: d.value < 99.9 ? "bad" : "good"}));
 </script>
-
-Example 3, built-ins (as canvas_set items):
-{"id": "by-state", "kind": "map", "title": "Margin by state, pts", "data": {"PA": 2.1, "GA": -0.6}, "options": {"scale": "diverging", "show": "value", "legend": ["−", "+"]}, "size": "l", "importance": 4}
-{"id": "events", "kind": "timeline", "data": [{"date": "06:10", "label": "Feed lag", "tone": "bad"}], "options": {"layout": "row"}, "size": "xl", "importance": 2}
-{"id": "p95", "kind": "stat", "title": "p95 latency", "data": {"value": 320, "series": [180, 190, 240, 320], "caption": "cache miss storm"}, "options": {"unit": " ms", "invert": true}, "size": "s", "importance": 3}
 `),
 };
 
@@ -193,6 +185,7 @@ export function designGuide(only: OrganicLook | null = null): string {
     "DESIGN GUIDE",
     CHOOSING,
     COMMON,
+    COMPOSITIONS_GUIDE,
     KIT,
     ACCENTS,
     ...styles.map((look) => `STYLE ${look} (${NAMES[look]})\n${LOOK_RULES[look]}\n\nExamples to adapt (change the content; keep the craft):\n${EXAMPLES[look]}`),
@@ -201,5 +194,5 @@ export function designGuide(only: OrganicLook | null = null): string {
 
 /** The configure hook's line about styles: the current one and how to choose. */
 export function lookInstruction(look: OrganicLook): string {
-  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). A quote takes options.accent pull or bar. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: at least 6 items: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) stats with sparklines or a table for the evidence; (4) a takeaway that says what it means, inside the lead or a caption. There are no notes, stickies or connectors. Every follow-up changes the board (add, update, highlight); never answer only in the reply. To single out what matters most, raise its importance and say why in its caption or takeaway. The design guide with examples is in this thread's first message; canvas_guide returns it.`;
+  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind. This board is ${look} (${LOOK_INFO[look].name}) now. Compose every board for its content: pick a composition (orbit, giant-number, map, spine, split, quote, close-up, essay; never the same as the last board unless asked) and set it with canvas_set composition, with a title naming the topic. One hero (scale "hero"): often your own custom piece, a chart annotated on itself, a huge number, a map, a timeline across the screen, a frameless quote. The rest at clearly different scales (large, medium, small, tiny), placed roughly with region or pinnedTo + point; Studio fills the screen, no grid. No boxes, no notes or connectors: say what matters inside the pieces (callouts on charts, takeaways, highlights). Never the kicker-headline-dek-paragraph-table template. Every follow-up changes the board. The design guide with examples is in this thread's first message; canvas_guide returns it.`;
 }
