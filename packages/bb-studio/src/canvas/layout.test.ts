@@ -131,6 +131,17 @@ describe("stability", () => {
     valid(after.cells, 12);
   });
 
+  it("puts a displaced important item above less important ones, not at the bottom", () => {
+    const before = packBoard(election, 12);
+    const chart = item("margins-chart", { kind: "bar", size: "l", importance: 5, createdAt: 100, updatedAt: 100 });
+    const demoted = election.map((each) => (each.id === "headline" ? { ...each, importance: 4, updatedAt: 90 } : each));
+    const after = packBoard([...demoted, chart], 12, before.cells);
+    expect(after.focusId).toBe("margins-chart");
+    const headline = after.cells.get("headline")!;
+    for (const id of ["races", "margins", "note"]) expect(headline.y).toBeLessThanOrEqual(after.cells.get(id)!.y);
+    valid(after.cells, 12);
+  });
+
   it("re-packs for a narrow window with everything within four columns", () => {
     const wide = packBoard(election, 12);
     const narrow = packBoard(election, 4);

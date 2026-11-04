@@ -4,9 +4,10 @@
 // - The focus item (highest importance, then the most recently changed) is
 //   the biggest and sits top-left.
 // - Stable: an item that keeps its cell size keeps its place when it can
-//   (the previous layout is the hint). New and resized items fill in first
-//   fit, most important first. Then everything floats up into the gaps
-//   removals left, in reading order, so nothing jumps sideways.
+//   (the previous layout is the hint). Items go in by importance, level by
+//   level: at each level, kept items take their old spots, then new,
+//   resized and displaced ones fill in first fit. Then everything floats up
+//   into the gaps removals left, in reading order, so nothing jumps sideways.
 // - Responsive: 12 columns when wide, 8 at medium widths, 4 when narrow.
 // - Deterministic: the same items, columns and previous layout always give
 //   the same cells, whatever order the items come in.
@@ -136,31 +137,33 @@ export function packBoard(items: readonly LayoutItem[], cols: number, previous?:
   };
   place(focus.id, { x: 0, y: 0 });
 
+  // By importance, most important first. Within each level, items that keep
+  // their cell size try their old spot first (stability); the rest, and any
+  // whose old spot is taken, go to the first free spot. So a displaced
+  // important item lands near the top, never under less important ones.
   const rest = items.filter((item) => item.id !== focus.id);
-  // Keepers: the same cell size as last time, so they try their old spot.
-  const keepers = rest
-    .filter((item) => {
-      const was = previous?.get(item.id);
+  const levels = [...new Set(rest.map((item) => item.importance))].sort((a, b) => b - a);
+  for (const level of levels) {
+    const tier = rest.filter((item) => item.importance === level);
+    const keepers = tier
+      .filter((item) => {
+        const was = previous?.get(item.id);
+        const size = sizes.get(item.id)!;
+        return !!was && was.w === size.w && was.h === size.h;
+      })
+      .sort((a, b) => {
+        const pa = previous!.get(a.id)!;
+        const pb = previous!.get(b.id)!;
+        return pa.y - pb.y || pa.x - pb.x || (a.id < b.id ? -1 : 1);
+      });
+    for (const item of keepers) {
+      const was = previous!.get(item.id)!;
+      if (grid.fits(was.x, was.y, was.w, was.h)) place(item.id, was);
+    }
+    for (const item of tier.filter((each) => !cells.has(each.id)).sort(byImportance)) {
       const size = sizes.get(item.id)!;
-      return !!was && was.w === size.w && was.h === size.h;
-    })
-    .sort((a, b) => {
-      const pa = previous!.get(a.id)!;
-      const pb = previous!.get(b.id)!;
-      return pa.y - pb.y || pa.x - pb.x || (a.id < b.id ? -1 : 1);
-    });
-  const others: LayoutItem[] = [];
-  for (const item of keepers) {
-    const was = previous!.get(item.id)!;
-    if (grid.fits(was.x, was.y, was.w, was.h)) place(item.id, was);
-    else others.push(item);
-  }
-  const kept = new Set(cells.keys());
-  others.push(...rest.filter((item) => !kept.has(item.id) && !others.includes(item)));
-  others.sort(byImportance);
-  for (const item of others) {
-    const size = sizes.get(item.id)!;
-    place(item.id, grid.firstFit(size.w, size.h));
+      place(item.id, grid.firstFit(size.w, size.h));
+    }
   }
 
   // Float up into gaps, in reading order; the focus stays at the top.

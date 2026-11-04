@@ -59,10 +59,16 @@ function Content({ item, width, height, theme }: { item: CanvasItem; width: numb
             className={cn("absolute inset-0", leaving && "pointer-events-none")}
             data-canvas-layer={leaving ? "leaving" : "current"}
             ref={(element) => {
-              if (!element || element.dataset.animated) return;
-              element.dataset.animated = "1";
-              if (leaving) fadeOut(element, () => setLayers((current) => current.filter((each) => each.version !== layer.version)));
-              else if (shown.length > 1) fadeIn(element);
+              // A layer is animated once as it arrives and once as it leaves (it was the current one before).
+              const role = leaving ? "out" : "in";
+              if (!element || element.dataset.animated === role || (role === "in" && element.dataset.animated === "out")) return;
+              element.dataset.animated = role;
+              if (leaving) {
+                const drop = () => setLayers((current) => current.filter((each) => each.version !== layer.version));
+                fadeOut(element, drop);
+                // A hidden tab doesn't run animations: don't leave the old copy behind.
+                setTimeout(drop, 900);
+              } else if (shown.length > 1) fadeIn(element);
             }}
           >
             <ItemBody item={layer.item} width={width} height={height} theme={theme} />

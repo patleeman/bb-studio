@@ -14,8 +14,9 @@ export function asWidget(item: CanvasItem): WidgetView {
   return {
     id: item.id,
     type: item.kind as WidgetType,
-    title: item.title,
-    options: item.options,
+    // A stat draws its own small label, which leaves room for its caption and sparkline.
+    title: item.kind === "stat" ? null : item.title,
+    options: item.kind === "stat" && item.title ? { ...item.options, label: item.title } : item.options,
     source: { kind: "static", data: item.data },
     customType: null,
     html: item.html,
@@ -25,6 +26,8 @@ export function asWidget(item: CanvasItem): WidgetView {
 
 /** Kinds drawn straight on the board, without a card. */
 export const BARE_KINDS: ReadonlySet<string> = new Set(["headline", "caption"]);
+/** Kinds that draw their own label inside the card. */
+const SELF_LABELLED: ReadonlySet<string> = new Set(["stat"]);
 
 const TONE: Record<string, string> = {
   neutral: "text-foreground",
@@ -67,6 +70,6 @@ export function ItemBody({ item, width, height, theme }: { item: CanvasItem; wid
 
 /** The small title over a card, when the item has one. */
 export function itemLabel(item: CanvasItem): string | null {
-  if (BARE_KINDS.has(item.kind)) return null;
-  return item.title ?? (item.kind === "stat" && typeof item.options.label === "string" ? item.options.label : null);
+  if (BARE_KINDS.has(item.kind) || SELF_LABELLED.has(item.kind)) return null;
+  return item.title;
 }
