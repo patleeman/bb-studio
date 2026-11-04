@@ -83,6 +83,22 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
     } catch (error) { toast.error(errorMessage(error)); throw error; }
   }, [rpc, send, threadId, newLook, draft]);
 
+  // Hands-free can be the first input: on a new canvas it creates the canvas (on the picked model) first.
+  const voice = useCallback(async () => {
+    let target = threadId;
+    if (!target) {
+      try {
+        const created = await rpc.call("canvas.create", { voice: true, look: newLook, providerId: draft.providerId, model: draft.model, ...(draft.reasoningLevel ? { reasoningLevel: draft.reasoningLevel } : {}) });
+        target = created.threadId;
+        openAppPath(canvasHref(target), { replace: true });
+      } catch (error) {
+        toast.error(errorMessage(error));
+        return;
+      }
+    }
+    window.dispatchEvent(new CustomEvent(HANDSFREE_START_EVENT, { detail: { threadId: target } }));
+  }, [rpc, threadId, newLook, draft]);
+
   const items = canvas?.items ?? [];
   const working = canvas?.status === "working" || !!pending;
   return (
@@ -108,7 +124,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
           />
         )}
       </div>
-      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} onSubmit={submit} onHeight={setChatHeight} />
+      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} onSubmit={submit} onVoice={voice} onHeight={setChatHeight} />
     </div>
   );
 }
@@ -166,7 +182,12 @@ function History({ lines }: { lines: readonly CanvasTurn[] }) {
 }
 
 /** The chat, as one faint line: the latest caption over a borderless field. */
-function ChatLine({ threadId, canvas, pending, working, onSubmit, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void>; onHeight(height: number): void }) {
+function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void>; onVoice(): Promise<void>; onHeight(height: number): void }) {
+  const [startingVoice, setStartingVoice] = useState(false);
+  const startVoice = async () => {
+    setStartingVoice(true);
+    try { await onVoice(); } finally { setStartingVoice(false); }
+  };
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState(false);
@@ -244,8 +265,8 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onHeight }: { 
             onClick={() => input.current?.dispatchEvent(new CustomEvent(TOGGLE_EVENT, { bubbles: true }))}>
             <Icon name="Mic" className="size-4" />
           </button>
-          <button type="button" className={FAINT_BUTTON} aria-label="Hands-free voice" title={threadId ? "Hands-free voice: talk, and the board changes as it answers" : "Start the canvas first"} disabled={!threadId}
-            onClick={() => threadId && window.dispatchEvent(new CustomEvent(HANDSFREE_START_EVENT, { detail: { threadId } }))} data-canvas-handsfree>
+          <button type="button" className={FAINT_BUTTON} aria-label="Hands-free voice" title="Hands-free voice: talk, and the board changes as it answers" disabled={startingVoice}
+            onClick={() => void startVoice()} data-canvas-handsfree>
             <Icon name="studio/handsfree" className="size-4" />
           </button>
         </form>

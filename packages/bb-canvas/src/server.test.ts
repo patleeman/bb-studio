@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
 import { CANVAS_MIGRATIONS } from "./migrations";
-import { CANVAS_DEFAULT_MODEL, registerCanvas } from "./server";
+import { CANVAS_DEFAULT_MODEL, registerCanvas, VOICE_START_NOTE } from "./server";
 import { CANVAS_CHANNEL } from "./shared";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
 
@@ -90,6 +90,17 @@ describe("canvas threads", () => {
     const { canvas } = await call("canvas.get", { threadId });
     expect(canvas).toMatchObject({ status: "idle", caption: "Democrats took the House; the Senate stays close." });
     expect(canvas.history.at(-1)).toMatchObject({ role: "agent" });
+  });
+
+  it("starts a canvas by voice with no message, and its [PASS] reply isn't a caption", async () => {
+    const { host, call, spawned } = canvasHost();
+    const { threadId } = await call("canvas.create", { voice: true });
+    expect(JSON.stringify(spawned[0])).toContain(VOICE_START_NOTE);
+    expect(spawned[0]).toMatchObject({ providerId: CANVAS_DEFAULT_MODEL.providerId, model: CANVAS_DEFAULT_MODEL.model });
+    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "Voice canvas", turn: 0, status: "idle" });
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "[PASS]" });
+    expect((await call("canvas.get", { threadId })).canvas.caption).toBeNull();
+    await expect(call("canvas.create", {})).rejects.toThrow();
   });
 
   it("gives canvas threads their tools and rules, and nothing to other threads' check", async () => {

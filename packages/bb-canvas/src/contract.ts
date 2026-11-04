@@ -21,8 +21,9 @@ export const canvasContract = defineRpcContract({
     output: z.object({ canvas: canvasViewSchema.nullable() }),
   },
   "canvas.create": {
-    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules. look picks its design direction (default editorial).",
-    input: z.object({ text, providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional(), look: lookSchema.optional() }),
+    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules. look picks its design direction (default editorial). voice: true starts it with no message, for hands-free voice to be the first input.",
+    input: z.object({ text: text.optional(), voice: z.boolean().optional(), providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional(), look: lookSchema.optional() })
+      .refine((input) => !!input.text || input.voice === true, { message: "Say what to look at, or start by voice." }),
     output: z.object({ canvasId: z.string(), threadId: z.string() }),
   },
   "canvas.voice": {

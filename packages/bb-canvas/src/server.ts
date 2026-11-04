@@ -70,6 +70,9 @@ export async function listProviders(bb: BbPluginApi): Promise<PickerProvider[]> 
  * own thread at creation, never on the user's global default; canvases made
  * before keep the model their thread has.
  */
+/** The agent-only note on a canvas started by voice, before the user has said anything. */
+export const VOICE_START_NOTE = "The user started this canvas with hands-free voice. The voice session edits this board itself and passes deeper work to you here. Nothing to do yet: reply exactly [PASS].";
+
 export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.providerId, model: CANVAS_DEFAULT_EXECUTION.model } as const;
 /** BB's personal project: canvas threads live there, as the Bot's do. */
 const PERSONAL_PROJECT_ID = "proj_personal";
@@ -167,18 +170,24 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       return { canvas: row ? store.view(row.id) : null };
     },
     async "canvas.create"(input) {
-      const { text } = input;
+      // Started by voice: no message yet. The thread gets the rules and answers [PASS]; the voice session edits the board.
+      const text = input.text ?? "";
       const look = input.look ?? DEFAULT_LOOK;
       // A caller that names a provider or model gets exactly that; otherwise the canvas default.
       const providerId = input.providerId || input.model ? input.providerId ?? null : CANVAS_DEFAULT_MODEL.providerId;
       const model = input.providerId || input.model ? input.model ?? null : CANVAS_DEFAULT_MODEL.model;
       const reasoningLevel = input.reasoningLevel ?? null;
-      const title = text.replace(/\s+/g, " ").trim().slice(0, 80);
+      const title = text ? text.replace(/\s+/g, " ").trim().slice(0, 80) : "Voice canvas";
       const row = store.create({ title, look, execution: providerId && model ? { providerId, model, reasoningLevel } : null });
       try {
-        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [{ type: "text", text, mentions: [] }, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }]);
-        store.beginTurn(row.id, "user", text);
-        store.setStatus(row.id, "working");
+        const first = text
+          ? [{ type: "text", text, mentions: [] }]
+          : [{ type: "text", text: "🎙 Started by voice.", mentions: [] }, { type: "text", text: VOICE_START_NOTE, mentions: [], visibility: "agent-only" }];
+        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [...first, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }]);
+        if (text) {
+          store.beginTurn(row.id, "user", text);
+          store.setStatus(row.id, "working");
+        }
         publish(row.id);
         return { canvasId: row.id, threadId };
       } catch (error) {
@@ -250,7 +259,8 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     const row = store.byThread(threadId);
     if (!row) return;
     store.setStatus(row.id, next);
-    if (reply?.trim()) {
+    // [PASS] is the thread saying it has nothing to add (a voice start): not a caption.
+    if (reply?.trim() && !/^\s*\[PASS\]\s*$/i.test(reply)) {
       store.setCaption(row.id, reply);
       store.note(row.id, "agent", reply.trim().slice(0, CANVAS_LIMITS.messageChars));
     }
