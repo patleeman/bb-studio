@@ -58,6 +58,31 @@
           "ref": "stable"
         }
       }
+    },
+    {
+      "id": "canvas",
+      "displayName": "Canvas",
+      "description": "Part of BB Studio (prototype). A canvas: an agent talks on a board it edits each turn, with charts, numbers, tables and captions that animate as they change. Off unless you install it.",
+      "icon": "GridView",
+      "tags": [
+        "canvas",
+        "visualization",
+        "charts",
+        "voice",
+        "prototype",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-canvas",
+          "ref": "stable"
+        }
+      }
     }
   ]
 }

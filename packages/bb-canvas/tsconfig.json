@@ -4,6 +4,6 @@
     "server.ts",
     "app.tsx",
     "src",
-    "ui/*.d.ts"
+    "bundle/*.d.ts"
   ]
 }

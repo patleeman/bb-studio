@@ -12,7 +12,8 @@ const packages = join(root, "packages");
 const files = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {
-    if (["node_modules", "dist", "dist.prev", "upstream", "test", "testing"].includes(name)) continue;
+    // bundle/: committed build output (the Canvas page), not source.
+    if (["node_modules", "dist", "dist.prev", "upstream", "test", "testing", "bundle"].includes(name)) continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path);
     else if (/\.[cm]?[jt]sx?$/.test(name) && !/\.test\.[cm]?[jt]sx?$/.test(name)) files.push(path);

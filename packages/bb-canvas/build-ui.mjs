@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds the canvas page (src/ui/panel.tsx) into one file, ui/canvas-ui.js,
+// Builds the canvas page (src/ui/panel.tsx) into one file, bundle/canvas-ui.js,
 // which app.tsx loads. The page reuses Studio's source (Dashboards' widget
 // renderers, markdown, theme, kit helpers; src/ui/studio.ts), and those
 // files import npm packages that BB's install-time build can't resolve
@@ -31,7 +31,7 @@ const requireShims = {
     }));
   },
 };
-const outfile = join(here, "ui", "canvas-ui.js");
+const outfile = join(here, "bundle", "canvas-ui.js");
 await build({
   entryPoints: [join(here, "src", "ui", "panel.tsx")],
   outfile,

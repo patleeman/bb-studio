@@ -1,5 +1,5 @@
 // The canvas page as one component, the entry of the prebuilt bundle
-// (build-ui.mjs → ui/canvas-ui.js): /plugins/canvas/canvas for a new canvas,
+// (build-ui.mjs → bundle/canvas-ui.js): /plugins/canvas/canvas for a new canvas,
 // /plugins/canvas/canvas/<threadId> for one.
 import CanvasRoute from "./route";
 

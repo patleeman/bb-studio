@@ -81,7 +81,9 @@ describe("buildSetup", () => {
     const summary = await buildSetup(sdk, health());
     expect(summary.marketplaceAdded).toBe(false);
     expect(summary.commands[0]).toBe("bb marketplace add git:github.com/patleeman/bb-studio@main");
-    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 1);
+    // Mobile and Canvas are optional: not in "Install all".
+    expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 2);
+    expect(summary.installAll).not.toContain("canvas");
   });
 });
 

@@ -38,6 +38,7 @@ export interface SetupSdk {
 /** Add-ons left out of "Install all", and why. */
 const OPTIONAL: Record<string, string> = {
   mobile: "Only needed for the BB Studio iOS app.",
+  canvas: "A prototype, off unless you install it: an agent that talks on a board.",
 };
 
 export const installCommand = (id: string) => `bb plugin install ${id}@${MARKETPLACE_NAME} --yes`;
