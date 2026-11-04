@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canvasFirstNote, canvasInstructions } from "./instructions";
 import { ORGANIC_LOOKS } from "./looks";
-import { layoutOrganic, linkEnds, organicWidths, type OrganicItem, type Placed } from "./organic";
+import { edgeToward, layoutOrganic, linkEnds, organicWidths, type OrganicItem, type Placed } from "./organic";
 
 let clock = 0;
 const item = (id: string, kind: OrganicItem["kind"], size: OrganicItem["size"], importance = 3, extra: Partial<OrganicItem> = {}): OrganicItem => ({ id, kind, size, importance, createdAt: ++clock, updatedAt: clock, ...extra });
@@ -153,6 +153,19 @@ describe("rough spots", () => {
     expect(layout.rects.get("n")!.rotate).not.toBe(0);
     expect(layout.rects.get("m")!.rotate).toBe(0);
     expect(layout.rects.get("lead")!.rotate).toBe(0);
+  });
+});
+
+describe("leaders", () => {
+  it("keeps a lane note level with a lower anchor, never above it", () => {
+    const items = [item("lead", "custom", "xl", 5), item("s", "stat", "s", 4), item("t", "table", "l", 3), item("n", "note", "s", 2, { anchor: "t", point: { x: 0.5, y: 0.8 } })];
+    const layout = layoutOrganic(items, 1400, "editorial", new Map([["lead", 500], ["s", 120], ["t", 300], ["n", 80]]));
+    expect(layout.rects.get("n")!.y).toBeGreaterThanOrEqual(layout.rects.get("t")!.y);
+  });
+
+  it("finds where a leader meets its anchor's edge", () => {
+    expect(edgeToward({ x: 100, y: 100, w: 200, h: 100 }, { x: 50, y: 150 }, { x: 200, y: 150 })).toEqual({ x: 100, y: 150 });
+    expect(edgeToward({ x: 100, y: 100, w: 200, h: 100 }, { x: 200, y: 40 }, { x: 200, y: 150 })).toEqual({ x: 200, y: 100 });
   });
 });
 

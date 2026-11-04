@@ -5,7 +5,7 @@
 // enters) once it's measured. Moves glide (FLIP from the last rects),
 // updates flash and cross-fade, removals fade out where they were.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { hashOf, layoutOrganic, linkEnds, organicWidths, type Link, type OrganicItem, type Placed } from "../organic";
+import { edgeToward, hashOf, layoutOrganic, linkEnds, organicWidths, type Link, type OrganicItem, type Placed } from "../organic";
 import { accentOf, type OrganicLook } from "../looks";
 import type { CanvasItem } from "../shared";
 import { enter, exit, fadeIn, fadeOut, highlight, move, restyle, type Rect } from "./motion";
@@ -140,7 +140,17 @@ function Links({ links, rects, look, width, height, layer, seen }: { links: read
         const from = rects.get(link.from);
         const to = rects.get(link.to);
         if (!from || !to) return null;
-        const ends = linkEnds(from, to, link.point);
+        let ends = linkEnds(from, to, link.point);
+        // A note right beside its anchor gets a short tick to the anchor's edge and a ring at the point,
+        // not a line across the anchor's content.
+        let ring: { x: number; y: number } | null = null;
+        if (link.kind === "anchor") {
+          const edge = edgeToward(to, { x: ends.x1, y: ends.y1 }, { x: ends.x2, y: ends.y2 });
+          if (Math.hypot(edge.x - ends.x1, edge.y - ends.y1) < 64 && Math.hypot(ends.x2 - edge.x, ends.y2 - edge.y) > 24) {
+            ring = { x: ends.x2, y: ends.y2 };
+            ends = { x1: ends.x1, y1: ends.y1, x2: edge.x, y2: edge.y };
+          }
+        }
         const d = linkPath(look, link, ends);
         const key = `${link.kind}:${link.from}>${link.to}`;
         const fresh = !seen.has(key);
@@ -150,6 +160,7 @@ function Links({ links, rects, look, width, height, layer, seen }: { links: read
           <g key={key} data-canvas-link={key}>
             <path className={`cvt-link${fresh && look !== "instrument" ? " cvt-link-new" : ""}`} d={d} style={{ d: `path("${d}")` } as React.CSSProperties} pathLength={look === "instrument" ? undefined : 1} stroke={stroke} strokeWidth={widthPx} strokeDasharray={look === "instrument" ? "3 2" : undefined} strokeLinecap="round" markerEnd={look === "field" ? `url(#cvt-arrow-${layer})` : undefined} />
             {look === "editorial" ? <><circle cx={ends.x1} cy={ends.y1} r={2.5} fill={stroke} /><circle cx={ends.x2} cy={ends.y2} r={link.kind === "anchor" ? 3.5 : 2.5} fill={link.kind === "anchor" ? "none" : stroke} stroke={stroke} strokeWidth={1.2} /></> : null}
+            {ring ? <circle cx={ring.x} cy={ring.y} r={look === "field" ? 9 : 6} fill="none" stroke={stroke} strokeWidth={look === "field" ? 2.2 : 1.4} strokeDasharray={look === "field" ? "4 3" : undefined} data-canvas-ring /> : null}
             {look === "instrument" ? <><rect x={ends.x1 - 2.5} y={ends.y1 - 2.5} width={5} height={5} fill={stroke} /><rect x={ends.x2 - 3} y={ends.y2 - 3} width={6} height={6} fill="none" stroke={stroke} /></> : null}
           </g>
         );

@@ -278,8 +278,9 @@ export function layoutOrganic(items: readonly OrganicItem[], width: number, look
         const distance = Math.abs(candidate - want);
         if (ty < bestY - 0.5 || (Math.abs(ty - bestY) <= 0.5 && distance < bestDistance)) { best = candidate; bestY = ty; bestDistance = distance; }
       }
-      // At the top of the free room beside it (the leader line reaches the point), so no empty rail is left above it.
-      const ny = bestY;
+      // At the top of the free room beside it, but never above the anchor itself: a note on the lead
+      // starts the rail, and a note on a lower item stays level with it.
+      const ny = Math.max(bestY, y);
       rects.set(note.id, { x: Math.round(laneX(best)), y: Math.round(ny), w: nw, h: nh, rotate: tiltOf(note, rules, false, hashOf(note.id)), z: 5, floating: true, lane: best, units: nu });
       for (let k = best; k < best + nu; k++) tops[k] = ny + nh + rules.gap(note, false, hashOf(note.id));
     }
@@ -431,6 +432,21 @@ function placeAround(ordered: readonly OrganicItem[], focus: OrganicItem | null,
     rects.set(item.id, { x: placed.x, y: placed.y, w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, floating: false, lane, units: Math.round((w + rules.gutter) / (unit + rules.gutter)) });
     placeNotes(boxes.at(-1)!);
   }
+}
+
+/** Where the segment from a point outside a rect toward a point inside it crosses the rect's edge. */
+export function edgeToward(rect: { x: number; y: number; w: number; h: number }, outside: { x: number; y: number }, inside: { x: number; y: number }): { x: number; y: number } {
+  const dx = inside.x - outside.x, dy = inside.y - outside.y;
+  let t = 0;
+  const hits = [
+    dx ? (rect.x - outside.x) / dx : -1, dx ? (rect.x + rect.w - outside.x) / dx : -1,
+    dy ? (rect.y - outside.y) / dy : -1, dy ? (rect.y + rect.h - outside.y) / dy : -1,
+  ];
+  for (const hit of hits.filter((value) => value >= 0 && value <= 1).sort((a, b) => a - b)) {
+    const x = outside.x + dx * hit, y = outside.y + dy * hit;
+    if (x >= rect.x - 0.5 && x <= rect.x + rect.w + 0.5 && y >= rect.y - 0.5 && y <= rect.y + rect.h + 0.5) { t = hit; break; }
+  }
+  return { x: Math.round(outside.x + dx * t), y: Math.round(outside.y + dy * t) };
 }
 
 /** Where a line between two rects leaves each one: the centers' line, clipped to the edges (or the anchor's point). */
