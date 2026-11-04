@@ -13,7 +13,7 @@ import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instru
 import { DEFAULT_LOOK, lookOf } from "./looks";
 import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
-import type { ImageDeps } from "./image";
+import { ImageCache, type ImageDeps } from "./image";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
 
 export { CANVAS_TOOL_NAMES as CANVAS_TOOLS } from "./tools";
@@ -81,6 +81,8 @@ const PERSONAL_PROJECT_ID = "proj_personal";
 /** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
 export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
+  // Found pictures are reused for a day (memory and this plugin's database).
+  const images: ImageDeps | undefined = options.images ? { cache: new ImageCache(db, options.now), ...options.images } : undefined;
   /** Canvases whose thread is being made: a tool call that races the spawn waits for it. */
   const pending = new Set<Promise<unknown>>();
 
@@ -100,7 +102,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   };
 
   const run = async (canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor) => {
-    const result = await runCanvasTool(store, canvasId, name, input, by, options.images);
+    const result = await runCanvasTool(store, canvasId, name, input, by, images);
     if (result.changed) publish(canvasId);
     return result;
   };

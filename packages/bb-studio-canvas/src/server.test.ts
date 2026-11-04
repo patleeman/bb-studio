@@ -259,13 +259,39 @@ describe("canvas_image", () => {
     const { threadId } = await call("canvas.create", { text: "Showcase" });
     const found = JSON.parse(text(await tool("canvas_image", { pageUrl: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)" }, threadId)));
     expect(found).toEqual({ url: "https://upload.example.org/tetris.jpg", alt: "Tetris (Game Boy)", source: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)", width: 600 });
-    const noKey = await tool("canvas_image", { query: "Tetris box art" }, threadId) as { isError?: boolean; content?: { text: string }[] };
-    expect(noKey.content?.[0]?.text).toContain("No image search key is set. Pass pageUrl");
     const inward = canvasHost({ exaKey: async () => "", transport, lookup: async () => [{ address: "10.0.0.5" }] });
     const inwardThread = (await inward.call("canvas.create", { text: "x" })).threadId;
     const blocked = await inward.tool("canvas_image", { pageUrl: "https://intranet.example.com/" }, inwardThread) as { content?: { text: string }[] };
     expect(blocked.content?.[0]?.text).toContain("isn't a public web page");
+    // Wikipedia's API goes through the same check: a resolver answering private is refused before any request.
+    const wiki = await inward.tool("canvas_image", { query: "Tetris DX" }, inwardThread) as { content?: { text: string }[] };
+    expect(wiki.content?.[0]?.text).toContain("isn't a public web page");
     expect(seen).toHaveLength(1);
+  });
+
+  it("finds a picture by name on Wikipedia without a key, and a whole batch in one call", async () => {
+    const asked: string[] = [];
+    const transport: Transport = async (url) => {
+      asked.push(url.toString());
+      const search = url.searchParams.get("gsrsearch") ?? "";
+      if (url.hostname !== "en.wikipedia.org" || url.pathname !== "/w/api.php") throw new Error("only Wikipedia's API here");
+      const pages = search === "Nothing here" ? [] : [{ title: search, index: 1, fullurl: `https://en.wikipedia.org/wiki/${encodeURIComponent(search)}`, original: { source: `https://upload.wikimedia.org/${encodeURIComponent(search)}.jpg`, width: 300, height: 400 } }];
+      return { status: 200, location: null, type: "application/json", body: (async function* () { yield new TextEncoder().encode(JSON.stringify({ query: { pages } })); })(), close() {} };
+    };
+    const { call, tool } = canvasHost({ exaKey: async () => "", transport, lookup: publicDns });
+    const { threadId } = await call("canvas.create", { text: "Showcase" });
+    const one = JSON.parse(text(await tool("canvas_image", { query: "Tetris DX box art" }, threadId)));
+    expect(one).toEqual({ url: "https://upload.wikimedia.org/Tetris%20DX.jpg", alt: "Tetris DX", source: "https://en.wikipedia.org/wiki/Tetris%20DX", width: 300, height: 400 });
+    expect(new URL(asked[0]!).searchParams.get("pilicense")).toBe("any");
+    const batch = text(await tool("canvas_images", { items: [{ key: "game-wario", query: "Wario Land 3" }, { key: "game-none", query: "Nothing here" }, { key: "game-tetris", query: "Tetris DX box art" }] }, threadId));
+    const answers = JSON.parse(batch.slice(0, batch.lastIndexOf("}") + 1));
+    expect(Object.keys(answers)).toEqual(["game-wario", "game-none", "game-tetris"]);
+    expect(answers["game-wario"].url).toBe("https://upload.wikimedia.org/Wario%20Land%203.jpg");
+    expect(answers["game-none"].error).toContain('No picture found for "Nothing here"');
+    expect(batch).toContain("1 not found");
+    // Tetris DX came from the cache: no second request for it.
+    expect(asked.filter((each) => each.includes("Tetris"))).toHaveLength(1);
+    await expect(tool("canvas_images", { items: [{ key: "a", query: "x" }, { key: "a", query: "y" }] }, threadId)).rejects.toThrow(/each key once/);
   });
 
   it("searches Exa with the key and picks the best match, and never shows the key", async () => {
@@ -284,7 +310,8 @@ describe("canvas_image", () => {
     expect(calls[0]!.url).toBe("https://api.exa.ai/search");
     expect((calls[0]!.init.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
     // A failure that echoes the key is redacted.
-    const leaky = canvasHost({ exaKey: async () => KEY, fetch: (async () => { throw new Error(`bad key ${KEY}`); }) as unknown as typeof globalThis.fetch, lookup: publicDns });
+    const offline: Transport = async () => { throw new Error("offline"); };
+    const leaky = canvasHost({ exaKey: async () => KEY, fetch: (async () => { throw new Error(`bad key ${KEY}`); }) as unknown as typeof globalThis.fetch, lookup: publicDns, transport: offline });
     const leakyThread = (await leaky.call("canvas.create", { text: "x" })).threadId;
     const failed = text(await leaky.tool("canvas_image", { query: "Tetris" }, leakyThread));
     expect(failed).toContain("bad key [key]");

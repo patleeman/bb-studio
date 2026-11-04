@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { mainImage, pickExaImage, pinnedTransport, privateAddress, safeFetch, stripTracking, type Transport } from "./image";
+import Database from "better-sqlite3";
+import { findImages, ImageCache, IMAGE_CACHE_MS, mainImage, pickExaImage, pickWikipediaImage, pinnedTransport, privateAddress, safeFetch, stripTracking, wikipediaSearchText, type Transport } from "./image";
+import { CANVAS_MIGRATIONS } from "./migrations";
 
 describe("canvas_image", () => {
   it("treats private, loopback, link-local and mapped addresses as off limits", () => {
@@ -69,5 +71,57 @@ describe("canvas_image", () => {
     ], "Pokemon Red box art");
     expect(picked).toEqual({ url: "https://a.example.com/pokemon-red-box.jpg", alt: "Pokemon Red box art", source: "https://a.example.com" });
     expect(pickExaImage([], "x")).toBeNull();
+  });
+
+  it("searches Wikipedia by the thing's name and takes the article that names it", () => {
+    expect(wikipediaSearchText("Tetris DX Game Boy Color box art")).toBe("Tetris DX Game Boy Color");
+    expect(wikipediaSearchText("cover")).toBe("cover");
+    const pic = (name: string) => ({ source: `https://upload.wikimedia.org/${name}.jpg`, width: 300, height: 400 });
+    const hits = [
+      { title: "Tetris (Game Boy video game)", index: 1, original: pic("tetris-gb") },
+      { title: "Tetris DX", index: 2, fullurl: "https://en.wikipedia.org/wiki/Tetris_DX", original: pic("tetris-dx") },
+      { title: "List of best-selling Game Boy video games", index: 3, original: pic("list") },
+      { title: "Game Boy Color", index: 5, original: pic("gbc") },
+    ];
+    expect(pickWikipediaImage(hits, "Tetris DX Game Boy Color box art")).toEqual({ url: "https://upload.wikimedia.org/tetris-dx.jpg", alt: "Tetris DX", source: "https://en.wikipedia.org/wiki/Tetris_DX", width: 300, height: 400 });
+    // No hit names it: search order, lists last, vector art skipped.
+    expect(pickWikipediaImage([{ title: "List of Metal Gear media", index: 1, original: pic("list") }, { title: "Logo", index: 2, original: { source: "https://upload.wikimedia.org/a.svg" } }, { title: "Metal Gear: Ghost Babel", index: 3, original: pic("babel") }], "Metal Gear Solid Game Boy Color")?.url).toBe("https://upload.wikimedia.org/babel.jpg");
+    expect(pickWikipediaImage([{ title: "No picture", index: 1 }], "x")).toBeNull();
+  });
+
+  it("looks a batch up in parallel, in the order asked, one failure not stopping the rest", async () => {
+    let inFlight = 0, most = 0;
+    const transport: Transport = async (url) => {
+      inFlight++; most = Math.max(most, inFlight);
+      await new Promise((done) => setTimeout(done, 30));
+      inFlight--;
+      const search = url.searchParams.get("gsrsearch")!;
+      if (search === "broken") throw new Error("timed out");
+      const pages = [{ title: search, index: 1, original: { source: `https://upload.wikimedia.org/${search}.jpg` } }];
+      return { status: 200, location: null, type: "application/json", body: (async function* () { yield new TextEncoder().encode(JSON.stringify({ query: { pages } })); })(), close() {} };
+    };
+    const items = ["a", "b", "broken", "d", "e", "f"].map((name) => ({ key: `k-${name}`, query: name }));
+    const started = Date.now();
+    const found = await findImages(items, { exaKey: async () => "", transport, lookup: async () => [{ address: "93.184.216.34" }] });
+    expect(Date.now() - started).toBeLessThan(150);
+    expect(most).toBe(6);
+    expect(Object.keys(found)).toEqual(items.map((item) => item.key));
+    expect(found["k-a"]).toMatchObject({ url: "https://upload.wikimedia.org/a.jpg" });
+    expect(found["k-broken"]).toMatchObject({ error: expect.stringContaining("timed out") });
+  });
+
+  it("keeps found pictures for a day, in memory and in the database", () => {
+    const db = new Database(":memory:");
+    for (const statement of CANVAS_MIGRATIONS) db.exec(statement);
+    let now = 1_000_000;
+    const cache = new ImageCache(db, () => now);
+    const image = { url: "https://upload.wikimedia.org/a.jpg", alt: "A", source: "https://en.wikipedia.org/wiki/A" };
+    cache.set("q:a", image);
+    expect(cache.get("q:a")).toEqual(image);
+    // A new process (a fresh cache on the same database) still has it.
+    expect(new ImageCache(db, () => now).get("q:a")).toEqual(image);
+    now += IMAGE_CACHE_MS + 1;
+    expect(cache.get("q:a")).toBeNull();
+    expect(new ImageCache(db, () => now).get("q:a")).toBeNull();
   });
 });

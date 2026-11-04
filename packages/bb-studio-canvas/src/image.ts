@@ -1,25 +1,23 @@
-// canvas_image: a picture for the page (box art, a product shot, a photo)
-// as an https address the page's frame may load.
+// canvas_image / canvas_images: pictures for the page (box art, a product
+// shot, a photo) as https addresses the page's frame may load.
 //
-// - With an Exa API key (the plugin's exaApiKey secret setting): Exa search
-//   with contents; each result's image and its page's image links (with alt
-//   text) are candidates, and the best match for the query wins.
-// - Without one: given pageUrl, the page is fetched here on the server and
-//   its main image is taken (og:image, twitter:image, else the largest
-//   image in it).
+// - query, with an Exa API key (the plugin's exaApiKey secret setting): Exa
+//   search with contents; each result's image and its page's image links
+//   (with alt text) are candidates, and the best match for the query wins.
+// - pageUrl: the page is fetched here on the server and its main image is
+//   taken (og:image, twitter:image, else the largest image in it).
+// - query without a key (or when Exa finds nothing): Wikipedia's search API
+//   finds the best-matching article and its page image (the original file).
 //
-// The key never leaves this module: it isn't logged, returned or put in an
-// error (errors are redacted). Every fetch of a page goes through
-// safeFetch: http(s) only; each hop's host resolved once, every address
-// checked (no private, loopback, link-local, CGNAT, multicast, ULA or
-// mapped addresses) and the connection pinned to that exact address, so a
-// resolver can't change its answer between the check and the connect;
-// again on every redirect; a time limit and a size cap. Image addresses
-// lose their tracking parameters.
+// canvas_images looks up a batch at once, in parallel. Every answer is cached
+// for a day by its query or address, in memory and in the plugin's database
+// (ImageCache), so a follow-up or a retry costs nothing.
+//
 import { lookup as dnsLookup } from "node:dns/promises";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import type Database from "better-sqlite3";
 
 export interface ImageResult { url: string; alt: string; source: string; width?: number; height?: number }
 export interface ImageDeps {
@@ -30,9 +28,20 @@ export interface ImageDeps {
   lookup?: (host: string) => Promise<{ address: string }[]>;
   /** How a checked page is fetched (pinnedTransport by default). */
   transport?: Transport;
+  /** Answers already found (a day's worth); none: every lookup goes out. */
+  cache?: ImageCacheLike;
 }
 
+/** Where found pictures are kept: get answers null when there's nothing fresh. */
+export interface ImageCacheLike { get(key: string): ImageResult | null; set(key: string, image: ImageResult): void }
+
 export const EXA_SEARCH_URL = "https://api.exa.ai/search";
+export const WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php";
+/** How long a found picture is reused. */
+export const IMAGE_CACHE_MS = 24 * 60 * 60 * 1000;
+/** At most this many pictures in one canvas_images call, and this many looked up at the same time. */
+export const IMAGE_BATCH_MAX = 24;
+const IMAGE_PARALLEL = 8;
 const PAGE_BYTES = 2 * 1024 * 1024;
 const TIMEOUT_MS = 10_000;
 
@@ -208,42 +217,149 @@ export function pickExaImage(results: readonly ExaResult[], query: string): Imag
   return image;
 }
 
-/** Runs canvas_image. Errors are redacted of the key. */
-export async function findImage(input: { query?: string; pageUrl?: string }, deps: ImageDeps): Promise<ImageResult> {
-  const key = await deps.exaKey();
+interface WikiPage { title?: string; index?: number; fullurl?: string; original?: { source?: string; width?: number; height?: number }; thumbnail?: { source?: string; width?: number; height?: number } }
+
+/** Words that say what kind of picture is wanted, not what it shows: Wikipedia searches better without them. */
+const PICTURE_WORDS = /\b(box ?art|cover ?art|covers?|boxes|box|photos?|pictures?|images?|screenshots?|official|artwork|logo|poster|product shot|jpe?g|png)\b/gi;
+export const wikipediaSearchText = (query: string) => query.replace(PICTURE_WORDS, " ").replace(/\s+/g, " ").trim() || query.trim();
+
+const words = (text: string) => text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * The best Wikipedia article with a picture for a query. Search order decides, except that among the first three
+ * hits an article whose whole name is in the query wins (the longest such name: "Tetris DX" over "Tetris" for
+ * "Tetris DX Game Boy Color"), and lists ("List of …") come last.
+ */
+export function pickWikipediaImage(pages: readonly WikiPage[], query: string): ImageResult | null {
+  const asked = ` ${words(wikipediaSearchText(query))} `;
+  const hits = pages
+    .map((page) => ({ page, picture: page.original?.source ? page.original : page.thumbnail }))
+    .map((hit) => ({ ...hit, url: https(hit.picture?.source ?? null, "https://en.wikipedia.org/") }))
+    .filter((hit) => hit.url && !/\.svg(\?|$)/i.test(hit.url))
+    .sort((a, b) => (a.page.index ?? 99) - (b.page.index ?? 99));
+  const list = (hit: (typeof hits)[number]) => /^list of\b/i.test(hit.page.title ?? "");
+  const named = hits.slice(0, 3).filter((hit) => !list(hit)).map((hit) => ({ hit, name: words((hit.page.title ?? "").replace(/\s*\([^)]*\)\s*$/, "")) })).filter((each) => each.name && asked.includes(` ${each.name} `));
+  named.sort((a, b) => b.name.length - a.name.length);
+  const best = named[0]?.hit ?? hits.find((hit) => !list(hit)) ?? hits[0];
+  if (!best) return null;
+  const { page, picture } = best;
+  return { url: best.url!, alt: page.title ?? query, source: page.fullurl ?? `https://en.wikipedia.org/wiki/${encodeURIComponent((page.title ?? "").replace(/ /g, "_"))}`, ...(picture?.width ? { width: picture.width } : {}), ...(picture?.height ? { height: picture.height } : {}) };
+}
+
+/** A picture from Wikipedia for a query: its search API, then each hit's page image (any licence, so box art counts). */
+export async function wikipediaImage(query: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<ImageResult | null> {
+  const params = new URLSearchParams({
+    action: "query", format: "json", formatversion: "2", redirects: "1",
+    generator: "search", gsrsearch: wikipediaSearchText(query), gsrlimit: "5", gsrnamespace: "0",
+    prop: "pageimages|info", piprop: "original|thumbnail", pithumbsize: "1200", pilicense: "any", inprop: "url",
+  });
+  const page = await safeFetch(`${WIKIPEDIA_API_URL}?${params}`, deps);
+  let payload: { query?: { pages?: WikiPage[] } };
+  try { payload = JSON.parse(page.text); } catch { throw new Error("Wikipedia's answer couldn't be read."); }
+  return pickWikipediaImage(payload.query?.pages ?? [], query);
+}
+
+/** Runs one Exa search for a query: its best picture, or null. */
+async function exaImage(query: string, key: string, deps: ImageDeps): Promise<ImageResult | null> {
+  const doFetch = deps.fetch ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await doFetch(EXA_SEARCH_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json", "x-api-key": key },
+      body: JSON.stringify({ query, numResults: 6, contents: { extras: { imageLinks: 6 } } }),
+    });
+    if (!response.ok) throw new Error(`Image search failed (${response.status}).`);
+    const payload = (await response.json()) as { results?: ExaResult[] };
+    return pickExaImage(payload.results ?? [], query);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const queryKey = (query: string) => `q:${query.toLowerCase().replace(/\s+/g, " ").trim()}`;
+const pageKey = (pageUrl: string) => `u:${pageUrl.trim()}`;
+
+/**
+ * Runs canvas_image: Exa for a query when a key is set, then the page's main picture when pageUrl is given, then
+ * Wikipedia for the query. Answers are cached by query and by address. Errors are redacted of the key.
+ */
+export async function findImage(input: { query?: string; pageUrl?: string }, deps: ImageDeps, key?: string): Promise<ImageResult> {
+  key ??= await deps.exaKey();
   const redact = (error: unknown) => {
     const text = error instanceof Error ? error.message : String(error);
     return new Error(key ? text.split(key).join("[key]") : text);
   };
-  try {
-    if (key && input.query) {
-      const doFetch = deps.fetch ?? fetch;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-      try {
-        const response = await doFetch(EXA_SEARCH_URL, {
-          method: "POST",
-          signal: controller.signal,
-          headers: { "content-type": "application/json", "x-api-key": key },
-          body: JSON.stringify({ query: input.query, numResults: 6, contents: { extras: { imageLinks: 6 } } }),
-        });
-        if (!response.ok) throw new Error(`Image search failed (${response.status}).`);
-        const payload = (await response.json()) as { results?: ExaResult[] };
-        const image = pickExaImage(payload.results ?? [], input.query);
-        if (image) return image;
-        if (!input.pageUrl) throw new Error(`No picture found for "${input.query}". Try other words, or pass pageUrl.`);
-      } finally {
-        clearTimeout(timer);
-      }
+  const query = input.query?.trim() || "";
+  const pageUrl = input.pageUrl?.trim() || "";
+  const cached = (query && deps.cache?.get(queryKey(query))) || (pageUrl && deps.cache?.get(pageKey(pageUrl))) || null;
+  if (cached) return cached;
+  const keep = (image: ImageResult) => {
+    if (query) deps.cache?.set(queryKey(query), image);
+    if (pageUrl) deps.cache?.set(pageKey(pageUrl), image);
+    return image;
+  };
+  const failures: string[] = [];
+  const attempt = async (find: () => Promise<ImageResult | null>) => {
+    try { return await find(); } catch (error) { failures.push(redact(error).message); return null; }
+  };
+  if (!query && !pageUrl) throw new Error("Say what to find (query) or which page to take the picture from (pageUrl).");
+  if (key && query) { const image = await attempt(() => exaImage(query, key!, deps)); if (image) return keep(image); }
+  if (pageUrl) {
+    const image = await attempt(async () => { const page = await safeFetch(pageUrl, deps); return mainImage(page.text, page.url); });
+    if (image) return keep(image);
+    if (!failures.length) failures.push("That page has no main image.");
+  }
+  if (query) { const image = await attempt(() => wikipediaImage(query, deps)); if (image) return keep(image); }
+  const why = failures.length ? ` (${failures.join("; ")})` : "";
+  throw new Error(query ? `No picture found for "${query}"${why}. Try the thing's exact name, or pass pageUrl (a store, publisher or Wikipedia page about it).` : `No picture on that page${why}. Try another page about it (a store, publisher or Wikipedia page).`);
+}
+
+export interface ImageRequest { key: string; query?: string; pageUrl?: string }
+export type ImageAnswer = ImageResult | { error: string };
+
+/** Runs canvas_images: every request at once (a few at a time), each answer under its key; one failure doesn't stop the rest. */
+export async function findImages(items: readonly ImageRequest[], deps: ImageDeps): Promise<Record<string, ImageAnswer>> {
+  const key = await deps.exaKey();
+  const answers: Record<string, ImageAnswer> = {};
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next++]!;
+      try { answers[item.key] = await findImage(item, deps, key); } catch (error) { answers[item.key] = { error: error instanceof Error ? error.message : String(error) }; }
     }
-    if (input.pageUrl) {
-      const page = await safeFetch(input.pageUrl, deps);
-      const image = mainImage(page.text, page.url);
-      if (!image) throw new Error("That page has no main image. Try another page about it (a store, publisher or Wikipedia page).");
-      return image;
+  };
+  await Promise.all(Array.from({ length: Math.min(IMAGE_PARALLEL, items.length) }, worker));
+  // In the order asked.
+  return Object.fromEntries(items.map((item) => [item.key, answers[item.key]!]));
+}
+
+/**
+ * Found pictures, kept for a day: in memory, and in the plugin's database (canvas_image_cache) so they last
+ * across restarts. Only answers are kept, never failures, so a picture that wasn't found is looked up again.
+ */
+export class ImageCache implements ImageCacheLike {
+  private readonly memory = new Map<string, { at: number; image: ImageResult }>();
+  constructor(private readonly db: Database.Database | null, private readonly now: () => number = Date.now, private readonly ttl = IMAGE_CACHE_MS) {}
+  get(key: string): ImageResult | null {
+    const at = this.now();
+    let hit = this.memory.get(key);
+    if (!hit && this.db) {
+      const row = this.db.prepare("SELECT image, at FROM canvas_image_cache WHERE key = ?").get(key) as { image: string; at: number } | undefined;
+      if (row) { try { hit = { at: row.at, image: JSON.parse(row.image) as ImageResult }; this.memory.set(key, hit); } catch { /* a bad row is looked up again */ } }
     }
-    throw new Error(key ? "Say what to find (query) or which page to take the picture from (pageUrl)." : "No image search key is set. Pass pageUrl (a store, publisher or Wikipedia page about it) and I'll take that page's main image.");
-  } catch (error) {
-    throw redact(error);
+    if (!hit) return null;
+    if (at - hit.at > this.ttl) { this.memory.delete(key); return null; }
+    return hit.image;
+  }
+  set(key: string, image: ImageResult): void {
+    const at = this.now();
+    this.memory.set(key, { at, image });
+    if (this.memory.size > 2000) this.memory.delete(this.memory.keys().next().value!);
+    if (!this.db) return;
+    this.db.prepare("INSERT INTO canvas_image_cache (key, image, at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET image = excluded.image, at = excluded.at").run(key, JSON.stringify(image), at);
+    this.db.prepare("DELETE FROM canvas_image_cache WHERE at < ?").run(at - this.ttl);
   }
 }

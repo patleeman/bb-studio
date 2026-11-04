@@ -4,17 +4,18 @@
 //
 // The agent writes the whole board as one HTML page (canvas_page) and
 // changes parts of it by their data-cv-id (canvas_patch). canvas_image
-// finds a picture's address for the page. Boards of items from before
+// finds a picture's address for the page, and canvas_images a batch of them
+// at once (in parallel). Boards of items from before
 // pages still show; canvas_page replaces them.
 import { z } from "zod";
 import { designGuide } from "./guides";
-import { findImage, type ImageDeps } from "./image";
+import { findImage, findImages, IMAGE_BATCH_MAX, type ImageDeps } from "./image";
 import { LOOK_INFO, lookOf, ORGANIC_LOOKS, type OrganicLook } from "./looks";
 import { outline } from "./page";
 import { CANVAS_LIMITS, jsonBytes } from "./shared";
 import type { CanvasActor, CanvasStore } from "./store";
 
-export const CANVAS_TOOL_NAMES = ["canvas_read", "canvas_page", "canvas_patch", "canvas_style", "canvas_image", "canvas_guide"] as const;
+export const CANVAS_TOOL_NAMES = ["canvas_read", "canvas_page", "canvas_patch", "canvas_style", "canvas_image", "canvas_images", "canvas_guide"] as const;
 export type CanvasToolName = (typeof CANVAS_TOOL_NAMES)[number];
 export const isCanvasTool = (name: string): name is CanvasToolName => (CANVAS_TOOL_NAMES as readonly string[]).includes(name);
 
@@ -33,6 +34,14 @@ export const CANVAS_TOOL_PARAMS = {
   canvas_patch: z.object({ id: z.string().regex(PART_ID), html: z.string().max(CANVAS_LIMITS.pageBytes) }),
   canvas_style: z.object({ style, reason: z.string().max(200).optional() }),
   canvas_image: z.object({ query: z.string().trim().min(1).max(200).optional(), pageUrl: z.string().url().max(2000).optional() }),
+  canvas_images: z.object({
+    items: z.array(z.object({
+      key: z.string().trim().min(1).max(64),
+      query: z.string().trim().min(1).max(200).optional(),
+      pageUrl: z.string().url().max(2000).optional(),
+    }).refine((item) => !!item.query || !!item.pageUrl, { message: "give query or pageUrl" })).min(1).max(IMAGE_BATCH_MAX)
+      .refine((items) => new Set(items.map((item) => item.key)).size === items.length, { message: "each key once" }),
+  }),
   canvas_guide: z.object({}),
 } satisfies Record<CanvasToolName, z.ZodType>;
 
@@ -41,7 +50,8 @@ export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_page: "Show a new version of the whole board: one HTML page you design for this answer (HTML and CSS, no <html>/<head>; scripts allowed). It renders in a sandboxed frame the size of the screen, with the style's tokens (--cv-* CSS variables), the kit's classes and charts (data-chart), and no network except https images. Mark each part with a stable data-cv-id: between versions, parts with the same id glide to their new place, new ones come in, gone ones leave. title names the topic (else the page's first heading). style switches the board's style: editorial, field or instrument (with styleReason).",
   canvas_patch: "Change one part of the page in place: id is its data-cv-id, html replaces that whole element (keep the data-cv-id on it so it animates); an empty html removes it.",
   canvas_style: "Switch the board's style without rewriting the page: editorial, field or instrument, with the reason in a few words. The page's tokens change and it animates.",
-  canvas_image: "Find a picture for the page (box art, a cover, a product shot, a photo): returns {url, alt, source, width?, height?}, an https address the page can show in an <img>. query searches for it (when image search is set up); pageUrl takes the main picture of a page you found (a store, publisher or Wikipedia page). Call it once per picture.",
+  canvas_image: "Find one picture for the page (box art, a cover, a product shot, a photo): returns {url, alt, source, width?, height?}, an https address the page can show in an <img>. query names the thing (\"Tetris DX Game Boy Color\"); pageUrl takes the main picture of a page about it. For more than one picture, use canvas_images.",
+  canvas_images: "Find all the page's pictures in ONE call, looked up in parallel: items [{key, query?, pageUrl?}] (up to 24). key is your name for it (use the part's data-cv-id); query names the thing (\"Tetris DX Game Boy Color\", found on the web or Wikipedia); pageUrl takes the main picture of a page about it. Returns {key: {url, alt, source} or {error}}. Answers are cached for a day.",
   canvas_guide: "The design guide again: how to tell the story on one page, the style tokens, the kit and the examples.",
 };
 
@@ -136,6 +146,14 @@ export async function runCanvasTool(store: CanvasStore, canvasId: string, name: 
         if (!images) return { text: "Pictures can't be looked up here.", changed: false, error: true };
         const image = await findImage(parsed, images);
         return { text: JSON.stringify(image), changed: false };
+      }
+      case "canvas_images": {
+        const parsed = CANVAS_TOOL_PARAMS.canvas_images.parse(input ?? {});
+        if (!images) return { text: "Pictures can't be looked up here.", changed: false, error: true };
+        const found = await findImages(parsed.items, images);
+        const missing = Object.values(found).filter((answer) => "error" in answer).length;
+        const note = missing ? ` (${missing} not found: leave those as a card without a picture, or retry them with pageUrl)` : "";
+        return { text: `${JSON.stringify(found)}${note}`, changed: false };
       }
     }
   } catch (error) {

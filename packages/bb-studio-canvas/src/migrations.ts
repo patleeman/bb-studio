@@ -42,4 +42,7 @@ export const CANVAS_MIGRATIONS: string[] = [
   // (prompt, agent or page), so the title follows the topic.
   `ALTER TABLE canvases ADD COLUMN page TEXT;
   ALTER TABLE canvases ADD COLUMN title_source TEXT;`,
+  // Pictures canvas_image and canvas_images found (src/image.ts ImageCache),
+  // by query or page address, reused for a day.
+  `CREATE TABLE canvas_image_cache (key TEXT PRIMARY KEY, image TEXT NOT NULL, at INTEGER NOT NULL);`,
 ];
