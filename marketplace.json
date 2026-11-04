@@ -60,8 +60,8 @@
       }
     },
     {
-      "id": "canvas",
-      "displayName": "Canvas",
+      "id": "studio-canvas",
+      "displayName": "BB Studio Canvas",
       "description": "Part of BB Studio (prototype). A canvas: an agent talks on a board it edits each turn, with charts, numbers, tables and captions that animate as they change. Off unless you install it.",
       "icon": "GridView",
       "tags": [
@@ -79,7 +79,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-canvas",
+          "subdir": "packages/bb-studio-canvas",
           "ref": "stable"
         }
       }

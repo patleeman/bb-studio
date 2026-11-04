@@ -32,4 +32,9 @@ export const CANVAS_MIGRATIONS: string[] = [
   ALTER TABLE canvases ADD COLUMN reasoning_level TEXT;
   ALTER TABLE canvases ADD COLUMN pending_execution TEXT;
   CREATE TABLE canvas_thread_aliases (thread_id TEXT PRIMARY KEY, canvas_id TEXT NOT NULL);`,
+  // BB Studio Canvas was the plugin "canvas": its one-time import of that
+  // plugin's canvases (src/legacy-import.ts), recorded so it never runs twice.
+  `CREATE TABLE canvas_legacy_import (
+    id INTEGER PRIMARY KEY CHECK (id = 1), source TEXT NOT NULL, at INTEGER NOT NULL, counts TEXT NOT NULL
+  );`,
 ];

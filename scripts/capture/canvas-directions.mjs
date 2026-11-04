@@ -122,15 +122,15 @@ try {
   for (const [index, prompt] of PROMPTS.entries()) {
     const n = index + 1;
     log(`turn ${n}: ${prompt.text.split("\n")[0]}`);
-    const before = threadId ? (await pluginRpc("canvas", "canvas.get", { threadId })).canvas : null;
+    const before = threadId ? (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas : null;
     // Before turns 2+, both tabs watch for a style switch to pause mid-animation (once).
     if (threadId && !midDone) for (const mode of ["light", "dark"]) await armMidSwitch(tabs[mode]);
     const started = Date.now();
-    if (!threadId) ({ threadId } = await pluginRpc("canvas", "canvas.create", { text: prompt.text, ...pick }));
-    else await pluginRpc("canvas", "canvas.send", { threadId, text: prompt.text });
+    if (!threadId) ({ threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: prompt.text, ...pick }));
+    else await pluginRpc("studio-canvas", "canvas.send", { threadId, text: prompt.text });
     if (n === 1) {
       for (const mode of ["light", "dark"]) {
-        await tabs[mode].navigate(`/plugins/canvas/canvas/${threadId}`);
+        await tabs[mode].navigate(`/plugins/studio-canvas/canvas/${threadId}`);
         await tabs[mode].waitForSelector("[data-canvas-board]", 30_000);
         await collapseSidebar(tabs[mode]);
       }
@@ -142,7 +142,7 @@ try {
         const state = await tabs.light.poll("window.__canvasMid");
         if (String(state).startsWith("paused")) mid = state;
       }
-      return (await pluginRpc("canvas", "canvas.get", { threadId })).canvas;
+      return (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas;
     }, (canvas) => mid !== null || (canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent"), TURN_MS, `turn ${n}`);
     if (mid) {
       midDone = true;
@@ -157,7 +157,7 @@ try {
     } else if (n > 1 && !midDone) {
       for (const mode of ["light", "dark"]) await tabs[mode].evaluate("window.__canvasMid = 'off'; true");
     }
-    const done = await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
+    const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
     const seconds = Math.round((Date.now() - started) / 1000);
     const styleChanges = done.changes.filter((change) => change.op === "style" && change.turn === done.turn);
     const result = {

@@ -1,4 +1,4 @@
-// The canvas page: /plugins/canvas/canvas/<threadId>, or /canvas for a
+// The canvas page: /plugins/studio-canvas/canvas/<threadId>, or /canvas for a
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.

@@ -13,14 +13,14 @@ const until = async (read, done, sleep, ms) => {
 
 export default ({ pluginRpc, sleep }) => [
   {
-    id: "canvas",
-    packageDir: "bb-canvas",
+    id: "studio-canvas",
+    packageDir: "bb-studio-canvas",
     privateSidebar: true,
     setup: async (client) => {
       const prompt = process.env.BB_CAPTURE_CANVAS_PROMPT ?? "Compare the populations of the five largest US cities, with a chart.";
-      const { threadId } = await pluginRpc("canvas", "canvas.create", { text: prompt });
-      const canvas = await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas), (view) => view?.status === "idle" && view.items.length >= 3 && !!view.caption, sleep, 8 * 60_000);
-      await client.navigate(`/plugins/canvas/canvas/${threadId}`);
+      const { threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: prompt });
+      const canvas = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (view) => view?.status === "idle" && view.items.length >= 3 && !!view.caption, sleep, 8 * 60_000);
+      await client.navigate(`/plugins/studio-canvas/canvas/${threadId}`);
       await client.waitForSelector("[data-canvas-board]");
       await until(() => client.poll(`document.querySelectorAll("[data-canvas-item]").length`), (count) => count >= 3, sleep, 15_000);
       await client.waitForText(canvas.caption.slice(0, 40));

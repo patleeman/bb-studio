@@ -35,7 +35,7 @@ async function until(read, done, ms, what) {
     await sleep(500);
   }
 }
-const view = (threadId) => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas);
+const view = (threadId) => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas);
 const idleAfter = (threadId, turn) => until(() => view(threadId), (canvas) => canvas.turn > turn && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, "the turn");
 async function providerOf(threadId) {
   const thread = JSON.parse(await bbCli(["thread", "get", threadId, "--json"]));
@@ -55,11 +55,11 @@ const TOP = { x: 0, y: 0, width: VIEW.width, height: 150 };
 
 try {
   // Turn 1, on the canvas default.
-  const { threadId } = await pluginRpc("canvas", "canvas.create", { text: "How did yesterday's election go?" });
+  const { threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: "How did yesterday's election go?" });
   log("turn 1 on", threadId);
   const first = await idleAfter(threadId, 0);
   results.push({ turn: 1, threadId, execution: first.execution, threadProvider: await providerOf(threadId), caption: first.caption });
-  await client.navigate(`/plugins/canvas/canvas/${threadId}`);
+  await client.navigate(`/plugins/studio-canvas/canvas/${threadId}`);
   await client.waitForSelector("[data-canvas-model-picker] button", 30_000);
   await client.evaluate(`(() => { const sidebar = document.querySelector('[data-sidebar="sidebar"]'); const state = sidebar?.closest('[data-state]')?.getAttribute('data-state'); if (sidebar && state !== 'collapsed' && state !== 'closed') document.querySelector('button[aria-label^="Toggle sidebar" i]')?.click(); return true; })()`);
   await until(() => client.poll(`document.querySelector("[data-canvas-model]")?.textContent ?? ""`), (text) => /Haiku 5\.5/.test(text), 20_000, "the picker's label");

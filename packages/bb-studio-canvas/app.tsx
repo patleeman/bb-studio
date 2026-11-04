@@ -1,5 +1,5 @@
-// Canvas (prototype): its page in BB's rail, /plugins/canvas/canvas for a
-// new canvas and /plugins/canvas/canvas/<threadId> for one. The page is
+// BB Studio Canvas (prototype): its page in BB's rail, /plugins/studio-canvas/canvas for a
+// new canvas and /plugins/studio-canvas/canvas/<threadId> for one. The page is
 // prebuilt into bundle/canvas-ui.js (build-ui.mjs) because it reuses Studio's
 // widget renderers, whose npm imports BB's install-time build can't reach.
 import { definePluginApp, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";

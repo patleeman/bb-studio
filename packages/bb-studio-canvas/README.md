@@ -1,4 +1,4 @@
-# Canvas (prototype)
+# BB Studio Canvas (prototype)
 
 Part of BB Studio. A canvas is a board an agent talks on, like someone at a
 whiteboard. It isn't a transcript. Each turn, the agent edits the board to
@@ -6,8 +6,10 @@ show what matters now: it adds, changes and removes charts, numbers,
 tables, captions and generated widgets. Every change animates, so you can
 see what moved. You never arrange the board.
 
-Canvas is its own plugin and is off unless you install it. It needs
-Studio.
+BB Studio Canvas is its own plugin (id `studio-canvas`) and is off unless
+you install it. It needs Studio. It was called Canvas (id `canvas`) until
+that id clashed with another store plugin; see
+[Moving from the old Canvas plugin](#moving-from-the-old-canvas-plugin).
 
 ## Staged preview
 
@@ -19,14 +21,17 @@ and its short reply is the caption line at the bottom.
 
 ## Use it
 
-Open **Canvas** in BB's rail, or go to `/plugins/canvas/canvas`. Type what
+Open **Canvas** in BB's rail, or go to `/plugins/studio-canvas/canvas`. Type what
 you want to look at. The chat is one faint line at the bottom: the agent's
 latest reply, a text field, Talk's dictation mic, a history peek and the
 hands-free button.
 
 - **Text:** each message goes to the canvas's thread. A message sent while
   the agent works waits its turn.
-- **Dictation:** the mic dictates into the field with Studio's Talk.
+- **Dictation:** the mic dictates into the field with Studio's Talk. While
+  you talk, Talk's controls (timer, cancel, stop-and-insert, and a ▾ menu)
+  sit in the field, as in the thread composer. The text lands in the field
+  for you to edit or send; nothing is sent on its own.
 - **Hands-free voice:** starts Studio's hands-free voice speaking for the
   canvas. The voice edits the board while it talks, and passes deeper work
   to the canvas's thread, which edits the board when it's done.
@@ -101,3 +106,18 @@ node build-ui.mjs   # after changing src/ui or the Studio files it uses
 turn in a staged BB. `scripts/capture/canvas-directions.mjs` runs real turns in
 one canvas and saves light and dark stills after each, with the style the
 agent picked.
+
+## Moving from the old Canvas plugin
+
+A plugin's data is keyed by its id, so canvases made under the old id stay
+in `<BB data dir>/plugins/canvas/data.db`. The first time BB Studio Canvas
+starts with no canvases of its own and finds that file, it copies every
+canvas, item, change, history line and model choice in, keeping their ids.
+Each canvas keeps its hidden thread, so old links
+(`/plugins/canvas/canvas/<threadId>` becomes
+`/plugins/studio-canvas/canvas/<threadId>`) and hands-free voice find it.
+
+- It opens the old file read-only and never changes or deletes it.
+- It runs once and records that it ran (`canvas_legacy_import`).
+- Disable the old plugin before installing this one, so the two don't both
+  run. You can uninstall the old one once you've checked your canvases.

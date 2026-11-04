@@ -1,5 +1,5 @@
 {
-  "name": "@bb-studio/canvas",
+  "name": "@bb-studio/studio-canvas",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -9,7 +9,7 @@
     "bbPluginSdk": ">=0.6.104"
   },
   "bb": {
-    "name": "Canvas",
+    "name": "BB Studio Canvas",
     "description": "Part of BB Studio (prototype). A canvas: an agent talks on a board it edits each turn, with charts, numbers, tables and captions that animate as they change. Off unless you install it.",
     "branding": {
       "icon": "GridView"

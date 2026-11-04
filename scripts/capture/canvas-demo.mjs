@@ -111,7 +111,7 @@ let canvasPath = null;
 async function turn(index, text, { mid = false } = {}) {
   log(`turn ${index}: ${text}`);
   const before = canvasPath ? Number(await page(light, "page?.dataset.canvasRev ?? 0")) : 0;
-  const turnBefore = canvasPath ? (await pluginRpc("canvas", "canvas.get", { threadId: canvasPath.split("/").pop() })).canvas.turn : 0;
+  const turnBefore = canvasPath ? (await pluginRpc("studio-canvas", "canvas.get", { threadId: canvasPath.split("/").pop() })).canvas.turn : 0;
   if (mid) { await armMidAnimation(light); if (canvasPath) await armMidAnimation(dark); }
   await type(light, text);
   if (!canvasPath) {
@@ -131,7 +131,7 @@ async function turn(index, text, { mid = false } = {}) {
       await resume(dark).catch(() => {});
     } else log("no animation was running at the pause", state);
   }
-  const view = await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${index} to finish`);
+  const view = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${index} to finish`);
   log(`turn ${index}: rev ${view.rev}, ${view.items.length} items, caption: ${view.caption}`);
   await until(() => page(light, "Number(page?.dataset.canvasRev)"), (rev) => rev >= view.rev, 15_000, "the light tab");
   await until(() => page(dark, "Number(page?.dataset.canvasRev)"), (rev) => rev >= view.rev, 15_000, "the dark tab");
@@ -143,7 +143,7 @@ async function turn(index, text, { mid = false } = {}) {
 
 let mock = null;
 try {
-  await light.navigate("/plugins/canvas/canvas");
+  await light.navigate("/plugins/studio-canvas/canvas");
   await light.waitForSelector("[data-canvas-input]");
   await collapseSidebar(light);
   await sleep(800);
@@ -177,14 +177,14 @@ try {
   const threadId = canvasPath.split("/").pop();
   log("voice turn");
   await light.evaluate(`document.querySelector("[data-canvas-handsfree]")?.click()`);
-  await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas.items.map((item) => item.id)), (ids) => ids.includes("voice-saturday-hourly"), 60_000, "the voice's first board edit");
+  await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas.items.map((item) => item.id)), (ids) => ids.includes("voice-saturday-hourly"), 60_000, "the voice's first board edit");
   await sleep(1800);
   await still(light, "voice-1-light");
-  await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas.items.map((item) => item.id)), (ids) => ids.includes("voice-sunday-rain"), 60_000, "the voice's second board edit");
+  await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas.items.map((item) => item.id)), (ids) => ids.includes("voice-sunday-rain"), 60_000, "the voice's second board edit");
   await sleep(1800);
   await still(light, "voice-2-light");
   await still(dark, "voice-2-dark");
-  await until(() => pluginRpc("canvas", "canvas.get", { threadId }).then((result) => result.canvas.changes.filter((change) => change.by === "voice").length), (count) => count >= 3, 60_000, "the voice's last edit");
+  await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas.changes.filter((change) => change.by === "voice").length), (count) => count >= 3, 60_000, "the voice's last edit");
   await sleep(6000);
   await still(light, "voice-end-light");
   recording = false;
