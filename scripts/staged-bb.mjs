@@ -55,7 +55,12 @@ const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
 const codexHome = join(stagedDir, "codex-home");
-const claudeHome = join(stagedDir, "claude-home");
+// One fixed Claude Code folder shared by every staged BB. Claude Code keys its
+// Keychain sign-in to its config folder, so a fresh folder per instance is never
+// signed in. Sign in to this one once (CLAUDE_CONFIG_DIR=~/.bb-staged/claude
+// claude, then /login); it sits outside ~/.claude, so the transcript archive
+// never sees staged sessions. Nothing is ever copied into it from ~/.claude.
+const claudeHome = process.env.BB_STAGED_CLAUDE_HOME?.trim() || join(homedir(), ".bb-staged", "claude");
 // Holds the claude wrapper; it goes first on PATH.
 const shimDir = join(stagedDir, "shims");
 const fixturesDir = join(repoRoot, "scripts/capture/fixtures");
@@ -328,8 +333,8 @@ async function useOwnAgentHomes() {
   if (existsSync(auth)) await symlink(auth, join(codexHome, "auth.json"));
 
   // Claude Code: bb passes it only BB_CLAUDE_CODE_EXECUTABLE and its OAuth
-  // token, so a wrapper sets CLAUDE_CONFIG_DIR. The sign-in stays in the
-  // Keychain, shared with your real one.
+  // token, so a wrapper sets CLAUDE_CONFIG_DIR to the fixed staged folder
+  // (claudeHome), which has its own one-time sign-in.
   const claude = process.env.BB_CLAUDE_CODE_EXECUTABLE?.trim() || (await which("claude"));
   if (claude) {
     await mkdir(claudeHome, { recursive: true });
@@ -337,6 +342,9 @@ async function useOwnAgentHomes() {
     const shim = join(shimDir, "claude");
     await writeFile(shim, `#!/bin/sh\nCLAUDE_CONFIG_DIR=${JSON.stringify(claudeHome)} exec ${JSON.stringify(claude)} "$@"\n`);
     await chmod(shim, 0o755);
+    if (!existsSync(join(claudeHome, ".claude.json"))) {
+      console.warn(`Claude Code in staged BBs isn't signed in yet. Sign in once with: CLAUDE_CONFIG_DIR=${claudeHome} claude, then /login`);
+    }
   }
 }
 
