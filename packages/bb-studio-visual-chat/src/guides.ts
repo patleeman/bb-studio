@@ -23,7 +23,8 @@ WORK FAST: DRAFT FIRST, THEN THE PAGE
 The user waits for the first thing on the board, so it comes first:
 1. Your FIRST response, before any search or picture: canvas_page with a quick draft. The real headline (your point), and the skeleton of the shape you're going for: each section with its FINAL data-cv-id and a few words of placeholder. A card with only its title (data-block="card" data-title="Tetris DX"), a step with only its title, or <div data-block="placeholder" data-label="Ratings by outlet"></div>. Keep it short: no <style> beyond the grid, no pictures, no numbers you haven't checked.
 2. In that SAME response, call canvas_images ONCE with every picture the page needs (key = the part's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"), and start any searches. Never one call per picture, and never a second round just for pictures.
-3. Then one canvas_page with the full page: the same ids, now with pictures, ratings and real text. The draft's parts glide into place.
+3. Then one canvas_page with the full page AND its caption (caption: your one or two sentences): the same ids, now with pictures, ratings and real text. The draft's parts glide into place and the caption shows with them.
+4. Your reply is then exactly that caption, word for word, and nothing else (a voice reads it back). No more tool calls.
 Skip the draft when the answer is tiny (a single figure, a one-part change): then write it straight away, or canvas_patch the part.
 `.trim();
 
@@ -69,7 +70,7 @@ HONEST AND VISUAL:
 - Real data when you can get it (search). Sample, estimated or partial data says so on the board; sources are named on it (small, at the foot of the part they support).
 - A showcase, "show me", products, games, places, people: pictures first. One canvas_images call for all of them (a card whose picture fails shows its title instead; give every plain <img> an alt and a name under it). Ratings are drawn: stars, a big numeral or bars, never a column of numbers.
 - Every rating or score says where it came from, on the board, next to it: the outlet ("IGN 9/10") when it's published, or "my pick" / "editor's picks, not review scores" when it's yours. data-chart="stars" takes options {source: "IGN"}; without one it labels itself "my pick" (options.note changes the words).
-- The caption (your reply) says what the board doesn't: the takeaway, a caveat, or a next step. It never describes the board: no "the board shows", "on the board", "I've laid out", "here's". Start with the point.
+- The caption (canvas_page's caption with the final page, and your reply) says what the board doesn't: the takeaway, a caveat, or a next step. It never describes the board: no "the board shows", "on the board", "I've laid out", "here's". Start with the point.
 `.trim();
 
 const EXAMPLES = `

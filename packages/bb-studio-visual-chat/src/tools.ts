@@ -30,6 +30,7 @@ export const CANVAS_TOOL_PARAMS = {
     title: z.string().trim().min(1).max(CANVAS_LIMITS.title).optional(),
     style: style.optional(),
     styleReason: z.string().max(200).optional(),
+    caption: z.string().trim().min(1).max(CANVAS_LIMITS.captionChars).optional(),
   }),
   canvas_patch: z.object({ id: z.string().regex(PART_ID), html: z.string().max(CANVAS_LIMITS.pageBytes) }),
   canvas_style: z.object({ style, reason: z.string().max(200).optional() }),
@@ -47,7 +48,7 @@ export const CANVAS_TOOL_PARAMS = {
 
 export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_read: "Read this canvas: its style, title and the page's source (or, for a board from before pages, its items), with the ids of its parts, and the latest changes.",
-  canvas_page: "Show a new version of the whole board: one HTML page you design for this answer (HTML and CSS, no <html>/<head>; scripts allowed). It renders in a sandboxed frame the size of the screen, with the style's tokens (--cv-* CSS variables), the kit's classes and charts (data-chart), and no network except https images. Mark each part with a stable data-cv-id: between versions, parts with the same id glide to their new place, new ones come in, gone ones leave. title names the topic (else the page's first heading). style switches the board's style: editorial, field or instrument (with styleReason).",
+  canvas_page: "Show a new version of the whole board: one HTML page you design for this answer (HTML and CSS, no <html>/<head>; scripts allowed). It renders in a sandboxed frame the size of the screen, with the style's tokens (--cv-* CSS variables), the kit's classes and charts (data-chart), and no network except https images. Mark each part with a stable data-cv-id: between versions, parts with the same id glide to their new place, new ones come in, gone ones leave. title names the topic (else the page's first heading). style switches the board's style: editorial, field or instrument (with styleReason). caption: with the FINAL page, the caption under the board (your reply's one or two sentences), shown with the page at once; then reply with that same caption.",
   canvas_patch: "Change one part of the page in place: id is its data-cv-id, html replaces that whole element (keep the data-cv-id on it so it animates); an empty html removes it.",
   canvas_style: "Switch the board's style without rewriting the page: editorial, field or instrument, with the reason in a few words. The page's tokens change and it animates.",
   canvas_image: "Find one picture for the page (box art, a cover, a product shot, a photo): returns {url, alt, source, width?, height?}, an https address the page can show in an <img>. query is the thing's name only (\"Tetris DX\", no platform or \"box art\"); pageUrl takes the main picture of a page about it. For more than one picture, use canvas_images.",
@@ -128,8 +129,11 @@ export async function runCanvasTool(store: CanvasStore, canvasId: string, name: 
         }
         const before = store.get(canvasId)?.page ?? null;
         const { rev, parts } = store.setPage(canvasId, parsed.html, by, parsed.title ?? null);
+        // The caption shows with the page, without waiting for the reply; the reply (the same words) is what a voice reads back.
+        if (parsed.caption) store.setCaption(canvasId, parsed.caption);
         const advice = parts ? renamedParts(before, parsed.html) : " No part has a data-cv-id, so the next version can't animate part by part: mark the main parts.";
-        return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${advice}`, changed: true };
+        const close = parsed.caption ? " The caption is up: now reply with exactly that caption and stop." : "";
+        return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${advice}${close}`, changed: true };
       }
       case "canvas_patch": {
         const parsed = CANVAS_TOOL_PARAMS.canvas_patch.parse(input);

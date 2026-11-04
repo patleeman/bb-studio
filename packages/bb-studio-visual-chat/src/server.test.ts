@@ -239,6 +239,16 @@ describe("canvas tools", () => {
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ items: [], page: PAGE });
   });
 
+  it("shows the caption sent with the final page at once", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Showcase" });
+    const result = text(await tool("canvas_page", { html: PAGE, caption: "Start with Link's Awakening." }, threadId));
+    expect(result).toContain("reply with exactly that caption");
+    expect((await call("canvas.get", { threadId })).canvas.caption).toBe("Start with Link's Awakening.");
+    expect(text(await tool("canvas_page", { html: PAGE }, threadId))).not.toContain("caption");
+    expect((await call("canvas.get", { threadId })).canvas.caption).toBe("Start with Link's Awakening.");
+  });
+
   it("returns the design guide from canvas_guide", async () => {
     const { call, tool } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Ops" });

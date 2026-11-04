@@ -36,7 +36,9 @@ thread is your memory; they never read it.
 
 ## The tools
 
-- `canvas_page({ html, title?, style?, styleReason? })`: the whole board.
+- `canvas_page({ html, title?, style?, styleReason?, caption? })`: the whole
+  board. With the final page, pass the caption so it shows at once, then
+  reply with exactly that caption.
 - `canvas_patch({ id, html })`: one part, by its `data-cv-id` (`""` removes it).
 - `canvas_read()`: the page's source and its parts.
 - `canvas_images({ items: [{ key, query?, pageUrl? }] })`: every picture

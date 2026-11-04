@@ -106,9 +106,12 @@ hands-free button.
   whiteboard) and Instrument (a control room) are token sets. The agent
   picks one per board, a style you ask for wins, and the top bar shows it.
 - **Title and caption:** the canvas's title is the topic the agent names,
-  else the page's first heading. The caption is the agent's reply, written
-  to add what the board doesn't say; sentences that describe the board
-  ("The board shows…") are dropped from it.
+  else the page's first heading. The agent sends the caption with its final
+  page (`canvas_page`'s `caption`), so it shows with the page, and its reply
+  repeats it (the reply wins if it differs, and it's what a voice reads
+  back). The caption is written to add what the board doesn't say;
+  sentences that describe the board ("The board shows…") are dropped from
+  it.
 - **Boards from before pages** (items placed by the old layout) still open
   and show as they were. The agent's next page replaces them.
 
