@@ -88,6 +88,9 @@ hands-free button.
   Wikipedia (its search API, then the best article's page image); a pageUrl
   takes that page's main picture (og:image, else the largest image). Found
   pictures are cached for a day, in memory and in the plugin's database.
+  Each picture goes into the card whose `data-cv-id` is its key, on the
+  page at once (so a draft shows them) and on every later version, so the
+  agent never writes picture addresses into the page.
   Server-side fetches go only to public http(s) addresses: each
   hop's host is resolved once, every address checked, and the connection
   pinned to that address (so a resolver can't switch it after the check),

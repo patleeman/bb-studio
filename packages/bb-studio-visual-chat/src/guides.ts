@@ -22,7 +22,7 @@ DESIGN GUIDE
 WORK FAST: DRAFT FIRST, THEN THE PAGE
 The user waits for the first thing on the board, so it comes first:
 1. Your FIRST response, before any search or picture: canvas_page with a quick draft. The real headline (your point), and the skeleton of the shape you're going for: each section with its FINAL data-cv-id and a few words of placeholder. A card with only its title (data-block="card" data-title="Tetris DX"), a step with only its title, or <div data-block="placeholder" data-label="Ratings by outlet"></div>. Keep it short: no <style> beyond the grid, no pictures, no numbers you haven't checked.
-2. In that SAME response, call canvas_images ONCE with every picture the page needs (key = the part's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"), and start any searches. Never one call per picture, and never a second round just for pictures.
+2. In that SAME response, call canvas_images ONCE with every picture the page needs (key = the card's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"), and start any searches. Never one call per picture. Each picture goes into its card by itself, now and in later versions: never write data-img for them.
 3. Then one canvas_page with the full page AND its caption (caption: your one or two sentences): the same ids, now with pictures, ratings and real text. The draft's parts glide into place and the caption shows with them.
 4. Your reply is then exactly that caption, word for word, and nothing else (a voice reads it back). No more tool calls.
 Skip the draft when the answer is tiny (a single figure, a one-part change): then write it straight away, or canvas_patch the part.
@@ -30,7 +30,7 @@ Skip the draft when the answer is tiny (a single figure, a one-part change): the
 
 const BLOCKS = `
 BUILDING BLOCKS (optional; they save markup): an element with data-block and a few data-* attributes; the kit fills it in, and anything inside it comes after its parts. It keeps its own data-cv-id, class and style.
-- data-block="card": a picture with its title, rating and line. data-img (https, from canvas_images), data-alt, data-title, data-rating + data-max (default 10) + data-source ("IGN"; without one the rating reads "my pick"), data-line, data-tag. data-fit="contain" shows a whole box. Without data-img its picture is a placeholder (a draft); a picture that fails shows the title instead.
+- data-block="card": a picture with its title, rating and line. data-img (canvas_images fills it by the card's id; write it only for other addresses), data-alt, data-title, data-rating + data-max (default 10) + data-source ("IGN"; without one the rating reads "my pick"), data-line, data-tag. data-fit="contain" shows a whole box. Without data-img its picture is a placeholder (a draft); a picture that fails shows the title instead.
 - data-block="stat": a big figure with its evidence. data-value, data-unit, data-label, data-line (the evidence), data-delta, data-source. Put a chart inside it for the trend.
 - data-block="step": a row of a timeline. data-when, data-title, data-line, data-tone="key" for the one that matters.
 - data-block="side": a column of a comparison. data-label, data-title, data-value + data-unit, data-points ("a | b | c"), data-verdict ("Pick") on the winner.
@@ -53,7 +53,7 @@ THE PAGE (canvas_page html):
 - Put a <style> at the top for your layout. Colours, type and spacing come from the style's tokens (var(--cv-…)), so a style switch restyles your page.
 - Mark the main parts with data-cv-id="…" (short, stable, named after what they show: "verdict", "chat", "game-tetris"). In a follow-up, anything that's still on the board keeps its id, even when it moves, grows or changes style: canvas_read lists the current ids. Same id → it glides to its new place; a new id → it enters as new. canvas_patch replaces one part by id.
 - Charts without drawing SVG: <div data-chart="KIND" data-rows='[…]' data-options='{…}'></div> (data-value for one number), sized to the element's width (give it a CSS height for line, area and columns). KIND: line, area, columns (vertical bars), bars (horizontal, ranked), donut, split (one bar in parts with a mark), map (US tile map: rows {"PA": 2.1} or [{state, value}]), timeline ([{date, label, note, tone}], options {layout: "row"}), multiples, waffle, spark, stars (data-value score, options {max: 5|10|100}), meter, bignum (data-value, options {label, unit, sub}), delta, legend. Options as in the kit: x, series, unit, max, highlight, marks [{x, label}], callouts [{x, text}] (labels drawn on the chart at that point).
-- Pictures: canvas_images gives all of them in one call (query names the thing; pageUrl takes a page's main picture), as https addresses: put them in data-img of a card, or <img src alt>. Nothing else loads from the network: no fonts, scripts or fetches.
+- Pictures: canvas_images finds all of them in one call (query names the thing; pageUrl takes a page's main picture). A card whose data-cv-id is a key gets its picture by itself; anywhere else, use the https address in <img src alt>. Nothing else loads from the network: no fonts, scripts or fetches.
 - Scripts run (window.cv is the kit: cv.esc, cv.fmt, cv.line(rows, opts) and the rest return HTML strings), but declarative charts are simpler and animate better.
 - Kit classes when they help: cv-kicker, cv-label, cv-h1, cv-h2, cv-h3, cv-dek, cv-body, cv-small, cv-num, cv-unit, cv-hl (highlighter), cv-rule, cv-table (td.n for numbers), cv-legend, cv-chip.
 ${TOKEN_HELP}
@@ -87,12 +87,12 @@ Draft:
   </div>
   <p class="cv-small" data-cv-id="source">Scores loading</p>
 </div>
-Full page (data-img from canvas_images):
+Full page (no data-img: canvas_images put the pictures in by the cards' ids):
 <div class="cv-fill">
   <header data-cv-id="title"><div class="cv-kicker">Game Boy Color</div><h1 class="cv-h1">Six cartridges worth owning first</h1></header>
   <div class="cv-wall" style="--cv-cols:4" data-cv-id="games">
-    <div data-block="card" data-cv-id="game-links" data-span="2" data-img="https://…/links-awakening.jpg" data-title="Link's Awakening DX" data-rating="9.5" data-source="IGN" data-line="Start here: the best game on the system."></div>
-    <div data-block="card" data-cv-id="game-tetris" data-img="https://…/tetris-dx.jpg" data-title="Tetris DX" data-rating="9"></div>  <!-- no published score: it reads "my pick" -->
+    <div data-block="card" data-cv-id="game-links" data-span="2" data-title="Link's Awakening DX" data-rating="9.5" data-source="IGN" data-line="Start here: the best game on the system."></div>
+    <div data-block="card" data-cv-id="game-tetris" data-title="Tetris DX" data-rating="9"></div>  <!-- no published score: it reads "my pick" -->
     …four more cards…
   </div>
   <p class="cv-small" data-cv-id="source">Scores: IGN where named; the rest are my picks.</p>

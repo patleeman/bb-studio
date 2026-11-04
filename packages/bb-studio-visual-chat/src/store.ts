@@ -349,6 +349,18 @@ export class CanvasStore {
    * title is the agent's when given, else the page's first heading. A page
    * replaces any items left from before pages.
    */
+  /** Pictures canvas_images found for a canvas, by key (a card's data-cv-id): kept in memory for its cards. */
+  private readonly found = new Map<string, Map<string, { url: string; alt?: string }>>();
+  pictures(canvasId: string): ReadonlyMap<string, { url: string; alt?: string }> {
+    return this.found.get(canvasId) ?? new Map();
+  }
+  rememberPictures(canvasId: string, pictures: Record<string, { url: string; alt?: string }>): void {
+    const map = this.found.get(canvasId) ?? new Map<string, { url: string; alt?: string }>();
+    for (const [key, picture] of Object.entries(pictures)) map.set(key, { url: picture.url, alt: picture.alt });
+    if (map.size > 200) for (const key of [...map.keys()].slice(0, map.size - 200)) map.delete(key);
+    this.found.set(canvasId, map);
+  }
+
   setPage(canvasId: string, html: string, by: CanvasActor, title: string | null = null): { rev: number; parts: number } {
     if (new TextEncoder().encode(html).length > CANVAS_LIMITS.pageBytes) throw new Error(`The page is over ${CANVAS_LIMITS.pageBytes / 1024} KB; make it leaner.`);
     if (!html.trim()) throw new Error("The page is empty.");

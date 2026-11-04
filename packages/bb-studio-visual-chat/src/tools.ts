@@ -9,9 +9,9 @@
 // pages still show; canvas_page replaces them.
 import { z } from "zod";
 import { designGuide } from "./guides";
-import { findImage, findImages, IMAGE_BATCH_MAX, type ImageDeps } from "./image";
+import { findImage, findImages, IMAGE_BATCH_MAX, type ImageDeps, type ImageResult } from "./image";
 import { LOOK_INFO, lookOf, ORGANIC_LOOKS, type OrganicLook } from "./looks";
-import { outline } from "./page";
+import { fillPictures, outline } from "./page";
 import { CANVAS_LIMITS, jsonBytes } from "./shared";
 import type { CanvasActor, CanvasStore } from "./store";
 
@@ -52,7 +52,7 @@ export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_patch: "Change one part of the page in place: id is its data-cv-id, html replaces that whole element (keep the data-cv-id on it so it animates); an empty html removes it.",
   canvas_style: "Switch the board's style without rewriting the page: editorial, field or instrument, with the reason in a few words. The page's tokens change and it animates.",
   canvas_image: "Find one picture for the page (box art, a cover, a product shot, a photo): returns {url, alt, source, width?, height?}, an https address the page can show in an <img>. query is the thing's name only (\"Tetris DX\", no platform or \"box art\"); pageUrl takes the main picture of a page about it. For more than one picture, use canvas_images.",
-  canvas_images: "Find all the page's pictures in ONE call, looked up in parallel: items [{key, query?, pageUrl?}] (up to 24). key is your name for it (use the part's data-cv-id); query is the thing's name only (\"Tetris DX\", no platform or \"box art\"; found on the web or Wikipedia); pageUrl takes the main picture of a page about it. Returns {key: {url, alt, source} or {error}}. Answers are cached for a day.",
+  canvas_images: "Find all the page's pictures in ONE call, looked up in parallel: items [{key, query?, pageUrl?}] (up to 24). key is the card's data-cv-id: each card (data-block=\"card\") with that id gets the picture by itself, on the page now and in every later version, so never copy the addresses into the page; query is the thing's name only (\"Tetris DX\", no platform or \"box art\"; found on the web or Wikipedia); pageUrl takes the main picture of a page about it. Returns {key: {url, alt, source} or {error}}. Answers are cached for a day.",
   canvas_guide: "The design guide again: how to tell the story on one page, the style tokens, the kit and the examples.",
 };
 
@@ -128,16 +128,18 @@ export async function runCanvasTool(store: CanvasStore, canvasId: string, name: 
           styled = ` Style: ${LOOK_INFO[parsed.style].name}.`;
         }
         const before = store.get(canvasId)?.page ?? null;
-        const { rev, parts } = store.setPage(canvasId, parsed.html, by, parsed.title ?? null);
+        const { html, filled } = fillPictures(parsed.html, store.pictures(canvasId));
+        const { rev, parts } = store.setPage(canvasId, html, by, parsed.title ?? null);
         // The caption shows with the page, without waiting for the reply; the reply (the same words) is what a voice reads back.
         if (parsed.caption) store.setCaption(canvasId, parsed.caption);
         const advice = parts ? renamedParts(before, parsed.html) : " No part has a data-cv-id, so the next version can't animate part by part: mark the main parts.";
+        const pictured = filled.length ? ` Pictures from canvas_images went into ${filled.length} card${filled.length === 1 ? "" : "s"} (${filled.join(", ")}).` : "";
         const close = parsed.caption ? " The caption is up: now reply with exactly that caption and stop." : "";
-        return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${advice}${close}`, changed: true };
+        return { text: `The page is up (revision ${rev}, ${parts} part${parts === 1 ? "" : "s"}).${styled} Title: "${store.get(canvasId)!.title}".${pictured}${advice}${close}`, changed: true };
       }
       case "canvas_patch": {
         const parsed = CANVAS_TOOL_PARAMS.canvas_patch.parse(input);
-        const { rev } = store.patchPage(canvasId, parsed.id, parsed.html, by);
+        const { rev } = store.patchPage(canvasId, parsed.id, fillPictures(parsed.html, store.pictures(canvasId)).html, by);
         return { text: `${parsed.html.trim() ? "Changed" : "Removed"} part "${parsed.id}" (revision ${rev}).`, changed: true };
       }
       case "canvas_style": {
@@ -155,9 +157,16 @@ export async function runCanvasTool(store: CanvasStore, canvasId: string, name: 
         const parsed = CANVAS_TOOL_PARAMS.canvas_images.parse(input ?? {});
         if (!images) return { text: "Pictures can't be looked up here.", changed: false, error: true };
         const found = await findImages(parsed.items, images);
+        const pictures = Object.fromEntries(Object.entries(found).filter((entry): entry is [string, ImageResult] => !("error" in entry[1])));
+        store.rememberPictures(canvasId, pictures);
+        // Cards already on the page (a draft) get their pictures now.
+        const page = store.get(canvasId)?.page ?? null;
+        const { html, filled } = page ? fillPictures(page, store.pictures(canvasId)) : { html: "", filled: [] };
+        if (filled.length) store.setPage(canvasId, html, by);
         const missing = Object.values(found).filter((answer) => "error" in answer).length;
         const note = missing ? ` (${missing} not found: leave those as a card without a picture, or retry them with pageUrl)` : "";
-        return { text: `${JSON.stringify(found)}${note}`, changed: false };
+        const placed = ` Each card whose data-cv-id is a key gets its picture by itself${filled.length ? ` (already in: ${filled.join(", ")})` : ""}: don't copy these addresses into the page.`;
+        return { text: `${JSON.stringify(found)}${note}${placed}`, changed: filled.length > 0 };
       }
     }
   } catch (error) {

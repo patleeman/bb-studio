@@ -42,8 +42,9 @@ thread is your memory; they never read it.
 - `canvas_patch({ id, html })`: one part, by its `data-cv-id` (`""` removes it).
 - `canvas_read()`: the page's source and its parts.
 - `canvas_images({ items: [{ key, query?, pageUrl? }] })`: every picture
-  the page needs in ONE call, looked up in parallel (key: the part's
-  `data-cv-id`; query: the thing's exact name, found with Exa when a key is
+  the page needs in ONE call, looked up in parallel (key: the card's
+  `data-cv-id`, and the card gets its picture by itself, so never copy the
+  addresses into the page; query: the thing's exact name, found with Exa when a key is
   set, else on Wikipedia; pageUrl: a page's main picture). Cached for a day.
   `canvas_image({ query?, pageUrl? })` finds a single one.
 - `canvas_style({ style, reason? })` and `canvas_guide()`.

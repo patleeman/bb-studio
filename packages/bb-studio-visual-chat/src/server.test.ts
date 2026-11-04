@@ -239,6 +239,30 @@ describe("canvas tools", () => {
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ items: [], page: PAGE });
   });
 
+  it("puts found pictures into the cards by id: on the draft at once, and on every later version", async () => {
+    const transport: Transport = async (url) => {
+      const search = url.searchParams.get("gsrsearch") ?? "";
+      const pages = [{ title: search, index: 1, original: { source: `https://upload.wikimedia.org/${encodeURIComponent(search)}.jpg` } }];
+      return { status: 200, location: null, type: "application/json", body: (async function* () { yield new TextEncoder().encode(JSON.stringify({ query: { pages } })); })(), close() {} };
+    };
+    const { call, tool } = canvasHost({ exaKey: async () => "", transport, lookup: async () => [{ address: "93.184.216.34" }] });
+    const { threadId } = await call("canvas.create", { text: "Showcase" });
+    const draft = '<div class="cv-wall"><div data-block="card" data-cv-id="g-tetris" data-title="Tetris DX"></div><div data-block="card" data-cv-id="g-own" data-img="https://example.org/mine.jpg"></div><p data-cv-id="g-wario">Wario</p></div>';
+    await tool("canvas_page", { html: draft }, threadId);
+    const found = text(await tool("canvas_images", { items: [{ key: "g-tetris", query: "Tetris DX" }, { key: "g-own", query: "Own" }, { key: "g-wario", query: "Wario Land 3" }] }, threadId));
+    expect(found).toContain("already in: g-tetris");
+    let page = (await call("canvas.get", { threadId })).canvas.page as string;
+    expect(page).toContain('data-cv-id="g-tetris" data-title="Tetris DX" data-img="https://upload.wikimedia.org/Tetris%20DX.jpg" data-alt="Tetris DX"');
+    // A card's own address stays; an element that isn't a card is left alone.
+    expect(page).toContain('data-img="https://example.org/mine.jpg"');
+    expect(page).not.toContain("Wario%20Land");
+    // The full page without data-img gets the pictures back by id.
+    const full = text(await tool("canvas_page", { html: '<div data-block="card" data-cv-id="g-tetris" data-title="Tetris DX" data-rating="9"></div>' }, threadId));
+    expect(full).toContain("went into 1 card (g-tetris)");
+    page = (await call("canvas.get", { threadId })).canvas.page as string;
+    expect(page).toContain('data-img="https://upload.wikimedia.org/Tetris%20DX.jpg"');
+  });
+
   it("shows the caption sent with the final page at once", async () => {
     const { call, tool } = canvasHost();
     const { threadId } = await call("canvas.create", { text: "Showcase" });

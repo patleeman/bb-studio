@@ -50,6 +50,30 @@ export function findPart(html: string, id: string): { start: number; end: number
   return null;
 }
 
+const attrEsc = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Puts found pictures into the page: every card (data-block="card") whose data-cv-id is a key and that has no
+ * data-img yet gets data-img (and data-alt when it has none). So the agent never copies picture addresses into
+ * the page, and pictures land on a draft as soon as they're found. Returns the page and the ids it filled.
+ */
+export function fillPictures(html: string, pictures: ReadonlyMap<string, { url: string; alt?: string }>): { html: string; filled: string[] } {
+  if (!pictures.size) return { html, filled: [] };
+  const edits: { at: number; text: string; id: string }[] = [];
+  for (const tag of tags(html)) {
+    if (tag.close || !/\bdata-block\s*=\s*(?:"card"|'card'|card\b)/i.test(tag.attrs) || /\bdata-img\s*=/i.test(tag.attrs)) continue;
+    const id = idOf(tag.attrs);
+    const picture = id ? pictures.get(id) : undefined;
+    if (!id || !picture || !/^https:\/\//i.test(picture.url)) continue;
+    const alt = !/\bdata-alt\s*=/i.test(tag.attrs) && picture.alt ? ` data-alt="${attrEsc(picture.alt)}"` : "";
+    const at = tag.end - (tag.selfClosing ? 2 : 1);
+    edits.push({ at, text: ` data-img="${attrEsc(picture.url)}"${alt}`, id });
+  }
+  let out = html;
+  for (const edit of edits.sort((a, b) => b.at - a.at)) out = out.slice(0, edit.at) + edit.text + out.slice(edit.at);
+  return { html: out, filled: edits.map((edit) => edit.id).reverse() };
+}
+
 /** The page with the part replaced by html ("" removes it), or null when there's no such part. */
 export function replacePart(html: string, id: string, replacement: string): string | null {
   const range = findPart(html, id);

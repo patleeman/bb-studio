@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPart, outline, pageTitle, replacePart, textOf } from "./page";
+import { fillPictures, findPart, outline, pageTitle, replacePart, textOf } from "./page";
 
 const PAGE = `<style>.a > div { color: red } /* <div data-cv-id="fake"> */</style>
 <div data-cv-id="outer" class="a"><div><div data-cv-id='inner'>Inner <b>bold</b></div></div><img data-cv-id=pic src="x.png"><br></div>
@@ -30,5 +30,18 @@ describe("pages", () => {
     expect(pageTitle("<h1>Big <em>news</em></h1><h2>x</h2>")).toBe("Big news");
     expect(pageTitle("<p>none</p>")).toBeNull();
     expect(textOf(PAGE)).not.toContain("color");
+  });
+});
+
+describe("fillPictures", () => {
+  it("fills cards by id with escaped attributes, keeping their own and skipping the rest", () => {
+    const pictures = new Map([["a", { url: 'https://upload.wikimedia.org/a".jpg', alt: "A <b>" }], ["b", { url: "javascript:alert(1)" }], ["c", { url: "https://x.org/c.jpg" }]]);
+    const html = `<div data-block='card' data-cv-id="a"></div><div data-block="card" data-cv-id="b"></div><div data-block="card" data-cv-id="c" data-alt="mine"/><script>var s = '<div data-block="card" data-cv-id="a">';</script>`;
+    const { html: out, filled } = fillPictures(html, pictures);
+    expect(filled).toEqual(["a", "c"]);
+    expect(out).toContain(`data-cv-id="a" data-img="https://upload.wikimedia.org/a&quot;.jpg" data-alt="A &lt;b&gt;">`);
+    expect(out).toContain(`data-cv-id="c" data-alt="mine" data-img="https://x.org/c.jpg"/>`);
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain(`<script>var s = '<div data-block="card" data-cv-id="a">';</script>`);
   });
 });
