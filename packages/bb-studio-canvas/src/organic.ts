@@ -290,7 +290,9 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
   for (const item of items) { const s = sizes.get(item.id)!; area += s.w * heightOf(item); }
   // Composed for the screen; only a board too full for it (after the fit's shrink) is composed taller, to scroll.
   const Hv = Math.round(Math.max(H, narrow ? area / (W * 0.78) : area / (W * 0.82 * MIN_FIT)));
-  const pull = Math.max(0.62, Math.min(1, 0.4 + area / (W * H)));
+  // How far toward the composition's targets pieces reach from the hero: a sparse board stays a tight cluster
+  // (the fit then scales it up to the screen), a full one spreads to the edges.
+  const pull = Math.max(0.45, Math.min(1, 0.2 + (area / (W * H)) * 1.2));
 
   const boxes: Box[] = [];
   const gapOf = (item: OrganicItem) => Math.round(rules.gap * (narrow ? 0.7 : 1) * (0.78 + (hashOf(item.id) % 9) / 16));
@@ -415,7 +417,12 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
   for (const item of order) {
     if (pins.has(item.id)) continue;
     const isHero = item.id === hero?.id || item.id === second?.id;
-    if (item.region) targets.set(item.id, [REGION_AT[item.region][0] * W, REGION_AT[item.region][1] * Hv]);
+    if (item.region && !isHero) {
+      // A region is a direction from the hero, drawn in like the composition's own targets.
+      const [x, y] = REGION_AT[item.region];
+      const hx = mx(pattern.hero.x), hy = pattern.hero.y;
+      targets.set(item.id, [(hx + (x - hx) * pull) * W, (hy + (y - hy) * pull) * Hv]);
+    } else if (item.region) targets.set(item.id, [REGION_AT[item.region][0] * W, REGION_AT[item.region][1] * Hv]);
     else if (isHero) { const spot = item.id === hero?.id ? pattern.hero : pattern.second ?? { x: 0.75, y: 0.42 }; targets.set(item.id, [mx(spot.x) * W, spot.y * Hv]); }
     else if (narrow) {
       // A narrow screen: down the page, alternating sides, so it still reads as composed.
@@ -428,12 +435,13 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
     }
   }
 
+  let keptAny = false;
   // Pass 1, stability: whatever kept its width keeps its spot while it's free (a pin only beside a target that stayed too).
   for (const item of order) {
     const target = pins.get(item.id);
     if (target && !rects.has(target)) continue;
     const was = kept(item, pinOf(item));
-    if (was) place(item, was[0], was[1]);
+    if (was) { place(item, was[0], was[1]); keptAny = true; }
   }
   // Pass 2: the rest, composed.
   for (const item of order) {
@@ -455,9 +463,31 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
     place(item, x, y);
   }
 
+  // A fresh composition (nothing kept from the last one) is stretched to the screen; kept spots already were.
+  if (!narrow && !keptAny && !items.some((item) => item.fixed)) stretch(rects, W, H);
   let height = 0;
   for (const rect of rects.values()) height = Math.max(height, rect.y + rect.h);
   return { rects, focusId: hero?.id ?? null, height: Math.ceil(height), frame, composition: comp, fit: fitTo(rects, W, H, narrow || items.some((item) => item.fixed)) };
+}
+
+/**
+ * When the composition is much wider than tall for the screen (a spine, a
+ * close-up), its pieces spread apart downward from its top, up to half
+ * again, so after the fit it reaches the screen's top and bottom.
+ * Positions only: spacing every pair further apart keeps them clear.
+ */
+function stretch(rects: Map<string, Placed>, W: number, H: number): void {
+  if (rects.size < 2) return;
+  let x0 = Number.POSITIVE_INFINITY, y0 = Number.POSITIVE_INFINITY, x1 = Number.NEGATIVE_INFINITY, y1 = Number.NEGATIVE_INFINITY;
+  for (const r of rects.values()) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
+  const fit = Math.min(W / Math.max(1, x1 - x0), MAX_FIT);
+  const want = H / fit; // the height that fills the screen once fitted
+  const bh = y1 - y0;
+  if (want <= bh * 1.08) return;
+  const reach = Math.max(...[...rects.values()].map((r) => r.y - y0));
+  if (reach <= 0) return;
+  const f = Math.min(1.5, 1 + (want - bh) / reach);
+  for (const [id, r] of rects) rects.set(id, { ...r, y: Math.round(y0 + (r.y - y0) * f) });
 }
 
 /** Bigger than this, a sparse board's type and charts would read as blown up. */

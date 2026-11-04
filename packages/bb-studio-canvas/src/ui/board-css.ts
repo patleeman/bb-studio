@@ -12,7 +12,7 @@ ${S} .canvas-chat{background:var(--cv-paper)}
 ${S} .canvas-scroll{background-color:var(--cv-paper)}
 ${S} .cvt{position:absolute;will-change:transform;font-family:var(--cv-font-text);color:var(--cv-ink)}
 ${S} .cvt-rot{transform-origin:50% 35%}
-${S} .cvt-fit{position:absolute;inset:0;transform-origin:0 0;transition:transform .56s cubic-bezier(.2,.8,.2,1)}
+${S} .cvt-fit{position:absolute;left:0;top:0;width:100%;height:0;transform-origin:0 0;transition:transform .56s cubic-bezier(.2,.8,.2,1)}
 @media (prefers-reduced-motion: reduce){${S} .cvt-fit{transition:none}}
 ${S} .cvt-card{position:relative;color:var(--cv-ink)}
 ${S} .cvt-head{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);font-weight:700;letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-ink);margin-bottom:var(--cv-s-3);display:flex;align-items:center;gap:8px}
