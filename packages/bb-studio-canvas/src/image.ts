@@ -220,43 +220,59 @@ export function pickExaImage(results: readonly ExaResult[], query: string): Imag
 interface WikiPage { title?: string; index?: number; fullurl?: string; original?: { source?: string; width?: number; height?: number }; thumbnail?: { source?: string; width?: number; height?: number } }
 
 /** Words that say what kind of picture is wanted, not what it shows: Wikipedia searches better without them. */
-const PICTURE_WORDS = /\b(box ?art|cover ?art|covers?|boxes|box|photos?|pictures?|images?|screenshots?|official|artwork|logo|poster|product shot|jpe?g|png)\b/gi;
+const PICTURE_WORDS = /\b(box ?art|cover ?art|covers?|boxes|box|cartridges?|carts?|game ?paks?|photos?|pictures?|images?|screenshots?|official|artwork|logo|poster|product shot|jpe?g|png)\b/gi;
 export const wikipediaSearchText = (query: string) => query.replace(PICTURE_WORDS, " ").replace(/\s+/g, " ").trim() || query.trim();
+/** Where a platform or store starts in a query ("Tetris DX | Game Boy Color"): the thing's name is what comes before. */
+const PLATFORM = /\b(game ?boy|gbc|gba|nintendo|famicom|super nintendo|snes|nes|n64|gamecube|wii|switch|playstation|ps[1-5]|psp|vita|xbox|sega|genesis|mega drive|dreamcast|atari|steam|pc|mac|ios|android|chromatic|modretro)\b/i;
 
 const words = (text: string) => text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const STOP = new Set(["the", "a", "an", "of", "and"]);
 
 /**
- * The best Wikipedia article with a picture for a query. Search order decides, except that among the first three
- * hits an article whose whole name is in the query wins (the longest such name: "Tetris DX" over "Tetris" for
- * "Tetris DX Game Boy Color"), and lists ("List of …") come last.
+ * The best Wikipedia article with a picture for a query, or null when no hit is about it. Among the first three
+ * hits, one whose whole name starts the query wins (the longest: "Tetris DX" over "Tetris" for "Tetris DX Game
+ * Boy Color"). Otherwise the first hit that has the query's first word in its name, skipping lists ("List of …")
+ * and articles named by a later part of the query (the platform: "Game Boy Color").
  */
 export function pickWikipediaImage(pages: readonly WikiPage[], query: string): ImageResult | null {
-  const asked = ` ${words(wikipediaSearchText(query))} `;
+  const asked = words(wikipediaSearchText(query));
+  const first = asked.split(" ").find((word) => word.length > 1 && !STOP.has(word)) ?? "";
   const hits = pages
     .map((page) => ({ page, picture: page.original?.source ? page.original : page.thumbnail }))
-    .map((hit) => ({ ...hit, url: https(hit.picture?.source ?? null, "https://en.wikipedia.org/") }))
-    .filter((hit) => hit.url && !/\.svg(\?|$)/i.test(hit.url))
+    .map((hit) => ({ ...hit, url: https(hit.picture?.source ?? null, "https://en.wikipedia.org/"), name: words((hit.page.title ?? "").replace(/\s*\([^)]*\)\s*$/, "")) }))
+    .filter((hit) => hit.url && !/\.svg(\?|$)/i.test(hit.url) && !/^list of\b/i.test(hit.page.title ?? ""))
     .sort((a, b) => (a.page.index ?? 99) - (b.page.index ?? 99));
-  const list = (hit: (typeof hits)[number]) => /^list of\b/i.test(hit.page.title ?? "");
-  const named = hits.slice(0, 3).filter((hit) => !list(hit)).map((hit) => ({ hit, name: words((hit.page.title ?? "").replace(/\s*\([^)]*\)\s*$/, "")) })).filter((each) => each.name && asked.includes(` ${each.name} `));
-  named.sort((a, b) => b.name.length - a.name.length);
-  const best = named[0]?.hit ?? hits.find((hit) => !list(hit)) ?? hits[0];
+  const starts = hits.slice(0, 3).filter((hit) => hit.name && (asked === hit.name || asked.startsWith(`${hit.name} `))).sort((a, b) => b.name.length - a.name.length);
+  const best = starts[0] ?? hits.find((hit) => ` ${hit.name} `.includes(` ${first} `) && !(` ${asked} `.includes(` ${hit.name} `) && !asked.startsWith(hit.name)));
   if (!best) return null;
   const { page, picture } = best;
   return { url: best.url!, alt: page.title ?? query, source: page.fullurl ?? `https://en.wikipedia.org/wiki/${encodeURIComponent((page.title ?? "").replace(/ /g, "_"))}`, ...(picture?.width ? { width: picture.width } : {}), ...(picture?.height ? { height: picture.height } : {}) };
 }
 
-/** A picture from Wikipedia for a query: its search API, then each hit's page image (any licence, so box art counts). */
-export async function wikipediaImage(query: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<ImageResult | null> {
+async function wikipediaSearch(search: string, query: string, deps: Pick<ImageDeps, "lookup" | "transport">): Promise<ImageResult | null> {
   const params = new URLSearchParams({
     action: "query", format: "json", formatversion: "2", redirects: "1",
-    generator: "search", gsrsearch: wikipediaSearchText(query), gsrlimit: "5", gsrnamespace: "0",
+    generator: "search", gsrsearch: search, gsrlimit: "5", gsrnamespace: "0",
     prop: "pageimages|info", piprop: "original|thumbnail", pithumbsize: "1200", pilicense: "any", inprop: "url",
   });
   const page = await safeFetch(`${WIKIPEDIA_API_URL}?${params}`, deps);
   let payload: { query?: { pages?: WikiPage[] } };
   try { payload = JSON.parse(page.text); } catch { throw new Error("Wikipedia's answer couldn't be read."); }
   return pickWikipediaImage(payload.query?.pages ?? [], query);
+}
+
+/**
+ * A picture from Wikipedia for a query: its search API, then the best hit's page image (any licence, so box art
+ * counts). When no hit is about the thing, once more with just its name (the words before a platform, else the
+ * first three).
+ */
+export async function wikipediaImage(query: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<ImageResult | null> {
+  const search = wikipediaSearchText(query);
+  const found = await wikipediaSearch(search, query, deps);
+  if (found) return found;
+  const cut = PLATFORM.exec(search)?.index ?? -1;
+  const name = (cut > 0 ? search.slice(0, cut) : search.split(" ").slice(0, 3).join(" ")).trim();
+  return name && name !== search ? wikipediaSearch(name, name, deps) : null;
 }
 
 /** Runs one Exa search for a query: its best picture, or null. */

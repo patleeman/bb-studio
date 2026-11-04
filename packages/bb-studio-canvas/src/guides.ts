@@ -22,7 +22,7 @@ DESIGN GUIDE
 WORK FAST: DRAFT FIRST, THEN THE PAGE
 The user waits for the first thing on the board, so it comes first:
 1. Your FIRST response, before any search or picture: canvas_page with a quick draft. The real headline (your point), and the skeleton of the shape you're going for: each section with its FINAL data-cv-id and a few words of placeholder. A card with only its title (data-block="card" data-title="Tetris DX"), a step with only its title, or <div data-block="placeholder" data-label="Ratings by outlet"></div>. Keep it short: no <style> beyond the grid, no pictures, no numbers you haven't checked.
-2. In that SAME response, call canvas_images ONCE with every picture the page needs (key = the part's data-cv-id, query = the thing's exact name), and start any searches. Never one call per picture, and never a second round just for pictures.
+2. In that SAME response, call canvas_images ONCE with every picture the page needs (key = the part's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"), and start any searches. Never one call per picture, and never a second round just for pictures.
 3. Then one canvas_page with the full page: the same ids, now with pictures, ratings and real text. The draft's parts glide into place.
 Skip the draft when the answer is tiny (a single figure, a one-part change): then write it straight away, or canvas_patch the part.
 `.trim();

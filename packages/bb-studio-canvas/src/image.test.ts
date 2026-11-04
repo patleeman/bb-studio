@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Database from "better-sqlite3";
-import { findImages, ImageCache, IMAGE_CACHE_MS, mainImage, pickExaImage, pickWikipediaImage, pinnedTransport, privateAddress, safeFetch, stripTracking, wikipediaSearchText, type Transport } from "./image";
+import { findImages, ImageCache, wikipediaImage, IMAGE_CACHE_MS, mainImage, pickExaImage, pickWikipediaImage, pinnedTransport, privateAddress, safeFetch, stripTracking, wikipediaSearchText, type Transport } from "./image";
 import { CANVAS_MIGRATIONS } from "./migrations";
 
 describe("canvas_image", () => {
@@ -87,6 +87,23 @@ describe("canvas_image", () => {
     // No hit names it: search order, lists last, vector art skipped.
     expect(pickWikipediaImage([{ title: "List of Metal Gear media", index: 1, original: pic("list") }, { title: "Logo", index: 2, original: { source: "https://upload.wikimedia.org/a.svg" } }, { title: "Metal Gear: Ghost Babel", index: 3, original: pic("babel") }], "Metal Gear Solid Game Boy Color")?.url).toBe("https://upload.wikimedia.org/babel.jpg");
     expect(pickWikipediaImage([{ title: "No picture", index: 1 }], "x")).toBeNull();
+    // Only the platform matched: nothing, rather than a picture of a Game Boy.
+    expect(pickWikipediaImage([{ title: "List of Game Boy Color games", index: 1, original: pic("list") }, { title: "Game Boy Color", index: 2, original: pic("gbc") }], "Link's Awakening DX Game Boy Color cartridge")).toBeNull();
+  });
+
+  it("searches again with just the name when no hit is about the thing", async () => {
+    const searched: string[] = [];
+    const transport: Transport = async (url) => {
+      const search = url.searchParams.get("gsrsearch")!;
+      searched.push(search);
+      const pages = search === "Link's Awakening DX"
+        ? [{ title: "The Legend of Zelda: Link's Awakening DX", index: 1, original: { source: "https://upload.wikimedia.org/la-dx.png" } }]
+        : [{ title: "Game Boy Color", index: 1, original: { source: "https://upload.wikimedia.org/gbc.png" } }];
+      return { status: 200, location: null, type: "application/json", body: (async function* () { yield new TextEncoder().encode(JSON.stringify({ query: { pages } })); })(), close() {} };
+    };
+    const found = await wikipediaImage("Link's Awakening DX Game Boy Color cartridge box art", { transport, lookup: async () => [{ address: "93.184.216.34" }] });
+    expect(searched).toEqual(["Link's Awakening DX Game Boy Color", "Link's Awakening DX"]);
+    expect(found?.url).toBe("https://upload.wikimedia.org/la-dx.png");
   });
 
   it("looks a batch up in parallel, in the order asked, one failure not stopping the rest", async () => {
