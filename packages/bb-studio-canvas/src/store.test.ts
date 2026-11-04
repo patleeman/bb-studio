@@ -130,4 +130,54 @@ describe("canvas store", () => {
     expect(clipCaption("Democrats held the Senate.\n\n```js\ncode\n```\n::next{reply=\"x\"}")).toBe("Democrats held the Senate.");
     expect(clipCaption("x".repeat(1000))).toHaveLength(CANVAS_LIMITS.captionChars);
   });
+
+  it("keeps placement: scale, region, pin, side and bleed; set replaces them", () => {
+    const { store } = memory();
+    const { id } = store.create({ threadId: "thr_a", look: "editorial" });
+    store.edit(id, [
+      { op: "add", item: { id: "chart", kind: "line", data: [{ x: "a", y: 1 }, { x: "b", y: 2 }], scale: "hero", bleed: true } },
+      { op: "add", item: { id: "fact", kind: "stat", data: 4, region: "top-right", pinnedTo: "chart", point: { x: 1, y: 0.2 }, side: "right", scale: "small" } },
+    ], "agent");
+    expect(store.items(id).find((item) => item.id === "chart")).toMatchObject({ scale: "hero", bleed: true, region: null });
+    expect(store.items(id).find((item) => item.id === "fact")).toMatchObject({ region: "top-right", pinnedTo: "chart", side: "right", scale: "small", point: { x: 1, y: 0.2 } });
+    store.edit(id, [{ op: "update", patch: { id: "fact", region: null } }], "agent");
+    expect(store.items(id).find((item) => item.id === "fact")).toMatchObject({ region: null, pinnedTo: "chart" });
+    store.edit(id, [{ op: "set", items: [{ id: "fact", kind: "stat", data: 5 }] }], "agent");
+    expect(store.items(id)[0]).toMatchObject({ id: "fact", region: null, pinnedTo: null, scale: null, side: null, bleed: null });
+  });
+
+  it("keeps the title on the topic: the agent's, else the board's headline or hero, and a new board renames it", () => {
+    const { store } = memory();
+    const { id } = store.create({ threadId: "thr_a", title: "give me a rundown of the election yesterday", look: "editorial" });
+    store.edit(id, [{ op: "set", items: [{ id: "h", kind: "headline", data: { text: "Democrats take the House" } }, { id: "seats", kind: "stat", data: 221, importance: 5 }] }], "agent");
+    expect(store.get(id)!.title).toBe("Democrats take the House");
+    // The agent names it: that sticks through follow-ups on the same board.
+    store.edit(id, [{ op: "board", title: "Election 2026" }], "agent");
+    store.edit(id, [{ op: "update", patch: { id: "h", data: { text: "Democrats hold the House" } } }], "agent");
+    expect(store.get(id)!.title).toBe("Election 2026");
+    // A new topic (nothing of the old board stays) takes the new board's hero, unless the agent names it.
+    store.edit(id, [{ op: "set", items: [{ id: "studio", kind: "custom", title: "BB Studio at a glance", html: "<p>x</p>", importance: 5 }] }], "agent");
+    expect(store.get(id)!.title).toBe("BB Studio at a glance");
+    store.edit(id, [{ op: "clear" }, { op: "board", title: "Week plan" }], "agent");
+    expect(store.get(id)!.title).toBe("Week plan");
+  });
+
+  it("refuses the same composition on two boards in a row, unless asked", () => {
+    const { store } = memory();
+    const { id } = store.create({ threadId: "thr_a", look: "editorial" });
+    store.edit(id, [{ op: "set", items: [{ id: "a", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit" }], "agent");
+    expect(store.view(id)?.composition).toBe("orbit");
+    // A follow-up on the same board may keep it.
+    store.edit(id, [{ op: "set", items: [{ id: "a", kind: "stat", data: 2 }, { id: "b", kind: "stat", data: 3 }] }, { op: "board", composition: "orbit" }], "agent");
+    // A new board may not repeat it...
+    expect(() => store.edit(id, [{ op: "set", items: [{ id: "c", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit" }], "agent")).toThrow(/composition too/);
+    expect(store.items(id).map((item) => item.id)).toEqual(["a", "b"]);
+    // ...unless the user asked; another composition is fine.
+    store.edit(id, [{ op: "set", items: [{ id: "c", kind: "stat", data: 1 }] }, { op: "board", composition: "orbit", sameComposition: true }], "agent");
+    store.edit(id, [{ op: "set", items: [{ id: "d", kind: "map", data: { PA: 1 } }] }, { op: "board", composition: "map" }], "agent");
+    expect(store.view(id)?.composition).toBe("map");
+    // A new board without one drops the old (the page infers it).
+    store.edit(id, [{ op: "set", items: [{ id: "e", kind: "stat", data: 1 }] }], "agent");
+    expect(store.view(id)?.composition).toBeNull();
+  });
 });

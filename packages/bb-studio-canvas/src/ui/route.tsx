@@ -7,12 +7,12 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
-import { canvasHref, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
+import { canvasHref, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasView, type Composition } from "../shared";
 import { DEFAULT_LOOK, isLook, LOOK_INFO, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
 import { lookCss } from "./board-css";
 import { ModelPicker } from "./model-picker";
-import { OrganicBoard } from "./organic-board";
+import { OrganicBoard, type BoardItem } from "./organic-board";
 import { useCanvas } from "./use-canvas";
 
 const decode = (segment: string) => {
@@ -31,6 +31,33 @@ function startLook(): OrganicLook {
   } catch {
     return DEFAULT_LOOK;
   }
+}
+
+/**
+ * A reference board, shown in place of the canvas's own (for design
+ * comparisons): a window event, so only the page's own scripts (a capture
+ * driving it) can show one; nothing in a URL can. detail null puts the
+ * canvas's own board back. Items may carry fixed: {x, y, w} (shares of the
+ * board) to be placed by hand.
+ */
+export const PREVIEW_EVENT = "bb-studio-canvas:preview";
+interface Preview { look: OrganicLook; title: string; caption: string | null; composition: Composition | null; items: BoardItem[] }
+function usePreview(): Preview | null {
+  const [preview, setPreview] = useState<Preview | null>(null);
+  useEffect(() => {
+    const on = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { look?: unknown; title?: unknown; caption?: unknown; composition?: unknown; items?: unknown } | null;
+      if (!detail || !Array.isArray(detail.items)) { setPreview(null); return; }
+      const items = (detail.items as Partial<BoardItem>[]).filter((item) => item && typeof item.id === "string" && typeof item.kind === "string").map((item, index): BoardItem => ({
+        title: null, data: null, options: {}, html: null, size: "m", importance: 3, rev: 1, createdAt: index + 1, updatedAt: index + 1,
+        ...(item as Partial<CanvasItem>), id: item.id!, kind: item.kind!, fixed: item.fixed ?? null,
+      } as BoardItem));
+      setPreview({ look: isLook(detail.look) && detail.look !== "classic" ? detail.look : DEFAULT_LOOK, title: typeof detail.title === "string" ? detail.title : "Reference", caption: typeof detail.caption === "string" ? detail.caption : null, composition: (typeof detail.composition === "string" ? detail.composition : null) as Composition | null, items });
+    };
+    window.addEventListener(PREVIEW_EVENT, on);
+    return () => window.removeEventListener(PREVIEW_EVENT, on);
+  }, []);
+  return preview;
 }
 
 export default function CanvasRoute({ rest }: { rest: string }) {
@@ -55,7 +82,9 @@ function useDictating(field: string): boolean {
 function CanvasPage({ threadId }: { threadId: string | null }) {
   const rpc = useRpc<typeof canvasContract>();
   const theme = useWidgetTheme();
-  const { canvas, send, reload } = useCanvas(threadId);
+  const { canvas: own, send, reload } = useCanvas(threadId);
+  const preview = usePreview();
+  const canvas = useMemo(() => (preview && own ? { ...own, look: preview.look, title: preview.title, caption: preview.caption, composition: preview.composition, items: preview.items, status: "idle" as const } : own), [own, preview]);
   const [pending, setPending] = useState<string | null>(null);
   const [chatHeight, setChatHeight] = useState(0);
   const [newLook] = useState<OrganicLook>(startLook);
@@ -102,15 +131,17 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const items = canvas?.items ?? [];
   const working = canvas?.status === "working" || !!pending;
   return (
-    <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
+    <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-preview={preview ? "" : undefined} data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
       {css ? <style>{css}</style> : null}
       <TopBar canvas={canvas ?? null} look={look} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className="canvas-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 pt-2" style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : look !== "classic" ? (
           <OrganicBoard
+            key={preview ? "preview" : "board"}
             items={items}
             look={look}
+            composition={canvas?.composition ?? null}
             mode={theme.mode}
             bottomPad={24}
             empty={<p className="max-w-sm text-center text-[15px] leading-relaxed" style={{ color: "var(--cv-muted)", fontFamily: "var(--cv-font-text)" }}>{working ? "Thinking it through…" : "Ask anything. The board fills in as we talk, and changes as the conversation does."}</p>}

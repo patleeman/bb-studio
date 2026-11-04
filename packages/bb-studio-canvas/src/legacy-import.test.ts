@@ -19,10 +19,12 @@ function legacyDataDir(upTo = 3): { dataDir: string; path: string } {
   const path = legacyDatabasePath(dataDir);
   const db = new Database(path);
   for (const migration of CANVAS_MIGRATIONS.slice(0, upTo)) db.exec(migration);
+  // This store writes the composition columns (migration 5), which the old plugin's file never had: add them for the fixture only.
+  if (upTo >= 3) db.exec(CANVAS_MIGRATIONS[4]!);
   const store = new CanvasStore(db, () => 5_000);
   if (upTo >= 3) {
     const a = store.create({ threadId: "thr_old_a", title: "Release", look: "instrument", execution: { providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: null } });
-    store.edit(a.id, [{ op: "add", item: { id: "issues", kind: "stat", title: "Open issues", data: { value: 12 } } }], "agent");
+    store.edit(a.id, [{ op: "add", item: { id: "issues", kind: "stat", title: "Open issues", data: { value: 12 } } }, { op: "board", title: "Release" }], "agent");
     store.beginTurn(a.id, "user", "How is the release going?");
     store.attach(a.id, "thr_old_a2");
     store.create({ threadId: "thr_old_b", title: "Weather" });

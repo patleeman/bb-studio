@@ -294,7 +294,8 @@ describe("canvas tools", () => {
     const item = (await call("canvas.get", { threadId })).canvas.items.find((each: { id: string }) => each.id === "quote");
     expect(Object.keys(item)).not.toEqual(expect.arrayContaining(["anchor"]));
     expect(item).not.toHaveProperty("relatedTo");
-    expect(item).not.toHaveProperty("point");
+    // point is a placement field now (a spot on pinnedTo): without a pin it's dropped.
+    expect(item.point ?? null).toBeNull();
     const read = text(await tool("canvas_read", {}, threadId));
     expect(read).not.toMatch(/anchored|related to|note/);
   });
@@ -323,6 +324,23 @@ describe("canvas tools", () => {
     expect(read).toContain("(focus)");
     expect(read).toContain("Removed stat \"house\"");
     expect(read).not.toMatch(/- house:/);
+  });
+
+  it("takes the board's title, composition and placement through canvas_set, and refuses a repeated composition", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "give me a rundown of the election yesterday" });
+    await tool("canvas_set", { style: "editorial", title: "Election 2026", composition: "giant-number", items: [{ id: "seats", kind: "stat", data: 221, scale: "hero" }, { id: "why", kind: "caption", data: "First flip since 2018", pinnedTo: "seats", point: { x: 1, y: 0.3 } }, { id: "map", kind: "map", data: { PA: 2 }, region: "top-right", scale: "medium" }] }, threadId);
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ title: "Election 2026", composition: "giant-number" });
+    expect(view.items.find((item: { id: string }) => item.id === "map")).toMatchObject({ region: "top-right", scale: "medium" });
+    const read = text(await tool("canvas_read", {}, threadId));
+    expect(read).toContain("Composition: giant-number.");
+    expect(read).toContain('Title: "Election 2026"');
+    expect(read).toContain("pinned to seats at 1,0.3");
+    const again = await tool("canvas_set", { title: "BB Studio", composition: "giant-number", items: [{ id: "studio", kind: "stat", data: 12 }] }, threadId);
+    expect(text(again)).toContain("Nothing changed: The last board was a \\\"giant-number\\\" composition too");
+    await tool("canvas_set", { title: "BB Studio", composition: "essay", items: [{ id: "studio", kind: "caption", data: "One plugin." }] }, threadId);
+    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "BB Studio", composition: "essay" });
   });
 });
 

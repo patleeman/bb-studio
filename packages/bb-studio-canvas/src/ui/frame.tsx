@@ -34,7 +34,7 @@ export function frameSrcDoc(html: string, look: OrganicLook, mode: "light" | "da
   return `<!doctype html><html data-cv-look="${look}" data-cv-mode="${mode}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${CSP}"><style>${css}</style><script>${BOOT}</script><script>${kit}${RENDER_PATCH}</script></head><body><div id="cv-root" class="cv-root">${html}</div></body></html>`;
 }
 
-export function CanvasFrame({ html, title, data, options, look, mode, width, onHeight }: {
+export function CanvasFrame({ html, title, data, options, look, mode, width, room, onHeight }: {
   html: string;
   title: string;
   data: unknown;
@@ -42,6 +42,8 @@ export function CanvasFrame({ html, title, data, options, look, mode, width, onH
   look: OrganicLook;
   mode: "light" | "dark";
   width: number;
+  /** The height its place in the composition suggests (cv.height()). */
+  room?: number;
   /** The content's height once the frame has reported it. */
   onHeight?(height: number): void;
 }) {
@@ -53,12 +55,12 @@ export function CanvasFrame({ html, title, data, options, look, mode, width, onH
   // waiting for its data forever.
   const [readyDoc, setReadyDoc] = useState<string | null>(null);
   const ready = readyDoc === srcDoc;
-  const latest = useRef({ srcDoc, data, options, mode, width, height, onHeight });
-  latest.current = { srcDoc, data, options, mode, width, height, onHeight };
+  const latest = useRef({ srcDoc, data, options, mode, width, room, height, onHeight });
+  latest.current = { srcDoc, data, options, mode, width, room, height, onHeight };
   const send = useCallback(() => {
-    const { data: d, options: o, mode: m, width: w, height: h } = latest.current;
+    const { data: d, options: o, mode: m, width: w, room: r, height: h } = latest.current;
     try {
-      frame.current?.contentWindow?.postMessage({ type: STATE_MESSAGE, data: d, options: o, theme: { mode: m, colors: {} }, size: { width: w, height: h ?? 0 } }, "*");
+      frame.current?.contentWindow?.postMessage({ type: STATE_MESSAGE, data: d, options: o, theme: { mode: m, colors: {} }, size: { width: w, height: h ?? 0, room: r ?? 0 } }, "*");
     } catch {
       // Data that can't be cloned never reaches the frame.
     }
@@ -77,7 +79,7 @@ export function CanvasFrame({ html, title, data, options, look, mode, width, onH
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [send]);
-  useEffect(() => { if (ready) send(); }, [ready, data, options, mode, width, send]);
+  useEffect(() => { if (ready) send(); }, [ready, data, options, mode, width, room, send]);
   return (
     <iframe
       ref={frame}

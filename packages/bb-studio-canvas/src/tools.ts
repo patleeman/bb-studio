@@ -6,7 +6,7 @@ import { designGuide } from "./guides";
 import { KIND_LINES } from "./instructions";
 import { LOOK_INFO, lookOf, ORGANIC_LOOKS, type OrganicLook } from "./looks";
 import { focusOf } from "./layout";
-import { CANVAS_LIMITS, itemInputSchema, itemPatchSchema, jsonBytes, ITEM_ID } from "./shared";
+import { CANVAS_LIMITS, COMPOSITION_INFO, COMPOSITIONS, itemInputSchema, itemPatchSchema, jsonBytes, ITEM_ID } from "./shared";
 import type { CanvasActor, CanvasOp, CanvasStore, EditResult } from "./store";
 
 export const CANVAS_TOOL_NAMES = ["canvas_read", "canvas_add", "canvas_update", "canvas_remove", "canvas_clear", "canvas_set", "canvas_style", "canvas_guide"] as const;
@@ -17,27 +17,32 @@ const items = z.array(itemInputSchema).min(1).max(CANVAS_LIMITS.perCall);
 /** The board styles the agent picks from (looks.ts; classic isn't one). */
 const style = z.enum(ORGANIC_LOOKS as [OrganicLook, ...OrganicLook[]]);
 const styleReason = z.string().max(200).optional();
+/** The board's topic, for the canvas's title (a few words). */
+const title = z.string().trim().min(1).max(CANVAS_LIMITS.title).optional();
+const composition = z.enum(COMPOSITIONS).optional();
+const sameComposition = z.boolean().optional();
 
 export const CANVAS_TOOL_PARAMS = {
   canvas_read: z.object({}),
   canvas_add: z.object({ items }),
   canvas_update: z.object({ items: z.array(itemPatchSchema).min(1).max(CANVAS_LIMITS.perCall) }),
   canvas_remove: z.object({ ids: z.array(z.string().regex(ITEM_ID)).min(1).max(CANVAS_LIMITS.items) }),
-  canvas_clear: z.object({ style: style.optional(), styleReason }),
-  canvas_set: z.object({ items: z.array(itemInputSchema).max(CANVAS_LIMITS.items), style: style.optional(), styleReason }),
+  canvas_clear: z.object({ style: style.optional(), styleReason, title }),
+  canvas_set: z.object({ items: z.array(itemInputSchema).max(CANVAS_LIMITS.items), style: style.optional(), styleReason, title, composition, sameComposition }),
   canvas_style: z.object({ style, reason: styleReason }),
   canvas_guide: z.object({ style: style.optional() }),
 } satisfies Record<CanvasToolName, z.ZodType>;
 
-const ITEM_HELP = `Each item: id? (short, like "turnout-chart"; made from the title when left out), kind, title?, data, options?, html? (custom only), size? (s|m|l|xl), importance? (1–5, default 3). Kinds:\n${KIND_LINES}`;
+const ITEM_HELP = `Each item: id? (short, like "turnout-chart"; made from the title when left out), kind, title?, data, options?, html? (custom only), importance? (1–5, default 3), size? (s|m|l|xl, a fallback for scale). Placement (rough; Studio composes it, never on a grid): scale? (hero|large|medium|small|tiny: one hero, the rest at clearly different scales), region? (top-left|top|top-right|left|center|right|bottom-left|bottom|bottom-right), pinnedTo? (an id: placed right next to it, nothing drawn between) with point? ({x, y} 0–1 on it) and side? (left|right|above|below), bleed? (true: runs off the edge). Kinds:\n${KIND_LINES}`;
+const COMPOSITION_HELP = `composition (each new board; never the same as the last board unless the user asks): ${COMPOSITIONS.map((name) => `${name} (${COMPOSITION_INFO[name]})`).join("; ")}.`;
 
 export const CANVAS_TOOL_DESCRIPTIONS: Record<CanvasToolName, string> = {
   canvas_read: "Read this canvas: each item's id, kind, title, size, importance and data, the focus item, and the latest changes. Read it before editing when you're unsure what's on the board.",
   canvas_add: `Add items to this canvas's board. The user sees them appear at once; Studio places them by importance and size. ${ITEM_HELP}`,
   canvas_update: "Change items in place: pass each item's id and the fields to change. data and html replace; options merge (null removes a key; replaceOptions replaces them). Raise importance to make an item the focus. The user sees the change highlighted.",
   canvas_remove: "Remove items that no longer matter, by id.",
-  canvas_clear: "Clear the board, for a topic change; style (and styleReason) switches its style at the same time. Then add the new items (or use canvas_set to do both in one step).",
-  canvas_set: `Replace the whole board in one step: items whose id is already there update in place, new ones appear, the rest leave. Use it on a topic change, or to rebuild. style picks the board's style: editorial (news, stories, explainers), field (brainstorming, planning, ideas), instrument (dense data, monitoring, comparisons); give styleReason in a few words. Set it on your first board and when the topic changes kind; the switch animates. ${ITEM_HELP}`,
+  canvas_clear: "Clear the board, for a topic change; style (and styleReason) switches its style at the same time, and title names the new topic (a few words; the canvas's title). Then add the new items (or use canvas_set to do both in one step).",
+  canvas_set: `Replace the whole board in one step: items whose id is already there update in place, new ones appear, the rest leave. Use it on a topic change, or to rebuild. style picks the board's style: editorial (news, stories, explainers), field (brainstorming, planning, ideas), instrument (dense data, monitoring, comparisons); give styleReason in a few words. Set it on your first board and when the topic changes kind; the switch animates. title: the topic in a few words (the canvas's title); set it whenever the topic changes. ${COMPOSITION_HELP} ${ITEM_HELP}`,
   canvas_style: "Switch the board's style without rebuilding it: editorial, field or instrument, with the reason in a few words. Use it when the user asks for a style (\"make this a whiteboard\" is field) or the content changes kind.",
   canvas_guide: "The design guide: how to choose a style, what makes a rich board, the tokens, the kit (window.cv) for custom components, quote accents, and examples. style narrows it to one style's rules and examples.",
 };
@@ -56,13 +61,14 @@ export function describeBoard(store: CanvasStore, canvasId: string): string {
   const board = store.items(canvasId);
   const row = store.get(canvasId)!;
   const look = lookOf(row.look);
-  const styleLine = look === "classic" ? "" : ` Style: ${look} (${LOOK_INFO[look].name}).`;
+  const styleLine = look === "classic" ? "" : ` Style: ${look} (${LOOK_INFO[look].name}).${row.composition ? ` Composition: ${row.composition}.` : ""} Title: "${row.title}".`;
   if (!board.length) return `The board is empty (revision ${row.rev}, turn ${row.turn}).${styleLine}`;
   const focus = focusOf(board);
   const lines = board.map((item) => {
     const data = jsonBytes(item.data) > 1500 ? `${JSON.stringify(item.data).slice(0, 1500)}… (clipped)` : JSON.stringify(item.data);
     const options = Object.keys(item.options).length ? ` options=${JSON.stringify(item.options).slice(0, 400)}` : "";
-    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}, size ${item.size}, importance ${item.importance}${item.id === focus?.id ? " (focus)" : ""}${item.html ? `, html ${item.html.length} chars` : ""}\n  data=${data}${options}`;
+    const place = `${item.scale ? `, scale ${item.scale}` : ""}${item.region ? `, region ${item.region}` : ""}${item.bleed ? ", bleeds" : ""}${item.pinnedTo ? `, pinned to ${item.pinnedTo}${item.point ? ` at ${item.point.x},${item.point.y}` : ""}${item.side ? ` (${item.side})` : ""}` : ""}`;
+    return `- ${item.id}: ${item.kind}${item.title ? ` "${item.title}"` : ""}, size ${item.size}, importance ${item.importance}${item.id === focus?.id ? " (focus)" : ""}${place}${item.html ? `, html ${item.html.length} chars` : ""}\n  data=${data}${options}`;
   });
   const changes = store.changes(canvasId, 12).map((change) => `- turn ${change.turn}, rev ${change.rev} (${change.by}): ${change.summary}`);
   return [`Board (revision ${row.rev}, turn ${row.turn}), ${board.length} item(s).${styleLine}`, ...lines, "", "Latest changes:", ...changes].join("\n");
@@ -82,8 +88,12 @@ export function toolOps(name: Exclude<CanvasToolName, "canvas_read" | "canvas_gu
     case "canvas_add": return CANVAS_TOOL_PARAMS.canvas_add.parse(input).items.map((item) => ({ op: "add", item }));
     case "canvas_update": return CANVAS_TOOL_PARAMS.canvas_update.parse(input).items.map((patch) => ({ op: "update", patch }));
     case "canvas_remove": return CANVAS_TOOL_PARAMS.canvas_remove.parse(input).ids.map((id) => ({ op: "remove", id }));
-    case "canvas_clear": { const parsed = CANVAS_TOOL_PARAMS.canvas_clear.parse(input ?? {}); return [{ op: "clear" }, ...styled(parsed.style, parsed.styleReason)]; }
-    case "canvas_set": { const parsed = CANVAS_TOOL_PARAMS.canvas_set.parse(input); return [...styled(parsed.style, parsed.styleReason), { op: "set", items: parsed.items }]; }
+    case "canvas_clear": { const parsed = CANVAS_TOOL_PARAMS.canvas_clear.parse(input ?? {}); return [{ op: "clear" }, ...styled(parsed.style, parsed.styleReason), ...(parsed.title ? [{ op: "board" as const, title: parsed.title }] : [])]; }
+    case "canvas_set": {
+      const parsed = CANVAS_TOOL_PARAMS.canvas_set.parse(input);
+      const board: CanvasOp[] = parsed.title || parsed.composition ? [{ op: "board", title: parsed.title ?? null, composition: parsed.composition ?? null, sameComposition: parsed.sameComposition }] : [];
+      return [...styled(parsed.style, parsed.styleReason), { op: "set", items: parsed.items }, ...board];
+    }
     case "canvas_style": { const parsed = CANVAS_TOOL_PARAMS.canvas_style.parse(input); return styled(parsed.style, parsed.reason); }
   }
 }

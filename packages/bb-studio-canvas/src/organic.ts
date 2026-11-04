@@ -1,20 +1,27 @@
-// The organic layout for the canvas looks (looks.ts). No slide grid: items
-// are as tall as their content (the page measures them), take widths by
-// kind, size and look, and settle into lanes like a skyline, so edges don't
-// line up into rows. Per look:
+// The composition engine for the canvas styles (looks.ts). No grid, no
+// lanes, no reading order: the board is composed for the screen it's on.
 //
-// - editorial: the focus is the lead, wide on the left; the rest fill a
-//   narrow rail beside it and flow below. Quotes hang into the gutter.
-// - field: the focus sits in the middle and the rest orbit it, with loose,
-//   varied gaps, a small offset and tilt per item.
-// - instrument: tight lanes and small gaps; the focus is a wide panel.
+// - The frame is the visible board (width × height). One hero dominates it;
+//   the rest sit around it at clearly different scales (scale: hero, large,
+//   medium, small, tiny), as wide as a share of the frame, not of columns.
+// - A composition (orbit, giant-number, map, spine, split, quote, close-up,
+//   essay, gallery) gives the hero its spot and size and spreads targets for the
+//   rest across both axes, so the board fills the screen instead of
+//   flowing from the top-left. A hash of the hero mirrors it, so two boards
+//   in a row don't land the same way.
+// - The agent's rough placement wins: region ("top-right"), pinnedTo (an
+//   item, a point on it, a side), bleed. The engine resolves each item to
+//   the free spot nearest its target, at any x and y: items never overlap
+//   (a hero may bleed off the board's edge), stay on the
+//   screen when they fit, and spill below (the board scrolls) only when the
+//   screen is full.
+// - Nothing is drawn between items: no notes, leader lines or connectors.
 //
-// The user never arranges anything. Deterministic: the same items, width,
-// heights and previous layout always give the same rects. Stable: an item
-// keeps its lane from the previous layout when that costs little height, so
-// items that didn't change stay where they were.
+// Deterministic: the same items, frame, heights and previous layout always
+// give the same rects. Stable: an item keeps its spot from the last settled
+// layout of this frame while it's still free and its width didn't change.
 import type { OrganicLook } from "./looks";
-import type { CanvasKind, SizeHint } from "./shared";
+import type { CanvasKind, Composition, Region, Scale, Side, SizeHint } from "./shared";
 
 export interface OrganicItem {
   id: string;
@@ -23,270 +30,431 @@ export interface OrganicItem {
   importance: number;
   createdAt: number;
   updatedAt: number;
-  /** A quote's accent (looks.ts accentOf): accented items never tilt. */
+  point?: { x: number; y: number } | null;
+  /** A quote's accent (looks.ts accentOf). */
   accent?: string | null;
+  scale?: Scale | null;
+  region?: Region | null;
+  pinnedTo?: string | null;
+  side?: Side | null;
+  bleed?: boolean | null;
+  /** A chart, map or picture (not text). */
+  visual?: boolean;
+  /** Hand placement, as shares of the frame (reference boards only): exactly here, this wide. */
+  fixed?: { x: number; y: number; w: number } | null;
 }
 
-export interface Placed { x: number; y: number; w: number; h: number; rotate: number; z: number; lane: number; units: number }
-export interface OrganicLayout { rects: Map<string, Placed>; focusId: string | null; height: number; units: number }
+export interface Frame { width: number; height: number }
+export interface Placed { x: number; y: number; w: number; h: number; rotate: number; z: number; scale: Scale }
+export interface OrganicLayout { rects: Map<string, Placed>; focusId: string | null; height: number; frame: Frame; composition: Composition }
 
-const ORDER: readonly SizeHint[] = ["s", "m", "l", "xl"];
+/** How far a bleeding item runs past the board's edge (the page's side padding). */
+export const BLEED = 32;
+/** Below this width the board composes for a narrow screen: bigger shares, and it scrolls. */
+export const NARROW = 760;
 
-interface Rules {
-  gutter: number;
-  /** Space below an item. */
-  gap(item: OrganicItem, focus: boolean, hash: number): number;
-  /** 12-unit widths per size hint, and per kind where it differs. */
-  widths: Record<SizeHint, number>;
-  kinds: Partial<Record<CanvasKind, Partial<Record<SizeHint, number>>>>;
-  /** The focus is at least this wide (12-unit). */
-  focusMin: number;
-  focusAt: "left" | "center";
-  /** px of offset and degrees of tilt, at most, per item (from its id). */
-  jitter: number;
-  tilt: number;
-  /** Quotes hang this share of a unit into the gutter on their left. */
-  quoteHang: number;
-}
+const VISUAL_KINDS: ReadonlySet<CanvasKind> = new Set(["line", "bar", "area", "pie", "map", "image", "multiples"]);
+export const isVisualKind = (kind: CanvasKind) => VISUAL_KINDS.has(kind);
 
-export const LOOK_RULES: Record<OrganicLook, Rules> = {
-  editorial: {
-    gutter: 34,
-    gap: (item, focus) => (focus ? 40 : item.kind === "headline" ? 14 : 28),
-    widths: { s: 3, m: 4, l: 6, xl: 8 },
-    kinds: { headline: { s: 6, m: 8, l: 8, xl: 12 }, ticker: { s: 12, m: 12, l: 12, xl: 12 }, stat: { s: 3, m: 4, l: 4, xl: 6 }, quote: { s: 4, m: 4, l: 6, xl: 8 }, table: { s: 4, m: 6, l: 8, xl: 12 }, multiples: { s: 6, m: 8, l: 8, xl: 12 }, timeline: { s: 4, m: 4, l: 8, xl: 12 } },
-    focusMin: 8,
-    focusAt: "left",
-    jitter: 0,
-    tilt: 0,
-    quoteHang: 0,
-  },
-  field: {
-    gutter: 30,
-    gap: (_item, focus, hash) => (focus ? 40 : 22 + (hash % 5) * 6),
-    widths: { s: 3, m: 4, l: 5, xl: 6 },
-    kinds: { headline: { s: 4, m: 5, l: 6, xl: 7 }, ticker: { s: 8, m: 10, l: 12, xl: 12 }, table: { s: 4, m: 5, l: 5, xl: 7 }, multiples: { s: 4, m: 5, l: 5, xl: 7 }, timeline: { s: 3, m: 3, l: 5, xl: 7 }, stat: { s: 3, m: 3, l: 4, xl: 4 } },
-    focusMin: 6,
-    focusAt: "center",
-    jitter: 0,
-    tilt: 1.4,
-    quoteHang: 0,
-  },
-  instrument: {
-    gutter: 8,
-    gap: () => 8,
-    widths: { s: 2, m: 3, l: 6, xl: 8 },
-    kinds: { headline: { s: 4, m: 6, l: 6, xl: 12 }, ticker: { s: 12, m: 12, l: 12, xl: 12 }, stat: { s: 2, m: 3, l: 4, xl: 4 }, table: { s: 4, m: 6, l: 6, xl: 12 }, multiples: { s: 6, m: 6, l: 8, xl: 12 }, timeline: { s: 4, m: 6, l: 12, xl: 12 }, map: { s: 4, m: 4, l: 6, xl: 8 } },
-    focusMin: 6,
-    focusAt: "left",
-    jitter: 0,
-    tilt: 0,
-    quoteHang: 0,
-  },
+interface Rules { gap: number; tilt: number }
+const LOOK_RULES: Record<OrganicLook, Rules> = {
+  editorial: { gap: 44, tilt: 0 },
+  field: { gap: 38, tilt: 1.2 },
+  instrument: { gap: 22, tilt: 0 },
 };
 
-/** An item's tilt, in degrees: accented items never; cards as the style says (the focus less). */
-function tiltOf(item: OrganicItem, rules: Rules, isFocus: boolean, hash: number): number {
-  const range = item.accent ? 0 : isFocus ? rules.tilt * 0.4 : rules.tilt;
-  return range ? Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * range * 100) / 100 : 0;
-}
+/** Share of the frame's width per scale; on a narrow screen, per scale too. */
+const SCALE_W: Record<Scale, number> = { hero: 0.56, large: 0.34, medium: 0.25, small: 0.185, tiny: 0.14 };
+const NARROW_W: Record<Scale, number> = { hero: 1, large: 1, medium: 0.66, small: 0.5, tiny: 0.46 };
+/** Suggested height per scale, as a share of the frame's height (charts and custom pieces size to it). */
+const SCALE_ROOM: Record<Scale, number> = { hero: 0.66, large: 0.44, medium: 0.34, small: 0.26, tiny: 0.2 };
+/** Narrowest readable width per kind, px. */
+const MIN_W: Partial<Record<CanvasKind, number>> = {
+  table: 380, map: 300, timeline: 320, multiples: 340, line: 300, area: 300, bar: 280, pie: 240, custom: 240, headline: 260,
+  caption: 220, quote: 240, list: 240, stat: 150, image: 220, ticker: 400, progress: 200,
+};
 
-/** Lanes for a board this wide. */
-export function unitsFor(width: number): number {
-  return width >= 1100 ? 12 : width >= 700 ? 8 : 4;
-}
+interface Pattern { hero: { x: number; y: number; w: number }; second?: { x: number; y: number; w: number }; slots: [number, number][] }
+/** Each composition: the hero's center and width (shares of the frame), the second hero's (split), and targets for the rest, by rank. */
+export const PATTERNS: Record<Composition, Pattern> = {
+  orbit: { hero: { x: 0.37, y: 0.44, w: 0.58 }, slots: [[0.86, 0.13], [0.87, 0.52], [0.13, 0.9], [0.84, 0.9], [0.5, 0.93], [0.1, 0.08], [0.62, 0.06]] },
+  "giant-number": { hero: { x: 0.25, y: 0.34, w: 0.38 }, slots: [[0.72, 0.3], [0.22, 0.84], [0.66, 0.84], [0.93, 0.62], [0.55, 0.06], [0.92, 0.1], [0.44, 0.6]] },
+  map: { hero: { x: 0.5, y: 0.47, w: 0.5 }, slots: [[0.11, 0.15], [0.89, 0.17], [0.1, 0.8], [0.9, 0.82], [0.5, 0.96], [0.12, 0.48], [0.88, 0.5]] },
+  spine: { hero: { x: 0.5, y: 0.52, w: 0.94 }, slots: [[0.15, 0.13], [0.52, 0.1], [0.87, 0.15], [0.27, 0.9], [0.63, 0.9], [0.92, 0.88], [0.06, 0.88]] },
+  split: { hero: { x: 0.26, y: 0.42, w: 0.44 }, second: { x: 0.75, y: 0.42, w: 0.43 }, slots: [[0.5, 0.07], [0.23, 0.9], [0.77, 0.9], [0.5, 0.92], [0.06, 0.9], [0.95, 0.9]] },
+  quote: { hero: { x: 0.33, y: 0.3, w: 0.56 }, slots: [[0.84, 0.2], [0.24, 0.8], [0.64, 0.76], [0.9, 0.62], [0.5, 0.96], [0.9, 0.92]] },
+  "close-up": { hero: { x: 0.5, y: 0.36, w: 0.97 }, slots: [[0.14, 0.88], [0.45, 0.9], [0.77, 0.88], [0.94, 0.08], [0.06, 0.06]] },
+  essay: { hero: { x: 0.26, y: 0.46, w: 0.42 }, slots: [[0.73, 0.18], [0.8, 0.58], [0.63, 0.9], [0.94, 0.9], [0.56, 0.5]] },
+  gallery: { hero: { x: 0.25, y: 0.46, w: 0.4 }, slots: [[0.6, 0.24], [0.86, 0.3], [0.62, 0.78], [0.88, 0.8], [0.74, 0.52], [0.47, 0.06], [0.95, 0.06]] },
+};
+const REGION_AT: Record<Region, [number, number]> = {
+  "top-left": [0.12, 0.1], top: [0.5, 0.08], "top-right": [0.88, 0.1], left: [0.1, 0.5], center: [0.5, 0.5], right: [0.9, 0.5],
+  "bottom-left": [0.12, 0.9], bottom: [0.5, 0.92], "bottom-right": [0.88, 0.9],
+};
 
-/** A small stable number from an id, for per-item offsets. */
+/** A small stable number from an id, for per-item variety. */
 export function hashOf(id: string): number {
   let h = 2166136261;
   for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
 
-/** Highest importance, then most recently changed, then id. */
+/** Items pinned to an item that's on the board: placed right next to it (nothing is drawn between them). */
+function pinsOf(items: readonly OrganicItem[]): Map<string, string> {
+  const ids = new Set(items.map((item) => item.id));
+  const pins = new Map<string, string>();
+  for (const item of items) {
+    const target = item.pinnedTo ?? null;
+    if (target && target !== item.id && ids.has(target)) pins.set(item.id, target);
+  }
+  // A pin loop (a pinned to b pinned to a) would have nowhere to start: the later one floats free.
+  for (const [id, target] of pins) {
+    const seen = new Set([id]);
+    for (let at = target; pins.has(at); at = pins.get(at)!) { if (seen.has(at)) { pins.delete(id); break; } seen.add(at); }
+  }
+  return pins;
+}
+
+const recency = (a: OrganicItem, b: OrganicItem) => b.importance - a.importance || b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** The hero: an item the agent made the hero, else the highest importance, most recently changed. */
 export function organicFocus(items: readonly OrganicItem[]): OrganicItem | null {
-  let best: OrganicItem | null = null;
-  for (const item of items) {
-    if (!best || item.importance > best.importance || (item.importance === best.importance && (item.updatedAt > best.updatedAt || (item.updatedAt === best.updatedAt && item.id < best.id)))) best = item;
+  const heroes = items.filter((item) => item.scale === "hero");
+  return [...(heroes.length ? heroes : items)].sort(recency)[0] ?? null;
+}
+
+/** The composition when the agent named none: from what the hero is. */
+export function inferComposition(hero: OrganicItem | null, items: readonly OrganicItem[] = []): Composition {
+  if (!hero) return "orbit";
+  if (items.filter((item) => item.scale === "hero").length >= 2) return "split";
+  switch (hero.kind) {
+    case "stat": case "progress": return "giant-number";
+    case "map": return "map";
+    case "timeline": return "spine";
+    case "quote": return "quote";
+    case "headline": case "caption": case "list": return "essay";
+    case "image": return "gallery";
+    default: return "orbit";
   }
-  return best;
 }
 
-const byImportance = (a: OrganicItem, b: OrganicItem) => b.importance - a.importance || a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-
-function unitWidth(width: number, units: number, gutter: number) {
-  return Math.max(30, (width - gutter * (units - 1)) / units);
-}
-
-/** Lane units for an item: its kind and size in this look, scaled to the board's lanes. */
-function laneUnits(item: OrganicItem, rules: Rules, units: number, focus: boolean): number {
-  let w12 = rules.kinds[item.kind]?.[item.size] ?? rules.widths[item.size];
-  if (focus) {
-    // The focus dominates: a size up, and at least focusMin.
-    const up = ORDER[Math.min(3, ORDER.indexOf(item.size) + 1)]!;
-    w12 = Math.max(w12, rules.kinds[item.kind]?.[up] ?? rules.widths[up], rules.focusMin);
-  }
-  if (units >= 12) return Math.min(12, w12);
-  if (units >= 8) return Math.min(8, Math.max(2, Math.round((w12 * 8) / 12)));
-  return w12 <= 3 && !focus ? 2 : 4;
-}
+interface Sized { w: number; scale: Scale; room: number }
 
 /**
- * Lane looks put a rail beside the focus. When nothing on the board fits
- * that rail (everything else is wide), the focus takes the
- * whole width instead of leaving the rail empty.
+ * Each item's width, scale and suggested height (room) before heights are
+ * known: the page renders items at these widths and measures their heights.
  */
-function focusUnitsFor(items: readonly OrganicItem[], rules: Rules, units: number, focus: OrganicItem | null): number | null {
-  if (!focus) return null;
-  const own = laneUnits(focus, rules, units, true);
-  if (rules.focusAt !== "left" || own >= units) return own;
-  const rail = units - own;
-  const fits = items.some((item) => item.id !== focus.id && laneUnits(item, rules, units, false) <= rail);
-  return fits ? own : units;
+export function organicSizes(items: readonly OrganicItem[], frame: Frame, _look: OrganicLook, composition?: Composition | null): Map<string, Sized> {
+  const sizes = new Map<string, Sized>();
+  const W = Math.max(0, frame.width);
+  const H = Math.max(320, frame.height);
+  if (!W) return sizes;
+  const narrow = W < NARROW;
+  const hero = organicFocus(items);
+  const comp = composition ?? inferComposition(hero, items);
+  const pattern = PATTERNS[comp];
+  const pins = pinsOf(items);
+  const second = secondHero(items, hero, comp, pins);
+  for (const item of items) {
+    const hash = hashOf(item.id);
+    if (item.fixed) { sizes.set(item.id, { w: Math.round(item.fixed.w * W), scale: item.id === hero?.id ? "hero" : scaleOf(item, false), room: Math.round(H * (item.id === hero?.id ? SCALE_ROOM.hero : SCALE_ROOM[scaleOf(item, false)])) }); continue; }
+    const isHero = item.id === hero?.id;
+    const scale: Scale = isHero || item.id === second?.id ? "hero" : scaleOf(item, false);
+    const min = Math.min(W, MIN_W[item.kind] ?? 200);
+    let w: number;
+    if (narrow) w = W * NARROW_W[scale];
+    else if (isHero) w = W * heroShare(item, pattern.hero.w, comp, W, H);
+    else if (item.id === second?.id) w = W * (pattern.second?.w ?? SCALE_W.large);
+    else w = W * SCALE_W[scale] * (0.92 + (hash % 17) / 100);
+    if (item.bleed && !narrow) w += BLEED;
+    w = Math.round(Math.max(min, Math.min(W + (item.bleed ? BLEED : 0), w)));
+    sizes.set(item.id, { w, scale, room: Math.round(H * SCALE_ROOM[scale]) });
+  }
+  return sizes;
 }
 
-/**
- * Each item's width in px, before heights are known: the page renders items
- * at these widths and measures their heights.
- */
-export function organicWidths(items: readonly OrganicItem[], width: number, look: OrganicLook): Map<string, number> {
-  const rules = LOOK_RULES[look];
-  const units = unitsFor(width);
-  const unit = unitWidth(width, units, rules.gutter);
-  const focus = organicFocus(items);
-  const widths = new Map<string, number>();
-  const focusUnits = focusUnitsFor(items, rules, units, focus);
-  for (const item of items) {
-    const u = item.id === focus?.id ? focusUnits! : laneUnits(item, rules, units, false);
-    widths.set(item.id, Math.round(u * unit + (u - 1) * rules.gutter));
+/** The hero's share of the width: its composition's, kept short enough to fit the screen when its height follows its width. */
+function heroShare(item: OrganicItem, share: number, comp: Composition, W: number, H: number): number {
+  // A tile map is ~0.75 as tall as wide; a giant number or quote stays its composition's.
+  if (item.kind === "map") return Math.min(share, (H * 0.86) / 0.76 / W);
+  if (item.kind === "stat" || item.kind === "progress") return comp === "giant-number" ? share : Math.min(share, 0.4);
+  if (item.kind === "table" || item.kind === "list" || item.kind === "caption") return Math.min(share, 0.5);
+  return share;
+}
+
+/** The scale an item takes when the agent gave none: from its size hint and importance. */
+function scaleOf(item: OrganicItem, isHero: boolean): Scale {
+  if (isHero) return "hero";
+  if (item.scale && item.scale !== "hero") return item.scale;
+  if (item.scale === "hero") return "large";
+  switch (item.size) {
+    case "xl": return "large";
+    case "l": return item.importance >= 4 ? "large" : "medium";
+    case "m": return item.importance <= 2 ? "small" : "medium";
+    default: return item.importance <= 2 ? "tiny" : "small";
   }
-  return widths;
+}
+
+/** split's second side: the other item marked hero, else the next most important. */
+function secondHero(items: readonly OrganicItem[], hero: OrganicItem | null, comp: Composition, pins: ReadonlyMap<string, string>): OrganicItem | null {
+  if (comp !== "split" || !hero) return null;
+  const rest = items.filter((item) => item.id !== hero.id && !pins.has(item.id) && !item.fixed);
+  const marked = rest.filter((item) => item.scale === "hero");
+  return [...(marked.length ? marked : rest)].sort(recency)[0] ?? null;
 }
 
 /** A height to place an item at before it's measured. */
-export function estimateHeight(kind: CanvasKind, width: number): number {
+export function estimateHeight(kind: CanvasKind, width: number, room = 400): number {
   switch (kind) {
-    case "headline": return 130;
-    case "caption": return 90;
-    case "stat": return 120;
-    case "quote": return 150;
+    case "headline": return Math.round(Math.min(260, 60 + 9000 / Math.max(200, width)) + width * 0.08);
+    case "caption": return Math.round(Math.max(70, 26000 / Math.max(160, width)));
+    case "stat": return Math.round(Math.max(110, Math.min(room, width * 0.5)));
+    case "quote": return Math.round(Math.max(120, 40000 / Math.max(200, width)));
     case "ticker": return 52;
     case "progress": return 80;
-    case "map": return Math.round(width * 0.78);
+    case "map": return Math.round(Math.min(width * 0.76, room + 60));
+    case "image": return Math.round(width * 1.15 + 50);
     case "timeline": return 220;
-    default: return Math.round(Math.min(420, Math.max(160, width * 0.62)));
+    case "table": case "list": return 300;
+    default: return Math.round(Math.max(140, Math.min(room, width * 0.6)));
   }
 }
 
-/**
- * Lays the board out. heights: measured px per item (estimates for the rest).
- * previous: the last layout at this width, the stability hint.
- */
-export function layoutOrganic(items: readonly OrganicItem[], width: number, look: OrganicLook, heights: ReadonlyMap<string, number>, previous?: ReadonlyMap<string, Placed> | null): OrganicLayout {
-  const rects = new Map<string, Placed>();
-  const units = unitsFor(width);
-  if (!items.length || width <= 0) return { rects, focusId: null, height: 0, units };
-  const rules = LOOK_RULES[look];
-  const unit = unitWidth(width, units, rules.gutter);
-  const focus = organicFocus(items);
-  const widths = organicWidths(items, width, look);
-  const heightOf = (item: OrganicItem) => heights.get(item.id) ?? estimateHeight(item.kind, widths.get(item.id)!);
-  const laneX = (lane: number) => lane * (unit + rules.gutter);
-  const tops = new Array<number>(units).fill(0);
-  const ordered = focus ? [focus, ...items.filter((item) => item.id !== focus.id).sort(byImportance)] : [...items].sort(byImportance);
+interface Box { id: string; x: number; y: number; w: number; h: number; gap: number }
+const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, pad = 0) =>
+  a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
 
-  if (rules.focusAt === "center") placeAround(ordered, focus, rects, { width, units, unit, rules, widths, heightOf, previous });
-  else for (const item of ordered) {
-    const isFocus = item.id === focus?.id;
-    const u = isFocus ? focusUnitsFor(items, rules, units, focus)! : laneUnits(item, rules, units, false);
-    const h = heightOf(item);
-    const hash = hashOf(item.id);
-    const topAt = (lane: number) => Math.max(...tops.slice(lane, lane + u));
-    let lane: number;
-    if (isFocus) lane = 0;
-    else {
-      lane = 0;
-      let best = Number.POSITIVE_INFINITY;
-      for (let candidate = 0; candidate + u <= units; candidate++) {
-        const y = topAt(candidate);
-        if (y < best - 0.5) { best = y; lane = candidate; }
+/**
+ * Composes the board. frame: the visible board. heights: measured px per
+ * item (estimates for the rest). previous: the last settled layout of this
+ * frame, the stability hint. composition: the agent's, or inferred.
+ */
+export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look: OrganicLook, heights: ReadonlyMap<string, number>, previous?: ReadonlyMap<string, Placed> | null, composition?: Composition | null): OrganicLayout {
+  const rects = new Map<string, Placed>();
+  const W = frame.width;
+  const H = Math.max(320, frame.height);
+  const hero = organicFocus(items);
+  const comp = composition ?? inferComposition(hero, items);
+  if (!items.length || W <= 0) return { rects, focusId: null, height: 0, frame, composition: comp };
+  const rules = LOOK_RULES[look];
+  const narrow = W < NARROW;
+  const sizes = organicSizes(items, frame, look, comp);
+  const pins = pinsOf(items);
+  const second = secondHero(items, hero, comp, pins);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const heightOf = (item: OrganicItem) => heights.get(item.id) ?? estimateHeight(item.kind, sizes.get(item.id)!.w, sizes.get(item.id)!.room);
+  // A mirror image of the composition for some heroes, so boards in a row vary, unless
+  // the agent's regions and pins ask for room on one side of the hero.
+  const pattern0 = PATTERNS[comp];
+  const conflicts = (flip: boolean) => {
+    const hx = flip ? 1 - pattern0.hero.x : pattern0.hero.x;
+    let n = 0;
+    for (const item of items) {
+      if (item.id === hero?.id) continue;
+      // A region the hero would cover (its footprint, plus room for the item).
+      if (item.region && hero) {
+        const [rx, ry] = REGION_AT[item.region];
+        const hw = sizes.get(hero.id)!.w / W / 2, hh = heightOf(hero) / H / 2;
+        if (Math.abs(rx - hx) < hw + 0.1 && Math.abs(ry - pattern0.hero.y) < hh + 0.15) n++;
       }
-      // Stability: keep the old lane when it costs little.
-      const was = previous?.get(item.id);
-      if (was && was.units === u && was.lane + u <= units && topAt(was.lane) <= best + 32) lane = was.lane;
+      if (hero && item.pinnedTo === hero.id && item.side !== "above" && item.side !== "below") {
+        const right = item.side === "right" || (!item.side && (item.point?.x ?? 1) >= 0.5);
+        if (right ? hx > 0.5 : hx < 0.5) n++;
+      }
     }
-    const y = topAt(lane);
-    let x = laneX(lane);
-    let dy = 0;
-    if (rules.jitter) {
-      x += ((hash % 1000) / 1000 - 0.5) * 2 * rules.jitter;
-      dy = (((hash >>> 10) % 1000) / 1000) * rules.jitter;
+    return n;
+  };
+  const plain = conflicts(false), flipped = conflicts(true);
+  const mirror = !!hero && comp !== "spine" && (plain === flipped ? hashOf(hero.id) % 2 === 1 : flipped < plain);
+  const mx = (x: number) => (mirror ? 1 - x : x);
+  const pattern = PATTERNS[comp];
+
+  // The composition's height: the screen, or taller when everything can't fit on it (it scrolls).
+  let area = 0;
+  for (const item of items) { const s = sizes.get(item.id)!; area += s.w * heightOf(item); }
+  const Hv = Math.round(Math.max(H, area / (W * (narrow ? 0.78 : 0.56))));
+
+  const boxes: Box[] = [];
+  const gapOf = (item: OrganicItem) => Math.round(rules.gap * (narrow ? 0.7 : 1) * (0.78 + (hashOf(item.id) % 9) / 16));
+  const minX = (item: OrganicItem) => (item.bleed && !narrow ? -BLEED : 0);
+  const maxX = (item: OrganicItem, w: number) => W - w + (item.bleed && !narrow ? BLEED : 0);
+  /** Free: clear of every box by the gaps between them (a pinned item may sit closer to its target). */
+  const free = (rect: { x: number; y: number; w: number; h: number }, gap: number, pin: { target: string; near: number } | null) => {
+    for (const box of boxes) {
+      if (pin && box.id === pin.target) {
+        if (overlaps(rect, box, pin.near)) return false;
+        continue;
+      }
+      if (overlaps(rect, box, Math.round((Math.max(gap, box.gap) + Math.min(gap, box.gap)) / 2 * 0.8))) return false;
     }
-    if (item.kind === "quote" && rules.quoteHang && lane > 0) x -= (rules.gutter + unit * rules.quoteHang) * 0.6;
-    const w = widths.get(item.id)!;
-    x = Math.max(0, Math.min(width - w, x));
-    const rotate = tiltOf(item, rules, isFocus, hash);
-    rects.set(item.id, { x: Math.round(x), y: Math.round(y + dy), w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, lane, units: u });
-    const bottom = y + dy + h + rules.gap(item, isFocus, hash);
-    for (let k = lane; k < lane + u; k++) tops[k] = bottom;
+    return true;
+  };
+  const place = (item: OrganicItem, x: number, y: number) => {
+    const s = sizes.get(item.id)!;
+    const h = heightOf(item);
+    const isHero = item.id === hero?.id;
+    const hash = hashOf(item.id);
+    boxes.push({ id: item.id, x, y, w: s.w, h, gap: gapOf(item) });
+    rects.set(item.id, { x: Math.round(x), y: Math.round(y), w: s.w, h, rotate: tiltOf(item, rules, isHero, s.scale, hash), z: isHero ? 2 : item.kind === "quote" ? 3 : 1, scale: s.scale });
+  };
+  /** The free spot nearest a target center, searched around everything placed, the frame's edges and a coarse sweep. */
+  const search = (item: OrganicItem, tx: number, ty: number) => {
+    const { w } = sizes.get(item.id)!;
+    const h = heightOf(item);
+    const gap = gapOf(item);
+    const lo = minX(item), hi = maxX(item, w);
+    const xs = new Set<number>([tx - w / 2, lo, hi]);
+    const ys = new Set<number>([ty - h / 2, 0, Hv - h]);
+    const tries: [number, number][] = [];
+    for (const x of xs) for (const y of ys) tries.push([x, y]);
+    for (const box of boxes) {
+      const g = Math.round((Math.max(gap, box.gap) + Math.min(gap, box.gap)) / 2 * 0.8) + 1;
+      for (const y of [box.y, box.y + box.h - h, box.y + (box.h - h) / 2, ty - h / 2]) { tries.push([box.x + box.w + g, y], [box.x - w - g, y]); }
+      for (const x of [box.x, box.x + box.w - w, box.x + (box.w - w) / 2, tx - w / 2]) { tries.push([x, box.y + box.h + g], [x, box.y - h - g]); }
+    }
+    for (let i = 0; i <= 14; i++) for (let j = 0; j <= 10; j++) tries.push([lo + (i / 14) * (hi - lo), (j / 10) * Math.max(0, Hv - h)]);
+    let best: [number, number] | null = null;
+    let bestCost = Number.POSITIVE_INFINITY;
+    for (const [rx, ry] of tries) {
+      const x = Math.round(Math.max(lo, Math.min(hi, rx))), y = Math.round(Math.max(0, ry));
+      const rect = { x, y, w, h };
+      if (!free(rect, gap, null)) continue;
+      const dx = (x + w / 2 - tx) / W, dy = (y + h / 2 - ty) / Hv;
+      const cost = Math.hypot(dx, dy * 0.9) * 100 + (Math.max(0, y + h - Hv) / Hv) * 600 + (Math.max(0, y + h - H) / H) * 40;
+      if (cost < bestCost - 1e-9) { bestCost = cost; best = [x, y]; }
+    }
+    if (best) return best;
+    const bottom = boxes.reduce((max, box) => Math.max(max, box.y + box.h + box.gap), 0);
+    return [Math.round(Math.max(lo, Math.min(hi, tx - w / 2))), Math.round(bottom)] as [number, number];
+  };
+  /** An item's previous spot, when it's the same width and still free. */
+  const kept = (item: OrganicItem, pin: { target: string; near: number } | null) => {
+    const was = previous?.get(item.id);
+    const s = sizes.get(item.id)!;
+    if (!was || Math.abs(was.w - s.w) > 1 || was.x < minX(item) - 1 || was.x > maxX(item, s.w) + 1) return null;
+    const rect = { x: was.x, y: was.y, w: s.w, h: heightOf(item) };
+    return free(rect, gapOf(item), pin) ? ([was.x, was.y] as [number, number]) : null;
+  };
+
+  // Pinned items come right after what they're pinned to.
+  const pinned = new Map<string, OrganicItem[]>();
+  for (const [id, target] of pins) { const list = pinned.get(target) ?? []; list.push(byId.get(id)!); pinned.set(target, list); }
+  const pinOf = (item: OrganicItem) => {
+    const target = pins.get(item.id);
+    const t = target ? boxes.find((box) => box.id === target) : undefined;
+    if (!target || !t) return null;
+    return { target, near: Math.round(gapOf(item) * 0.6) };
+  };
+  const placePinned = (item: OrganicItem, target: OrganicItem) => {
+    const t = boxes.find((box) => box.id === target.id)!;
+    const { w } = sizes.get(item.id)!;
+    const h = heightOf(item);
+    const point = item.point ?? { x: 1, y: 0.5 };
+    const px = t.x + point.x * t.w, py = t.y + point.y * t.h;
+    const pin = pinOf(item)!;
+    const side: Side = item.side ? item.side : point.y <= 0.12 ? "above" : point.y >= 0.88 ? "below" : point.x < 0.5 ? "left" : "right";
+    const g = pin.near + 4;
+    const tries: { x: number; y: number; side: Side; far: number }[] = [];
+    for (const far of [0, 1, 2.5]) {
+      const d = g + far * 24;
+      for (const y of [py - h / 2, py - h * 0.2, py - h * 0.8, t.y, t.y + t.h - h]) { tries.push({ x: t.x + t.w + d, y, side: "right", far }, { x: t.x - w - d, y, side: "left", far }); }
+      for (const x of [px - w / 2, px - w * 0.15, px - w * 0.85, t.x, t.x + t.w - w]) { tries.push({ x, y: t.y - h - d, side: "above", far }, { x, y: t.y + t.h + d, side: "below", far }); }
+    }
+    let best: { x: number; y: number } | null = null;
+    let bestCost = Number.POSITIVE_INFINITY;
+    for (const each of tries) {
+      const x = Math.round(Math.max(minX(item), Math.min(maxX(item, w), each.x))), y = Math.round(Math.max(0, each.y));
+      const rect = { x, y, w, h };
+      if (!free(rect, gapOf(item), pin)) continue;
+      // Nearest the point, on the side asked for, on the screen.
+      const nx = Math.max(x, Math.min(x + w, px)), ny = Math.max(y, Math.min(y + h, py));
+      const cost = Math.hypot(nx - px, ny - py) + (each.side === side ? 0 : 90) + each.far * 30 + Math.max(0, y + h - Hv) * 2;
+      if (cost < bestCost - 1e-9) { bestCost = cost; best = { x, y }; }
+    }
+    const spot = best ?? (() => { const [x, y] = search(item, px, py); return { x, y }; })();
+    place(item, spot.x, spot.y);
+  };
+
+  // Hand-placed items (reference boards) first, exactly where they were put.
+  for (const item of items.filter((each) => each.fixed).sort(recency)) place(item, Math.round(item.fixed!.x * W), Math.round(item.fixed!.y * H));
+
+  // The order: the hero (and split's second side), then the rest by rank, each followed by what's pinned to it.
+  const order: OrganicItem[] = [];
+  const queued = new Set<string>();
+  const queue = (item: OrganicItem) => {
+    if (queued.has(item.id)) return;
+    queued.add(item.id);
+    if (!item.fixed) order.push(item);
+    for (const each of (pinned.get(item.id) ?? []).sort(recency)) queue(each);
+  };
+  for (const item of [hero, second]) if (item) queue(item);
+  for (const item of items.filter((each) => !pins.has(each.id)).sort(recency)) queue(item);
+  for (const item of items.filter((each) => !queued.has(each.id)).sort(recency)) queue(item);
+
+  // Each free item's target: its region, else the composition's next spot, by rank.
+  const targets = new Map<string, [number, number]>();
+  let slot = 0;
+  for (const item of order) {
+    if (pins.has(item.id)) continue;
+    const isHero = item.id === hero?.id || item.id === second?.id;
+    if (item.region) targets.set(item.id, [REGION_AT[item.region][0] * W, REGION_AT[item.region][1] * Hv]);
+    else if (isHero) { const spot = item.id === hero?.id ? pattern.hero : pattern.second ?? { x: 0.75, y: 0.42 }; targets.set(item.id, [mx(spot.x) * W, spot.y * Hv]); }
+    else if (narrow) {
+      // A narrow screen: down the page, alternating sides, so it still reads as composed.
+      targets.set(item.id, [slot++ % 2 ? W - sizes.get(item.id)!.w / 2 : sizes.get(item.id)!.w / 2, 0]);
+    } else if (slot < pattern.slots.length) { const [x, y] = pattern.slots[slot++]!; targets.set(item.id, [mx(x) * W, y * Hv]); }
+  }
+
+  // Pass 1, stability: whatever kept its width keeps its spot while it's free (a pin only beside a target that stayed too).
+  for (const item of order) {
+    const target = pins.get(item.id);
+    if (target && !rects.has(target)) continue;
+    const was = kept(item, pinOf(item));
+    if (was) place(item, was[0], was[1]);
+  }
+  // Pass 2: the rest, composed.
+  for (const item of order) {
+    if (rects.has(item.id)) continue;
+    const target = pins.get(item.id);
+    if (target && rects.has(target)) { placePinned(item, byId.get(target)!); continue; }
+    const s = sizes.get(item.id)!;
+    const h = heightOf(item);
+    const [tx, ty] = targets.get(item.id) ?? emptiest(boxes, W, Hv);
+    if (item.id === hero?.id || item.id === second?.id) {
+      // The hero goes right on its spot when it's free, kept on the screen (or bleeding off its edge).
+      let x = narrow ? (W - s.w) / 2 : tx - s.w / 2;
+      if (item.bleed && !narrow) x = tx < W / 2 ? -BLEED : W - s.w + BLEED;
+      x = Math.round(Math.max(minX(item), Math.min(maxX(item, s.w), x)));
+      const y = Math.round(narrow && item.id === hero?.id ? 0 : Math.max(0, Math.min(Math.max(0, H - h), ty - h / 2)));
+      if (free({ x, y, w: s.w, h }, gapOf(item), null)) { place(item, x, y); continue; }
+    }
+    const [x, y] = search(item, tx, ty);
+    place(item, x, y);
   }
 
   let height = 0;
   for (const rect of rects.values()) height = Math.max(height, rect.y + rect.h);
-  return { rects, focusId: focus?.id ?? null, height: Math.ceil(height), units };
+  return { rects, focusId: hero?.id ?? null, height: Math.ceil(height), frame, composition: comp };
 }
 
-/**
- * Field notes: the focus in the middle, then each item at the free spot
- * nearest the focus among spots touching what's already placed (beside,
- * under or over each card, aligned to its edges), so the board grows as a
- * cluster around the focus instead of in rows. An item keeps its old spot
- * when it's still free.
- */
-function placeAround(ordered: readonly OrganicItem[], focus: OrganicItem | null, rects: Map<string, Placed>, ctx: { width: number; units: number; unit: number; rules: Rules; widths: Map<string, number>; heightOf(item: OrganicItem): number; previous?: ReadonlyMap<string, Placed> | null }) {
-  const { width, units, unit, rules, widths, heightOf, previous } = ctx;
-  const boxes: { id: string; x: number; y: number; w: number; h: number; gap: number }[] = [];
-  /** Free of every card, with a gap around each. */
-  const free = (x: number, y: number, w: number, h: number, gap: number) => x >= 0 && x + w <= width + 0.5 && y >= 0 && boxes.every((box) => {
-    const g = Math.max(gap, box.gap) * 0.6;
-    return x + w + g <= box.x || box.x + box.w + g <= x || y + h + g <= box.y || box.y + box.h + g <= y;
-  });
-  let center = { x: width / 2, y: 0 };
-  for (const item of ordered) {
-    const isFocus = item.id === focus?.id;
-    const w = widths.get(item.id)!;
-    const h = heightOf(item);
-    const hash = hashOf(item.id);
-    const gap = rules.gap(item, isFocus, hash);
-    let spot: { x: number; y: number } | null = null;
-    if (isFocus) spot = { x: Math.round((width - w) / 2), y: 0 };
-    else {
-      const was = previous?.get(item.id);
-      if (was && was.w === w && free(was.x, was.y, w, h, gap)) spot = { x: was.x, y: was.y };
+/** The point of the frame farthest from everything placed: where the next item helps balance most. */
+function emptiest(boxes: readonly Box[], W: number, H: number): [number, number] {
+  let best: [number, number] = [W / 2, H / 2];
+  let bestD = -1;
+  for (let i = 1; i < 12; i++) for (let j = 1; j < 9; j++) {
+    const x = (i / 12) * W, y = (j / 9) * H;
+    let d = Number.POSITIVE_INFINITY;
+    for (const box of boxes) {
+      const nx = Math.max(box.x, Math.min(box.x + box.w, x)), ny = Math.max(box.y, Math.min(box.y + box.h, y));
+      d = Math.min(d, Math.hypot((nx - x) / W, (ny - y) / H));
     }
-    if (!spot) {
-      let best = Number.POSITIVE_INFINITY;
-      const consider = (x: number, y: number) => {
-        x = Math.round(Math.max(0, Math.min(width - w, x)));
-        y = Math.round(Math.max(0, y));
-        if (!free(x, y, w, h, gap)) return;
-        // Nearest the focus; going down costs a little more than going sideways.
-        const dx = x + w / 2 - center.x, dy = y + h / 2 - center.y;
-        const score = Math.hypot(dx * 0.55, dy * 1.25) + (hash % 13);
-        if (score < best) { best = score; spot = { x, y }; }
-      };
-      for (const box of boxes) {
-        const g = Math.max(gap, box.gap) * 0.75;
-        for (const y of [box.y, box.y + box.h - h, box.y + (box.h - h) / 2]) { consider(box.x + box.w + g, y); consider(box.x - w - g, y); }
-        for (const x of [box.x, box.x + box.w - w, box.x + (box.w - w) / 2, 0, width - w]) { consider(x, box.y + box.h + g); consider(x, box.y - h - g); }
-      }
-      if (!spot) { const bottom = Math.max(0, ...boxes.map((box) => box.y + box.h + box.gap)); spot = { x: Math.round((width - w) / 2), y: bottom }; }
-    }
-    const placed = spot as { x: number; y: number };
-    if (isFocus) center = { x: placed.x + w / 2, y: placed.y + h / 2 };
-    boxes.push({ id: item.id, x: placed.x, y: placed.y, w, h, gap });
-    const rotate = tiltOf(item, rules, isFocus, hash);
-    const lane = Math.max(0, Math.min(units - 1, Math.round(placed.x / (unit + rules.gutter))));
-    rects.set(item.id, { x: placed.x, y: placed.y, w, h, rotate, z: isFocus ? 2 : item.kind === "quote" ? 3 : 1, lane, units: Math.round((w + rules.gutter) / (unit + rules.gutter)) });
+    if (d > bestD + 1e-9) { bestD = d; best = [x, y]; }
   }
+  return best;
+}
+
+/** An item's tilt, in degrees: small text pieces a little in field notes; nothing else. */
+function tiltOf(item: OrganicItem, rules: Rules, isHero: boolean, scale: Scale, hash: number): number {
+  const range = item.accent || isHero || item.visual || isVisualKind(item.kind) || item.kind === "table" || item.kind === "custom" ? 0 : scale === "small" || scale === "tiny" ? rules.tilt : 0;
+  return range ? Math.round((((hash >>> 20) % 1000) / 1000 - 0.5) * 2 * range * 100) / 100 : 0;
 }

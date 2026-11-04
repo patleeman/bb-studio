@@ -17,13 +17,15 @@ import {
   type CanvasMeta,
   type CanvasTurn,
   type CanvasView,
+  type Composition,
   type ItemInput,
   type ItemPatch,
   type SizeHint,
 } from "./shared";
 import { LOOK_INFO, lookOf, type Look, type OrganicLook } from "./looks";
+import { organicFocus } from "./organic";
 
-type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
+type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; composition: string | null; title_source: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
 type ItemRow = { canvas_id: string; id: string; kind: string; title: string | null; data: string | null; options: string; html: string | null; size: string; importance: number; created_at: number; updated_at: number; rev: number; rel: string | null };
 
 /** Who made an edit: the canvas thread's agent, the hands-free voice, or the user. */
@@ -38,7 +40,9 @@ export type CanvasOp =
   /** Replace the whole board: ids already there are updated in place, the rest added, the others removed. */
   | { op: "set"; items: ItemInput[] }
   /** The board's style (the agent picks it), with why. */
-  | { op: "style"; look: OrganicLook; reason?: string | null };
+  | { op: "style"; look: OrganicLook; reason?: string | null }
+  /** The board as a whole: its title (the topic) and composition; sameComposition allows repeating the last board's. */
+  | { op: "board"; title?: string | null; composition?: Composition | null; sameComposition?: boolean };
 
 export interface EditResult { rev: number; changes: CanvasChange[]; items: CanvasItem[] }
 
@@ -46,14 +50,41 @@ const parse = (text: string | null): unknown => (text === null ? null : JSON.par
 const DEFAULT_IMPORTANCE = 3;
 
 // Retired: note items (and any other kind Canvas no longer has) are left out
-// wherever the board is read, and the next edit drops their rows. The rel
-// column (relatedTo, anchor, point: connectors) is no longer read or written.
+// wherever the board is read, and the next edit drops their rows.
 const shownKinds = (rows: ItemRow[]) => rows.filter((row) => isCanvasKind(row.kind));
 /** A change line about a note item, from before notes were retired. */
 const NOTE_CHANGE = /^(Added|Updated|Removed) note "/;
 
+/**
+ * An item's placement, kept as JSON in its rel column (which once held
+ * connectors: relatedTo and anchor are ignored when read, and dropped on
+ * the next write).
+ */
+type Rel = Pick<CanvasItem, "scale" | "region" | "pinnedTo" | "point" | "side" | "bleed">;
+const PLACEMENT = ["scale", "region", "pinnedTo", "point", "side", "bleed"] as const;
+function relOf(text: string | null): Rel {
+  const rel = (text ? parse(text) : null) as Partial<Rel> | null;
+  const pinnedTo = typeof rel?.pinnedTo === "string" ? rel.pinnedTo : null;
+  return { scale: rel?.scale ?? null, region: rel?.region ?? null, pinnedTo, point: pinnedTo ? rel?.point ?? null : null, side: pinnedTo ? rel?.side ?? null : null, bleed: rel?.bleed === true ? true : null };
+}
+const relText = (item: Rel) => {
+  const placement = Object.fromEntries(PLACEMENT.filter((key) => item[key] !== null && item[key] !== undefined).map((key) => [key, item[key]]));
+  return Object.keys(placement).length ? JSON.stringify(placement) : null;
+};
+
+/** The topic a board shows, for the canvas's title: its headline, else its hero's title. */
+export function boardTitle(items: readonly CanvasItem[]): string | null {
+  const text = (value: unknown) => (typeof value === "string" ? value : value && typeof value === "object" && typeof (value as { text?: unknown }).text === "string" ? (value as { text: string }).text : "").replace(/\s+/g, " ").trim();
+  const headline = [...items].filter((item) => item.kind === "headline").sort((a, b) => b.importance - a.importance || b.updatedAt - a.updatedAt)[0];
+  const hero = organicFocus(items.map((item) => ({ ...item, accent: null })));
+  const heroItem = hero ? items.find((item) => item.id === hero.id) : undefined;
+  const found = (headline && text(headline.data)) || heroItem?.title?.trim() || (heroItem && (heroItem.kind === "quote" || heroItem.kind === "headline") ? text(heroItem.data) : "") || "";
+  return found ? found.slice(0, CANVAS_LIMITS.title) : null;
+}
+
 function toItem(row: ItemRow): CanvasItem {
   return {
+    ...relOf(row.rel),
     id: row.id, kind: row.kind as CanvasKind, title: row.title, data: parse(row.data), options: (parse(row.options) as Record<string, unknown>) ?? {},
     html: row.html, size: row.size as SizeHint, importance: row.importance, createdAt: row.created_at, updatedAt: row.updated_at, rev: row.rev,
   };
@@ -127,7 +158,7 @@ export class CanvasStore {
 
   private meta(row: CanvasRow): CanvasMeta {
     const count = shownKinds(this.db.prepare("SELECT kind FROM canvas_items WHERE canvas_id = ?").all(row.id) as ItemRow[]).length;
-    return { id: row.id, threadId: row.thread_id ?? "", title: row.title || "Untitled canvas", createdAt: row.created_at, updatedAt: row.updated_at, itemCount: count, look: lookOf(row.look) };
+    return { id: row.id, threadId: row.thread_id ?? "", title: row.title || "Untitled canvas", createdAt: row.created_at, updatedAt: row.updated_at, itemCount: count, look: lookOf(row.look), composition: (row.composition as Composition | null) ?? null };
   }
 
   items(canvasId: string): CanvasItem[] {
@@ -197,7 +228,10 @@ export class CanvasStore {
       const rev = row.rev + 1;
       const at = this.now();
       const board = new Map(this.items(canvasId).map((item) => [item.id, item]));
+      const before = new Set(board.keys());
       let look = row.look;
+      let cleared = false;
+      const boardOps: Extract<CanvasOp, { op: "board" }>[] = [];
       const log: Omit<CanvasChange, "seq">[] = [];
       const record = (op: CanvasChange["op"], itemId: string | null, summary: string) => log.push({ rev, turn: row.turn, op, itemId, summary, by, at });
 
@@ -209,6 +243,7 @@ export class CanvasStore {
           id, kind: input.kind, title: input.title?.trim() || null, data: input.data ?? null, options: input.options ?? {},
           html: input.kind === "custom" ? input.html ?? null : null, size: input.size ?? CANVAS_KIND_INFO[input.kind].size,
           importance: input.importance ?? DEFAULT_IMPORTANCE, createdAt: at, updatedAt: at, rev,
+          scale: input.scale ?? null, region: input.region ?? null, pinnedTo: input.pinnedTo && input.pinnedTo !== id ? input.pinnedTo : null, point: input.pinnedTo ? input.point ?? null : null, side: input.pinnedTo ? input.side ?? null : null, bleed: input.bleed === true ? true : null,
         };
         checkItem(item);
         board.set(id, item);
@@ -228,11 +263,17 @@ export class CanvasStore {
           html: kind !== "custom" ? null : patch.html === undefined ? before.html : patch.html,
           size: patch.size ?? before.size,
           importance: patch.importance ?? before.importance,
+          scale: patch.scale === undefined ? before.scale ?? null : patch.scale,
+          region: patch.region === undefined ? before.region ?? null : patch.region,
+          pinnedTo: patch.pinnedTo === undefined ? before.pinnedTo ?? null : patch.pinnedTo && patch.pinnedTo !== before.id ? patch.pinnedTo : null,
+          point: patch.point === undefined ? before.point ?? null : patch.point,
+          side: patch.side === undefined ? before.side ?? null : patch.side,
+          bleed: patch.bleed === undefined ? before.bleed ?? null : patch.bleed === true ? true : null,
           updatedAt: at, rev,
         };
         checkItem(next);
         board.set(next.id, next);
-        const fields = (["kind", "title", "data", "options", "html", "size", "importance"] as const).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(next[key]));
+        const fields = (["kind", "title", "data", "options", "html", "size", "importance", "scale", "region", "pinnedTo", "point", "side", "bleed"] as const).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(next[key]));
         record("update", next.id, `Updated ${label(next)}${fields.length ? ` (${fields.join(", ")})` : " (no change)"}`);
       };
       const remove = (id: string) => {
@@ -250,6 +291,10 @@ export class CanvasStore {
           case "clear":
             if (board.size) record("clear", null, `Cleared ${board.size} item(s)`);
             board.clear();
+            cleared = true;
+            break;
+          case "board":
+            boardOps.push(op);
             break;
           case "style":
             // Logged when it changes, and the agent's first pick (even of the style the canvas started in), with its reason.
@@ -264,7 +309,7 @@ export class CanvasStore {
             }
             for (const id of [...board.keys()]) if (!ids.has(id)) remove(id);
             for (const input of op.items) {
-              if (input.id && board.has(input.id)) update({ ...input, id: input.id, replaceOptions: true, options: input.options ?? {}, data: input.data ?? null, title: input.title ?? null, html: input.html ?? undefined });
+              if (input.id && board.has(input.id)) update({ ...input, id: input.id, replaceOptions: true, options: input.options ?? {}, data: input.data ?? null, title: input.title ?? null, html: input.html ?? undefined, scale: input.scale ?? null, region: input.region ?? null, pinnedTo: input.pinnedTo ?? null, point: input.point ?? null, side: input.side ?? null, bleed: input.bleed ?? null });
               else add(input);
             }
             break;
@@ -273,12 +318,32 @@ export class CanvasStore {
       }
       if (board.size > CANVAS_LIMITS.items) throw new Error(`A board holds at most ${CANVAS_LIMITS.items} items; it would have ${board.size}. Remove what no longer matters.`);
 
-      this.db.prepare("DELETE FROM canvas_items WHERE canvas_id = ?").run(canvasId);
-      const insert = this.db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      for (const item of board.values()) {
-        insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev);
+      // A new board: cleared, or none of what was there stays (a topic change).
+      const fresh = cleared || !before.size || (board.size > 0 && ![...board.keys()].some((id) => before.has(id)));
+      let composition = fresh && before.size ? null : row.composition;
+      const asked = boardOps.length ? Object.assign({}, ...boardOps) as Extract<CanvasOp, { op: "board" }> : null;
+      if (asked?.composition) {
+        if (fresh && before.size && asked.composition === row.composition && !asked.sameComposition) {
+          throw new Error(`The last board was a "${row.composition}" composition too. Compose this one another way (orbit, giant-number, map, spine, split, quote, close-up, essay: whichever fits this content), or pass sameComposition: true only if the user asked for the same layout.`);
+        }
+        if (asked.composition !== row.composition) record("compose", null, `Composition: ${asked.composition}`);
+        composition = asked.composition;
       }
-      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ? WHERE id = ?").run(rev, at, look, canvasId);
+      // The title follows the topic: the agent's, else the board's headline or hero (on a new board, or until the agent names one).
+      let title = row.title;
+      let titleSource = row.title_source;
+      if (asked?.title?.trim()) { title = asked.title.trim().slice(0, CANVAS_LIMITS.title); titleSource = "agent"; }
+      else if (fresh || titleSource !== "agent") {
+        const derived = boardTitle([...board.values()]);
+        if (derived) { title = derived; titleSource = "hero"; }
+      }
+
+      this.db.prepare("DELETE FROM canvas_items WHERE canvas_id = ?").run(canvasId);
+      const insert = this.db.prepare("INSERT INTO canvas_items (canvas_id, id, kind, title, data, options, html, size, importance, created_at, updated_at, rev, rel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      for (const item of board.values()) {
+        insert.run(canvasId, item.id, item.kind, item.title, item.data === null || item.data === undefined ? null : JSON.stringify(item.data), JSON.stringify(item.options), item.html, item.size, item.importance, item.createdAt, item.updatedAt, item.rev, relText(item));
+      }
+      this.db.prepare("UPDATE canvases SET rev = ?, updated_at = ?, look = ?, composition = ?, title = ?, title_source = ? WHERE id = ?").run(rev, at, look, composition, title, titleSource, canvasId);
       const write = this.db.prepare("INSERT INTO canvas_changes (canvas_id, rev, turn, op, item_id, summary, by, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       const changes: CanvasChange[] = log.map((change) => ({ ...change, seq: Number(write.run(canvasId, change.rev, change.turn, change.op, change.itemId, change.summary, change.by, change.at).lastInsertRowid) }));
       this.db.prepare("DELETE FROM canvas_changes WHERE canvas_id = ? AND seq <= (SELECT seq FROM canvas_changes WHERE canvas_id = ? ORDER BY seq DESC LIMIT 1 OFFSET ?)").run(canvasId, canvasId, CANVAS_LIMITS.changesKept);

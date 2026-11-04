@@ -31,10 +31,15 @@ export interface CanvasKit {
   multiples(items: unknown, options?: Record<string, unknown>): string;
   delta(value: unknown, options?: Record<string, unknown>): string;
   legend(items: unknown): string;
+  bignum(value: unknown, options?: Record<string, unknown>): string;
+  quote(text: unknown, options?: Record<string, unknown>): string;
+  callout(text: unknown, options?: Record<string, unknown>): string;
+  stars(value: unknown, options?: Record<string, unknown>): string;
   states: Record<string, [number, number]>;
   render?(build: (data: unknown, options: Record<string, unknown>, state: unknown) => string): void;
   hydrate?(root?: unknown): void;
   width?(): number;
+  height?(): number;
 }
 
 /** Builds the kit. With a window, it also becomes window.cv with render and hydrate. Self-contained: its source runs in frames. */
@@ -144,7 +149,36 @@ export function canvasKit(win?: unknown): CanvasKit {
     return paint(null, index);
   };
 
-  /** A line (or area) chart with direct labels at the line ends, in px. options: x, series, w, h, unit, area, zero, colors, highlight, marks [{x, label}]. */
+  /** Words for a label in SVG, broken into short lines. */
+  const wrap = (text: unknown, chars = 24): string[] => {
+    const words = str(text).replace(/\s+/g, " ").trim().slice(0, 140).split(" ");
+    const lines: string[] = [];
+    for (const word of words) { const last = lines.at(-1); if (last !== undefined && (last + " " + word).length <= chars) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word); }
+    return lines.slice(0, 4);
+  };
+  /**
+   * An annotation drawn on a chart itself: a dot on the spot, a short leader
+   * and a label, kept inside the chart's box. (px, py) is the spot; dx, dy
+   * where the label goes from it (default: up and toward the middle).
+   */
+  const annotation = (px: number, py: number, text: unknown, note: Record<string, unknown>, box: { w: number; h: number; l?: number; t?: number }): string => {
+    const lines = wrap(text, num(note.chars) ?? 24);
+    if (!lines.length) return "";
+    const lh = 13;
+    const dx = num(note.dx) ?? (px > (box.l ?? 0) + (box.w - (box.l ?? 0)) * 0.55 ? -46 : 46);
+    const dy = num(note.dy) ?? (py - lines.length * lh - 30 > (box.t ?? 0) ? -34 : 30);
+    const anchor = dx < 0 ? "end" : "start";
+    const tw = Math.max(...lines.map((line) => line.length)) * 6.6;
+    let lx = px + dx, ly = py + dy;
+    lx = anchor === "end" ? Math.max(tw + 2, Math.min(box.w - 2, lx)) : Math.max(2, Math.min(box.w - tw - 2, lx));
+    ly = Math.max((box.t ?? 0) + 11, Math.min(box.h - lines.length * lh, ly));
+    const color = paint(note.color ?? "ink");
+    const tspans = lines.map((line, i) => `<tspan x="${round(lx)}" dy="${i ? lh : 0}">${esc(line)}</tspan>`).join("");
+    const ey = dy < 0 ? ly + (lines.length - 1) * lh + 4 : ly - 11;
+    return `<g class="cv-anno-g"><line x1="${round(px)}" y1="${round(py)}" x2="${round(lx - (anchor === "end" ? -3 : 3))}" y2="${round(ey)}" class="cv-anno-line" style="stroke:${color}"/><circle cx="${round(px)}" cy="${round(py)}" r="3.4" class="cv-anno-dot" style="fill:${color}"/><text x="${round(lx)}" y="${round(ly)}" text-anchor="${anchor}" class="cv-anno" style="fill:${color}">${tspans}</text></g>`;
+  };
+
+  /** A line (or area) chart with direct labels at the line ends, in px. options: x, series, w, h, unit, area, zero, colors, highlight, marks [{x, label}], callouts [{x, series?, text, dx?, dy?, color?}] (labels drawn on the chart). */
   const line = (rows: unknown, options?: Record<string, unknown>): string => {
     const o = opt(options);
     const { list, x, series } = chartShape(rows, o);
@@ -188,6 +222,13 @@ export function canvasKit(win?: unknown): CanvasKit {
       for (let i = 1; i < ends.length; i++) if (ends[i]!.y - ends[i - 1]!.y < 13) ends[i]!.y = ends[i - 1]!.y + 13;
       for (const end of ends) out += `<text x="${w - m.r + 8}" y="${round(end.y) + 4}" class="cv-end-label" fill="${end.color}">${esc(end.text.slice(0, 22))}</text>`;
     }
+    for (const note of Array.isArray(o.callouts) ? o.callouts.filter(isObj).slice(0, 6) : []) {
+      const i = list.findIndex((row) => str(row[x]) === str(note.x));
+      const key = typeof note.series === "string" && series.includes(note.series) ? note.series : series[0]!;
+      const v = i < 0 ? null : num(list[i]![key]);
+      if (v === null) continue;
+      out += annotation(X(i), Y(v), note.text ?? note.label, note, { w: w - m.r, h: h - m.b, l: m.l, t: m.t });
+    }
     return `${out}</svg>`;
   };
 
@@ -229,6 +270,12 @@ export function canvasKit(win?: unknown): CanvasKit {
       if (i % step === 0) out += `<text x="${round(x0 + inner / 2)}" y="${h - 6}" text-anchor="middle" class="cv-axis">${esc(str(row[x]).slice(0, 10))}</text>`;
     });
     if (lo < 0 || o.baseline !== false) out += `<line x1="${m.l}" x2="${w - m.r}" y1="${round(Y(0))}" y2="${round(Y(0))}" class="cv-zero-line"/>`;
+    for (const note of Array.isArray(o.callouts) ? o.callouts.filter(isObj).slice(0, 6) : []) {
+      const i = list.findIndex((row) => str(row[x]) === str(note.x));
+      if (i < 0) continue;
+      const top = o.stacked ? totals[i]! : Math.max(...series.map((key) => num(list[i]![key]) ?? 0));
+      out += annotation(m.l + i * band + band / 2, Y(Math.max(0, top)) - (showValues ? 14 : 2), note.text ?? note.label, note, { w: w - m.r, h: h - m.b, l: m.l, t: 0 });
+    }
     return `${out}</svg>`;
   };
 
@@ -345,14 +392,33 @@ export function canvasKit(win?: unknown): CanvasKit {
       const pct = Math.round(12 + t * 88);
       return { bg: `color-mix(in oklab, ${high} ${pct}%, var(--cv-surface))`, strong: pct > 58 };
     };
-    const W = 11 * (cell + gap), H = 8 * (cell + gap);
-    let out = `<svg class="cv-tilemap" viewBox="0 0 ${round(W)} ${round(H)}" width="100%" style="max-width:${round(W * 1.6)}px" role="img" aria-label="US map">`;
+    const callouts = Array.isArray(o.callouts) ? o.callouts.filter(isObj).filter((note) => stateCode(note.state)).slice(0, 6) : [];
+    // Callouts sit in a margin beside the map, on the side nearer their state, with a leader to the tile.
+    const margin = callouts.length ? (cell + gap) * 3.2 : 0;
+    const W = 11 * (cell + gap) + margin * 2, H = 8 * (cell + gap);
+    let out = `<svg class="cv-tilemap" viewBox="${round(-margin)} 0 ${round(W)} ${round(H)}" width="100%" style="max-width:${round(W * 1.6)}px" role="img" aria-label="US map">`;
     for (const [code, [cx, cy]] of Object.entries(states)) {
       const entry = entries.get(code) ?? { value: null, label: "", color: null };
       const { bg, strong } = fill(entry);
       const x = cx * (cell + gap), y = cy * (cell + gap);
       const shown = o.show === "value" && entry.value !== null ? fmt(entry.value, { decimals: 0 }) : entry.label && o.show === "label" ? entry.label.slice(0, 4) : code;
       out += `<g><rect x="${round(x)}" y="${round(y)}" width="${cell}" height="${cell}" rx="${round(cell * 0.12)}" style="fill:${bg}" class="${entries.has(code) ? "cv-tile" : "cv-tile cv-tile-empty"}"><title>${esc(code)}${entry.value !== null ? ` ${esc(fmt(entry.value))}` : ""}${entry.label ? ` ${esc(entry.label)}` : ""}</title></rect><text x="${round(x + cell / 2)}" y="${round(y + cell / 2 + cell * 0.13)}" text-anchor="middle" class="cv-tile-text" style="font-size:${round(cell * 0.34)}px;fill:${strong ? "#fff" : "var(--cv-ink-2)"}">${esc(shown)}</text></g>`;
+    }
+    const used: Record<string, number[]> = { left: [], right: [] };
+    for (const note of callouts) {
+      const code = stateCode(note.state)!;
+      const [cx, cy] = states[code] ?? [0, 0];
+      const tx = cx * (cell + gap) + cell / 2, ty = cy * (cell + gap) + cell / 2;
+      const side = note.side === "left" || (note.side !== "right" && cx < 5.5) ? "left" : "right";
+      const fs = Math.max(9, cell * 0.36), lh = fs * 1.2;
+      const lines = wrap(note.text ?? note.label, Math.max(10, Math.round(margin / (fs * 0.55))));
+      let ly = Math.max(fs, Math.min(H - lines.length * lh, ty - (lines.length - 1) * lh / 2));
+      for (const taken of used[side]!) if (Math.abs(taken - ly) < lines.length * lh + 4) ly = taken + lines.length * lh + 6;
+      used[side]!.push(ly);
+      const lx = side === "left" ? -margin + 2 : 11 * (cell + gap) + gap * 2;
+      const ex = side === "left" ? -gap * 2 : 11 * (cell + gap);
+      const color = paint(note.color ?? "ink");
+      out += `<g class="cv-anno-g"><polyline points="${round(ex)},${round(ly - fs * 0.35)} ${round(side === "left" ? Math.min(ex + gap * 2, tx - cell * 0.3) : Math.max(ex - gap * 2, tx + cell * 0.3))},${round(ly - fs * 0.35)} ${round(tx)},${round(ty)}" class="cv-anno-line" style="stroke:${color};fill:none"/><circle cx="${round(tx)}" cy="${round(ty)}" r="${round(cell * 0.12)}" class="cv-anno-dot" style="fill:${color}"/><text x="${round(side === "left" ? ex - gap : lx)}" y="${round(ly)}" text-anchor="${side === "left" ? "end" : "start"}" class="cv-anno" style="fill:${color};font-size:${round(fs)}px">${lines.map((line, i) => `<tspan x="${round(side === "left" ? ex - gap : lx)}" dy="${i ? round(lh) : 0}">${esc(line)}</tspan>`).join("")}</text></g>`;
     }
     out += "</svg>";
     const legend = Array.isArray(o.legend) ? `<div class="cv-map-legend"><span>${esc(o.legend[0])}</span><i style="background:linear-gradient(90deg, ${diverging ? `${low}, var(--cv-surface), ${high}` : `var(--cv-surface), ${high}`})"></i><span>${esc(o.legend[1] ?? "")}</span></div>` : "";
@@ -414,7 +480,59 @@ export function canvasKit(win?: unknown): CanvasKit {
 
   const legend = (items: unknown): string => `<div class="cv-legend">${(Array.isArray(items) ? items : []).filter(isObj).slice(0, 12).map((item, index) => `<span><i class="cv-swatch" style="background:${paint(item.color, index)}"></i>${esc(item.label)}</span>`).join("")}</div>`;
 
-  const kit: CanvasKit = { esc, num, paint, fmt, spark, bars, line, columns, hbars, split, donut, meter, tilemap, timeline, waffle, multiples, delta, legend, states };
+  /** One number set huge, with its label above and a line under: the shape is the type. options: label, unit, prefix, decimals, delta, invert, sub, size (px; default: a third of the width), color. */
+  const bignum = (value: unknown, options?: Record<string, unknown>): string => {
+    const o = opt(options);
+    const size = num(o.size);
+    const color = o.color ? paint(o.color) : "var(--cv-ink)";
+    const n = num(value);
+    const body = n === null ? esc(value) : fmt(n, { decimals: o.decimals, compact: o.compact });
+    return `<div class="cv-bignum">${o.label ? `<div class="cv-bignum-label">${esc(o.label)}</div>` : ""}<div class="cv-bignum-n" style="color:${color}${size ? `;font-size:${size}px` : ""}">${o.prefix ? `<span class="cv-bignum-unit">${esc(o.prefix)}</span>` : ""}${body}${o.unit ? `<span class="cv-bignum-unit">${esc(o.unit)}</span>` : ""}</div>${o.delta !== undefined ? delta(o.delta, { invert: o.invert, unit: o.deltaUnit }) : ""}${o.sub ? `<div class="cv-bignum-sub">${esc(o.sub)}</div>` : ""}</div>`;
+  };
+
+  /** A quote with no frame: big type, a hanging mark, the speaker under it. options: by, role, size (px). */
+  const quote = (text: unknown, options?: Record<string, unknown>): string => {
+    const o = opt(options);
+    const size = num(o.size);
+    return `<figure class="cv-bare-quote"><blockquote${size ? ` style="font-size:${size}px"` : ""}>${esc(text)}</blockquote>${o.by ? `<figcaption>${esc(o.by)}${o.role ? `, <span>${esc(o.role)}</span>` : ""}</figcaption>` : ""}</figure>`;
+  };
+
+  /**
+   * A callout with a leader line, over a figure: put it inside an element
+   * with class cv-annotated, after the figure. x, y: the spot (0–1 of the
+   * figure); dx, dy: where the label sits from it, in px. options: x, y, dx, dy, color, w (label width).
+   */
+  const callout = (text: unknown, options?: Record<string, unknown>): string => {
+    const o = opt(options);
+    const x = Math.max(0, Math.min(1, num(o.x) ?? 0.5)), y = Math.max(0, Math.min(1, num(o.y) ?? 0.5));
+    const dx = num(o.dx) ?? (x > 0.55 ? -60 : 60), dy = num(o.dy) ?? (y > 0.35 ? -44 : 44);
+    const color = paint(o.color ?? "ink");
+    const lw = px(o.w, 160, 60, 400);
+    const left = dx < 0 ? dx - lw : dx;
+    const top = dy < 0 ? dy - 6 : dy - 6;
+    const ax = Math.abs(dx), ay = Math.abs(dy);
+    return `<div class="cv-callout-pin" style="left:${round(x * 100)}%;top:${round(y * 100)}%;--cv-callout-color:${color}"><svg class="cv-callout-leader" width="${ax + 2}" height="${ay + 2}" style="left:${dx < 0 ? -ax - 1 : -1}px;top:${dy < 0 ? -ay - 1 : -1}px" aria-hidden="true"><line x1="${dx < 0 ? ax + 1 : 1}" y1="${dy < 0 ? ay + 1 : 1}" x2="${dx < 0 ? 1 : ax + 1}" y2="${dy < 0 ? 1 : ay + 1}"/></svg><i class="cv-callout-dot"></i><span class="cv-callout-text" style="left:${round(left)}px;top:${round(top)}px;width:${round(lw)}px;text-align:${dx < 0 ? "right" : "left"};${dy < 0 ? "transform:translateY(-100%)" : ""}">${esc(text)}</span></div>`;
+  };
+
+  /** A rating as five stars (partly filled), from a score out of max (5, 10 or 100). options: max, size (px), color, label (true: the number beside it). */
+  const stars = (value: unknown, options?: Record<string, unknown>): string => {
+    const o = opt(options);
+    const n = num(value);
+    if (n === null) return "";
+    const max = num(o.max) ?? (n > 10 ? 100 : n > 5 ? 10 : 5);
+    const share = Math.max(0, Math.min(1, n / (max || 5)));
+    const size = px(o.size, 16, 8, 64);
+    const color = paint(o.color ?? "amber");
+    const star = "M10 1.5l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L10 15l-5.3 2.8 1.1-5.9L1.4 7.8l6-.8z";
+    const id = `cvs${Math.round(share * 1000)}${Math.round(size)}`;
+    let shapes = "";
+    for (let i = 0; i < 5; i++) shapes += `<path d="${star}" transform="translate(${i * 21} 0)"/>`;
+    const w = 5 * 21 - 1;
+    const label = o.label === false ? "" : `<b class="cv-stars-n">${esc(fmt(n, { decimals: max === 100 ? 0 : 1 }))}<small>/${esc(max)}</small></b>`;
+    return `<span class="cv-stars" role="img" aria-label="${esc(`${fmt(n)} out of ${max}`)}"><svg width="${round((size * w) / 20)}" height="${size}" viewBox="0 0 ${w} 20"><defs><clipPath id="${id}"><rect width="${round(w * share)}" height="20"/></clipPath></defs><g fill="var(--cv-rule)">${shapes}</g><g fill="${color}" clip-path="url(#${id})">${shapes}</g></svg>${label}</span>`;
+  };
+
+  const kit: CanvasKit = { esc, num, paint, fmt, spark, bars, line, columns, hbars, split, donut, meter, tilemap, timeline, waffle, multiples, delta, legend, bignum, quote, callout, stars, states };
 
   const w = win as (Window & { cv?: CanvasKit; bbWidget?: { data: unknown; options: Record<string, unknown> } }) | undefined;
   if (w && typeof w.document !== "undefined") {
@@ -438,6 +556,8 @@ export function canvasKit(win?: unknown): CanvasKit {
       if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", draw); else draw();
     };
     kit.width = () => Math.max(120, doc.documentElement.clientWidth || w.innerWidth || 480);
+    // The height its place in the composition suggests: size the figure to it (never set it on the outer element).
+    kit.height = () => { const room = num((w.bbWidget as { size?: { room?: unknown } } | undefined)?.size?.room); return Math.max(90, room && room > 0 ? room - 40 : Math.round(kit.width!() * 0.55)); };
     w.cv = kit;
     const ready = () => kit.hydrate!();
     if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", ready); else ready();

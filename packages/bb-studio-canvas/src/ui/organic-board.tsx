@@ -4,9 +4,9 @@
 // enters) once it's measured. Moves glide (FLIP from the last rects),
 // updates flash and cross-fade, removals fade out where they were.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { layoutOrganic, organicWidths, type OrganicItem, type Placed } from "../organic";
+import { isVisualKind, layoutOrganic, organicSizes, type Frame, type OrganicItem, type Placed } from "../organic";
 import { accentOf, type OrganicLook } from "../looks";
-import type { CanvasItem } from "../shared";
+import type { CanvasItem, Composition } from "../shared";
 import { enter, exit, fadeIn, fadeOut, highlight, move, restyle, type Rect } from "./motion";
 import { OrganicBody, organicLabel, tilePadding } from "./organic-items";
 
@@ -14,20 +14,39 @@ const versionOf = (item: CanvasItem) => `${item.rev}:${item.updatedAt}`;
 /** An unmeasured item shows anyway after this long (a frame that never reports). */
 const MEASURE_TIMEOUT_MS = 2500;
 
-function useWidth(ref: React.RefObject<HTMLElement | null>): number {
-  const [width, setWidth] = useState(0);
+/**
+ * The visible board: its width, and the height of the scroll area it sits
+ * in (less its top padding and the board's bottom pad), so the composition
+ * fits the screen.
+ */
+function useFrame(ref: React.RefObject<HTMLElement | null>, bottomPad: number): Frame {
+  const [frame, setFrame] = useState<Frame>({ width: 0, height: 0 });
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    setWidth(element.clientWidth);
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    const host = element.parentElement;
+    const read = () => {
+      const pad = host ? parseFloat(getComputedStyle(host).paddingTop) || 0 : 0;
+      const next = { width: element.clientWidth, height: Math.max(0, Math.round((host?.clientHeight ?? 0) - pad - bottomPad)) };
+      setFrame((current) => (current.width === next.width && current.height === next.height ? current : next));
+    };
+    read();
+    const observer = new ResizeObserver(read);
     observer.observe(element);
+    if (host) observer.observe(host);
     return () => observer.disconnect();
-  }, [ref]);
-  return width;
+  }, [ref, bottomPad]);
+  return frame;
 }
 
-export const toOrganic = (item: CanvasItem, look: OrganicLook): OrganicItem => ({ id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt, accent: accentOf(item.kind, item.options, look) });
+/** A board item for the page: a canvas item, or (a reference board) one placed by hand. */
+export type BoardItem = CanvasItem & { fixed?: { x: number; y: number; w: number } | null };
+
+export const toOrganic = (item: BoardItem, look: OrganicLook): OrganicItem => ({
+  id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt, accent: accentOf(item.kind, item.options, look),
+  scale: item.scale ?? null, region: item.region ?? null, pinnedTo: item.pinnedTo ?? null, point: item.point ?? null, side: item.side ?? null, bleed: item.bleed ?? null,
+  visual: isVisualKind(item.kind) || (item.kind === "custom" && item.options.visual === true), fixed: item.fixed ?? null,
+});
 
 /** Panel tags for the instrument look: A1, A2, … in reading order. */
 function tagsOf(rects: ReadonlyMap<string, Placed>): Map<string, string> {
@@ -38,11 +57,11 @@ function tagsOf(rects: ReadonlyMap<string, Placed>): Map<string, string> {
 const KIND_TAG: Partial<Record<string, string>> = { line: "TREND", area: "TREND", bar: "BARS", pie: "SHARE", table: "TABLE", list: "LIST", map: "MAP", timeline: "TIME", multiples: "GRID", custom: "LIVE", image: "IMG", stat: "VAL" };
 
 /** An item's card: chrome by look, content cross-faded when it changes. */
-function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: CanvasItem; look: OrganicLook; mode: "light" | "dark"; width: number; focus: boolean; tag?: string; onMeasure?(height: number): void }) {
+function Card({ item, look, mode, width, room, focus, tag, onMeasure }: { item: CanvasItem; look: OrganicLook; mode: "light" | "dark"; width: number; room: number; focus: boolean; tag?: string; onMeasure?(height: number): void }) {
   const accent = accentOf(item.kind, item.options, look);
   const pad = tilePadding(look, item.kind, accent);
   const label = look === "instrument" && item.kind !== "headline" ? item.title ?? (item.kind === "custom" ? item.id : null) : organicLabel(item);
-  const inner = Math.max(40, width - pad * 2 - (look === "instrument" ? 2 : 0));
+  const inner = Math.max(40, width - pad * 2);
   const measure = useRef<HTMLDivElement>(null);
   const frameReported = useRef(item.kind !== "custom");
   const report = useRef(onMeasure);
@@ -106,7 +125,7 @@ function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: Canvas
                 } else if (shown.length > 1) fadeIn(element);
               }}
             >
-              <OrganicBody item={layer.item} width={inner} focus={focus} look={look} mode={mode} onFrameHeight={leaving ? undefined : onFrameHeight} />
+              <OrganicBody item={layer.item} width={inner} room={room} focus={focus} look={look} mode={mode} onFrameHeight={leaving ? undefined : onFrameHeight} />
             </div>
           );
         })}
@@ -115,11 +134,13 @@ function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: Canvas
   );
 }
 
-export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { items: readonly CanvasItem[]; look: OrganicLook; mode: "light" | "dark"; empty?: ReactNode; bottomPad?: number }) {
+export function OrganicBoard({ items, look, mode, composition = null, empty, bottomPad = 24 }: { items: readonly BoardItem[]; look: OrganicLook; mode: "light" | "dark"; composition?: Composition | null; empty?: ReactNode; bottomPad?: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const width = useWidth(ref);
+  const frame = useFrame(ref, bottomPad);
+  const width = frame.width;
   const layoutItems = useMemo(() => items.map((item) => toOrganic(item, look)), [items, look]);
-  const widths = useMemo(() => organicWidths(layoutItems, width, look), [layoutItems, width, look]);
+  const sizes = useMemo(() => organicSizes(layoutItems, frame, look, composition), [layoutItems, frame, look, composition]);
+  const widths = useMemo(() => new Map([...sizes].map(([id, size]) => [id, size.w])), [sizes]);
 
   // Measured heights, batched to one update per tick (a timer, not a frame:
   // a background tab runs no frames, and the board must settle there too). Keyed by id and width.
@@ -127,12 +148,12 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   const pending = useRef(new Map<string, number>());
   /** Each item's latest height at any width: its stand-in while it's re-measured (after a style switch or resize), so it glides instead of vanishing. */
   const latest = useRef(new Map<string, number>());
-  const frame = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tick = useRef<ReturnType<typeof setTimeout> | null>(null);
   const report = useCallback((id: string, w: number, height: number) => {
     pending.current.set(`${id}@${w}`, height);
-    if (frame.current) return;
-    frame.current = setTimeout(() => {
-      frame.current = null;
+    if (tick.current) return;
+    tick.current = setTimeout(() => {
+      tick.current = null;
       const batch = pending.current;
       pending.current = new Map();
       for (const [key, value] of batch) latest.current.set(key.slice(0, key.lastIndexOf("@")), value);
@@ -144,7 +165,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
       });
     }, 16);
   }, []);
-  useEffect(() => () => { if (frame.current) clearTimeout(frame.current); }, []);
+  useEffect(() => () => { if (tick.current) clearTimeout(tick.current); }, []);
   const { measured, exact } = useMemo(() => {
     const map = new Map<string, number>();
     let count = 0;
@@ -165,8 +186,8 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   }, [items, measured, forced]);
   const ready = useCallback((id: string) => measured.has(id) || forced.has(id), [measured, forced]);
 
-  const previous = useRef<{ width: number; rects: Map<string, Placed> } | null>(null);
-  const layout = useMemo(() => layoutOrganic(layoutItems, width, look, measured, previous.current?.width === width ? previous.current.rects : null), [layoutItems, width, look, measured]);
+  const previous = useRef<{ width: number; height: number; rects: Map<string, Placed> } | null>(null);
+  const layout = useMemo(() => layoutOrganic(layoutItems, frame, look, measured, previous.current?.width === frame.width && previous.current.height === frame.height ? previous.current.rects : null, composition), [layoutItems, frame, look, measured, composition]);
   const tags = useMemo(() => (look === "instrument" ? tagsOf(layout.rects) : new Map<string, string>()), [layout, look]);
 
   const elements = useRef(new Map<string, HTMLElement>());
@@ -177,7 +198,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   useLayoutEffect(() => {
     if (!width) return;
     // Only a settled layout (every item measured) is the next one's stability hint, so the first settle isn't stuck on estimates.
-    if (exact === items.length) previous.current = { width, rects: layout.rects };
+    if (exact === items.length) previous.current = { width: frame.width, height: frame.height, rects: layout.rects };
     const rects = new Map<string, Rect>();
     for (const [id, placed] of layout.rects) rects.set(id, rectOf(placed));
     const before = last.current;
@@ -199,7 +220,7 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
     }
     if (before) {
       const gone = [...before.items.values()].filter((item) => !layout.rects.has(item.id) && before.ready.has(item.id));
-      if (gone.length) setGhosts((current) => [...current, ...gone.map((item) => { const r = before.rects.get(item.id)!; return { key: `${item.id}:${versionOf(item)}:${Date.now()}`, item, rect: { x: r.left, y: r.top, w: r.width, h: r.height, rotate: 0, z: 0, lane: 0, units: 0 } }; })]);
+      if (gone.length) setGhosts((current) => [...current, ...gone.map((item) => { const r = before.rects.get(item.id)!; return { key: `${item.id}:${versionOf(item)}:${Date.now()}`, item, rect: { x: r.left, y: r.top, w: r.width, h: r.height, rotate: 0, z: 0, scale: "small" as const } }; })]);
     }
     last.current = { rects, ready: nowReady, versions: new Map(items.map((item) => [item.id, versionOf(item)])), items: new Map(items.map((item) => [item.id, item])), width, look };
   }, [layout, width]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,9 +232,10 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   }, [ghosts]);
 
   const ghostBottom = ghosts.reduce((max, ghost) => Math.max(max, ghost.rect.y + ghost.rect.h), 0);
-  const height = Math.max(layout.height, ghostBottom);
+  // The board fills the screen; it only scrolls when the composition is taller than it.
+  const height = Math.max(layout.height, ghostBottom, items.length ? frame.height : 0);
   return (
-    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-items={items.length} data-measured={exact}>
+    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-canvas-composition={layout.composition} data-items={items.length} data-measured={exact} data-frame={`${frame.width}x${frame.height}`}>
       {width ? (
         <>
           {ghosts.map((ghost, index) => <Ghost key={ghost.key} ghost={ghost} index={index} look={look} mode={mode} onDone={() => setGhosts((current) => current.filter((each) => each.key !== ghost.key))} />)}
@@ -233,10 +255,11 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
                 data-kind={item.kind}
                 data-accent={accentOf(item.kind, item.options, look) ?? undefined}
                 data-focus={layout.focusId === item.id || undefined}
+                data-scale={placed.scale}
                 style={{ left: placed.x, top: placed.y, width: w, zIndex: placed.z, visibility: shown ? undefined : "hidden" }}
               >
                 <div className="cvt-rot" style={placed.rotate ? { transform: `rotate(${placed.rotate}deg)` } : undefined}>
-                  <Card item={item} look={look} mode={mode} width={w} focus={layout.focusId === item.id} tag={tags.get(item.id)} onMeasure={(h) => report(item.id, w, h)} />
+                  <Card item={item} look={look} mode={mode} width={w} room={sizes.get(item.id)?.room ?? 320} focus={layout.focusId === item.id} tag={tags.get(item.id)} onMeasure={(h) => report(item.id, w, h)} />
                 </div>
               </section>
             );
@@ -253,7 +276,7 @@ function Ghost({ ghost, index, look, mode, onDone }: { ghost: { item: CanvasItem
   useLayoutEffect(() => { exit(ref.current, onDone, index); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div ref={ref} className="cvt" style={{ left: ghost.rect.x, top: ghost.rect.y, width: ghost.rect.w, zIndex: 0, pointerEvents: "none" }} aria-hidden data-canvas-ghost={ghost.item.id} data-kind={ghost.item.kind} data-accent={accentOf(ghost.item.kind, ghost.item.options, look) ?? undefined}>
-      <Card item={ghost.item} look={look} mode={mode} width={ghost.rect.w} focus={false} />
+      <Card item={ghost.item} look={look} mode={mode} width={ghost.rect.w} room={ghost.rect.h} focus={false} />
     </div>
   );
 }

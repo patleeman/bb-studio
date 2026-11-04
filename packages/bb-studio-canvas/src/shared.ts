@@ -3,8 +3,9 @@
 //
 // A canvas is a board the agent edits each turn, backed by a hidden BB
 // thread (its memory). The board holds items: Dashboards' widget types, plus
-// a headline and a caption. The user never arranges it; the app packs it by
-// importance and size (layout.ts).
+// a headline and a caption. The user never arranges it: in Classic the app
+// packs it by importance and size (layout.ts); in a style it composes it
+// from the agent's rough placement (organic.ts).
 import { z } from "zod";
 import { lookSchema } from "./looks";
 
@@ -60,24 +61,51 @@ const kindSchema = z.enum(CANVAS_KINDS, { error: (issue) => (issue.input === "no
 export const SIZE_HINTS = ["s", "m", "l", "xl"] as const;
 export type SizeHint = (typeof SIZE_HINTS)[number];
 
+/**
+ * Placement (styles only; organic.ts). The agent says roughly where and how
+ * big; the engine composes. scale: the item's rank in the composition (one
+ * hero). region: a rough spot on the screen. pinnedTo (+ point, side): next
+ * to a spot on another item. bleed: runs off the board's edge.
+ */
+export const SCALES = ["hero", "large", "medium", "small", "tiny"] as const;
+export type Scale = (typeof SCALES)[number];
+export const REGIONS = ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"] as const;
+export type Region = (typeof REGIONS)[number];
+export const SIDES = ["left", "right", "above", "below"] as const;
+export type Side = (typeof SIDES)[number];
+/** Whole-board compositions the design guide teaches (guides.ts); the engine's starting arrangement for each. */
+export const COMPOSITIONS = ["orbit", "giant-number", "map", "spine", "split", "quote", "close-up", "essay", "gallery"] as const;
+export type Composition = (typeof COMPOSITIONS)[number];
+export const COMPOSITION_INFO: Record<Composition, string> = {
+  orbit: "a hero chart or figure, with facts orbiting it at different scales",
+  "giant-number": "one number set huge, with annotations and a small supporting chart around it",
+  map: "a map in the middle, with facts in the corners pointing at places",
+  spine: "a timeline running across the screen, with moments above and below it",
+  split: "two sides compared, left and right (two heroes), the verdict between or below",
+  quote: "a big quote with no frame leading, and the evidence beside and below it",
+  "close-up": "one chart full-width, bleeding off the edge, annotated on itself, a few facts under it",
+  essay: "a column of text on one side, the figures and notes around it on the other",
+  gallery: "a spread of pictures (one big, the rest smaller, at different sizes), each with its name and rating drawn as stars or a big numeral",
+};
+
 /** Per kind: what data and options it reads (for agents), and its default size. */
 export const CANVAS_KIND_INFO: Record<CanvasKind, { data: string; options: string; size: SizeHint }> = {
   headline: { data: "{text, subtitle?, kicker?, tone?: neutral|good|bad|accent} or a string", options: "none", size: "l" },
   caption: { data: "short Markdown (a few lines), or {markdown}", options: "none", size: "m" },
   stat: { data: "a number; a number array (last is the value); or {value, delta?, trend?: up|down|flat, series?: number[], caption?}", options: "label?, unit?, prefix?, decimals?, invert? (down is good)", size: "s" },
-  line: { data: "rows, e.g. [{day: \"Mon\", a: 4}]", options: "x? (category key), series? (numeric keys, max 8), unit?, stacked?", size: "l" },
-  bar: { data: "rows", options: "x?, series?, unit?, stacked?", size: "l" },
-  area: { data: "rows", options: "x?, series?, unit?, stacked?", size: "l" },
+  line: { data: "rows, e.g. [{day: \"Mon\", a: 4}]", options: "x? (category key), series? (numeric keys, max 8), unit?, stacked?, callouts? [{x, series?, text}] (labels drawn on the chart at that point)", size: "l" },
+  bar: { data: "rows", options: "x?, series?, unit?, stacked?, callouts? [{x, series?, text}] (labels drawn on the chart at that point)", size: "l" },
+  area: { data: "rows", options: "x?, series?, unit?, stacked?, callouts? [{x, series?, text}] (labels drawn on the chart at that point)", size: "l" },
   pie: { data: "rows, e.g. [{label: \"Web\", value: 60}]", options: "x? (label key), series? (first is the value key), unit?", size: "m" },
   table: { data: "an array of objects, or {columns, rows}", options: "columns? (keys in order), maxRows?, wrapColumns?", size: "l" },
   list: { data: "an array of {title, link?, summary?, date?} or strings", options: "maxItems?, showDates?", size: "m" },
   ticker: { data: "an array of {label, value?, delta?} or strings", options: "speed? (seconds per loop)", size: "xl" },
   progress: { data: "a number, or {value, max?, min?, label?}", options: "style? (bar|gauge), min?, max?, unit?, label?", size: "s" },
-  image: { data: "a URL string, or none", options: "url, alt?, fit? (cover|contain)", size: "m" },
+  image: { data: "an http(s) URL string (a photo, cover or box art found by web search)", options: "url?, alt?, headline? (its name), kicker?, caption?, rating? (number), ratingMax? (5, 10 or 100), credit?, aspect? (\"3 / 4\" for covers and box art), fit? (cover|contain), focus? (CSS object-position, e.g. \"50% 20%\")", size: "m" },
   custom: { data: "anything; the HTML reads window.bbWidget.data (cv.render)", options: "anything the HTML reads (window.bbWidget.options)", size: "m" },
   quote: { data: "{text, by?, role?} or a string", options: "none", size: "m" },
   timeline: { data: "[{date, label, note?, tone?: good|bad|accent|warn}]", options: "layout? (column|row), highlight? (index or date)", size: "m" },
-  map: { data: "US states: {PA: 2.1, ...} or {PA: {value, label?, color?}} or [{state, value, label?, color?}]", options: "scale? (diverging|sequential), legend? [low, high], show? (abbr|value|label), low?, high?", size: "m" },
+  map: { data: "US states: {PA: 2.1, ...} or {PA: {value, label?, color?}} or [{state, value, label?, color?}]", options: "scale? (diverging|sequential), legend? [low, high], show? (abbr|value|label), low?, high?, callouts? [{state, text}] (beside the map, with a leader to the state)", size: "m" },
   multiples: { data: "[{label, values: number[], value?, delta?, note?}]", options: "unit?, shared? (one scale), invert?", size: "l" },
 };
 
@@ -104,7 +132,19 @@ export const itemInputSchema = z.object({
   size: z.enum(SIZE_HINTS).optional(),
   /** 5: the point of the board right now; 1: background. */
   importance: z.number().int().min(1).max(5).optional(),
-  // Unknown fields (relatedTo, anchor and point from older turns) are stripped.
+  // Unknown fields (relatedTo and anchor from older turns) are stripped.
+  /** Its rank in the composition: one hero, the rest at clearly different scales. */
+  scale: z.enum(SCALES).nullable().optional(),
+  /** Roughly where on the screen. */
+  region: z.enum(REGIONS).nullable().optional(),
+  /** Placed right next to this item, at point on it, on side. Nothing is drawn between them. */
+  pinnedTo: z.string().regex(ITEM_ID).nullable().optional(),
+  /** Where on the pinnedTo item, 0–1 from its top-left. */
+  point: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().optional(),
+  /** Which side of that spot: left, right, above or below. */
+  side: z.enum(SIDES).nullable().optional(),
+  /** Run off the board's edge (a hero chart, map or image). */
+  bleed: z.boolean().nullable().optional(),
 });
 export type ItemInput = z.infer<typeof itemInputSchema>;
 
@@ -125,6 +165,12 @@ export const canvasItemSchema = z.object({
   html: z.string().nullable(),
   size: z.enum(SIZE_HINTS),
   importance: z.number(),
+  scale: z.enum(SCALES).nullable().optional(),
+  region: z.enum(REGIONS).nullable().optional(),
+  pinnedTo: z.string().nullable().optional(),
+  point: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  side: z.enum(SIDES).nullable().optional(),
+  bleed: z.boolean().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   /** The board revision that last changed it. */
@@ -132,7 +178,7 @@ export const canvasItemSchema = z.object({
 });
 export type CanvasItem = z.infer<typeof canvasItemSchema>;
 
-export const CHANGE_OPS = ["add", "update", "remove", "clear", "style"] as const;
+export const CHANGE_OPS = ["add", "update", "remove", "clear", "style", "compose"] as const;
 export const changeSchema = z.object({
   seq: z.number(),
   rev: z.number(),
@@ -165,6 +211,8 @@ export const canvasMetaSchema = z.object({
   itemCount: z.number(),
   /** The canvas's look (looks.ts); classic for canvases made before looks. */
   look: lookSchema,
+  /** The board's composition, when the agent named one (organic.ts). */
+  composition: z.enum(COMPOSITIONS).nullable().optional(),
 });
 
 /** What a canvas's agent runs on: a provider, a model and, when the model has levels, a reasoning level. */

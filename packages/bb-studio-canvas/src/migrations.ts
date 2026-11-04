@@ -37,4 +37,9 @@ export const CANVAS_MIGRATIONS: string[] = [
   `CREATE TABLE canvas_legacy_import (
     id INTEGER PRIMARY KEY CHECK (id = 1), source TEXT NOT NULL, at INTEGER NOT NULL, counts TEXT NOT NULL
   );`,
+  // Composition (organic.ts): the board's composition when the agent named
+  // one, and where its title came from (prompt, agent or hero), so the title
+  // follows the topic.
+  `ALTER TABLE canvases ADD COLUMN composition TEXT;
+  ALTER TABLE canvases ADD COLUMN title_source TEXT;`,
 ];

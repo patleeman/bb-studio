@@ -3,7 +3,7 @@
 // their natural height (the board measures them). Charts, maps, timelines
 // and small multiples are the kit's builders (kit.ts), the same ones custom
 // frames get, so built-ins and the agent's components match.
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { OrganicLook } from "../looks";
 import { captionOf, headlineOf, quoteOf, type CanvasItem } from "../shared";
 import { CanvasFrame } from "./frame";
@@ -13,12 +13,9 @@ import { columnLabel, imageSrc, listItems, readProgress, readStat, tableOf } fro
 export const kit = canvasKit();
 
 /** Inner padding of a tile, per look and kind (px, each side). */
-export function tilePadding(look: OrganicLook, kind: CanvasItem["kind"], accent: string | null = null): number {
-  if (accent) return accent === "pull" ? 4 : 10;
-  if (kind === "headline") return look === "field" ? 4 : 0;
-  if (look === "editorial") return 0;
-  if (look === "field") return 16;
-  return 10;
+export function tilePadding(_look: OrganicLook, _kind: CanvasItem["kind"], accent: string | null = null): number {
+  // No boxes: only a bar quote (a rule beside the text) is inset.
+  return accent === "bar" ? 10 : 0;
 }
 
 const Html = ({ html, className }: { html: string; className?: string }) => (html ? <div className={className} dangerouslySetInnerHTML={{ __html: html }} /> : null);
@@ -72,8 +69,8 @@ const TONE: Record<string, string> = { neutral: "var(--cv-ink)", good: "var(--cv
 function Headline({ item, width, focus, look }: { item: CanvasItem; width: number; focus: boolean; look: OrganicLook }) {
   const headline = headlineOf(item.data);
   if (!headline) return null;
-  // Big when there's room: a headline is read from across the room.
-  const px = Math.round(Math.max(26, Math.min(focus ? (look === "instrument" ? 46 : 60) : 40, width / (focus ? 12 : 13))));
+  // Big when there's room: a headline is read from across the room; the hero's is set huge.
+  const px = Math.round(Math.max(24, Math.min(focus ? (look === "instrument" ? 64 : 92) : 44, width / (focus ? 9 : 12.5))));
   return (
     <header className="cvi-headline" data-canvas-body="headline">
       {headline.kicker ? <div className="cv-kicker" style={{ marginBottom: 8 }}>{headline.kicker}</div> : null}
@@ -83,13 +80,14 @@ function Headline({ item, width, focus, look }: { item: CanvasItem; width: numbe
   );
 }
 
-function Stat({ item, width, look }: { item: CanvasItem; width: number; look: OrganicLook }) {
+function Stat({ item, width, room, focus, look }: { item: CanvasItem; width: number; room: number; focus: boolean; look: OrganicLook }) {
   const stat = readStat(item.data, item.options);
   const o = item.options;
   const value = typeof stat.value === "number" ? kit.fmt(stat.value, { decimals: o.decimals, compact: o.compact }) : kit.esc(stat.value ?? "—");
   const deltaNumber = stat.delta ? kit.num(stat.delta) : null;
   const good = stat.trend === "flat" || deltaNumber === null || deltaNumber === 0 ? null : (deltaNumber > 0) !== (o.invert === true);
-  const size = Math.round(Math.max(28, Math.min(64, width / 4.2)));
+  // A number in huge type when it's the hero; big enough to read from afar otherwise.
+  const size = Math.round(focus ? Math.max(64, Math.min(room * 0.6, width / 2.9, 260)) : Math.max(28, Math.min(72, width / 4)));
   return (
     <div className="cvi-stat" data-canvas-body="stat">
       {item.title && look !== "instrument" ? <div className="cv-label cv-stat-label" style={{ marginBottom: 6 }}>{item.title}</div> : null}
@@ -165,34 +163,55 @@ function Ticker({ item }: { item: CanvasItem }) {
   );
 }
 
-function Photo({ item, width, look }: { item: CanvasItem; width: number; look: OrganicLook }) {
+/**
+ * A picture: cropped to its aspect (focus picks what stays), with its name,
+ * a rating drawn as stars, and a caption. When the address fails, a tile in
+ * the style's colors with the name set large stands in, so a gallery never
+ * shows a hole.
+ */
+function Photo({ item, width, focus, look }: { item: CanvasItem; width: number; focus: boolean; look: OrganicLook }) {
   const src = imageSrc(typeof item.data === "string" ? item.data : item.options.url);
+  const [failed, setFailed] = useState<string | null>(null);
+  const broken = !src || failed === src;
   const headline = str(item.options.headline) || item.title || "";
   const kicker = str(item.options.kicker);
   const credit = str(item.options.credit);
-  const overlay = look !== "editorial" && headline;
+  const caption = str(item.options.caption);
+  const rating = kit.num(item.options.rating);
+  const overlay = look !== "editorial" && headline && !broken && item.options.overlay !== false;
+  const name = Math.max(16, Math.min(focus ? 44 : 28, width / (focus ? 12 : 11)));
   return (
-    <figure className="cvi-photo" data-canvas-body="image" style={{ margin: 0 }}>
+    <figure className="cvi-photo" data-canvas-body="image" data-image-state={broken ? "fallback" : "image"} style={{ margin: 0 }}>
       <div style={{ position: "relative", aspectRatio: str(item.options.aspect) || "3 / 2", overflow: "hidden", borderRadius: "var(--cv-radius-sm)", background: "linear-gradient(135deg, color-mix(in oklab, var(--cv-accent) 30%, var(--cv-surface)), color-mix(in oklab, var(--cv-blue) 35%, var(--cv-surface)))" }}>
-        {src ? <img src={src} alt={str(item.options.alt) || headline} referrerPolicy="no-referrer" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: item.options.fit === "contain" ? "contain" : "cover" }} onError={(event) => { (event.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null}
+        {!broken ? <img src={src!} alt={str(item.options.alt) || headline} referrerPolicy="no-referrer" loading="eager" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: item.options.fit === "contain" ? "contain" : "cover", objectPosition: str(item.options.focus) || "50% 40%" }} onError={() => setFailed(src)} /> : null}
+        {broken && headline ? <div aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-end", padding: Math.round(width * 0.06), fontFamily: "var(--cv-font-display)", fontWeight: "var(--cv-display-weight)" as never, fontSize: Math.max(18, Math.min(64, width / 6)), lineHeight: 1, color: "var(--cv-ink)", opacity: 0.85, textWrap: "balance" as never }}>{headline}</div> : null}
         {overlay ? (
           <figcaption style={{ position: "absolute", inset: "auto 0 0 0", padding: "40px 14px 12px", background: "linear-gradient(transparent, rgb(0 0 0 / 0.72))", color: "#fff" }}>
             {kicker ? <div className="cv-kicker" style={{ color: "#fff", opacity: 0.85 }}>{kicker}</div> : null}
-            <div className="cv-h3" style={{ color: "#fff", fontSize: Math.max(18, Math.min(30, width / 14)) }}>{headline}</div>
+            <div className="cv-h3" style={{ color: "#fff", fontSize: name }}>{headline}</div>
           </figcaption>
         ) : null}
       </div>
-      {!overlay && headline ? <figcaption style={{ marginTop: 8 }}>{kicker ? <div className="cv-kicker">{kicker}</div> : null}<div className="cv-h3" style={{ fontSize: Math.max(18, Math.min(28, width / 14)) }}>{headline}</div></figcaption> : null}
+      {(!overlay && headline && !broken) || rating !== null || caption ? (
+        <figcaption style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          {!overlay && kicker && !broken ? <div className="cv-kicker">{kicker}</div> : null}
+          {!overlay && headline && !broken ? <div className="cv-h3" style={{ fontSize: name }}>{headline}</div> : null}
+          {rating !== null ? <Html html={kit.stars(rating, { max: item.options.ratingMax, size: focus ? 22 : 15 })} /> : null}
+          {caption ? <div className="cv-small">{caption}</div> : null}
+        </figcaption>
+      ) : null}
       {credit ? <div className="cv-caption">{credit}</div> : null}
     </figure>
   );
 }
 
-function Quote({ item }: { item: CanvasItem }) {
+function Quote({ item, width, focus }: { item: CanvasItem; width: number; focus: boolean }) {
   const quote = quoteOf(item.data);
   if (!quote) return null;
+  // No frame: the words are the shape. A leading quote is set large.
+  const px = focus ? Math.round(Math.max(28, Math.min(64, width / 13))) : undefined;
   return (
-    <blockquote className="cv-quote cvi-quote" data-canvas-body="quote" style={{ margin: 0 }}>
+    <blockquote className="cv-quote cvi-quote" data-canvas-body="quote" style={{ margin: 0, fontSize: px }}>
       {quote.text}
       {quote.by ? <cite>— {quote.by}{quote.role ? `, ${quote.role}` : ""}</cite> : null}
     </blockquote>
@@ -200,13 +219,14 @@ function Quote({ item }: { item: CanvasItem }) {
 }
 
 /** The item's content at its natural height, for a content box this wide. */
-export function OrganicBody({ item, width, focus, look, mode, onFrameHeight }: { item: CanvasItem; width: number; focus: boolean; look: OrganicLook; mode: "light" | "dark"; onFrameHeight?(height: number): void }): ReactNode {
+export function OrganicBody({ item, width, room = 320, focus, look, mode, onFrameHeight }: { item: CanvasItem; width: number; room?: number; focus: boolean; look: OrganicLook; mode: "light" | "dark"; onFrameHeight?(height: number): void }): ReactNode {
   const o = item.options;
-  const chartHeight = Math.round(Math.min(focus ? 380 : 300, Math.max(140, width * (focus ? 0.5 : 0.56))));
+  // Charts take the height their place in the composition gives them (room), not a fixed one.
+  const chartHeight = Math.round(Math.max(130, Math.min(room - (item.title ? 30 : 0), width * (focus ? 0.62 : 0.6))));
   switch (item.kind) {
     case "headline": return <Headline item={item} width={width} focus={focus} look={look} />;
     case "caption": { const text = captionOf(item.data); return text ? <RichText text={text} className="cv-body" /> : null; }
-    case "stat": return <Stat item={item} width={width} look={look} />;
+    case "stat": return <Stat item={item} width={width} room={room} focus={focus} look={look} />;
     case "line": case "area": return <Html className="cvi-chart" html={kit.line(item.data, { ...o, w: width, h: chartHeight, area: item.kind === "area" || o.area })} />;
     case "bar": {
       const rows = Array.isArray(item.data) ? item.data : [];
@@ -219,12 +239,12 @@ export function OrganicBody({ item, width, focus, look, mode, onFrameHeight }: {
     case "list": return <List item={item} />;
     case "ticker": return <Ticker item={item} />;
     case "progress": { const progress = readProgress(item.data, o); return progress ? <Html html={kit.meter(progress.value, { min: progress.min, max: progress.max, label: progress.label || undefined, unit: o.unit, marks: o.marks })} /> : null; }
-    case "image": return <Photo item={item} width={width} look={look} />;
-    case "quote": return <Quote item={item} />;
+    case "image": return <Photo item={item} width={width} focus={focus} look={look} />;
+    case "quote": return <Quote item={item} width={width} focus={focus} />;
     case "timeline": return <Html html={kit.timeline(item.data, { ...o, layout: o.layout ?? (look === "instrument" && width >= 520 ? "row" : "column") })} />;
-    case "map": return <Html html={kit.tilemap(item.data, { ...o, cell: Math.max(14, Math.min(46, width / 11.9)) })} />;
+    case "map": return <Html html={kit.tilemap(item.data, { ...o, cell: Math.max(14, Math.min(focus ? 72 : 46, width / 11.9, (room - 40) / 8.6)) })} />;
     case "multiples": return <Html html={kit.multiples(item.data, { ...o, min: o.min ?? (look === "instrument" ? 104 : 124) })} />;
-    case "custom": return item.html ? <CanvasFrame html={item.html} title={item.title ?? item.id} data={item.data} options={item.options} look={look} mode={mode} width={width} onHeight={onFrameHeight} /> : null;
+    case "custom": return item.html ? <CanvasFrame html={item.html} title={item.title ?? item.id} data={item.data} options={item.options} look={look} mode={mode} width={width} room={room} onHeight={onFrameHeight} /> : null;
     default: return null;
   }
 }

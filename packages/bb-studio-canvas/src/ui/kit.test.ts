@@ -21,6 +21,27 @@ describe("accents", () => {
 });
 
 describe("the canvas kit", () => {
+  it("draws shaped pieces and annotations with every value escaped", () => {
+    for (const html of [
+      kit.bignum(EVIL, { label: EVIL, unit: EVIL, sub: EVIL }),
+      kit.quote(EVIL, { by: EVIL, role: EVIL }),
+      kit.callout(EVIL, { x: 0.5, y: 0.5 }),
+      kit.stars(4.5, { max: EVIL }),
+      kit.line([{ m: "a", v: 1 }, { m: "b", v: 3 }], { callouts: [{ x: "b", text: EVIL }] }),
+      kit.columns([{ m: "a", v: 1 }, { m: "b", v: 3 }], { callouts: [{ x: "a", text: EVIL }] }),
+      kit.tilemap({ PA: 2 }, { callouts: [{ state: "PA", text: EVIL }] }),
+    ]) {
+      expect(html).not.toContain("<img");
+      expect(html.length).toBeGreaterThan(20);
+    }
+    // A callout lands on its point: the chart draws its dot and label.
+    expect(kit.line([{ m: "a", v: 1 }, { m: "b", v: 3 }], { callouts: [{ x: "b", text: "peak" }] })).toContain("peak");
+    expect(kit.tilemap({ PA: 2 }, { callouts: [{ state: "Pennsylvania", text: "flipped" }] })).toContain("flipped");
+    // Stars fill to the share of the score.
+    expect(kit.stars(86, { max: 100 })).toContain("86 out of 100");
+    expect(kit.stars("n/a")).toBe("");
+  });
+
   it("runs from its own source, as a custom frame gets it", () => {
     // The frame injects `(${canvasKit})(window)`: nothing from outside its body.
     const fake = { document: { readyState: "complete", querySelectorAll: () => [], getElementById: () => null, documentElement: { clientWidth: 300 } }, addEventListener() {} } as unknown as { cv?: CanvasKit };
