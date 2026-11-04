@@ -18,6 +18,7 @@ import type { PageMetaView, rpcContract as pagesContract } from "../pages/contra
 import { useCall, useLive } from "./live";
 import { BOT_INFO_ACTION } from "./bot/workspace";
 import { botPath } from "./bot/selection";
+import { avatarIcon, registerBotAvatarIcons, setAvatarSlots } from "./bot/avatar-icons";
 
 /** Header actions sort among themselves by group. */
 const HEADER_GROUP = "studio";
@@ -58,21 +59,39 @@ function useBotOwners(threadIds: readonly string[]) {
   return useThreadLookup(threadIds, load);
 }
 
-/** "Bot info" on a Bot's threads: the Bot's Info in a tab beside the chat. */
-export const botInfoHeaderAction: PluginThreadActionRegistration<ReadonlyMap<string, string | null>> = {
+interface BotHeaderData {
+  owners: ReadonlyMap<string, string | null>;
+  bots: readonly { id: string; name: string; threadId: string | null }[];
+}
+
+/**
+ * The Bot, the header's main control on a Bot's threads: its avatar and name,
+ * opening its Info in a tab beside the chat. BB draws a plugin's header
+ * actions as one split button, the first as the button and the rest in its
+ * menu, so this goes first and Loops follows it in the menu.
+ */
+export const botInfoHeaderAction: PluginThreadActionRegistration<BotHeaderData> = {
   id: "bot-info",
   title: "Bot info",
   icon: "Bot",
   group: HEADER_GROUP,
-  order: 2,
+  order: 1,
   placement: "header",
-  useData: ({ threadIds }) => useBotOwners(threadIds),
+  useData: ({ threadIds }) => {
+    const owners = useBotOwners(threadIds);
+    const bots = useLive("bot_list", {}, { enabled: threadIds.length > 0, pollMs: LOOKUP_POLL_MS }).data?.bots ?? [];
+    useEffect(() => setAvatarSlots(bots), [bots]);
+    return { owners, bots };
+  },
   item: ({ thread, data, experimental_panel }) => {
-    const botId = data.get(thread.id);
+    const botId = data.owners.get(thread.id);
     if (!botId) return null;
+    const index = data.bots.findIndex((bot) => bot.id === botId);
+    const bot = data.bots[index];
     return {
-      label: "Bot info",
-      icon: "Bot",
+      label: bot?.name ?? "Bot info",
+      detail: "Bot info",
+      icon: avatarIcon(index),
       run: () => { if (!openThreadTab(experimental_panel, { actionId: BOT_INFO_ACTION, title: "Bot info" })) openAppPath(botPath(botId)); },
     };
   },
@@ -81,16 +100,17 @@ export const botInfoHeaderAction: PluginThreadActionRegistration<ReadonlyMap<str
 interface LoopsHeaderData { botId: string; threadId: string; needs: number }
 
 /**
- * "Loops" on the primary Bot's chat while the Attention Router is on: the
- * Loops pane beside the chat, labelled with what needs Patrick now. Where the
- * pane can't open, it says so and opens the Loops page instead.
+ * "Loops" on the primary Bot's chat while the Attention Router is on, after
+ * the Bot in the header's split button: the Loops pane beside the chat,
+ * labelled with what needs Patrick now. Where the pane can't open, it says so
+ * and opens the Loops page instead.
  */
 export const loopsHeaderAction: PluginThreadActionRegistration<LoopsHeaderData | null> = {
   id: "loops-pane",
   title: "Loops",
   icon: "ListTodo",
   group: HEADER_GROUP,
-  order: 1,
+  order: 2,
   placement: "header",
   useData: ({ threadIds }) => {
     const enabled = useLoopsEnabled();
@@ -144,7 +164,8 @@ export const pageLinkHeaderAction: PluginThreadActionRegistration<ReadonlyMap<st
 
 /** Registers Studio's header buttons; Page only while Pages is on. */
 export function registerThreadHeader(app: PluginAppBuilder, options: { pages: boolean }): void {
-  app.slots.experimental_threadAction(loopsHeaderAction);
+  registerBotAvatarIcons(app);
   app.slots.experimental_threadAction(botInfoHeaderAction);
+  app.slots.experimental_threadAction(loopsHeaderAction);
   if (options.pages) app.slots.experimental_threadAction(pageLinkHeaderAction);
 }

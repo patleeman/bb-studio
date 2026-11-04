@@ -611,8 +611,12 @@ test("Bot info beside a thread: the owner's compact page (Needs you, Up next, Re
   expect(container.textContent).toContain("Not a Bot thread.");
 });
 
-test("the thread header Bot info button opens the Bot info tab, on Bot threads only", async () => {
-  const { botInfoHeaderAction } = await import("../thread-header");
+test("the thread header's main button is the Bot (its avatar and name), before Loops; it opens the Bot info tab, on Bot threads only", async () => {
+  const { botInfoHeaderAction, loopsHeaderAction } = await import("../thread-header");
+  // BB draws a plugin's header actions as one split button, the first as the button: the Bot.
+  expect(botInfoHeaderAction.group).toBe(loopsHeaderAction.group);
+  expect(botInfoHeaderAction.order!).toBeLessThan(loopsHeaderAction.order!);
+  state.data = { bot_list: { bots: [{ ...dot, primary: true }] } };
   state.call.mockImplementation((async (method: string, input: { threadId: string }) => method === "bot_thread_owner" ? { botId: input.threadId === "thr_bot" ? "bot_main" : null } : {}) as never);
   let data: unknown;
   function Header({ ids }: { ids: string[] }) { data = botInfoHeaderAction.useData!({ threadIds: ids }); return null; }
@@ -621,7 +625,10 @@ test("the thread header Bot info button opens the Bot info tab, on Bot threads o
   const panel = { openTab: vi.fn((_options: unknown) => true) };
   const item = (threadId: string) => botInfoHeaderAction.item({ thread: { id: threadId } as never, data: data as never, sdk: null as never, navigate: null as never, experimental_panel: panel as never });
   const action = item("thr_bot")!;
-  expect(action.label).toBe("Bot info");
+  expect(action.label).toBe("Dot");
+  expect(action.detail).toBe("Bot info");
+  // Its avatar, through the icon slot the header filled with it (avatar-icons.tsx).
+  expect(action.icon).toBe("studio/bot-avatar-0");
   act(() => { void action.run({ requestRename: () => {} }); });
   expect(panel.openTab).toHaveBeenLastCalledWith({ tab: { id: "bot-info", context: { kind: "thread" }, availability: "action" }, title: "Bot info" });
   // No side panel: the Bot page, which is its Info.

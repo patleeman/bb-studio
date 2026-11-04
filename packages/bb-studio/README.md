@@ -189,7 +189,7 @@ Light mode:
 
 The Loops pane is the same list beside the chat, in the thread's side panel,
 so it stays up while you talk loops through with the Bot. Open it from the
-Loops button in the Bot chat's header, from a `::loops{open="pane"}` card or
+Loops entry in the Bot chat's header (the menu of the Bot's header button), from a `::loops{open="pane"}` card or
 "N more in Loops" in the chat, from All loops in the sidebar, or from the side
 panel's launcher. A do or read row's circle marks it done in one click (a
 check on hover), and the row stays put with Undo. Each row's actions are in
@@ -1619,8 +1619,13 @@ the Chief of Staff: an existing Chief of Staff became the Bot, named "Chief
 of Staff", with the same thread and check-ins; rename it from its page.
 
 - **Workspace**: the Bot page lives under the Studio panel
-  (`/plugins/studio/studio/bot`); the rail has no Bot item, since the Bots
-  list is always in the sidebar. The bare page opens the last Bot thread you had open in this window: the bot's chat, or a
+  (`/plugins/studio/studio/bot`). The rail has a **Bots** item
+  (`src/ui/bot/BotsRail.tsx`, a nav panel at `/plugins/studio/bots` that
+  goes straight on to the Bot page), so the Bots stay in reach with the
+  sidebar collapsed. Its badge counts the Bots that need you (critical: a
+  pending question or approval, or a released loop), or shows a dot while
+  one has a reply you haven't read (neutral); nothing while they're idle or
+  just working (`bot_attention_all`). The bare page opens the last Bot thread you had open in this window: the bot's chat, or a
   runner or worker thread you opened from the Bots list (kept in session
   storage beside the sidebar mode, updated on every thread page shown in
   **bots** mode). With none, or once that thread is gone, it opens the
@@ -1729,6 +1734,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
   history), **Check-ins** (Change…), **Prompt cache** (the only place tokens
   and cost show) and **Maintenance** (the switch, rules, Dry run, Run now and
   history). An external bot has Profile, Model and Check-ins only.
+- **Header**: on a Bot's thread, Studio's header button is the Bot, its
+  avatar and name, opening Bot info. BB draws a plugin's header actions as one
+  split button, the first as the button and the rest in its menu, so Loops
+  (with its count, "Loops · 4") is in that menu, after the Bot. The avatar is
+  an app icon: Studio registers icon slots (`studio/bot-avatar-<n>`,
+  `src/ui/bot/avatar-icons.tsx`) and fills them with the Bots in list order,
+  since a header action names an icon and can't draw one.
 - **Bot info** (the panel tab beside a bot's thread; a thread panel action,
   so BB's panel launcher offers it on every thread; on a thread no bot owns
   it shows "Not a Bot thread"): the page's compact version. Name and status
@@ -1755,8 +1767,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (`working`); Studio's realtime signal on `thread.active` and `thread.idle`
   refreshes it at once. Unread comes from `bot_attention` too, since BB marks
   the chat unread after a check-in's `[PASS]`. It clears when you read or
-  answer the chat. The icon rail has no Bot entries, so nothing shows
-  there: a plugin can't add per-Bot rail items with SDK 0.6.104.
+  answer the chat. The icon rail has one Bots item with a badge (above),
+  not a row per Bot: a plugin can't add per-Bot rail items with SDK 0.6.104.
   A thread the Bot started that waits on a question or approval shows
   under Running as **waiting**; it's the Bot's to handle.
 
