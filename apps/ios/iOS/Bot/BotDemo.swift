@@ -304,8 +304,8 @@ enum BotDemo {
         /// fills in a sent message's attachments after it first showed it.
         func addSpacePhoto() {
             let arguments = ProcessInfo.processInfo.arguments
-            let image = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
-                ?? "https://offline-fixtures.invalid/photo.png"
+            let given: String? = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+            let image: String = given ?? "https://offline-fixtures.invalid/photo.png"
             lock.withLock {
                 guard let index = rows.firstIndex(where: { $0.id == "sp1" }) else { return }
                 rows[index].attachments = BotDemo.decode(#"{"imageUrls":["\#(image)"]}"#) as TimelineRow.Attachments
@@ -487,21 +487,23 @@ enum BotDemo {
     private static func spaceRows(_ at: Double, message: (String, String, String, Double) -> String,
                                   work: (String, String, Double, String, String) -> String) -> [String] {
         let arguments = ProcessInfo.processInfo.arguments
-        let image = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
-            ?? "https://offline-fixtures.invalid/photo.png"
+        let given: String? = arguments.firstIndex(of: "-qaDuoSpaceImage").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        let image: String = given ?? "https://offline-fixtures.invalid/photo.png"
         let text = "Mobile app, get rid of this chat / loops bar on top. Loops should not be a tab. Maybe an icon on the right rail but maybe just in the three dot menu"
-        return [
-            // `-qaDuoSpaceLate`: the photo comes in later, on the same row (`addSpacePhoto`).
-            arguments.contains("-qaDuoSpaceLate") ? message("sp1", "user", text, at)
-                : #"{"id":"sp1","kind":"conversation","role":"user","text":"\#(text)","attachments":{"imageUrls":["\#(image)"]},"createdAt":\#(at)}"#,
-            work("sp2", "pages_read", at + 5_000, "completed", ""),
-            work("sp3", "bb_thread_start", at + 8_000, "completed", ""),
-            message("sp4", "assistant", "Done. Loops moved into the ⋯ menu, and the Chat | Loops bar at the top of the bot chat goes away, so the chat fills the screen.", at + 20_000),
-        ] + (arguments.contains("-qaDuoSpaceTail") ? (1...8).flatMap { index in
-            // `-qaDuoSpaceTail`: more after it, so the photo's row starts above the view, unmeasured.
-            [message("spt\(index)u", "user", "Follow-up \(index): and the thread view?", at + 30_000 + Double(index) * 10_000),
-             message("spt\(index)a", "assistant", "Follow-up \(index): the thread view keeps its own header, composer and rows, with the same insets.", at + 35_000 + Double(index) * 10_000)]
-        } : [])
+        let withPhoto: String = #"{"id":"sp1","kind":"conversation","role":"user","text":"\#(text)","attachments":{"imageUrls":["\#(image)"]},"createdAt":\#(at)}"#
+        // `-qaDuoSpaceLate`: the photo comes in later, on the same row (`addSpacePhoto`).
+        let sent: String = arguments.contains("-qaDuoSpaceLate") ? message("sp1", "user", text, at) : withPhoto
+        let reply = "Done. Loops moved into the ⋯ menu, and the Chat | Loops bar at the top of the bot chat goes away, so the chat fills the screen."
+        var rows: [String] = [sent, work("sp2", "pages_read", at + 5_000, "completed", ""),
+                              work("sp3", "bb_thread_start", at + 8_000, "completed", ""), message("sp4", "assistant", reply, at + 20_000)]
+        // `-qaDuoSpaceTail`: more after it, so the photo's row starts above the view, unmeasured.
+        guard arguments.contains("-qaDuoSpaceTail") else { return rows }
+        for index in 1...8 {
+            let time: Double = at + 30_000 + Double(index) * 10_000
+            rows.append(message("spt\(index)u", "user", "Follow-up \(index): and the thread view?", time))
+            rows.append(message("spt\(index)a", "assistant", "Follow-up \(index): the thread view keeps its own header, composer and rows, with the same insets.", time + 5_000))
+        }
+        return rows
     }
 
     /// A long chat for timing: `count` messages of Markdown, lists, tables,

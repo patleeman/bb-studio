@@ -7,12 +7,14 @@ import XCTest
 /// and its reply); the server is a closed local port.
 ///
 /// Checks that the composer rests on the home indicator's inset (not 8
-/// points above it) and that no row draws over your message. With
+/// points above it), one row until it's focused; that no row draws over
+/// your message; and, on the folded Duo, that the header is one line with
+/// its buttons in the right column, where back works from a thread the Bot
+/// tab opened. With
 /// `TEST_RUNNER_DUO_SPACE_OUT` naming a folder, it also writes PNGs and a
 /// JSON of measured frames as `<TAG>-<device>-<surface>-kb<down|up>`:
 /// `TEST_RUNNER_DUO_SPACE_TAG` names the build (before, fix, proposal),
-/// `TEST_RUNNER_DUO_SPACE_ARGS` adds launch arguments (space separated, e.g.
-/// `-qaCompactChrome`), and `TEST_RUNNER_DUO_SPACE_IMAGE` serves the photo
+/// `TEST_RUNNER_DUO_SPACE_ARGS` adds launch arguments (space separated), and `TEST_RUNNER_DUO_SPACE_IMAGE` serves the photo
 /// (a local fixture server; without it the photo can't load).
 @MainActor
 final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
@@ -79,6 +81,27 @@ final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(seen, "Scrolled up to your message")
     }
 
+    /// The folded Duo: a thread the Bot started opens inside the Bot tab,
+    /// and the column's back returns to the chat.
+    func testFoldedBackFromThreadInBotTab() throws {
+        guard device == "duo" else { throw XCTSkip("Folded Duo only (466 × 678)") }
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaDark", "-qaReduceMotion", "-openURL", "bbstudio://bot"]
+        app.launchOffline()
+        let title = app.staticTexts["foldedChatTitle"]
+        XCTAssertTrue(title.waitForExistence(timeout: 30))
+        XCTAssertTrue(title.label.hasPrefix("Juniper"))
+        let started = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Lisbon offsite options")).firstMatch
+        XCTAssertTrue(started.waitForExistence(timeout: 10))
+        started.tap()
+        let back = app.buttons["folded-back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "The thread has back in the column")
+        XCTAssertFalse(app.buttons["Hands-free"].exists, "The Bot's buttons go with its chat")
+        back.tap()
+        expectation(for: NSPredicate(format: "exists == true AND label BEGINSWITH 'Juniper'"), evaluatedWith: app.staticTexts["foldedChatTitle"])
+        waitForExpectations(timeout: 10)
+        XCTAssertTrue(app.buttons["Hands-free"].waitForExistence(timeout: 5), "Back in the Bot's chat")
+    }
+
     // MARK: -
 
     private var yourMessage: XCUIElement {
@@ -117,17 +140,27 @@ final class DuoSpaceCaptureUITests: ServerIsolatedUITestCase {
             if tabBar.exists, tabBar.frame.height > 0, tabBar.frame.minY < window.frame.maxY {
                 // A phone's Bot tab: the composer stands on its tab bar.
                 XCTAssertLessThan(card.frame.maxY, tabBar.frame.minY, "The composer clears the tab bar")
-            } else if env["DUO_SPACE_ARGS"] == nil {
+            } else {
                 // Over a home indicator alone: the card rests on its inset.
                 XCTAssertEqual(window.frame.maxY - card.frame.maxY, safeBottom, accuracy: 1.5,
                                "The composer rests on the home indicator's \(safeBottom)-point inset, no higher")
             }
         }
         if yourMessage.exists { assertNothingOver(yourMessage) }
+        // One row until it's focused: no model chip yet.
+        XCTAssertFalse(app.buttons["Model & permissions"].exists, "The composer is one row while it's not focused")
+        if card.exists { XCTAssertLessThan(card.frame.height, 60, "One row: + field mic send") }
+        if device == "duo" {
+            XCTAssertTrue(app.staticTexts["foldedChatTitle"].exists, "One line for the name and status")
+            XCTAssertEqual(app.navigationBars.count, 0, "No navigation bar on the folded Duo")
+            XCTAssertTrue(app.buttons["Hands-free"].exists && app.buttons["bot-menu"].exists || surface == "thread",
+                          "The Bot's buttons are in the column")
+        }
         record(surface: surface, keyboard: "down")
         composer.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10))
         sleep(2)
+        XCTAssertTrue(app.buttons["Model & permissions"].exists, "The model chip shows with the keyboard")
         record(surface: surface, keyboard: "up")
     }
 

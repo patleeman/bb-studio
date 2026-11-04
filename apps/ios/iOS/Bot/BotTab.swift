@@ -207,6 +207,14 @@ struct BotTab: View {
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) { banner(bot) }
+                // The folded Duo's header buttons in its right column (`FoldedChrome`).
+                // Drawn here rather than handed to the chat through the
+                // environment: a view there, new on each pass, never settled.
+                .overlay {
+                    if FoldedChrome.columnHeader && !duoLayout.twoPages && path.isEmpty {
+                        FoldedColumn { columnActions(bot) }
+                    }
+                }
             } else {
                 ContentUnavailableView {
                     Label { Text("\(bot.name) has no chat") } icon: { BotAvatar(bot.look, size: 56) }
@@ -277,6 +285,26 @@ struct BotTab: View {
         }
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) { menu(bot) }
+    }
+
+    /// The bar's buttons, as the folded Duo's column draws them: back (to
+    /// the chat over the Loops, or to the Bots list), voice and bell in one
+    /// capsule, then ⋯.
+    @ViewBuilder private func columnActions(_ bot: BotInfo) -> some View {
+        if showsLoops && loopsOn {
+            Button { showsLoops = false } label: { Label("Back to \(bot.name)", systemImage: "chevron.backward") }
+                .accessibilityIdentifier("loops-back")
+        } else if let back {
+            Button(action: back) { Label("Bots", systemImage: "chevron.backward") }
+                .accessibilityHint("Shows all your bots")
+        }
+        FoldedColumnGroup {
+            Button { model.sheet = .handsFree() } label: { Label("Hands-free", systemImage: "waveform") }
+                .accessibilityHint("Talk with your voice assistant without looking")
+            Button { sheet = .activity } label: { FoldedBell(count: needsYou) }
+                .accessibilityLabel(activity?.attention.map { "Activity, \($0.reason)" } ?? "Activity")
+        }
+        menu(bot)
     }
 
     private func wideActions(_ bot: BotInfo) -> some View {

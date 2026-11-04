@@ -145,7 +145,7 @@ struct BotMessageRow: View {
                 ClampedText(text: text)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    .padding(.vertical, 7)
                     .background(userFill, in: bubbleShape(mine: true))
                     .contentShape(.contextMenuPreview, bubbleShape(mine: true))
                     .contextMenu { menu }
@@ -199,7 +199,7 @@ struct BotMessageRow: View {
     private func bubble(_ text: String) -> some View {
         MarkdownText(text)
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(Color(uiColor: .secondarySystemBackground), in: bubbleShape(mine: false))
             .contentShape(.contextMenuPreview, bubbleShape(mine: false))
             .contextMenu { menu }
@@ -297,7 +297,7 @@ struct BotWorkRow: View {
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)

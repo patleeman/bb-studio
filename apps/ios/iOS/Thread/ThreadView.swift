@@ -1331,7 +1331,8 @@ struct ThreadView: View {
                 clear: true, dictation: dictation,
                 toPage: canUseNotes && !editing ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
-                    busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil
+                    busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
+                compact: true
             ) {
                 Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
                     .disabled(handoffStatus?.working == true)
@@ -1651,12 +1652,25 @@ extension ThreadView {
             .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(duoLayout.twoPages || (sizeClass == .compact && hidesTabBar) ? .hidden : .automatic, for: .tabBar)
-            .toolbar(duoLayout.twoPages ? .hidden : .automatic, for: .navigationBar)
+            .toolbar(duoLayout.twoPages || compactHeader ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 if botChrome == nil && !duoLayout.twoPages {
                     ToolbarItemGroup(placement: .topBarTrailing) { threadActions }
                 }
             }
+            .overlay { if compactHeader && botChrome == nil { FoldedColumn { compactActions } } }
+    }
+
+    /// The folded Duo's header: its buttons in the right column and a one-line title (`FoldedChrome`).
+    fileprivate var compactHeader: Bool { FoldedChrome.columnHeader && !duoLayout.twoPages }
+
+    @ViewBuilder fileprivate var compactActions: some View {
+        // The Bot's chat has its buttons from the Bot tab (`BotTab`). A
+        // thread: back out of whichever stack it's on, and its own actions.
+        if botChrome == nil {
+            FoldedBackButton()
+            threadActions
+        }
     }
 
     private var transcriptV2Body: some View {
@@ -1797,6 +1811,7 @@ extension ThreadView {
         chrome.restingBackdrop = .systemBackground
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin(bot: botChrome != nil)
+        chrome.rows.spacing = 10
         chrome.rows.readableWidth = Self.readableWidth
         if duoLayout.twoPages {
             chrome.rowsTrailingClear = RegularScrollingSurface.inset(column: duoLayout.statusColumn, width: duoLayout.detailWidth,
@@ -1808,11 +1823,17 @@ extension ThreadView {
         return chrome
     }
 
-    fileprivate var transcriptV2HasTop: Bool { finding || (duoLayout.twoPages && botChrome == nil) }
+    fileprivate var transcriptV2HasTop: Bool { finding || (duoLayout.twoPages && botChrome == nil) || compactHeader }
 
     /// The Duo's header beside two pages, and the find bar under it.
     fileprivate var transcriptV2Top: some View {
         VStack(spacing: 0) {
+            if compactHeader {
+                FoldedChatTitle(avatar: botChrome.map { AnyView(BotAvatar($0.bot.look, size: 16, working: model.thread?.isRunning == true)) },
+                                 title: botChrome?.bot.name ?? model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread",
+                                 status: botChrome != nil ? botStatus : nil)
+                    .background(.bar)
+            }
             if duoLayout.twoPages && botChrome == nil {
                 DuoHeader {
                     Text(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")

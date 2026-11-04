@@ -112,7 +112,7 @@ struct MessageBubble: View {
         let files = row.attachments?.localFilePaths ?? []
         if !images.isEmpty, let projectId {
             // Three to a row, so a batch of screenshots wraps instead of running off screen.
-            let side: CGFloat = images.count == 1 ? 200 : 96
+            let side: CGFloat = images.count == 1 ? 160 : 96
             Grid(horizontalSpacing: 6, verticalSpacing: 6) {
                 ForEach(Array(stride(from: 0, to: images.count, by: 3)), id: \.self) { start in
                     GridRow {
@@ -210,7 +210,8 @@ struct AttachmentImage: View {
                 ProgressView()
             }
         }
-        .frame(width: side, height: side)
+        // A small tile until the photo is in, not an empty box of its full size.
+        .frame(width: image == nil ? min(side, 120) : side, height: image == nil ? min(side, 72) : side)
         .background(.fill.tertiary)
         .clipShape(.rect(cornerRadius: 14))
         .contentShape(.rect)

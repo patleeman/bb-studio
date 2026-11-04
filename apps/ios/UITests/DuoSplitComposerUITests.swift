@@ -46,8 +46,9 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     }
 
     /// One page (the Duo's outer screen, or any iPhone): the composer keeps
-    /// its 12-point margins inside the safe area, stays clear of the home
-    /// indicator, and the jump button floats in the corner above it.
+    /// its 12-point margins inside the safe area, rests on the home
+    /// indicator's inset (8 points above a tab bar where one shows), and the
+    /// jump button floats in the corner above it.
     func testNarrowWindowKeepsItsComposerAndJumpButton() throws {
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDark", "-openURL", "bbstudio://bot"]
@@ -67,9 +68,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertLessThan(layout.width, 900)
         XCTAssertEqual(composer.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 1)
         XCTAssertGreaterThan(layout.safeBottom, 0, "A home indicator")
-        // 8 points above the home indicator, or above the tab bar where it shows.
-        XCTAssertGreaterThanOrEqual(layout.height - layout.safeBottom - composer.frame.maxY, composerGap - 1,
-                                    "Above the home indicator, as before")
+        assertResting(layout.height - layout.safeBottom - composer.frame.maxY, layout: layout, "narrow")
         XCTAssertEqual(jump.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 2, "In the corner, as before")
         XCTAssertLessThanOrEqual(jump.frame.maxY, composer.frame.minY + 1)
         command("capture?split-composer-narrow-\(Int(layout.width))")
@@ -143,8 +142,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         if innerScreen {
             XCTAssertEqual(edge, composerGap, accuracy: 1, "\(name): 8 points from the inner screen's bottom edge")
         } else {
-            // Above the home indicator, or the tab bar where it shows.
-            XCTAssertGreaterThanOrEqual(aboveIndicator, composerGap - 1, "\(name): clear of the home indicator")
+            assertResting(aboveIndicator, layout: layout, name)
         }
         command("capture?\(capture)-down")
 
@@ -242,6 +240,18 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         return frames.filter { (frame: CGRect) -> Bool in
             guard frame.width > 0, frame.height > 0, frame.minX >= minX, frame.maxY > 0, frame.minY < 669 else { return false }
             return !frame.intersects(composer) && frame.minY >= 58
+        }
+    }
+
+    /// Over a home indicator alone the card rests on its inset (its own
+    /// padding inside it); where a tab bar shows, 8 points above the bar.
+    private func assertResting(_ aboveIndicator: CGFloat, layout: Geometry, _ name: String,
+                               file: StaticString = #filePath, line: UInt = #line) {
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.exists, tabBar.frame.width > layout.width / 2, tabBar.frame.minY < layout.height - 1 {
+            XCTAssertGreaterThanOrEqual(aboveIndicator, composerGap - 1, "\(name): above the tab bar", file: file, line: line)
+        } else {
+            XCTAssertEqual(aboveIndicator, 0, accuracy: 1, "\(name): resting on the home indicator's inset", file: file, line: line)
         }
     }
 
