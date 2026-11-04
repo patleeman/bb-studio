@@ -958,6 +958,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_maintenance_set: ({ botId, ...patch }) => maintenance.set(learnerId(botId), patch),
     bot_maintenance_run: ({ botId, dryRun }) => maintenance.run(learnerId(botId), { dryRun }),
     bot_attention: ({ botId }) => bots.attentionView(botId),
+    bot_attention_all: () => bots.attentionAll(),
     bot_page_state: ({ botId }) => pageStateView(pageBotId(botId)),
     bot_calendar_group_rename: ({ botId, key, name }) => { const id = pageBotId(botId); pageState.renameGroup(id, key, name, "user"); return pageStateView(id); },
     bot_run_dismiss: ({ botId, automationId, runId }) => { const id = pageBotId(botId); pageState.dismiss(id, automationId, runId); return pageStateView(id); },

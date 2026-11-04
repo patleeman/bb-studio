@@ -16,7 +16,7 @@
 // - unread: a reply the user hasn't read. Read off bot_attention, not BB's
 //   isUnread: BB marks the chat unread after every turn, including the
 //   [PASS] a check-in ends with when nothing changed, which isn't news.
-import type { PluginSidebarThread, PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
+import type { ExperimentalBadge, PluginSidebarThread, PluginSidebarThreadIndicator } from "@get-bb/plugin-sdk/app";
 
 export type ThreadState = "needs-you" | "working" | "error" | "unread" | "idle";
 
@@ -69,3 +69,16 @@ export const STATE_INDICATOR: Record<ThreadState, PluginSidebarThreadIndicator> 
   unread: "unread-success",
   idle: "none",
 };
+
+/**
+ * The rail's Bots badge (app.tsx's "bots" nav panel): how many Bots need the
+ * user (critical), else a dot while any has a reply they haven't read
+ * (neutral), else nothing. A busy Bot alone draws nothing.
+ */
+export function railBadge(bots: readonly { name: string; attention: BotAttentionSummary }[]): ExperimentalBadge | null {
+  const needs = bots.filter((bot) => (bot.attention?.count ?? 0) - (bot.attention?.unread ?? 0) > 0);
+  if (needs.length) return { count: needs.length, tone: "critical", label: needs.length === 1 ? `${needs[0]!.name} needs you` : `${needs.length} Bots need you` };
+  const unread = bots.filter((bot) => (bot.attention?.unread ?? 0) > 0);
+  if (unread.length) return { tone: "neutral", label: unread.length === 1 ? `${unread[0]!.name} has a reply you haven't read` : `${unread.length} Bots have replies you haven't read` };
+  return null;
+}
