@@ -74,10 +74,15 @@ const ORBIT_THREADS = [
   "Plan the Friday release window",
 ];
 
-// Drop the BB_* variables of the thread this script may run inside: BB_CLI and
-// BB_HOST_DAEMON_PORT would send the CLI to the BB you work in.
+// Drop the variables of the agent session this script may run inside:
+// - BB_*: BB_CLI and BB_HOST_DAEMON_PORT would send the CLI to the BB you work in.
+// - CLAUDE_*, ANTHROPIC_* and CLAUDECODE: a Claude Code session's own
+//   (ANTHROPIC_BASE_URL, CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST, …) tell the
+//   staged Claude Code that its host signs it in, so it never reads its own
+//   Keychain sign-in and says "Not logged in".
+const INHERITED = /^(BB_|CLAUDE_|_CLAUDE_|ANTHROPIC_|CLAUDECODE$)/;
 function stagedEnv(extra) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("BB_")));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !INHERITED.test(name)));
   return {
     ...env,
     PATH: `${shimDir}:${binDir}:${process.env.PATH}`,
