@@ -74,6 +74,14 @@ export function describeBoard(store: CanvasStore, canvasId: string): string {
   return [`Board (revision ${row.rev}, turn ${row.turn}), ${board.length} item(s).${styleLine}`, ...lines, "", "Latest changes:", ...changes].join("\n");
 }
 
+/** After canvas_set in a style: what a thin or heroless board still needs (the board is already shown). */
+export function boardAdvice(items: readonly { kind: string; scale?: string | null }[]): string {
+  const advice: string[] = [];
+  if (items.length && items.length < 5) advice.push(`it has only ${items.length} pieces: add 2–5 more that each say something specific (numbers with context, a chart, pictures, a quote), at different scales, so the board fills the screen`);
+  if (items.length && !items.some((item) => item.scale === "hero")) advice.push("no piece is the hero: give the one that answers the question scale \"hero\"");
+  return advice.length ? ` Still to do: ${advice.join("; ")}.` : "";
+}
+
 function summarize(result: EditResult, focus: { id: string } | null): string {
   // (the style line, when it changed, is one of the changes)
   const done = result.changes.map((change) => change.summary).join("; ") || "No change.";
@@ -112,7 +120,8 @@ export function runCanvasTool(store: CanvasStore, canvasId: string, name: Canvas
       return { text: designGuide(asked ?? null), changed: false };
     }
     const result = store.edit(canvasId, toolOps(name, input), by);
-    return { text: summarize(result, focusOf(result.items)), changed: true };
+    const look = lookOf(store.get(canvasId)?.look);
+    return { text: summarize(result, focusOf(result.items)) + (name === "canvas_set" && look !== "classic" ? boardAdvice(result.items) : ""), changed: true };
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")

@@ -12,6 +12,8 @@ ${S} .canvas-chat{background:var(--cv-paper)}
 ${S} .canvas-scroll{background-color:var(--cv-paper)}
 ${S} .cvt{position:absolute;will-change:transform;font-family:var(--cv-font-text);color:var(--cv-ink)}
 ${S} .cvt-rot{transform-origin:50% 35%}
+${S} .cvt-fit{position:absolute;inset:0;transform-origin:0 0;transition:transform .56s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion: reduce){${S} .cvt-fit{transition:none}}
 ${S} .cvt-card{position:relative;color:var(--cv-ink)}
 ${S} .cvt-head{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);font-weight:700;letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-ink);margin-bottom:var(--cv-s-3);display:flex;align-items:center;gap:8px}
 ${S} .cvt-head span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -25,6 +27,9 @@ ${S} .cvi-ticker{display:flex;flex-wrap:wrap;gap:var(--cv-s-2) var(--cv-s-5);ali
 ${S} .cvi-ticker-item{display:inline-flex;align-items:baseline;gap:8px}
 ${S} .cv-body p{margin:0 0 var(--cv-s-3)}
 ${S} .cv-body p:last-child{margin-bottom:0}
+${S} .cvt[data-kind=caption][data-scale=hero] .cv-body{font-size:var(--cv-t-2xl);line-height:1.25}
+${S} .cvt[data-kind=caption][data-scale=large] .cv-body{font-size:var(--cv-t-xl);line-height:1.35}
+${S} .cvt[data-kind=caption][data-scale=medium] .cv-body{font-size:var(--cv-t-lg);line-height:1.42}
 `;
 
 // No boxes: text and charts sit on the paper. Hierarchy comes from scale,

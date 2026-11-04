@@ -103,7 +103,7 @@ function Card({ item, look, mode, width, room, focus, tag, onMeasure }: { item: 
         <div className="cvt-head" style={look === "instrument" ? undefined : { padding: pad ? `${pad}px ${pad}px 0` : undefined, marginBottom: pad ? 8 : undefined }}>
           {tag ? <b className="cvt-tag">{tag}</b> : null}
           <span>{label}</span>
-          {look === "instrument" && KIND_TAG[item.kind] ? <i className="cvt-kind">{KIND_TAG[item.kind]}</i> : null}
+          {look === "instrument" && KIND_TAG[item.kind] && !item.bleed ? <i className="cvt-kind">{KIND_TAG[item.kind]}</i> : null}
         </div>
       ) : null}
       <div className="cvt-body" style={{ padding: label && look !== "instrument" ? `0 ${pad}px ${pad}px` : pad, position: "relative" }}>
@@ -233,11 +233,14 @@ export function OrganicBoard({ items, look, mode, composition = null, empty, bot
 
   const ghostBottom = ghosts.reduce((max, ghost) => Math.max(max, ghost.rect.y + ghost.rect.h), 0);
   // The board fills the screen; it only scrolls when the composition is taller than it.
-  const height = Math.max(layout.height, ghostBottom, items.length ? frame.height : 0);
+  // Fitted (a sparse board scaled up, or one just over the screen scaled down), the board is the screen; else it scrolls.
+  const fit = layout.fit;
+  const fitted = fit.scale !== 1 || fit.x !== 0 || fit.y !== 0;
+  const height = fitted ? Math.max(frame.height, ghostBottom) : Math.max(layout.height, ghostBottom, items.length ? frame.height : 0);
   return (
-    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-canvas-composition={layout.composition} data-items={items.length} data-measured={exact} data-frame={`${frame.width}x${frame.height}`}>
+    <div ref={ref} className="canvas-board relative w-full" style={{ height: height + bottomPad }} data-canvas-board data-canvas-look={look} data-canvas-composition={layout.composition} data-items={items.length} data-measured={exact} data-frame={`${frame.width}x${frame.height}`} data-fit={fit.scale}>
       {width ? (
-        <>
+        <div className="cvt-fit" style={{ transform: fitted ? `translate(${fit.x}px, ${fit.y}px) scale(${fit.scale})` : undefined }}>
           {ghosts.map((ghost, index) => <Ghost key={ghost.key} ghost={ghost} index={index} look={look} mode={mode} onDone={() => setGhosts((current) => current.filter((each) => each.key !== ghost.key))} />)}
           {items.map((item) => {
             const placed = layout.rects.get(item.id);
@@ -264,7 +267,7 @@ export function OrganicBoard({ items, look, mode, composition = null, empty, bot
               </section>
             );
           })}
-        </>
+        </div>
       ) : null}
       {!items.length && !ghosts.length && empty ? <div className="pointer-events-none absolute inset-x-0 top-[28vh] flex justify-center">{empty}</div> : null}
     </div>

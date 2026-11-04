@@ -340,6 +340,10 @@ describe("canvas tools", () => {
     const again = await tool("canvas_set", { title: "BB Studio", composition: "giant-number", items: [{ id: "studio", kind: "stat", data: 12 }] }, threadId);
     expect(text(again)).toContain("Nothing changed: The last board was a \\\"giant-number\\\" composition too");
     await tool("canvas_set", { title: "BB Studio", composition: "essay", items: [{ id: "studio", kind: "caption", data: "One plugin." }] }, threadId);
+    // A thin, heroless board is shown, and the result says what it still needs.
+    const thin = text(await tool("canvas_set", { items: [{ id: "studio", kind: "caption", data: "One plugin." }, { id: "n", kind: "stat", data: 3 }] }, threadId));
+    expect(thin).toContain("Still to do: it has only 2 pieces");
+    expect(thin).toContain("no piece is the hero");
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "BB Studio", composition: "essay" });
   });
 });

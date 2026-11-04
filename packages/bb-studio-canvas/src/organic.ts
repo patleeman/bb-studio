@@ -46,7 +46,9 @@ export interface OrganicItem {
 
 export interface Frame { width: number; height: number }
 export interface Placed { x: number; y: number; w: number; h: number; rotate: number; z: number; scale: Scale }
-export interface OrganicLayout { rects: Map<string, Placed>; focusId: string | null; height: number; frame: Frame; composition: Composition }
+/** How the composed board sits on the screen: scaled about its top-left, then moved (screen = board × scale + (x, y)). */
+export interface Fit { scale: number; x: number; y: number }
+export interface OrganicLayout { rects: Map<string, Placed>; focusId: string | null; height: number; frame: Frame; composition: Composition; fit: Fit }
 
 /** How far a bleeding item runs past the board's edge (the page's side padding). */
 export const BLEED = 32;
@@ -68,6 +70,8 @@ const SCALE_W: Record<Scale, number> = { hero: 0.56, large: 0.34, medium: 0.25, 
 const NARROW_W: Record<Scale, number> = { hero: 1, large: 1, medium: 0.66, small: 0.5, tiny: 0.46 };
 /** Suggested height per scale, as a share of the frame's height (charts and custom pieces size to it). */
 const SCALE_ROOM: Record<Scale, number> = { hero: 0.66, large: 0.44, medium: 0.34, small: 0.26, tiny: 0.2 };
+/** The hero's suggested height per composition: a full-width close-up or a spine leaves room under it. */
+const HERO_ROOM: Record<Composition, number> = { orbit: 0.62, "giant-number": 0.56, map: 0.7, spine: 0.4, split: 0.56, quote: 0.5, "close-up": 0.5, essay: 0.66, gallery: 0.62 };
 /** Narrowest readable width per kind, px. */
 const MIN_W: Partial<Record<CanvasKind, number>> = {
   table: 380, map: 300, timeline: 320, multiples: 340, line: 300, area: 300, bar: 280, pie: 240, custom: 240, headline: 260,
@@ -168,7 +172,19 @@ export function organicSizes(items: readonly OrganicItem[], frame: Frame, _look:
     else w = W * SCALE_W[scale] * (0.92 + (hash % 17) / 100);
     if (item.bleed && !narrow) w += BLEED;
     w = Math.round(Math.max(min, Math.min(W + (item.bleed ? BLEED : 0), w)));
-    sizes.set(item.id, { w, scale, room: Math.round(H * SCALE_ROOM[scale]) });
+    sizes.set(item.id, { w, scale, room: Math.round(H * (isHero ? HERO_ROOM[comp] : SCALE_ROOM[scale])) });
+  }
+  // A sparse board would leave the screen mostly empty: its supporting pieces grow (up to half again) until
+  // they'd cover about two fifths of it. From estimates only, so measuring never feeds back into widths.
+  if (!narrow) {
+    let area = 0;
+    for (const item of items) { const s = sizes.get(item.id)!; area += s.w * estimateHeight(item.kind, s.w, s.room); }
+    const boost = Math.max(1, Math.min(1.5, Math.sqrt((0.42 * W * H) / Math.max(1, area))));
+    if (boost > 1.02) for (const item of items) {
+      const s = sizes.get(item.id)!;
+      if (item.fixed || s.scale === "hero") continue;
+      sizes.set(item.id, { ...s, w: Math.round(Math.min(W * 0.48, s.w * boost)), room: Math.round(Math.min(H * 0.5, s.room * boost)) });
+    }
   }
   return sizes;
 }
@@ -235,7 +251,7 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
   const H = Math.max(320, frame.height);
   const hero = organicFocus(items);
   const comp = composition ?? inferComposition(hero, items);
-  if (!items.length || W <= 0) return { rects, focusId: null, height: 0, frame, composition: comp };
+  if (!items.length || W <= 0) return { rects, focusId: null, height: 0, frame, composition: comp, fit: { scale: 1, x: 0, y: 0 } };
   const rules = LOOK_RULES[look];
   const narrow = W < NARROW;
   const sizes = organicSizes(items, frame, look, comp);
@@ -272,7 +288,9 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
   // The composition's height: the screen, or taller when everything can't fit on it (it scrolls).
   let area = 0;
   for (const item of items) { const s = sizes.get(item.id)!; area += s.w * heightOf(item); }
-  const Hv = Math.round(Math.max(H, area / (W * (narrow ? 0.78 : 0.56))));
+  // Composed for the screen; only a board too full for it (after the fit's shrink) is composed taller, to scroll.
+  const Hv = Math.round(Math.max(H, narrow ? area / (W * 0.78) : area / (W * 0.82 * MIN_FIT)));
+  const pull = Math.max(0.62, Math.min(1, 0.4 + area / (W * H)));
 
   const boxes: Box[] = [];
   const gapOf = (item: OrganicItem) => Math.round(rules.gap * (narrow ? 0.7 : 1) * (0.78 + (hashOf(item.id) % 9) / 16));
@@ -320,7 +338,7 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
       const rect = { x, y, w, h };
       if (!free(rect, gap, null)) continue;
       const dx = (x + w / 2 - tx) / W, dy = (y + h / 2 - ty) / Hv;
-      const cost = Math.hypot(dx, dy * 0.9) * 100 + (Math.max(0, y + h - Hv) / Hv) * 600 + (Math.max(0, y + h - H) / H) * 40;
+      const cost = Math.hypot(dx, dy * 0.9) * 100 + (Math.max(0, y + h - Hv) / Hv) * 600 + (Math.max(0, y + h - H) / H) * 260;
       if (cost < bestCost - 1e-9) { bestCost = cost; best = [x, y]; }
     }
     if (best) return best;
@@ -402,7 +420,12 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
     else if (narrow) {
       // A narrow screen: down the page, alternating sides, so it still reads as composed.
       targets.set(item.id, [slot++ % 2 ? W - sizes.get(item.id)!.w / 2 : sizes.get(item.id)!.w / 2, 0]);
-    } else if (slot < pattern.slots.length) { const [x, y] = pattern.slots[slot++]!; targets.set(item.id, [mx(x) * W, y * Hv]); }
+    } else if (slot < pattern.slots.length) {
+      // On a sparse board the targets draw in toward the hero, so the pieces cluster instead of sitting alone in the corners.
+      const [x, y] = pattern.slots[slot++]!;
+      const hx = mx(pattern.hero.x), hy = pattern.hero.y;
+      targets.set(item.id, [(hx + (mx(x) - hx) * pull) * W, (hy + (y - hy) * pull) * Hv]);
+    }
   }
 
   // Pass 1, stability: whatever kept its width keeps its spot while it's free (a pin only beside a target that stayed too).
@@ -434,7 +457,30 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
 
   let height = 0;
   for (const rect of rects.values()) height = Math.max(height, rect.y + rect.h);
-  return { rects, focusId: hero?.id ?? null, height: Math.ceil(height), frame, composition: comp };
+  return { rects, focusId: hero?.id ?? null, height: Math.ceil(height), frame, composition: comp, fit: fitTo(rects, W, H, narrow || items.some((item) => item.fixed)) };
+}
+
+/** Bigger than this, a sparse board's type and charts would read as blown up. */
+export const MAX_FIT = 1.4;
+/** A board this much taller than the screen shrinks to fit it rather than scroll. */
+export const MIN_FIT = 0.86;
+
+/**
+ * Fits the composed board to the screen: a sparse board is scaled up (to
+ * MAX_FIT) and centered so it fills the screen instead of leaving dead
+ * zones; one a little taller than the screen shrinks to fit (to MIN_FIT);
+ * a taller one scrolls at full size. Narrow screens and hand-placed boards
+ * aren't fitted.
+ */
+export function fitTo(rects: ReadonlyMap<string, Placed>, W: number, H: number, off = false): Fit {
+  if (off || !rects.size) return { scale: 1, x: 0, y: 0 };
+  let x0 = Number.POSITIVE_INFINITY, y0 = Number.POSITIVE_INFINITY, x1 = Number.NEGATIVE_INFINITY, y1 = Number.NEGATIVE_INFINITY;
+  for (const r of rects.values()) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
+  const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0);
+  let scale = Math.min(W / bw, H / bh, MAX_FIT);
+  if (scale < MIN_FIT) return { scale: 1, x: 0, y: 0 };
+  scale = Math.round(scale * 1000) / 1000;
+  return { scale, x: Math.round((W - bw * scale) / 2 - x0 * scale), y: Math.round((H - bh * scale) / 2 - y0 * scale) };
 }
 
 /** The point of the frame farthest from everything placed: where the next item helps balance most. */

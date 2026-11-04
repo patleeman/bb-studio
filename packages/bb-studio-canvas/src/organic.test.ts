@@ -158,6 +158,30 @@ describe("composition", () => {
 
 });
 
+describe("fitting the screen", () => {
+  it("scales a sparse board up and centers it, so the screen has no dead zones", () => {
+    const items = [item("n", "stat", "s", 5), item("a", "caption", "m", 3), item("b", "caption", "s", 2)];
+    const layout = layoutOrganic(items, WIDE, "editorial", new Map([["n", 260], ["a", 90], ["b", 70]]));
+    expect(layout.fit.scale).toBeGreaterThan(1);
+    expect(layout.fit.scale).toBeLessThanOrEqual(1.4);
+    const rects = [...layout.rects.values()].map((r) => ({ x: r.x * layout.fit.scale + layout.fit.x, y: r.y * layout.fit.scale + layout.fit.y, w: r.w * layout.fit.scale, h: r.h * layout.fit.scale }));
+    for (const r of rects) {
+      expect(r.x).toBeGreaterThanOrEqual(-0.5);
+      expect(r.x + r.w).toBeLessThanOrEqual(WIDE.width + 0.5);
+      expect(r.y).toBeGreaterThanOrEqual(-0.5);
+      expect(r.y + r.h).toBeLessThanOrEqual(WIDE.height + 0.5);
+    }
+  });
+
+  it("shrinks a board a little over the screen to fit it, and lets a much taller one scroll", () => {
+    const items = board();
+    const tall = new Map([...heightsFor(items, WIDE)].map(([id, h]) => [id, h * 2.2]));
+    expect(layoutOrganic(items, WIDE, "editorial", tall).fit).toEqual({ scale: 1, x: 0, y: 0 });
+    const narrowFit = layoutOrganic(items, PHONE, "editorial", heightsFor(items, PHONE)).fit;
+    expect(narrowFit.scale).toBe(1);
+  });
+});
+
 describe("pins", () => {
   it("drops a pin whose target left: the item is placed on its own", () => {
     const items = [item("a", "headline", "xl", 5), item("b", "table", "xl", 4), item("n", "caption", "s", 2, { pinnedTo: "gone" })];
