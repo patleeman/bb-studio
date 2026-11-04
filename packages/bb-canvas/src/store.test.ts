@@ -6,13 +6,45 @@ import { CanvasStore, clipCaption } from "./store";
 
 function memory() {
   const db = new Database(":memory:");
-  db.exec(CANVAS_MIGRATIONS[0]!);
+  for (const migration of CANVAS_MIGRATIONS) db.exec(migration);
   let clock = 1_000;
   const store = new CanvasStore(db, () => clock);
   return { db, store, tick: (ms = 1000) => { clock += ms; } };
 }
 
 describe("canvas store", () => {
+  it("keeps a canvas's look, classic when it has none", () => {
+    const { store } = memory();
+    store.create({ threadId: "thr_a", look: "instrument" });
+    store.create({ threadId: "thr_b" });
+    expect(store.list().map((each) => [each.threadId, each.look]).sort()).toEqual([["thr_a", "instrument"], ["thr_b", "classic"]]);
+  });
+
+  it("keeps relations: related items, the anchor and its point; set and update replace them", () => {
+    const { store } = memory();
+    const { id } = store.create({ threadId: "thr_a" });
+    store.edit(id, [
+      { op: "add", item: { id: "map", kind: "map", data: { PA: 2 } } },
+      { op: "add", item: { id: "why", kind: "note", data: "Flipped", anchor: "map", point: { x: 0.7, y: 0.4 }, relatedTo: ["map", "why", "map"] } },
+    ], "agent");
+    expect(store.items(id).find((item) => item.id === "why")).toMatchObject({ anchor: "map", point: { x: 0.7, y: 0.4 }, relatedTo: ["map"] });
+    expect(store.items(id).find((item) => item.id === "map")).toMatchObject({ anchor: null, point: null, relatedTo: [] });
+    const updated = store.edit(id, [{ op: "update", patch: { id: "why", anchor: null } }], "agent");
+    expect(updated.items.find((item) => item.id === "why")).toMatchObject({ anchor: null, point: { x: 0.7, y: 0.4 } });
+    expect(updated.changes[0]!.summary).toContain("anchor");
+    const set = store.edit(id, [{ op: "set", items: [{ id: "why", kind: "note", data: "Flipped" }, { id: "map", kind: "map", data: { PA: 2 } }] }], "agent");
+    expect(set.items.find((item) => item.id === "why")).toMatchObject({ relatedTo: [], anchor: null, point: null });
+  });
+
+  it("checks the new kinds' data", () => {
+    const { store } = memory();
+    const { id } = store.create({ threadId: "thr_a" });
+    expect(() => store.edit(id, [{ op: "add", item: { kind: "quote", data: { by: "nobody" } } }], "agent")).toThrow(/quote needs data/);
+    expect(() => store.edit(id, [{ op: "add", item: { kind: "note", data: "" } }], "agent")).toThrow(/note needs data/);
+    expect(() => store.edit(id, [{ op: "add", item: { kind: "timeline" } }], "agent")).toThrow(/timeline needs data/);
+    expect(store.edit(id, [{ op: "add", item: { kind: "quote", data: "Every vote counts" } }], "agent").items[0]).toMatchObject({ kind: "quote", size: "m" });
+  });
+
   it("keeps one board per thread", () => {
     const { store } = memory();
     const row = store.create({ threadId: "thr_a", title: "Election" });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CanvasItem } from "../shared";
 import { shortHeader, tableColumns } from "./items";
 
-const table = (data: unknown, options: Record<string, unknown> = {}): CanvasItem => ({ id: "t", kind: "table", title: null, data, options, html: null, size: "m", importance: 3, createdAt: 1, updatedAt: 1, rev: 1 });
+const table = (data: unknown, options: Record<string, unknown> = {}): CanvasItem => ({ id: "t", kind: "table", title: null, data, options, html: null, size: "m", importance: 3, relatedTo: [], anchor: null, point: null, createdAt: 1, updatedAt: 1, rev: 1 });
 
 describe("canvas tables", () => {
   it("counts a table's columns for the layout", () => {

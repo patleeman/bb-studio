@@ -20,4 +20,8 @@ export const CANVAS_MIGRATIONS: string[] = [
   CREATE INDEX canvas_changes_canvas ON canvas_changes (canvas_id, seq);
   CREATE TABLE canvas_turns (seq INTEGER PRIMARY KEY AUTOINCREMENT, canvas_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL);
   CREATE INDEX canvas_turns_canvas ON canvas_turns (canvas_id, seq);`,
+  // Looks (looks.ts): a canvas's design direction (null: classic), and each
+  // item's relations as JSON {relatedTo, anchor, point}.
+  `ALTER TABLE canvases ADD COLUMN look TEXT;
+  ALTER TABLE canvas_items ADD COLUMN rel TEXT;`,
 ];

@@ -6,6 +6,7 @@
 // a headline and a caption. The user never arranges it; the app packs it by
 // importance and size (layout.ts).
 import { z } from "zod";
+import { lookSchema } from "./looks";
 
 /** The canvas plugin's panel: /plugins/canvas/canvas/<threadId>. */
 export const CANVAS_SEGMENT = "canvas";
@@ -50,7 +51,7 @@ export const CANVAS_LIMITS = {
  * renderers. Not Dashboards' embed: it reads Studio's RPCs, which a canvas
  * (another plugin) can't call from its page.
  */
-export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "custom"] as const;
+export const CANVAS_KINDS = ["headline", "caption", "stat", "line", "bar", "area", "pie", "table", "list", "ticker", "progress", "image", "custom", "quote", "note", "timeline", "map", "multiples"] as const;
 export type CanvasKind = (typeof CANVAS_KINDS)[number];
 export const SIZE_HINTS = ["s", "m", "l", "xl"] as const;
 export type SizeHint = (typeof SIZE_HINTS)[number];
@@ -69,7 +70,12 @@ export const CANVAS_KIND_INFO: Record<CanvasKind, { data: string; options: strin
   ticker: { data: "an array of {label, value?, delta?} or strings", options: "speed? (seconds per loop)", size: "xl" },
   progress: { data: "a number, or {value, max?, min?, label?}", options: "style? (bar|gauge), min?, max?, unit?, label?", size: "s" },
   image: { data: "a URL string, or none", options: "url, alt?, fit? (cover|contain)", size: "m" },
-  custom: { data: "anything; the HTML reads window.bbWidget.data", options: "anything the HTML reads (window.bbWidget.options)", size: "m" },
+  custom: { data: "anything; the HTML reads window.bbWidget.data (cv.render)", options: "anything the HTML reads (window.bbWidget.options)", size: "m" },
+  quote: { data: "{text, by?, role?} or a string", options: "none", size: "m" },
+  note: { data: "a short string, or {text, tone?: accent|good|bad}; with anchor (and point) it points at that item", options: "none", size: "s" },
+  timeline: { data: "[{date, label, note?, tone?: good|bad|accent|warn}]", options: "layout? (column|row), highlight? (index or date)", size: "m" },
+  map: { data: "US states: {PA: 2.1, ...} or {PA: {value, label?, color?}} or [{state, value, label?, color?}]", options: "scale? (diverging|sequential), legend? [low, high], show? (abbr|value|label), low?, high?", size: "m" },
+  multiples: { data: "[{label, values: number[], value?, delta?, note?}]", options: "unit?, shared? (one scale), invert?", size: "l" },
 };
 
 const jsonBytes = (value: unknown) => {
@@ -95,6 +101,12 @@ export const itemInputSchema = z.object({
   size: z.enum(SIZE_HINTS).optional(),
   /** 5: the point of the board right now; 1: background. */
   importance: z.number().int().min(1).max(5).optional(),
+  /** Items this one relates to: the board draws a connector to each. */
+  relatedTo: z.array(z.string().regex(ITEM_ID)).max(6).optional(),
+  /** The item this one annotates: a note is placed beside it, pointing at `point`. */
+  anchor: z.string().regex(ITEM_ID).nullable().optional(),
+  /** Where on the anchor to point, 0–1 from its top-left. */
+  point: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).nullable().optional(),
 });
 export type ItemInput = z.infer<typeof itemInputSchema>;
 
@@ -115,6 +127,9 @@ export const canvasItemSchema = z.object({
   html: z.string().nullable(),
   size: z.enum(SIZE_HINTS),
   importance: z.number(),
+  relatedTo: z.array(z.string()),
+  anchor: z.string().nullable(),
+  point: z.object({ x: z.number(), y: z.number() }).nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
   /** The board revision that last changed it. */
@@ -153,6 +168,8 @@ export const canvasMetaSchema = z.object({
   updatedAt: z.number(),
   createdAt: z.number(),
   itemCount: z.number(),
+  /** The canvas's look (looks.ts); classic for canvases made before looks. */
+  look: lookSchema,
 });
 export type CanvasMeta = z.infer<typeof canvasMetaSchema>;
 
@@ -189,6 +206,12 @@ export function checkItem(item: { kind: CanvasKind; data?: unknown; options?: Re
     case "custom":
       if (!item.html?.trim()) throw new Error("A custom item needs html.");
       return;
+    case "quote":
+      if (!quoteOf(item.data)) throw new Error("A quote needs data: a string, or {text, by?, role?}.");
+      return;
+    case "note":
+      if (!noteOf(item.data)) throw new Error("A note needs data: a short string, or {text, tone?}.");
+      return;
     case "image": {
       const url = typeof item.data === "string" ? item.data : item.options?.url;
       if (typeof url !== "string" || !/^https?:\/\//.test(url)) throw new Error("An image needs an http(s) URL in data or options.url.");
@@ -210,6 +233,24 @@ export function headlineOf(data: unknown): Headline | null {
   const str = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
   const tone = row.tone === "good" || row.tone === "bad" || row.tone === "accent" ? row.tone : "neutral";
   return { text, subtitle: str(row.subtitle), kicker: str(row.kicker), tone };
+}
+
+export function quoteOf(data: unknown): { text: string; by: string | null; role: string | null } | null {
+  if (typeof data === "string") return data.trim() ? { text: data.trim(), by: null, role: null } : null;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const row = data as Record<string, unknown>;
+  const str = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
+  const text = str(row.text) ?? str(row.quote);
+  return text ? { text, by: str(row.by) ?? str(row.author), role: str(row.role) } : null;
+}
+
+export function noteOf(data: unknown): { text: string; tone: "accent" | "good" | "bad" | "neutral" } | null {
+  if (typeof data === "string") return data.trim() ? { text: data.trim(), tone: "neutral" } : null;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const row = data as Record<string, unknown>;
+  const text = typeof row.text === "string" ? row.text.trim() : "";
+  const tone = row.tone === "good" || row.tone === "bad" || row.tone === "accent" ? row.tone : "neutral";
+  return text ? { text, tone } : null;
 }
 
 export function captionOf(data: unknown): string | null {

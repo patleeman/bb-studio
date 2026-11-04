@@ -21,7 +21,7 @@ function canvasHost() {
     },
   });
   const db = host.bb.storage.database();
-  db.exec(CANVAS_MIGRATIONS[0]!);
+  for (const migration of CANVAS_MIGRATIONS) db.exec(migration);
   const canvas = registerCanvas(host.bb, db);
   const call = (method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
   const tool = (name: string, input: unknown, threadId: string) => host.harness.behavior.callAgentTool(name, input, { threadId });
@@ -81,7 +81,29 @@ describe("canvas threads", () => {
     expect(canvas.isCanvasThread("thr_other")).toBe(false);
     // Before Studio records the thread, its metadata already says so.
     expect(canvas.isCanvasThread("thr_new", { canvas: canvasId })).toBe(true);
-    expect(canvas.instructions).toContain("On a topic change, clear and rebuild");
+    expect(canvas.instructionsFor(threadId)).toContain("On a topic change, clear and rebuild");
+  });
+
+  it("starts a canvas in the look the page picked (editorial by default), with that look's guide and instructions", async () => {
+    const { call, canvas, spawned } = canvasHost();
+    const first = await call("canvas.create", { text: "Election" });
+    const second = await call("canvas.create", { text: "Weather", look: "field" });
+    expect((await call("canvas.get", { threadId: first.threadId })).canvas.look).toBe("editorial");
+    expect((await call("canvas.get", { threadId: second.threadId })).canvas.look).toBe("field");
+    const note = (spawned[1]!.input as { text: string }[])[1]!.text;
+    expect(note).toContain("Look: Field notes.");
+    expect(note).toContain("cv.render(");
+    expect(note).not.toContain("@@");
+    expect(canvas.instructionsFor(second.threadId)).toContain("look is Field notes");
+    // Before the thread is attached, the metadata finds the canvas.
+    expect(canvas.instructionsFor("thr_new", { canvas: second.canvasId })).toContain("look is Field notes");
+    expect(canvas.instructionsFor("thr_unknown")).not.toContain("look is");
+  });
+
+  it("returns the look's design guide from canvas_guide", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Ops", look: "instrument" });
+    expect(text(await tool("canvas_guide", {}, threadId))).toContain("Look: Instrument.");
   });
 });
 

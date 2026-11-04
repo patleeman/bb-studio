@@ -2,6 +2,8 @@
 // instructions every session (as the Bot gets its role), the first message
 // carries the same rules as an agent-only note, and the `canvas` skill has
 // the long form (skills/canvas/SKILL.md).
+import { designGuide, lookInstruction } from "./guides";
+import type { Look } from "./looks";
 import { CANVAS_KIND_INFO, CANVAS_KINDS, CANVAS_LIMITS } from "./shared";
 
 /** The core rules, short enough for the configure hook's 4,096 characters with room to spare. */
@@ -19,8 +21,23 @@ export const CANVAS_RULES = [
 
 export const CANVAS_INSTRUCTIONS = `${CANVAS_RULES}\n\nItem kinds: ${CANVAS_KINDS.join(", ")}. Read the canvas skill for each kind's data shape. canvas_read shows the board and its recent changes.`;
 
+/** The configure hook's instructions for a canvas in this look: the core rules, and for an organic look, its line. */
+export function canvasInstructions(look: Look): string {
+  if (look === "classic") return CANVAS_INSTRUCTIONS;
+  // A rich look replaces "keep the board small" with "rich but focused".
+  const rules = CANVAS_RULES.replace(/- Keep the board small:[^\n]*/, `- Rich but focused: one dominant focus and 5–12 dense supporting items (your own custom components, stats with sparklines, maps, timelines, quotes, notes). At most ${CANVAS_LIMITS.items} items.`)
+    .replace(" The highest importance, most recently changed item is the focus: biggest, top-left.", " The highest importance, most recently changed item is the focus: it dominates and the rest orbit it.");
+  return `${rules}\n\n${lookInstruction(look)}\n\nItem kinds: ${CANVAS_KINDS.join(", ")}. The canvas skill has each kind's data shape. canvas_read shows the board and its recent changes.`;
+}
+
 /** The agent-only note on a new canvas's first message. */
 export const CANVAS_FIRST_NOTE = `Canvas note (agent only): this thread backs a canvas. ${CANVAS_RULES}`;
+
+/** The first note for a canvas in this look: the rules, and for an organic look, its whole design guide. */
+export function canvasFirstNote(look: Look): string {
+  if (look === "classic") return CANVAS_FIRST_NOTE;
+  return `Canvas note (agent only): this thread backs a canvas. ${canvasInstructions(look)}\n\n${designGuide(look)}`;
+}
 
 /** One line per kind: its data and options, for tool descriptions. */
 export const KIND_LINES = CANVAS_KINDS.map((kind) => `- ${kind}: data ${CANVAS_KIND_INFO[kind].data}; options ${CANVAS_KIND_INFO[kind].options}; default size ${CANVAS_KIND_INFO[kind].size}.`).join("\n");

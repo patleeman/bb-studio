@@ -3,8 +3,8 @@ name: canvas
 description: >-
   Use in a canvas thread, where you talk with the user on a board instead of in
   a transcript. It covers editing the board each turn with the canvas_* tools,
-  each item kind's data, importance and size, and keeping the reply to a short
-  spoken caption.
+  each item kind's data, importance, size and relations, the canvas's look and
+  its design guide, and keeping the reply to a short spoken caption.
 ---
 
 # Canvas
@@ -28,15 +28,39 @@ chat on their screen is one faint line: your latest reply.
 Never ask the user to arrange, move or resize anything. Studio lays the board
 out. You steer it with `importance` and `size`.
 
+## Looks
+
+A canvas has a look, picked when it starts: **Editorial** (a newspaper
+front), **Field notes** (a whiteboard of cards and sticky notes) or
+**Instrument** (a dense control panel); canvases from before looks are
+**Classic** (the slide grid). The first message has the look's design guide
+with examples; `canvas_guide` returns it again. In every look but Classic:
+
+- Make the board rich and dense, not a slide: one dominant focus and 5–12
+  supporting items that each say something specific.
+- Write your own components first: a `custom` item's HTML gets the look's
+  tokens (`--cv-*` CSS variables), the kit's classes (`cv-kicker`, `cv-h1`,
+  `cv-num`, `cv-float-right`, …) and `window.cv` (sparklines, line and bar
+  charts, seat splits, US tile maps, timelines, small multiples). Draw with
+  `cv.render((data, options) => html)` so updates to `data` redraw it. The
+  frame grows to its content: never set a height on it.
+- Annotate: a `note` with `anchor` (an item id) and `point` (`{x, y}`, 0–1
+  inside that item) sits beside it with a line to that spot. `relatedTo`
+  (ids) draws connectors.
+- Inline marks in captions and notes: `{spark:3,5,4}`, `{delta:+2.1}`,
+  `==highlight==`.
+
 ## Layout
 
 - `importance` 1–5. The highest importance, most recently changed item is the
-  focus: Studio makes it the biggest and puts it top-left. Give the one thing
+  focus: Studio makes it the biggest (top-left in Classic, Editorial and
+  Instrument; in the middle in Field notes) and the rest orbit it. Give the one thing
   the board is about importance 5 (often the headline), supporting numbers 4,
   detail 3, background 1–2.
 - `size` s, m, l or xl is a hint. Stats are small, charts and tables large.
-- Keep it small: a headline, three or four stats, one or two charts or tables,
-  a caption. At most 24 items. Fewer, bigger items read better.
+- Classic: keep it small: a headline, three or four stats, one or two charts
+  or tables, a caption. Other looks: rich but focused (see Looks). At most 24
+  items.
 - Items that don't change keep their place, so prefer `canvas_update` over
   remove-and-add for the same thing.
 
@@ -55,6 +79,14 @@ out. You steer it with `importance` and `size`.
 | progress | a number, or `{value, max?, label?}` | `style` (bar, gauge), `max`, `unit` |
 | image | an http(s) URL | `url`, `alt`, `fit` |
 | custom | anything (`window.bbWidget.data`) | anything; pass `html` too |
+| quote | `{text, by?, role?}` or a string | none |
+| note | a short string, or `{text, tone?}`; with `anchor` and `point` it points at that item | none |
+| timeline | `[{date, label, note?, tone?}]` | `layout` (column, row), `highlight` |
+| map | US states: `{PA: 2.1}`, `{PA: {value, label?, color?}}` or `[{state, value}]` | `scale` (diverging, sequential), `legend` [low, high], `show` (abbr, value, label), `low`, `high` |
+| multiples | `[{label, values, value?, delta?, note?}]` | `unit`, `shared`, `invert` |
+
+Any item also takes `relatedTo` (ids it connects to), `anchor` (the id it
+annotates) and `point` (`{x, y}` on the anchor).
 
 Generated widgets: a `custom` item's `html` runs in a sandboxed frame with no
 network, and gets `window.bbWidget.data`, `.options` and `.theme` (listen for

@@ -2,18 +2,34 @@
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
 import { canvasHref, CANVAS_LIMITS, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
+import { DEFAULT_LOOK, isLook, LOOK_INFO, ORGANIC_LOOKS, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
+import { lookCss } from "./board-css";
+import { OrganicBoard } from "./organic-board";
 import { useCanvas } from "./use-canvas";
 
 const decode = (segment: string) => {
   try { return decodeURIComponent(segment); } catch { return ""; }
 };
+
+/** The look new canvases start in: the last one picked here (a prototype setting, per browser). */
+const LOOK_KEY = "bb-canvas:look";
+function readNewLook(): OrganicLook {
+  try {
+    const query = new URLSearchParams(window.location.search).get("look");
+    if (query && isLook(query) && query !== "classic") return query;
+    const saved = window.localStorage.getItem(LOOK_KEY);
+    return saved && isLook(saved) && saved !== "classic" ? saved : DEFAULT_LOOK;
+  } catch {
+    return DEFAULT_LOOK;
+  }
+}
 
 export default function CanvasRoute({ rest }: { rest: string }) {
   const threadId = decode(rest.split("/")[0] ?? "") || null;
@@ -40,12 +56,19 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const { canvas, send } = useCanvas(threadId);
   const [pending, setPending] = useState<string | null>(null);
   const [chatHeight, setChatHeight] = useState(0);
+  const [newLook, setNewLook] = useState<OrganicLook>(readNewLook);
+  const pickLook = useCallback((look: OrganicLook) => {
+    setNewLook(look);
+    try { window.localStorage.setItem(LOOK_KEY, look); } catch { /* the pick lasts for this page */ }
+  }, []);
+  const look: Look = canvas ? canvas.look : threadId ? "classic" : newLook;
+  const css = useMemo(() => (look === "classic" ? null : lookCss(look)), [look]);
 
   const submit = useCallback(async (text: string) => {
     if (!threadId) {
       setPending(text);
       try {
-        const created = await rpc.call("canvas.create", { text });
+        const created = await rpc.call("canvas.create", { text, look: newLook });
         openAppPath(canvasHref(created.threadId), { replace: true });
       } catch (error) {
         setPending(null);
@@ -55,16 +78,25 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       return;
     }
     try { await send(text); } catch (error) { toast.error(errorMessage(error)); throw error; }
-  }, [rpc, send, threadId]);
+  }, [rpc, send, threadId, newLook]);
 
   const items = canvas?.items ?? [];
   const working = canvas?.status === "working" || !!pending;
   return (
-    <div className="canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground" data-canvas-page data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0}>
-      <TopBar canvas={canvas ?? null} />
+    <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
+      {css ? <style>{css}</style> : null}
+      <TopBar canvas={canvas ?? null} look={look} onPickLook={threadId ? null : pickLook} />
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className="canvas-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 pt-2" style={{ marginBottom: chatHeight }} data-canvas-scroll>
-        {canvas === undefined ? null : (
+        {canvas === undefined ? null : look !== "classic" ? (
+          <OrganicBoard
+            items={items}
+            look={look}
+            mode={theme.mode}
+            bottomPad={24}
+            empty={<p className="max-w-sm text-center text-[15px] leading-relaxed" style={{ color: "var(--cv-muted)", fontFamily: "var(--cv-font-text)" }}>{working ? "Thinking it through…" : "Ask anything. The board fills in as we talk, and changes as the conversation does."}</p>}
+          />
+        ) : (
           <Board
             items={items}
             theme={theme}
@@ -78,8 +110,8 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   );
 }
 
-/** A faint bar: the canvas's name, its other canvases, and New. */
-function TopBar({ canvas }: { canvas: CanvasView | null }) {
+/** A faint bar: the canvas's name, its other canvases, its look (picked for a new one), and New. */
+function TopBar({ canvas, look, onPickLook }: { canvas: CanvasView | null; look: Look; onPickLook: ((look: OrganicLook) => void) | null }) {
   const rpc = useRpc<typeof canvasContract>();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<CanvasMeta[] | null>(null);
@@ -98,6 +130,15 @@ function TopBar({ canvas }: { canvas: CanvasView | null }) {
       </button>
       <span className="ml-1 rounded-full border border-border/70 px-2 py-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/70">Prototype</span>
       <div className="flex-1" />
+      {onPickLook ? (
+        <div role="radiogroup" aria-label="Look" className="mr-2 flex items-center gap-0.5 rounded-full border border-border/70 p-0.5 text-[12px]" data-canvas-looks>
+          {ORGANIC_LOOKS.map((each) => (
+            <button key={each} type="button" role="radio" aria-checked={look === each} title={LOOK_INFO[each].line} className={cn("rounded-full px-2.5 py-0.5 hover:text-foreground", look === each && "bg-foreground/10 text-foreground")} onClick={() => onPickLook(each)} data-canvas-look={each}>
+              {LOOK_INFO[each].name}
+            </button>
+          ))}
+        </div>
+      ) : look !== "classic" ? <span className="mr-2 text-[12px] text-muted-foreground/80" data-canvas-look-name>{LOOK_INFO[look].name}</span> : null}
       <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => openAppPath(canvasHref(null))}>
         <Icon name="Plus" className="size-3.5" /> New canvas
       </button>

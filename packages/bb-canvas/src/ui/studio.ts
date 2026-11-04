@@ -10,7 +10,7 @@ export { errorMessage } from "../../../bb-studio/src/kit/format";
 export { useWidgetTheme } from "../../../bb-studio/src/dashboards/ui/theme";
 export type { WidgetTheme } from "../../../bb-studio/src/dashboards/ui/custom-frame";
 export { Markdown } from "../../../bb-studio/src/dashboards/ui/markdown";
-export { columnLabel, ScrollBody, tableOf, WidgetBody } from "../../../bb-studio/src/dashboards/ui/widgets";
+export { columnLabel, imageSrc, listItems, readProgress, readStat, ScrollBody, tableOf, WidgetBody } from "../../../bb-studio/src/dashboards/ui/widgets";
 export type { WidgetType, WidgetView } from "../../../bb-studio/src/dashboards/shared";
 export { INSERT_EVENT, STATE_EVENT, TOGGLE_EVENT } from "../../../bb-studio/src/talk/ui/fields";
 export { HANDSFREE_START_EVENT } from "../../../bb-studio/src/voice/live/shared";

@@ -9,7 +9,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { canvasContract } from "./contract";
-import { CANVAS_FIRST_NOTE, CANVAS_INSTRUCTIONS, CANVAS_VOICE_NOTE } from "./instructions";
+import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instructions";
+import { DEFAULT_LOOK, lookOf } from "./looks";
 import { CANVAS_CHANNEL, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasSignal } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
@@ -20,7 +21,8 @@ export interface BuiltinCanvas {
   store: CanvasStore;
   /** Whether a thread backs a canvas: its metadata says so, or the store has it. */
   isCanvasThread(threadId: string, metadata?: Readonly<Record<string, unknown>>): boolean;
-  instructions: string;
+  /** The configure hook's instructions for a canvas thread, in its canvas's look. */
+  instructionsFor(threadId: string, metadata?: Readonly<Record<string, unknown>>): string;
   /** For a hands-free session launched from a canvas thread: Studio's voice calls these over RPC (canvas.voice, canvas.voiceRun). */
   voice: {
     tools(threadId: string | null): ReturnType<typeof canvasVoiceTools>;
@@ -90,10 +92,11 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     },
     async "canvas.create"(input) {
       const { text, reasoningLevel } = input;
+      const look = input.look ?? DEFAULT_LOOK;
       // A caller that names a provider or model gets exactly that; otherwise the canvas default.
       const { providerId, model } = input.providerId || input.model ? input : CANVAS_DEFAULT_MODEL;
       const title = text.replace(/\s+/g, " ").trim().slice(0, 80);
-      const row = store.create({ title });
+      const row = store.create({ title, look });
       const spawning = bb.sdk.threads.spawn({
         projectId: PERSONAL_PROJECT_ID,
         title: `Canvas: ${title}`,
@@ -105,7 +108,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         ...(model ? { model } : {}),
         ...(reasoningLevel ? { reasoningLevel } : {}),
         ...(providerId || model ? { executionInputSources: { ...(providerId ? { providerId: "explicit" } : {}), ...(model ? { model: "explicit" } : {}), ...(reasoningLevel ? { reasoningLevel: "explicit" } : {}) } } : {}),
-        input: [{ type: "text", text, mentions: [] }, { type: "text", text: CANVAS_FIRST_NOTE, mentions: [], visibility: "agent-only" }],
+        input: [{ type: "text", text, mentions: [] }, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }],
       } as never).then((thread) => {
         store.attach(row.id, (thread as { id: string }).id);
         return (thread as { id: string }).id;
@@ -162,7 +165,11 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   return {
     store,
     isCanvasThread: (threadId, metadata) => typeof metadata?.[CANVAS_METADATA_KEY] === "string" || !!store.byThread(threadId),
-    instructions: CANVAS_INSTRUCTIONS,
+    instructionsFor(threadId, metadata) {
+      const id = metadata?.[CANVAS_METADATA_KEY];
+      const row = (typeof id === "string" ? store.get(id) : null) ?? store.byThread(threadId);
+      return canvasInstructions(lookOf(row?.look));
+    },
     voice: {
       tools: (threadId) => (threadId && store.byThread(threadId) ? canvasVoiceTools() : []),
       run(threadId, name, args) {

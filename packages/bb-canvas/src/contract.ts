@@ -3,6 +3,7 @@
 // (bb.sdk.plugins.callRpc) for a session launched from a canvas thread.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { lookSchema } from "./looks";
 import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema } from "./shared";
 
 const threadId = z.string().min(1).max(200);
@@ -20,8 +21,8 @@ export const canvasContract = defineRpcContract({
     output: z.object({ canvas: canvasViewSchema.nullable() }),
   },
   "canvas.create": {
-    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules.",
-    input: z.object({ text, providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional() }),
+    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules. look picks its design direction (default editorial).",
+    input: z.object({ text, providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional(), look: lookSchema.optional() }),
     output: z.object({ canvasId: z.string(), threadId: z.string() }),
   },
   "canvas.voice": {

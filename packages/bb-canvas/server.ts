@@ -14,6 +14,6 @@ export default function plugin(bb: BbPluginApi) {
   // A canvas's hidden thread gets the canvas tools, rules and skill; other
   // threads get nothing from this plugin. pluginMetadata is this plugin's own.
   bb.agents.configure((context) => canvas.isCanvasThread(context.thread.id, context.pluginMetadata)
-    ? { tools: [...CANVAS_TOOLS], skills: ["canvas"], instructions: canvas.instructions }
+    ? { tools: [...CANVAS_TOOLS], skills: ["canvas"], instructions: canvas.instructionsFor(context.thread.id, context.pluginMetadata) }
     : { tools: [], skills: [], instructions: "" });
 }
