@@ -313,7 +313,7 @@ ${e} .cv-delta{border-radius:1px}
 .canvas-page${xe}{background:var(--cv-paper);color:var(--cv-ink)}
 ${xe} .canvas-chat{background:var(--cv-paper)}
 ${xe} .canvas-scroll{background-color:var(--cv-paper)}
-${xe} .cvt{position:absolute;will-change:transform}
+${xe} .cvt{position:absolute;will-change:transform;font-family:var(--cv-font-text);color:var(--cv-ink)}
 ${xe} .cvt-rot{transform-origin:50% 35%}
 ${xe} .cvt-card{position:relative;color:var(--cv-ink)}
 ${xe} .cvt-head{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);font-weight:700;letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-ink);margin-bottom:var(--cv-s-3);display:flex;align-items:center;gap:8px}

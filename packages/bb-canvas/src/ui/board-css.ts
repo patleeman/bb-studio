@@ -10,7 +10,7 @@ const COMMON = `
 .canvas-page${S}{background:var(--cv-paper);color:var(--cv-ink)}
 ${S} .canvas-chat{background:var(--cv-paper)}
 ${S} .canvas-scroll{background-color:var(--cv-paper)}
-${S} .cvt{position:absolute;will-change:transform}
+${S} .cvt{position:absolute;will-change:transform;font-family:var(--cv-font-text);color:var(--cv-ink)}
 ${S} .cvt-rot{transform-origin:50% 35%}
 ${S} .cvt-card{position:relative;color:var(--cv-ink)}
 ${S} .cvt-head{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);font-weight:700;letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-ink);margin-bottom:var(--cv-s-3);display:flex;align-items:center;gap:8px}
