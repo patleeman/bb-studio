@@ -69,7 +69,31 @@ const clickHeaderLoops = () => client.evaluate(`(() => {
   const header = document.querySelector(${JSON.stringify(HEADER)});
   const button = [...(header?.querySelectorAll("button") ?? [])].find((each) => /^Loops( · \\d+)?$/.test(each.textContent.trim()));
   if (button) { button.click(); return "header action"; }
-  throw new Error("No Loops button in the Bot chat's header");
+  return null;
+})()`);
+/** Opens the header split button's menu (its "More actions"), where Loops follows the Bot's button; null when there's none. */
+const openHeaderMenu = () => client.evaluate(`(() => {
+  const header = document.querySelector(${JSON.stringify(HEADER)});
+  const more = [...(header?.querySelectorAll("button") ?? [])].find((each) => each.offsetParent && each.getAttribute("aria-label") === "More actions");
+  if (!more) return false;
+  more.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+  more.click();
+  return true;
+})()`);
+/** The open menu's Loops row, clicked; its label. */
+const clickMenuLoops = () => client.evaluate(`(() => {
+  const item = [...document.querySelectorAll('[role="menuitem"]')].find((each) => /^Loops/.test(each.textContent.trim()));
+  if (!item) return null;
+  const label = item.textContent.trim();
+  item.click();
+  return label;
+})()`);
+/** The open menu with the header above it, for the render. */
+const clipMenu = () => client.evaluate(`(() => {
+  const header = document.querySelector(${JSON.stringify(HEADER)}).getBoundingClientRect();
+  const menu = document.querySelector('[role="menu"]')?.getBoundingClientRect() ?? header;
+  const x = Math.max(0, Math.min(header.left, menu.left) - 6), y = Math.max(0, header.top - 6);
+  return { x, y, width: Math.min(innerWidth, Math.max(header.right, menu.right) + 6) - x, height: Math.min(innerHeight, menu.bottom + 6) - y };
 })()`);
 
 try {
@@ -93,7 +117,16 @@ try {
     await client.capture(join(out, `header-${mode}.png`), await clipOf(HEADER));
     await client.capture(join(out, `chat-${mode}.png`));
 
+    // Loops is its own button on main; after the header change it's in the Bot button's menu.
     report.header[mode] = await clickHeaderLoops();
+    if (!report.header[mode]) {
+      if (!(await openHeaderMenu())) throw new Error("No Loops button in the Bot chat's header, and no menu to find it in");
+      await sleep(500);
+      await client.capture(join(out, `header-menu-${mode}.png`), await clipMenu());
+      const label = await clickMenuLoops();
+      if (!label) throw new Error("No Loops in the header button's menu");
+      report.header[mode] = `header menu: ${label}`;
+    }
     const took = await paneWithin(15000);
     report.header[`${mode}Ms`] = took;
     if (took === null) throw new Error(`The Loops pane didn't open from the header (${mode})`);

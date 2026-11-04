@@ -1737,10 +1737,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **Header**: on a Bot's thread, Studio's header button is the Bot, its
   avatar and name, opening Bot info. BB draws a plugin's header actions as one
   split button, the first as the button and the rest in its menu, so Loops
-  (with its count, "Loops · 4") is in that menu, after the Bot. The avatar is
-  an app icon: Studio registers icon slots (`studio/bot-avatar-<n>`,
-  `src/ui/bot/avatar-icons.tsx`) and fills them with the Bots in list order,
-  since a header action names an icon and can't draw one.
+  (with its count, "Loops · 4") is in that menu, after the Bot. BB's header
+  button shows its label only; where BB folds header actions into the thread
+  menu (a narrow window or split pane), the Bot's row has its avatar. The
+  avatar is an app icon: Studio registers icon slots
+  (`studio/bot-avatar-<n>`, `src/ui/bot/avatar-icons.tsx`) and fills them
+  with the Bots in list order, since a header action names an icon and can't
+  draw one.
 - **Bot info** (the panel tab beside a bot's thread; a thread panel action,
   so BB's panel launcher offers it on every thread; on a thread no bot owns
   it shows "Not a Bot thread"): the page's compact version. Name and status
