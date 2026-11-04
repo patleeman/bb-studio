@@ -574,7 +574,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       case "card": {
         const picture = safe
           ? `<div class="cv-card-pic"><img src="${esc(safe)}" alt="${esc(a("alt") ?? a("title") ?? "")}" loading="eager" decoding="async"></div>`
-          : `<div class="cv-card-pic cv-card-ph" aria-hidden="true"><span>${esc(a("title") ?? "")}</span></div>`;
+          : `<div class="cv-card-pic cv-card-ph" aria-hidden="true"></div>`;
         const rating = a("rating") !== null ? stars(a("rating"), { max: a("max") ?? 10, size: 20, ...(a("source") ? { source: a("source") } : {}) }) : "";
         return `${picture}<div class="cv-card-text">${a("tag") ? `<span class="cv-chip">${esc(a("tag"))}</span>` : ""}${text("title", "cv-card-title")}${rating ? `<div class="cv-card-rating">${rating}</div>` : ""}${text("line", "cv-card-line", "p")}${inner}</div>`;
       }

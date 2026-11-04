@@ -138,7 +138,7 @@ describe("the kit's building blocks", () => {
     expect(card).toContain("IGN");
     expect(card).not.toContain("<img src=x");
     expect(kit.block("card", { title: "Tetris", rating: "8" })).toContain("my pick");
-    // No picture (a draft) or one that isn't https: a placeholder with the title.
+    // No picture (a draft) or one that isn't https: a placeholder.
     for (const attrs of [{ title: "Tetris" }, { title: "Tetris", img: "javascript:alert(1)" }]) {
       const html = kit.block("card", attrs);
       expect(html).toContain("cv-card-ph");

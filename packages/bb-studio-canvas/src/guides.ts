@@ -29,7 +29,7 @@ Skip the draft when the answer is tiny (a single figure, a one-part change): the
 
 const BLOCKS = `
 BUILDING BLOCKS (optional; they save markup): an element with data-block and a few data-* attributes; the kit fills it in, and anything inside it comes after its parts. It keeps its own data-cv-id, class and style.
-- data-block="card": a picture with its title, rating and line. data-img (https, from canvas_images), data-alt, data-title, data-rating + data-max (default 10) + data-source ("IGN"; without one the rating reads "my pick"), data-line, data-tag. data-fit="contain" shows a whole box. Without data-img it's a placeholder with the title.
+- data-block="card": a picture with its title, rating and line. data-img (https, from canvas_images), data-alt, data-title, data-rating + data-max (default 10) + data-source ("IGN"; without one the rating reads "my pick"), data-line, data-tag. data-fit="contain" shows a whole box. Without data-img its picture is a placeholder (a draft); a picture that fails shows the title instead.
 - data-block="stat": a big figure with its evidence. data-value, data-unit, data-label, data-line (the evidence), data-delta, data-source. Put a chart inside it for the trend.
 - data-block="step": a row of a timeline. data-when, data-title, data-line, data-tone="key" for the one that matters.
 - data-block="side": a column of a comparison. data-label, data-title, data-value + data-unit, data-points ("a | b | c"), data-verdict ("Pick") on the winner.
