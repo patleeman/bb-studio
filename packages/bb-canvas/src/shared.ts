@@ -171,9 +171,38 @@ export const canvasMetaSchema = z.object({
   /** The canvas's look (looks.ts); classic for canvases made before looks. */
   look: lookSchema,
 });
+
+/** What a canvas's agent runs on: a provider, a model and, when the model has levels, a reasoning level. */
+export const executionSchema = z.object({
+  providerId: z.string().min(1).max(100),
+  model: z.string().min(1).max(200),
+  reasoningLevel: z.string().max(40).nullable(),
+});
+export type CanvasExecution = z.infer<typeof executionSchema>;
+
+/** A provider in the model picker, with its models (BB's own listing). */
+export const pickerProviderSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Why its models couldn't be listed (signed out, missing), when they couldn't. */
+  error: z.string().nullable(),
+  models: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    isDefault: z.boolean(),
+    /** Its reasoning levels; empty when it has none to pick. */
+    reasoningLevels: z.array(z.object({ id: z.string(), label: z.string() })),
+    defaultReasoningLevel: z.string().nullable(),
+  })),
+});
+export type PickerProvider = z.infer<typeof pickerProviderSchema>;
 export type CanvasMeta = z.infer<typeof canvasMetaSchema>;
 
 export const canvasViewSchema = canvasMetaSchema.extend({
+  /** What the backing thread runs on (null for canvases from before the picker). */
+  execution: executionSchema.nullable(),
+  /** A provider switch picked but not yet run: the next message starts a fresh thread on it, keeping the board. */
+  pendingExecution: executionSchema.nullable(),
   rev: z.number(),
   turn: z.number(),
   status: z.enum(CANVAS_STATUSES),

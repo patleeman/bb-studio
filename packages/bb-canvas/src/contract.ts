@@ -4,7 +4,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { lookSchema } from "./looks";
-import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema } from "./shared";
+import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema, pickerProviderSchema } from "./shared";
 
 const threadId = z.string().min(1).max(200);
 const text = z.string().trim().min(1).max(CANVAS_LIMITS.messageChars);
@@ -36,8 +36,18 @@ export const canvasContract = defineRpcContract({
     output: z.object({ output: z.string().nullable() }),
   },
   "canvas.send": {
-    experimental_description: "A message to the canvas's thread; queued while it works.",
+    experimental_description: "A message to the canvas's thread; queued while it works. After a provider switch it starts the canvas's fresh thread: threadId is the canvas's thread now.",
     input: z.object({ threadId, text }),
-    output: z.object({ ok: z.boolean() }),
+    output: z.object({ ok: z.boolean(), threadId: z.string() }),
+  },
+  "canvas.models": {
+    experimental_description: "The providers and models BB has, for the model picker: each available provider's models, with reasoning levels when a model has them.",
+    input: z.null(),
+    output: z.object({ providers: z.array(pickerProviderSchema) }),
+  },
+  "canvas.setModel": {
+    experimental_description: "Pick the canvas's provider and model (and reasoning level) for its next turn. The same provider changes the backing thread's model in place; another provider starts a fresh backing thread on the next message, keeping the board.",
+    input: z.object({ threadId, providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), reasoningLevel: z.string().max(40).nullable().optional() }),
+    output: z.object({ mode: z.enum(["unchanged", "same-thread", "new-thread-next-turn"]), canvas: canvasViewSchema.nullable() }),
   },
 });

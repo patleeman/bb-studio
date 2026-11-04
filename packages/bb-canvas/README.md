@@ -35,9 +35,19 @@ hands-free button.
 
 - **The agent** is an ordinary BB thread, hidden, in your personal
   project. Canvas makes it when you start a canvas, on Claude Code's
-  Haiku 5.5 (`claude-haiku-5-5`) for speed: the model is set on the
-  canvas's own thread, not on your BB default, and a canvas keeps the
-  model it started with. The thread is the canvas's memory; you see the board.
+  Haiku 5.5 (`claude-haiku-5-5`) for speed. The thread is the canvas's
+  memory; you see the board.
+- **The model picker** in the top bar ("Haiku 5.5 ▾") lists the
+  providers and models BB has (as `bb provider models <id>` does), grouped
+  by provider, with reasoning levels when a model has more than one. The
+  pick is saved per canvas and applies from the next message:
+  - another model from the same provider changes the canvas's thread in
+    place (BB's thread update);
+  - another provider starts a fresh hidden thread on the next message,
+    because BB can't move a thread to another provider. The board stays (it's
+    Canvas's own), and the new thread gets the canvas rules, the design
+    guide, the board as it is and the last few lines of talk. The old
+    thread's address still opens the canvas.
 - **The board** is in this plugin's own database: one per canvas thread,
   with a short log of what changed in each turn.
 - **The canvas tools** (`canvas_read`, `canvas_add`, `canvas_update`,

@@ -10,6 +10,7 @@ import {
   checkItem,
   slugId,
   type CanvasChange,
+  type CanvasExecution,
   type CanvasItem,
   type CanvasKind,
   type CanvasMeta,
@@ -21,7 +22,7 @@ import {
 } from "./shared";
 import { LOOK_INFO, lookOf, type Look, type OrganicLook } from "./looks";
 
-type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null };
+type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
 type ItemRow = { canvas_id: string; id: string; kind: string; title: string | null; data: string | null; options: string; html: string | null; size: string; importance: number; created_at: number; updated_at: number; rev: number; rel: string | null };
 
 /** Who made an edit: the canvas thread's agent, the hands-free voice, or the user. */
@@ -63,21 +64,46 @@ const label = (item: Pick<CanvasItem, "id" | "kind" | "title">) => `${item.kind}
 export class CanvasStore {
   constructor(private readonly db: Database.Database, private readonly now: () => number = Date.now) {}
 
-  create(input: { threadId?: string | null; title?: string; look?: Look | null }): CanvasRow {
+  create(input: { threadId?: string | null; title?: string; look?: Look | null; execution?: CanvasExecution | null }): CanvasRow {
     const id = `cnv_${randomBytes(8).toString("hex")}`;
     const at = this.now();
-    this.db.prepare("INSERT INTO canvases (id, thread_id, title, created_at, updated_at, look) VALUES (?, ?, ?, ?, ?, ?)").run(id, input.threadId ?? null, input.title?.trim() ?? "", at, at, input.look ?? null);
+    const run = input.execution ?? null;
+    this.db.prepare("INSERT INTO canvases (id, thread_id, title, created_at, updated_at, look, provider_id, model, reasoning_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(id, input.threadId ?? null, input.title?.trim() ?? "", at, at, input.look ?? null, run?.providerId ?? null, run?.model ?? null, run?.reasoningLevel ?? null);
     return this.get(id)!;
   }
 
-  /** Links a canvas made before its thread to the thread. */
+  /** Links a canvas made before its thread to the thread. A thread it had before stays an alias, so its links still find the canvas. */
   attach(id: string, threadId: string): void {
-    this.db.prepare("UPDATE canvases SET thread_id = ? WHERE id = ?").run(threadId, id);
+    this.db.transaction(() => {
+      const before = this.get(id)?.thread_id;
+      if (before && before !== threadId) this.db.prepare("INSERT OR REPLACE INTO canvas_thread_aliases (thread_id, canvas_id) VALUES (?, ?)").run(before, id);
+      this.db.prepare("UPDATE canvases SET thread_id = ? WHERE id = ?").run(threadId, id);
+    })();
+  }
+
+  /** What the canvas's thread runs on, as last set. */
+  execution(id: string): CanvasExecution | null {
+    const row = this.get(id);
+    return row?.provider_id && row.model ? { providerId: row.provider_id, model: row.model, reasoningLevel: row.reasoning_level } : null;
+  }
+
+  setExecution(id: string, execution: CanvasExecution): void {
+    this.db.prepare("UPDATE canvases SET provider_id = ?, model = ?, reasoning_level = ?, pending_execution = NULL WHERE id = ?").run(execution.providerId, execution.model, execution.reasoningLevel, id);
+  }
+
+  /** A provider switch for the next turn (null clears it). */
+  pendingExecution(id: string): CanvasExecution | null {
+    const text = this.get(id)?.pending_execution;
+    return text ? (JSON.parse(text) as CanvasExecution) : null;
+  }
+
+  setPendingExecution(id: string, execution: CanvasExecution | null): void {
+    this.db.prepare("UPDATE canvases SET pending_execution = ? WHERE id = ?").run(execution ? JSON.stringify(execution) : null, id);
   }
 
   delete(id: string): void {
     this.db.transaction(() => {
-      for (const table of ["canvas_items", "canvas_changes", "canvas_turns"]) this.db.prepare(`DELETE FROM ${table} WHERE canvas_id = ?`).run(id);
+      for (const table of ["canvas_items", "canvas_changes", "canvas_turns", "canvas_thread_aliases"]) this.db.prepare(`DELETE FROM ${table} WHERE canvas_id = ?`).run(id);
       this.db.prepare("DELETE FROM canvases WHERE id = ?").run(id);
     })();
   }
@@ -86,8 +112,12 @@ export class CanvasStore {
     return (this.db.prepare("SELECT * FROM canvases WHERE id = ?").get(id) as CanvasRow | undefined) ?? null;
   }
 
+  /** The canvas a thread backs now, or backed before a provider switch. */
   byThread(threadId: string): CanvasRow | null {
-    return (this.db.prepare("SELECT * FROM canvases WHERE thread_id = ?").get(threadId) as CanvasRow | undefined) ?? null;
+    const row = this.db.prepare("SELECT * FROM canvases WHERE thread_id = ?").get(threadId) as CanvasRow | undefined;
+    if (row) return row;
+    const alias = this.db.prepare("SELECT canvas_id FROM canvas_thread_aliases WHERE thread_id = ?").get(threadId) as { canvas_id: string } | undefined;
+    return alias ? this.get(alias.canvas_id) : null;
   }
 
   list(): CanvasMeta[] {
@@ -120,6 +150,7 @@ export class CanvasStore {
     if (!row?.thread_id) return null;
     return {
       ...this.meta(row), rev: row.rev, turn: row.turn, status: (row.status as CanvasView["status"]) ?? "idle", caption: row.caption,
+      execution: this.execution(id), pendingExecution: this.pendingExecution(id),
       items: this.items(id), changes: this.changes(id), history: this.history(id),
     };
   }

@@ -45,10 +45,12 @@ export function useCanvas(threadId: string | null) {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [load]);
 
-  const send = useCallback(async (text: string) => {
+  /** Sends a message; resolves to the canvas's thread now (a new one after a provider switch). */
+  const send = useCallback(async (text: string): Promise<string> => {
     if (!threadId) throw new Error("No canvas yet.");
-    await rpc.call("canvas.send", { threadId, text });
-    await load();
+    const result = await rpc.call("canvas.send", { threadId, text });
+    if (result.threadId === threadId) await load();
+    return result.threadId;
   }, [load, rpc, threadId]);
 
   return { canvas, reload: load, send };

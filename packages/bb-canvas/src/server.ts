@@ -11,9 +11,9 @@ import type Database from "better-sqlite3";
 import { canvasContract } from "./contract";
 import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instructions";
 import { DEFAULT_LOOK, lookOf } from "./looks";
-import { CANVAS_CHANNEL, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasSignal } from "./shared";
+import { CANVAS_CHANNEL, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
-import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
+import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
 
 export { CANVAS_TOOL_NAMES as CANVAS_TOOLS } from "./tools";
 
@@ -31,6 +31,39 @@ export interface BuiltinCanvas {
 }
 
 const PENDING_WAIT_MS = 5000;
+const MODELS_TTL_MS = 60_000;
+
+type ProviderEntry = { id: string; displayName?: string; available?: boolean };
+type ModelEntry = { id: string; model?: string; displayName?: string; isDefault?: boolean; defaultReasoningEffort?: string; supportedReasoningEfforts?: { reasoningEffort: string; label?: string; description?: string }[] };
+
+/**
+ * The picker's providers: BB's available providers, each with the models it
+ * lists for the personal project (where canvas threads live), as `bb
+ * provider models <id>` shows them. A provider whose models can't be listed
+ * (signed out) says why instead.
+ */
+export async function listProviders(bb: BbPluginApi): Promise<PickerProvider[]> {
+  const providers = ((await bb.sdk.providers.list()) as unknown as ProviderEntry[]).filter((provider) => provider.available !== false);
+  return Promise.all(providers.map(async (provider): Promise<PickerProvider> => {
+    try {
+      const result = (await bb.sdk.providers.models({ projectId: PERSONAL_PROJECT_ID, providerId: provider.id })) as unknown as { models: ModelEntry[]; modelLoadError: { code: string; detail: string | null } | null };
+      const models = result.models.map((entry) => {
+        const levels = (entry.supportedReasoningEfforts ?? []).map((level) => ({ id: level.reasoningEffort, label: level.label || level.reasoningEffort }));
+        return {
+          id: entry.id,
+          name: entry.displayName || entry.id,
+          isDefault: !!entry.isDefault,
+          // A single level is no choice: the picker shows levels only when there's more than one.
+          reasoningLevels: levels.length > 1 ? levels : [],
+          defaultReasoningLevel: levels.length > 1 ? entry.defaultReasoningEffort || null : null,
+        };
+      });
+      return { id: provider.id, name: provider.displayName || provider.id, error: result.modelLoadError ? result.modelLoadError.detail || result.modelLoadError.code : null, models };
+    } catch (error) {
+      return { id: provider.id, name: provider.displayName || provider.id, error: error instanceof Error ? error.message : String(error), models: [] };
+    }
+  }));
+}
 /**
  * The model a new canvas thread runs on when the caller names none: Haiku,
  * for speed (a canvas turn should land in seconds). Pinned on the canvas's
@@ -82,6 +115,49 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     } as never);
   }
 
+  /** Starts a canvas's hidden backing thread on this execution; a tool call racing it waits for it. */
+  const spawnThread = async (canvasId: string, title: string, run: { providerId: string | null; model: string | null; reasoningLevel: string | null }, input: unknown[]) => {
+    const { providerId, model, reasoningLevel } = run;
+    const spawning = bb.sdk.threads.spawn({
+      projectId: PERSONAL_PROJECT_ID,
+      title: `Canvas: ${title}`,
+      environment: { type: "project-default" },
+      // The transcript is the canvas's memory; the user sees the board.
+      visibility: "hidden",
+      pluginMetadata: { [CANVAS_METADATA_KEY]: canvasId },
+      ...(providerId ? { providerId } : {}),
+      ...(model ? { model } : {}),
+      ...(reasoningLevel ? { reasoningLevel } : {}),
+      ...(providerId || model ? { executionInputSources: { ...(providerId ? { providerId: "explicit" } : {}), ...(model ? { model: "explicit" } : {}), ...(reasoningLevel ? { reasoningLevel: "explicit" } : {}) } } : {}),
+      input,
+    } as never).then((thread) => {
+      store.attach(canvasId, (thread as { id: string }).id);
+      return (thread as { id: string }).id;
+    });
+    pending.add(spawning);
+    try { return await spawning; } finally { pending.delete(spawning); }
+  };
+
+  /** For a fresh thread after a provider switch: what's on the board, and the last few lines of talk. */
+  const handoffNote = (canvasId: string) => {
+    const talk = store.history(canvasId, 8).map((line) => `- ${line.role === "agent" ? "You" : line.role === "user" ? "User" : line.role}: ${line.text.replace(/\s+/g, " ").slice(0, 300)}`).join("\n");
+    return [
+      "This canvas moved to this thread from another model; the board stays as it is. Carry on from it: update items in place, keep the style unless the topic changes kind.",
+      describeBoard(store, canvasId),
+      talk ? `Recent conversation (oldest first):\n${talk}` : "",
+    ].filter(Boolean).join("\n\n");
+  };
+
+  /** The providers and models BB has, for the picker; listed again after a minute. */
+  let listed: { at: number; providers: Promise<PickerProvider[]> } | null = null;
+  const models = (): Promise<PickerProvider[]> => {
+    const at = (options.now ?? Date.now)();
+    if (listed && at - listed.at < MODELS_TTL_MS) return listed.providers;
+    const providers = listProviders(bb).catch((error) => { listed = null; throw error; });
+    listed = { at, providers };
+    return providers;
+  };
+
   bb.rpc.register(canvasContract, {
     "canvas.list"() {
       return { canvases: store.list() };
@@ -91,31 +167,16 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       return { canvas: row ? store.view(row.id) : null };
     },
     async "canvas.create"(input) {
-      const { text, reasoningLevel } = input;
+      const { text } = input;
       const look = input.look ?? DEFAULT_LOOK;
       // A caller that names a provider or model gets exactly that; otherwise the canvas default.
-      const { providerId, model } = input.providerId || input.model ? input : CANVAS_DEFAULT_MODEL;
+      const providerId = input.providerId || input.model ? input.providerId ?? null : CANVAS_DEFAULT_MODEL.providerId;
+      const model = input.providerId || input.model ? input.model ?? null : CANVAS_DEFAULT_MODEL.model;
+      const reasoningLevel = input.reasoningLevel ?? null;
       const title = text.replace(/\s+/g, " ").trim().slice(0, 80);
-      const row = store.create({ title, look });
-      const spawning = bb.sdk.threads.spawn({
-        projectId: PERSONAL_PROJECT_ID,
-        title: `Canvas: ${title}`,
-        environment: { type: "project-default" },
-        // The transcript is the canvas's memory; the user sees the board.
-        visibility: "hidden",
-        pluginMetadata: { [CANVAS_METADATA_KEY]: row.id },
-        ...(providerId ? { providerId } : {}),
-        ...(model ? { model } : {}),
-        ...(reasoningLevel ? { reasoningLevel } : {}),
-        ...(providerId || model ? { executionInputSources: { ...(providerId ? { providerId: "explicit" } : {}), ...(model ? { model: "explicit" } : {}), ...(reasoningLevel ? { reasoningLevel: "explicit" } : {}) } } : {}),
-        input: [{ type: "text", text, mentions: [] }, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }],
-      } as never).then((thread) => {
-        store.attach(row.id, (thread as { id: string }).id);
-        return (thread as { id: string }).id;
-      });
-      pending.add(spawning);
+      const row = store.create({ title, look, execution: providerId && model ? { providerId, model, reasoningLevel } : null });
       try {
-        const threadId = await spawning;
+        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [{ type: "text", text, mentions: [] }, { type: "text", text: canvasFirstNote(look), mentions: [], visibility: "agent-only" }]);
         store.beginTurn(row.id, "user", text);
         store.setStatus(row.id, "working");
         publish(row.id);
@@ -123,8 +184,6 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       } catch (error) {
         store.delete(row.id);
         throw error;
-      } finally {
-        pending.delete(spawning);
       }
     },
     // Studio's hands-free voice asks these when a session's launching thread is a canvas thread.
@@ -139,12 +198,51 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     },
     async "canvas.send"({ threadId, text }) {
       const row = store.byThread(threadId);
-      if (!row) throw new Error("That canvas is gone.");
-      await bb.sdk.threads.send({ threadId, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }] } as never);
+      if (!row?.thread_id) throw new Error("That canvas is gone.");
+      const next = store.pendingExecution(row.id);
+      if (next) {
+        // A provider switch: BB can't move a thread to another provider, so the canvas gets a
+        // fresh backing thread on it. The board is Canvas's own, so it stays; the new thread
+        // gets the rules, the guide, the board as it is and the last few lines of talk.
+        const note = `${canvasFirstNote(lookOf(row.look))}\n\n${handoffNote(row.id)}`;
+        const fresh = await spawnThread(row.id, row.title, next, [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }]);
+        store.setExecution(row.id, next);
+        store.beginTurn(row.id, "user", text);
+        store.setStatus(row.id, "working");
+        publish(row.id);
+        return { ok: true, threadId: fresh };
+      }
+      await bb.sdk.threads.send({ threadId: row.thread_id, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }] } as never);
       store.beginTurn(row.id, "user", text);
       store.setStatus(row.id, "working");
       publish(row.id);
-      return { ok: true };
+      return { ok: true, threadId: row.thread_id };
+    },
+    async "canvas.models"() {
+      return { providers: await models() };
+    },
+    async "canvas.setModel"({ threadId, providerId, model, reasoningLevel }) {
+      const row = store.byThread(threadId);
+      if (!row?.thread_id) throw new Error("That canvas is gone.");
+      const pick = { providerId, model, reasoningLevel: reasoningLevel ?? null };
+      const current = store.execution(row.id);
+      const same = (a: CanvasExecution | null) => !!a && a.providerId === pick.providerId && a.model === pick.model && a.reasoningLevel === pick.reasoningLevel;
+      if (same(current)) {
+        // The current model again: nothing to change, and any waiting provider switch is dropped.
+        if (store.pendingExecution(row.id)) { store.setPendingExecution(row.id, null); publish(row.id); }
+        return { mode: "unchanged" as const, canvas: store.view(row.id) };
+      }
+      if (current && current.providerId === providerId) {
+        // Same provider: the thread changes model (and level) for its next turn.
+        await bb.sdk.threads.update({ threadId: row.thread_id, model, reasoningLevel: pick.reasoningLevel } as never);
+        store.setExecution(row.id, pick);
+        publish(row.id);
+        return { mode: "same-thread" as const, canvas: store.view(row.id) };
+      }
+      // Another provider (or a canvas from before the picker): it takes effect with the next message.
+      store.setPendingExecution(row.id, pick);
+      publish(row.id);
+      return { mode: "new-thread-next-turn" as const, canvas: store.view(row.id) };
     },
   });
 

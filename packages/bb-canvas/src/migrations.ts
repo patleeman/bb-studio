@@ -24,4 +24,12 @@ export const CANVAS_MIGRATIONS: string[] = [
   // item's relations as JSON {relatedTo, anchor, point}.
   `ALTER TABLE canvases ADD COLUMN look TEXT;
   ALTER TABLE canvas_items ADD COLUMN rel TEXT;`,
+  // The model picker: each canvas's provider, model and reasoning level (its
+  // backing thread's), a provider switch waiting for the next turn (JSON), and
+  // the threads a canvas had before a provider switch (old links keep working).
+  `ALTER TABLE canvases ADD COLUMN provider_id TEXT;
+  ALTER TABLE canvases ADD COLUMN model TEXT;
+  ALTER TABLE canvases ADD COLUMN reasoning_level TEXT;
+  ALTER TABLE canvases ADD COLUMN pending_execution TEXT;
+  CREATE TABLE canvas_thread_aliases (thread_id TEXT PRIMARY KEY, canvas_id TEXT NOT NULL);`,
 ];

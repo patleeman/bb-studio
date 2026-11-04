@@ -10,6 +10,8 @@ type Sent = { threadId: string; input: { text: string; visibility?: string }[]; 
 function canvasHost() {
   const spawned: Record<string, unknown>[] = [];
   const sent: Sent[] = [];
+  const updated: Record<string, unknown>[] = [];
+  const listed: string[] = [];
   let next = 0;
   const host = createFakePluginHost({
     pluginId: "studio",
@@ -17,15 +19,31 @@ function canvasHost() {
       threads: {
         spawn: async (input: unknown) => { spawned.push(input as Record<string, unknown>); return { id: `thr_canvas${++next}` }; },
         send: async (input: unknown) => { sent.push(input as Sent); return { ok: true }; },
+        update: async (input: unknown) => { updated.push(input as Record<string, unknown>); return { ok: true }; },
+      },
+      providers: {
+        list: async () => [
+          { id: "claude-code", displayName: "Claude Code", available: true },
+          { id: "codex", displayName: "Codex", available: true },
+          { id: "gone", displayName: "Gone", available: false },
+          { id: "opencode", displayName: "OpenCode", available: true },
+        ],
+        models: async ({ providerId }: { providerId: string }) => {
+          listed.push(providerId);
+          if (providerId === "opencode") return { models: [], modelLoadError: { code: "auth_required", detail: "Sign in to OpenCode" } };
+          return providerId === "codex"
+            ? { models: [{ id: "gpt-6.1-sol", model: "gpt-6.1-sol", displayName: "GPT-6.1-Sol", isDefault: true, defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "low", description: "" }, { reasoningEffort: "medium", label: "Medium", description: "" }, { reasoningEffort: "high", description: "" }] }, { id: "gpt-6-luna", model: "gpt-6-luna", displayName: "GPT-6-Luna", isDefault: false, defaultReasoningEffort: "low", supportedReasoningEfforts: [{ reasoningEffort: "low", description: "" }] }], modelLoadError: null }
+            : { models: [{ id: "claude-opus-5-5", displayName: "Opus 5.5", isDefault: true, defaultReasoningEffort: "", supportedReasoningEfforts: [] }, { id: "claude-haiku-5-5", displayName: "Haiku 5.5", isDefault: false, defaultReasoningEffort: "", supportedReasoningEfforts: [] }], modelLoadError: null };
+        },
       },
     },
-  });
+  } as never);
   const db = host.bb.storage.database();
   for (const migration of CANVAS_MIGRATIONS) db.exec(migration);
   const canvas = registerCanvas(host.bb, db);
   const call = (method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
   const tool = (name: string, input: unknown, threadId: string) => host.harness.behavior.callAgentTool(name, input, { threadId });
-  return { host, canvas, spawned, sent, call, tool };
+  return { host, canvas, spawned, sent, updated, listed, call, tool };
 }
 
 const text = (result: unknown): string => typeof result === "string" ? result : JSON.stringify(result);
@@ -135,6 +153,71 @@ describe("canvas threads", () => {
     const one = text(await tool("canvas_guide", { style: "instrument" }, threadId));
     expect(one).toContain("Style: Instrument.");
     expect(one).not.toContain("Style: Field notes.");
+  });
+});
+
+describe("the model picker", () => {
+  it("lists BB's available providers and their models, with reasoning levels only when there's a choice", async () => {
+    const { call, listed } = canvasHost();
+    const { providers } = await call("canvas.models", null);
+    expect(providers.map((provider: { id: string }) => provider.id)).toEqual(["claude-code", "codex", "opencode"]);
+    const codex = providers.find((provider: { id: string }) => provider.id === "codex");
+    expect(codex.models[0]).toEqual({ id: "gpt-6.1-sol", name: "GPT-6.1-Sol", isDefault: true, reasoningLevels: [{ id: "low", label: "low" }, { id: "medium", label: "Medium" }, { id: "high", label: "high" }], defaultReasoningLevel: "medium" });
+    expect(codex.models[1]).toMatchObject({ id: "gpt-6-luna", reasoningLevels: [], defaultReasoningLevel: null });
+    expect(providers.find((provider: { id: string }) => provider.id === "claude-code").models[1]).toMatchObject({ id: "claude-haiku-5-5", name: "Haiku 5.5", reasoningLevels: [] });
+    expect(providers.find((provider: { id: string }) => provider.id === "opencode")).toMatchObject({ error: "Sign in to OpenCode", models: [] });
+    // Listed again only after a minute.
+    await call("canvas.models", null);
+    expect(listed).toHaveLength(3);
+  });
+
+  it("records new canvases on Haiku, and a same-provider pick changes the thread's model in place", async () => {
+    const { call, spawned, updated } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    expect((await call("canvas.get", { threadId })).canvas.execution).toEqual({ providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: null });
+    const result = await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-opus-5-5" });
+    expect(result.mode).toBe("same-thread");
+    expect(updated).toEqual([{ threadId, model: "claude-opus-5-5", reasoningLevel: null }]);
+    expect(result.canvas).toMatchObject({ threadId, execution: { providerId: "claude-code", model: "claude-opus-5-5" }, pendingExecution: null });
+    expect(spawned).toHaveLength(1);
+    expect((await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-opus-5-5" })).mode).toBe("unchanged");
+  });
+
+  it("switches provider with a fresh thread on the next message, keeping the board, and old links still find it", async () => {
+    const { call, tool, spawned, sent, updated } = canvasHost();
+    const { threadId, canvasId } = await call("canvas.create", { text: "Election" });
+    await tool("canvas_set", { style: "editorial", items: [{ id: "lead", kind: "headline", data: "Democrats take both chambers" }] }, threadId);
+    const picked = await call("canvas.setModel", { threadId, providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" });
+    expect(picked).toMatchObject({ mode: "new-thread-next-turn", canvas: { execution: { providerId: "claude-code" }, pendingExecution: { providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" } } });
+    expect(updated).toEqual([]);
+    const reply = await call("canvas.send", { threadId, text: "Drill into the closest races" });
+    expect(reply).toEqual({ ok: true, threadId: "thr_canvas2" });
+    expect(sent).toEqual([]);
+    expect(spawned[1]).toMatchObject({ providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low", visibility: "hidden", pluginMetadata: { canvas: canvasId } });
+    const input = spawned[1]!.input as { text: string; visibility?: string }[];
+    expect(input[0]).toMatchObject({ text: "Drill into the closest races" });
+    expect(input[1]!.visibility).toBe("agent-only");
+    expect(input[1]!.text).toContain("moved to this thread from another model");
+    expect(input[1]!.text).toContain("lead: headline");
+    expect(input[1]!.text).toContain("User: Election");
+    const now = (await call("canvas.get", { threadId: "thr_canvas2" })).canvas;
+    expect(now).toMatchObject({ id: canvasId, threadId: "thr_canvas2", execution: { providerId: "codex", model: "gpt-6.1-sol", reasoningLevel: "low" }, pendingExecution: null, items: [expect.objectContaining({ id: "lead" })] });
+    // The old thread's address still finds the canvas, and its messages go to the new thread.
+    expect((await call("canvas.get", { threadId })).canvas.id).toBe(canvasId);
+    expect((await call("canvas.send", { threadId, text: "And the Senate?" })).threadId).toBe("thr_canvas2");
+    expect(sent.at(-1)).toMatchObject({ threadId: "thr_canvas2" });
+    // The new thread's tools edit the same board.
+    expect(text(await tool("canvas_read", {}, "thr_canvas2"))).toContain("lead: headline");
+  });
+
+  it("drops a waiting provider switch when the current model is picked again", async () => {
+    const { call, spawned } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    await call("canvas.setModel", { threadId, providerId: "codex", model: "gpt-6-luna" });
+    const back = await call("canvas.setModel", { threadId, providerId: "claude-code", model: "claude-haiku-5-5" });
+    expect(back).toMatchObject({ mode: "unchanged", canvas: { pendingExecution: null } });
+    await call("canvas.send", { threadId, text: "Next" });
+    expect(spawned).toHaveLength(1);
   });
 });
 
