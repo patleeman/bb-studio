@@ -57,6 +57,15 @@ function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: Canvas
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  // A new width (the lead narrows when the rail fills, a style switch) is
+  // measured on purpose too, now and once the content (a frame) has redrawn:
+  // a resize observer in a background tab may never call back.
+  useLayoutEffect(() => {
+    const send = () => { if (measure.current && frameReported.current) report.current?.(Math.ceil(measure.current.offsetHeight)); };
+    send();
+    const timer = setTimeout(send, 450);
+    return () => clearTimeout(timer);
+  }, [width]);
   // Layers: the current content in flow, the previous one fading out over it.
   const version = versionOf(item);
   const [layers, setLayers] = useState<{ version: string; item: CanvasItem }[]>([{ version, item }]);

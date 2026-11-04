@@ -28,12 +28,12 @@ const rec = (value: unknown): Record<string, unknown> => (value && typeof value 
 /**
  * Short text with a little Markdown (paragraphs, - lists, **bold**, *italic*)
  * and inline marks: {spark:3,5,4} draws a sparkline, {delta:+2.1} a chip,
- * ==words== highlights.
+ * ==words== highlights, [text](https://…) links.
  */
 export function RichText({ text, className }: { text: string; className?: string }) {
   const inline = (line: string, key: string): ReactNode[] => {
     const parts: ReactNode[] = [];
-    const pattern = /\{spark:([^}]*)\}|\{delta:([^}]*)\}|\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==/g;
+    const pattern = /\{spark:([^}]*)\}|\{delta:([^}]*)\}|\*\*([^*]+)\*\*|\*([^*]+)\*|==([^=]+)==|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
     let last = 0;
     let match: RegExpExecArray | null;
     let index = 0;
@@ -45,6 +45,8 @@ export function RichText({ text, className }: { text: string; className?: string
       else if (match[3] !== undefined) parts.push(<strong key={k} style={{ color: "var(--cv-ink)", fontWeight: 650 }}>{match[3]}</strong>);
       else if (match[4] !== undefined) parts.push(<em key={k}>{match[4]}</em>);
       else if (match[5] !== undefined) parts.push(<mark key={k} className="cv-hl" style={{ color: "inherit" }}>{match[5]}</mark>);
+      // A link: its text, opening the http(s) address in a new tab.
+      else if (match[6] !== undefined) parts.push(<a key={k} href={match[7]} target="_blank" rel="noreferrer noopener" style={{ color: "var(--cv-accent)", textDecoration: "underline", textUnderlineOffset: "0.15em" }}>{match[6]}</a>);
       last = pattern.lastIndex;
     }
     if (last < line.length) parts.push(line.slice(last));

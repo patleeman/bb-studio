@@ -89,3 +89,16 @@ describe("the canvas kit", () => {
     }
   });
 });
+
+describe("rich text", () => {
+  it("renders Markdown links as links (http only), not raw brackets", async () => {
+    // @ts-expect-error react-dom ships no types here; the test only needs renderToStaticMarkup.
+    const { renderToStaticMarkup } = (await import("react-dom/server")) as { renderToStaticMarkup(element: unknown): string };
+    const { createElement } = await import("react");
+    const { RichText } = await import("./organic-items");
+    const html = renderToStaticMarkup(createElement(RichText, { text: "See [AP](https://apnews.com/x) and [bad](javascript:alert(1))." }));
+    expect(html).toContain('<a href="https://apnews.com/x"');
+    expect(html).not.toContain("[AP]");
+    expect(html).not.toContain('href="javascript');
+  });
+});
