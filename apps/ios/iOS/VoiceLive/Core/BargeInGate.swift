@@ -10,16 +10,23 @@ import Foundation
 /// voice's playback level (what's left of it after echo cancellation), so the
 /// voice can't trigger itself; and speech must last `minDuration`, so a cough,
 /// a bump or a click doesn't either. Levels are linear RMS, 0 to 1.
+///
+/// Nov 4: on the speaker, echo and room noise cleared the old bar (0.035, half
+/// the playback plus 0.02, for 120 ms) and cut the voice off mid-sentence again
+/// and again. The bar is now 0.06, 70% of the playback plus 0.02, for 250 ms.
 struct BargeInGate: Equatable, Sendable {
     /// The bar while the voice is quiet.
     var quietThreshold: Float = 0.02
     /// While it plays: at least this much…
-    var playingFloor: Float = 0.035
+    var playingFloor: Float = 0.06
     /// …and above this share of the playback level plus a margin.
-    var echoRatio: Float = 0.5
+    var echoRatio: Float = 0.7
     var echoMargin: Float = 0.02
     /// Speech has to stay above the bar this long.
-    var minDuration: TimeInterval = 0.12
+    var minDuration: TimeInterval = 0.25
+
+    /// The bar before Nov 4, for comparisons.
+    static let before = BargeInGate(playingFloor: 0.035, echoRatio: 0.5, minDuration: 0.12)
 
     private var aboveSince: TimeInterval?
 

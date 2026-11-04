@@ -19,6 +19,13 @@ protocol LiveTransport: AnyObject {
     func close()
 }
 
+/// A WebRTC connection: the offer, then the answer (WebRTCLiveTransport; a fake in tests).
+@MainActor
+protocol LivePeer: LiveTransport {
+    func makeOffer() async throws -> String
+    func setAnswer(_ sdp: String) async throws
+}
+
 // MARK: - WebRTC (GPT-Live and the Realtime API)
 
 /// The phone's side of a WebRTC session with OpenAI: the mic track up, the
@@ -26,7 +33,7 @@ protocol LiveTransport: AnyObject {
 /// to Studio (gpt-live-1, which creates the session with its key) or to
 /// OpenAI with a 2-minute client secret (gpt-realtime-2.1).
 @MainActor
-final class WebRTCLiveTransport: NSObject, LiveTransport {
+final class WebRTCLiveTransport: NSObject, LivePeer {
     var onMessage: ((Data) -> Void)?
     var onClosed: ((String?) -> Void)?
     var onLevels: (([Float], Float) -> Void)?
@@ -46,11 +53,8 @@ final class WebRTCLiveTransport: NSObject, LiveTransport {
     private var queued: [Data] = []
 
     /// Makes the peer connection and returns its SDP offer, once ICE gathering is done (or 2 s).
+    /// The audio session is VoiceLiveAudio's: it's active, and WebRTC told, before this runs.
     func makeOffer() async throws -> String {
-        let session = RTCAudioSession.sharedInstance()
-        // Studio's config owns the AVAudioSession (VoiceAudioConfig.handsFree); WebRTC runs inside it.
-        session.useManualAudio = true
-        session.isAudioEnabled = true
         let config = RTCConfiguration()
         config.sdpSemantics = .unifiedPlan
         config.continualGatheringPolicy = .gatherOnce
@@ -149,7 +153,9 @@ final class WebRTCLiveTransport: NSObject, LiveTransport {
         peer?.close()
         peer = nil
         channel = nil
-        RTCAudioSession.sharedInstance().isAudioEnabled = false
+        mic = nil
+        remote = nil
+        // WebRTC's audio (and its voice-processing unit) is VoiceLiveAudio's to turn off.
     }
 
     fileprivate func opened() {

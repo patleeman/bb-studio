@@ -42,14 +42,20 @@ final class VoiceLiveController: ObservableObject {
     private var protocolKind: LiveProtocol = .live
     private var loops: [Task<Void, Never>] = []
     private var observers: [NSObjectProtocol] = []
+    private var appObservers: [NSObjectProtocol] = []
     private var connectStarted: Date?
     private var firstWords = false
-    private let audio = VoiceAudioConfig.handsFree
+    /// The audio session, handed between the app and WebRTC.
+    let audio: VoiceLiveAudio
+    private let makePeer: () -> LivePeer
     private var usesMic = true
 
-    init(studio: VoiceLiveStudio, threadId: String? = nil) {
+    /// `audio` and `makePeer`: fakes in tests (no mic, no WebRTC).
+    init(studio: VoiceLiveStudio, threadId: String? = nil, audio: VoiceLiveAudio? = nil, makePeer: (() -> LivePeer)? = nil) {
         self.studio = studio
         self.threadId = threadId
+        self.audio = audio ?? VoiceLiveAudio()
+        self.makePeer = makePeer ?? { WebRTCLiveTransport() }
     }
 
     var phase: LivePhase { machine.phase }
@@ -57,11 +63,13 @@ final class VoiceLiveController: ObservableObject {
 
     func start() {
         if !machine.isLive { identity = nil }
+        observeApp()
         apply(machine.start(now: Self.now))
     }
 
-    func stop() {
-        apply(machine.stop(now: Self.now))
+    /// `reason`: End and the header's close are the user's; the screen going away is `.dismissed`.
+    func stop(reason: LiveCloseReason = .user) {
+        apply(machine.stop(now: Self.now, reason: reason))
     }
 
     private static var now: TimeInterval { Date().timeIntervalSince1970 }
@@ -115,11 +123,11 @@ final class VoiceLiveController: ObservableObject {
             let chosen = state.model.map(Self.modelName) ?? "gpt-live-1"
             model = chosen
             var started: VoiceLiveStart
-            var rtc: WebRTCLiveTransport?
+            var rtc: LivePeer?
             if chosen == "gpt-live-1", usesMic {
                 // Studio needs the offer to create the session; a host running the mock ignores it.
                 try await prepareAudio()
-                let peer = WebRTCLiveTransport()
+                let peer = makePeer()
                 let offer = try await peer.makeOffer()
                 started = try await studio.voiceLiveStart(model: chosen, sdp: offer, threadId: threadId)
                 rtc = peer
@@ -146,7 +154,7 @@ final class VoiceLiveController: ObservableObject {
                 guard let secret = started.clientSecret, let url = started.callsUrl.flatMap(URL.init(string:)) else {
                     throw BBError(status: 0, message: "Studio didn't return a voice session.")
                 }
-                let peer = WebRTCLiveTransport()
+                let peer = makePeer()
                 let offer = try await peer.makeOffer()
                 attach(peer)
                 try await peer.setAnswer(try await WebRTCLiveTransport.exchange(offer: offer, url: url, secret: secret))
@@ -183,7 +191,7 @@ final class VoiceLiveController: ObservableObject {
         }
         transport.onClosed = { [weak self] reason in
             guard let self, self.machine.isLive else { return }
-            self.apply(self.machine.fail(reason ?? "The voice connection closed.", now: Self.now))
+            self.apply(self.machine.fail(reason ?? "The voice connection closed.", now: Self.now, reason: .transport))
         }
         self.transport = transport
     }
@@ -191,23 +199,16 @@ final class VoiceLiveController: ObservableObject {
     // MARK: Audio session
 
     private func prepareAudio() async throws {
-        guard await AVAudioApplication.requestRecordPermission() else {
-            throw BBError(status: 0, message: "Microphone access is off. Enable it in Settings.")
-        }
-        let session = AVAudioSession.sharedInstance()
-        try audio.apply(to: session)
-        try session.setActive(true)
+        try await audio.activate()
         describeRoute()
         observeAudio()
     }
 
-    private func reconfigureAudio() {
+    /// A route change, an interruption's end or a media-services reset: our config again,
+    /// WebRTC told, the loudspeaker unless a headset is there.
+    private func reconfigureAudio(reset: Bool = false) {
         guard usesMic else { return }
-        let session = AVAudioSession.sharedInstance()
-        // Only set ours again when it changed: our own setCategory is a category change too.
-        if session.category != audio.category || session.mode != audio.mode { try? audio.apply(to: session) }
-        try? VoiceAudioConfig.preferBluetoothInput(session)
-        try? session.setActive(true)
+        audio.reactivate(reset: reset)
         describeRoute()
     }
 
@@ -223,24 +224,42 @@ final class VoiceLiveController: ObservableObject {
             center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
                 let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
                 let reason = AVAudioSession.RouteChangeReason(rawValue: raw) ?? .unknown
-                Task { @MainActor in
-                    guard let self else { return }
-                    switch VoiceRouteAction.forReason(reason) {
-                    case .keep: break
-                    case .reroute, .reapply: self.apply(self.machine.routeChanged())
-                    }
-                }
+                Task { @MainActor in self?.routeChanged(reason) }
             },
             center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
                 let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt ?? 0
                 let began = AVAudioSession.InterruptionType(rawValue: raw) == .began
-                Task { @MainActor in
-                    guard let self else { return }
-                    self.apply(self.machine.interruption(began: began, now: Self.now))
-                }
+                Task { @MainActor in self?.interruption(began: began) }
             },
             center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.reconfigureAudio() }
+                Task { @MainActor in self?.reconfigureAudio(reset: true) }
+            },
+        ]
+    }
+
+    private func routeChanged(_ reason: AVAudioSession.RouteChangeReason) {
+        let route = audio.route
+        log.info("route change \(VoiceRouteAction.name(reason), privacy: .public): in \(route.input, privacy: .public), out \(route.output, privacy: .public)")
+        let reconfigure = VoiceRouteAction.forReason(reason) != .keep
+        apply(machine.routeChanged(reason: VoiceRouteAction.name(reason), input: route.input, output: route.output, reconfigure: reconfigure, now: Self.now))
+    }
+
+    private func interruption(began: Bool) {
+        log.info("interruption \(began ? "began" : "ended", privacy: .public)")
+        if began, machine.isLive, usesMic { audio.interrupted() }
+        apply(machine.interruption(began: began, now: Self.now))
+    }
+
+    /// The app going to the background and back, logged so a session that ends there says so.
+    private func observeApp() {
+        guard appObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        appObservers = [
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.machine.appState(background: true, now: Self.now) }
+            },
+            center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.machine.appState(background: false, now: Self.now) }
             },
         ]
     }
@@ -296,7 +315,7 @@ final class VoiceLiveController: ObservableObject {
             costUsd = result.costUsd
             if let stop = result.stop {
                 apply(machine.handle(.error(stop), now: Self.now))
-                apply(machine.stop(now: Self.now))
+                apply(machine.stop(now: Self.now, reason: .cap, detail: stop))
                 return
             }
             if (result.replies ?? 0) > 0 {
@@ -319,12 +338,18 @@ final class VoiceLiveController: ObservableObject {
         }
         // Let session.close reach the model (it answers with final usage), then drop the line.
         try? await Task.sleep(for: .milliseconds(400))
-        transport?.close()
-        transport = nil
-        sessionId = nil
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
-        if usesMic { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+        appObservers.forEach(NotificationCenter.default.removeObserver)
+        appObservers = []
+        let closing = transport
+        transport = nil
+        sessionId = nil
+        if usesMic {
+            await audio.release { closing?.close() }
+        } else {
+            closing?.close()
+        }
     }
 
     #if DEBUG

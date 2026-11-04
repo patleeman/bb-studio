@@ -100,8 +100,11 @@ final class TalkRecorder: ObservableObject {
             // input is chosen here, before the engine starts, since switching to it mid-start stalled the
             // engine. A route change later restarts capture on the new input (SegmentCapture.restart).
             // Voice chat cancels echo.
-            try VoiceAudioConfig.dictation(echoCancelling: echoCancelling).apply(to: session)
+            let config = VoiceAudioConfig.dictation(echoCancelling: echoCancelling)
+            try config.apply(to: session)
             try session.setActive(true)
+            // Set up again if the mic reads 0 Hz (a voice session's unit not yet let go of it).
+            capture.sessionConfig = config
 
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
             if discardRequested {
@@ -126,7 +129,7 @@ final class TalkRecorder: ObservableObject {
             }
             self.handoff = handoff
             stoppedSegments = nil
-            try capture.start(journal: outbox.captureJournal, session: captureSession,
+            try await capture.start(journal: outbox.captureJournal, session: captureSession,
                 onError: { [weak self] error in Task { @MainActor in
                     guard let self else { return }
                     self.needsRecovery = true
@@ -353,9 +356,53 @@ struct CapturedSegment: Sendable {
     var durationMs: Int
 }
 
+/// The capture engine (AVAudioEngine's input; a fake in tests).
+protocol CaptureEngine: AnyObject {
+    /// The input's format, or nil when it reads 0 Hz or no channels: no mic yet.
+    func inputFormat() -> AVAudioFormat?
+    var isRunning: Bool { get }
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock)
+    func removeTap()
+    func prepare()
+    func start() throws
+    func stop()
+    /// What posts `AVAudioEngineConfigurationChange` for it.
+    var notificationObject: AnyObject? { get }
+}
+
+final class SystemCaptureEngine: CaptureEngine {
+    private let engine = AVAudioEngine()
+
+    func inputFormat() -> AVAudioFormat? {
+        let format = engine.inputNode.outputFormat(forBus: 0)
+        log.info("capture: input \(format.description, privacy: .public)")
+        return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
+    }
+    var isRunning: Bool { engine.isRunning }
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) {
+        engine.inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format, block: block)
+    }
+    func removeTap() { engine.inputNode.removeTap(onBus: 0) }
+    func prepare() { engine.prepare() }
+    func start() throws { try engine.start() }
+    func stop() { engine.stop() }
+    var notificationObject: AnyObject? { engine }
+}
+
 /// Runs on the engine's tap thread. All segment state lives on `queue`.
 final class SegmentCapture: @unchecked Sendable {
-    private let engine = AVAudioEngine()
+    static let noMicrophone = "No microphone is available."
+
+    private let makeEngine: () -> CaptureEngine
+    private var engine: CaptureEngine
+    private let audioSession: AudioSessionControl
+    /// The recorder's session config, set again when the input reads 0 Hz.
+    var sessionConfig: VoiceAudioConfig?
+    /// Tries to start the engine, in ms after the first: restart()'s pattern.
+    var retryDelays = [0, 200, 600, 1500]
+    /// One line per try, for the logs and tests.
+    var trace: ((String) -> Void)?
+    private var engineObserver: NSObjectProtocol?
     private let queue = DispatchQueue(label: "talk.capture")
     private let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
     private var converter: AVAudioConverter?
@@ -379,7 +426,14 @@ final class SegmentCapture: @unchecked Sendable {
     /// Set before `start`; read on the capture queue.
     var policy = SegmentPolicy.talk
 
-    func start(journal: TalkCaptureJournal, session: TalkCaptureJournal.Session, onError: @escaping (Error) -> Void, onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) throws {
+    init(makeEngine: @escaping () -> CaptureEngine = { SystemCaptureEngine() }, audioSession: AudioSessionControl = AVAudioSession.sharedInstance()) {
+        self.makeEngine = makeEngine
+        self.engine = makeEngine()
+        self.audioSession = audioSession
+    }
+
+    @MainActor
+    func start(journal: TalkCaptureJournal, session: TalkCaptureJournal.Session, onError: @escaping (Error) -> Void, onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) async throws {
         self.journal = journal
         self.session = session
         self.onError = onError
@@ -393,19 +447,14 @@ final class SegmentCapture: @unchecked Sendable {
         }
         capturing = true
         do {
-            try startEngine()
+            try await startEngineRecovering()
         } catch {
             _ = stop()
             throw error
         }
-        // A route change (AirPods, a call, another app's audio) stops the engine
-        // and can change the input format; pick up where it left off.
+        observeEngine()
         let center = NotificationCenter.default
         observers = [
-            center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-                log.info("capture: audio configuration changed")
-                self?.restart()
-            },
             center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) {
                 [weak self] note in
                 let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
@@ -428,39 +477,77 @@ final class SegmentCapture: @unchecked Sendable {
         queue.sync { CaptureStats(peakRMS: peakRMS, lastAudioAt: lastAudioAt) }
     }
 
-    /// Starts the engine again after it stopped, retrying while a new route settles.
-    func restart() {
-        guard capturing else { return }
-        engine.stop()
-        engine.inputNode.removeTap(onBus: 0)
-        queue.sync { lastAudioAt = Date() }
-        try? AVAudioSession.sharedInstance().setActive(true)
-        Task { @MainActor [weak self] in
-            for delay in [0, 200, 600, 1500] {
-                try? await Task.sleep(for: .milliseconds(delay))
-                guard let self, self.capturing else { return }
-                if self.engine.isRunning { return }
-                do {
-                    self.engine.inputNode.removeTap(onBus: 0)
-                    try self.startEngine()
-                    return
-                } catch {
-                    log.error("capture restart failed: \(error.localizedDescription, privacy: .public)")
-                }
+    /// A route change (AirPods, a call, another app's audio) stops the engine
+    /// and can change the input format; pick up where it left off.
+    private func observeEngine() {
+        engineObserver.map(NotificationCenter.default.removeObserver)
+        engineObserver = engine.notificationObject.map {
+            NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: $0, queue: .main) { [weak self] _ in
+                log.info("capture: audio configuration changed")
+                self?.restart()
             }
         }
     }
 
+    /// Starts the engine again after it stopped, retrying while a new route settles.
+    func restart() {
+        guard capturing else { return }
+        engine.stop()
+        engine.removeTap()
+        queue.sync { lastAudioAt = Date() }
+        try? audioSession.setActive(true, options: [])
+        Task { @MainActor [weak self] in
+            do { try await self?.startEngineRecovering() } catch {
+                log.error("capture restart failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Starts the engine, trying again over about 2 s. An input that reads 0 Hz (a voice
+    /// session's voice-processing unit not yet let go of the mic) gets the recorder's session
+    /// config and activation again, and a new engine: the old one keeps the stale format.
+    @MainActor
+    private func startEngineRecovering() async throws {
+        var lastError: Error?
+        for (attempt, delay) in retryDelays.enumerated() {
+            if delay > 0 { try? await Task.sleep(for: .milliseconds(delay)) }
+            guard capturing else { return }
+            if engine.isRunning { return }
+            do {
+                try startEngine()
+                trace?("try \(attempt + 1): started")
+                if attempt > 0 { log.info("capture: started on try \(attempt + 1)") }
+                return
+            } catch {
+                lastError = error
+                engine.removeTap()
+                trace?("try \(attempt + 1): \(error.localizedDescription)")
+                log.error("capture start, try \(attempt + 1): \(error.localizedDescription, privacy: .public)")
+                guard Self.isNoMicrophone(error) else { continue }
+                if let sessionConfig {
+                    try? sessionConfig.apply(to: audioSession)
+                    try? audioSession.setActive(true, options: [])
+                }
+                engine.stop()
+                engine = makeEngine()
+                observeEngine()
+            }
+        }
+        throw lastError ?? NSError(domain: "Talk", code: 1, userInfo: [NSLocalizedDescriptionKey: Self.noMicrophone])
+    }
+
+    static func isNoMicrophone(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == "Talk" && error.code == 1
+    }
+
     private func startEngine() throws {
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        log.info("capture start: input \(inputFormat.description, privacy: .public)")
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw NSError(domain: "Talk", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone is available."])
+        guard let inputFormat = engine.inputFormat() else {
+            throw NSError(domain: "Talk", code: 1, userInfo: [NSLocalizedDescriptionKey: Self.noMicrophone])
         }
         let converter = AVAudioConverter(from: inputFormat, to: format)
         queue.sync { self.converter = converter }
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+        engine.installTap(bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
             self.queue.sync {
                 guard let converted = self.convert(buffer) else { return }
@@ -478,8 +565,10 @@ final class SegmentCapture: @unchecked Sendable {
         capturing = false
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
+        engineObserver.map(NotificationCenter.default.removeObserver)
+        engineObserver = nil
         log.info("capture stop: engine running \(self.engine.isRunning), frames \(self.segmentFrames)")
-        engine.inputNode.removeTap(onBus: 0)
+        engine.removeTap()
         engine.stop()
         return queue.sync {
             closeSegment()

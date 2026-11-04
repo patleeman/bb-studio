@@ -40,6 +40,16 @@ enum LiveReport: Equatable, Sendable {
     case backendUsage(input: Int, cached: Int, output: Int)
     case realtimeUsage(json: String)
     case transcriptionUsage(json: String)
+    /// The level gate muted the voice and no words followed: what it heard, and how long the voice was silent.
+    case falseTrigger(atMs: Int, mic: Float, playback: Float, mutedMs: Int)
+    /// The audio route changed: why, and the new input and output.
+    case routeChange(reason: String, input: String, output: String, atMs: Int)
+    /// A call or Siri took the audio (began), or gave it back.
+    case audioInterruption(began: Bool, atMs: Int)
+    /// The app went to the background or came back.
+    case appState(background: Bool, atMs: Int)
+    /// Why the session ended; `background` when the app wasn't on screen then.
+    case close(LiveCloseReason, detail: String?, background: Bool, atMs: Int)
 
     var object: [String: Any] {
         func parsed(_ json: String) -> Any { (try? JSONSerialization.jsonObject(with: Data(json.utf8))) ?? [String: Any]() }
@@ -50,8 +60,37 @@ enum LiveReport: Equatable, Sendable {
         case .backendUsage(let input, let cached, let output): return ["type": "backend_usage", "input_tokens": input, "cached_tokens": cached, "output_tokens": output]
         case .realtimeUsage(let json): return ["type": "usage", "usage": parsed(json)]
         case .transcriptionUsage(let json): return ["type": "transcription_usage", "usage": parsed(json)]
+        case .falseTrigger(let at, let mic, let playback, let mutedMs):
+            return ["type": "false_trigger", "at": at, "mic": Self.level(mic), "playback": Self.level(playback), "muted_ms": mutedMs]
+        case .routeChange(let reason, let input, let output, let at):
+            return ["type": "route_change", "reason": reason, "input": String(input.prefix(200)), "output": String(output.prefix(200)), "at": at]
+        case .audioInterruption(let began, let at): return ["type": "audio_interruption", "began": began, "at": at]
+        case .appState(let background, let at): return ["type": "app_state", "state": background ? "background" : "foreground", "at": at]
+        case .close(let reason, let detail, let background, let at):
+            var object: [String: Any] = ["type": "close", "reason": reason.rawValue, "background": background, "at": at]
+            if let detail, !detail.isEmpty { object["detail"] = String(detail.prefix(500)) }
+            return object
         }
     }
+
+    /// A level to three places (Float's 0.0799999982 reads 0.08).
+    private static func level(_ value: Float) -> Double { (Double(min(1, max(0, value))) * 1000).rounded() / 1000 }
+}
+
+/// Why a session ended, as Studio logs it.
+enum LiveCloseReason: String, Sendable {
+    /// End, or the header's close button.
+    case user
+    /// The screen went away while live.
+    case dismissed
+    /// Connecting failed.
+    case error
+    /// The connection dropped (ICE failed, the data channel closed).
+    case transport
+    /// Studio's monthly cap.
+    case cap
+    /// The voice service ended it (session.closed).
+    case server
 }
 
 enum LiveEarcon: String, Sendable {
@@ -87,11 +126,17 @@ struct LiveSessionMachine: Sendable {
     private(set) var falseTriggers = 0
     /// When the level gate muted the voice, until words confirm it or the window passes.
     private(set) var provisionalSince: TimeInterval?
+    /// The loudest mic frame and the playback level when the gate fired, for the false-trigger log and the "still loud" bar.
+    private var triggerMic: Float = 0
+    private var triggerPlayback: Float = 0
+    /// The app is in the background (a close then says so).
+    private var background = false
     var gate = BargeInGate()
     /// Words must arrive this soon after the user's level drops back, or the voice comes back.
-    /// It counts from the end of the loud part, not the trigger: while the voice talks, GPT-Live's
-    /// transcript of the user lags ~2.4 s (live run, Nov 1), longer than a cough lasts.
-    var confirmWindow: TimeInterval = 1.0
+    /// It counts from the end of the loud part, not the trigger. 0.4 s (was 1 s, Nov 4): a false
+    /// mute on the speaker cost a second of the voice each time. Words that come later (GPT-Live's
+    /// transcript lags ~2.4 s while the voice talks) still barge in on their own (userHeard).
+    var confirmWindow: TimeInterval = 0.4
     /// The last mic frame above the gate's bar during a provisional mute.
     private var loudUntil: TimeInterval = 0
     /// The last mic frame that sounded like the user (above the gate's bar), for ending lines.
@@ -146,26 +191,30 @@ struct LiveSessionMachine: Sendable {
 
     mutating func start(now: TimeInterval) -> [LiveEffect] {
         guard !isLive else { return [] }
+        let background = background
         self = LiveSessionMachine(endsLinesOnPause: endsLinesOnPause)
+        self.background = background
         phase = .connecting
         sessionStart = now
         return [.earcon(.start), .connect]
     }
 
-    mutating func stop(now: TimeInterval) -> [LiveEffect] {
+    mutating func stop(now: TimeInterval, reason: LiveCloseReason = .user, detail: String? = nil) -> [LiveEffect] {
         guard isLive else { return [] }
         finishUser(now: now)
         finishAgent(now: now)
+        closed(reason, detail: detail, now: now)
         phase = .ended(nil)
         confirmation = nil
         stillWaiting = nil
         return [.send(.close), .hangUp(drain()), .earcon(.end)]
     }
 
-    mutating func fail(_ message: String, now: TimeInterval) -> [LiveEffect] {
+    mutating func fail(_ message: String, now: TimeInterval, reason: LiveCloseReason = .error) -> [LiveEffect] {
         let wasLive = isLive
         finishUser(now: now)
         finishAgent(now: now)
+        if wasLive { closed(reason, detail: message, now: now) }
         phase = .failed(message)
         confirmation = nil
         stillWaiting = nil
@@ -228,6 +277,7 @@ struct LiveSessionMachine: Sendable {
         case .closed(let reason):
             finishUser(now: now)
             finishAgent(now: now)
+            closed(.server, detail: reason, now: now)
             phase = .ended(Self.closedReason(reason))
             confirmation = nil
             stillWaiting = nil
@@ -245,9 +295,10 @@ struct LiveSessionMachine: Sendable {
         // While the user is audibly talking, their line isn't over, however slowly the transcript comes.
         let playing = phase == .agentSpeaking && !agentMuted
         for frame in frames where frame.level > gate.threshold(playback: playback, voicePlaying: playing) { lastLoudAt = max(lastLoudAt, frame.at) }
-        // While muted provisionally, keep track of whether the user is still talking.
+        // While muted provisionally, keep track of whether the user is still talking: by the bar
+        // that fired (the voice is silent now, so playback reads 0; the room's noise doesn't count).
         if let since = provisionalSince {
-            let bar = gate.threshold(playback: 0, voicePlaying: true)
+            let bar = gate.threshold(playback: triggerPlayback, voicePlaying: true)
             for frame in frames where frame.at >= since && frame.level > bar { loudUntil = max(loudUntil, frame.at) }
             return []
         }
@@ -258,6 +309,11 @@ struct LiveSessionMachine: Sendable {
         for frame in frames where gate.feed(level: frame.level, playback: playback, voicePlaying: true, at: frame.at) {
             provisionalSince = frame.at
             loudUntil = frame.at
+            triggerMic = frames.filter { $0.at <= frame.at }.map(\.level).max() ?? frame.level
+            triggerPlayback = playback
+            // The rest of this batch: still talking?
+            let bar = gate.threshold(playback: playback, voicePlaying: true)
+            for later in frames where later.at > frame.at && later.level > bar { loudUntil = max(loudUntil, later.at) }
             agentMuted = true
             gate.reset()
             return [.muteAgentAudio(true)]
@@ -274,6 +330,7 @@ struct LiveSessionMachine: Sendable {
             provisionalSince = nil
             agentMuted = false
             falseTriggers += 1
+            reports.append(.falseTrigger(atMs: Self.ms(since), mic: triggerMic, playback: triggerPlayback, mutedMs: Self.ms(now - since)))
             effects.append(.muteAgentAudio(false))
         }
         // GPT-Live's transcript of the user comes in bursts while the voice talks: a line ends on a pause in the words and in the mic.
@@ -364,6 +421,7 @@ struct LiveSessionMachine: Sendable {
     /// A phone call (or Siri) took the audio, and gave it back. Never falls back to push to talk.
     mutating func interruption(began: Bool, now: TimeInterval) -> [LiveEffect] {
         guard isLive else { return [] }
+        reports.append(.audioInterruption(began: began, atMs: Self.ms(now)))
         if began {
             finishUser(now: now)
             finishAgent(now: now)
@@ -376,9 +434,23 @@ struct LiveSessionMachine: Sendable {
         return [.reconfigureAudio, .muteMic(false), .muteAgentAudio(false)]
     }
 
-    /// A route change (the car connects, AirPods out): keep talking on the new route.
-    mutating func routeChanged() -> [LiveEffect] {
-        isLive ? [.reconfigureAudio] : []
+    /// A route change (the car connects, AirPods out): logged, and when `reconfigure`,
+    /// the session is set up again so the voice keeps talking on the new route.
+    mutating func routeChanged(reason: String, input: String, output: String, reconfigure: Bool, now: TimeInterval) -> [LiveEffect] {
+        guard isLive else { return [] }
+        reports.append(.routeChange(reason: reason, input: input, output: output, atMs: Self.ms(now)))
+        return reconfigure ? [.reconfigureAudio] : []
+    }
+
+    /// The app went to the background or came back: logged, so a session that ends there says so.
+    mutating func appState(background: Bool, now: TimeInterval) {
+        guard self.background != background else { return }
+        self.background = background
+        if isLive { reports.append(.appState(background: background, atMs: Self.ms(now))) }
+    }
+
+    private mutating func closed(_ reason: LiveCloseReason, detail: String?, now: TimeInterval) {
+        reports.append(.close(reason, detail: detail, background: background, atMs: Self.ms(now)))
     }
 
     // MARK: Lines

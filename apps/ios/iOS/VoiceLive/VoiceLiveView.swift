@@ -41,7 +41,7 @@ struct VoiceLiveView: View {
         .background(VoiceLiveBackground(speaker: controller.machine.speaking))
         .interactiveDismissDisabled(controller.isLive)
         .onAppear { if autoStart, controller.phase == .idle { controller.start() } }
-        .onDisappear { if controller.isLive { controller.stop() } }
+        .onDisappear { if controller.isLive { controller.stop(reason: .dismissed) } }
     }
 }
 
