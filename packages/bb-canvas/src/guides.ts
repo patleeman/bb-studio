@@ -20,7 +20,8 @@ Make the board RICH and dense, like a great front page or a briefing someone des
 - Inline sparklines: in a caption write {spark:3,5,4,8}; in HTML use cv.spark([3,5,4,8]) or <span data-spark="3,5,4,8"></span>. Deltas: {delta:+2.1} in a caption, cv.delta(2.1) in HTML.
 - Type: kicker → headline → dek → body, with the cv-* classes or the --cv-t-* scale. Color only with tokens (var(--cv-…)); --cv-blue and --cv-red for the two sides of a race, --cv-good/--cv-bad for change, --cv-c1…--cv-c8 for series.
 - size is a hint: s about a quarter of the width, m a third, l half, xl two-thirds. The focus grows.
-- Every board: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), and 1–3 anchored notes. A board of only headline, stats and text is a failure.
+- Every board: at least 6 items: a custom lead component, at least one visual beyond numbers (map, timeline, multiples, chart), evidence (stats with sparklines, a table), and 1–3 anchored notes. A board of only a headline, a list and text is a failure.
+- Every follow-up changes the board: a question about what's there ("which of these matters?", "why?") gets notes, highlights or a new item on the board, and a short reply. Never answer only in the reply.
 - Charts are honest: bars start at zero. When differences are tiny (margins of a few tenths), set options.max to a meaningful scale (e.g. 5 points) or show the numbers in a table instead, so 0.1 doesn't look like a landslide.
 - Example numbers below are placeholders: never reuse them. Use real data (search) and label estimates.
 `.trim();
@@ -174,7 +175,7 @@ Examples:
 - "Help me plan a weekend in Vermont with the kids" → field: it's planning; days, options and constraints as cards, decisions as stickies.
 - "Here are our API's latency and error numbers for the last day" → instrument: dense metrics; readouts, small multiples, a timeline of incidents.
 - "Should I take the Denver job or stay?" → field: a decision with trade-offs (instrument only if it's mostly numbers).
-- Borrowing: an instrument board of server metrics where one number is alarming gets a sticky: {"kind": "note", "data": "Fix this first", "anchor": "p95", "point": {"x": 0.9, "y": 0.3}, "options": {"accent": "sticky"}}. A sticky on a dashboard draws the eye.
+- Borrowing: "which of these should I worry about?" on an instrument board of server metrics: keep the style, and mark the one to fix with a sticky, which stands out among the callouts: {"kind": "note", "data": "Fix this first", "anchor": "p95", "point": {"x": 0.9, "y": 0.3}, "options": {"accent": "sticky"}}. A sticky on a dashboard draws the eye.
 - Switching: after an editorial election board, "Help me plan my week around the recount hearings" is planning: canvas_set({"style": "field", "styleReason": "planning a week", "items": [...]}).
 `.trim();
 
@@ -200,5 +201,5 @@ export function designGuide(only: OrganicLook | null = null): string {
 
 /** The configure hook's line about styles: the current one and how to choose. */
 export function lookInstruction(look: OrganicLook): string {
-  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). Borrow accents across styles with options.accent on notes and quotes. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) 1–3 notes with anchor + point on what matters. The design guide with examples is in this thread's first message; canvas_guide returns it.`;
+  return `Board style (you choose it): editorial for news and stories, field for brainstorming and planning, instrument for dense data and monitoring; a style the user names wins. Set style (with styleReason) on your first canvas_set, keep it for follow-ups, switch on a topic change of a different kind (canvas_set with style, or canvas_style). Borrow accents across styles with options.accent on notes and quotes. This board is ${look} (${LOOK_INFO[look].name}) now. Make every board rich and dense, not a slide: at least 6 items: (1) a lead you write as a custom HTML component with the tokens and the kit (window.cv); (2) a visual beyond numbers (map, timeline, small multiples, chart); (3) stats with sparklines or a table for the evidence; (4) 1–3 notes with anchor + point on what matters. Every follow-up changes the board (add, update, annotate, highlight); never answer only in the reply. To single out what matters most on a dense board, borrow a sticky (note options.accent "sticky"). The design guide with examples is in this thread's first message; canvas_guide returns it.`;
 }

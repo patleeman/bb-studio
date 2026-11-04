@@ -225,7 +225,8 @@ export class CanvasStore {
             board.clear();
             break;
           case "style":
-            if (op.look !== lookOf(look)) record("style", null, `Style: ${LOOK_INFO[op.look].name}${op.reason?.trim() ? ` (${op.reason.trim().slice(0, 160)})` : ""}`);
+            // Logged when it changes, and the agent's first pick (even of the style the canvas started in), with its reason.
+            if (op.look !== lookOf(look) || !(log.some((change) => change.op === "style") || this.db.prepare("SELECT 1 FROM canvas_changes WHERE canvas_id = ? AND op = 'style' LIMIT 1").get(canvasId))) record("style", null, `Style: ${LOOK_INFO[op.look].name}${op.reason?.trim() ? ` (${op.reason.trim().slice(0, 160)})` : ""}`);
             look = op.look;
             break;
           case "set": {

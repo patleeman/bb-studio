@@ -108,6 +108,9 @@ describe("canvas threads", () => {
     let view = (await call("canvas.get", { threadId })).canvas;
     expect(view.look).toBe("field");
     expect(view.changes.map((change: { op: string }) => change.op)).toEqual(["style", "add"]);
+    // The same style again isn't logged twice.
+    await tool("canvas_style", { style: "field" }, threadId);
+    expect((await call("canvas.get", { threadId })).canvas.changes.filter((change: { op: string }) => change.op === "style")).toHaveLength(1);
     await tool("canvas_style", { style: "instrument", reason: "the user asked for a dashboard" }, threadId);
     view = (await call("canvas.get", { threadId })).canvas;
     expect(view).toMatchObject({ look: "instrument", items: [expect.objectContaining({ id: "days" })] });
@@ -116,6 +119,13 @@ describe("canvas threads", () => {
     expect(view).toMatchObject({ look: "editorial", items: [] });
     expect(text(await tool("canvas_read", {}, threadId))).toContain("Style: editorial (Editorial)");
     await expect(tool("canvas_style", { style: "classic" }, threadId)).rejects.toThrow(/Invalid option/);
+  });
+
+  it("logs the agent's first style pick even when the canvas already started in it", async () => {
+    const { call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    await tool("canvas_set", { style: "editorial", styleReason: "it's news", items: [{ kind: "headline", data: "Results" }] }, threadId);
+    expect((await call("canvas.get", { threadId })).canvas.changes[0].summary).toBe("Style: Editorial (it's news)");
   });
 
   it("returns the look's design guide from canvas_guide", async () => {
