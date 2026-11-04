@@ -48,6 +48,10 @@ export interface CanvasKit {
   viewport?(): { width: number; height: number };
   /** Zooms a page that stops short of the screen up to fill it (at most 1.4x). Returns the zoom. */
   fit?(root?: unknown): number;
+  /** One building block's HTML (card, stat, step, side, quote, placeholder) from its data-* attributes, then the element's own children. */
+  block(kind: unknown, attrs: Record<string, string | undefined>, inner?: string): string;
+  /** Expands every [data-block] under root in place. */
+  blocks?(root?: unknown): void;
 }
 
 /** Builds the kit. With a window, it also becomes window.cv with render and hydrate. Self-contained: its source runs in frames. */
@@ -547,7 +551,51 @@ export function canvasKit(win?: unknown): CanvasKit {
     return `<span class="cv-stars" role="img" aria-label="${esc(`${fmt(n)} out of ${max}${source ? `, ${source}` : note ? `, ${note}` : ""}`)}"><svg width="${round((size * w) / 20)}" height="${size}" viewBox="0 0 ${w} 20"><defs><clipPath id="${id}"><rect width="${round(w * share)}" height="20"/></clipPath></defs><g fill="var(--cv-rule)">${shapes}</g><g fill="${color}" clip-path="url(#${id})">${shapes}</g></svg>${label}${tail}</span>`;
   };
 
-  const kit: CanvasKit = { esc, num, paint, fmt, spark, bars, line, columns, hbars, split, donut, meter, tilemap, timeline, waffle, multiples, delta, legend, bignum, quote, callout, stars, states };
+  /**
+   * Building blocks for the common shapes, declared in a few attributes so a page needs little markup:
+   * <div data-block="card" data-img data-title data-rating data-max data-source data-line data-tag>, and
+   * stat (data-value, data-unit, data-label, data-line, data-delta, data-source), step (data-when, data-title,
+   * data-line, data-tone="key"), side (data-label, data-title, data-value, data-unit, data-points "a | b",
+   * data-verdict), quote (data-text, data-by, data-role) and placeholder (data-label). The element keeps its
+   * own attributes (data-cv-id, class, style); what it holds comes after the block's parts. Every value is
+   * escaped, and a picture must be https.
+   */
+  const block = (kind: unknown, attrs: Record<string, string | undefined>, inner = ""): string => {
+    const a = (name: string) => { const v = attrs[name]; return typeof v === "string" && v.trim() ? v.trim() : null; };
+    const text = (name: string, cls: string, tag = "div") => (a(name) ? `<${tag} class="${cls}">${esc(a(name))}</${tag}>` : "");
+    const list = (raw: string | null): string[] => {
+      if (!raw) return [];
+      if (raw.startsWith("[")) { try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed.map((v) => String(v)).filter(Boolean).slice(0, 12); } catch { /* as text */ } }
+      return raw.split("|").map((v) => v.trim()).filter(Boolean).slice(0, 12);
+    };
+    const src = a("img");
+    const safe = src && /^https:\/\//i.test(src) ? src : null;
+    switch (kind) {
+      case "card": {
+        const picture = safe
+          ? `<div class="cv-card-pic"><img src="${esc(safe)}" alt="${esc(a("alt") ?? a("title") ?? "")}" loading="eager" decoding="async"></div>`
+          : `<div class="cv-card-pic cv-card-ph" aria-hidden="true"><span>${esc(a("title") ?? "")}</span></div>`;
+        const rating = a("rating") !== null ? stars(a("rating"), { max: a("max") ?? 10, size: 20, ...(a("source") ? { source: a("source") } : {}) }) : "";
+        return `${picture}<div class="cv-card-text">${a("tag") ? `<span class="cv-chip">${esc(a("tag"))}</span>` : ""}${text("title", "cv-card-title")}${rating ? `<div class="cv-card-rating">${rating}</div>` : ""}${text("line", "cv-card-line", "p")}${inner}</div>`;
+      }
+      case "stat":
+        return `${bignum(a("value") ?? "–", { label: a("label") ?? undefined, unit: a("unit") ?? undefined, ...(a("delta") !== null ? { delta: a("delta") } : {}) })}${text("line", "cv-stat-line", "p")}${inner}${text("source", "cv-stat-source")}`;
+      case "step":
+        return `${text("when", "cv-step-when")}${text("title", "cv-step-title")}${text("line", "cv-step-line", "p")}${inner}`;
+      case "side": {
+        const points = list(a("points"));
+        return `<div class="cv-side-head">${text("label", "cv-side-label")}${a("verdict") ? `<span class="cv-chip">${esc(a("verdict"))}</span>` : ""}</div>${text("title", "cv-side-title")}${a("value") !== null ? bignum(a("value"), { unit: a("unit") ?? undefined }) : ""}${points.length ? `<ul class="cv-side-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : ""}${inner}`;
+      }
+      case "quote":
+        return `<blockquote>${esc(a("text") ?? "")}${a("by") ? `<cite>${esc(a("by"))}${a("role") ? `, ${esc(a("role"))}` : ""}</cite>` : ""}</blockquote>${inner}`;
+      case "placeholder":
+        return `<div class="cv-ph-box" aria-hidden="true"></div>${text("label", "cv-ph-label")}${inner}`;
+      default:
+        return inner;
+    }
+  };
+
+  const kit: CanvasKit = { esc, num, paint, fmt, spark, bars, line, columns, hbars, split, donut, meter, tilemap, timeline, waffle, multiples, delta, legend, bignum, quote, callout, stars, states, block };
 
   const w = win as (Window & { cv?: CanvasKit; bbWidget?: { data: unknown; options: Record<string, unknown> } }) | undefined;
   if (w && typeof w.document !== "undefined") {
@@ -559,6 +607,19 @@ export function canvasKit(win?: unknown): CanvasKit {
       scope.querySelectorAll<HTMLElement>("[data-bars]").forEach((el) => { el.innerHTML = bars(el.dataset.bars, { color: el.dataset.color, w: el.dataset.w, h: el.dataset.h }); });
       scope.querySelectorAll<HTMLElement>("[data-meter]").forEach((el) => { el.innerHTML = meter(el.dataset.meter, { max: el.dataset.max, label: el.dataset.label, color: el.dataset.color }); });
       scope.querySelectorAll<HTMLElement>("[data-delta]").forEach((el) => { el.innerHTML = delta(el.dataset.delta, { invert: el.dataset.invert === "true" }); });
+    };
+    // data-block="card" (and the rest): expanded in place once; the element gets class cv-<kind> and keeps its children after the parts.
+    kit.blocks = (root?: unknown) => {
+      const scope = (root as ParentNode | undefined) ?? doc;
+      scope.querySelectorAll<HTMLElement>("[data-block]").forEach((el) => {
+        if (el.dataset.blockDone) return;
+        const kind = el.dataset.block ?? "";
+        const attrs: Record<string, string | undefined> = {};
+        for (const name of Object.keys(el.dataset)) attrs[name] = el.dataset[name];
+        el.innerHTML = block(kind, attrs, el.innerHTML);
+        el.classList.add(`cv-${kind.replace(/[^a-z]/g, "")}`);
+        el.dataset.blockDone = "1";
+      });
     };
     // cv.render((data, options) => html): redraws #cv-app on every state the canvas sends.
     kit.render = (build) => {
@@ -660,6 +721,15 @@ export function canvasKit(win?: unknown): CanvasKit {
       if (z > 1.02) kit.charts!(root);
       return z;
     };
+    // A card's picture that fails to load gives way to its placeholder (the title), never a broken image.
+    doc.addEventListener?.("error", (event) => {
+      const img = event.target as HTMLImageElement | null;
+      const pic = img?.tagName === "IMG" ? img.closest<HTMLElement>(".cv-card-pic") : null;
+      if (!pic) return;
+      const title = pic.closest<HTMLElement>("[data-block]")?.dataset.title ?? img!.alt ?? "";
+      pic.classList.add("cv-card-ph", "cv-card-failed");
+      pic.innerHTML = `<span>${esc(title)}</span>`;
+    }, true);
     // Pictures change the page's height as they load: fit again.
     doc.addEventListener?.("load", (event) => { if ((event.target as Element | null)?.tagName === "IMG") { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 120); } }, true);
     w.addEventListener("resize", () => { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 150); });
@@ -692,6 +762,7 @@ export function canvasKit(win?: unknown): CanvasKit {
         script.textContent = old.textContent;
         old.replaceWith(script);
       });
+      kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root);
       kit.fit!(root);

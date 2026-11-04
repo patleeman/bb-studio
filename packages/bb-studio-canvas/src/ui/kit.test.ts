@@ -130,3 +130,34 @@ describe("rich text", () => {
     expect(html).not.toContain('href="javascript');
   });
 });
+
+describe("the kit's building blocks", () => {
+  it("expand a card from its attributes, escaped, with an https picture and a sourced or 'my pick' rating", () => {
+    const card = kit.block("card", { img: "https://upload.wikimedia.org/tetris.jpg", title: EVIL, rating: "9", source: "IGN", line: EVIL, alt: EVIL });
+    expect(card).toContain('<img src="https://upload.wikimedia.org/tetris.jpg"');
+    expect(card).toContain("IGN");
+    expect(card).not.toContain("<img src=x");
+    expect(kit.block("card", { title: "Tetris", rating: "8" })).toContain("my pick");
+    // No picture (a draft) or one that isn't https: a placeholder with the title.
+    for (const attrs of [{ title: "Tetris" }, { title: "Tetris", img: "javascript:alert(1)" }]) {
+      const html = kit.block("card", attrs);
+      expect(html).toContain("cv-card-ph");
+      expect(html).not.toContain("<img");
+    }
+  });
+
+  it("expand stats, steps, sides, quotes and placeholders, keeping what the element holds", () => {
+    const stat = kit.block("stat", { value: "88", unit: " min", label: "Median reply", line: "Double W32", source: "Sample data" }, '<div data-chart="spark"></div>');
+    expect(stat).toContain("cv-bignum");
+    expect(stat).toContain("Double W32");
+    expect(stat.indexOf("data-chart")).toBeGreaterThan(stat.indexOf("Double W32"));
+    expect(kit.block("step", { when: "Thu 12", title: "Launch", line: "Nothing else" })).toContain("cv-step-title");
+    const side = kit.block("side", { label: "Chat", verdict: "First", value: "1010", points: `Largest queue | ${EVIL}` });
+    expect(side.match(/<li>/g)).toHaveLength(2);
+    expect(side).not.toContain("<img src=x");
+    expect(kit.block("side", { points: '["a","b","c"]' }).match(/<li>/g)).toHaveLength(3);
+    expect(kit.block("quote", { text: EVIL, by: "Ada" })).toContain("&lt;img");
+    expect(kit.block("placeholder", { label: "Ratings" })).toContain("cv-ph-box");
+    expect(kit.block("nope", {}, "<b>kept</b>")).toBe("<b>kept</b>");
+  });
+});
