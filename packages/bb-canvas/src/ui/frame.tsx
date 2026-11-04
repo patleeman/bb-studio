@@ -3,7 +3,7 @@
 // with the look's tokens, the kit's CSS classes and window.cv injected, and
 // sized to its content: the frame reports #cv-root's height, so the item is
 // as tall as what it draws.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { OrganicLook } from "../looks";
 import { tokenDeclarations } from "../looks";
 import { canvasKit } from "./kit";
@@ -46,34 +46,38 @@ export function CanvasFrame({ html, title, data, options, look, mode, width, onH
   onHeight?(height: number): void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [ready, setReady] = useState(false);
   const [height, setHeight] = useState<number | null>(null);
   const srcDoc = useMemo(() => frameSrcDoc(html, look, mode), [html, look, mode]);
-  useEffect(() => setReady(false), [srcDoc]);
-  const report = useRef(onHeight);
-  report.current = onHeight;
+  // Ready per document, never reset by an effect: a frame can report ready
+  // before this component's effects run, and a reset then would leave it
+  // waiting for its data forever.
+  const [readyDoc, setReadyDoc] = useState<string | null>(null);
+  const ready = readyDoc === srcDoc;
+  const latest = useRef({ srcDoc, data, options, mode, width, height, onHeight });
+  latest.current = { srcDoc, data, options, mode, width, height, onHeight };
+  const send = useCallback(() => {
+    const { data: d, options: o, mode: m, width: w, height: h } = latest.current;
+    try {
+      frame.current?.contentWindow?.postMessage({ type: STATE_MESSAGE, data: d, options: o, theme: { mode: m, colors: {} }, size: { width: w, height: h ?? 0 } }, "*");
+    } catch {
+      // Data that can't be cloned never reaches the frame.
+    }
+  }, []);
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (!frame.current || event.source !== frame.current.contentWindow) return;
       const message = event.data as { type?: unknown; height?: unknown } | null;
-      if (message?.type === READY_MESSAGE) setReady(true);
+      if (message?.type === READY_MESSAGE) { setReadyDoc(latest.current.srcDoc); send(); }
       if (message?.type === HEIGHT_MESSAGE && typeof message.height === "number" && Number.isFinite(message.height)) {
         const next = Math.min(MAX_HEIGHT, Math.max(0, Math.ceil(message.height)));
         setHeight(next);
-        report.current?.(next);
+        latest.current.onHeight?.(next);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      frame.current?.contentWindow?.postMessage({ type: STATE_MESSAGE, data, options, theme: { mode, colors: {} }, size: { width, height: height ?? 0 } }, "*");
-    } catch {
-      // Data that can't be cloned never reaches the frame.
-    }
-  }, [ready, data, options, mode, width]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [send]);
+  useEffect(() => { if (ready) send(); }, [ready, data, options, mode, width, send]);
   return (
     <iframe
       ref={frame}
