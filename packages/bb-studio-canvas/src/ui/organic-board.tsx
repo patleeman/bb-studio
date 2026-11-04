@@ -262,7 +262,7 @@ export function OrganicBoard({ items, look, mode, composition = null, empty, bot
                 style={{ left: placed.x, top: placed.y, width: w, zIndex: placed.z, visibility: shown ? undefined : "hidden" }}
               >
                 <div className="cvt-rot" style={placed.rotate ? { transform: `rotate(${placed.rotate}deg)` } : undefined}>
-                  <Card item={item} look={look} mode={mode} width={w} room={sizes.get(item.id)?.room ?? 320} focus={layout.focusId === item.id} tag={tags.get(item.id)} onMeasure={(h) => report(item.id, w, h)} />
+                  <Card item={item} look={look} mode={mode} width={w} room={sizes.get(item.id)?.room ?? 320} focus={placed.scale === "hero"} tag={tags.get(item.id)} onMeasure={(h) => report(item.id, w, h)} />
                 </div>
               </section>
             );
