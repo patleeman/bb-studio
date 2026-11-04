@@ -10,17 +10,26 @@
 //
 // The key never leaves this module: it isn't logged, returned or put in an
 // error (errors are redacted). Every fetch of a page goes through
-// safeFetch: http(s) only, no private, loopback or link-local addresses
-// (checked again on every redirect), a time limit and a size cap.
+// safeFetch: http(s) only; each hop's host resolved once, every address
+// checked (no private, loopback, link-local, CGNAT, multicast, ULA or
+// mapped addresses) and the connection pinned to that exact address, so a
+// resolver can't change its answer between the check and the connect;
+// again on every redirect; a time limit and a size cap. Image addresses
+// lose their tracking parameters.
 import { lookup as dnsLookup } from "node:dns/promises";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
 export interface ImageResult { url: string; alt: string; source: string; width?: number; height?: number }
 export interface ImageDeps {
   /** The Exa key, or "" when none is set. */
   exaKey(): Promise<string>;
+  /** For Exa's API (a fixed public host). */
   fetch?: typeof fetch;
   lookup?: (host: string) => Promise<{ address: string }[]>;
+  /** How a checked page is fetched (pinnedTransport by default). */
+  transport?: Transport;
 }
 
 export const EXA_SEARCH_URL = "https://api.exa.ai/search";
@@ -32,21 +41,63 @@ export function privateAddress(address: string): boolean {
   const v = isIP(address);
   if (v === 4) {
     const [a, b] = address.split(".").map(Number) as [number, number];
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19)) || (a === 192 && b === 0) || a >= 224;
   }
   if (v === 6) {
     const s = address.toLowerCase();
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
-    if (mapped) return privateAddress(mapped[1]!);
+    // IPv4 inside IPv6 (mapped, compatible, NAT64): judged as the IPv4 address it carries.
+    const embedded = /^(?:::ffff:|::|64:ff9b::)(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+    if (embedded) return privateAddress(embedded[1]!);
+    const hexMapped = /^(?:::ffff:|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(s);
+    if (hexMapped) { const hi = parseInt(hexMapped[1]!, 16), lo = parseInt(hexMapped[2]!, 16); return privateAddress(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`); }
     return s === "::" || s === "::1" || /^f[cd]/.test(s) || /^fe[89ab]/.test(s) || /^ff/.test(s);
   }
   return true;
 }
 
-/** A GET of a public http(s) page: every hop's host resolved and checked, at most 3 redirects, a time limit and a size cap. */
-export async function safeFetch(url: string, deps: Pick<ImageDeps, "fetch" | "lookup"> = {}): Promise<{ url: string; text: string; type: string }> {
-  const doFetch = deps.fetch ?? fetch;
+/** One HTTP exchange, already connected to a checked address: what safeFetch needs back. */
+export interface Exchange { status: number; location: string | null; type: string; body: AsyncIterable<Uint8Array> | null; close(): void }
+/**
+ * Sends a GET to url, connecting to exactly this IP address (the one that was checked): a lookup that always
+ * answers with it, while the Host header and TLS server name (SNI) stay the URL's host. Nothing resolves the
+ * name a second time, so a resolver can't answer "public" for the check and "private" for the connection.
+ */
+export type Transport = (url: URL, address: string, signal: AbortSignal) => Promise<Exchange>;
+
+export const pinnedTransport: Transport = (url, address, signal) => new Promise((resolve, reject) => {
+  const family = isIP(address);
+  const lookup = (_host: string, options: { all?: boolean } | unknown, callback: (...args: unknown[]) => void) => {
+    if (typeof options === "object" && options && (options as { all?: boolean }).all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+  const send = url.protocol === "https:" ? httpsRequest : httpRequest;
+  const request = send(url, {
+    method: "GET",
+    lookup: lookup as never,
+    servername: isIP(url.hostname) ? undefined : url.hostname,
+    signal,
+    headers: { "user-agent": "Mozilla/5.0 (BB Studio Canvas image finder)", accept: "text/html,application/xhtml+xml" },
+  }, (response) => {
+    resolve({
+      status: response.statusCode ?? 0,
+      location: typeof response.headers.location === "string" ? response.headers.location : null,
+      type: String(response.headers["content-type"] ?? ""),
+      body: response,
+      close: () => response.destroy(),
+    });
+  });
+  request.on("error", reject);
+  request.end();
+});
+
+/**
+ * A GET of a public http(s) page. Each hop: the host is resolved once, every address it gives must be public,
+ * and the request connects to that exact address (pinnedTransport). At most 3 redirects, each checked the same
+ * way; a time limit and a size cap.
+ */
+export async function safeFetch(url: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<{ url: string; text: string; type: string }> {
   const resolve = deps.lookup ?? ((host: string) => dnsLookup(host, { all: true }));
+  const transport = deps.transport ?? pinnedTransport;
   let current = url;
   for (let hop = 0; hop < 4; hop++) {
     const parsed = new URL(current);
@@ -58,33 +109,40 @@ export async function safeFetch(url: string, deps: Pick<ImageDeps, "fetch" | "lo
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const response = await doFetch(parsed.toString(), { redirect: "manual", signal: controller.signal, headers: { "user-agent": "Mozilla/5.0 (BB Studio Canvas image finder)", accept: "text/html,application/xhtml+xml" } });
+      const response = await transport(parsed, addresses[0]!.address, controller.signal);
       if (response.status >= 300 && response.status < 400) {
-        const next = response.headers.get("location");
-        if (!next) throw new Error("A redirect with nowhere to go.");
-        current = new URL(next, parsed).toString();
+        response.close();
+        if (!response.location) throw new Error("A redirect with nowhere to go.");
+        current = new URL(response.location, parsed).toString();
         continue;
       }
-      if (!response.ok) throw new Error(`The page answered ${response.status}.`);
-      const reader = response.body?.getReader();
+      if (response.status < 200 || response.status >= 300) { response.close(); throw new Error(`The page answered ${response.status}.`); }
       let text = "";
-      if (reader) {
+      if (response.body) {
         const decoder = new TextDecoder();
         let bytes = 0;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          bytes += value.byteLength;
-          text += decoder.decode(value, { stream: true });
-          if (bytes > PAGE_BYTES) { await reader.cancel().catch(() => {}); break; }
+        for await (const chunk of response.body) {
+          bytes += chunk.byteLength;
+          text += decoder.decode(chunk, { stream: true });
+          if (bytes > PAGE_BYTES) { response.close(); break; }
         }
-      } else text = (await response.text()).slice(0, PAGE_BYTES);
-      return { url: parsed.toString(), text, type: response.headers.get("content-type") ?? "" };
+      }
+      return { url: parsed.toString(), text, type: response.type };
     } finally {
       clearTimeout(timer);
     }
   }
   throw new Error("Too many redirects.");
+}
+
+/** Tracking parameters an image address doesn't need (and shouldn't carry to the page). */
+const TRACKING = /^(utm_.*|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|_hsenc|_hsmi|ref_src|yclid|oly_.*|vero_.*)$/i;
+export function stripTracking(raw: string): string {
+  try {
+    const url = new URL(raw);
+    for (const key of [...url.searchParams.keys()]) if (TRACKING.test(key)) url.searchParams.delete(key);
+    return url.toString();
+  } catch { return raw; }
 }
 
 const attr = (tag: string, name: string) => new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i").exec(tag)?.slice(1).find((v) => v !== undefined) ?? null;
@@ -94,7 +152,7 @@ const https = (raw: string | null, base: string): string | null => {
   try {
     const url = new URL(decode(raw.trim()), base);
     if (url.protocol === "http:") url.protocol = "https:"; // the frame loads https only; most hosts serve both
-    return url.protocol === "https:" ? url.toString() : null;
+    return url.protocol === "https:" ? stripTracking(url.toString()) : null;
   } catch { return null; }
 };
 

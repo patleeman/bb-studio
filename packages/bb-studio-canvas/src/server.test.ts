@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CANVAS_MIGRATIONS } from "./migrations";
 import { CANVAS_DEFAULT_MODEL, registerCanvas, VOICE_START_NOTE } from "./server";
 import { CANVAS_CHANNEL } from "./shared";
-import type { ImageDeps } from "./image";
+import type { ImageDeps, Transport } from "./image";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
 
 type Sent = { threadId: string; input: { text: string; visibility?: string }[]; mode?: string };
@@ -235,18 +235,18 @@ describe("canvas tools", () => {
 describe("canvas_image", () => {
   const KEY = "exa-test-key-123";
   const publicDns = async () => [{ address: "93.184.216.34" }];
-  const htmlResponse = (body: string) => new Response(body, { status: 200, headers: { "content-type": "text/html" } });
+  const htmlPage = (body: string) => ({ status: 200, location: null, type: "text/html", body: (async function* () { yield new TextEncoder().encode(body); })(), close() {} });
 
   it("takes a page's main picture when no search key is set, and never reaches private addresses", async () => {
     const seen: string[] = [];
-    const fetch = (async (url: string) => { seen.push(String(url)); return htmlResponse('<html><head><title>Tetris (Game Boy)</title><meta property="og:image" content="//upload.example.org/tetris.jpg"><meta property="og:image:width" content="600"></head></html>'); }) as unknown as typeof globalThis.fetch;
-    const { call, tool } = canvasHost({ exaKey: async () => "", fetch, lookup: publicDns });
+    const transport: Transport = async (url) => { seen.push(url.toString()); return htmlPage('<html><head><title>Tetris (Game Boy)</title><meta property="og:image" content="//upload.example.org/tetris.jpg?utm_source=x"><meta property="og:image:width" content="600"></head></html>'); };
+    const { call, tool } = canvasHost({ exaKey: async () => "", transport, lookup: publicDns });
     const { threadId } = await call("canvas.create", { text: "Showcase" });
     const found = JSON.parse(text(await tool("canvas_image", { pageUrl: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)" }, threadId)));
     expect(found).toEqual({ url: "https://upload.example.org/tetris.jpg", alt: "Tetris (Game Boy)", source: "https://en.wikipedia.org/wiki/Tetris_(Game_Boy_video_game)", width: 600 });
     const noKey = await tool("canvas_image", { query: "Tetris box art" }, threadId) as { isError?: boolean; content?: { text: string }[] };
     expect(noKey.content?.[0]?.text).toContain("No image search key is set. Pass pageUrl");
-    const inward = canvasHost({ exaKey: async () => "", fetch, lookup: async () => [{ address: "10.0.0.5" }] });
+    const inward = canvasHost({ exaKey: async () => "", transport, lookup: async () => [{ address: "10.0.0.5" }] });
     const inwardThread = (await inward.call("canvas.create", { text: "x" })).threadId;
     const blocked = await inward.tool("canvas_image", { pageUrl: "https://intranet.example.com/" }, inwardThread) as { content?: { text: string }[] };
     expect(blocked.content?.[0]?.text).toContain("isn't a public web page");
