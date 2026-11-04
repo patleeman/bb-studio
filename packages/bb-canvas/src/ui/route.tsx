@@ -2,7 +2,7 @@
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
@@ -39,6 +39,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const theme = useWidgetTheme();
   const { canvas, send } = useCanvas(threadId);
   const [pending, setPending] = useState<string | null>(null);
+  const [chatHeight, setChatHeight] = useState(0);
 
   const submit = useCallback(async (text: string) => {
     if (!threadId) {
@@ -61,16 +62,18 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   return (
     <div className="canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground" data-canvas-page data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0}>
       <TopBar canvas={canvas ?? null} />
-      <div className="canvas-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 pt-2">
+      {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
+      <div className="canvas-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 pt-2" style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : (
           <Board
             items={items}
             theme={theme}
+            bottomPad={24}
             empty={<p className="max-w-sm text-center text-[15px] leading-relaxed text-muted-foreground/70">{working ? "Thinking it through…" : "Ask anything. The board fills in as we talk, and changes as the conversation does."}</p>}
           />
         )}
       </div>
-      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} onSubmit={submit} />
+      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} onSubmit={submit} onHeight={setChatHeight} />
     </div>
   );
 }
@@ -125,12 +128,23 @@ function History({ lines }: { lines: readonly CanvasTurn[] }) {
 }
 
 /** The chat, as one faint line: the latest caption over a borderless field. */
-function ChatLine({ threadId, canvas, pending, working, onSubmit }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void> }) {
+function ChatLine({ threadId, canvas, pending, working, onSubmit, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void>; onHeight(height: number): void }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const form = useRef<HTMLFormElement>(null);
+  const block = useRef<HTMLDivElement>(null);
+  // The page reserves exactly this block's height for it, as it changes (a longer caption, the history peek).
+  useLayoutEffect(() => {
+    const element = block.current;
+    if (!element) return;
+    const report = () => onHeight(Math.ceil(element.getBoundingClientRect().height));
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [onHeight]);
   const field = `canvas:${threadId ?? "new"}`;
   const dictating = useDictating(field);
 
@@ -161,7 +175,7 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit }: { threadId: 
   const caption = pending ? null : canvas?.caption ?? null;
   const lastUser = pending ?? [...(canvas?.history ?? [])].reverse().find((line) => line.role === "user")?.text ?? null;
   return (
-    <div className="canvas-chat pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center bg-gradient-to-t from-background from-45% via-background/80 to-transparent pb-5 pt-16">
+    <div ref={block} className="canvas-chat pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center bg-background pb-5 pt-3" data-canvas-chat>
       <div className="pointer-events-auto w-full max-w-2xl px-6">
         {history && canvas ? <History lines={canvas.history} /> : null}
         <div className="mb-1.5 min-h-[1.5rem] text-[15px] leading-snug" aria-live="polite" data-canvas-caption>

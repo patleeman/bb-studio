@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { cn, type WidgetTheme } from "./studio";
 import { columnsFor, packBoard, type Cell } from "../layout";
 import type { CanvasItem } from "../shared";
-import { BARE_KINDS, ItemBody, itemLabel } from "./items";
+import { BARE_KINDS, ItemBody, itemLabel, tableColumns } from "./items";
 import { enter, exit, fadeIn, fadeOut, highlight, move, type Rect } from "./motion";
 
 export const GAP = 14;
@@ -119,7 +119,7 @@ export function Board({ items, theme, empty, bottomPad = 160 }: { items: readonl
   const cols = columnsFor(width);
   // The last layout per column count: the stability hint for the next.
   const previous = useRef(new Map<number, Map<string, Cell>>());
-  const packed = useMemo(() => packBoard(items.map((item) => ({ id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt })), cols, previous.current.get(cols)), [items, cols]);
+  const packed = useMemo(() => packBoard(items.map((item) => ({ id: item.id, kind: item.kind, size: item.size, importance: item.importance, createdAt: item.createdAt, updatedAt: item.updatedAt, columns: tableColumns(item) })), cols, previous.current.get(cols)), [items, cols]);
   const { rect, rowHeight } = geometry(width, cols);
 
   const elements = useRef(new Map<string, HTMLElement>());
