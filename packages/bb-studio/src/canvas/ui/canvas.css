@@ -1,0 +1,13 @@
+/* Canvas (prototype): the board's whiteboard ground and the caption's
+   "working" pulse. Imported by app.tsx; only the canvas page uses these. */
+.canvas-scroll {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--muted-foreground, #71717a) 22%, transparent) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+}
+.canvas-tile { will-change: transform; }
+@keyframes canvas-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+.canvas-pulse { animation: canvas-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .canvas-pulse { animation: none; }
+}

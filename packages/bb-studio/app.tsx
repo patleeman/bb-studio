@@ -17,6 +17,7 @@ import { DrawingDirective } from "./src/draw/ui/drawing-directive";
 import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
 import { isDashboardId } from "./src/dashboards/shared";
+import { CANVAS_SEGMENT } from "./src/canvas/shared";
 import { isMiniId } from "./src/minis/shared";
 import { MiniCard } from "./src/minis/ui/mini-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
@@ -30,6 +31,7 @@ import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
 import "./src/dashboards/ui/dashboards.css";
+import "./src/canvas/ui/canvas.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, StudioPanel } from "./src/ui/StudioPanel";
@@ -103,6 +105,9 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   minis: { isId: isMiniId, View: lazy(() => import("./src/minis/ui/route")) },
 };
 
+/** Canvas (prototype): the board page, loaded when a canvas first opens. */
+const CanvasRoute = lazy(() => import("./src/canvas/ui/route"));
+
 /** The thread's Studio tab; its kinds' editors load when an item opens. */
 const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 
@@ -115,6 +120,8 @@ function StudioRoot({ subPath }: { subPath: string }) {
   // The Bot page: the selected Bot's Info, or the create flow; its chat and
   // threads open as BB threads, with the Bots list in BB's sidebar.
   if (path === BOT_SUBPATH || path.startsWith(`${BOT_SUBPATH}/`)) return <BotPanel />;
+  // Canvas (prototype, src/canvas): canvas/<threadId> is one board; canvas alone starts a new one.
+  if (path === CANVAS_SEGMENT || path.startsWith(`${CANVAS_SEGMENT}/`)) return <Suspense fallback={null}><CanvasRoute rest={path.slice(CANVAS_SEGMENT.length + 1)} /></Suspense>;
   // Conversations about items: chats/item/…, chats/choose/…, chats/quote/….
   if (path === CHATS_PATH || path.startsWith(`${CHATS_PATH}/`)) return <ConversationPage subPath={path.slice(CHATS_PATH.length + 1)} />;
   // A built-in kind: <segment>/<id> is one item; <segment> alone is the
