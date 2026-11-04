@@ -20,7 +20,7 @@ export const CANVAS_RULES = [
 export const CANVAS_INSTRUCTIONS = `${CANVAS_RULES}\n\nItem kinds: ${CANVAS_KINDS.join(", ")}. Read the canvas skill for each kind's data shape. canvas_read shows the board and its recent changes.`;
 
 /** The agent-only note on a new canvas's first message. */
-export const CANVAS_FIRST_NOTE = `Studio note (agent only): this thread backs a canvas. ${CANVAS_RULES}`;
+export const CANVAS_FIRST_NOTE = `Canvas note (agent only): this thread backs a canvas. ${CANVAS_RULES}`;
 
 /** One line per kind: its data and options, for tool descriptions. */
 export const KIND_LINES = CANVAS_KINDS.map((kind) => `- ${kind}: data ${CANVAS_KIND_INFO[kind].data}; options ${CANVAS_KIND_INFO[kind].options}; default size ${CANVAS_KIND_INFO[kind].size}.`).join("\n");
