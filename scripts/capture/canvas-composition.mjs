@@ -84,7 +84,7 @@ for (const [index, [size, mode]] of TABS.entries()) {
 async function open(threadId) {
   for (const client of Object.values(tabs)) {
     await client.navigate(`/plugins/studio-canvas/canvas/${threadId}`);
-    await client.waitForSelector("[data-canvas-board]", 30_000);
+    await client.waitForSelector("[data-canvas-board], [data-canvas-page-frame][data-page-ready]", 30_000);
     await client.evaluate(`(() => { const sidebar = document.querySelector('[data-sidebar="sidebar"]'); const state = sidebar?.closest('[data-state]')?.getAttribute('data-state'); if (sidebar && state !== 'collapsed' && state !== 'closed') document.querySelector('button[aria-label^="Toggle sidebar" i]')?.click(); return true; })()`);
   }
   await sleep(800);
@@ -145,11 +145,13 @@ async function stills(prefix, rev) {
 async function midMorph(threadId, text, n) {
   const client = tabs["wide-light"];
   await client.command("Page.bringToFront").catch(() => {});
-  const tree = await client.command("Page.getFrameTree");
-  const child = (tree.frameTree.childFrames ?? []).map((each) => each.frame).find((frame) => frame.url === "about:srcdoc") ?? tree.frameTree.childFrames?.[0]?.frame;
-  if (!child) throw new Error("No page frame to catch mid-morph.");
-  const { executionContextId } = await client.command("Page.createIsolatedWorld", { frameId: child.id, worldName: "canvas-capture" });
-  const inFrame = (expression) => client.command("Runtime.evaluate", { expression, contextId: executionContextId, returnByValue: true }).then((result) => result.result?.value);
+  // The page's frame is sandboxed, so it runs as its own (out-of-process) target under this tab.
+  const { targetInfo } = await client.command("Target.getTargetInfo");
+  const { targetInfos } = await client.command("Target.getTargets");
+  const frame = targetInfos.find((target) => target.type === "iframe" && target.parentId === targetInfo.targetId && target.url === "about:srcdoc");
+  if (!frame) throw new Error("No page frame to catch mid-morph.");
+  const { sessionId } = await client.command("Target.attachToTarget", { targetId: frame.targetId, flatten: true });
+  const inFrame = (expression) => client.command("Runtime.evaluate", { expression, returnByValue: true }, 10_000, sessionId).then((result) => result.result?.value);
   await inFrame(`(() => { const root = document.getElementById("cv-page"); const observer = new MutationObserver(() => { observer.disconnect(); setTimeout(() => { document.getAnimations().forEach((a) => a.pause()); document.documentElement.dataset.captureMid = String(document.getAnimations().length); }, 260); }); observer.observe(root, { childList: true }); return true; })()`);
   const before = (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas;
   await pluginRpc("studio-canvas", "canvas.send", { threadId, text });
