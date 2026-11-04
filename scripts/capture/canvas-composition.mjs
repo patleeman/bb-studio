@@ -16,6 +16,10 @@
  *   board as JSON (turn-<n>.json, for writing its reference), and what the
  *   page measured: the composition, whether it scrolls, overlapping items and
  *   lines.
+ * - A follow-up caught mid-morph (CANVAS_COMPOSITION_THREAD and _FOLLOWUP):
+ *   sends that message to the canvas and pauses the page's animations
+ *   about 260 ms into its first change (turn-<n>-mid-animation-wide-light.png),
+ *   then takes the four stills.
  * - References (CANVAS_COMPOSITION_THREAD and _REFS): for each ref-<n>.json in
  *   _REFS ({look, title, caption, composition, items}, items with fixed: {x, y,
  *   w} as shares of the board, and fixedNarrow for the narrow window when it
@@ -133,8 +137,36 @@ async function stills(prefix, rev) {
   return pages;
 }
 
+/**
+ * A page morph caught halfway: in the wide-light tab, an observer in the page's frame (an isolated world, so
+ * the page's own scripts don't see it) pauses every animation ~260 ms after the page changes; the still is
+ * taken, then they play on.
+ */
+async function midMorph(threadId, text, n) {
+  const client = tabs["wide-light"];
+  await client.command("Page.bringToFront").catch(() => {});
+  const tree = await client.command("Page.getFrameTree");
+  const child = (tree.frameTree.childFrames ?? []).map((each) => each.frame).find((frame) => frame.url === "about:srcdoc") ?? tree.frameTree.childFrames?.[0]?.frame;
+  if (!child) throw new Error("No page frame to catch mid-morph.");
+  const { executionContextId } = await client.command("Page.createIsolatedWorld", { frameId: child.id, worldName: "canvas-capture" });
+  const inFrame = (expression) => client.command("Runtime.evaluate", { expression, contextId: executionContextId, returnByValue: true }).then((result) => result.result?.value);
+  await inFrame(`(() => { const root = document.getElementById("cv-page"); const observer = new MutationObserver(() => { observer.disconnect(); setTimeout(() => { document.getAnimations().forEach((a) => a.pause()); document.documentElement.dataset.captureMid = String(document.getAnimations().length); }, 260); }); observer.observe(root, { childList: true }); return true; })()`);
+  const before = (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas;
+  await pluginRpc("studio-canvas", "canvas.send", { threadId, text });
+  const paused = await until(() => inFrame(`document.documentElement.dataset.captureMid ?? null`), (value) => value !== null && value !== undefined, TURN_MS, "the page to change").catch(() => null);
+  log(`mid-morph: ${paused} animations paused`);
+  await client.capture(join(out, `turn-${n}-mid-animation-wide-light.png`));
+  await inFrame(`(() => { document.getAnimations().forEach((a) => a.play()); delete document.documentElement.dataset.captureMid; return true; })()`);
+  const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > before.turn && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, "the follow-up");
+  const pages = await stills(`turn-${n}`, done.rev);
+  await writeFile(join(out, `turn-${n}.json`), JSON.stringify({ turn: n, prompt: text, look: done.look, title: done.title, caption: done.caption, parts: [...(done.page ?? "").matchAll(/data-cv-id=["']?([^"'\s>]+)/g)].map((match) => match[1]), mid: paused, pages, view: done }, null, 2));
+}
+
 try {
-  if (refThread) {
+  if (process.env.CANVAS_COMPOSITION_FOLLOWUP && refThread) {
+    await open(refThread);
+    await midMorph(refThread, process.env.CANVAS_COMPOSITION_FOLLOWUP, Number(process.env.CANVAS_COMPOSITION_TURN ?? 7));
+  } else if (refThread) {
     if (!refsDir) throw new Error("Set CANVAS_COMPOSITION_REFS to the folder with ref-<n>.json.");
     await open(refThread);
     const rev = (await pluginRpc("studio-canvas", "canvas.get", { threadId: refThread })).canvas.rev;
@@ -155,30 +187,13 @@ try {
   } else {
     const results = [];
     let threadId = null;
-    let armMid = false;
     for (const [index, prompt] of PROMPTS.entries()) {
       const n = index + 1;
       log(`turn ${n}: ${prompt.text.split("\n")[0]}`);
       const before = threadId ? (await pluginRpc("studio-canvas", "canvas.get", { threadId })).canvas : null;
       const started = Date.now();
-      const midTab = tabs["wide-light"];
-      if (armMid) {
-        await midTab.command("Page.bringToFront").catch(() => {});
-        await midTab.command("Animation.enable");
-        await midTab.command("Animation.setPlaybackRate", { playbackRate: 0.1 });
-      }
       if (!threadId) ({ threadId } = await pluginRpc("studio-canvas", "canvas.create", { text: prompt.text }));
       else await pluginRpc("studio-canvas", "canvas.send", { threadId, text: prompt.text });
-      if (armMid) {
-        // The first new page revision starts the morph; ~3 s at a tenth of the speed is about halfway.
-        const startRev = Number(await midTab.poll(`document.querySelector("[data-canvas-page-frame]")?.dataset.pageRev ?? 0`));
-        await until(() => midTab.poll(`Number(document.querySelector("[data-canvas-page-frame]")?.dataset.pageRev ?? 0)`), (value) => value > startRev, TURN_MS, "the follow-up's first page change").catch(() => null);
-        await sleep(3000);
-        await midTab.capture(join(out, `turn-${n}-mid-animation-wide-light.png`));
-        log("still", `turn-${n}-mid-animation-wide-light.png`);
-        await midTab.command("Animation.setPlaybackRate", { playbackRate: 1 });
-        armMid = false;
-      }
       if (n === 1) await open(threadId);
       const turnBefore = before?.turn ?? 0;
       const done = await until(() => pluginRpc("studio-canvas", "canvas.get", { threadId }).then((result) => result.canvas), (canvas) => canvas.turn > turnBefore && canvas.status === "idle" && canvas.history.at(-1)?.role === "agent", TURN_MS, `turn ${n}`);
@@ -186,8 +201,6 @@ try {
       const compositionChanges = done.changes.filter((change) => change.turn === done.turn).map((change) => change.summary);
       log(`turn ${n}: ${seconds}s, ${done.look}, title "${done.title}", ${done.page ? `page ${done.page.length} chars` : `${done.items.length} items`}`);
       const pages = await stills(`turn-${n}`, done.rev);
-      // Before the follow-up, slow every animation down in one tab and catch the page mid-morph.
-      if (prompt.id === "data" && process.env.CANVAS_COMPOSITION_MID !== "0") armMid = true;
       const result = { turn: n, id: prompt.id, prompt: prompt.text.split("\n")[0], seconds, look: done.look, title: done.title, caption: done.caption, changes: compositionChanges, parts: [...(done.page ?? "").matchAll(/data-cv-id=["']?([^"'\s>]+)/g)].map((match) => match[1]), pages };
       results.push(result);
       await writeFile(join(out, `turn-${n}.json`), JSON.stringify({ ...result, view: done }, null, 2));
