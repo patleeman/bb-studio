@@ -344,6 +344,10 @@ describe("canvas tools", () => {
     const thin = text(await tool("canvas_set", { items: [{ id: "studio", kind: "caption", data: "One plugin." }, { id: "n", kind: "stat", data: 3 }] }, threadId));
     expect(thin).toContain("Still to do: it has only 2 pieces");
     expect(thin).toContain("no piece is the hero");
+    // A showcase without pictures is told to add them.
+    await call("canvas.send", { threadId, text: "give me a showcase of games" });
+    const noPictures = text(await tool("canvas_set", { items: [{ id: "studio", kind: "caption", data: "Games", scale: "hero" }] }, threadId));
+    expect(noPictures).toContain("add image items");
     expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ title: "BB Studio", composition: "essay" });
   });
 });

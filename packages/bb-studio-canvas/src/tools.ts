@@ -74,9 +74,13 @@ export function describeBoard(store: CanvasStore, canvasId: string): string {
   return [`Board (revision ${row.rev}, turn ${row.turn}), ${board.length} item(s).${styleLine}`, ...lines, "", "Latest changes:", ...changes].join("\n");
 }
 
+/** A request for something to look at: a showcase, a gallery, pictures. */
+const VISUAL_ASK = /\b(showcase|show me|gallery|pictures?|photos?|images?|what (does|do) .* look like)\b/i;
+
 /** After canvas_set in a style: what a thin or heroless board still needs (the board is already shown). */
-export function boardAdvice(items: readonly { kind: string; scale?: string | null }[]): string {
+export function boardAdvice(items: readonly { kind: string; scale?: string | null }[], asked: string | null = null): string {
   const advice: string[] = [];
+  if (asked && VISUAL_ASK.test(asked) && !items.some((item) => item.kind === "image")) advice.push("the user asked to see things: add image items with real pictures (covers, box art, photos) from web search; one that fails to load shows its name on a tile, so don't leave them out");
   if (items.length && items.length < 5) advice.push(`it has only ${items.length} pieces: add 2–5 more that each say something specific (numbers with context, a chart, pictures, a quote), at different scales, so the board fills the screen`);
   if (items.length && !items.some((item) => item.scale === "hero")) advice.push("no piece is the hero: give the one that answers the question scale \"hero\"");
   return advice.length ? ` Still to do: ${advice.join("; ")}.` : "";
@@ -121,7 +125,7 @@ export function runCanvasTool(store: CanvasStore, canvasId: string, name: Canvas
     }
     const result = store.edit(canvasId, toolOps(name, input), by);
     const look = lookOf(store.get(canvasId)?.look);
-    return { text: summarize(result, focusOf(result.items)) + (name === "canvas_set" && look !== "classic" ? boardAdvice(result.items) : ""), changed: true };
+    return { text: summarize(result, focusOf(result.items)) + (name === "canvas_set" && look !== "classic" ? boardAdvice(result.items, [...store.history(canvasId, 6)].reverse().find((line) => line.role === "user" || line.role === "voice")?.text ?? null) : ""), changed: true };
   } catch (error) {
     const message = error instanceof z.ZodError
       ? error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")

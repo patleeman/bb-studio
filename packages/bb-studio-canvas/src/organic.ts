@@ -289,7 +289,7 @@ export function layoutOrganic(items: readonly OrganicItem[], frame: Frame, look:
   let area = 0;
   for (const item of items) { const s = sizes.get(item.id)!; area += s.w * heightOf(item); }
   // Composed for the screen; only a board too full for it (after the fit's shrink) is composed taller, to scroll.
-  const Hv = Math.round(Math.max(H, narrow ? area / (W * 0.78) : area / (W * 0.82 * MIN_FIT)));
+  const Hv = Math.round(Math.max(H, narrow ? area / (W * 0.78) : area / (W * 0.82 * minFit(H))));
   // How far toward the composition's targets pieces reach from the hero: a sparse board stays a tight cluster
   // (the fit then scales it up to the screen), a full one spreads to the edges.
   const pull = Math.max(0.45, Math.min(1, 0.2 + (area / (W * H)) * 1.2));
@@ -492,8 +492,9 @@ function stretch(rects: Map<string, Placed>, W: number, H: number): void {
 
 /** Bigger than this, a sparse board's type and charts would read as blown up. */
 export const MAX_FIT = 1.4;
-/** A board this much taller than the screen shrinks to fit it rather than scroll. */
+/** A board this much taller than the screen shrinks to fit it rather than scroll (more on a short screen). */
 export const MIN_FIT = 0.86;
+export const minFit = (H: number) => (H < 700 ? 0.74 : MIN_FIT);
 
 /**
  * Fits the composed board to the screen: a sparse board is scaled up (to
@@ -508,7 +509,7 @@ export function fitTo(rects: ReadonlyMap<string, Placed>, W: number, H: number, 
   for (const r of rects.values()) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
   const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0);
   let scale = Math.min(W / bw, H / bh, MAX_FIT);
-  if (scale < MIN_FIT) return { scale: 1, x: 0, y: 0 };
+  if (scale < minFit(H)) return { scale: 1, x: 0, y: 0 };
   scale = Math.round(scale * 1000) / 1000;
   return { scale, x: Math.round((W - bw * scale) / 2 - x0 * scale), y: Math.round((H - bh * scale) / 2 - y0 * scale) };
 }
