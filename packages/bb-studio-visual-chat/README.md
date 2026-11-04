@@ -115,6 +115,17 @@ hands-free button.
   back). The caption is written to add what the board doesn't say;
   sentences that describe the board ("The board shows…") are dropped from
   it.
+- **Versions:** each turn's finished board is saved as a version: its
+  page, style, title, the message that led to it and the caption (drafts
+  and mid-turn patches aren't versions). ‹ › and "3 / 7" beside the chat
+  line page back and forward, with the same glide, and so do ← and → while
+  the field is empty; hovering shows each version's message. A message
+  sent from an old version continues from it: the board goes back to that
+  version, the agent is told so, and the new version comes after the
+  others, which stay. The last 50 are kept per canvas. A canvas from before
+  versions starts with its board as it was as version 1 (a board of items
+  shows as it was). `canvas_read` says when the user is looking at an old
+  version.
 - **Boards from before pages** (items placed by the old layout) still open
   and show as they were. The agent's next page replaces them.
 

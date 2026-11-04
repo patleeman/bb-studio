@@ -49,6 +49,8 @@ export const CANVAS_LIMITS = {
   /** Change log and history kept per canvas. */
   changesKept: 200,
   turnsKept: 200,
+  /** Versions kept per canvas: the oldest go past this. */
+  versionsKept: 50,
 } as const;
 
 /**
@@ -247,6 +249,24 @@ export const pickerProviderSchema = z.object({
 export type PickerProvider = z.infer<typeof pickerProviderSchema>;
 export type CanvasMeta = z.infer<typeof canvasMetaSchema>;
 
+/** A version in the timeline: n only grows (old ones drop off), from is the version a branch continued from. */
+export const versionMetaSchema = z.object({
+  n: z.number(),
+  look: lookSchema,
+  title: z.string(),
+  /** The message that led to it. */
+  prompt: z.string().nullable(),
+  caption: z.string().nullable(),
+  rev: z.number(),
+  from: z.number().nullable(),
+  at: z.number(),
+  /** A board of items from before pages (read-only: it shows as it was). */
+  items: z.boolean(),
+});
+export type CanvasVersionMeta = z.infer<typeof versionMetaSchema>;
+export const versionSchema = versionMetaSchema.extend({ page: z.string().nullable(), board: z.array(canvasItemSchema) });
+export type CanvasVersion = z.infer<typeof versionSchema>;
+
 export const canvasViewSchema = canvasMetaSchema.extend({
   /** What the backing thread runs on (null for canvases from before the picker). */
   execution: executionSchema.nullable(),
@@ -264,8 +284,13 @@ export const canvasViewSchema = canvasMetaSchema.extend({
   changes: z.array(changeSchema),
   /** The hidden transcript's last few lines, oldest first. */
   history: z.array(turnSchema),
+  /** Each turn's finished board, oldest first (store.ts); fetch one's board with canvas.version. */
+  versions: z.array(versionMetaSchema),
+  /** The version the user is looking at, or null for the latest. */
+  viewing: z.number().nullable(),
 });
 export type CanvasView = z.infer<typeof canvasViewSchema>;
+
 
 /**
  * A checked item: size limits, and what each kind needs. Throws a readable

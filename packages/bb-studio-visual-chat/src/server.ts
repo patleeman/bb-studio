@@ -164,6 +164,24 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     return providers;
   };
 
+  /** The version a turn continued from, until that turn's version is saved. */
+  const branchedFrom = new Map<string, number>();
+  /**
+   * The user went back to version n (not the latest) and continues from it: the board returns to that version,
+   * and the agent gets a note saying so. Returns the note, or "" when the board is already the latest version.
+   */
+  const goBack = (canvasId: string, n: number | null | undefined): string => {
+    if (!n) return "";
+    const versions = store.versions(canvasId);
+    const index = versions.findIndex((version) => version.n === n);
+    if (index < 0 || index === versions.length - 1) return "";
+    store.restoreVersion(canvasId, n, "user");
+    branchedFrom.set(canvasId, n);
+    publish(canvasId);
+    const version = versions[index]!;
+    return `The user went back to version ${index + 1} of ${versions.length}${version.prompt ? ` (their message then: "${version.prompt.replace(/\s+/g, " ").slice(0, 200)}")` : ""} and this message continues from it. The board is that version again (canvas_read shows it): build on it, not on the later versions, keeping its ids.`;
+  };
+
   bb.rpc.register(canvasContract, {
     "canvas.list"() {
       return { canvases: store.list() };
@@ -208,15 +226,28 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       if (!row) return { output: "This session isn't speaking for a canvas, so there's no board to edit." };
       return { output: (await run(row.id, name, args, "voice")).text };
     },
-    async "canvas.send"({ threadId, text }) {
+    "canvas.version"({ threadId, n }) {
+      const row = store.byThread(threadId);
+      return { version: row ? store.version(row.id, n) : null };
+    },
+    "canvas.view"({ threadId, n }) {
+      const row = store.byThread(threadId);
+      if (!row) throw new Error("That canvas is gone.");
+      store.setViewing(row.id, n);
+      return { viewing: store.viewing(row.id) };
+    },
+    async "canvas.send"({ threadId, text, fromVersion }) {
       const row = store.byThread(threadId);
       if (!row?.thread_id) throw new Error("That canvas is gone.");
+      // The board as it was before this turn is a version (a canvas from before versions gets its first now).
+      store.ensureFirstVersion(row.id);
+      const back = goBack(row.id, fromVersion ?? store.viewing(row.id));
       const next = store.pendingExecution(row.id);
       if (next) {
         // A provider switch: BB can't move a thread to another provider, so the canvas gets a
         // fresh backing thread on it. The board is Canvas's own, so it stays; the new thread
         // gets the rules, the guide, the board as it is and the last few lines of talk.
-        const note = `${canvasFirstNote(lookOf(row.look), next.providerId)}\n\n${handoffNote(row.id)}`;
+        const note = `${canvasFirstNote(lookOf(row.look), next.providerId)}\n\n${handoffNote(row.id)}${back ? `\n\n${back}` : ""}`;
         const fresh = await spawnThread(row.id, row.title, next, [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }]);
         store.setExecution(row.id, next);
         store.beginTurn(row.id, "user", text);
@@ -224,7 +255,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         publish(row.id);
         return { ok: true, threadId: fresh };
       }
-      await bb.sdk.threads.send({ threadId: row.thread_id, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }] } as never);
+      await bb.sdk.threads.send({ threadId: row.thread_id, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }, ...(back ? [{ type: "text", text: back, mentions: [], visibility: "agent-only" }] : [])] } as never);
       store.beginTurn(row.id, "user", text);
       store.setStatus(row.id, "working");
       publish(row.id);
@@ -267,6 +298,8 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       store.setCaption(row.id, reply);
       store.note(row.id, "agent", reply.trim().slice(0, CANVAS_LIMITS.messageChars));
     }
+    // The finished board is the turn's version (drafts and mid-turn patches never are).
+    if (next === "idle") { store.saveVersion(row.id, branchedFrom.get(row.id) ?? null); branchedFrom.delete(row.id); }
     publish(row.id);
   };
   bb.events.on("thread.active", ({ thread }) => status(thread.id, "working"));

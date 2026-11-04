@@ -16,6 +16,8 @@ import {
   type CanvasKind,
   type CanvasMeta,
   type CanvasTurn,
+  type CanvasVersion,
+  type CanvasVersionMeta,
   type CanvasView,
   type ItemInput,
   type ItemPatch,
@@ -25,7 +27,7 @@ import { LOOK_INFO, lookOf, type Look, type OrganicLook } from "./looks";
 import { organicFocus } from "./organic";
 import { outline, pageTitle, replacePart } from "./page";
 
-type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; page: string | null; title_source: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null };
+type CanvasRow = { id: string; thread_id: string | null; title: string; caption: string | null; status: string; rev: number; turn: number; created_at: number; updated_at: number; archived_at: number | null; look: string | null; page: string | null; title_source: string | null; provider_id: string | null; model: string | null; reasoning_level: string | null; pending_execution: string | null; viewing?: number | null };
 type ItemRow = { canvas_id: string; id: string; kind: string; title: string | null; data: string | null; options: string; html: string | null; size: string; importance: number; created_at: number; updated_at: number; rev: number; rel: string | null };
 
 /** Who made an edit: the canvas thread's agent, the hands-free voice, or the user. */
@@ -134,7 +136,7 @@ export class CanvasStore {
 
   delete(id: string): void {
     this.db.transaction(() => {
-      for (const table of ["canvas_items", "canvas_changes", "canvas_turns", "canvas_thread_aliases"]) this.db.prepare(`DELETE FROM ${table} WHERE canvas_id = ?`).run(id);
+      for (const table of ["canvas_items", "canvas_changes", "canvas_turns", "canvas_thread_aliases", "canvas_versions"]) this.db.prepare(`DELETE FROM ${table} WHERE canvas_id = ?`).run(id);
       this.db.prepare("DELETE FROM canvases WHERE id = ?").run(id);
     })();
   }
@@ -184,6 +186,7 @@ export class CanvasStore {
       execution: this.execution(id), pendingExecution: this.pendingExecution(id),
       page: row.page ?? null,
       items: this.items(id), changes: this.changes(id), history: this.history(id),
+      versions: this.versions(id), viewing: this.viewing(id),
     };
   }
 
@@ -349,6 +352,92 @@ export class CanvasStore {
    * title is the agent's when given, else the page's first heading. A page
    * replaces any items left from before pages.
    */
+  // Versions: the board at the end of each turn, to page back and forward through. ---------------------------
+
+  /** The canvas's versions, oldest first (without their boards). A board from before versions becomes version 1. */
+  versions(canvasId: string): CanvasVersionMeta[] {
+    this.ensureFirstVersion(canvasId);
+    const rows = this.db.prepare("SELECT n, look, title, prompt, caption, rev, from_n, at, page IS NULL AS old FROM canvas_versions WHERE canvas_id = ? ORDER BY n").all(canvasId) as { n: number; look: string | null; title: string; prompt: string | null; caption: string | null; rev: number; from_n: number | null; at: number; old: number }[];
+    return rows.map((row) => ({ n: row.n, look: lookOf(row.look), title: row.title, prompt: row.prompt, caption: row.caption, rev: row.rev, from: row.from_n, at: row.at, items: row.old === 1 }));
+  }
+
+  /** One version with its board: the page, or a board of items from before pages. */
+  version(canvasId: string, n: number): CanvasVersion | null {
+    const row = this.db.prepare("SELECT * FROM canvas_versions WHERE canvas_id = ? AND n = ?").get(canvasId, n) as { n: number; page: string | null; items: string | null; look: string | null; title: string; prompt: string | null; caption: string | null; rev: number; from_n: number | null; at: number } | undefined;
+    if (!row) return null;
+    const items = row.page === null ? ((parse(row.items) as CanvasItem[] | null) ?? []) : [];
+    return { n: row.n, look: lookOf(row.look), title: row.title, prompt: row.prompt, caption: row.caption, rev: row.rev, from: row.from_n, at: row.at, items: row.page === null, page: row.page, board: items };
+  }
+
+  /** The version the user is looking at, or null for the latest. */
+  viewing(canvasId: string): number | null {
+    const row = this.get(canvasId);
+    return typeof row?.viewing === "number" ? row.viewing : null;
+  }
+
+  setViewing(canvasId: string, n: number | null): void {
+    const latest = this.latestVersion(canvasId);
+    const next = n !== null && n !== latest?.n && this.version(canvasId, n) ? n : null;
+    this.db.prepare("UPDATE canvases SET viewing = ? WHERE id = ?").run(next, canvasId);
+  }
+
+  private latestVersion(canvasId: string): { n: number; page: string | null; items: string | null; look: string | null; caption: string | null } | null {
+    return (this.db.prepare("SELECT n, page, items, look, caption FROM canvas_versions WHERE canvas_id = ? ORDER BY n DESC LIMIT 1").get(canvasId) as { n: number; page: string | null; items: string | null; look: string | null; caption: string | null } | undefined) ?? null;
+  }
+
+  /** A canvas from before versions: its board as it is, as version 1 (never mid-turn, when the board is a draft). */
+  ensureFirstVersion(canvasId: string): void {
+    if (this.db.prepare("SELECT 1 FROM canvas_versions WHERE canvas_id = ? LIMIT 1").get(canvasId)) return;
+    const row = this.get(canvasId);
+    // Mid-turn, the board is a draft: the turn's end saves it.
+    if (!row || row.status === "working" || (!row.page && !this.items(canvasId).length)) return;
+    this.insertVersion(row, null);
+  }
+
+  /**
+   * The turn ended: its finished board becomes the next version, with the prompt that led to it and the caption.
+   * Nothing is saved for an empty board or one exactly like the latest version. Past VERSIONS_KEPT the oldest go.
+   */
+  saveVersion(canvasId: string, from: number | null = null): number | null {
+    return this.db.transaction(() => {
+      const row = this.get(canvasId);
+      if (!row || (!row.page && !this.items(canvasId).length)) return null;
+      const last = this.latestVersion(canvasId);
+      const items = row.page ? null : JSON.stringify(this.items(canvasId));
+      if (last && last.page === (row.page ?? null) && last.items === items && last.look === row.look && last.caption === row.caption) return null;
+      const n = this.insertVersion(row, from);
+      this.db.prepare("UPDATE canvases SET viewing = NULL WHERE id = ?").run(canvasId);
+      this.db.prepare("DELETE FROM canvas_versions WHERE canvas_id = ? AND n <= (SELECT n FROM canvas_versions WHERE canvas_id = ? ORDER BY n DESC LIMIT 1 OFFSET ?)").run(canvasId, canvasId, CANVAS_LIMITS.versionsKept);
+      return n;
+    }).immediate();
+  }
+
+  private insertVersion(row: CanvasRow, from: number | null): number {
+    const n = ((this.db.prepare("SELECT MAX(n) AS n FROM canvas_versions WHERE canvas_id = ?").get(row.id) as { n: number | null }).n ?? 0) + 1;
+    const prompt = [...this.history(row.id, 40)].reverse().find((line) => line.role === "user" || line.role === "voice")?.text ?? null;
+    const items = row.page ? null : JSON.stringify(this.items(row.id));
+    this.db.prepare("INSERT INTO canvas_versions (canvas_id, n, page, items, look, title, prompt, caption, rev, from_n, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(row.id, n, row.page ?? null, items, row.look, row.title, prompt?.slice(0, 2000) ?? null, row.caption, row.rev, from, this.now());
+    return n;
+  }
+
+  /**
+   * The board goes back to a version, to continue from it: its page (or its items), style, title and caption, as
+   * a new revision, so it glides. Later versions stay; the next one saved is appended after them.
+   */
+  restoreVersion(canvasId: string, n: number, by: CanvasActor): void {
+    const version = this.version(canvasId, n);
+    if (!version) throw new Error(`There's no version ${n}.`);
+    this.db.transaction(() => {
+      this.db.prepare("UPDATE canvases SET look = ?, caption = ?, viewing = NULL WHERE id = ?").run(version.look, version.caption, canvasId);
+      if (version.page !== null) this.setPage(canvasId, version.page, by, version.title || null);
+      else {
+        this.db.prepare("UPDATE canvases SET page = NULL WHERE id = ?").run(canvasId);
+        this.edit(canvasId, [{ op: "set", items: version.board.map(({ createdAt: _c, updatedAt: _u, rev: _r, ...item }) => item as ItemInput) }, ...(version.title ? [{ op: "board" as const, title: version.title }] : [])], by);
+      }
+    }).immediate();
+  }
+
   /** Pictures canvas_images found for a canvas, by key (a card's data-cv-id): kept in memory for its cards. */
   private readonly found = new Map<string, Map<string, { url: string; alt?: string }>>();
   pictures(canvasId: string): ReadonlyMap<string, { url: string; alt?: string }> {

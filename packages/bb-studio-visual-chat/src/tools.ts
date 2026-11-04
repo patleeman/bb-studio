@@ -69,7 +69,11 @@ export function canvasVoiceTools(): { type: "function"; name: CanvasToolName; de
 export function describeBoard(store: CanvasStore, canvasId: string): string {
   const row = store.get(canvasId)!;
   const look = lookOf(row.look);
-  const head = `Canvas (revision ${row.rev}, turn ${row.turn}). Style: ${look === "classic" ? "classic" : `${look} (${LOOK_INFO[look].name})`}. Title: "${row.title}".`;
+  const versions = store.versions(canvasId);
+  const viewing = store.viewing(canvasId);
+  const at = viewing === null ? -1 : versions.findIndex((version) => version.n === viewing);
+  const shown = at >= 0 ? ` The user is looking at version ${at + 1} of ${versions.length}${versions[at]!.prompt ? ` ("${versions[at]!.prompt!.replace(/\s+/g, " ").slice(0, 160)}")` : ""}, not the latest; a message they send continues from it. Below is the latest board.` : "";
+  const head = `Canvas (revision ${row.rev}, turn ${row.turn}${versions.length ? `, ${versions.length} version${versions.length === 1 ? "" : "s"}` : ""}). Style: ${look === "classic" ? "classic" : `${look} (${LOOK_INFO[look].name})`}. Title: "${row.title}".${shown}`;
   const changes = store.changes(canvasId, 12).map((change) => `- turn ${change.turn}, rev ${change.rev} (${change.by}): ${change.summary}`);
   const tail = ["", "Latest changes:", ...(changes.length ? changes : ["- none"])];
   if (row.page) {

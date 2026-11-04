@@ -46,10 +46,10 @@ export function useCanvas(threadId: string | null) {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [load]);
 
-  /** Sends a message; resolves to the canvas's thread now (a new one after a provider switch). */
-  const send = useCallback(async (text: string): Promise<string> => {
+  /** Sends a message (continuing from an old version when fromVersion is one); resolves to the canvas's thread now (a new one after a provider switch). */
+  const send = useCallback(async (text: string, fromVersion: number | null = null): Promise<string> => {
     if (!threadId) throw new Error("No canvas yet.");
-    const result = await rpc.call("canvas.send", { threadId, text });
+    const result = await rpc.call("canvas.send", { threadId, text, ...(fromVersion ? { fromVersion } : {}) });
     if (result.threadId === threadId) await load();
     return result.threadId;
   }, [load, rpc, threadId]);

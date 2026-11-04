@@ -25,7 +25,7 @@ import type Database from "better-sqlite3";
 export const LEGACY_PLUGIN_IDS = ["studio-canvas", "canvas"] as const;
 
 /** Canvas's tables, in the order they are copied (pages, looks and model choices are columns of canvases). */
-export const LEGACY_TABLES = ["canvases", "canvas_items", "canvas_changes", "canvas_turns", "canvas_thread_aliases", "canvas_image_cache"] as const;
+export const LEGACY_TABLES = ["canvases", "canvas_items", "canvas_changes", "canvas_turns", "canvas_thread_aliases", "canvas_image_cache", "canvas_versions"] as const;
 
 export type LegacyImport =
   | { status: "imported"; source: string; counts: Record<string, number> }

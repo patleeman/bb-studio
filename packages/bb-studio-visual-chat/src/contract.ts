@@ -4,7 +4,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { lookSchema } from "./looks";
-import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema, pickerProviderSchema } from "./shared";
+import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema, pickerProviderSchema, versionSchema } from "./shared";
 
 const threadId = z.string().min(1).max(200);
 const text = z.string().trim().min(1).max(CANVAS_LIMITS.messageChars);
@@ -36,9 +36,19 @@ export const canvasContract = defineRpcContract({
     input: z.object({ threadId, name: z.string().min(1).max(64), args: z.record(z.string(), z.unknown()) }),
     output: z.object({ output: z.string().nullable() }),
   },
+  "canvas.version": {
+    experimental_description: "One version of the canvas's board (the finished board of a turn), with its page or old items, style, title, prompt and caption.",
+    input: z.object({ threadId, n: z.number().int().positive() }),
+    output: z.object({ version: versionSchema.nullable() }),
+  },
+  "canvas.view": {
+    experimental_description: "Which version the user is looking at (null: the latest), so the agent and the voice know.",
+    input: z.object({ threadId, n: z.number().int().positive().nullable() }),
+    output: z.object({ viewing: z.number().nullable() }),
+  },
   "canvas.send": {
-    experimental_description: "A message to the canvas's thread; queued while it works. After a provider switch it starts the canvas's fresh thread: threadId is the canvas's thread now.",
-    input: z.object({ threadId, text }),
+    experimental_description: "A message to the canvas's thread; queued while it works. After a provider switch it starts the canvas's fresh thread: threadId is the canvas's thread now. fromVersion: the user went back to that version, so the board returns to it and the message continues from there (later versions stay).",
+    input: z.object({ threadId, text, fromVersion: z.number().int().positive().nullable().optional() }),
     output: z.object({ ok: z.boolean(), threadId: z.string() }),
   },
   "canvas.models": {

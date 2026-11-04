@@ -45,4 +45,15 @@ export const CANVAS_MIGRATIONS: string[] = [
   // Pictures canvas_image and canvas_images found (src/image.ts ImageCache),
   // by query or page address, reused for a day.
   `CREATE TABLE canvas_image_cache (key TEXT PRIMARY KEY, image TEXT NOT NULL, at INTEGER NOT NULL);`,
+  // Versions (store.ts): each turn's finished board (its page, or the items
+  // of a board from before pages), with its style, title, prompt and caption,
+  // the last 50 per canvas. n only grows; from_n is the version a branch
+  // continued from. viewing: the version the user is looking at (null: the
+  // latest).
+  `CREATE TABLE canvas_versions (
+    canvas_id TEXT NOT NULL, n INTEGER NOT NULL, page TEXT, items TEXT, look TEXT, title TEXT NOT NULL DEFAULT '',
+    prompt TEXT, caption TEXT, rev INTEGER NOT NULL, from_n INTEGER, at INTEGER NOT NULL,
+    PRIMARY KEY (canvas_id, n)
+  );
+  ALTER TABLE canvases ADD COLUMN viewing INTEGER;`,
 ];

@@ -7,7 +7,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
-import { canvasHref, canvasNewHref, CANVAS_NEW_SEGMENT, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
+import { canvasHref, canvasNewHref, CANVAS_NEW_SEGMENT, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasVersion, type CanvasVersionMeta, type CanvasView } from "../shared";
 import { DEFAULT_LOOK, isLook, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
 import { lookCss } from "./board-css";
@@ -122,7 +122,14 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   // Remember the open canvas, so coming back to Canvas reopens it.
   useEffect(() => { if (threadId && own) writeLast(threadId); }, [threadId, own]);
   const preview = usePreview();
-  const canvas = useMemo(() => (preview && own ? { ...own, look: preview.look, title: preview.title, caption: preview.caption, page: null, items: preview.items, status: "idle" as const } : own), [own, preview]);
+  const timeline = useTimeline(threadId, own);
+  const snap = timeline.snapshot;
+  const canvas = useMemo(() => {
+    if (preview && own) return { ...own, look: preview.look, title: preview.title, caption: preview.caption, page: null, items: preview.items, status: "idle" as const };
+    // An old version: its board, style, title and caption (the live board comes back at the latest).
+    if (own && snap) return { ...own, look: snap.look, title: snap.title || own.title, caption: snap.caption, page: snap.page, items: snap.board };
+    return own;
+  }, [own, preview, snap]);
   const [pending, setPending] = useState<string | null>(null);
   const [chatHeight, setChatHeight] = useState(0);
   const [newLook] = useState<OrganicLook>(startLook);
@@ -145,11 +152,12 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       return;
     }
     try {
-      const now = await send(text);
+      const now = await send(text, timeline.viewing);
+      timeline.toLatest();
       // After a provider switch the canvas has a fresh thread: follow it (the old address still finds the canvas).
       if (now !== threadId) openAppPath(canvasHref(now), { replace: true });
     } catch (error) { toast.error(errorMessage(error)); throw error; }
-  }, [rpc, send, threadId, newLook, draft]);
+  }, [rpc, send, threadId, newLook, draft, timeline]);
 
   // Hands-free can be the first input: on a new canvas it creates the canvas (on the picked model) first.
   const voice = useCallback(async () => {
@@ -196,10 +204,65 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
           />
         )}
       </div>
-      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} onSubmit={submit} onVoice={voice} onHeight={setChatHeight} />
+      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} timeline={timeline} onSubmit={submit} onVoice={voice} onHeight={setChatHeight} />
     </div>
   );
 }
+
+/** Where a timeline position points: a version's n, or null for the live board (always the last position). */
+export function timelinePositions(versions: readonly Pick<CanvasVersionMeta, "n" | "rev">[], liveRev: number, working: boolean, viewing: number | null) {
+  const last = versions.at(-1);
+  // While a turn works, its board isn't a version yet: the live board is one more position after the last version.
+  const liveExtra = !last || (working && last.rev !== liveRev);
+  const total = versions.length + (liveExtra ? 1 : 0);
+  const at = viewing === null ? -1 : versions.findIndex((version) => version.n === viewing);
+  const position = at >= 0 && at < total - 1 ? at + 1 : total;
+  const target = (p: number): number | null => (p >= total ? null : versions[p - 1]?.n ?? null);
+  return { total, position, target };
+}
+
+/** Paging back and forward through the canvas's versions: which one is showing, and its board once fetched. */
+function useTimeline(threadId: string | null, canvas: CanvasView | null | undefined) {
+  const rpc = useRpc<typeof canvasContract>();
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [boards, setBoards] = useState<Map<number, CanvasVersion>>(() => new Map());
+  const started = useRef<string | null>(null);
+  // Open where the user left it (the server remembers), once per canvas.
+  useEffect(() => {
+    if (!canvas || !threadId || started.current === threadId) return;
+    started.current = threadId;
+    setBoards(new Map());
+    setViewing(canvas.viewing ?? null);
+  }, [canvas, threadId]);
+  const versions = canvas?.versions ?? [];
+  const { total, position, target } = timelinePositions(versions, canvas?.rev ?? 0, canvas?.status === "working", viewing);
+  const shown = position < total ? viewing : null;
+  useEffect(() => {
+    if (!threadId || shown === null || boards.has(shown)) return;
+    let live = true;
+    rpc.call("canvas.version", { threadId, n: shown }).then(({ version }) => {
+      if (live && version) setBoards((map) => new Map(map).set(version.n, version as CanvasVersion));
+    }, () => {});
+    return () => { live = false; };
+  }, [rpc, threadId, shown, boards]);
+  const go = useCallback((p: number) => {
+    if (!threadId || p < 1 || p > total) return;
+    const n = target(p);
+    setViewing(n);
+    rpc.call("canvas.view", { threadId, n }).catch(() => {});
+  }, [rpc, threadId, total, target]);
+  const promptAt = (p: number) => (p >= 1 && p <= versions.length && p < total ? versions[p - 1]!.prompt : p === total ? (canvas?.history ?? []).filter((line) => line.role !== "agent").at(-1)?.text ?? null : null);
+  return {
+    viewing: shown,
+    snapshot: shown === null ? null : boards.get(shown) ?? null,
+    position, total,
+    back: () => go(position - 1),
+    forward: () => go(position + 1),
+    toLatest: () => setViewing(null),
+    promptAt,
+  };
+}
+type Timeline = ReturnType<typeof useTimeline>;
 
 /** A faint bar: the canvas's name, its other canvases, the model, and New. */
 function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: CanvasView | null; onModelChanged(): void; isNew: boolean; draft: CanvasExecution; onDraft(pick: CanvasExecution): void }) {
@@ -253,7 +316,7 @@ function History({ lines }: { lines: readonly CanvasTurn[] }) {
 }
 
 /** The chat, as one faint line: the latest caption over a borderless field. */
-function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; onSubmit(text: string): Promise<void>; onVoice(): Promise<void>; onHeight(height: number): void }) {
+function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVoice, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; timeline: Timeline; onSubmit(text: string): Promise<void>; onVoice(): Promise<void>; onHeight(height: number): void }) {
   const [startingVoice, setStartingVoice] = useState(false);
   const startVoice = async () => {
     setStartingVoice(true);
@@ -293,6 +356,22 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
     return () => element.removeEventListener(INSERT_EVENT, onInsert);
   }, []);
 
+  // ← and → page through the versions while the field is empty (and nothing else has focus).
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.key !== "ArrowLeft" && event.key !== "ArrowRight") || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const ours = target === input.current;
+      if (ours ? textRef.current !== "" : target && target !== document.body && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      event.preventDefault();
+      if (event.key === "ArrowLeft") timeline.back(); else timeline.forward();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [timeline]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const value = text.trim();
@@ -321,7 +400,7 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
             value={text}
             onChange={(event) => setText(event.target.value)}
             maxLength={CANVAS_LIMITS.messageChars}
-            placeholder={threadId ? "Say what's next…" : "What should we look at?"}
+            placeholder={!threadId ? "What should we look at?" : timeline.position < timeline.total ? `Continue from version ${timeline.position}…` : "Say what's next…"}
             aria-label="Message Visual Chat"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/55"
             data-canvas-input
@@ -329,6 +408,7 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
           />
           {/* Talk shows its dictation controls here while dictating into this field, as in BB's composer (fields.ts). */}
           <span className="flex min-w-0 items-center" data-talk-field-dock />
+          {canvas && timeline.total > 1 ? <Versions timeline={timeline} /> : null}
           {canvas ? (
             <button type="button" className={cn(FAINT_BUTTON, history && "bg-foreground/5 text-foreground")} aria-label="History" title="History" aria-pressed={history} onClick={() => setHistory((value) => !value)}>
               <Icon name="Clock" className="size-4" />
@@ -345,5 +425,27 @@ function ChatLine({ threadId, canvas, pending, working, onSubmit, onVoice, onHei
         </form>
       </div>
     </div>
+  );
+}
+
+const quoted = (text: string | null) => (text ? `“${text.length > 120 ? `${text.slice(0, 119)}…` : text}”` : "");
+
+/** ‹ 3 / 7 ›: the version showing, of the canvas's versions; hovering shows the message that led to each. */
+function Versions({ timeline }: { timeline: Timeline }) {
+  const { position, total } = timeline;
+  const old = position < total;
+  const step = "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-30";
+  return (
+    <span className="mr-0.5 flex shrink-0 items-center" data-canvas-versions data-position={position} data-total={total}>
+      <button type="button" className={step} aria-label="Previous version" title={position > 1 ? `Version ${position - 1}: ${quoted(timeline.promptAt(position - 1))} (←)` : "Previous version"} disabled={position <= 1} onClick={timeline.back}>
+        <Icon name="ChevronLeft" className="size-3.5" />
+      </button>
+      <span className={cn("min-w-[2.75rem] select-none text-center text-[12px] tabular-nums", old ? "font-medium text-foreground" : "text-muted-foreground/70")} title={`Version ${position} of ${total}${timeline.promptAt(position) ? `: ${quoted(timeline.promptAt(position))}` : ""}${old ? ". A message from here continues from this version." : ""}`} aria-live="polite" data-canvas-version-label>
+        {position} / {total}
+      </span>
+      <button type="button" className={step} aria-label="Next version" title={position < total ? `Version ${position + 1}: ${quoted(timeline.promptAt(position + 1))} (→)` : "Next version"} disabled={position >= total} onClick={timeline.forward}>
+        <Icon name="ChevronRight" className="size-3.5" />
+      </button>
+    </span>
   );
 }

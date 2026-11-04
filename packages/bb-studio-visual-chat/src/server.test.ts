@@ -281,6 +281,92 @@ describe("canvas tools", () => {
   });
 });
 
+describe("versions", () => {
+  const page = (word: string) => `<h1 data-cv-id="title">${word}</h1><p data-cv-id="body">${word} body</p>`;
+  const idle = (host: ReturnType<typeof canvasHost>["host"], threadId: string, text: string) => host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: text });
+
+  it("saves each turn's finished board at turn end, with its prompt and caption, never a draft", async () => {
+    const { host, call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "Show the games" });
+    await tool("canvas_page", { html: page("Draft") }, threadId);
+    await tool("canvas_page", { html: page("Games"), title: "Games", caption: "Start with Zelda." }, threadId);
+    expect((await call("canvas.get", { threadId })).canvas.versions).toEqual([]);
+    await idle(host, threadId, "Start with Zelda.");
+    // A second idle with nothing new saves nothing.
+    await idle(host, threadId, "Start with Zelda.");
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.versions).toHaveLength(1);
+    expect(view.versions[0]).toMatchObject({ n: 1, title: "Games", prompt: "Show the games", caption: "Start with Zelda.", look: "editorial", items: false, from: null });
+    expect((await call("canvas.version", { threadId, n: 1 })).version).toMatchObject({ page: page("Games"), board: [] });
+  });
+
+  it("steps through versions, and canvas_read says when the user isn't on the latest", async () => {
+    const { host, call, tool } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "One" });
+    for (const word of ["One", "Two", "Three"]) {
+      if (word !== "One") await call("canvas.send", { threadId, text: word });
+      await tool("canvas_page", { html: page(word) }, threadId);
+      await idle(host, threadId, `${word} caption.`);
+    }
+    const versions = (await call("canvas.get", { threadId })).canvas.versions;
+    expect(versions.map((version: { prompt: string }) => version.prompt)).toEqual(["One", "Two", "Three"]);
+    expect((await call("canvas.version", { threadId, n: 2 })).version.page).toBe(page("Two"));
+    expect(text(await tool("canvas_read", {}, threadId))).not.toContain("looking at version");
+    expect((await call("canvas.view", { threadId, n: 2 })).viewing).toBe(2);
+    expect(text(await tool("canvas_read", {}, threadId))).toContain('looking at version 2 of 3 ("Two"), not the latest');
+    // The latest is no "old version".
+    expect((await call("canvas.view", { threadId, n: 3 })).viewing).toBeNull();
+  });
+
+  it("continues from an old version: the board goes back to it, the agent is told, later versions stay", async () => {
+    const { host, call, tool, sent } = canvasHost();
+    const { threadId } = await call("canvas.create", { text: "One" });
+    await tool("canvas_page", { html: page("One"), style: "field" }, threadId);
+    await idle(host, threadId, "One caption.");
+    await call("canvas.send", { threadId, text: "Two" });
+    await tool("canvas_page", { html: page("Two"), style: "instrument" }, threadId);
+    await idle(host, threadId, "Two caption.");
+    await call("canvas.send", { threadId, text: "Back to one, but bigger", fromVersion: 1 });
+    const now = (await call("canvas.get", { threadId })).canvas;
+    expect(now).toMatchObject({ page: page("One"), look: "field", caption: "One caption.", viewing: null });
+    const note = sent.at(-1)!.input.find((part: { visibility?: string }) => part.visibility === "agent-only") as { text: string };
+    expect(note.text).toContain('went back to version 1 of 2 (their message then: "One")');
+    await tool("canvas_page", { html: page("One bigger") }, threadId);
+    await idle(host, threadId, "Bigger.");
+    const versions = (await call("canvas.get", { threadId })).canvas.versions;
+    expect(versions.map((version: { n: number; from: number | null }) => [version.n, version.from])).toEqual([[1, null], [2, null], [3, 1]]);
+    // From the latest, nothing goes back and no note is added.
+    await call("canvas.send", { threadId, text: "More", fromVersion: 3 });
+    expect(sent.at(-1)!.input).toHaveLength(1);
+  });
+
+  it("keeps the last 50, and a board from before versions becomes version 1", async () => {
+    const { host, call, tool, canvas } = canvasHost();
+    const { threadId, canvasId } = await call("canvas.create", { text: "Old board" });
+    // A board of items from before versions, idle.
+    canvas.store.edit(canvasId, [{ op: "add", item: { id: "house", kind: "stat", data: 220 } }], "agent");
+    canvas.store.setStatus(canvasId, "idle");
+    await call("canvas.send", { threadId, text: "Now a page" });
+    expect((await call("canvas.get", { threadId })).canvas.versions[0]).toMatchObject({ n: 1, items: true, prompt: "Old board" });
+    expect((await call("canvas.version", { threadId, n: 1 })).version.board.map((item: { id: string }) => item.id)).toEqual(["house"]);
+    await tool("canvas_page", { html: page("First page") }, threadId);
+    await idle(host, threadId, "First page.");
+    // Going back to the old board of items brings its items back, and the page goes.
+    await call("canvas.send", { threadId, text: "Back to the old one", fromVersion: 1 });
+    expect((await call("canvas.get", { threadId })).canvas).toMatchObject({ page: null, items: [{ id: "house" }] });
+    for (let i = 0; i < 55; i++) {
+      await tool("canvas_page", { html: page(`P${i}`) }, threadId);
+      await idle(host, threadId, `Caption ${i}.`);
+    }
+    const versions = (await call("canvas.get", { threadId })).canvas.versions;
+    expect(versions).toHaveLength(50);
+    expect(versions[0].n).toBe(8);
+    expect(versions.at(-1).n).toBe(57);
+    await call("canvas.send", { threadId, text: "x", fromVersion: 8 });
+    expect((await call("canvas.get", { threadId })).canvas.page).toBe(page("P5"));
+  });
+});
+
 describe("canvas_image", () => {
   const KEY = "exa-test-key-123";
   const publicDns = async () => [{ address: "93.184.216.34" }];
