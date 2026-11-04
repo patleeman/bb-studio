@@ -1,16 +1,17 @@
 // Canvas (prototype): its page in BB's rail, /plugins/canvas/canvas for a
-// new canvas and /plugins/canvas/canvas/<threadId> for one. The page and
-// its board are src/ui; they reuse Studio's widget renderers at build time.
+// new canvas and /plugins/canvas/canvas/<threadId> for one. The page is
+// prebuilt into ui/canvas-ui.js (build-ui.mjs) because it reuses Studio's
+// widget renderers, whose npm imports BB's install-time build can't reach.
 import { definePluginApp, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense } from "react";
 import "./src/ui/canvas.css";
 
-const CanvasRoute = lazy(() => import("./src/ui/route"));
+const CanvasPanel = lazy(() => import("./ui/canvas-ui.js").then((module) => ({ default: module.CanvasPanel })));
 
-function CanvasPanel({ subPath }: PluginNavPanelProps) {
-  return <Suspense fallback={null}><CanvasRoute rest={subPath.replace(/^\/+|\/+$/g, "")} /></Suspense>;
+function Panel({ subPath }: PluginNavPanelProps) {
+  return <Suspense fallback={null}><CanvasPanel subPath={subPath} /></Suspense>;
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({ id: "canvas", title: "Canvas", icon: "GridView", path: "canvas", component: CanvasPanel });
+  app.slots.navPanel({ id: "canvas", title: "Canvas", icon: "GridView", path: "canvas", component: Panel });
 });
