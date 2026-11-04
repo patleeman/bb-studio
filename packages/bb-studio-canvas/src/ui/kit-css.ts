@@ -107,9 +107,9 @@ ${S} .cv-tilemap{overflow:visible}
 ${S} .cv-anno{font-family:var(--cv-font-hand);font-size:12.5px;font-weight:600}
 ${S} .cv-anno-line{stroke-width:1.1;fill:none}
 ${S} .cv-anno-dot{stroke:var(--cv-paper);stroke-width:1.5}
-${S} .cv-bignum{display:flex;flex-direction:column;align-items:flex-start;gap:var(--cv-s-2)}
+${S} .cv-bignum{display:flex;flex-direction:column;align-items:flex-start;gap:var(--cv-s-2);container-type:inline-size}
 ${S} .cv-bignum-label{font-family:var(--cv-font-label);font-size:var(--cv-t-sm);letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-muted)}
-${S} .cv-bignum-n{font-family:var(--cv-font-num);font-weight:var(--cv-display-weight);font-size:clamp(56px,30vw,260px);line-height:0.86;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+${S} .cv-bignum-n{font-family:var(--cv-font-num);font-weight:var(--cv-display-weight);font-size:clamp(44px,30cqi,240px);line-height:0.86;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
 ${S} .cv-bignum-unit{font-size:0.36em;letter-spacing:0;color:var(--cv-muted);margin:0 0.06em;font-weight:500}
 ${S} .cv-bignum-sub{font-family:var(--cv-font-text);font-size:var(--cv-t-lg);color:var(--cv-ink-2);line-height:1.35;max-width:34ch;text-wrap:pretty}
 ${S} .cv-bare-quote{margin:0;position:relative;padding-left:0.62em}
