@@ -59,6 +59,8 @@ const tabs = {};
   for (const [client, scheme] of [[light, "light"], [dark, "dark"]]) {
     await client.command("Emulation.setDeviceMetricsOverride", VIEW);
     await client.command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
+    // Both tabs act focused and visible, so animations and frames run in each.
+    await client.command("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
     tabs[scheme] = client;
   }
 }
@@ -70,6 +72,7 @@ async function collapseSidebar(client) {
 
 /** The canvas page for this thread, settled: every item measured, no animation running. */
 async function settle(client, threadId, rev) {
+  await client.command("Page.bringToFront").catch(() => {});
   await client.navigate(`/plugins/canvas/canvas/${threadId}`);
   await client.waitForSelector("[data-canvas-board]", 30_000);
   await collapseSidebar(client);

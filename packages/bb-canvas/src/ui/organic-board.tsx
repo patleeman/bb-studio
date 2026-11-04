@@ -67,7 +67,7 @@ function Card({ item, look, mode, width, focus, tag, onMeasure }: { item: Canvas
     if (frameReported.current) return;
     frameReported.current = true;
     // The frame's new height lands in the next frame.
-    requestAnimationFrame(() => { if (measure.current) report.current?.(Math.ceil(measure.current.offsetHeight)); });
+    setTimeout(() => { if (measure.current) report.current?.(Math.ceil(measure.current.offsetHeight)); }, 16);
   }, []);
   return (
     <div ref={measure} className="cvt-card" data-kind={item.kind}>
@@ -163,15 +163,16 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
   const layoutItems = useMemo(() => items.map(toOrganic), [items]);
   const widths = useMemo(() => organicWidths(layoutItems, width, look), [layoutItems, width, look]);
 
-  // Measured heights, batched to one update a frame. Keyed by id and width.
+  // Measured heights, batched to one update per tick (a timer, not a frame:
+  // a background tab runs no frames, and the board must settle there too). Keyed by id and width.
   const [heights, setHeights] = useState<Map<string, number>>(() => new Map());
   const pending = useRef(new Map<string, number>());
-  const frame = useRef(0);
+  const frame = useRef<ReturnType<typeof setTimeout> | null>(null);
   const report = useCallback((id: string, w: number, height: number) => {
     pending.current.set(`${id}@${w}`, height);
     if (frame.current) return;
-    frame.current = requestAnimationFrame(() => {
-      frame.current = 0;
+    frame.current = setTimeout(() => {
+      frame.current = null;
       const batch = pending.current;
       pending.current = new Map();
       setHeights((current) => {
@@ -180,9 +181,9 @@ export function OrganicBoard({ items, look, mode, empty, bottomPad = 24 }: { ite
         for (const [key, value] of batch) if (next.get(key) !== value) { next.set(key, value); changed = true; }
         return changed ? next : current;
       });
-    });
+    }, 16);
   }, []);
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useEffect(() => () => { if (frame.current) clearTimeout(frame.current); }, []);
   const measured = useMemo(() => {
     const map = new Map<string, number>();
     for (const item of items) { const h = heights.get(`${item.id}@${widths.get(item.id)}`); if (h !== undefined) map.set(item.id, h); }
