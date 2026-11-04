@@ -7,8 +7,8 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
-import { canvasHref, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
-import { DEFAULT_LOOK, isLook, LOOK_INFO, type Look, type OrganicLook } from "../looks";
+import { canvasHref, canvasNewHref, CANVAS_NEW_SEGMENT, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
+import { DEFAULT_LOOK, isLook, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
 import { lookCss } from "./board-css";
 import { ModelPicker } from "./model-picker";
@@ -61,9 +61,44 @@ function usePreview(): Preview | null {
   return preview;
 }
 
+/** The canvas this window had open last: the rail opens the bare root, which reopens it. */
+const LAST_KEY = "bb-studio-canvas:last";
+const readLast = () => { try { return window.localStorage.getItem(LAST_KEY); } catch { return null; } };
+const writeLast = (threadId: string) => { try { window.localStorage.setItem(LAST_KEY, threadId); } catch { /* storage off */ } };
+
 export default function CanvasRoute({ rest }: { rest: string }) {
-  const threadId = decode(rest.split("/")[0] ?? "") || null;
+  const segment = decode(rest.split("/")[0] ?? "");
+  if (!segment) return <ResumeLast />;
+  const threadId = segment === CANVAS_NEW_SEGMENT ? null : segment;
   return <CanvasPage key={threadId ?? "new"} threadId={threadId} />;
+}
+
+/**
+ * Coming back to Canvas: reopen the last canvas (its board as it is now, a
+ * board still being made included, since the turn runs on the server), else
+ * the most recent one, else a new canvas.
+ */
+function ResumeLast() {
+  const rpc = useRpc<typeof canvasContract>();
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const last = readLast();
+      try {
+        if (last && (await rpc.call("canvas.get", { threadId: last })).canvas) {
+          if (live) openAppPath(canvasHref(last), { replace: true });
+          return;
+        }
+        const { canvases } = await rpc.call("canvas.list", null);
+        const latest = [...(canvases as CanvasMeta[])].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        if (latest) { if (live) openAppPath(canvasHref(latest.threadId), { replace: true }); return; }
+      } catch { /* fall through to a new canvas */ }
+      if (live) setFresh(true);
+    })();
+    return () => { live = false; };
+  }, [rpc]);
+  return fresh ? <CanvasPage key="new" threadId={null} /> : null;
 }
 
 const FAINT_BUTTON = "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-40";
@@ -84,6 +119,8 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const rpc = useRpc<typeof canvasContract>();
   const theme = useWidgetTheme();
   const { canvas: own, send, reload } = useCanvas(threadId);
+  // Remember the open canvas, so coming back to Canvas reopens it.
+  useEffect(() => { if (threadId && own) writeLast(threadId); }, [threadId, own]);
   const preview = usePreview();
   const canvas = useMemo(() => (preview && own ? { ...own, look: preview.look, title: preview.title, caption: preview.caption, page: null, items: preview.items, status: "idle" as const } : own), [own, preview]);
   const [pending, setPending] = useState<string | null>(null);
@@ -136,7 +173,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   return (
     <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-preview={preview ? "" : undefined} data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
       {css ? <style>{css}</style> : null}
-      <TopBar canvas={canvas ?? null} look={look} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
+      <TopBar canvas={canvas ?? null} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : page && look !== "classic" ? (
@@ -164,8 +201,8 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   );
 }
 
-/** A faint bar: the canvas's name, its other canvases, the style the agent picked, and New. */
-function TopBar({ canvas, look, onModelChanged, isNew, draft, onDraft }: { canvas: CanvasView | null; look: Look; onModelChanged(): void; isNew: boolean; draft: CanvasExecution; onDraft(pick: CanvasExecution): void }) {
+/** A faint bar: the canvas's name, its other canvases, the model, and New. */
+function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: CanvasView | null; onModelChanged(): void; isNew: boolean; draft: CanvasExecution; onDraft(pick: CanvasExecution): void }) {
   const rpc = useRpc<typeof canvasContract>();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<CanvasMeta[] | null>(null);
@@ -186,8 +223,7 @@ function TopBar({ canvas, look, onModelChanged, isNew, draft, onDraft }: { canva
       <div className="flex-1" />
       {/* Always shown: on a new canvas it picks the model the first message starts on. */}
       {canvas || isNew ? <ModelPicker canvas={canvas} onChanged={onModelChanged} draft={draft} onDraft={onDraft} /> : null}
-      {canvas && look !== "classic" ? <span className="mr-2 text-[12px] text-muted-foreground/80" title={`The agent picked this style: ${LOOK_INFO[look].line}`} data-canvas-look-name={look}>{LOOK_INFO[look].name}</span> : null}
-      <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => openAppPath(canvasHref(null))}>
+      <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => openAppPath(canvasNewHref())}>
         <Icon name="Plus" className="size-3.5" /> New canvas
       </button>
       {open ? (

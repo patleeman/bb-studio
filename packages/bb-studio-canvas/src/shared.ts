@@ -19,6 +19,9 @@ export const CANVAS_UPDATE_TYPE = "canvas:updated";
 export interface CanvasSignal { type: typeof CANVAS_UPDATE_TYPE; canvasId: string; threadId: string; rev: number }
 
 export const canvasHref = (threadId?: string | null) => (threadId ? `${CANVAS_ROOT}/${encodeURIComponent(threadId)}` : CANVAS_ROOT);
+/** An explicit new canvas. The bare root reopens the last canvas instead (the rail opens the root). */
+export const CANVAS_NEW_SEGMENT = "new";
+export const canvasNewHref = () => `${CANVAS_ROOT}/${CANVAS_NEW_SEGMENT}`;
 
 export const isCanvasId = (value: string) => /^cnv_[0-9a-f]{16}$/.test(value);
 

@@ -143,7 +143,7 @@ async function turn(index, text, { mid = false } = {}) {
 
 let mock = null;
 try {
-  await light.navigate("/plugins/studio-canvas/canvas");
+  await light.navigate("/plugins/studio-canvas/canvas/new");
   await light.waitForSelector("[data-canvas-input]");
   await collapseSidebar(light);
   await sleep(800);
