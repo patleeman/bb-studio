@@ -180,6 +180,9 @@ export const executionSchema = z.object({
 });
 export type CanvasExecution = z.infer<typeof executionSchema>;
 
+/** What a new canvas runs on unless the user picks another: Haiku, for speed. */
+export const CANVAS_DEFAULT_EXECUTION: CanvasExecution = { providerId: "claude-code", model: "claude-haiku-5-5", reasoningLevel: null };
+
 /** A provider in the model picker, with its models (BB's own listing). */
 export const pickerProviderSchema = z.object({
   id: z.string(),

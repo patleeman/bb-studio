@@ -26,7 +26,11 @@ export function pickedOf(canvas: Pick<CanvasView, "execution" | "pendingExecutio
 
 let cache: Promise<PickerProvider[]> | null = null;
 
-export function ModelPicker({ canvas, onChanged }: { canvas: CanvasView; onChanged?(view: CanvasView | null): void }) {
+/**
+ * On a canvas, a pick goes to canvas.setModel. Before the first message there's
+ * no canvas yet: the pick is a draft (draft/onDraft) that canvas.create uses.
+ */
+export function ModelPicker({ canvas, onChanged, draft, onDraft }: { canvas: CanvasView | null; onChanged?(view: CanvasView | null): void; draft?: CanvasExecution; onDraft?(pick: CanvasExecution): void }) {
   const rpc = useRpc<typeof canvasContract>();
   const [open, setOpen] = useState(false);
   const [providers, setProviders] = useState<PickerProvider[] | null>(null);
@@ -47,8 +51,9 @@ export function ModelPicker({ canvas, onChanged }: { canvas: CanvasView; onChang
     return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", escape); };
   }, [open]);
 
-  const picked = pickedOf(canvas);
+  const picked = canvas ? pickedOf(canvas) : draft ?? null;
   const choose = async (providerId: string, model: string, reasoningLevel: string | null) => {
+    if (!canvas) { onDraft?.({ providerId, model, reasoningLevel }); return; }
     setBusy(true);
     try {
       const result = await rpc.call("canvas.setModel", { threadId: canvas.threadId, providerId, model, reasoningLevel });
@@ -68,7 +73,7 @@ export function ModelPicker({ canvas, onChanged }: { canvas: CanvasView; onChang
       <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px] hover:bg-foreground/5 hover:text-foreground disabled:opacity-60" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} disabled={busy} title={picked ? `${picked.providerId} · ${picked.model}${picked.reasoningLevel ? ` · ${picked.reasoningLevel}` : ""}` : "Pick the canvas's model"} data-canvas-model={picked?.model ?? ""}>
         <span className="truncate">{label}</span>
         {picked?.reasoningLevel && current?.reasoningLevels.length ? <span className="text-muted-foreground/70">· {current.reasoningLevels.find((level) => level.id === picked.reasoningLevel)?.label ?? picked.reasoningLevel}</span> : null}
-        {canvas.pendingExecution ? <span className="text-muted-foreground/70" title="Takes effect with the next message">· next</span> : null}
+        {canvas?.pendingExecution ? <span className="text-muted-foreground/70" title="Takes effect with the next message">· next</span> : null}
         <Icon name="ChevronDown" className="size-3 shrink-0 opacity-60" />
       </button>
       {open ? (
@@ -100,7 +105,7 @@ export function ModelPicker({ canvas, onChanged }: { canvas: CanvasView; onChang
               })}
             </div>
           ))}
-          <p className="border-t border-border/60 px-2 pb-1 pt-1.5 text-[11px] leading-snug text-muted-foreground">Applies from the next message. Another provider starts a fresh thread for this canvas; the board stays.</p>
+          <p className="border-t border-border/60 px-2 pb-1 pt-1.5 text-[11px] leading-snug text-muted-foreground">{canvas ? "Applies from the next message. Another provider starts a fresh thread for this canvas; the board stays." : "The new canvas starts on this model."}</p>
         </div>
       ) : null}
     </div>

@@ -11,7 +11,7 @@ import type Database from "better-sqlite3";
 import { canvasContract } from "./contract";
 import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instructions";
 import { DEFAULT_LOOK, lookOf } from "./looks";
-import { CANVAS_CHANNEL, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
+import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
 import { CanvasStore, type CanvasActor } from "./store";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
 
@@ -70,7 +70,7 @@ export async function listProviders(bb: BbPluginApi): Promise<PickerProvider[]> 
  * own thread at creation, never on the user's global default; canvases made
  * before keep the model their thread has.
  */
-export const CANVAS_DEFAULT_MODEL = { providerId: "claude-code", model: "claude-haiku-5-5" } as const;
+export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.providerId, model: CANVAS_DEFAULT_EXECUTION.model } as const;
 /** BB's personal project: canvas threads live there, as the Bot's do. */
 const PERSONAL_PROJECT_ID = "proj_personal";
 

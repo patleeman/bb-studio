@@ -7,7 +7,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
-import { canvasHref, CANVAS_LIMITS, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
+import { canvasHref, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasMeta, type CanvasTurn, type CanvasView } from "../shared";
 import { DEFAULT_LOOK, isLook, LOOK_INFO, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
 import { lookCss } from "./board-css";
@@ -59,6 +59,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const [pending, setPending] = useState<string | null>(null);
   const [chatHeight, setChatHeight] = useState(0);
   const [newLook] = useState<OrganicLook>(startLook);
+  const [draft, setDraft] = useState<CanvasExecution>(CANVAS_DEFAULT_EXECUTION);
   const look: Look = canvas ? canvas.look : threadId ? "classic" : newLook;
   const css = useMemo(() => (look === "classic" ? null : lookCss(look)), [look]);
 
@@ -66,7 +67,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
     if (!threadId) {
       setPending(text);
       try {
-        const created = await rpc.call("canvas.create", { text, look: newLook });
+        const created = await rpc.call("canvas.create", { text, look: newLook, providerId: draft.providerId, model: draft.model, ...(draft.reasoningLevel ? { reasoningLevel: draft.reasoningLevel } : {}) });
         openAppPath(canvasHref(created.threadId), { replace: true });
       } catch (error) {
         setPending(null);
@@ -80,14 +81,14 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       // After a provider switch the canvas has a fresh thread: follow it (the old address still finds the canvas).
       if (now !== threadId) openAppPath(canvasHref(now), { replace: true });
     } catch (error) { toast.error(errorMessage(error)); throw error; }
-  }, [rpc, send, threadId, newLook]);
+  }, [rpc, send, threadId, newLook, draft]);
 
   const items = canvas?.items ?? [];
   const working = canvas?.status === "working" || !!pending;
   return (
     <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
       {css ? <style>{css}</style> : null}
-      <TopBar canvas={canvas ?? null} look={look} onModelChanged={() => void reload()} />
+      <TopBar canvas={canvas ?? null} look={look} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className="canvas-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-8 pt-2" style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : look !== "classic" ? (
@@ -113,7 +114,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
 }
 
 /** A faint bar: the canvas's name, its other canvases, the style the agent picked, and New. */
-function TopBar({ canvas, look, onModelChanged }: { canvas: CanvasView | null; look: Look; onModelChanged(): void }) {
+function TopBar({ canvas, look, onModelChanged, isNew, draft, onDraft }: { canvas: CanvasView | null; look: Look; onModelChanged(): void; isNew: boolean; draft: CanvasExecution; onDraft(pick: CanvasExecution): void }) {
   const rpc = useRpc<typeof canvasContract>();
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<CanvasMeta[] | null>(null);
@@ -132,7 +133,8 @@ function TopBar({ canvas, look, onModelChanged }: { canvas: CanvasView | null; l
       </button>
       <span className="ml-1 rounded-full border border-border/70 px-2 py-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/70">Prototype</span>
       <div className="flex-1" />
-      {canvas ? <ModelPicker canvas={canvas} onChanged={onModelChanged} /> : null}
+      {/* Always shown: on a new canvas it picks the model the first message starts on. */}
+      {canvas || isNew ? <ModelPicker canvas={canvas} onChanged={onModelChanged} draft={draft} onDraft={onDraft} /> : null}
       {canvas && look !== "classic" ? <span className="mr-2 text-[12px] text-muted-foreground/80" title={`The agent picked this style: ${LOOK_INFO[look].line}`} data-canvas-look-name={look}>{LOOK_INFO[look].name}</span> : null}
       <button type="button" className="flex items-center gap-1 rounded-md px-2 py-1 hover:bg-foreground/5 hover:text-foreground" onClick={() => openAppPath(canvasHref(null))}>
         <Icon name="Plus" className="size-3.5" /> New canvas
