@@ -207,9 +207,9 @@ const DESKTOP_SCRIPT: Step[] = [
 ];
 
 /**
- * --script canvas: a session launched from a canvas thread (src/canvas) in a
+ * --script canvas: a session launched from a canvas thread (the Canvas plugin) in a
  * staged BB. The voice edits the board while it talks: each tool call is the
- * staged Studio's real canvas tool, on the launching canvas. Its numbers are
+ * Canvas plugin's real canvas tool (via Studio's voice), on the launching canvas. Its numbers are
  * the script's own, so the items say "sample data".
  */
 const CANVAS_SCRIPT: Step[] = [
