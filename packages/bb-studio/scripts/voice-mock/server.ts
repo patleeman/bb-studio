@@ -12,6 +12,8 @@
 //   made with macOS `say`, streamed in real time. It plays the user's side
 //   too (input transcript deltas), including a barge-in.
 // - It writes timings.json and voice-thread.md (what the voice thread got) to --out.
+// - `desktop` and `canvas` script a staged BB's own Studio instead (the panel
+//   calls its real voiceLive.tool); `canvas` edits the launching canvas's board.
 //
 // The iOS app: -qaVoiceLive script -qaVoiceLiveStudio http://127.0.0.1:8790 -qaVoiceLiveAutostart
 //
@@ -204,6 +206,24 @@ const DESKTOP_SCRIPT: Step[] = [
   { close: true },
 ];
 
+/**
+ * --script canvas: a session launched from a canvas thread (src/canvas) in a
+ * staged BB. The voice edits the board while it talks: each tool call is the
+ * staged Studio's real canvas tool, on the launching canvas. Its numbers are
+ * the script's own, so the items say "sample data".
+ */
+const CANVAS_SCRIPT: Step[] = [
+  { user: "What about Saturday, hour by hour?" },
+  { tool: "canvas_add", args: { items: [{ id: "voice-saturday-hourly", kind: "line", title: "Saturday hour by hour, °F (voice demo, sample data)", size: "l", importance: 5, data: [{ hour: "8a", temp: 47 }, { hour: "10a", temp: 52 }, { hour: "12p", temp: 57 }, { hour: "2p", temp: 60 }, { hour: "4p", temp: 59 }, { hour: "6p", temp: 54 }, { hour: "8p", temp: 50 }], options: { x: "hour", series: ["temp"], unit: "°" } }] } },
+  { say: "Saturday starts in the high forties, warms to about sixty by mid-afternoon, then cools off after sunset." },
+  { user: "And should I bring an umbrella on Sunday?" },
+  { tool: "canvas_add", args: { items: [{ id: "voice-sunday-rain", kind: "progress", title: "Sunday rain chance (voice demo, sample data)", size: "m", importance: 5, data: { value: 20, max: 100, label: "Chance of rain" }, options: { style: "gauge", unit: "%" } }] } },
+  { say: "Only about a one in five chance of rain on Sunday." },
+  { tool: "canvas_update", args: { items: [{ id: "voice-saturday-hourly", importance: 3, size: "m" }] } },
+  { say: "So you can probably leave the umbrella at home." },
+  { close: true },
+];
+
 const SCRIPT: Step[] = [
   { user: "What's waiting on me?" },
   { tool: "loops_list", args: {} },
@@ -332,7 +352,7 @@ function runScript(socket: Duplex) {
   void (async () => {
     send({ type: "session.started" });
     await sleep(1500);
-    for (const step of process.argv.includes("desktop") ? DESKTOP_SCRIPT : SCRIPT) {
+    for (const step of process.argv.includes("canvas") ? CANVAS_SCRIPT : process.argv.includes("desktop") ? DESKTOP_SCRIPT : SCRIPT) {
       if (closed) break;
       if ("user" in step) await user(step.user);
       else if ("tool" in step) await tool(step.tool, step.args);
