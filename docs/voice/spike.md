@@ -156,10 +156,12 @@ in the deliverables folder.
   mic level ([`BargeInGate.swift`](../../apps/ios/iOS/VoiceLive/Core/BargeInGate.swift)).
   On the phone, the levels are WebRTC's `audioLevel` stats every 50 ms: the mic
   (`media-source`, after echo cancellation) and the voice (`inbound-rtp`).
-  - **When it triggers.** The level must stay above a bar for 120 ms. The bar
+  - **When it triggers.** The level must stay above a bar for 250 ms. The bar
     is 0.02 RMS when the voice is quiet. While the voice plays it is the higher
-    of 0.035 and half the voice's playback level plus 0.02, so the voice's own
-    echo can't trigger it.
+    of 0.06 and 70% of the voice's playback level plus 0.02, so the voice's own
+    echo can't trigger it. (Until Nov 4 it was 120 ms, 0.035 and half: on the
+    speaker, echo and room noise cleared that bar and cut the voice off again
+    and again.)
   - **What happens.** The phone mutes the voice's track at once
     (`isEnabled = false`; in the mock it stops the player). Nothing is sent to
     the model yet.
@@ -167,12 +169,27 @@ in the deliverables folder.
     phone sends the silent note with what the user heard ("The user interrupted
     you. They heard up to: '…'"; `session.thinking.append` for Live, a system
     item for Realtime), and the rest of the cut-off reply isn't shown or played.
-    If no words come within 1 s of the user's level dropping back, it was a
-    false alarm (a cough, a bump): the voice is unmuted and carries on. While
-    muted it skips that stretch, because WebRTC can't pause a live stream.
+    If no words come within 0.4 s of the user's level dropping back below the
+    bar that fired, it was a false alarm (a cough, a bump): the voice is
+    unmuted and carries on, and the phone reports a `false_trigger` event
+    (levels and how long it was muted) to Studio. Words that come later still
+    barge in on their own. While muted it skips that stretch, because WebRTC
+    can't pause a live stream.
   - **Why the window starts when the level drops.** GPT-Live's transcript of
     the user lags about 2.4 s while the voice talks. A window counted from the
     trigger cancelled a real barge-in in testing.
+- **The audio session and WebRTC.** WebRTC runs in manual-audio mode inside
+  Studio's session ([`VoiceLiveAudio.swift`](../../apps/ios/iOS/VoiceLive/VoiceLiveAudio.swift)).
+  Each time the app activates the session (start, a route change, an
+  interruption's end, a media-services reset) it calls
+  `audioSessionDidActivate` and turns WebRTC's audio on; at an interruption
+  and at hang-up it turns it off and calls `audioSessionDidDeactivate` before
+  deactivating, retrying while the voice-processing unit winds down. WebRTC's
+  own session config is set to ours, so it keeps `.defaultToSpeaker`. The
+  voice plays on the loudspeaker unless AirPods, Bluetooth, a wired headset or
+  the car is connected. Route changes, interruptions, the app going to the
+  background and why the session closed go to Studio as events in
+  `voice_call_events`.
   - **Without levels** (the scripted mock, or no stats), the first transcript
     word still barges in on its own. The voice's own words echoing back into
     the mic don't trigger it.
