@@ -31,7 +31,7 @@ import { speakable } from "./speakable";
 import { pickSettings } from "../../settings/schema";
 import type { LiveEvent, VoiceLiveState, VoiceLiveView } from "./contract";
 import { classify, confirmPrompt, DRAFT_MS, hallucinated, outwardKinds, relayNote, relayText, spokenAnswer, UNDO_MS, VOICE_SNOOZES, type DestructiveAction } from "./rules";
-import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest } from "./session";
+import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, liveSessionRequest, REALTIME_TRANSCRIBE_MODEL, realtimeSecretRequest, type ExtraTool } from "./session";
 import { BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS, REALTIME_CALLS_URL, relayIntent, replyNote, sessionLength, usd, voiceFor, VOICE_TOOLS, waitFor, type VoiceWaitFor, type RelayIntent, type BackendModel, type LiveModel, type LiveTransport, type VoiceLiveSignal, type VoiceToolName } from "./shared";
 
 export { DEFAULT_CAP_USD };
@@ -119,6 +119,15 @@ export interface VoiceLiveDeps {
   send(input: { threadId: string; senderThreadId?: string | null; text: string; note: string; mode: "auto" | "queue-if-active" }): Promise<void>;
   push(input: { title: string; body: string; threadId: string; coalesceKey: string }): Promise<void>;
   publish(signal: VoiceLiveSignal): void;
+  /**
+   * Canvas (src/canvas): a session launched from a canvas thread gets the
+   * canvas tools, scoped to that thread, and edits its board while it talks.
+   */
+  canvas?: {
+    tools(threadId: string | null): readonly ExtraTool[];
+    /** The tool's output; null when it isn't a canvas tool. */
+    run(threadId: string, name: string, args: Record<string, unknown>): string | null;
+  };
   /** A staged BB's scripted mock server (STUDIO_VOICE_MOCK_URL on the host): no key, no OpenAI. */
   mockUrl?(): string | null;
   now?(): number;
@@ -323,19 +332,21 @@ export class VoiceLive {
     const mockUrl = this.deps.mockUrl?.() ?? null;
     if (!mockUrl && model === "gpt-live-1" && !input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
     const { seed, ms } = await this.persona(input.threadId ?? null, cos);
-    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name };
+    const extraTools = this.deps.canvas?.tools(seed.identity.threadId) ?? [];
+    const canvas = extraTools.length > 0;
+    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name, canvas };
     let transport: LiveTransport = model === "gpt-live-1" ? "live-webrtc" : "realtime-webrtc";
     let answerSdp: string | null = null;
     let clientSecret: string | null = null;
     let expiresAt: number | null = null;
     if (mockUrl) transport = "mock";
     else if (model === "gpt-live-1") {
-      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp!, voice, backendModel }), "the voice session");
+      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp!, voice, backendModel, extraTools }), "the voice session");
       const sdp = (created.transport as { sdp?: unknown } | undefined)?.sdp;
       if (typeof sdp !== "string" || !sdp) throw new Error("OpenAI answered without an SDP answer.");
       answerSdp = sdp;
     } else {
-      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona, voice }), "the voice session");
+      const minted = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona, voice, extraTools }), "the voice session");
       if (typeof minted.value !== "string" || !minted.value) throw new Error("OpenAI answered without a client secret.");
       clientSecret = minted.value;
       expiresAt = typeof minted.expires_at === "number" ? minted.expires_at * 1000 : this.now() + 60_000;
@@ -345,7 +356,7 @@ export class VoiceLive {
     this.deps.db.prepare("INSERT INTO voice_calls (id, bot_id, bot_name, thread_id, model, voice, transcribe_model, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(sessionId, "cos", cos.name, null, model, voice, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
     this.append(sessionId, "config", { data: { voice, backendModel: model === "gpt-live-1" ? backendModel : null } });
-    this.append(sessionId, "identity", { data: { identity: seed.identity, chars: seed.text.length, ms, missing: seed.missing } });
+    this.append(sessionId, "identity", { data: { identity: seed.identity, chars: seed.text.length, ms, missing: seed.missing, canvas } });
     // The thread opens beside the call: the phone connects without waiting for it.
     this.opening.set(sessionId, this.deps.openThread({
       title: voiceTitle(startedAt),
@@ -394,6 +405,8 @@ export class VoiceLive {
   async toolReply(sessionId: string, name: string, args: string | undefined, events: readonly LiveEvent[] = []): Promise<ToolReply> {
     const row = this.live(sessionId);
     if (events.length) this.save(sessionId, events);
+    const canvasOutput = this.canvasTool(row, name, args);
+    if (canvasOutput !== null) return { output: clip(canvasOutput, TOOL_OUTPUT_CHARS) };
     if (!(VOICE_TOOLS as readonly string[]).includes(name)) {
       return { output: `There's no tool named ${JSON.stringify(clip(name, 64))}, and voice can't spend money, email or message people, post, delete or approve anything. Offer to pass the request to ${this.identity(row.id)?.name ?? row.bot_name} instead.` };
     }
@@ -412,6 +425,28 @@ export class VoiceLive {
     } catch (error) {
       return { output: `That didn't work: ${clip(error instanceof Error ? error.message : String(error), 300)}` };
     }
+  }
+
+  /**
+   * A canvas tool, when the session speaks for a canvas: it edits that
+   * canvas's board (and only that one) at once. null: not a canvas tool here.
+   */
+  private canvasTool(row: SessionRow, name: string, args: string | undefined): string | null {
+    if (!name.startsWith("canvas_") || !this.deps.canvas) return null;
+    const event = this.events(row.id).find((each) => each.kind === "identity");
+    const identity = event ? data<{ identity: VoiceIdentity; canvas?: boolean }>(event) : null;
+    if (!identity?.canvas || !identity.identity.threadId) return null;
+    let parsed: Record<string, unknown> = {};
+    if (args?.trim()) {
+      try {
+        const value = JSON.parse(args) as unknown;
+        if (!value || typeof value !== "object" || Array.isArray(value)) return "The arguments must be a JSON object.";
+        parsed = value as Record<string, unknown>;
+      } catch { return "The arguments weren't valid JSON."; }
+    }
+    const output = this.deps.canvas.run(identity.identity.threadId, name, parsed);
+    if (output !== null && name !== "canvas_read") this.append(row.id, "canvas", { text: clip(output, 600), data: { tool: name } });
+    return output;
   }
 
   private run(row: SessionRow, name: VoiceToolName, arg: (key: string) => string): Promise<string | ToolReply> | string {
@@ -729,6 +764,7 @@ export class VoiceLive {
         case "loop_action": { const action = data<LoopAction>(event); return [`✓ **Loop ${action.action.replace("_", " ")}:** ${action.title}`]; }
         case "undone": return ["↩ **Undone**"];
         case "confirmed": return [`⚠️ **Done after a spoken yes:** ${event.text}`];
+        case "canvas": return [`▦ **Board:** ${event.text}`];
         default: return [];
       }
     });

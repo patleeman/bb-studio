@@ -722,3 +722,58 @@ it("caps the launching transcript while keeping the full reply in the voice thre
   expect(ended.replies[0]!.text).toBe(reply.trim());
   expect(send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text).toContain(reply.trim());
 });
+
+describe("a session launched from a canvas (src/canvas)", () => {
+  const CANVAS_THREAD = "thr_canvas";
+  const canvasTool = { type: "function" as const, name: "canvas_add", description: "Add items", parameters: { type: "object", properties: {} } };
+  function canvasSetup(model = "gpt-live-1") {
+    const runs: { threadId: string; name: string; args: Record<string, unknown> }[] = [];
+    const harness = setup({ model }, {
+      seed: async (threadId) => ({ kind: "thread", name: "Canvas: Election", threadId, role: null, recent: [] }),
+      canvas: {
+        tools: (threadId) => (threadId === CANVAS_THREAD ? [canvasTool] : []),
+        run: (threadId, name, args) => { if (!name.startsWith("canvas_")) return null; runs.push({ threadId, name, args }); return `Added ${String((args.items as { id: string }[])[0]?.id)}.`; },
+      },
+    });
+    return { ...harness, runs };
+  }
+  const body = (fetch: ReturnType<typeof setup>["fetch"]) => JSON.parse(String(fetch.mock.calls[0]![1]!.body)) as Record<string, any>;
+
+  it("adds the canvas tools and the board note to the voice and its backend", async () => {
+    const { live, fetch } = canvasSetup();
+    await live.start({ sdp: "v=0 offer", threadId: CANVAS_THREAD });
+    const session = body(fetch).session;
+    expect(session.delegation.responses.tools.map((tool: { name: string }) => tool.name)).toEqual([...VOICE_TOOLS, "canvas_add"]);
+    expect(session.instructions).toContain("You are speaking on a canvas");
+  });
+
+  it("does the same for the Realtime fallback", async () => {
+    const { live, fetch } = canvasSetup("gpt-realtime-2.1");
+    await live.start({ threadId: CANVAS_THREAD });
+    expect(body(fetch).session.tools.map((tool: { name: string }) => tool.name)).toContain("canvas_add");
+  });
+
+  it("leaves other sessions' tools and words alone", async () => {
+    const { live, fetch } = canvasSetup();
+    await live.start({ sdp: "v=0 offer", threadId: "thr_elsewhere" });
+    const session = body(fetch).session;
+    expect(session.delegation.responses.tools).toEqual(VOICE_TOOL_DEFINITIONS);
+    expect(session.instructions).not.toContain("canvas");
+  });
+
+  it("runs the voice's canvas calls on the launching canvas, while it talks, and records them", async () => {
+    const { live, runs } = canvasSetup();
+    const { sessionId } = await live.start({ sdp: "v=0 offer", threadId: CANVAS_THREAD });
+    const output = await live.tool(sessionId, "canvas_add", JSON.stringify({ items: [{ id: "pa", kind: "stat", data: 1 }] }), [said("Show me Pennsylvania")]);
+    expect(output).toBe("Added pa.");
+    expect(runs).toEqual([{ threadId: CANVAS_THREAD, name: "canvas_add", args: { items: [{ id: "pa", kind: "stat", data: 1 }] } }]);
+    expect(await live.tool(sessionId, "canvas_add", "not json")).toBe("The arguments weren't valid JSON.");
+  });
+
+  it("refuses canvas calls from a session that doesn't speak for a canvas", async () => {
+    const { live, runs } = canvasSetup();
+    const { sessionId } = await live.start({ sdp: "v=0 offer", threadId: "thr_elsewhere" });
+    expect(await live.tool(sessionId, "canvas_add", "{}")).toContain("There's no tool named");
+    expect(runs).toEqual([]);
+  });
+});
