@@ -95,7 +95,11 @@ hands-free button.
   returns. The moment the html block closes, it's committed as the page
   and the turn's version, as `canvas_page` would make it, and the board is
   final: the finished page lands on the streamed one with no flash, and
-  pictures that arrive after it fade into their cards in place. When the
+  pictures that arrive after it fade into their cards in place. A
+  follow-up on a board that already shows a page doesn't clear it: each
+  part the new page has finished that's on the board too takes its new
+  content in place, and the finished page then morphs from the board
+  (parts glide, enter and leave). When the
   thread goes idle, the caption (the reply's words outside the block) and
   anything that changed since (pictures, patches) fill in that same version;
   idle never adds a second one. If the turn ends without a closing fence

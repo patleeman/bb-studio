@@ -773,6 +773,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       const root = rootArg as HTMLElement;
       root.removeAttribute("data-cv-streaming");
       root.removeAttribute("data-cv-streamed");
+      root.removeAttribute("data-cv-over");
       const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null; key: string | null }>();
       const sx = w.scrollX || 0, sy = w.scrollY || 0;
       if (animate) root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
@@ -780,6 +781,8 @@ export function canvasKit(win?: unknown): CanvasKit {
         before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent, key: contentKey(el) });
       });
       root.innerHTML = html;
+      // Each part's source as written, so a later stream can tell which parts it changes.
+      root.querySelectorAll("[data-cv-id]").forEach((el) => sourceOf.set(el, el.outerHTML));
       if (options.scripts === false) root.querySelectorAll("script").forEach((script) => script.remove());
       else runScripts(root);
       kit.blocks!(root);
@@ -859,8 +862,31 @@ export function canvasKit(win?: unknown): CanvasKit {
         const same = root.hasAttribute("data-cv-streamed") && lastStreamed !== null && withoutPictures(lastStreamed) === withoutPictures(html);
         if (final && !same) { kit.morph!(root, html, true); return; }
       }
+      // A follow-up on a board that already shows a page: the board stays, and each part the new page has
+      // finished that's on the board too takes its new content in place; the finished page then morphs from it
+      // (parts glide, enter and leave), as any new version does.
+      if (!final && (root.hasAttribute("data-cv-over") || (!root.hasAttribute("data-cv-streaming") && root.querySelector("[data-cv-id]")))) {
+        root.setAttribute("data-cv-over", "");
+        root.removeAttribute("data-cv-streamed");
+        const leaf = (el: Element) => !el.querySelector("[data-cv-id]");
+        let changed = 0;
+        for (const [el, source] of sources) {
+          if (!leaf(el)) continue;
+          const id = el.dataset.cvId!;
+          const was = Array.from(root.querySelectorAll<HTMLElement>("[data-cv-id]")).find((each) => each.dataset.cvId === id);
+          if (!was || !leaf(was) || sourceOf.get(was) === source) continue;
+          const next = el.cloneNode(true) as HTMLElement;
+          was.replaceWith(next);
+          sourceOf.set(next, source);
+          kit.blocks!(next.parentElement ?? root);
+          kit.hydrate!(next);
+          kit.charts!(next.parentElement ?? root, true);
+          if (!reduced() && typeof next.animate === "function") next.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 480, delay: Math.min(changed++, 3) * 60, easing: "ease-out", fill: "backwards" });
+        }
+        return;
+      }
       if (!root.hasAttribute("data-cv-streaming") && !final) {
-        // The stream's first version: from the board on screen, as a new version would.
+        // The stream's first version on an empty board.
         kit.morph!(root, html, root.childElementCount > 0, { fit: false, scripts: false });
         root.setAttribute("data-cv-streaming", "");
         const byId = new Map<string, { source: string; inner: string }>();
