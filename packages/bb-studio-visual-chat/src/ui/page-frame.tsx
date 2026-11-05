@@ -245,11 +245,11 @@ function WebpageEmbed({ embed, services }: { embed: PlacedEmbed; services: Embed
     );
   }
   const card = answer.card ?? { title: embed.title, site: new URL(answer.url).hostname, summary: null, image: null };
-  // OpenGraph pictures are wide (1.91:1): on top in a card with the height for it, else beside, shown whole.
+  // OpenGraph pictures are wide (1.91:1): on top in a card with the height for it, else beside; always shown whole, never cropped.
   const top = embed.rect.h >= 280;
   return (
     <div className={`flex size-full overflow-hidden bg-card text-card-foreground ${top ? "flex-col" : "flex-row"}`} data-webpage-state="card">
-      {card.image ? <img src={card.image} alt="" referrerPolicy="no-referrer" className={top ? "w-full shrink-0 object-cover" : "h-full w-2/5 shrink-0 bg-muted object-contain"} style={top ? { aspectRatio: "1.91 / 1", maxHeight: "58%" } : undefined} /> : null}
+      {card.image ? <img src={card.image} alt="" referrerPolicy="no-referrer" className={top ? "w-full shrink-0 bg-muted object-contain" : "h-full w-2/5 shrink-0 bg-muted object-contain"} style={top ? { aspectRatio: "1.91 / 1", maxHeight: "58%" } : undefined} /> : null}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-4 pr-20">
         <div className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{card.site}</div>
         <div className="line-clamp-3 text-base font-semibold leading-snug">{card.title}</div>
