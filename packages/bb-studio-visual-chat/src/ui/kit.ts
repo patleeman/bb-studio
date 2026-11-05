@@ -40,10 +40,16 @@ export interface CanvasKit {
   hydrate?(root?: unknown): void;
   width?(): number;
   height?(): number;
-  /** Draws every [data-chart] under root from its data-rows / data-value and data-options. */
-  charts?(root?: unknown): void;
+  /** Draws every [data-chart] under root from its data-rows / data-value and data-options (fresh: only ones not drawn yet). */
+  charts?(root?: unknown, fresh?: boolean): void;
   /** Shows a new page in root, animating parts by data-cv-id (or, when an id changed, by the same picture or text). */
-  morph?(root: unknown, html: string, animate?: boolean): void;
+  morph?(root: unknown, html: string, animate?: boolean, options?: { fit?: boolean; scripts?: boolean }): void;
+  /**
+   * Shows a page as it's being written (src/stream.ts): finished parts already on screen stay as they are,
+   * newly finished ones come in, and parts still being written stay hidden. `final` lands the finished page
+   * the same way, runs its scripts and fits it.
+   */
+  stream?(root: unknown, html: string, final?: boolean): void;
   /** The screen the page has, in px. */
   viewport?(): { width: number; height: number };
   /** Zooms a page that stops short of the screen up to fill it (at most 1.4x). Returns the zoom. */
@@ -658,9 +664,10 @@ export function canvasKit(win?: unknown): CanvasKit {
       bignum: (_el, value, o) => bignum(value, o),
       delta: (_el, value, o) => delta(value, o),
     };
-    kit.charts = (root?: unknown) => {
+    kit.charts = (root?: unknown, fresh = false) => {
       const scope = (root as ParentNode | undefined) ?? doc;
       scope.querySelectorAll<HTMLElement>("[data-chart]").forEach((el) => {
+        if (fresh && el.dataset.drawnWidth !== undefined) return;
         const draw = CHARTS[el.dataset.chart ?? ""];
         if (!draw) return;
         const data = el.dataset.value !== undefined ? el.dataset.value : parse(el.dataset.rows, []);
@@ -737,6 +744,14 @@ export function canvasKit(win?: unknown): CanvasKit {
     doc.addEventListener?.("load", (event) => { if ((event.target as Element | null)?.tagName === "IMG") { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 120); } }, true);
     w.addEventListener("resize", () => { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 150); });
 
+    // Scripts in the page run (innerHTML doesn't run them).
+    const runScripts = (root: HTMLElement) => root.querySelectorAll("script").forEach((old) => {
+      const script = doc.createElement("script");
+      for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
+      script.textContent = old.textContent;
+      old.replaceWith(script);
+    });
+
     // What a part shows, to match a part that was given a new id: its picture, else its text.
     const contentKey = (el: Element): string | null => {
       const img = el.tagName === "IMG" ? el : el.querySelector("img");
@@ -749,8 +764,9 @@ export function canvasKit(win?: unknown): CanvasKit {
     // A new page, animated by part: parts (data-cv-id) that stay glide from where they were, relative to the
     // part they sit in; new ones come in; gone ones leave from where they were. FLIP, with the Web Animations API.
     const reduced = () => typeof w.matchMedia === "function" && w.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    kit.morph = (rootArg: unknown, html: string, animate = true) => {
+    kit.morph = (rootArg: unknown, html: string, animate = true, options: { fit?: boolean; scripts?: boolean } = {}) => {
       const root = rootArg as HTMLElement;
+      root.removeAttribute("data-cv-streaming");
       const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null; key: string | null }>();
       const sx = w.scrollX || 0, sy = w.scrollY || 0;
       if (animate) root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
@@ -758,17 +774,12 @@ export function canvasKit(win?: unknown): CanvasKit {
         before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent, key: contentKey(el) });
       });
       root.innerHTML = html;
-      // Scripts in the page run (innerHTML doesn't run them).
-      root.querySelectorAll("script").forEach((old) => {
-        const script = doc.createElement("script");
-        for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
-        script.textContent = old.textContent;
-        old.replaceWith(script);
-      });
+      if (options.scripts === false) root.querySelectorAll("script").forEach((script) => script.remove());
+      else runScripts(root);
       kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root);
-      kit.fit!(root);
+      if (options.fit === false) root.style.zoom = ""; else kit.fit!(root);
       if (!animate || reduced() || typeof root.animate !== "function") return;
       const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
       const after = new Map<string, DOMRect>();
@@ -814,6 +825,83 @@ export function canvasKit(win?: unknown): CanvasKit {
         const out = ghost.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.96)" }], { duration: 360, easing: "ease-in", fill: "forwards" });
         out.onfinish = () => ghost.remove();
         w.setTimeout(() => ghost.remove(), 1200);
+      }
+    };
+    // A page as it's written. Each version is the whole page so far, with open parts marked (data-cv-pending:
+    // hidden, its space kept; data-cv-open: shown, it holds finished parts). A finished part whose source is
+    // the same as last time is kept as it is on screen (its picture, chart and entrance carry on), an open
+    // part keeps its element and takes the new children, and a part that's just finished comes in.
+    const sourceOf = new WeakMap<Element, string>();
+    const PENDING = "data-cv-pending", OPEN = "data-cv-open";
+    kit.stream = (rootArg: unknown, html: string, final = false) => {
+      const root = rootArg as HTMLElement;
+      const tpl = doc.createElement("template");
+      tpl.innerHTML = html;
+      const frag = tpl.content;
+      if (!final) frag.querySelectorAll("script").forEach((script) => script.remove());
+      const parts = Array.from(frag.querySelectorAll<HTMLElement>("[data-cv-id]"));
+      const finished = (el: Element) => !el.hasAttribute(PENDING) && !el.hasAttribute(OPEN);
+      const sources = new Map<HTMLElement, string>();
+      for (const el of parts) if (finished(el)) sources.set(el, el.outerHTML);
+      if (!root.hasAttribute("data-cv-streaming")) {
+        // The finished page with no stream on screen: the usual morph.
+        if (final) { kit.morph!(root, html, true); return; }
+        // The stream's first version: from the board on screen, as a new version would.
+        kit.morph!(root, html, root.childElementCount > 0, { fit: false, scripts: false });
+        root.setAttribute("data-cv-streaming", "");
+        const byId = new Map<string, string>();
+        for (const [el, source] of sources) byId.set(el.dataset.cvId!, source);
+        root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => { const source = byId.get(el.dataset.cvId!); if (source && finished(el)) sourceOf.set(el, source); });
+        return;
+      }
+      const shown = new Set<string>();
+      const onScreen = new Map<string, HTMLElement>();
+      root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
+        if (el.closest(`[${PENDING}]`)) return;
+        const id = el.dataset.cvId!;
+        shown.add(id);
+        if (!onScreen.has(id)) onScreen.set(id, el);
+      });
+      const fresh: HTMLElement[] = [];
+      for (const el of parts) {
+        if (!frag.contains(el)) continue; // inside a part kept from the screen
+        const id = el.dataset.cvId!;
+        const was = onScreen.get(id);
+        const source = sources.get(el);
+        if (source !== undefined && was && sourceOf.get(was) === source) { el.replaceWith(was); continue; }
+        // An open part keeps its element, also when it finishes: its attributes and children follow the new version.
+        if (was && was.hasAttribute(OPEN) && was.tagName === el.tagName && (source !== undefined || el.hasAttribute(OPEN))) {
+          for (const attr of Array.from(was.attributes)) if (!el.hasAttribute(attr.name)) was.removeAttribute(attr.name);
+          for (const attr of Array.from(el.attributes)) if (was.getAttribute(attr.name) !== attr.value) was.setAttribute(attr.name, attr.value);
+          was.replaceChildren(...Array.from(el.childNodes));
+          el.replaceWith(was);
+          if (source !== undefined) sourceOf.set(was, source);
+          continue;
+        }
+        if (source !== undefined) sourceOf.set(el, source);
+        if (source !== undefined || el.hasAttribute(OPEN)) fresh.push(el);
+      }
+      root.replaceChildren(frag);
+      if (final) { root.removeAttribute("data-cv-streaming"); runScripts(root); }
+      kit.blocks!(root);
+      kit.hydrate!(root);
+      kit.charts!(root, true);
+      if (final) kit.fit!(root);
+      if (reduced() || typeof root.animate !== "function") return;
+      const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+      let entering = 0;
+      for (const el of fresh) {
+        if (!el.isConnected) continue;
+        const id = el.dataset.cvId!;
+        if (shown.has(id)) {
+          // Already on screen in an earlier form (a part that changed when the page finished): its new content fades in.
+          if (finished(el)) el.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 360, easing: "ease-out" });
+          continue;
+        }
+        // Inside a part that's coming in too, that part's entrance carries it.
+        const host = el.parentElement?.closest<HTMLElement>("[data-cv-id]");
+        if (host && !shown.has(host.dataset.cvId!) && fresh.includes(host)) continue;
+        el.animate([{ opacity: 0, transform: "translateY(12px) scale(0.985)" }, { opacity: 1, transform: "none" }], { duration: 440, delay: Math.min(entering++, 3) * 70, easing: ease, fill: "backwards" });
       }
     };
     // The height its place in the composition suggests: size the figure to it (never set it on the outer element).

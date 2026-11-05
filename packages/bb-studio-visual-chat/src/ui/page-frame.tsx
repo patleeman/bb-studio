@@ -5,6 +5,9 @@
 // each style switch arrives as a message, and the kit morphs the page by
 // data-cv-id (parts that stay glide, new ones enter, gone ones leave). The
 // page scrolls inside the frame when it's taller than the screen.
+// A page the agent is still writing (src/stream.ts) arrives as stream
+// messages: the kit builds it part by part (cv.stream), and the finished page
+// lands on it the same way, so nothing flashes.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { tokenDeclarations, type OrganicLook } from "../looks";
 import { canvasKit } from "./kit";
@@ -13,6 +16,7 @@ import { kitCss } from "./kit-css";
 export const PAGE_MESSAGE = "bb-canvas-page";
 export const STYLE_MESSAGE = "bb-canvas-style";
 export const PAGE_READY_MESSAGE = "bb-canvas-page-ready";
+export const STREAM_MESSAGE = "bb-canvas-stream";
 /**
  * Pictures load straight from https addresses (canvas_image finds them):
  * the frame stays an opaque origin with no scripts, styles, fetches or
@@ -23,7 +27,8 @@ export const PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-s
 
 const BOOT = `(function(){addEventListener("message",function(event){if(event.source!==parent)return;var d=event.data;if(!d)return;
 if(d.type==="${STYLE_MESSAGE}"){document.getElementById("cv-style").textContent=d.css;document.documentElement.setAttribute("data-cv-look",d.look);document.documentElement.setAttribute("data-cv-mode",d.mode)}
-if(d.type==="${PAGE_MESSAGE}"){window.cv.morph(document.getElementById("cv-page"),d.html,!!d.animate);document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
+if(d.type==="${STREAM_MESSAGE}"){window.cv.stream(document.getElementById("cv-page"),d.html,false);document.documentElement.setAttribute("data-cv-stream",String(d.n||0))}
+if(d.type==="${PAGE_MESSAGE}"){var p=document.getElementById("cv-page");if(p.hasAttribute("data-cv-streaming"))window.cv.stream(p,d.html,true);else window.cv.morph(p,d.html,!!d.animate);document.documentElement.removeAttribute("data-cv-stream");document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
 addEventListener("load",function(){parent.postMessage({type:"${PAGE_READY_MESSAGE}"},"*")});})();`;
 
 /**
@@ -37,7 +42,10 @@ const FLUID = `:root{--cv-t-xs:clamp(11px,0.5vw + 0.35vh,15px);--cv-t-sm:clamp(1
 
 const BASE = `html,body{margin:0;padding:0;background:var(--cv-paper);color:var(--cv-ink);font-family:var(--cv-font-text);font-size:var(--cv-t-md);line-height:1.45;-webkit-font-smoothing:antialiased;transition:background-color .6s ease,color .6s ease}
 *{box-sizing:border-box}img,svg{max-width:100%}img{display:block}
-body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}`;
+body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}
+[data-cv-pending]{visibility:hidden}
+.cv-wall>[data-cv-pending]{visibility:visible;background:color-mix(in srgb,var(--cv-ink) 6%,transparent);border-radius:var(--cv-radius);animation:cv-pulse 1.6s ease-in-out infinite}
+.cv-wall>[data-cv-pending]>*{visibility:hidden}`;
 
 /** The page's CSS for a style and mode: its tokens, a base, the kit's classes. */
 export function pageCss(look: OrganicLook, mode: "light" | "dark"): string {
@@ -49,11 +57,21 @@ export function pageSrcDoc(): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}"><meta name="referrer" content="no-referrer"><style id="cv-style"></style><script>${BOOT}</script><script>(${canvasKit.toString()})(window);</script></head><body><div id="cv-page"></div></body></html>`;
 }
 
-export function PageFrame({ html, rev, look, mode, title }: { html: string; rev: number; look: OrganicLook; mode: "light" | "dark"; title: string }) {
+export function PageFrame({ html, stream = null, streamN = 0, rev, look, mode, title }: {
+  html: string | null;
+  /** The page the agent is writing, so far (null: none). It shows instead of html until it ends. */
+  stream?: string | null;
+  streamN?: number;
+  rev: number;
+  look: OrganicLook;
+  mode: "light" | "dark";
+  title: string;
+}) {
   const frame = useRef<HTMLIFrameElement>(null);
   const srcDoc = useMemo(() => pageSrcDoc(), []);
   const [ready, setReady] = useState(false);
   const shown = useRef<string | null>(null);
+  const streamed = useRef<string | null>(null);
   const post = (message: unknown) => { try { frame.current?.contentWindow?.postMessage(message, "*"); } catch { /* the frame is gone */ } };
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -67,11 +85,19 @@ export function PageFrame({ html, rev, look, mode, title }: { html: string; rev:
     if (ready) post({ type: STYLE_MESSAGE, css: pageCss(look, mode), look, mode });
   }, [ready, look, mode]);
   useEffect(() => {
-    if (!ready || shown.current === html) return;
+    if (!ready) return;
+    if (stream !== null) {
+      if (streamed.current !== stream) post({ type: STREAM_MESSAGE, html: stream, n: streamN });
+      streamed.current = stream;
+      return;
+    }
+    // A stream ended: the page lands on it, even when it's the page that was there before.
+    if (streamed.current !== null) { streamed.current = null; shown.current = "\u0000"; }
+    if (html === null || shown.current === html) return;
     // The first page shows at once; every later version animates.
     post({ type: PAGE_MESSAGE, html, animate: shown.current !== null, rev });
     shown.current = html;
-  }, [ready, html, rev]);
+  }, [ready, html, rev, stream, streamN]);
   return (
     <iframe
       ref={frame}
@@ -84,6 +110,7 @@ export function PageFrame({ html, rev, look, mode, title }: { html: string; rev:
       data-canvas-page-frame
       data-page-rev={rev}
       data-page-ready={ready || undefined}
+      data-page-streaming={stream !== null || undefined}
     />
   );
 }

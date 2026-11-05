@@ -118,7 +118,7 @@ function useDictating(field: string): boolean {
 function CanvasPage({ threadId }: { threadId: string | null }) {
   const rpc = useRpc<typeof canvasContract>();
   const theme = useWidgetTheme();
-  const { canvas: own, send, reload } = useCanvas(threadId);
+  const { canvas: own, stream: liveStream, send, reload } = useCanvas(threadId);
   // Remember the open canvas, so coming back to Canvas reopens it.
   useEffect(() => { if (threadId && own) writeLast(threadId); }, [threadId, own]);
   const preview = usePreview();
@@ -134,8 +134,10 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   const [chatHeight, setChatHeight] = useState(0);
   const [newLook] = useState<OrganicLook>(startLook);
   const [draft, setDraft] = useState<CanvasExecution>(CANVAS_DEFAULT_EXECUTION);
+  // The page the agent is writing shows on the live board only (not a preview or an old version).
+  const stream = !preview && !snap ? liveStream : null;
   // A board written as a page always has a style (a canvas from before styles takes the default).
-  const look: Look = canvas ? (canvas.page && canvas.look === "classic" ? DEFAULT_LOOK : canvas.look) : threadId ? "classic" : newLook;
+  const look: Look = canvas ? ((canvas.page || stream) && canvas.look === "classic" ? DEFAULT_LOOK : canvas.look) : threadId ? "classic" : newLook;
   const css = useMemo(() => (look === "classic" ? null : lookCss(look)), [look]);
 
   const submit = useCallback(async (text: string) => {
@@ -184,8 +186,8 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       <TopBar canvas={canvas ?? null} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
-        {canvas === undefined ? null : page && look !== "classic" ? (
-          <PageFrame html={page} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Visual Chat"} />
+        {canvas === undefined ? null : (page || stream) && look !== "classic" ? (
+          <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Visual Chat"} />
         ) : look !== "classic" ? (
           <OrganicBoard
             key={preview ? "preview" : "board"}
