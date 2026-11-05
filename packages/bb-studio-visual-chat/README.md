@@ -36,6 +36,35 @@ hands-free button.
   canvas. The voice edits the board while it talks, and passes deeper work
   to the canvas's thread, which edits the board when it's done.
 
+## Quick card
+
+For a quick question from anywhere in BB, press **⌘⇧Space** (Ctrl+Shift+Space
+on Windows and Linux), or run **Visual Chat: Ask** from the command palette. A
+card opens over the page, bottom right, with the field focused. Type and
+press Enter, and the board streams into the card. Press the shortcut again,
+or Esc, to close it.
+
+- **A fresh chat each time.** Every summon starts a new chat. Each chat is an
+  ordinary canvas, so it's in the chat list and on the full page too, and
+  closing the card never loses anything.
+- **‹ ›** in its header page through the chat's versions. Past the first
+  version, ‹ goes to the chat before it in the list, so on a fresh card ‹
+  brings back the last chat. Past the newest chat, › starts a new one. ← and
+  → do the same while the field is empty.
+- **Expand** opens the same chat on the full page and closes the card.
+- **Esc** closes the card when focus is inside it. It doesn't close the card
+  while the field holds a draft or dictation is on, and it never reaches
+  BB's own Esc (back).
+- **Drag** the header to move the card, and drag any edge or corner to
+  resize it. Each window remembers the card's place and size (a new window
+  starts from the last one saved), and the card stays on screen when the
+  window resizes. Until you resize it, it takes about 40% of the window.
+- It's a non-modal dialog: focus moves into the field on open and back where
+  it was on close. While closed, it renders nothing and takes no keys.
+- **The shortcut** doesn't clash with BB's defaults (⌘K is BB's thread search,
+  ⌘⇧P the palette) or Studio's (⌘⇧K is Studio's search). Rebind it in
+  **Settings → Keyboard**.
+
 ## How it works
 
 - **The agent** is an ordinary BB thread, hidden, in your personal
@@ -195,7 +224,9 @@ prompt in new canvases on a real model and times the first visible content,
 the first real card, the final page and the turn, with the model's rounds,
 and can record the page building. `scripts/capture/canvas-demo-video.mjs`
 records one real four-turn conversation, typed into the field, with no
-cuts, and notes which parts each follow-up kept, added and removed.
+cuts, and notes which parts each follow-up kept, added and removed. `scripts/capture/visual-chat-quick-video.mjs` records the quick card in
+real use (summon from a thread, ask, Esc, summon again, ‹, Expand) and takes
+stills over a thread in light, dark and a narrow window.
 
 ## Moving from BB Studio Canvas
 
