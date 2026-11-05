@@ -33,7 +33,7 @@ import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
 import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
-import { CANVAS_PLUGIN_ID, canvasVoiceOutput, canvasVoiceRunOutput } from "./src/voice/live/canvas-plugin";
+import { CANVAS_PLUGIN_ID, canvasVoiceOutput, canvasVoiceRunOutput, isCanvasThreadOrigin } from "./src/voice/live/canvas-plugin";
 import { subcommand, usage } from "./src/kit/cli";
 import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -299,6 +299,8 @@ export default async function plugin(bb: BbPluginApi) {
   // session start or resume on (BB doesn't change a running session).
   bb.agents.configure((context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
+    // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
+    if (isCanvasThreadOrigin(context.origin)) return { tools: [], skills: [], instructions: "" };
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     tools.push(...CODE_TOOLS);
