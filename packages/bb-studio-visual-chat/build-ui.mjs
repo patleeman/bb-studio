@@ -9,9 +9,13 @@
 // The bundle is in the plugin's own files, so `bb plugin build` also finds
 // its Tailwind classes.
 //
+// It also builds the board renderer (src/ui/renderer-entry.ts) into bundle/canvas-renderer.js: one classic
+// script, no imports, for the iOS app's web view, which gets it from canvas.renderer (src/renderer.ts).
+//
 //   node build-ui.mjs   (in packages/bb-studio-visual-chat, after changing src/ui or the Studio files it uses)
 import { build } from "esbuild";
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,3 +50,18 @@ await build({
   logLevel: "warning",
 });
 console.log(`${outfile}: ${(statSync(outfile).size / 1024).toFixed(0)} KB`);
+// The renderer: framework-free (no React, no SDK), so nothing is external.
+const rendererFile = join(here, "bundle", "canvas-renderer.js");
+await build({
+  entryPoints: [join(here, "src", "ui", "renderer-entry.ts")],
+  outfile: rendererFile,
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: "es2022",
+  minify: true,
+  legalComments: "eof",
+  logLevel: "warning",
+});
+const version = createHash("sha256").update(readFileSync(rendererFile, "utf8")).digest("hex").slice(0, 16);
+console.log(`${rendererFile}: ${(statSync(rendererFile).size / 1024).toFixed(0)} KB, version ${version}`);

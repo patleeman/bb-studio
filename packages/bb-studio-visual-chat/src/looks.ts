@@ -14,7 +14,8 @@ import { contrast, fitColor, fitHue, mix, oklchToRgb, rgb, rgbToOklch, toHex, ty
 
 export const LOOKS = ["editorial", "field", "instrument", "classic"] as const;
 export type Look = (typeof LOOKS)[number];
-export const lookSchema = z.enum(LOOKS);
+// Pure, so the board renderer (bundle/canvas-renderer.js), which never validates, leaves zod out.
+export const lookSchema = /* @__PURE__ */ z.enum(LOOKS);
 /** Organic looks: everything but classic. */
 export type OrganicLook = Exclude<Look, "classic">;
 export const ORGANIC_LOOKS: readonly OrganicLook[] = ["editorial", "field", "instrument"];
