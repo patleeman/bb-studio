@@ -42,7 +42,7 @@ export const CLAUDE_CODE_CANVAS_TOOLS = ["canvas_page", "canvas_images", "canvas
  * directly; telling it to search first made it search even when they were loaded. Above the threshold they're
  * deferred after all, and then loading them is one quick select instead of a search.
  */
-export const TOOL_LOADING_LINE = `The canvas tools are loaded up front here: call canvas_page and canvas_images directly, with no tool search. Only if canvas_page is listed as deferred (not callable), load them all in ONE tool search first, with exactly this query: select:${CLAUDE_CODE_CANVAS_TOOLS.join(",")}`;
+export const TOOL_LOADING_LINE = `The canvas tools are loaded up front here: call canvas_images and the other canvas tools directly, with no tool search. Only if canvas_images is listed as deferred (not callable), load them all in ONE tool search first, with exactly this query: select:${CLAUDE_CODE_CANVAS_TOOLS.join(",")}`;
 
 /** The configure hook's instructions for a canvas in this look; on Claude Code, how to load the tools. */
 export function canvasInstructions(look: Look, providerId?: string | null): string {

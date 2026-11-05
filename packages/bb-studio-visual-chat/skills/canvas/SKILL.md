@@ -87,7 +87,7 @@ the reply is only that caption (the voice reads it back).
 ## Claude Code
 
 Visual Chat has Claude Code load the canvas tools up front, so call them
-directly, with no tool search. Only if `canvas_page` is listed as deferred,
+directly, with no tool search. Only if `canvas_images` is listed as deferred,
 load them all in one tool search first:
 `select:mcp__bb-bridge__canvas_page,mcp__bb-bridge__canvas_images,mcp__bb-bridge__canvas_patch,mcp__bb-bridge__canvas_read`.
 
