@@ -5,10 +5,11 @@ import { CANVAS_DEFAULT_MODEL, registerCanvas, VOICE_START_NOTE } from "./server
 import { CANVAS_CHANNEL } from "./shared";
 import type { ImageDeps, Transport } from "./image";
 import { canvasVoiceTools, CANVAS_TOOL_NAMES } from "./tools";
+import type { EventRow } from "./stream";
 
 type Sent = { threadId: string; input: { text: string; visibility?: string }[]; mode?: string };
 
-function canvasHost(images?: ImageDeps) {
+function canvasHost(images?: ImageDeps, log: EventRow[] = []) {
   const spawned: Record<string, unknown>[] = [];
   const sent: Sent[] = [];
   const updated: Record<string, unknown>[] = [];
@@ -21,6 +22,14 @@ function canvasHost(images?: ImageDeps) {
         spawn: async (input: unknown) => { spawned.push(input as Record<string, unknown>); return { id: `thr_canvas${++next}` }; },
         send: async (input: unknown) => { sent.push(input as Sent); return { ok: true }; },
         update: async (input: unknown) => { updated.push(input as Record<string, unknown>); return { ok: true }; },
+        // The thread's event log, as threads.events.list pages it (streaming reads it).
+        events: {
+          list: async ({ afterSeq, order, limit, types }: { afterSeq?: string; order?: string; limit?: string; types?: string[] }) => {
+            const rows = log.filter((row) => (!afterSeq || row.seq > Number(afterSeq)) && (!types || types.includes(row.type)));
+            const sorted = order === "desc" ? [...rows].sort((a, b) => b.seq - a.seq) : rows;
+            return sorted.slice(0, Number(limit ?? 100));
+          },
+        },
       },
       providers: {
         list: async () => [
@@ -41,7 +50,7 @@ function canvasHost(images?: ImageDeps) {
   } as never);
   const db = host.bb.storage.database();
   for (const migration of CANVAS_MIGRATIONS) db.exec(migration);
-  const canvas = registerCanvas(host.bb, db, { images });
+  const canvas = registerCanvas(host.bb, db, { images, streamIntervalMs: 2 });
   const call = (method: string, input: unknown) => host.harness.behavior.callRpc(method, input) as Promise<any>;
   const tool = (name: string, input: unknown, threadId: string) => host.harness.behavior.callAgentTool(name, input, { threadId });
   return { host, canvas, spawned, sent, updated, listed, call, tool };
@@ -475,5 +484,106 @@ describe("for Studio's hands-free voice (canvas.voice, canvas.voiceRun)", () => 
     expect(await call("canvas.voice", { threadId: "thr_other" })).toEqual({ tools: [], instructions: null });
     expect((await call("canvas.voiceRun", { threadId, name: "canvas_page", args: { html: PAGE } })).output).toContain("The page is up");
     expect((await call("canvas.voiceRun", { threadId, name: "loops_list", args: {} })).output).toBeNull();
+  });
+});
+
+describe("a page streamed in the reply", () => {
+  const STREAMED = '<style>.w{display:grid}</style><div class="cv-fill"><header data-cv-id="title"><h1>Chromatic: five to own</h1></header><div class="cv-wall w" data-cv-id="games"><div data-block="card" data-cv-id="game-tetris" data-title="Tetris DX" data-rating="9"></div><div data-block="card" data-cv-id="game-links" data-title="Link\'s Awakening DX"></div></div></div>';
+  const REPLY = `\`\`\`html style=field\n${STREAMED}\n\`\`\`\nStart with Link's Awakening.`;
+  const wait = async (check: () => boolean, what: string) => {
+    for (let i = 0; i < 400; i++) { if (check()) return; await new Promise((resolve) => setTimeout(resolve, 2)); }
+    throw new Error(`timed out waiting for ${what}`);
+  };
+  const streamSignals = (host: ReturnType<typeof canvasHost>["host"]) => host.harness.inspection.realtimeSignals
+    .map((signal) => (signal as { payload: any }).payload)
+    .filter((payload) => payload?.type === "canvas:stream");
+  /** The reply as delta rows of one message, in chunks of `size`, from seq `from`. */
+  const deltas = (text: string, from: number, size = 40): EventRow[] => {
+    const rows: EventRow[] = [];
+    for (let i = 0; i < text.length; i += size) rows.push({ seq: from + rows.length, type: "item/agentMessage/delta", data: { delta: text.slice(i, i + size), itemId: "msg1" } });
+    return rows;
+  };
+
+  async function streamingCanvas() {
+    const log: EventRow[] = [{ seq: 1, type: "item/agentMessage/delta", data: { delta: "```html\n<p data-cv-id=\"old\">an earlier turn</p>", itemId: "old" } }];
+    const host = canvasHost(undefined, log);
+    const { threadId, canvasId } = await host.call("canvas.create", { text: "I just bought a Chromatic, give me a showcase of games including ratings" });
+    await host.host.harness.behavior.emitThreadEvent("thread.active", { thread: { id: threadId } as never });
+    return { ...host, log, threadId, canvasId };
+  }
+
+  it("publishes the page as it grows, from deltas in any order and seen twice, then commits it at idle", async () => {
+    const { host, call, log, threadId } = await streamingCanvas();
+    const rows = deltas(REPLY, 10);
+    // The first half arrives shuffled, with a duplicate.
+    const half = rows.slice(0, Math.ceil(rows.length / 2));
+    log.push(...[...half].reverse(), half[0]!);
+    await wait(() => streamSignals(host).length > 0, "a stream signal");
+    const first = streamSignals(host)[0];
+    expect(first).toMatchObject({ threadId, n: 1 });
+    expect(first.html).not.toContain("an earlier turn");
+    // The style on the fence line applies as the page starts.
+    expect((await call("canvas.get", { threadId })).canvas.look).toBe("field");
+    log.push(...rows.slice(half.length));
+    await wait(() => streamSignals(host).some((signal) => signal.html?.includes("game-links\" data-title")), "the whole page");
+    expect(streamSignals(host).every((signal) => !signal.html || !signal.html.includes("Start with"))).toBe(true);
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: REPLY });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.page).toBe(STREAMED);
+    expect(view.title).toBe("Chromatic: five to own");
+    expect(view.caption).toBe("Start with Link's Awakening.");
+    expect(view.status).toBe("idle");
+    expect(view.versions).toHaveLength(1);
+    expect(view.versions[0]).toMatchObject({ caption: "Start with Link's Awakening.", look: "field" });
+    expect(view.history.at(-1)).toMatchObject({ role: "agent", text: "Start with Link's Awakening." });
+    const last = streamSignals(host).at(-1);
+    expect(last).toMatchObject({ done: true, rev: view.rev });
+  });
+
+  it("commits what arrived, repaired, when the turn ends without a closing fence", async () => {
+    const { host, call, log, threadId } = await streamingCanvas();
+    const cut = REPLY.slice(0, REPLY.indexOf('data-cv-id="game-links"') + 10);
+    log.push(...deltas(cut, 10));
+    await wait(() => streamSignals(host).length > 0, "a stream signal");
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: null });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.page).toContain('data-cv-id="game-tetris"');
+    expect(view.page).not.toContain("game-links");
+    expect(view.page).not.toMatch(/data-cv-(pending|open)/);
+    expect(view.page.endsWith("</div></div>")).toBe(true);
+    expect(view.versions).toHaveLength(1);
+  });
+
+  it("keeps the board when no page came, and the reply is the caption", async () => {
+    const { host, call, tool, log, threadId } = await streamingCanvas();
+    await tool("canvas_page", { html: PAGE }, threadId);
+    log.push(...deltas("Democrats took the House.", 10));
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "Democrats took the House." });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.page).toBe(PAGE);
+    expect(view.caption).toBe("Democrats took the House.");
+    expect(streamSignals(host).filter((signal) => !signal.done)).toEqual([]);
+    expect(streamSignals(host).at(-1)).toMatchObject({ done: true, rev: null });
+  });
+
+  it("still takes canvas_page and canvas_patch in a streaming turn", async () => {
+    const { host, call, tool, threadId } = await streamingCanvas();
+    expect(text(await tool("canvas_page", { html: PAGE, caption: "The House flipped." }, threadId))).toContain("The page is up");
+    expect(text(await tool("canvas_patch", { id: "seats", html: '<section data-cv-id="seats"><div data-chart="bignum" data-value="222"></div></section>' }, threadId))).toContain("Changed part");
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "The House flipped." });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.page).toContain('data-value="222"');
+    expect(view.versions).toHaveLength(1);
+  });
+
+  it("commits what streamed when the turn fails", async () => {
+    const { host, call, log, threadId } = await streamingCanvas();
+    log.push(...deltas(REPLY.slice(0, REPLY.indexOf("</header>") + 9), 10));
+    await wait(() => streamSignals(host).length > 0, "a stream signal");
+    await host.harness.behavior.emitThreadEvent("thread.failed", { thread: { id: threadId } as never, error: "boom" } as never);
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.status).toBe("failed");
+    expect(view.page).toContain("Chromatic: five to own");
+    expect(view.caption).toBeNull();
   });
 });

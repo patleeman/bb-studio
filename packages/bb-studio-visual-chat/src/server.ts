@@ -6,12 +6,17 @@
 //   from any other thread is refused. Each edit publishes at once, so the
 //   page animates while the agent (or the hands-free voice) is still talking.
 // - The thread's reply becomes the page's caption when it goes idle.
+// - A page the agent writes in its reply (one fenced html block) streams: while
+//   the thread works, its event log is polled and the growing page published
+//   to the page (src/stream.ts); at idle the finished block is the page.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { canvasContract } from "./contract";
 import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instructions";
 import { DEFAULT_LOOK, lookOf } from "./looks";
-import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type PickerProvider } from "./shared";
+import { fillPictures } from "./page";
+import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_STREAM_TYPE, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type CanvasStreamSignal, type PickerProvider } from "./shared";
+import { PageStream, STREAM_EVENT_TYPES, turnPage, type EventRow } from "./stream";
 import { CanvasStore, type CanvasActor } from "./store";
 import { ImageCache, type ImageDeps } from "./image";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
@@ -81,7 +86,7 @@ export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.provi
 const PERSONAL_PROJECT_ID = "proj_personal";
 
 /** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
-export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps } = {}): BuiltinCanvas {
+export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps; streamIntervalMs?: number } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
   // Found pictures are reused for a day (memory and this plugin's database).
   const images: ImageDeps | undefined = options.images ? { cache: new ImageCache(db, options.now), ...options.images } : undefined;
@@ -304,9 +309,84 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     if (next === "idle") { store.saveVersion(row.id, branchedFrom.get(row.id) ?? null); branchedFrom.delete(row.id); }
     publish(row.id);
   };
-  bb.events.on("thread.active", ({ thread }) => status(thread.id, "working"));
-  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => status(thread.id, "idle", lastAssistantText));
-  bb.events.on("thread.failed", ({ thread }) => status(thread.id, "failed"));
+
+  // ─── Streaming: a page written in the reply builds on the page as it's written ───
+  const streams = new Map<string, { canvasId: string; n: number; stream: PageStream }>();
+  const publishStream = (signal: CanvasStreamSignal) => {
+    try { bb.realtime.publish(CANVAS_CHANNEL, signal); } catch { /* the page catches up at the end of the turn */ }
+  };
+  const events = (args: Record<string, unknown>) => Promise.resolve().then(() => bb.sdk.threads.events.list(args as never) as unknown as Promise<EventRow[]>);
+  /** While a canvas thread works, its reply's page streams to the page. */
+  const startStream = (threadId: string) => {
+    const row = store.byThread(threadId);
+    if (!row || streams.has(threadId)) return;
+    let failures = 0;
+    const startedAt = Date.now();
+    const entry = { canvasId: row.id, n: 0, stream: null as unknown as PageStream };
+    entry.stream = new PageStream({
+      tip: async () => (await events({ threadId, order: "desc", limit: "1" }))[0]?.seq ?? 0,
+      list: async (after, limit) => {
+        // A log that can't be read, or a turn that runs on for half an hour, stops the stream (the idle commit still runs).
+        if (failures > 20 || Date.now() - startedAt > 30 * 60_000) { void entry.stream.stop(); return []; }
+        const rows = await events({ threadId, afterSeq: String(after), order: "asc", limit: String(limit), types: [...STREAM_EVENT_TYPES] }).catch((error) => { failures++; throw error; });
+        failures = 0;
+        return rows;
+      },
+      fill: (html) => fillPictures(html, store.pictures(row.id)).html,
+      publish: ({ html, style }) => {
+        const now = store.get(row.id);
+        if (!now?.thread_id) return;
+        // The style named on the fence line applies as the page starts, so it builds in its own style.
+        if (style && now.look !== style) { store.edit(row.id, [{ op: "style", look: style, reason: null }], "agent"); publish(row.id); }
+        publishStream({ type: CANVAS_STREAM_TYPE, canvasId: row.id, threadId: now.thread_id, n: ++entry.n, html });
+      },
+      onError: () => {},
+      ...(options.streamIntervalMs !== undefined ? { intervalMs: options.streamIntervalMs } : {}),
+    });
+    streams.set(threadId, entry);
+    entry.stream.start();
+  };
+  /** The turn's streamed text (after one last read), and whether its page showed; null without a stream. */
+  const stopStream = async (threadId: string) => {
+    const entry = streams.get(threadId);
+    if (!entry) return null;
+    streams.delete(threadId);
+    return { entry, text: await entry.stream.stop() };
+  };
+  /**
+   * At the end of a turn: a page in the reply (or, failing that, what streamed of one) becomes the board, as
+   * canvas_page would make it. Returns the caption: the words outside the page, else the reply.
+   */
+  const commitReplyPage = (canvasId: string, reply: string | null, streamed: string | null): string | null => {
+    const turn = turnPage(reply, streamed);
+    if (!turn.html) return turn.caption;
+    try {
+      if (turn.style && store.get(canvasId)?.look !== turn.style) store.edit(canvasId, [{ op: "style", look: turn.style, reason: null }], "agent");
+      store.setPage(canvasId, fillPictures(turn.html, store.pictures(canvasId)).html, "agent", turn.title);
+    } catch (error) {
+      bb.log.warn(`Visual Chat couldn't use the page in the reply: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return turn.caption;
+  };
+  const endTurn = async (threadId: string, next: "idle" | "failed", reply: string | null) => {
+    const streamed = await stopStream(threadId);
+    const row = store.byThread(threadId);
+    if (!row) return;
+    const fenced = /(^|\n)[ \t]*(`{3,}|~{3,})[ \t]*html\b/i;
+    const hasPage = (reply && fenced.test(reply)) || (streamed && fenced.test(streamed.text));
+    const before = store.get(row.id)?.rev ?? 0;
+    const caption = hasPage ? commitReplyPage(row.id, next === "idle" ? reply : null, streamed?.text ?? null) : reply;
+    // A new turn started while this one was finishing: it's working again.
+    status(threadId, streams.has(threadId) ? "working" : next, next === "idle" ? caption : null);
+    if (streamed) {
+      const rev = store.get(row.id)?.rev ?? 0;
+      const now = store.get(row.id);
+      publishStream({ type: CANVAS_STREAM_TYPE, canvasId: row.id, threadId: now?.thread_id ?? threadId, n: streamed.entry.n + 1, done: true, rev: rev > before ? rev : null });
+    }
+  };
+  bb.events.on("thread.active", ({ thread }) => { status(thread.id, "working"); startStream(thread.id); });
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => endTurn(thread.id, "idle", lastAssistantText));
+  bb.events.on("thread.failed", ({ thread }) => endTurn(thread.id, "failed", null));
 
   return {
     store,

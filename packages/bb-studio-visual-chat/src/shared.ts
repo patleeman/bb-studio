@@ -18,6 +18,17 @@ export const CANVAS_UPDATE_TYPE = "canvas:updated";
 
 export interface CanvasSignal { type: typeof CANVAS_UPDATE_TYPE; canvasId: string; threadId: string; rev: number }
 
+/**
+ * Realtime: the page the agent is writing in its reply, so far (src/stream.ts). `html` is the partial page,
+ * repaired and marked; `n` counts up within a stream. The last signal of a stream has `done`: then `rev` is the
+ * board's revision with the finished page (the page shows the stream until it has that revision), or null when
+ * nothing was committed.
+ */
+export const CANVAS_STREAM_TYPE = "canvas:stream";
+export type CanvasStreamSignal =
+  | { type: typeof CANVAS_STREAM_TYPE; canvasId: string; threadId: string; n: number; html: string; done?: false }
+  | { type: typeof CANVAS_STREAM_TYPE; canvasId: string; threadId: string; n: number; done: true; rev: number | null };
+
 export const canvasHref = (threadId?: string | null) => (threadId ? `${CANVAS_ROOT}/${encodeURIComponent(threadId)}` : CANVAS_ROOT);
 /** An explicit new canvas. The bare root reopens the last canvas instead (the rail opens the root). */
 export const CANVAS_NEW_SEGMENT = "new";
