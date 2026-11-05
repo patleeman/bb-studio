@@ -213,13 +213,14 @@ describe("look instructions", () => {
 });
 
 describe("speed", () => {
-  it("has the agent look all pictures up in one call, then write the page in its reply, with no draft", () => {
+  it("has the agent write the page in its reply first, then look all pictures up in one call, with no draft", () => {
     const rules = canvasInstructions("editorial");
-    expect(rules).toContain("ONE canvas_images call");
     expect(rules).toContain("IN YOUR REPLY, as one fenced html block");
+    expect(rules).toContain("BEFORE any canvas tool call");
+    expect(rules).toContain("call canvas_images ONCE");
     expect(rules).toContain("No draft page");
     expect(rules).not.toContain("Draft first");
-    expect(canvasFirstNote("editorial")).toContain("WORK FAST: PICTURES, THEN THE PAGE IN YOUR REPLY");
+    expect(canvasFirstNote("editorial")).toContain("WORK FAST: THE PAGE FIRST, IN YOUR REPLY");
     expect(canvasFirstNote("editorial")).toContain("```html title=\"Game Boy Color\"");
   });
 

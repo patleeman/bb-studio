@@ -72,13 +72,15 @@ hands-free button.
   `canvas_images` and `canvas_guide`. Only canvas threads get them, with the canvas rules and
   the `canvas` skill, and each works only on the calling thread's board.
   Hands-free voice gets the same tools.
-- **The page streams:** for a new or rewritten page, the agent looks up
-  every picture in one `canvas_images` call, then writes the page in its
-  reply as one fenced html block (`` ```html ``, optionally with
-  `style=… title="…"`), and one caption line after it. BB writes a reply's
-  text to the thread's event log as it's generated
-  (`item/agentMessage/delta`); tool input doesn't stream, which is why the
-  page goes in the reply and not in `canvas_page`. While a canvas thread
+- **The page streams:** for a new or rewritten page, the agent writes the
+  page first, in its reply, as one fenced html block (`` ```html ``,
+  optionally with `style=… title="…"`), then in the same response looks up
+  every picture in one `canvas_images` call, and when that returns replies
+  with only the caption. BB writes a reply's text to the thread's event log
+  as it's generated (`item/agentMessage/delta`); tool input doesn't stream,
+  which is why the page goes in the reply and not in `canvas_page`. On
+  Claude Code, reply text that follows a tool result reaches the log in one
+  burst of about 2,000 characters, so the page comes before any tool call. While a canvas thread
   works, the server polls its log (`threads.events.list` after the last
   seq, every ~180 ms), assembles the text, takes the growing html block,
   repairs it (a half tag, attribute, entity or comment is dropped, a half
@@ -89,7 +91,8 @@ hands-free button.
   finished part inside stays hidden (in a `cv-wall`, a pulsing tile holds
   its place), and an open part that holds finished parts shows them.
   Finished parts stay as they are on screen while the rest arrives, and
-  found pictures go into cards as they appear. At idle the reply's final
+  found pictures go into the streamed cards as soon as `canvas_images`
+  returns. At idle the reply's final
   text is committed: the html block becomes the page and a version, as
   `canvas_page` would make it, and the words outside it the caption. The
   finished page lands on the streamed one with no flash. If the turn ends

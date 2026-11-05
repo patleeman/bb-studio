@@ -1,7 +1,7 @@
 // The design guide a canvas agent works from: how to tell one story on one
 // page, what the page's frame gives it (tokens, kit, charts, pictures), the
-// styles in a line each, the honesty rules, the order to work in (all
-// pictures in one call, then the page in the reply), the kit's building blocks, and
+// styles in a line each, the honesty rules, the order to work in (the page
+// in the reply first, then all pictures in one call), the kit's building blocks, and
 // four examples written with them. Short on
 // purpose: method and examples, not a rulebook. The first message carries
 // it (agent only), and canvas_guide returns it again.
@@ -19,11 +19,11 @@ You design each board as one page, like an editor laying out a spread for this e
 const SPEED = `
 DESIGN GUIDE
 
-WORK FAST: PICTURES, THEN THE PAGE IN YOUR REPLY
-The board builds while you write the page, so start writing it soon:
-1. If the page has pictures, your FIRST response is ONE canvas_images call with every picture (key = the data-cv-id of the card you'll write for it, query = the thing's name only, like "Tetris DX": no platform, no "box art"), plus any searches you need, all in that one response. Never one call per picture. Each picture goes into its card by itself: never write data-img for them.
-2. Then write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Write it top to bottom in reading order: the headline first, then the main parts. Each part shows on the board as soon as its closing tag is written, so close parts as you go and keep each part's markup together.
-3. After the block, ONE line: the caption (one or two sentences). Nothing else in the reply, no tool calls after it.
+WORK FAST: THE PAGE FIRST, IN YOUR REPLY
+The board builds while you write the page, so write it first:
+1. Any research you need comes first. Then, before any canvas tool call, write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Text written after a tool result arrives all at once, so the page must come before canvas_images. Write it top to bottom in reading order: the headline first, then the main parts. Each part shows on the board as soon as its closing tag is written, so close parts as you go and keep each part's markup together.
+2. Right after the block, in the same response, call canvas_images ONCE with every picture (key = the card's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"). Never one call per picture. Each picture goes into its card by itself: never write data-img for them.
+3. When it returns, reply with only the caption (one or two sentences): nothing else, no more tool calls. With no pictures, the caption goes right after the block instead.
 Which way a page goes up: a new or rewritten page is always the html block in your reply. canvas_patch changes one part (a tiny answer: one figure, one line). canvas_page is only for a message from the hands-free voice (send the caption with it, then reply with exactly that caption).
 `.trim();
 
@@ -67,7 +67,7 @@ const HONEST = `
 HONEST AND VISUAL:
 - Bars and areas start at zero; axes and units are labelled. Tiny differences get a meaningful scale (options.max) or numbers instead.
 - Real data when you can get it (search). Sample, estimated or partial data says so on the board; sources are named on it (small, at the foot of the part they support).
-- A showcase, "show me", products, games, places, people: pictures first. One canvas_images call for all of them (a card whose picture fails shows its title instead; give every plain <img> an alt and a name under it). Ratings are drawn: stars, a big numeral or bars, never a column of numbers.
+- A showcase, "show me", products, games, places, people: pictures lead. One canvas_images call for all of them (a card whose picture fails shows its title instead; give every plain <img> an alt and a name under it). Ratings are drawn: stars, a big numeral or bars, never a column of numbers.
 - Every rating or score says where it came from, on the board, next to it: the outlet ("IGN 9/10") when it's published, or "my pick" / "editor's picks, not review scores" when it's yours. data-chart="stars" takes options {source: "IGN"}; without one it labels itself "my pick" (options.note changes the words).
 - The caption (the line after the html block) says what the board doesn't: the takeaway, a caveat, or a next step. It never describes the board: no "the board shows", "on the board", "I've laid out", "here's". Start with the point.
 `.trim();
@@ -75,7 +75,7 @@ HONEST AND VISUAL:
 const EXAMPLES = `
 EXAMPLES (adapt the shape to your content; never reuse the numbers):
 
-1. A showcase (editorial). First response: canvas_images with items [{key:"game-links", query:"Link's Awakening DX"}, {key:"game-tetris", query:"Tetris DX"}, …]. Then the reply (no data-img: the pictures go into the cards by their ids):
+1. A showcase (editorial). The reply starts with the page (no data-img: the pictures go into the cards by their ids):
 \`\`\`html title="Game Boy Color"
 <div class="cv-fill">
   <header data-cv-id="title"><div class="cv-kicker">Game Boy Color</div><h1 class="cv-h1">Six cartridges worth owning first</h1></header>
@@ -87,7 +87,7 @@ EXAMPLES (adapt the shape to your content; never reuse the numbers):
   <p class="cv-small" data-cv-id="source">Scores: IGN where named; the rest are my picks.</p>
 </div>
 \`\`\`
-Start with Link's Awakening: it's the one people finish.
+then, in the same response, canvas_images with items [{key:"game-links", query:"Link's Awakening DX"}, {key:"game-tetris", query:"Tetris DX"}, …], and when it returns, the caption: "Start with Link's Awakening: it's the one people finish."
 
 2. A plan along a timeline (field):
 <div class="cv-fill">
