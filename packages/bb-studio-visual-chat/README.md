@@ -193,7 +193,9 @@ window sizes, light and dark, and can pause a page's morph for a
 mid-animation still. `scripts/capture/canvas-stream-timing.mjs` runs one
 prompt in new canvases on a real model and times the first visible content,
 the first real card, the final page and the turn, with the model's rounds,
-and can record the page building.
+and can record the page building. `scripts/capture/canvas-demo-video.mjs`
+records one real four-turn conversation, typed into the field, with no
+cuts, and notes which parts each follow-up kept, added and removed.
 
 ## Moving from BB Studio Canvas
 
