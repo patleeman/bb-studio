@@ -13,5 +13,5 @@ function Panel({ subPath }: PluginNavPanelProps) {
 }
 
 export default definePluginApp((app) => {
-  app.slots.navPanel({ id: "canvas", title: "Visual Chat", icon: "GridView", path: "canvas", component: Panel });
+  app.slots.navPanel({ id: "canvas", title: "Visual Chat", icon: "studio-visual-chat/visual-chat", path: "canvas", component: Panel });
 });

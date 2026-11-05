@@ -12,7 +12,10 @@
     "name": "BB Studio Visual Chat",
     "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
     "branding": {
-      "icon": "GridView"
+      "icon": "GridView",
+      "experimental_icons": {
+        "visual-chat": "./icons/visual-chat.svg"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx",
