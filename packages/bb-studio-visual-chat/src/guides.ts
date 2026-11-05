@@ -44,11 +44,12 @@ FILL THE SCREEN (firm):
 - Size type from the screen: the --cv-t-* sizes already grow with it in a page; use --cv-f-hero for one huge figure, and vh or clamp() for anything bigger. Never leave a column of small text in one corner.
 - Use the full width: columns run edge to edge (grid-template-columns that add up to the whole width), not a fixed max-width block.
 - cv.viewport() gives the screen's width and height in px (also --cv-vw and --cv-vh). As a safety net, a page that stops short is zoomed up a little, but design it to fill.
+- A note may name the user's screen ("on a phone, ~466×678"): below 700px wide, stack the parts in one column.
 `.trim();
 
 const PAGE = `
 THE PAGE (the html block in your reply, or canvas_page html):
-- HTML and CSS for the board's body (no <html>/<head>). It fills a frame the size of the screen: 100vw × 100vh is what the user sees, and it scrolls if taller. Design for that: CSS grid or flex, min-height: calc(100vh - 60px) for a page that fills the screen, clamp() for type that scales.
+- HTML and CSS for the board's body (no <html>/<head>). It fills a frame the size of the screen: 100vw × 100vh is what the user sees, and it scrolls if taller.
 - Put a <style> at the top for your layout. Colours, type and spacing come from the style's tokens (var(--cv-…)), so a style switch restyles your page. The ground and text follow the user's BB theme: set no background.
 - Mark the main parts with data-cv-id="…" (short, stable, named after what they show: "verdict", "chat", "game-tetris"). In a follow-up, anything that's still on the board keeps its id, even when it moves, grows or changes style: canvas_read lists the current ids. Same id → it glides to its new place; a new id → it enters as new. canvas_patch replaces one part by id.
 - Charts without drawing SVG: <div data-chart="KIND" data-rows='[…]' data-options='{…}'></div> (data-value for one number), sized to the element's width (give it a CSS height for line, area and columns). KIND: line, area, columns (vertical bars), bars (horizontal, ranked), donut, split (one bar in parts with a mark), map (US tile map: rows {"PA": 2.1} or [{state, value}]), timeline ([{date, label, note, tone}], options {layout: "row"}), multiples, waffle, spark, stars (data-value score, options {max: 5|10|100}), meter, bignum (data-value, options {label, unit, sub}), delta, legend. Options as in the kit: x, series, unit, max, highlight, marks [{x, label}], callouts [{x, text}] (labels drawn on the chart at that point).

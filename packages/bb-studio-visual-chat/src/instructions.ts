@@ -10,6 +10,7 @@
 // that reply is only the caption).
 import { designGuide } from "./guides";
 import { LOOK_INFO, ORGANIC_LOOKS, type Look } from "./looks";
+import type { ClientHint } from "./shared";
 
 /** The core rules, short enough for the configure hook's 4,096 characters with room to spare. */
 export const CANVAS_RULES = [
@@ -60,3 +61,17 @@ export const CANVAS_FIRST_NOTE = canvasFirstNote("editorial");
 
 /** What the hands-free voice is told when it speaks for a canvas. */
 export const CANVAS_VOICE_NOTE = `You are speaking in Visual Chat: the user sees a board (the canvas) while you talk. The board is one HTML page: canvas_read shows it and its parts (data-cv-id). As you answer, change it so it shows what you're talking about: canvas_patch one part (quick), or canvas_page the whole board on a topic change. Keep each tool call small and quick. Deeper work (research, a new page from real data) goes to the canvas thread with send_to_thread and no target: it rewrites the board when it's done.`;
+
+/** Below this board width (px), a page should be one column that stacks. */
+export const NARROW_BOARD = 700;
+const CLIENT_NAMES: Record<ClientHint["kind"], string> = { phone: "a phone", "duo-folded": "a phone (a folded Surface Duo)", "duo-unfolded": "an open Surface Duo", desktop: "a desktop" };
+
+/**
+ * The one line the agent gets with a message from a client that says its screen (canvas.create, canvas.send),
+ * agent only: "The user is on a phone, ~466×678: compose to stack cleanly below 700px." "" without a client.
+ */
+export function clientNote(client?: ClientHint | null): string {
+  if (!client) return "";
+  const narrow = client.width < NARROW_BOARD ? `: compose to stack cleanly below ${NARROW_BOARD}px` : "";
+  return `The user is on ${CLIENT_NAMES[client.kind]}, ~${client.width}×${client.height}${narrow}.`;
+}

@@ -4,7 +4,7 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { lookSchema } from "./looks";
-import { CANVAS_LIMITS, canvasMetaSchema, canvasViewSchema, pickerProviderSchema, versionSchema } from "./shared";
+import { CANVAS_LIMITS, canvasMetaSchema, clientHintSchema, canvasViewSchema, pickerProviderSchema, versionSchema } from "./shared";
 
 const threadId = z.string().min(1).max(200);
 const text = z.string().trim().min(1).max(CANVAS_LIMITS.messageChars);
@@ -21,8 +21,8 @@ export const canvasContract = defineRpcContract({
     output: z.object({ canvas: canvasViewSchema.nullable() }),
   },
   "canvas.create": {
-    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules. look picks its design direction (default editorial). voice: true starts it with no message, for hands-free voice to be the first input.",
-    input: z.object({ text: text.optional(), voice: z.boolean().optional(), providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional(), look: lookSchema.optional() })
+    experimental_description: "A new canvas: its hidden backing thread starts with this message and the canvas rules. look picks its design direction (default editorial). voice: true starts it with no message, for hands-free voice to be the first input. client: the screen the user is on, so the agent composes for it.",
+    input: z.object({ text: text.optional(), voice: z.boolean().optional(), providerId: z.string().max(100).optional(), model: z.string().max(200).optional(), reasoningLevel: z.string().max(40).optional(), look: lookSchema.optional(), client: clientHintSchema.optional() })
       .refine((input) => !!input.text || input.voice === true, { message: "Say what to look at, or start by voice." }),
     output: z.object({ canvasId: z.string(), threadId: z.string() }),
   },
@@ -47,8 +47,8 @@ export const canvasContract = defineRpcContract({
     output: z.object({ viewing: z.number().nullable() }),
   },
   "canvas.send": {
-    experimental_description: "A message to the canvas's thread; queued while it works. After a provider switch it starts the canvas's fresh thread: threadId is the canvas's thread now. fromVersion: the user went back to that version, so the board returns to it and the message continues from there (later versions stay).",
-    input: z.object({ threadId, text, fromVersion: z.number().int().positive().nullable().optional() }),
+    experimental_description: "A message to the canvas's thread; queued while it works. After a provider switch it starts the canvas's fresh thread: threadId is the canvas's thread now. fromVersion: the user went back to that version, so the board returns to it and the message continues from there (later versions stay). client: the screen the user is on, so the agent composes for it.",
+    input: z.object({ threadId, text, fromVersion: z.number().int().positive().nullable().optional(), client: clientHintSchema.optional() }),
     output: z.object({ ok: z.boolean(), threadId: z.string() }),
   },
   "canvas.models": {
@@ -70,5 +70,10 @@ export const canvasContract = defineRpcContract({
       source: z.string().nullable(),
       card: z.object({ title: z.string(), site: z.string(), summary: z.string().nullable(), image: z.string().nullable() }).nullable(),
     }),
+  },
+  "canvas.renderer": {
+    experimental_description: "The board renderer for a host outside BB's web UI (the iOS app): one classic script and its version (a hash of its text, the same for the same build). version: the one the caller has; then js is null when it's still the current one.",
+    input: z.object({ version: z.string().max(64).nullable().optional() }).nullable(),
+    output: z.object({ version: z.string(), js: z.string().nullable() }),
   },
 });

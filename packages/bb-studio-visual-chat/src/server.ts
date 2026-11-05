@@ -12,7 +12,8 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { canvasContract } from "./contract";
-import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instructions";
+import { canvasFirstNote, canvasInstructions, clientNote, CANVAS_VOICE_NOTE } from "./instructions";
+import { rendererLoader } from "./renderer";
 import { DEFAULT_LOOK, lookOf } from "./looks";
 import { fillPictures } from "./page";
 import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_STREAM_TYPE, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type CanvasStreamSignal, type PickerProvider } from "./shared";
@@ -87,8 +88,15 @@ export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.provi
 const PERSONAL_PROJECT_ID = "proj_personal";
 
 /** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
-export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps; streamIntervalMs?: number; webpages?: Pick<ImageDeps, "lookup" | "transport"> } = {}): BuiltinCanvas {
+export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps; streamIntervalMs?: number; webpages?: Pick<ImageDeps, "lookup" | "transport">; rendererDirs?: readonly string[] } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
+  // The board renderer for the iOS app (canvas.renderer): read once, versioned by its hash.
+  const renderer = rendererLoader(options.rendererDirs);
+  /** The agent-only line about the user's screen, when the client said it. */
+  const clientParts = (client: Parameters<typeof clientNote>[0]) => {
+    const line = clientNote(client);
+    return line ? [{ type: "text", text: line, mentions: [], visibility: "agent-only" }] : [];
+  };
   // Found pictures are reused for a day (memory and this plugin's database).
   const images: ImageDeps | undefined = options.images ? { cache: new ImageCache(db, options.now), ...options.images } : undefined;
   // Webpage parts (src/webpage.ts): looked-up pages are reused for a day.
@@ -257,7 +265,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         const first = text
           ? [{ type: "text", text, mentions: [] }]
           : [{ type: "text", text: "🎙 Started by voice.", mentions: [] }, { type: "text", text: VOICE_START_NOTE, mentions: [], visibility: "agent-only" }];
-        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [...first, { type: "text", text: canvasFirstNote(look, providerId), mentions: [], visibility: "agent-only" }]);
+        const threadId = await spawnThread(row.id, title, { providerId, model, reasoningLevel }, [...first, ...clientParts(input.client), { type: "text", text: canvasFirstNote(look, providerId), mentions: [], visibility: "agent-only" }]);
         if (text) {
           store.beginTurn(row.id, "user", text);
           store.setStatus(row.id, "working");
@@ -298,7 +306,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       store.setViewing(row.id, n);
       return { viewing: store.viewing(row.id) };
     },
-    async "canvas.send"({ threadId, text, fromVersion }) {
+    async "canvas.send"({ threadId, text, fromVersion, client }) {
       const row = store.byThread(threadId);
       if (!row?.thread_id) throw new Error("That canvas is gone.");
       // The board as it was before this turn is a version (a canvas from before versions gets its first now).
@@ -310,18 +318,22 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         // fresh backing thread on it. The board is Canvas's own, so it stays; the new thread
         // gets the rules, the guide, the board as it is and the last few lines of talk.
         const note = `${canvasFirstNote(lookOf(row.look), next.providerId)}\n\n${handoffNote(row.id)}${back ? `\n\n${back}` : ""}`;
-        const fresh = await spawnThread(row.id, row.title, next, [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }]);
+        const fresh = await spawnThread(row.id, row.title, next, [{ type: "text", text, mentions: [] }, ...clientParts(client), { type: "text", text: note, mentions: [], visibility: "agent-only" }]);
         store.setExecution(row.id, next);
         store.beginTurn(row.id, "user", text);
         store.setStatus(row.id, "working");
         publish(row.id);
         return { ok: true, threadId: fresh };
       }
-      await bb.sdk.threads.send({ threadId: row.thread_id, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }, ...(back ? [{ type: "text", text: back, mentions: [], visibility: "agent-only" }] : [])] } as never);
+      await bb.sdk.threads.send({ threadId: row.thread_id, mode: "queue-if-active", input: [{ type: "text", text, mentions: [] }, ...(back ? [{ type: "text", text: back, mentions: [], visibility: "agent-only" }] : []), ...clientParts(client)] } as never);
       store.beginTurn(row.id, "user", text);
       store.setStatus(row.id, "working");
       publish(row.id);
       return { ok: true, threadId: row.thread_id };
+    },
+    async "canvas.renderer"(input) {
+      const { version, js } = await renderer();
+      return { version, js: input?.version === version ? null : js };
     },
     async "canvas.models"() {
       return { providers: await models() };

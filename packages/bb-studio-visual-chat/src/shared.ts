@@ -220,6 +220,18 @@ export type CanvasTurn = z.infer<typeof turnSchema>;
 
 export const CANVAS_STATUSES = ["idle", "working", "failed"] as const;
 
+/**
+ * The screen the user is on, from a client that knows (the iOS app): a phone, a Surface Duo folded or open, or a
+ * desktop, with the board's size in points. The agent gets one line about it with the message (clientNote).
+ */
+export const CLIENT_KINDS = ["phone", "duo-folded", "duo-unfolded", "desktop"] as const;
+export const clientHintSchema = z.object({
+  kind: z.enum(CLIENT_KINDS),
+  width: z.number().int().min(200).max(10000),
+  height: z.number().int().min(200).max(10000),
+});
+export type ClientHint = z.infer<typeof clientHintSchema>;
+
 export const canvasMetaSchema = z.object({
   id: z.string(),
   threadId: z.string(),

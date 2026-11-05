@@ -245,6 +245,23 @@ or Esc, to close it.
   version.
 - **Boards from before pages** (items placed by the old layout) still open
   and show as they were. The agent's next page replaces them.
+- **One renderer, two hosts:** the frame document (its CSP, the boot script,
+  the kit with morph, streaming and when page scripts run), the page poster
+  and the embed overlay's logic (placement from the frame's rect reports,
+  built embed URLs, webpage checks) are framework-free
+  (`src/ui/renderer.ts`). The desktop page draws with them in React
+  (`src/ui/page-frame.tsx`); the iOS app draws with the same code through a
+  small DOM host (`src/ui/renderer-host.ts`), which `node build-ui.mjs` builds
+  into one classic script, `bundle/canvas-renderer.js`. `canvas.renderer`
+  serves it with its version (the first 16 hex of its SHA-256, so the same
+  build always has the same version); a caller that sends the version it has
+  gets no text back while it's current.
+- **The user's screen:** a client that knows it (the iOS app) sends
+  `client: { kind, width, height }` with `canvas.create` and `canvas.send`
+  (`kind`: `phone`, `duo-folded`, `duo-unfolded` or `desktop`; the board's
+  size in points). The agent gets one agent-only line with the message, such
+  as "The user is on a phone, ~466×678: compose to stack cleanly below
+  700px.", and the guide says what to do with it. The desktop page sends none.
 
 ## With Studio
 
@@ -260,7 +277,7 @@ so Visual Chat reads nothing of Studio's at runtime except through these:
 ## Development
 
 ```sh
-node build-ui.mjs   # after changing src/ui or the Studio files it uses
+node build-ui.mjs   # after changing src/ui or the Studio files it uses; also builds bundle/canvas-renderer.js
 ```
 
 `scripts/capture/canvas-demo.mjs` records four text turns and a hands-free
