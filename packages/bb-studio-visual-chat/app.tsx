@@ -5,6 +5,7 @@
 import { definePluginApp, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense } from "react";
 import "./src/ui/canvas.css";
+import { registerQuickCard } from "./src/quick-app";
 
 const CanvasPanel = lazy(() => import("./bundle/canvas-ui.js").then((module) => ({ default: module.CanvasPanel })));
 
@@ -14,4 +15,6 @@ function Panel({ subPath }: PluginNavPanelProps) {
 
 export default definePluginApp((app) => {
   app.slots.navPanel({ id: "canvas", title: "Visual Chat", icon: "studio-visual-chat/visual-chat", path: "canvas", component: Panel });
+  // The quick card and its "Visual Chat: Ask" shortcut (src/quick-app.tsx).
+  registerQuickCard(app);
 });

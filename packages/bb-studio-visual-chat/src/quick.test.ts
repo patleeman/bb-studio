@@ -1,0 +1,161 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { QUICK_COMMAND_ID, QUICK_COMMAND_TITLE, QUICK_SHORTCUT, registerQuickCard } from "./quick-app";
+import { createQuickStore, expandHref, neighborChats } from "./ui/quick-store";
+import { cardRect, DEFAULT_GEOMETRY, geometryOf, loadGeometry, MARGIN, MIN_HEIGHT, MIN_WIDTH, movedRect, QUICK_GEOMETRY_KEY, resizedRect, saveGeometry } from "./ui/quick-geometry";
+import { canvasHref, canvasNewHref } from "./shared";
+
+const memory = () => {
+  const map = new Map<string, string>();
+  return { getItem: (key: string) => map.get(key) ?? null, setItem: (key: string, value: string) => void map.set(key, value), map };
+};
+
+describe("the quick card's state", () => {
+  it("opens and closes, and each summon starts a fresh chat", () => {
+    const store = createQuickStore();
+    const seen: boolean[] = [];
+    store.subscribe(() => seen.push(store.get().open));
+    expect(store.get()).toEqual({ open: false, session: 0, threadId: null });
+    store.open();
+    expect(store.get()).toEqual({ open: true, session: 1, threadId: null });
+    // The first message makes a canvas; the card follows it.
+    store.setThread("thr_first");
+    expect(store.get().threadId).toBe("thr_first");
+    store.close();
+    // Closing keeps the chat (it's a canvas in the list); the next summon is a new one.
+    expect(store.get()).toEqual({ open: false, session: 1, threadId: "thr_first" });
+    store.open();
+    expect(store.get()).toEqual({ open: true, session: 2, threadId: null });
+    // Opening again while open changes nothing.
+    store.open();
+    expect(store.get().session).toBe(2);
+    expect(seen).toEqual([true, true, false, true]);
+  });
+
+  it("Expand opens the card's chat in the full page and closes the card", () => {
+    const store = createQuickStore();
+    const navigate = vi.fn();
+    store.open();
+    store.setThread("thr_quick");
+    expect(store.expand(navigate)).toBe("/plugins/studio-visual-chat/canvas/thr_quick");
+    expect(navigate).toHaveBeenCalledWith(canvasHref("thr_quick"));
+    expect(store.get().open).toBe(false);
+    // Nothing sent yet: the full page opens a new chat.
+    store.open();
+    store.expand(navigate);
+    expect(navigate).toHaveBeenLastCalledWith(canvasNewHref());
+    expect(expandHref(null)).toBe(canvasNewHref());
+  });
+});
+
+describe("the Visual Chat: Ask command", () => {
+  const fakeApp = () => {
+    const overlays: { id: string }[] = [];
+    const commands: { id: string; title: string; defaultShortcut?: unknown; run(context: unknown): void }[] = [];
+    const app = { slots: { experimental_appOverlay: (registration: { id: string }) => overlays.push(registration) }, commands: { register: (registration: (typeof commands)[number]) => commands.push(registration) } };
+    return { app: app as never, overlays, commands };
+  };
+
+  it("registers the card's overlay and a command with its shortcut, which toggles the card", () => {
+    const { app, overlays, commands } = fakeApp();
+    const store = registerQuickCard(app);
+    expect(overlays.map((overlay) => overlay.id)).toEqual(["quick-card"]);
+    expect(commands).toHaveLength(1);
+    const [command] = commands;
+    expect(command).toMatchObject({ id: QUICK_COMMAND_ID, title: QUICK_COMMAND_TITLE, defaultShortcut: { key: "Space", mod: true, shift: true } });
+    command!.run({});
+    expect(store.get()).toMatchObject({ open: true, session: 1, threadId: null });
+    command!.run({});
+    expect(store.get().open).toBe(false);
+    command!.run({});
+    expect(store.get()).toMatchObject({ open: true, session: 2, threadId: null });
+  });
+
+  it("has a default shortcut none of BB's or Studio's defaults use", () => {
+    // BB's defaults with Mod (apps/server/src/services/system/app-keybindings.ts) and Studio's search (Mod+Shift+K).
+    const taken = [
+      { key: "k", mod: true }, { key: "k", mod: true, shift: true }, { key: "p", mod: true, shift: true }, { key: "o", mod: true, shift: true },
+      { key: "e", mod: true, shift: true }, { key: "x", mod: true, shift: true }, { key: "[", mod: true, shift: true }, { key: "]", mod: true, shift: true },
+      { key: "p", mod: true }, { key: "n", mod: true }, { key: "j", mod: true }, { key: "t", mod: true }, { key: "w", mod: true },
+    ];
+    const same = (a: { key: string; mod?: boolean; shift?: boolean; alt?: boolean }, b: typeof a) => a.key.toLowerCase() === b.key.toLowerCase() && !!a.mod === !!b.mod && !!a.shift === !!b.shift && !!a.alt === !!b.alt;
+    expect(taken.some((each) => same(each, QUICK_SHORTCUT))).toBe(false);
+  });
+});
+
+describe("the quick card's place and size", () => {
+  const view = { width: 1600, height: 1000 };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("starts bottom right at about 40% of the window", () => {
+    const rect = cardRect(DEFAULT_GEOMETRY, view);
+    expect(rect.width).toBe(640);
+    expect(rect.height).toBe(700);
+    expect(rect.left + rect.width).toBe(view.width - MARGIN);
+    expect(rect.top + rect.height).toBe(view.height - MARGIN);
+  });
+
+  it("keeps its corner and stays on screen when the window resizes", () => {
+    const moved = movedRect(cardRect(DEFAULT_GEOMETRY, view), -2000, -2000, view);
+    expect(moved).toMatchObject({ left: MARGIN, top: MARGIN });
+    const kept = geometryOf(moved, view, false);
+    expect(kept).toMatchObject({ x: 0, y: 0, width: null, height: null });
+    // Resized by hand, then the window narrows below the card: it shrinks to fit.
+    const big = geometryOf(resizedRect(cardRect(DEFAULT_GEOMETRY, view), { x: -1, y: -1 }, -300, -200, view), view, true);
+    expect(big).toMatchObject({ width: 940, height: 900 });
+    const narrow = cardRect(big, { width: 700, height: 600 });
+    expect(narrow.left).toBeGreaterThanOrEqual(MARGIN);
+    expect(narrow.left + narrow.width).toBeLessThanOrEqual(700 - MARGIN);
+    expect(narrow.top + narrow.height).toBeLessThanOrEqual(600 - MARGIN);
+  });
+
+  it("never resizes below its minimum or past the window", () => {
+    const start = cardRect(DEFAULT_GEOMETRY, view);
+    expect(resizedRect(start, { x: -1, y: -1 }, 5000, 5000, view)).toMatchObject({ width: MIN_WIDTH, height: MIN_HEIGHT, left: start.left + start.width - MIN_WIDTH });
+    const grown = resizedRect(start, { x: 1, y: 1 }, 5000, 5000, view);
+    expect(grown.left + grown.width).toBe(view.width - MARGIN);
+    expect(grown.top + grown.height).toBe(view.height - MARGIN);
+  });
+
+  it("remembers its position and size, this window's first, then the last one saved anywhere", () => {
+    const session = memory();
+    const local = memory();
+    expect(loadGeometry([session, local])).toEqual(DEFAULT_GEOMETRY);
+    saveGeometry({ x: 0.25, y: 0.5, width: 500, height: 600 }, [session, local]);
+    expect(loadGeometry([session, local])).toEqual({ x: 0.25, y: 0.5, width: 500, height: 600 });
+    // A new window has no session entry yet: it starts where the last one was.
+    expect(loadGeometry([memory(), local])).toEqual({ x: 0.25, y: 0.5, width: 500, height: 600 });
+    // A corrupt or partial entry falls back.
+    local.setItem(QUICK_GEOMETRY_KEY, "{nope");
+    expect(loadGeometry([memory(), local])).toEqual(DEFAULT_GEOMETRY);
+    local.setItem(QUICK_GEOMETRY_KEY, JSON.stringify({ x: 3, y: -1, width: 500 }));
+    expect(loadGeometry([memory(), local])).toEqual({ x: 1, y: 0, width: null, height: null });
+  });
+
+  it("uses the browser's storages by default", () => {
+    const session = memory();
+    const local = memory();
+    vi.stubGlobal("sessionStorage", session);
+    vi.stubGlobal("localStorage", local);
+    saveGeometry({ x: 0, y: 1, width: null, height: null });
+    expect(JSON.parse(session.map.get(QUICK_GEOMETRY_KEY)!)).toEqual({ x: 0, y: 1, width: null, height: null });
+    expect(local.map.has(QUICK_GEOMETRY_KEY)).toBe(true);
+    expect(loadGeometry()).toEqual({ x: 0, y: 1, width: null, height: null });
+  });
+});
+
+describe("the card's steps between chats", () => {
+  const list = [
+    { threadId: "thr_old", title: "Old", updatedAt: 1 },
+    { threadId: "thr_new", title: "New", updatedAt: 3 },
+    { threadId: "thr_mid", title: "Mid", updatedAt: 2 },
+  ];
+  it("steps back from a fresh chat to the latest one, and forward past the newest to a new chat", () => {
+    expect(neighborChats(list, null)).toEqual({ older: list[1], newer: null });
+    expect(neighborChats(list, "thr_new")).toEqual({ older: list[2], newer: "new" });
+    expect(neighborChats(list, "thr_mid")).toEqual({ older: list[0], newer: list[1] });
+    expect(neighborChats(list, "thr_old")).toEqual({ older: null, newer: list[2] });
+    // Just made, not listed yet: it's the newest.
+    expect(neighborChats(list, "thr_made")).toEqual({ older: list[1], newer: "new" });
+    expect(neighborChats([], null)).toEqual({ older: null, newer: null });
+  });
+});

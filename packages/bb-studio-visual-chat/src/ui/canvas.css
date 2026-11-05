@@ -17,3 +17,7 @@
    (Studio's src/talk/ui/fields.ts), in place of the mic and hands-free. */
 [data-talk-field-dock]:empty { display: none; }
 [data-talk-field-dock]:not(:empty) ~ [data-canvas-voice] { display: none; }
+/* The quick card (src/ui/quick-card.tsx): while it's dragged or resized,
+   its frames don't take the pointer, so the move never stalls over the board. */
+[data-canvas-card][data-moving] iframe { pointer-events: none; }
+[data-canvas-card][data-moving] { user-select: none; }

@@ -2,7 +2,7 @@
 // new one. A full-window board, and the chat as one faint line at the
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
@@ -14,6 +14,7 @@ import { lookCss } from "./board-css";
 import { ModelPicker } from "./model-picker";
 import { OrganicBoard, type BoardItem } from "./organic-board";
 import { PageFrame } from "./page-frame";
+import { CardHeader, useCardSteps, type CardSteps } from "./quick-header";
 import { useCanvas } from "./use-canvas";
 
 const decode = (segment: string) => {
@@ -43,9 +44,10 @@ function startLook(): OrganicLook {
  */
 export const PREVIEW_EVENT = "bb-studio-canvas:preview";
 interface Preview { look: OrganicLook; title: string; caption: string | null; items: BoardItem[] }
-function usePreview(): Preview | null {
+function usePreview(enabled = true): Preview | null {
   const [preview, setPreview] = useState<Preview | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     const on = (event: Event) => {
       const detail = (event as CustomEvent).detail as { look?: unknown; title?: unknown; caption?: unknown; items?: unknown } | null;
       if (!detail || !Array.isArray(detail.items)) { setPreview(null); return; }
@@ -57,7 +59,7 @@ function usePreview(): Preview | null {
     };
     window.addEventListener(PREVIEW_EVENT, on);
     return () => window.removeEventListener(PREVIEW_EVENT, on);
-  }, []);
+  }, [enabled]);
   return preview;
 }
 
@@ -115,14 +117,34 @@ function useDictating(field: string): boolean {
   return on;
 }
 
-function CanvasPage({ threadId }: { threadId: string | null }) {
+/** What the quick card (quick-card.tsx) gives the canvas it shows. */
+export interface CardProps {
+  /** Follow a chat in the card: the one its first message made, another it steps to, or null for a new one. */
+  onThread(threadId: string | null): void;
+  onClose(): void;
+  onExpand(): void;
+  /** The header is the card's drag handle. */
+  onDragStart(event: ReactPointerEvent<HTMLElement>): void;
+  /** The id the card's dialog is labelled by (the header's title). */
+  titleId: string;
+}
+
+/** A canvas: the full page, or in the quick card (`card`), with a compact header and chat line and the same board. */
+export function CanvasPage({ threadId, card }: { threadId: string | null; card?: CardProps }) {
   const rpc = useRpc<typeof canvasContract>();
   const theme = useWidgetTheme();
   const { canvas: own, stream: liveStream, send, reload } = useCanvas(threadId);
-  // Remember the open canvas, so coming back to Canvas reopens it.
-  useEffect(() => { if (threadId && own) writeLast(threadId); }, [threadId, own]);
-  const preview = usePreview();
+  // Remember the open canvas, so coming back to Canvas reopens it (the card's chats don't change what the page reopens).
+  useEffect(() => { if (!card && threadId && own) writeLast(threadId); }, [card, threadId, own]);
+  const preview = usePreview(!card);
   const timeline = useTimeline(threadId, own);
+  // A canvas made or moved (after a provider switch): the page goes to its address, the card follows it.
+  const onThread = card?.onThread;
+  const follow = useCallback((next: string) => {
+    if (onThread) onThread(next);
+    else openAppPath(canvasHref(next), { replace: true });
+  }, [onThread]);
+  const steps = useCardSteps(card ? threadId : undefined, own, timeline, onThread);
   const snap = timeline.snapshot;
   const canvas = useMemo(() => {
     if (preview && own) return { ...own, look: preview.look, title: preview.title, caption: preview.caption, page: null, items: preview.items, status: "idle" as const };
@@ -145,7 +167,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       setPending(text);
       try {
         const created = await rpc.call("canvas.create", { text, look: newLook, providerId: draft.providerId, model: draft.model, ...(draft.reasoningLevel ? { reasoningLevel: draft.reasoningLevel } : {}) });
-        openAppPath(canvasHref(created.threadId), { replace: true });
+        follow(created.threadId);
       } catch (error) {
         setPending(null);
         toast.error(errorMessage(error));
@@ -157,9 +179,9 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       const now = await send(text, timeline.viewing);
       timeline.toLatest();
       // After a provider switch the canvas has a fresh thread: follow it (the old address still finds the canvas).
-      if (now !== threadId) openAppPath(canvasHref(now), { replace: true });
+      if (now !== threadId) follow(now);
     } catch (error) { toast.error(errorMessage(error)); throw error; }
-  }, [rpc, send, threadId, newLook, draft, timeline]);
+  }, [rpc, send, threadId, newLook, draft, timeline, follow]);
 
   // Hands-free can be the first input: on a new canvas it creates the canvas (on the picked model) first.
   const voice = useCallback(async () => {
@@ -168,14 +190,14 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
       try {
         const created = await rpc.call("canvas.create", { voice: true, look: newLook, providerId: draft.providerId, model: draft.model, ...(draft.reasoningLevel ? { reasoningLevel: draft.reasoningLevel } : {}) });
         target = created.threadId;
-        openAppPath(canvasHref(target), { replace: true });
+        follow(target);
       } catch (error) {
         toast.error(errorMessage(error));
         return;
       }
     }
     window.dispatchEvent(new CustomEvent(HANDSFREE_START_EVENT, { detail: { threadId: target } }));
-  }, [rpc, threadId, newLook, draft]);
+  }, [rpc, threadId, newLook, draft, follow]);
 
   const items = canvas?.items ?? [];
   const page = canvas?.page ?? null;
@@ -183,9 +205,13 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
   return (
     <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-preview={preview ? "" : undefined} data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
       {css ? <style>{css}</style> : null}
-      <TopBar canvas={canvas ?? null} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
+      {card ? (
+        <CardHeader canvas={canvas ?? null} pending={pending} steps={steps} titleId={card.titleId} onExpand={card.onExpand} onClose={card.onClose} onDragStart={card.onDragStart} />
+      ) : (
+        <TopBar canvas={canvas ?? null} onModelChanged={() => void reload()} isNew={!threadId} draft={draft} onDraft={setDraft} />
+      )}
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
-      <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
+      <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : card ? "overflow-y-auto px-4 pt-1" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : (page || stream) && look !== "classic" ? (
           <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Visual Chat"} />
         ) : look !== "classic" ? (
@@ -206,7 +232,7 @@ function CanvasPage({ threadId }: { threadId: string | null }) {
           />
         )}
       </div>
-      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} timeline={timeline} onSubmit={submit} onVoice={voice} onHeight={setChatHeight} />
+      <ChatLine threadId={threadId} canvas={canvas ?? null} pending={pending} working={working} timeline={timeline} steps={card ? steps : null} onSubmit={submit} onVoice={voice} onHeight={setChatHeight} />
     </div>
   );
 }
@@ -264,7 +290,7 @@ function useTimeline(threadId: string | null, canvas: CanvasView | null | undefi
     promptAt,
   };
 }
-type Timeline = ReturnType<typeof useTimeline>;
+export type Timeline = ReturnType<typeof useTimeline>;
 
 /** A faint bar: the canvas's name, its other canvases, the model, and New. */
 function TopBar({ canvas, onModelChanged, isNew, draft, onDraft }: { canvas: CanvasView | null; onModelChanged(): void; isNew: boolean; draft: CanvasExecution; onDraft(pick: CanvasExecution): void }) {
@@ -318,7 +344,15 @@ function History({ lines }: { lines: readonly CanvasTurn[] }) {
 }
 
 /** The chat, as one faint line: the latest caption over a borderless field. */
-function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVoice, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; timeline: Timeline; onSubmit(text: string): Promise<void>; onVoice(): Promise<void>; onHeight(height: number): void }) {
+/** The field key Talk dictates into: the card's is its own, so the page and the card never share one. */
+export const fieldKey = (threadId: string | null, inCard: boolean) => `${inCard ? "canvas-quick" : "canvas"}:${threadId ?? "new"}`;
+
+/**
+ * The chat, as one faint line: the latest caption over a borderless field.
+ * In the quick card (`steps`), it's compact, the versions are in the card's
+ * header, and ← → step as its ‹ › do, only for keys inside the card.
+ */
+function ChatLine({ threadId, canvas, pending, working, timeline, steps, onSubmit, onVoice, onHeight }: { threadId: string | null; canvas: CanvasView | null; pending: string | null; working: boolean; timeline: Timeline; steps: CardSteps | null; onSubmit(text: string): Promise<void>; onVoice(): Promise<void>; onHeight(height: number): void }) {
   const [startingVoice, setStartingVoice] = useState(false);
   const startVoice = async () => {
     setStartingVoice(true);
@@ -340,7 +374,8 @@ function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVo
     observer.observe(element);
     return () => observer.disconnect();
   }, [onHeight]);
-  const field = `canvas:${threadId ?? "new"}`;
+  const inCard = steps !== null;
+  const field = fieldKey(threadId, inCard);
   const dictating = useDictating(field);
 
   // Talk delivers dictation to the field, the form (src/talk/ui/fields.ts).
@@ -359,20 +394,24 @@ function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVo
   }, []);
 
   // ← and → page through the versions while the field is empty (and nothing else has focus).
+  // The card's keys stay in the card, and the page's never come from it.
   const textRef = useRef(text);
   textRef.current = text;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.key !== "ArrowLeft" && event.key !== "ArrowRight") || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.defaultPrevented) return;
       const target = event.target as HTMLElement | null;
+      const inSomeCard = !!target?.closest?.("[data-canvas-card]");
+      if (inCard ? !inSomeCard || !block.current?.closest("[data-canvas-card]")?.contains(target) : inSomeCard) return;
       const ours = target === input.current;
       if (ours ? textRef.current !== "" : target && target !== document.body && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       event.preventDefault();
-      if (event.key === "ArrowLeft") timeline.back(); else timeline.forward();
+      const go = steps ?? timeline;
+      if (event.key === "ArrowLeft") go.back(); else go.forward();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [timeline]);
+  }, [timeline, steps, inCard]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -386,8 +425,8 @@ function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVo
   const caption = pending ? null : canvas?.caption ?? null;
   const lastUser = pending ?? [...(canvas?.history ?? [])].reverse().find((line) => line.role === "user")?.text ?? null;
   return (
-    <div ref={block} className="canvas-chat pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center bg-background pb-5 pt-3" data-canvas-chat>
-      <div className="pointer-events-auto w-full max-w-2xl px-6">
+    <div ref={block} className={cn("canvas-chat pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center bg-background", inCard ? "pb-3 pt-2" : "pb-5 pt-3")} data-canvas-chat>
+      <div className={cn("pointer-events-auto w-full", inCard ? "px-4" : "max-w-2xl px-6")}>
         {history && canvas ? <History lines={canvas.history} /> : null}
         <div className="mb-1.5 min-h-[1.5rem] text-[15px] leading-snug" aria-live="polite" data-canvas-caption>
           {working ? (
@@ -402,7 +441,7 @@ function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVo
             value={text}
             onChange={(event) => setText(event.target.value)}
             maxLength={CANVAS_LIMITS.messageChars}
-            placeholder={!threadId ? "What should we look at?" : timeline.position < timeline.total ? `Continue from version ${timeline.position}…` : "Say what's next…"}
+            placeholder={!threadId ? (inCard ? "Ask anything…" : "What should we look at?") : timeline.position < timeline.total ? `Continue from version ${timeline.position}…` : "Say what's next…"}
             aria-label="Message Visual Chat"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-foreground outline-none placeholder:text-muted-foreground/55"
             data-canvas-input
@@ -410,7 +449,7 @@ function ChatLine({ threadId, canvas, pending, working, timeline, onSubmit, onVo
           />
           {/* Talk shows its dictation controls here while dictating into this field, as in BB's composer (fields.ts). */}
           <span className="flex min-w-0 items-center" data-talk-field-dock />
-          {canvas && timeline.total > 1 ? <Versions timeline={timeline} /> : null}
+          {canvas && !inCard && timeline.total > 1 ? <Versions timeline={timeline} /> : null}
           {canvas ? (
             <button type="button" className={cn(FAINT_BUTTON, history && "bg-foreground/5 text-foreground")} aria-label="History" title="History" aria-pressed={history} onClick={() => setHistory((value) => !value)}>
               <Icon name="Clock" className="size-4" />
