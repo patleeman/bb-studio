@@ -24,6 +24,7 @@ export function liveServer(rpc: Rpc): LiveServer {
   return {
     state: async () => (await rpc.call("voiceLive.state", {})) as never,
     start: async (input) => (await rpc.call("voiceLive.start", input)) as never,
+    reconnect: async (input) => (await rpc.call("voiceLive.reconnect", input)) as never,
     tool: async (input) => (await rpc.call("voiceLive.tool", input)) as never,
     event: async (input) => (await rpc.call("voiceLive.event", input)) as never,
     poll: async (input) => (await rpc.call("voiceLive.poll", input)) as never,

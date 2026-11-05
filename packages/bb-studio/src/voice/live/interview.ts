@@ -69,3 +69,11 @@ export function scorecardPrompt(pack: InterviewPack, transcript: string, evidenc
 export function scorecardMarkdown(score: z.infer<typeof scorecardSchema>): string {
   return [...score.dimensions.map(d => `### ${d.dimension} · ${d.score}/4 · ${d.label}\n\n${d.evidence.map(e => `> ${e}`).join('\n\n')}`), `## Overall\n\n${score.overall}`, `## Top 3 fixes\n\n${score.topFixes.map(f => `- ${f}`).join('\n')}`, `## What a strong answer would have added\n\n${score.strongAnswer}`, `## Time management\n\n${score.timeManagement}`].join('\n\n');
 }
+
+/** Deterministic compact recap spanning the whole round, with recent turns kept. */
+export function transcriptRecap(lines: { role: string; text: string }[]): string {
+  const stride = Math.max(1, Math.ceil(Math.max(0, lines.length - 10) / 20));
+  return lines.filter((_, i) => i >= lines.length - 10 || i % stride === 0)
+    .map(line => `${line.role}: ${line.text.replace(/\s+/g, ' ').slice(0, 180)}`)
+    .join('\n').slice(0, 6000);
+}

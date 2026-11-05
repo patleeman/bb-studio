@@ -10,12 +10,18 @@ private let log = Logger(subsystem: "nyc.plee.bbgo", category: "voice-live")
 protocol VoiceLiveStudio: AnyObject {
     func voiceLiveState() async throws -> VoiceLiveState
     func voiceLiveStart(model: String?, sdp: String?, threadId: String?) async throws -> VoiceLiveStart
+    func voiceLiveReconnect(sessionId: String, sdp: String?, reports: [LiveReport]) async throws -> Studio.VoiceLiveReconnectOutput
     func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult
     func voiceLiveEvent(sessionId: String, reports: [LiveReport]) async throws -> Studio.VoiceLiveEventOutput
     func voiceLivePoll(sessionId: String) async throws -> [VoiceLiveReply]
     func voiceLiveEnd(sessionId: String, reports: [LiveReport]) async throws
 }
 
+extension VoiceLiveStudio {
+    func voiceLiveReconnect(sessionId: String, sdp: String?, reports: [LiveReport]) async throws -> Studio.VoiceLiveReconnectOutput {
+        throw BBError(status: 0, message: "Interview reconnect is unavailable.")
+    }
+}
 extension BBClient: VoiceLiveStudio {}
 
 /// A hands-free voice session on the phone: one tap to start, then no taps.
@@ -45,6 +51,9 @@ final class VoiceLiveController: ObservableObject {
     private var appObservers: [NSObjectProtocol] = []
     private var connectStarted: Date?
     private var firstWords = false
+    private var recovering = false
+    private var recoveries = 0
+    private var canRecover: Bool { machine.isLive && identity?.label?.hasPrefix("Interviewer ·") == true && recoveries < 2 }
     /// The audio session, handed between the app and WebRTC.
     let audio: VoiceLiveAudio
     private let makePeer: () -> LivePeer
@@ -102,6 +111,7 @@ final class VoiceLiveController: ObservableObject {
 
     private func handle(_ data: Data) {
         for signal in LiveEventParser.parse(data) {
+            if case .closed(let reason) = signal, reason != "content", canRecover { Task { await recover() }; continue }
             if case .started = signal, let started = connectStarted { time("connect", since: started) }
             if case .agentText = signal, !firstWords, let started = connectStarted { firstWords = true; time("firstWords", since: started) }
             apply(machine.handle(signal, now: Self.now))
@@ -191,9 +201,34 @@ final class VoiceLiveController: ObservableObject {
         }
         transport.onClosed = { [weak self] reason in
             guard let self, self.machine.isLive else { return }
+            if self.canRecover { Task { await self.recover() }; return }
+            if self.recovering { return }
             self.apply(self.machine.fail(reason ?? "The voice connection closed.", now: Self.now, reason: .transport))
         }
         self.transport = transport
+    }
+
+    private func recover() async {
+        guard canRecover, !recovering, let sessionId else { return }
+        recovering = true
+        recoveries += 1
+        defer { recovering = false }
+        let reports = machine.drain()
+        let previous = transport
+        transport = nil
+        previous?.onClosed = nil
+        previous?.close()
+        do {
+            let peer = makePeer()
+            let offer = try await peer.makeOffer()
+            let result = try await studio.voiceLiveReconnect(sessionId: sessionId, sdp: model == "gpt-live-1" ? offer : nil, reports: reports)
+            guard machine.isLive else { peer.close(); return }
+            attach(peer)
+            if let answer = result.answerSdp { try await peer.setAnswer(answer) }
+            else if let secret = result.clientSecret, let url = result.callsUrl.flatMap(URL.init(string:)) {
+                try await peer.setAnswer(try await WebRTCLiveTransport.exchange(offer: offer, url: url, secret: secret))
+            } else { throw BBError(status: 0, message: "Studio returned no reconnect transport.") }
+        } catch { apply(machine.fail(error.localizedDescription, now: Self.now)) }
     }
 
     // MARK: Audio session

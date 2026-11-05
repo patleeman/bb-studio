@@ -53,6 +53,21 @@ describe("LiveSession", () => {
     expect(session.machine.card).toEqual({ kind: "sent", title: "Sent to the Kensico lead", detail: "" });
   });
 
+  it("recovers an interviewer server close on the same record without ending it", async () => {
+    const h = fakes();
+    const started = await h.server.start({});
+    vi.mocked(h.server.start).mockResolvedValue({ ...started, identity: { kind: 'thread', name: 'Interviewer · rate limiter', label: 'Interviewer · rate limiter', threadId: null } });
+    h.server.reconnect = vi.fn(async () => ({ sessionId: started.sessionId, answerSdp: 'new answer', clientSecret: null, callsUrl: null }));
+    h.session.start();
+    await flush();
+    h.emit({ type: 'session.started' });
+    h.emit({ type: 'session.input_transcript.delta', delta: 'Counter keys include org and model.' });
+    h.emit({ type: 'session.closed', reason: 'connection_lost', usage: { seconds: 60 } });
+    await flush();
+    expect(h.server.reconnect).toHaveBeenCalledWith(expect.objectContaining({ sessionId: started.sessionId }));
+    expect(h.server.end).not.toHaveBeenCalled();
+    expect(h.session.machine.isLive).toBe(true);
+  });
   it("barge-in by level mutes the transport at once", async () => {
     const { session, muted, emit, setLevels, advance } = fakes();
     session.start();

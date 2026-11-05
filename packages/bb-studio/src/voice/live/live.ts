@@ -23,7 +23,7 @@
 //
 // It replaced the old in-thread voice mode (removed Nov 1); it keeps the
 // retired Call's tables (voice_calls, voice_call_events; append-only).
-import { DIMENSIONS, parsePack, interviewClock, drawingGraph, scorecardPrompt, scorecardSchema, scorecardMarkdown, type InterviewPack, type Evidence } from "./interview";
+import { DIMENSIONS, parsePack, transcriptRecap, interviewClock, drawingGraph, scorecardPrompt, scorecardSchema, scorecardMarkdown, type InterviewPack, type Evidence } from "./interview";
 import { priceFor } from "../../bot-prices";
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
@@ -906,8 +906,8 @@ export class VoiceLive {
     if (this.capProblem("interviewer")) throw new VoiceRefused(this.capProblem("interviewer")!);
     if (this.interviewTick(row.id)) throw new Error("Interview time limit reached.");
     const all = this.events(row.id);
-    const transcript = all.filter(e => e.kind === "transcript").map(e => `${e.role}: ${e.text}`).join("\n");
-    const resume = `Resume the same interview; do not repeat the opening. State: ${JSON.stringify({ pack: pack.id, ...interviewClock(pack, row.started_at, this.now()), transcriptSummary: transcript.slice(-6000), evidence: all.filter(e => e.kind === "evidence").map(e => data<Evidence>(e)) })}`;
+    const transcript = transcriptRecap(all.filter(e => e.kind === "transcript").map(e => ({ role: e.role ?? "assistant", text: e.text ?? "" })));
+    const resume = `Resume the same interview; do not repeat the opening. State: ${JSON.stringify({ pack: pack.id, ...interviewClock(pack, row.started_at, this.now()), transcriptSummary: transcript, evidence: all.filter(e => e.kind === "evidence").map(e => data<Evidence>(e)) })}`;
     const persona = { identity: this.identity(row.id)!, seed: "", cosName: row.bot_name, interview: pack, resume };
     const config = data<{ backendModel?: string }>(all.find(e => e.kind === "config"));
     let answerSdp: string | null = null, clientSecret: string | null = null;

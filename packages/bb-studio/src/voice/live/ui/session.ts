@@ -14,6 +14,7 @@ export interface LiveIdentity { kind: string; label: string; name: string; threa
 export interface LiveServer {
   state(): Promise<{ ready: boolean; problem: string | null; model: string; cosName: string | null }>;
   start(input: { model?: string; sdp?: string; threadId?: string }): Promise<{ sessionId: string; model: string; transport: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null; mockUrl: string | null; cosName: string; identity?: LiveIdentity }>;
+  reconnect?(input: { sessionId: string; sdp?: string; events: Report[] }): Promise<{ sessionId: string; answerSdp: string | null; clientSecret: string | null; callsUrl: string | null }>;
   tool(input: { sessionId: string; name: string; args: string; events: Report[] }): Promise<{ output: string; waitFor?: { title: string; ms: number; note: string } }>;
   event(input: { sessionId: string; events: Report[] }): Promise<{ costUsd: number | null; replies: number; stop: string | null; voiceThreadId?: string | null }>;
   poll(input: { sessionId: string }): Promise<{ replies: { id: number; title: string; summary: string; note: string }[] }>;
@@ -51,6 +52,9 @@ export class LiveSession {
   private readonly listeners = new Set<() => void>();
   private version = 0;
   private syncing = false;
+  private recovering = false;
+  private recoveries = 0;
+  private started: Awaited<ReturnType<LiveServer["start"]>> | null = null;
   /** Meeting mode's address gate (src/voice/meeting/ui/gate.ts): shut, the voice stays muted whatever barge-in says. */
   private audioGate = true;
   private bargeMuted = false;
@@ -128,6 +132,7 @@ export class LiveSession {
   /** One message from the voice model. */
   receive(event: Record<string, unknown>): void {
     for (const signal of parseEvent(event)) {
+      if (signal.type === "closed" && signal.reason !== "content" && this.canRecover()) { void this.recover(); continue; }
       if (signal.type === "started") this.log("session started");
       if (signal.type === "userText") this.log(`user text: ${signal.text}`);
       if (signal.type === "agentText") this.log(`voice text: ${signal.text}`);
@@ -144,6 +149,7 @@ export class LiveSession {
       const threadId = this.options.threadId ?? undefined;
       const start = (sdp?: string) => this.server.start({ model: state.model, ...(sdp ? { sdp } : {}), ...(threadId ? { threadId } : {}) });
       const { transport, started } = await (this.options.connect ?? defaultConnect)(start, state.model);
+      this.started = started;
       this.sessionId = started.sessionId;
       this.identity = started.identity ?? null;
       if (this.identity) this.log(`speaking as ${this.identity.label}`);
@@ -154,7 +160,7 @@ export class LiveSession {
       this.transport = transport;
       if (!this.audioGate) transport.setAgentAudio(false);
       transport.onEvent((event) => this.receive(event));
-      transport.onClose((reason) => { if (this.machine.isLive) this.apply(this.machine.fail(reason, this.now())); });
+      transport.onClose((reason) => { if (this.canRecover()) void this.recover(); else if (this.machine.isLive && !this.recovering) this.apply(this.machine.fail(reason, this.now())); });
       this.startTimers();
       this.changed();
     } catch (error) {
@@ -162,6 +168,32 @@ export class LiveSession {
       this.transport?.close();
       this.transport = null;
     }
+  }
+
+  private canRecover(): boolean {
+    return this.machine.isLive && !!this.server.reconnect && !!this.identity?.label.startsWith("Interviewer ·") && this.recoveries < 2;
+  }
+
+  private async recover(): Promise<void> {
+    if (this.recovering || !this.canRecover() || !this.sessionId || !this.started) return;
+    this.recovering = true;
+    this.recoveries++;
+    const reports = this.machine.drain();
+    try {
+      const old = this.transport;
+      this.transport = null;
+      old?.close();
+      const base = this.started;
+      const start = async (sdp?: string) => ({ ...base, ...await this.server.reconnect!({ sessionId: this.sessionId!, sdp, events: reports }) });
+      const { transport } = await (this.options.connect ?? defaultConnect)(start, this.model);
+      if (!this.machine.isLive) { transport.close(); return; }
+      this.transport = transport;
+      transport.onEvent(e => this.receive(e));
+      transport.onClose(reason => { if (this.canRecover()) void this.recover(); else if (this.machine.isLive && !this.recovering) this.apply(this.machine.fail(reason, this.now())); });
+      transport.setAgentAudio(this.audioGate && !this.bargeMuted);
+    } catch (error) {
+      this.apply(this.machine.fail(String(error), this.now()));
+    } finally { this.recovering = false; }
   }
 
   private startTimers() {

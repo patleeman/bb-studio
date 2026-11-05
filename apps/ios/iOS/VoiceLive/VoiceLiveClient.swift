@@ -18,6 +18,10 @@ extension BBClient {
         try await rpc("studio", Studio.Method.voiceLive_start, .object(omittingNil: ["model": model.map(JSONValue.string), "sdp": sdp.map(JSONValue.string), "threadId": threadId.map(JSONValue.string)]))
     }
 
+    func voiceLiveReconnect(sessionId: String, sdp: String?, reports: [LiveReport]) async throws -> Studio.VoiceLiveReconnectOutput {
+        try await rpc("studio", Studio.Method.voiceLive_reconnect, .object(omittingNil: ["sessionId": .string(sessionId), "sdp": sdp.map(JSONValue.string), "events": Self.json(reports)]))
+    }
+
     func voiceLiveTool(sessionId: String, name: String, arguments: String, reports: [LiveReport]) async throws -> VoiceLiveToolResult {
         try await rpc("studio", Studio.Method.voiceLive_tool, .object([
             "sessionId": .string(sessionId), "name": .string(name), "args": .string(arguments), "events": Self.json(reports),
