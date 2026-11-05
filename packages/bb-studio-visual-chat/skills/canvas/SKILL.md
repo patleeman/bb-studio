@@ -91,8 +91,8 @@ the reply is only that caption (the voice reads it back).
   `spotify` with `data-kind` and `data-id`). Visual Chat frames the real thing over
   it; never invented coordinates. For "near X", a map embed beside a list from
   your research. `page` with `data-url` shows a webpage (framed, or a link card,
-  with Open) only for a URL the user gave or you fetched or found this turn;
-  never invent one.
+  with Open) only for a URL the user gave or you fetched or found in a web
+  search this turn (fetch it first); never one from memory.
 - No other network but https pictures from `canvas_images`.
 
 ## Claude Code
