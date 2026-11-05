@@ -51,7 +51,8 @@ import { registerThreadAutomations } from "./src/ui/automations/register";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopDirective, LoopsDirective } from "./src/loops/ui/LoopCard";
 import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
-import { registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
+import { onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
+import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
 import { registerThreadContext } from "./src/ui/thread-context";
 
@@ -223,6 +224,8 @@ export default definePluginApp((app) => {
       layout: "flush",
       component: (props) => <Suspense fallback={null}><StudioTab {...props} /></Suspense>,
     });
+    // The tab comes back where it was left; a card opening it on an item shows that item.
+    onThreadTabOpen((open) => { if (open.actionId === STUDIO_TAB && open.params != null) forgetView(open.params); });
   }
   // Pages (built in; docs/merging-add-ons.md): the Studio tab's pages, the
   // `::page{id="pg_…"}` card in replies, the header link back to a page a

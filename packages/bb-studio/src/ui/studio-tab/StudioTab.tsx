@@ -8,7 +8,7 @@ import { requestGeneration } from "../../kit/ui/request-generation";
 import { ICON_BUTTON, Icon, ItemTile, OUTLINE_BUTTON, PRIMARY_BUTTON, THUMBNAIL, cn, openAppPath, studioItemProps } from "../../kit/app/index";
 import { errorMessage, relativeTime, untitled } from "../../kit/format";
 import { useRealtime, useRpc, useSdk, type JsonValue } from "@get-bb/plugin-sdk/app";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { toast } from "sonner";
 import type { z } from "zod";
 import type { ProviderView, rpcContract } from "../../contract";
@@ -23,6 +23,7 @@ import { RECORDING_CHANGED } from "../../talk/shared/format";
 import { appliedKinds } from "../kinds-snapshot";
 import { runCreateEntry, startsGroup, useCreateEntries, type CreateEntry } from "../create-menu";
 import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, type CollectionKind, type TabKind, type TabKindInfo, type TabTarget } from "./model";
+import { applyScroll, elementPath, loadView, onViewForgotten, sameTarget, saveView, viewKey, type TabScroll } from "./view-state";
 
 const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => ({ default: module.PageTab })));
 const DrawingView = lazy(() => import("../../draw/ui/drawing-editor").then((module) => ({ default: module.DrawingEditor })));
@@ -55,8 +56,12 @@ export function ItemView({ kind, id, threadId, onBack }: { kind: TabKind; id: st
 export function StudioTab({ threadId, params }: { threadId: string; params: JsonValue | null }) {
   const enabled = useMemo(() => enabledKinds(appliedKinds()?.off ?? new Set()), []);
   const asked = useMemo(() => tabTarget(params, enabled), [params, enabled]);
-  const [target, setTarget] = useState<TabTarget>(asked);
-  const [filter, setFilter] = useState<string | null>(null);
+  const key = viewKey(threadId, params);
+  // BB unmounts this tab when another one is selected, and on a reload; it
+  // comes back where it was left (./view-state.ts).
+  const [restored] = useState(() => loadView(key, enabled));
+  const [target, setTarget] = useState<TabTarget>(restored?.target ?? asked);
+  const [filter, setFilter] = useState<string | null>(restored?.filter ?? null);
   // BB keeps this tab mounted when a card opens it on another item, so a new
   // target replaces the one on screen.
   const [openedWith, setOpenedWith] = useState(asked);
@@ -64,8 +69,27 @@ export function StudioTab({ threadId, params }: { threadId: string; params: Json
     setOpenedWith(asked);
     setTarget(asked);
   }
+  // A card opening this instance again shows its item, wherever the tab was.
+  useEffect(() => onViewForgotten(key, () => setTarget(asked)), [key, asked]);
   const back = useCallback(() => setTarget({ view: "list" }), []);
+  const root = useViewMemory(key, target, filter, restored?.scroll ?? null);
 
+  return (
+    <div ref={root.ref} className="contents" onScrollCapture={root.onScroll} onWheelCapture={root.onUser} onPointerDownCapture={root.onUser} onKeyDownCapture={root.onUser} onTouchStartCapture={root.onUser}>
+      <TabView threadId={threadId} target={target} enabled={enabled} filter={filter} onFilter={setFilter} onTarget={setTarget} onBack={back} />
+    </div>
+  );
+}
+
+function TabView({ threadId, target, enabled, filter, onFilter, onTarget, onBack: back }: {
+  threadId: string;
+  target: TabTarget;
+  enabled: readonly TabKindInfo[];
+  filter: string | null;
+  onFilter(filter: string | null): void;
+  onTarget(target: TabTarget): void;
+  onBack(): void;
+}) {
   if (target.view === "item") return <ItemView kind={target.kind} id={target.id} threadId={threadId} onBack={back} />;
   if (target.view === "save") {
     return (
@@ -89,11 +113,79 @@ export function StudioTab({ threadId, params }: { threadId: string; params: Json
       threadId={threadId}
       enabled={enabled}
       filter={filter}
-      onFilter={setFilter}
-      onOpen={(kind, id) => setTarget({ view: "item", kind, id })}
-      onSave={() => setTarget({ view: "save", seq: null })}
+      onFilter={onFilter}
+      onOpen={(kind, id) => onTarget({ view: "item", kind, id })}
+      onSave={() => onTarget({ view: "save", seq: null })}
     />
   );
+}
+
+/** How long a restored scroll waits for its view's content to load. */
+const RESTORE_MS = 5000;
+/** How often scrolling saves, at most. */
+const SAVE_MS = 250;
+
+/**
+ * Saves the tab's view whenever it changes and its scroll as it scrolls, and
+ * scrolls a restored view back once its content is tall enough. Spread its
+ * handlers on a wrapper around the view.
+ */
+function useViewMemory(key: string, target: TabTarget, filter: string | null, restoredScroll: TabScroll | null) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scroll = useRef<TabScroll | null>(restoredScroll);
+  const pending = useRef<TabScroll | null>(restoredScroll);
+  const shown = useRef(target);
+  const latest = useRef({ key, target, filter });
+  latest.current = { key, target, filter };
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const save = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const { key, target, filter } = latest.current;
+    saveView(key, { target, filter, scroll: scroll.current });
+  }, []);
+
+  // A new view starts at the top, and is saved at once.
+  useEffect(() => {
+    if (!sameTarget(shown.current, target)) {
+      shown.current = target;
+      scroll.current = null;
+      pending.current = null;
+    }
+    save();
+  }, [key, target, filter, save]);
+  // Leaving (a tab switch, a reload) keeps the last scroll.
+  useEffect(() => () => { if (timer.current) save(); }, [save]);
+
+  // Scroll a restored view back, frame by frame, until its content is there.
+  useLayoutEffect(() => {
+    const goal = pending.current;
+    const element = ref.current;
+    if (!goal || !element) return;
+    const until = Date.now() + RESTORE_MS;
+    let frame = 0;
+    const step = () => {
+      if (pending.current !== goal) return;
+      if (applyScroll(element, goal) || Date.now() > until) { pending.current = null; return; }
+      frame = requestAnimationFrame(step);
+    };
+    step();
+    return () => cancelAnimationFrame(frame);
+    // Only a restored view, on mount; a view opened later starts at the top.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onScroll = useCallback((event: SyntheticEvent) => {
+    // While restoring, a view loading in isn't the user's scroll.
+    if (pending.current || !ref.current || !(event.target instanceof Element)) return;
+    const path = elementPath(ref.current, event.target);
+    if (!path) return;
+    scroll.current = { path, top: Math.max(0, Math.round(event.target.scrollTop)) };
+    if (!timer.current) timer.current = setTimeout(save, SAVE_MS);
+  }, [save]);
+  // The user taking over stops a restore.
+  const onUser = useCallback(() => { pending.current = null; }, []);
+  return { ref, onScroll, onUser };
 }
 
 /** Refetch when any shown kind changes. A fixed hook per kind, so the count never changes. */

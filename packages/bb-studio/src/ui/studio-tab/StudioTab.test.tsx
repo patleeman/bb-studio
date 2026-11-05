@@ -54,7 +54,11 @@ vi.mock("../../talk/ui/recordings-panel", () => view("RecordingDetail", "id"));
 vi.mock("../../artifacts/ui/artifact-viewer", () => view("ArtifactViewer", "artifactId"));
 vi.mock("../../artifacts/ui/save-picker", () => ({ SavePicker: ({ params }: { params: unknown }) => <p data-view="SavePicker">{JSON.stringify(params)}</p> }));
 
+vi.mock("../../minis/ui/mini-view", () => view("TabMini", "miniId"));
+
 const { StudioTab } = await import("./StudioTab");
+const { forgetView, loadView, saveView, viewKey } = await import("./view-state");
+const { TAB_KINDS } = await import("./model");
 const { createEntries } = await import("../create-menu");
 
 let root: Root;
@@ -63,6 +67,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.off = new Set();
   state.opened = [];
+  localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -143,6 +148,129 @@ describe("Studio tab", () => {
     await render(<StudioTab threadId="thr_1" params={{ kind: "page", id: "pg_1" }} />);
     await render(<StudioTab threadId="thr_1" params={{ kind: "design", id: "dsn_0123456789abcdef" }} />);
     expect(shown()).toBe("TabCanvas:dsn_0123456789abcdef");
+  });
+});
+
+describe("coming back to the Studio tab", () => {
+  // BB unmounts the tab when another tab is selected; a new root is a remount.
+  async function remount(node: React.ReactNode) {
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(node);
+  }
+
+  it.each([
+    ["page", "pg_1", "PageTab:pg_1"],
+    ["drawing", "drw_0123456789abcdef", "DrawingEditor:drw_0123456789abcdef"],
+    ["design", "dsn_0123456789abcdef", "TabCanvas:dsn_0123456789abcdef"],
+    ["dashboard", "dsh_0123456789abcdef", "TabDashboard:dsh_0123456789abcdef"],
+    ["mini", "mini_0123456789abcdef", "TabMini:mini_0123456789abcdef"],
+    ["artifact", "art_0123456789abcdef", "ArtifactViewer:art_0123456789abcdef"],
+    ["recording", "rec_aaaaaaaa", "RecordingDetail:rec_aaaaaaaa"],
+  ])("shows the %s it had open", async (kind, id, expected) => {
+    const info = TAB_KINDS.find((each) => each.kind === kind)!;
+    expect(info.isId(id)).toBe(true);
+    saveView(viewKey("thr_1", null), { target: { view: "item", kind: info.kind, id }, filter: null, scroll: null });
+    await render(<StudioTab threadId="thr_1" params={null} />);
+    expect(shown()).toBe(expected);
+  });
+
+  it("reopens the page picked from the list after a tab switch, per thread", async () => {
+    await render(<StudioTab threadId="thr_1" params={null} />);
+    await act(async () => row("Plan").click());
+    await act(async () => { await new Promise((done) => setTimeout(done, 0)); });
+    expect(shown()).toBe("PageTab:pg_1");
+    await remount(<StudioTab threadId="thr_1" params={null} />);
+    expect(shown()).toBe("PageTab:pg_1");
+    // Another thread's Studio tab has its own view.
+    await remount(<StudioTab threadId="thr_2" params={null} />);
+    expect(shown()).toBeNull();
+    // Back to the list is remembered too, with its kind filter.
+    await remount(<StudioTab threadId="thr_1" params={null} />);
+    await act(async () => button("PageTab:pg_1").click());
+    await act(async () => button("Designs").click());
+    await remount(<StudioTab threadId="thr_1" params={null} />);
+    expect(shown()).toBeNull();
+    expect(button("Designs").getAttribute("aria-pressed")).toBe("true");
+    expect(container.textContent).not.toContain("Plan");
+  });
+
+  it("keeps the save picker and an item a card's instance moved on to", async () => {
+    await render(<StudioTab threadId="thr_1" params={{ view: "save", seq: 2 }} />);
+    await remount(<StudioTab threadId="thr_1" params={{ view: "save", seq: 2 }} />);
+    expect(shown()).toBe('{"seq":2}');
+    const card = { kind: "page", id: "pg_1" };
+    await remount(<StudioTab threadId="thr_1" params={card} />);
+    await act(async () => button("PageTab:pg_1").click());
+    await act(async () => row("Board").click());
+    await act(async () => { await new Promise((done) => setTimeout(done, 0)); });
+    await remount(<StudioTab threadId="thr_1" params={card} />);
+    expect(shown()).toBe("TabCanvas:dsn_0123456789abcdef");
+  });
+
+  it("shows the card's item when a card opens it again, mounted or not", async () => {
+    const card = { kind: "page", id: "pg_1" };
+    saveView(viewKey("thr_1", card), { target: { view: "list" }, filter: null, scroll: null });
+    forgetView(card);
+    await render(<StudioTab threadId="thr_1" params={card} />);
+    expect(shown()).toBe("PageTab:pg_1");
+    await act(async () => button("PageTab:pg_1").click());
+    expect(shown()).toBeNull();
+    await act(async () => forgetView(card));
+    expect(shown()).toBe("PageTab:pg_1");
+  });
+
+  it("drops a saved item whose kind was turned off", async () => {
+    saveView(viewKey("thr_1", null), { target: { view: "item", kind: "design", id: "dsn_0123456789abcdef" }, filter: null, scroll: null });
+    state.off = new Set(["design"]);
+    await render(<StudioTab threadId="thr_1" params={null} />);
+    expect(shown()).toBeNull();
+    expect(container.textContent).toContain("Plan");
+  });
+
+  it("saves the view's scroll and scrolls it back once its content is there", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame", "Date"] });
+    const tall = { value: 0 };
+    const scrolled = new WeakMap<Element, number>();
+    const restore = [
+      ["scrollHeight", { configurable: true, get: () => tall.value }],
+      ["clientHeight", { configurable: true, get: () => 100 }],
+      ["scrollTop", { configurable: true, get(this: Element) { return scrolled.get(this) ?? 0; }, set(this: Element, top: number) { scrolled.set(this, Math.min(top, Math.max(0, tall.value - 100))); } }],
+    ] as const;
+    const before = restore.map(([name]) => [name, Object.getOwnPropertyDescriptor(Element.prototype, name)] as const);
+    for (const [name, descriptor] of restore) Object.defineProperty(Element.prototype, name, descriptor);
+    try {
+      saveView(viewKey("thr_1", null), { target: { view: "item", kind: "page", id: "pg_1" }, filter: null, scroll: null });
+      await act(async () => root.render(<StudioTab threadId="thr_1" params={null} />));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      const page = () => container.querySelector("[data-view]")!;
+      expect(page().textContent).toBe("PageTab:pg_1");
+      tall.value = 1000;
+      page().scrollTop = 420;
+      await act(async () => { page().dispatchEvent(new Event("scroll")); await vi.advanceTimersByTimeAsync(300); });
+      expect(loadView(viewKey("thr_1", null), TAB_KINDS)?.scroll).toEqual({ path: [0], top: 420 });
+
+      // Back again: the page loads short, then grows; the scroll waits for it.
+      tall.value = 0;
+      act(() => root.unmount());
+      root = createRoot(container);
+      await act(async () => root.render(<StudioTab threadId="thr_1" params={null} />));
+      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+      expect(page().scrollTop).toBe(0);
+      tall.value = 1000;
+      await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+      expect(page().scrollTop).toBe(420);
+
+      // Another item starts at the top.
+      await act(async () => button("PageTab:pg_1").click());
+      expect(loadView(viewKey("thr_1", null), TAB_KINDS)).toMatchObject({ target: { view: "list" }, scroll: null });
+    } finally {
+      for (const [name, descriptor] of before) {
+        if (descriptor) Object.defineProperty(Element.prototype, name, descriptor);
+        else delete (Element.prototype as unknown as Record<string, unknown>)[name];
+      }
+      vi.useRealTimers();
+    }
   });
 });
 

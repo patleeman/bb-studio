@@ -28,8 +28,23 @@ export function threadTab(id: string) {
   return { id, context: { kind: "thread" as const }, availability: "action" as const };
 }
 
+const openListeners = new Set<(open: ThreadTabOpen) => void>();
+
+/**
+ * Calls `listener` before each tab openThreadTab opens (a card, a note, a
+ * request), so a tab that remembers its view can make way for the item asked
+ * for. Returns the unsubscribe.
+ */
+export function onThreadTabOpen(listener: (open: ThreadTabOpen) => void): () => void {
+  openListeners.add(listener);
+  return () => { openListeners.delete(listener); };
+}
+
 /** Opens a tab through `panel`. False when the surface has no side panel or declined. */
 export function openThreadTab(panel: Pick<ExperimentalPanelController, "openTab">, open: ThreadTabOpen): boolean {
+  for (const listener of openListeners) {
+    try { listener(open); } catch { /* a listener never blocks the open */ }
+  }
   try {
     return panel.openTab({ tab: threadTab(open.actionId), ...open.title ? { title: open.title } : {}, ...open.params !== undefined ? { params: open.params } : {} });
   } catch {

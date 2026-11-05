@@ -53,6 +53,10 @@ makes the item in the thread's project and links it to the thread. The
 save icon opens Artifacts' save picker for the latest reply's files. Reply
 cards and **Expand to page** open the Studio tab on their item
 (`{ kind, id }` params). Kinds turned off in **Setup → Kinds** don't appear.
+The tab remembers where you left it, per thread and per tab: switch to
+another side-panel tab, reload Studio or restart BB, and it comes back on
+the same item (or the collection, with its kind chip) scrolled where it was.
+A card that opens the tab again on its item shows that item.
 The old per-kind tabs (Pages, Drawings, Design, Dashboards, Artifacts) are
 gone; one of them still open from before shows as unavailable, so close it
 and open Studio.

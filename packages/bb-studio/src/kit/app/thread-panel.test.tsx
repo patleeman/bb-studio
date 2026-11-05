@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ openTab: vi.fn((_options: unknown) => true), tabs: { open: false, selectedKey: null as string | null, tabs: [] as unknown[] } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_useAppPanel: () => ({ openTab: state.openTab, getTabs: () => state.tabs }), useComposer: () => ({ scope: { kind: "thread", threadId: "thr_a" } }) }));
-const { openThreadTab, requestThreadTab, resetThreadTabRequests, ThreadTabReceiver, threadTab } = await import("./thread-panel");
+const { onThreadTabOpen, openThreadTab, requestThreadTab, resetThreadTabRequests, ThreadTabReceiver, threadTab } = await import("./thread-panel");
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
@@ -65,4 +65,17 @@ it("a background open waits behind the user's, and leaves a plugin tab the user 
   await act(async () => { opened = await requestThreadTab("thr_a", { actionId: "bot-info", background: true }); });
   expect(opened).toBe(true);
   expect(state.openTab).toHaveBeenCalledTimes(2);
+});
+
+it("tells open listeners before each open, and a throwing listener doesn't block it", () => {
+  const seen: unknown[] = [];
+  const stopThrow = onThreadTabOpen(() => { throw new Error("boom"); });
+  const stop = onThreadTabOpen((open) => seen.push(open.params));
+  const openTab = vi.fn(() => true);
+  expect(openThreadTab({ openTab }, { actionId: "studio", params: { kind: "page", id: "pg_1" } })).toBe(true);
+  stop();
+  stopThrow();
+  openThreadTab({ openTab }, { actionId: "studio" });
+  expect(seen).toEqual([{ kind: "page", id: "pg_1" }]);
+  expect(openTab).toHaveBeenCalledTimes(2);
 });
