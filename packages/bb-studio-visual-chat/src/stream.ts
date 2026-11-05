@@ -6,9 +6,11 @@
 // canvas thread works, the server polls its log, assembles the text, takes the
 // growing html block, repairs it into markup that parses (half tags dropped,
 // open elements closed) and publishes it to the page, which builds the board
-// part by part. When the thread goes idle, the reply's final text is the page
-// (a version, as canvas_page makes) and the words outside the block are the
-// caption.
+// part by part. The moment the block closes, it's committed as the page and
+// the turn's version (as canvas_page makes it); when the thread goes idle, the
+// caption (the words after the block) and anything that arrived after the
+// block (pictures, patches) fill that same version in. A turn whose block
+// never closed is committed at idle from what arrived.
 //
 // The page reveals a part (data-cv-id) once its element is closed. The repair
 // marks the open ones: an open part with no part inside yet is
@@ -241,6 +243,8 @@ export interface PageStreamDeps {
   /** The log's latest seq now (rows up to it are from before this turn). */
   tip(): Promise<number>;
   publish(update: StreamUpdate): void;
+  /** The html block closed: the page is finished (called once; nothing more is published after it). */
+  onClose?(page: FencedPage): void;
   /** Puts found pictures into cards (page.ts fillPictures). */
   fill?(html: string): string;
   intervalMs?: number;
@@ -266,6 +270,7 @@ export class PageStream {
   private lastHtml = "";
   private lastAt = -Infinity;
   private started = false;
+  private closed = false;
   published = 0;
 
   constructor(private readonly deps: PageStreamDeps) {}
@@ -306,8 +311,15 @@ export class PageStream {
   halt(): void { this.stopped = true; }
 
   private flush(): void {
+    if (this.closed) return;
     const found = extractPage(this.text.text());
     if (!found.opened) return;
+    // The block closed: the page is finished, whatever the throttle says. The rest of the turn isn't page.
+    if (found.closed && found.html.trim() && this.deps.onClose) {
+      this.closed = true;
+      this.deps.onClose(found);
+      return;
+    }
     const now = (this.deps.now ?? Date.now)();
     if (now - this.lastAt < (this.deps.throttleMs ?? 150)) return;
     const repaired = repairPartial(found.html);
@@ -336,6 +348,9 @@ export class PageStream {
     })();
     return this.stopping;
   }
+
+  /** Whether the html block closed while streaming. */
+  get finished(): boolean { return this.closed; }
 
   /** Whether anything of a page went to the page. */
   get showed(): boolean { return this.started; }

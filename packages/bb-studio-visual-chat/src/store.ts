@@ -412,6 +412,18 @@ export class CanvasStore {
     }).immediate();
   }
 
+  /**
+   * Version n takes the board as it is now (its page or items, style, title, caption): a turn whose page was
+   * saved as its version early (a streamed page, when its block closed) fills in what came after at its end.
+   */
+  refreshVersion(canvasId: string, n: number): void {
+    const row = this.get(canvasId);
+    if (!row) return;
+    const items = row.page ? null : JSON.stringify(this.items(canvasId));
+    this.db.prepare("UPDATE canvas_versions SET page = ?, items = ?, look = ?, title = ?, caption = ?, rev = ? WHERE canvas_id = ? AND n = ?")
+      .run(row.page ?? null, items, row.look, row.title, row.caption, row.rev, canvasId, n);
+  }
+
   private insertVersion(row: CanvasRow, from: number | null): number {
     const n = ((this.db.prepare("SELECT MAX(n) AS n FROM canvas_versions WHERE canvas_id = ?").get(row.id) as { n: number | null }).n ?? 0) + 1;
     const prompt = [...this.history(row.id, 40)].reverse().find((line) => line.role === "user" || line.role === "voice")?.text ?? null;

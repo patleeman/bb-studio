@@ -512,7 +512,7 @@ describe("a page streamed in the reply", () => {
     return { ...host, log, threadId, canvasId };
   }
 
-  it("publishes the page as it grows, from deltas in any order and seen twice, then commits it at idle", async () => {
+  it("publishes the page as it grows, from deltas in any order and seen twice, and commits it the moment its block closes", async () => {
     const { host, call, log, threadId } = await streamingCanvas();
     const rows = deltas(REPLY, 10);
     // The first half arrives shuffled, with a duplicate.
@@ -525,19 +525,51 @@ describe("a page streamed in the reply", () => {
     // The style on the fence line applies as the page starts.
     expect((await call("canvas.get", { threadId })).canvas.look).toBe("field");
     log.push(...rows.slice(half.length));
-    await wait(() => streamSignals(host).some((signal) => signal.html?.includes("game-links\" data-title")), "the whole page");
-    expect(streamSignals(host).every((signal) => !signal.html || !signal.html.includes("Start with"))).toBe(true);
+    await wait(() => streamSignals(host).some((signal) => signal.done), "the page committed");
+    // Committed while the turn is still working: the page, its title, one version; the caption waits for the turn's end.
+    const mid = (await call("canvas.get", { threadId })).canvas;
+    expect(mid).toMatchObject({ page: STREAMED, title: "Chromatic: five to own", status: "working", caption: null });
+    expect(mid.versions).toHaveLength(1);
+    expect(streamSignals(host).at(-1)).toMatchObject({ done: true, rev: mid.rev });
+    expect(streamSignals(host).filter((signal) => !signal.done).every((signal) => !signal.html.includes("Start with"))).toBe(true);
+    const signals = streamSignals(host).length;
     await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: REPLY });
     const view = (await call("canvas.get", { threadId })).canvas;
     expect(view.page).toBe(STREAMED);
-    expect(view.title).toBe("Chromatic: five to own");
     expect(view.caption).toBe("Start with Link's Awakening.");
     expect(view.status).toBe("idle");
+    // No second version at idle: the one from the fence gets the caption.
     expect(view.versions).toHaveLength(1);
-    expect(view.versions[0]).toMatchObject({ caption: "Start with Link's Awakening.", look: "field" });
+    expect(view.versions[0]).toMatchObject({ caption: "Start with Link's Awakening.", look: "field", title: "Chromatic: five to own" });
     expect(view.history.at(-1)).toMatchObject({ role: "agent", text: "Start with Link's Awakening." });
-    const last = streamSignals(host).at(-1);
-    expect(last).toMatchObject({ done: true, rev: view.rev });
+    // Nothing more streams after the commit.
+    expect(streamSignals(host)).toHaveLength(signals);
+  });
+
+  it("fills in the caption and what came after the block at idle, in the same version", async () => {
+    const { host, call, tool, log, threadId } = await streamingCanvas();
+    // Page first, then a tool call, then the caption alone as the last reply.
+    log.push(...deltas(`\`\`\`html\n${STREAMED}\n\`\`\``, 10));
+    await wait(() => streamSignals(host).some((signal) => signal.done), "the page committed");
+    expect((await call("canvas.get", { threadId })).canvas.versions).toHaveLength(1);
+    await tool("canvas_patch", { id: "title", html: '<header data-cv-id="title"><h1>Chromatic: six to own</h1></header>' }, threadId);
+    log.push({ seq: 500, type: "item/agentMessage/delta", data: { delta: "Start with Tetris.", itemId: "msg2" } });
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "Start with Tetris." });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view.caption).toBe("Start with Tetris.");
+    expect(view.page).toContain("six to own");
+    expect(view.versions).toHaveLength(1);
+    expect(view.versions[0]).toMatchObject({ caption: "Start with Tetris.", rev: view.rev });
+    expect((await call("canvas.version", { threadId, n: view.versions[0].n })).version.page).toContain("six to own");
+    // The next turn makes the next version.
+    await call("canvas.send", { threadId, text: "And for two players?" });
+    await host.harness.behavior.emitThreadEvent("thread.active", { thread: { id: threadId } as never });
+    log.push(...deltas(`\`\`\`html\n<h1 data-cv-id="title">Two players</h1>\n\`\`\`\nLink cable.`, 1000));
+    await wait(() => streamSignals(host).filter((signal) => signal.done).length > 1, "the second page committed");
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "```html\n<h1 data-cv-id=\"title\">Two players</h1>\n```\nLink cable." });
+    const next = (await call("canvas.get", { threadId })).canvas;
+    expect(next.versions).toHaveLength(2);
+    expect(next.versions[1]).toMatchObject({ caption: "Link cable.", prompt: "And for two players?" });
   });
 
   it("commits what arrived, repaired, when the turn ends without a closing fence", async () => {

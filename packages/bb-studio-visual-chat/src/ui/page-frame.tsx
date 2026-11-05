@@ -28,7 +28,7 @@ export const PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-s
 const BOOT = `(function(){addEventListener("message",function(event){if(event.source!==parent)return;var d=event.data;if(!d)return;
 if(d.type==="${STYLE_MESSAGE}"){document.getElementById("cv-style").textContent=d.css;document.documentElement.setAttribute("data-cv-look",d.look);document.documentElement.setAttribute("data-cv-mode",d.mode)}
 if(d.type==="${STREAM_MESSAGE}"){window.cv.stream(document.getElementById("cv-page"),d.html,false);document.documentElement.setAttribute("data-cv-stream",String(d.n||0))}
-if(d.type==="${PAGE_MESSAGE}"){var p=document.getElementById("cv-page");if(p.hasAttribute("data-cv-streaming"))window.cv.stream(p,d.html,true);else window.cv.morph(p,d.html,!!d.animate);document.documentElement.removeAttribute("data-cv-stream");document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
+if(d.type==="${PAGE_MESSAGE}"){var p=document.getElementById("cv-page");if(p.hasAttribute("data-cv-streaming")||p.hasAttribute("data-cv-streamed"))window.cv.stream(p,d.html,true);else window.cv.morph(p,d.html,!!d.animate);document.documentElement.removeAttribute("data-cv-stream");document.documentElement.setAttribute("data-cv-rev",String(d.rev||0))}});
 addEventListener("load",function(){parent.postMessage({type:"${PAGE_READY_MESSAGE}"},"*")});})();`;
 
 /**

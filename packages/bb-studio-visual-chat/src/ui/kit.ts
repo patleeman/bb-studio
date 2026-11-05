@@ -747,8 +747,11 @@ export function canvasKit(win?: unknown): CanvasKit {
     w.addEventListener("resize", () => { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 150); });
 
     // Scripts in the page run (innerHTML doesn't run them).
+    const ran = new WeakSet<Element>();
     const runScripts = (root: HTMLElement) => root.querySelectorAll("script").forEach((old) => {
+      if (ran.has(old)) return;
       const script = doc.createElement("script");
+      ran.add(script);
       for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
       script.textContent = old.textContent;
       old.replaceWith(script);
@@ -769,6 +772,7 @@ export function canvasKit(win?: unknown): CanvasKit {
     kit.morph = (rootArg: unknown, html: string, animate = true, options: { fit?: boolean; scripts?: boolean } = {}) => {
       const root = rootArg as HTMLElement;
       root.removeAttribute("data-cv-streaming");
+      root.removeAttribute("data-cv-streamed");
       const before = new Map<string, { r: DOMRect; html: string; clone: HTMLElement; parent: string | null; key: string | null }>();
       const sx = w.scrollX || 0, sy = w.scrollY || 0;
       if (animate) root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => {
@@ -834,6 +838,9 @@ export function canvasKit(win?: unknown): CanvasKit {
     // the same as last time is kept as it is on screen (its picture, chart and entrance carry on), an open
     // part keeps its element and takes the new children, and a part that's just finished comes in.
     const sourceOf = new WeakMap<Element, string>();
+    /** The finished streamed page on screen, to tell a later version that only adds pictures to it. */
+    let lastStreamed: string | null = null;
+    const withoutPictures = (html: string) => html.replace(/\sdata-(?:img|alt)\s*=\s*(?:"[^"]*"|'[^']*')/g, "");
     const innerOf = new WeakMap<Element, string>();
     const PENDING = "data-cv-pending", OPEN = "data-cv-open";
     kit.stream = (rootArg: unknown, html: string, final = false) => {
@@ -847,8 +854,12 @@ export function canvasKit(win?: unknown): CanvasKit {
       const sources = new Map<HTMLElement, string>();
       for (const el of parts) if (finished(el)) sources.set(el, el.outerHTML);
       if (!root.hasAttribute("data-cv-streaming")) {
-        // The finished page with no stream on screen: the usual morph.
-        if (final) { kit.morph!(root, html, true); return; }
+        // The finished page with no stream on screen: the usual morph, unless it's the streamed page again with
+        // only its pictures filled in, which updates in place (each picture fades in; nothing else moves).
+        const same = root.hasAttribute("data-cv-streamed") && lastStreamed !== null && withoutPictures(lastStreamed) === withoutPictures(html);
+        if (final && !same) { kit.morph!(root, html, true); return; }
+      }
+      if (!root.hasAttribute("data-cv-streaming") && !final) {
         // The stream's first version: from the board on screen, as a new version would.
         kit.morph!(root, html, root.childElementCount > 0, { fit: false, scripts: false });
         root.setAttribute("data-cv-streaming", "");
@@ -901,7 +912,7 @@ export function canvasKit(win?: unknown): CanvasKit {
         if (source !== undefined || el.hasAttribute(OPEN)) fresh.push(el);
       }
       root.replaceChildren(frag);
-      if (final) { root.removeAttribute("data-cv-streaming"); runScripts(root); }
+      if (final) { root.removeAttribute("data-cv-streaming"); root.setAttribute("data-cv-streamed", ""); lastStreamed = html; runScripts(root); }
       kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root, true);

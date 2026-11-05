@@ -92,12 +92,15 @@ hands-free button.
   its place), and an open part that holds finished parts shows them.
   Finished parts stay as they are on screen while the rest arrives, and
   found pictures go into the streamed cards as soon as `canvas_images`
-  returns. At idle the reply's final
-  text is committed: the html block becomes the page and a version, as
-  `canvas_page` would make it, and the words outside it the caption. The
-  finished page lands on the streamed one with no flash. If the turn ends
-  without a closing fence (or the final text is missing), what arrived is
-  committed, repaired; with no html at all the board stays and the reply is
+  returns. The moment the html block closes, it's committed as the page
+  and the turn's version, as `canvas_page` would make it, and the board is
+  final: the finished page lands on the streamed one with no flash, and
+  pictures that arrive after it fade into their cards in place. When the
+  thread goes idle, the caption (the reply's words outside the block) and
+  anything that changed since (pictures, patches) fill in that same version;
+  idle never adds a second one. If the turn ends without a closing fence
+  (or the final text is missing), what arrived is committed at idle,
+  repaired; with no html at all the board stays and the reply is
   the caption.
 - **Which way a page goes up:** a new or rewritten page is the html block in
   the reply; `canvas_patch` changes one part; `canvas_page` is for a message
@@ -148,7 +151,8 @@ hands-free button.
   it.
 - **Versions:** each turn's finished board is saved as a version: its
   page, style, title, the message that led to it and the caption (a page
-  still streaming and mid-turn patches aren't versions). ‹ › and "3 / 7" beside the chat
+  still streaming and mid-turn patches aren't versions; a streamed page is
+  saved when its block closes and completed at the turn's end). ‹ › and "3 / 7" beside the chat
   line page back and forward, with the same glide, and so do ← and → while
   the field is empty; hovering shows each version's message. A message
   sent from an old version continues from it: the board goes back to that

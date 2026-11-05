@@ -183,6 +183,29 @@ describe("streaming a page", () => {
   });
 });
 
+describe("the block closing", () => {
+  it("calls onClose once, at once (whatever the throttle), and publishes nothing after it", async () => {
+    const rows: EventRow[] = [];
+    const published: StreamUpdate[] = [];
+    const closed: string[] = [];
+    let clock = 0;
+    const stream = new PageStream({ tip: async () => 0, list: async (after) => rows.filter((row) => row.seq > after), publish: (update) => published.push(update), onClose: (page) => closed.push(page.html), now: () => clock });
+    rows.push(delta(1, "m", '```html\n<h1 data-cv-id="t">Hi</h1>\n<p data-cv-id="b">Bo'));
+    await stream.poll();
+    expect(published).toHaveLength(1);
+    rows.push(delta(2, "m", 'dy</p>\n```\nCaption.'));
+    clock += 10; // inside the throttle
+    await stream.poll();
+    expect(closed).toEqual(['<h1 data-cv-id="t">Hi</h1>\n<p data-cv-id="b">Body</p>']);
+    expect(stream.finished).toBe(true);
+    rows.push(delta(3, "m", " More words."));
+    clock += 1000;
+    await stream.poll();
+    expect(closed).toHaveLength(1);
+    expect(published).toHaveLength(1);
+  });
+});
+
 describe("stopping a stream", () => {
   it("reads once more and answers every stop the same; a halted stream doesn't read again", async () => {
     let reads = 0;

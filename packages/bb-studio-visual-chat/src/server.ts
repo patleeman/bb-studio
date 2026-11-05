@@ -16,7 +16,7 @@ import { canvasFirstNote, canvasInstructions, CANVAS_VOICE_NOTE } from "./instru
 import { DEFAULT_LOOK, lookOf } from "./looks";
 import { fillPictures } from "./page";
 import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADATA_KEY, CANVAS_STREAM_TYPE, CANVAS_UPDATE_TYPE, type CanvasExecution, type CanvasSignal, type CanvasStreamSignal, type PickerProvider } from "./shared";
-import { PageStream, STREAM_EVENT_TYPES, turnPage, type EventRow } from "./stream";
+import { PageStream, STREAM_EVENT_TYPES, turnPage, type EventRow, type TurnPage } from "./stream";
 import { CanvasStore, type CanvasActor } from "./store";
 import { ImageCache, type ImageDeps } from "./image";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
@@ -296,7 +296,8 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     },
   });
 
-  const status = (threadId: string, next: "working" | "idle" | "failed", reply?: string | null) => {
+  /** version: the turn's version saved already (a streamed page, at its fence): idle fills it in instead of adding one. */
+  const status = (threadId: string, next: "working" | "idle" | "failed", reply?: string | null, version: number | null = null) => {
     const row = store.byThread(threadId);
     if (!row) return;
     store.setStatus(row.id, next);
@@ -306,12 +307,15 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       store.note(row.id, "agent", reply.trim().slice(0, CANVAS_LIMITS.messageChars));
     }
     // The finished board is the turn's version (drafts and mid-turn patches never are).
-    if (next === "idle") { store.saveVersion(row.id, branchedFrom.get(row.id) ?? null); branchedFrom.delete(row.id); }
+    if (next === "idle" && version !== null) store.refreshVersion(row.id, version);
+    else if (next === "idle") { store.saveVersion(row.id, branchedFrom.get(row.id) ?? null); branchedFrom.delete(row.id); }
     publish(row.id);
   };
 
   // ─── Streaming: a page written in the reply builds on the page as it's written ───
-  const streams = new Map<string, { canvasId: string; n: number; stream: PageStream }>();
+  /** committed: the page committed when its block closed (its source, before pictures) and the version it made. */
+  type StreamEntry = { canvasId: string; n: number; stream: PageStream; committed: { source: string; version: number | null } | null };
+  const streams = new Map<string, StreamEntry>();
   const publishStream = (signal: CanvasStreamSignal) => {
     try { bb.realtime.publish(CANVAS_CHANNEL, signal); } catch { /* the page catches up at the end of the turn */ }
   };
@@ -322,7 +326,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     if (!row || streams.has(threadId)) return;
     let failures = 0;
     const startedAt = Date.now();
-    const entry = { canvasId: row.id, n: 0, stream: null as unknown as PageStream };
+    const entry: StreamEntry = { canvasId: row.id, n: 0, stream: null as unknown as PageStream, committed: null };
     entry.stream = new PageStream({
       tip: async () => (await events({ threadId, order: "desc", limit: "1" }))[0]?.seq ?? 0,
       list: async (after, limit) => {
@@ -345,6 +349,18 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
         if (style && now.look !== style) { store.edit(row.id, [{ op: "style", look: style, reason: null }], "agent"); publish(row.id); }
         publishStream({ type: CANVAS_STREAM_TYPE, canvasId: row.id, threadId: now.thread_id, n: ++entry.n, html });
       },
+      // The block closed: the page is finished, so it's committed now (and is the turn's version), not at turn end.
+      onClose: (page) => {
+        const before = store.get(row.id)?.rev ?? 0;
+        if (!commitPage(row.id, page.html, page.style, page.title)) return;
+        store.setCaption(row.id, null); // the caption comes with the end of the turn
+        const version = store.saveVersion(row.id, branchedFrom.get(row.id) ?? null);
+        branchedFrom.delete(row.id);
+        entry.committed = { source: page.html.trim(), version };
+        const now = store.get(row.id)!;
+        publish(row.id);
+        publishStream({ type: CANVAS_STREAM_TYPE, canvasId: row.id, threadId: now.thread_id ?? threadId, n: ++entry.n, done: true, rev: now.rev > before ? now.rev : null });
+      },
       onError: () => {},
       ...(options.streamIntervalMs !== undefined ? { intervalMs: options.streamIntervalMs } : {}),
     });
@@ -362,28 +378,47 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
    * At the end of a turn: a page in the reply (or, failing that, what streamed of one) becomes the board, as
    * canvas_page would make it. Returns the caption: the words outside the page, else the reply.
    */
-  const commitReplyPage = (canvasId: string, reply: string | null, streamed: string | null): string | null => {
-    const turn = turnPage(reply, streamed);
-    if (!turn.html) return turn.caption;
+  /** A page from the reply becomes the board, as canvas_page would make it (its style, found pictures, title). */
+  const commitPage = (canvasId: string, html: string, style: TurnPage["style"], title: string | null): boolean => {
     try {
-      if (turn.style && store.get(canvasId)?.look !== turn.style) store.edit(canvasId, [{ op: "style", look: turn.style, reason: null }], "agent");
-      store.setPage(canvasId, fillPictures(turn.html, store.pictures(canvasId)).html, "agent", turn.title);
+      if (style && store.get(canvasId)?.look !== style) store.edit(canvasId, [{ op: "style", look: style, reason: null }], "agent");
+      store.setPage(canvasId, fillPictures(html.trim(), store.pictures(canvasId)).html, "agent", title);
+      return true;
     } catch (error) {
       bb.log.warn(`Visual Chat couldn't use the page in the reply: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     }
+  };
+  /**
+   * At the end of a turn: a page in the reply (or, failing that, what streamed of one) becomes the board, as
+   * canvas_page would make it. Returns the caption: the words outside the page, else the reply.
+   */
+  const commitReplyPage = (canvasId: string, reply: string | null, streamed: string | null): string | null => {
+    const turn = turnPage(reply, streamed);
+    if (turn.html) commitPage(canvasId, turn.html, turn.style, turn.title);
     return turn.caption;
   };
   const endTurn = async (threadId: string, next: "idle" | "failed", reply: string | null) => {
     const streamed = await stopStream(threadId);
     const row = store.byThread(threadId);
     if (!row) return;
+    const committed = streamed?.entry.committed ?? null;
     const fenced = /(^|\n)[ \t]*(`{3,}|~{3,})[ \t]*html\b/i;
     const hasPage = (reply && fenced.test(reply)) || (streamed && fenced.test(streamed.text));
     const before = store.get(row.id)?.rev ?? 0;
-    const caption = hasPage ? commitReplyPage(row.id, next === "idle" ? reply : null, streamed?.text ?? null) : reply;
+    let caption: string | null;
+    if (committed) {
+      // The page went up when its block closed; pictures and patches since are on it. The turn's end brings the
+      // caption, and a page rewritten after that block (a second block) replaces it.
+      const turn = turnPage(next === "idle" ? reply : null, streamed!.text);
+      if (turn.complete && turn.html && turn.html !== committed.source) commitPage(row.id, turn.html, turn.style, turn.title);
+      caption = turn.caption;
+    } else {
+      caption = hasPage ? commitReplyPage(row.id, next === "idle" ? reply : null, streamed?.text ?? null) : reply;
+    }
     // A new turn started while this one was finishing: it's working again.
-    status(threadId, streams.has(threadId) ? "working" : next, next === "idle" ? caption : null);
-    if (streamed) {
+    status(threadId, streams.has(threadId) ? "working" : next, next === "idle" ? caption : null, committed?.version ?? null);
+    if (streamed && !committed) {
       const rev = store.get(row.id)?.rev ?? 0;
       const now = store.get(row.id);
       publishStream({ type: CANVAS_STREAM_TYPE, canvasId: row.id, threadId: now?.thread_id ?? threadId, n: streamed.entry.n + 1, done: true, rev: rev > before ? rev : null });
