@@ -100,11 +100,14 @@ hands-free button.
   (**Settings → Plugins → BB Studio Visual Chat**, or `bb plugin config
   studio-visual-chat`). It's only sent to Exa: never logged, returned or put in
   an error. Without it, pictures come from Wikipedia.
-- **Tool loading on Claude Code:** Claude Code defers plugin tools behind
-  its tool search, and BB gives a plugin no way to have them loaded up front
-  (the SDK's `registerTool` has no such option, and BB's `bb-bridge` MCP
-  server sets no `alwaysLoad`). So on Claude Code the instructions name the
-  exact tools, and loading them is one `select:` call.
+- **Tool loading on Claude Code:** Claude Code defers every plugin tool
+  behind its tool search unless `ENABLE_TOOL_SEARCH` says otherwise, which
+  cost each turn a ToolSearch round. On its own threads only, Visual Chat
+  sets `ENABLE_TOOL_SEARCH=auto` (through the SDK's
+  `bb.providers.experimental_contributeEnv`), so tools load up front while
+  their definitions stay under 10% of the context window, and Studio gives
+  these threads none of its tools. Above the threshold Claude Code defers
+  them after all; the instructions then name the exact `select:` query.
 - **Styles:** Editorial (a magazine spread), Field notes (a designer's
   whiteboard) and Instrument (a control room) are token sets. The agent
   picks one per board, a style you ask for wins, and the top bar shows it.

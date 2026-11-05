@@ -32,11 +32,11 @@ export const CANVAS_TOOL_SEARCH_ENV = { name: "ENABLE_TOOL_SEARCH", value: "auto
 export const CLAUDE_CODE_CANVAS_TOOLS = ["canvas_page", "canvas_images", "canvas_patch", "canvas_read"].map((name) => `mcp__bb-bridge__${name}`);
 
 /**
- * Claude Code defers plugin tools behind its tool search, and BB gives a plugin no way to have them loaded up front
- * (the bridge's MCP server sets no alwaysLoad, and a registered tool has no such option). So the agent is told
- * the exact names, and loading them is one quick select instead of a search.
+ * Visual Chat has Claude Code load the canvas tools up front (CANVAS_TOOL_SEARCH_ENV), so the agent calls them
+ * directly; telling it to search first made it search even when they were loaded. Above the threshold they're
+ * deferred after all, and then loading them is one quick select instead of a search.
  */
-export const TOOL_LOADING_LINE = `If the canvas tools are deferred, load them all in ONE tool search before anything else, with exactly this query: select:${CLAUDE_CODE_CANVAS_TOOLS.join(",")}`;
+export const TOOL_LOADING_LINE = `The canvas tools are loaded up front here: call canvas_page and canvas_images directly, with no tool search. Only if canvas_page is listed as deferred (not callable), load them all in ONE tool search first, with exactly this query: select:${CLAUDE_CODE_CANVAS_TOOLS.join(",")}`;
 
 /** The configure hook's instructions for a canvas in this look; on Claude Code, how to load the tools. */
 export function canvasInstructions(look: Look, providerId?: string | null): string {
