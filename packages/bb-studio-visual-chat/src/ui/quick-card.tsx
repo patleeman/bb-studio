@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { openAppPath } from "./studio";
 import { CanvasPage, type CardProps } from "./route";
-import { cardRect, geometryOf, loadGeometry, movedRect, resizedRect, saveGeometry, type Edge, type Rect, type Viewport } from "./quick-geometry";
+import { COMPOSER_SELECTOR, geometryOf, loadGeometry, movedRect, placeCard, resizedRect, saveGeometry, type Edge, type Rect, type Viewport } from "./quick-geometry";
 import type { QuickStore } from "./quick-store";
 
 const readViewport = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
@@ -26,6 +26,40 @@ const HANDLES: { edge: Edge; className: string }[] = [
   { edge: { x: -1, y: 1 }, className: "bottom-0 left-0 size-3 cursor-nesw-resize" },
 ];
 
+const sameRects = (a: readonly Rect[], b: readonly Rect[]) => a.length === b.length && a.every((each, i) => each.left === b[i]!.left && each.top === b[i]!.top && each.width === b[i]!.width && each.height === b[i]!.height);
+
+/**
+ * BB's composers on screen, measured (read-only) while the card sits in its
+ * default place, so it stays above them as they grow, shrink or come and go.
+ */
+function useComposerRects(enabled: boolean): Rect[] {
+  const [rects, setRects] = useState<Rect[]>([]);
+  useEffect(() => {
+    if (!enabled) return;
+    const observer = new ResizeObserver(() => measure());
+    let watched: Element[] = [];
+    function measure() {
+      const found = [...document.querySelectorAll<HTMLElement>(COMPOSER_SELECTOR)].filter((each) => !each.closest("[data-canvas-card]"));
+      if (found.length !== watched.length || found.some((each, i) => each !== watched[i])) {
+        observer.disconnect();
+        for (const each of found) observer.observe(each);
+        watched = found;
+      }
+      const next = found.map((each) => {
+        const r = each.getBoundingClientRect();
+        return { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+      }).filter((each) => each.width > 0 && each.height > 0);
+      setRects((now) => (sameRects(now, next) ? now : next));
+    }
+    measure();
+    // A composer can mount or unmount under the card (another page opens): look again now and then.
+    const timer = window.setInterval(measure, 1000);
+    window.addEventListener("resize", measure);
+    return () => { window.clearInterval(timer); window.removeEventListener("resize", measure); observer.disconnect(); };
+  }, [enabled]);
+  return rects;
+}
+
 /** Movement below this is a click, not a drag. */
 const DRAG_THRESHOLD = 3;
 
@@ -33,10 +67,15 @@ export function QuickCard({ store, threadId }: { store: QuickStore; threadId: st
   const root = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const [viewport, setViewport] = useState(readViewport);
+  // null until the user moves or resizes it: then it sits in its default place, above the composer.
   const [geometry, setGeometry] = useState(loadGeometry);
+  const composers = useComposerRects(geometry === null);
   // While dragging or resizing: the rectangle under the pointer.
   const [moving, setMoving] = useState<Rect | null>(null);
-  const rect = moving ?? cardRect(geometry, viewport);
+  const placed = placeCard(geometry, viewport, composers);
+  const rect = moving ?? placed;
+  const shown = useRef(placed);
+  shown.current = placed;
 
   // Kept on screen as the window changes size.
   useEffect(() => {
@@ -57,7 +96,7 @@ export function QuickCard({ store, threadId }: { store: QuickStore; threadId: st
   /** Follows the pointer from `start` until it's released, then keeps the result. */
   const track = useCallback((event: ReactPointerEvent<HTMLElement>, next: (start: Rect, dx: number, dy: number, viewport: Viewport) => Rect, sized: boolean) => {
     if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
-    const start = cardRect(geometry, readViewport());
+    const start = shown.current;
     const origin = { x: event.clientX, y: event.clientY };
     let last: Rect | null = null;
     const onMove = (move: PointerEvent) => {
@@ -73,7 +112,7 @@ export function QuickCard({ store, threadId }: { store: QuickStore; threadId: st
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
       if (!last) return;
-      const kept = geometryOf(last, readViewport(), sized || geometry.width !== null);
+      const kept = geometryOf(last, readViewport(), sized || (geometry?.width ?? null) !== null);
       saveGeometry(kept);
       setGeometry(kept);
       setMoving(null);

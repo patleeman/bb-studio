@@ -5,6 +5,10 @@
 // the user has resized it; until then it follows the window (about 40% of
 // it). Each window remembers its own (sessionStorage); a new window starts
 // from the last one saved anywhere (localStorage).
+// Until it's been moved or resized, the card sits bottom right but above
+// any BB composer under it (BB marks each with data-app-composer), so it
+// never covers the thread's composer; with no composer on screen it keeps
+// a safe margin from the bottom. Where the user put it always wins.
 
 export interface Viewport { width: number; height: number }
 export interface Rect { left: number; top: number; width: number; height: number }
@@ -24,6 +28,12 @@ export const MIN_WIDTH = 340;
 export const MIN_HEIGHT = 320;
 /** Bottom right, sized to the window. */
 export const DEFAULT_GEOMETRY: QuickGeometry = { x: 1, y: 1, width: null, height: null };
+/** The space between the card and the top of a composer it sits above. */
+export const COMPOSER_GAP = 12;
+/** How far above the window's bottom the card's default place ends when no composer is on screen. */
+export const SAFE_BOTTOM = 72;
+/** BB's composers (its own APP_COMPOSER_SELECTOR); a follow-up composer's queue banner is inside it. */
+export const COMPOSER_SELECTOR = "[data-app-composer]";
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const clamp01 = (value: number) => (Number.isFinite(value) ? clamp(value, 0, 1) : 1);
@@ -50,6 +60,28 @@ export function cardRect(geometry: QuickGeometry, viewport: Viewport): Rect {
   const freeW = Math.max(0, viewport.width - 2 * MARGIN - width);
   const freeH = Math.max(0, viewport.height - 2 * MARGIN - height);
   return { left: Math.round(MARGIN + clamp01(geometry.x) * freeW), top: Math.round(MARGIN + clamp01(geometry.y) * freeH), width, height };
+}
+
+/**
+ * The card's place before the user has moved or resized it: bottom right,
+ * ending above the highest composer it would overlap (`composers`, their
+ * rectangles on screen), else SAFE_BOTTOM above the window's bottom. It
+ * gets shorter to fit, down to its minimum.
+ */
+export function defaultRect(viewport: Viewport, composers: readonly Rect[]): Rect {
+  const base = cardRect(DEFAULT_GEOMETRY, viewport);
+  const visible = composers.filter((each) => each.width > 0 && each.height > 0 && each.top < viewport.height && each.top + each.height > 0);
+  const under = visible.filter((each) => each.left < base.left + base.width && each.left + each.width > base.left);
+  const minH = Math.min(MIN_HEIGHT, Math.max(0, viewport.height - 2 * MARGIN));
+  const floor = under.length ? Math.min(...under.map((each) => each.top)) - COMPOSER_GAP : visible.length ? viewport.height - MARGIN : viewport.height - SAFE_BOTTOM;
+  const bottom = clamp(Math.round(floor), MARGIN + minH, viewport.height - MARGIN);
+  const height = clamp(base.height, minH, bottom - MARGIN);
+  return { left: base.left, top: bottom - height, width: base.width, height };
+}
+
+/** Where the card goes: where the user put it (`saved`), else its default place above the composers. */
+export function placeCard(saved: QuickGeometry | null, viewport: Viewport, composers: readonly Rect[]): Rect {
+  return saved ? cardRect(saved, viewport) : defaultRect(viewport, composers);
 }
 
 /** The geometry to keep for a rectangle on screen; `sized`: the user has resized it, so its size is kept too. */
@@ -108,15 +140,15 @@ function parse(raw: string | null): QuickGeometry | null {
   }
 }
 
-/** This window's geometry, else the last one saved in any window, else bottom right. */
-export function loadGeometry(storages: StorageLike[] = stores()): QuickGeometry {
+/** This window's geometry, else the last one saved in any window; null: never moved or resized (the default place). */
+export function loadGeometry(storages: StorageLike[] = stores()): QuickGeometry | null {
   for (const storage of storages) {
     try {
       const found = parse(storage.getItem(QUICK_GEOMETRY_KEY));
       if (found) return found;
     } catch { /* storage off */ }
   }
-  return DEFAULT_GEOMETRY;
+  return null;
 }
 
 export function saveGeometry(geometry: QuickGeometry, storages: StorageLike[] = stores()): void {

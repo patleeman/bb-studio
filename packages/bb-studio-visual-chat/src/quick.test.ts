@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QUICK_COMMAND_ID, QUICK_COMMAND_TITLE, QUICK_SHORTCUT, registerQuickCard } from "./quick-app";
 import { createQuickStore, expandHref, neighborChats } from "./ui/quick-store";
-import { cardRect, DEFAULT_GEOMETRY, geometryOf, loadGeometry, MARGIN, MIN_HEIGHT, MIN_WIDTH, movedRect, QUICK_GEOMETRY_KEY, resizedRect, saveGeometry } from "./ui/quick-geometry";
+import { cardRect, COMPOSER_GAP, DEFAULT_GEOMETRY, defaultRect, geometryOf, loadGeometry, MARGIN, MIN_HEIGHT, MIN_WIDTH, movedRect, placeCard, QUICK_GEOMETRY_KEY, resizedRect, SAFE_BOTTOM, saveGeometry } from "./ui/quick-geometry";
 import { canvasHref, canvasNewHref } from "./shared";
 
 const memory = () => {
@@ -94,6 +94,38 @@ describe("the quick card's place and size", () => {
     expect(rect.top + rect.height).toBe(view.height - MARGIN);
   });
 
+  it("starts above the thread's composer, never over it", () => {
+    // A thread's composer (with its queue banner), bottom center, under the card's corner.
+    const composer = { left: 596, top: 730, width: 720, height: 226 };
+    const rect = defaultRect(view, [composer]);
+    expect(rect.left + rect.width).toBe(view.width - MARGIN);
+    expect(rect.top + rect.height).toBe(composer.top - COMPOSER_GAP);
+    expect(rect.height).toBe(700);
+    // A taller composer (a long draft): the card gets shorter to stay above it.
+    const tall = defaultRect(view, [{ ...composer, top: 420, height: 536 }]);
+    expect(tall.top + tall.height).toBe(420 - COMPOSER_GAP);
+    expect(tall).toMatchObject({ top: MARGIN, height: 420 - COMPOSER_GAP - MARGIN });
+    // In a narrow window the composer spans the width: still above it.
+    const narrowView = { width: 760, height: 900 };
+    const narrow = defaultRect(narrowView, [{ left: 16, top: 800, width: 728, height: 84 }]);
+    expect(narrow.top + narrow.height).toBeLessThanOrEqual(800 - COMPOSER_GAP);
+    expect(narrow.top).toBeGreaterThanOrEqual(MARGIN);
+    // Hidden composers (zero size) and ones beside the card don't move it.
+    expect(defaultRect(view, [{ left: 0, top: 0, width: 0, height: 0 }, { left: 60, top: 700, width: 400, height: 200 }])).toEqual(cardRect(DEFAULT_GEOMETRY, view));
+  });
+
+  it("keeps a safe bottom margin with no composer on screen, and where the user put it wins", () => {
+    const rect = defaultRect(view, []);
+    expect(rect.top + rect.height).toBe(view.height - SAFE_BOTTOM);
+    expect(rect.left + rect.width).toBe(view.width - MARGIN);
+    const composer = { left: 596, top: 730, width: 720, height: 226 };
+    expect(placeCard(null, view, [composer])).toEqual(defaultRect(view, [composer]));
+    // Dragged to the bottom right corner by hand: it stays there, composer or not.
+    const saved = { x: 1, y: 1, width: null, height: null };
+    expect(placeCard(saved, view, [composer])).toEqual(cardRect(saved, view));
+    expect(placeCard(saved, view, [composer]).top + 700).toBe(view.height - MARGIN);
+  });
+
   it("keeps its corner and stays on screen when the window resizes", () => {
     const moved = movedRect(cardRect(DEFAULT_GEOMETRY, view), -2000, -2000, view);
     expect(moved).toMatchObject({ left: MARGIN, top: MARGIN });
@@ -119,14 +151,15 @@ describe("the quick card's place and size", () => {
   it("remembers its position and size, this window's first, then the last one saved anywhere", () => {
     const session = memory();
     const local = memory();
-    expect(loadGeometry([session, local])).toEqual(DEFAULT_GEOMETRY);
+    // Never moved or resized: null, the default place.
+    expect(loadGeometry([session, local])).toBeNull();
     saveGeometry({ x: 0.25, y: 0.5, width: 500, height: 600 }, [session, local]);
     expect(loadGeometry([session, local])).toEqual({ x: 0.25, y: 0.5, width: 500, height: 600 });
     // A new window has no session entry yet: it starts where the last one was.
     expect(loadGeometry([memory(), local])).toEqual({ x: 0.25, y: 0.5, width: 500, height: 600 });
     // A corrupt or partial entry falls back.
     local.setItem(QUICK_GEOMETRY_KEY, "{nope");
-    expect(loadGeometry([memory(), local])).toEqual(DEFAULT_GEOMETRY);
+    expect(loadGeometry([memory(), local])).toBeNull();
     local.setItem(QUICK_GEOMETRY_KEY, JSON.stringify({ x: 3, y: -1, width: 500 }));
     expect(loadGeometry([memory(), local])).toEqual({ x: 1, y: 0, width: null, height: null });
   });
