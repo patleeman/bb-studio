@@ -61,7 +61,7 @@ describe("the Visual Chat: Ask command", () => {
     expect(overlays.map((overlay) => overlay.id)).toEqual(["quick-card"]);
     expect(commands).toHaveLength(1);
     const [command] = commands;
-    expect(command).toMatchObject({ id: QUICK_COMMAND_ID, title: QUICK_COMMAND_TITLE, defaultShortcut: { key: "Space", mod: true, shift: true } });
+    expect(command).toMatchObject({ id: QUICK_COMMAND_ID, title: QUICK_COMMAND_TITLE, defaultShortcut: { key: "Space", control: true, shift: true } });
     command!.run({});
     expect(store.get()).toMatchObject({ open: true, session: 1, threadId: null });
     command!.run({});
@@ -70,15 +70,28 @@ describe("the Visual Chat: Ask command", () => {
     expect(store.get()).toMatchObject({ open: true, session: 2, threadId: null });
   });
 
-  it("has a default shortcut none of BB's or Studio's defaults use", () => {
-    // BB's defaults with Mod (apps/server/src/services/system/app-keybindings.ts) and Studio's search (Mod+Shift+K).
-    const taken = [
-      { key: "k", mod: true }, { key: "k", mod: true, shift: true }, { key: "p", mod: true, shift: true }, { key: "o", mod: true, shift: true },
-      { key: "e", mod: true, shift: true }, { key: "x", mod: true, shift: true }, { key: "[", mod: true, shift: true }, { key: "]", mod: true, shift: true },
-      { key: "p", mod: true }, { key: "n", mod: true }, { key: "j", mod: true }, { key: "t", mod: true }, { key: "w", mod: true },
+  it("has a default shortcut none of BB's or Studio's defaults use, on any platform", () => {
+    type Shortcut = { key: string; mod?: boolean; meta?: boolean; control?: boolean; alt?: boolean; shift?: boolean };
+    const digits = "123456789".split("");
+    const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    // BB's defaults (apps/server/src/services/system/app-keybindings.ts), its desktop menu
+    // (apps/desktop/src/desktop-menu-shortcuts.ts, menu.ts), and Studio's search (Mod+Shift+K).
+    const taken: Shortcut[] = [
+      ...["[", "]", "k", "n", "p", "j", "t", "w", "o", ",", "\\", "0", "=", "-", "r", "f", "l", "d"].map((key) => ({ key, mod: true })),
+      ...["p", "o", "e", "x", "[", "]", "k", "t", "n", "r", "c", "m"].map((key) => ({ key, mod: true, shift: true })),
+      ...["[", "]"].map((key) => ({ key, control: true, shift: true })),
+      ...["m", "p", "t"].flatMap((key) => [{ key, alt: true }, { key, alt: true, shift: true }]),
+      ...digits.flatMap((key) => [{ key, control: true }, { key, mod: true }, { key, mod: true, shift: true }]),
+      ...arrows.flatMap((key) => [{ key, mod: true, control: true }, { key, mod: true, control: true, shift: true }]),
+      { key: "Escape" }, { key: "Enter", mod: true },
     ];
-    const same = (a: { key: string; mod?: boolean; shift?: boolean; alt?: boolean }, b: typeof a) => a.key.toLowerCase() === b.key.toLowerCase() && !!a.mod === !!b.mod && !!a.shift === !!b.shift && !!a.alt === !!b.alt;
-    expect(taken.some((each) => same(each, QUICK_SHORTCUT))).toBe(false);
+    // Mod is ⌘ on macOS and Ctrl elsewhere, so compare what each platform's keyboard sends.
+    const resolve = (each: Shortcut, mac: boolean) => ({ key: each.key.toLowerCase(), meta: !!each.meta || (!!each.mod && mac), control: !!each.control || (!!each.mod && !mac), alt: !!each.alt, shift: !!each.shift });
+    for (const mac of [true, false]) {
+      const ours = JSON.stringify(resolve(QUICK_SHORTCUT, mac));
+      expect(taken.filter((each) => JSON.stringify(resolve(each, mac)) === ours)).toEqual([]);
+    }
+    expect(QUICK_SHORTCUT).toEqual({ key: "Space", control: true, shift: true });
   });
 });
 

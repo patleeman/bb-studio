@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Visual Chat quick card: a recording of real use, and stills. In a staged
- * BB, from a thread page: press Visual Chat: Ask's shortcut (Mod+Shift+Space),
+ * BB, from a thread page: press Visual Chat: Ask's shortcut (Control+Shift+Space),
  * type a quick question, watch the board stream into the card (a real agent
  * turn on the canvas default model), press Esc, summon it again (a fresh
  * chat), press ‹ to step back to the chat before, and press Expand.
@@ -71,9 +71,8 @@ async function press(key, code, keyCode, modifiers = 0) {
   await tab.command("Input.dispatchKeyEvent", { type: "rawKeyDown", ...base });
   await tab.command("Input.dispatchKeyEvent", { type: "keyUp", ...base });
 }
-/** Visual Chat: Ask's default shortcut, Mod+Shift+Space (⌘ on macOS, Ctrl elsewhere). */
-const isMac = await tab.poll("/Mac/.test(navigator.platform)");
-const summon = () => press(" ", "Space", 32, (isMac ? 4 : 2) | 8);
+/** Visual Chat: Ask's default shortcut, Control+Shift+Space. */
+const summon = () => press(" ", "Space", 32, 2 | 8);
 const escape = () => press("Escape", "Escape", 27);
 const card = (expression) => tab.poll(`(() => { const card = document.querySelector("[data-canvas-card]"); return ${expression}; })()`);
 const openCard = (thread) => until(() => card(`card && card.contains(document.activeElement) && document.activeElement.matches("[data-canvas-input]") ? card.getAttribute("data-thread") : null`), (value) => value === thread, 30_000, `the card on ${thread}`);

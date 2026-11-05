@@ -38,7 +38,7 @@ hands-free button.
 
 ## Quick card
 
-For a quick question from anywhere in BB, press **⌘⇧Space** (Ctrl+Shift+Space
+For a quick question from anywhere in BB, press **⌃⇧Space** (Ctrl+Shift+Space
 on Windows and Linux), or run **Visual Chat: Ask** from the command palette. A
 card opens over the page, bottom right, with the field focused. Until you
 move it, it sits above the thread's composer (it never covers it), or a little
@@ -64,7 +64,9 @@ or Esc, to close it.
 - It's a non-modal dialog: focus moves into the field on open and back where
   it was on close. While closed, it renders nothing and takes no keys.
 - **The shortcut** doesn't clash with BB's defaults (⌘K is BB's thread search,
-  ⌘⇧P the palette) or Studio's (⌘⇧K is Studio's search). Rebind it in
+  ⌘⇧P the palette) or Studio's (⌘⇧K is Studio's search). It also stays clear
+  of common macOS ones: ⌘Space (Spotlight or Raycast), ⌥Space (the ChatGPT
+  and Claude apps) and ⌘⇧Space (1Password's Quick Access). Rebind it in
   **Settings → Keyboard**.
 
 ## How it works
