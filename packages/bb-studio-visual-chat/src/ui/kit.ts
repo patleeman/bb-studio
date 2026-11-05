@@ -715,6 +715,8 @@ export function canvasKit(win?: unknown): CanvasKit {
     kit.fit = (rootArg?: unknown) => {
       const root = (rootArg as HTMLElement | undefined) ?? doc.getElementById("cv-page");
       if (!root) return 1;
+      // A page still being written is short by nature: it's fitted once it's finished, so it never jumps.
+      if (root.hasAttribute("data-cv-streaming")) { root.style.zoom = ""; return 1; }
       root.style.zoom = "";
       const view = kit.viewport!();
       const roomW = view.width - 24, roomH = view.height - 24;
