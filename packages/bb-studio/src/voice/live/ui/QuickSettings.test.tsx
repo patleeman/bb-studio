@@ -16,7 +16,7 @@ vi.mock("../../../kit/ui", async (importOriginal) => ({
 import { HandsFreeQuickSettings, VOICE_SETTINGS_PATH } from "./QuickSettings";
 import { takeVoiceSectionRequest } from "../../../settings/ui/voice-anchor";
 
-const STATE: VoiceLiveState = { ready: true, problem: null, cosName: "Dot", monthUsd: 3.42, capUsd: 20, model: "gpt-live-1", voice: "marin", backendModel: "gpt-5.6-luna" };
+const STATE: VoiceLiveState = { interviewMonthUsd: 0, interviewCapUsd: 100, interviewProblem: null, ready: true, problem: null, cosName: "Dot", monthUsd: 3.42, capUsd: 20, model: "gpt-live-1", voice: "marin", backendModel: "gpt-5.6-luna" };
 
 let root: Root;
 let host: HTMLDivElement;

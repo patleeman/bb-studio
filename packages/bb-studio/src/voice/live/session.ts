@@ -14,6 +14,7 @@
 // - Realtime (the fallback): POST /v1/realtime/client_secrets mints a short
 //   secret with the whole session; the phone POSTs its SDP to /v1/realtime/calls.
 //   https://developers.openai.com/api/docs/guides/realtime-webrtc
+import { interviewInstructions, type InterviewPack } from "./interview";
 import type { VoiceIdentity } from "./identity";
 import { DEFAULT_BACKEND_MODEL, DEFAULT_VOICE, type LiveModel, type VoiceToolName } from "./shared";
 import { DRAFT_MS, UNDO_MS, VOICE_SNOOZES } from "./rules";
@@ -31,7 +32,7 @@ const seconds = (ms: number) => Math.round(ms / 1000);
  * the Chief of Staff's name. `canvasNote`: the launching thread backs a
  * canvas (the Canvas plugin), which says how the voice edits its board.
  */
-export interface VoicePersona { identity: VoiceIdentity; seed: string; cosName: string; canvasNote?: string | null }
+export interface VoicePersona { identity: VoiceIdentity; seed: string; cosName: string; canvasNote?: string | null; interview?: InterviewPack; resume?: string }
 
 /** The opening: who it is, and where what it can't answer goes. */
 function who({ identity, cosName }: VoicePersona): string {
@@ -44,6 +45,7 @@ function who({ identity, cosName }: VoicePersona): string {
 
 /** What the voice is told: who it is, the rules (which Studio enforces anyway), then its seed as data. */
 export function voiceInstructions(persona: VoicePersona): string {
+  if (persona.interview) return interviewInstructions(persona.interview, persona.resume);
   const { cosName } = persona;
   const home = persona.identity.kind === "cos" ? "your chat" : `"${persona.identity.name}"`;
   return `${who(persona)}
@@ -100,6 +102,15 @@ export const VOICE_TOOL_DEFINITIONS: ToolDefinition[] = [
   { type: "function", name: "cancel", description: "Drop a destructive action that's waiting: the user said no or changed their mind.", parameters: object({ action_id: { type: "string" } }, ["action_id"]) },
 ];
 
+export const INTERVIEW_TOOL_DEFINITIONS: ExtraTool[] = [
+  { type: "function", name: "interview_clock", description: "Elapsed and remaining time, current stage and next stage.", parameters: object({}) },
+  { type: "function", name: "read_drawing", description: "Read the latest or named Studio drawing as a compact text graph.", parameters: object({ name: { type: "string" } }) },
+  { type: "function", name: "note_evidence", description: "Append an observed fact and optional verbatim quote to the evidence log.", parameters: object({ dimension: { type: "string", enum: ["requirements", "numbers", "API and data model", "high-level design", "deep dive", "failure handling", "communication"] }, observation: { type: "string" }, quote: { type: "string" } }, ["dimension", "observation"]) },
+  { type: "function", name: "end_interview", description: "End the interview and write its scorecard Page.", parameters: object({}) },
+  { type: "function", name: "end", description: "Hang up and write the scorecard.", parameters: object({}) },
+  { type: "function", name: "cancel", description: "Cancel the interview and hang up.", parameters: object({}) },
+];
+
 /** POST /v1/live/sessions: GPT-Live over WebRTC, its backend a Responses model with Studio's tools. */
 export function liveSessionRequest(input: { persona: VoicePersona; sdp: string; voice?: string; backendModel?: string; extraTools?: readonly ExtraTool[] }) {
   return {
@@ -113,7 +124,7 @@ export function liveSessionRequest(input: { persona: VoicePersona; sdp: string; 
           // GPT-Live's backend: cheap and fast by default; it only picks tools and words replies.
           model: input.backendModel ?? DEFAULT_BACKEND_MODEL,
           instructions: backendInstructions(input.persona),
-          tools: [...VOICE_TOOL_DEFINITIONS, ...(input.extraTools ?? [])],
+          tools: input.persona.interview ? INTERVIEW_TOOL_DEFINITIONS : [...VOICE_TOOL_DEFINITIONS, ...(input.extraTools ?? [])],
           tool_choice: "auto",
           // One at a time: a confirm must land after its draft.
           parallel_tool_calls: false,
@@ -143,7 +154,7 @@ export function realtimeSecretRequest(input: { persona: VoicePersona; voice?: st
         },
         output: { voice: input.voice ?? DEFAULT_VOICE },
       },
-      tools: [...VOICE_TOOL_DEFINITIONS, ...(input.extraTools ?? [])],
+      tools: input.persona.interview ? INTERVIEW_TOOL_DEFINITIONS : [...VOICE_TOOL_DEFINITIONS, ...(input.extraTools ?? [])],
       tool_choice: "auto",
     },
   };

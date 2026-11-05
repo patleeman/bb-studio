@@ -1,4 +1,6 @@
-import { writeFileSync } from "node:fs";
+import { DIMENSIONS, parsePack, drawingGraph, interviewClock } from "./interview";
+import { INTERVIEW_TOOL_DEFINITIONS } from "./session";
+import { readFileSync, writeFileSync } from "node:fs";
 import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../../migrations";
@@ -516,7 +518,7 @@ describe("hands-free voice's settings: the next session's model, voice, backend 
 
   it("defaults to today's values: gpt-live-1, marin, gpt-5.6-luna and $20, with plain labels", () => {
     expect(Object.fromEntries(Object.entries(VOICE_LIVE_SETTINGS).map(([key, spec]) => [key, spec.default]))).toEqual({
-      voiceLiveModel: "gpt-live-1", voiceLiveVoice: "marin", voiceLiveBackendModel: "gpt-5.6-luna", voiceLiveMonthlyCapUsd: 20,
+      voiceLiveModel: "gpt-live-1", voiceLiveVoice: "marin", voiceLiveBackendModel: "gpt-5.6-luna", voiceLiveMonthlyCapUsd: 20, voiceInterviewScorecardModel: "gpt-5.6-sol", voiceInterviewMonthlyCapUsd: 100,
     });
     // Studio settings in its Voice section, with plain labels (no "Hands-free voice:" prefix).
     for (const spec of Object.values(VOICE_LIVE_SETTINGS)) { expect(spec.group).toBe("voice"); expect(spec.label).not.toMatch(/:/); }
@@ -782,5 +784,105 @@ describe("a session launched from a canvas thread (the Canvas plugin)", () => {
     const { sessionId } = await live.start({ sdp: "v=0 offer", threadId: "thr_elsewhere" });
     expect(await live.tool(sessionId, "canvas_add", "{}")).toContain("There's no tool named");
     expect(runs).toEqual([]);
+  });
+});
+
+
+const PACK_TEXT = readFileSync(new URL("./fixtures/rate-limiter.md", import.meta.url), "utf8");
+const PACK = { id: "pg_pack", title: "LLM API rate limiter", parentId: "pg_parent", markdown: PACK_TEXT, tagged: true };
+const SCORE = { dimensions: DIMENSIONS.map(dimension => ({ dimension, score: 2, label: "weak", evidence: ['"I would use Redis."'] })), overall: "A partial design.", topFixes: ["Estimate QPS", "Define keys", "Explain store failure"], strongAnswer: "Reserve and settle tokens; account for region drift.", timeManagement: "Spent too long on the store." };
+function interviewSetup(fail = false, cap = 100) {
+  const page = vi.fn(async (_input: { title: string; parentId: string | null; markdown: string }) => "pg_score");
+  const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url.endsWith('/responses')) return new Response(JSON.stringify(fail ? { error: { message: "model unavailable" } } : { output: [{ content: [{ type: "output_text", text: JSON.stringify(SCORE) }] }], usage: { input_tokens: 1000, output_tokens: 100 } }), { status: fail ? 503 : 200 });
+    return new Response(JSON.stringify({ session: { id: "live_new" }, transport: { sdp: "answer" } }), { status: 201 });
+  });
+  return { ...setup({}, { settings: () => ({ voiceLiveMonthlyCapUsd: 20, voiceInterviewMonthlyCapUsd: cap }), fetch: fetch as never, interview: { pack: () => PACK, drawing: () => ({ elements: [] }), page } }), page, modelFetch: fetch };
+}
+describe("interviewer", () => {
+  it("parses the actual first pack and rejects missing required sections", () => {
+    const pack = parsePack(PACK);
+    expect(pack.minutes).toBe(60);
+    expect(pack.stages.map(s => s.minute)).toEqual([0, 5, 10, 25, 45, 55]);
+    for (const heading of ['Problem', 'Stages', 'Rubric']) expect(() => parsePack({ ...PACK, markdown: PACK_TEXT.replace(`## ${heading}`, '## Other section') })).toThrow(/missing/i);
+    expect(interviewClock(pack, NOW, NOW + 10 * 60000)).toMatchObject({ elapsedMs: 600000, remainingMs: 3000000, stage: expect.stringContaining('High-level design') });
+  });
+  it("replaces the launching persona and advertises only interview tools", async () => {
+    const h = interviewSetup();
+    const started = await h.live.start({ mode: "interviewer", pack: PACK.id, sdp: "offer", threadId: "thr_kensico" });
+    const body = JSON.parse(String(h.modelFetch.mock.calls[0]![1]?.body));
+    expect(body.session.instructions).toContain('You are the interviewer');
+    expect(body.session.instructions).not.toContain('Chief of Staff');
+    expect(body.session.delegation.responses.tools).toEqual(INTERVIEW_TOOL_DEFINITIONS);
+    expect(started.identity.label).toBe('Interviewer · LLM API rate limiter');
+    expect(await h.live.tool(started.sessionId, 'send_to_thread', '{}')).toContain('only permits');
+    expect(h.send).not.toHaveBeenCalled();
+  });
+  it("nudges once at minute marks, logs evidence, carries state and cost across reconnect, and writes one nested scorecard", async () => {
+    const h = interviewSetup();
+    const { sessionId } = await h.live.start({ mode: "interviewer", pack: PACK.id, sdp: "offer" });
+    h.live.record(sessionId, [{ type: 'live_usage', seconds: 300 }, said('I would use Redis.')]);
+    h.live.poll(sessionId);
+    h.advance(5 * 60000);
+    h.live.record(sessionId, []);
+    expect(h.live.poll(sessionId).replies[0]?.note).toContain('5:00');
+    expect(h.live.poll(sessionId).replies).toHaveLength(0);
+    for (const dimension of ['numbers', 'requirements']) await h.live.tool(sessionId, 'note_evidence', JSON.stringify({ dimension, observation: 'No estimates', quote: 'I would use Redis.' }));
+    await h.live.reconnect({ sessionId, sdp: 'fresh offer' });
+    const request = String(h.modelFetch.mock.calls.at(-1)![1]?.body);
+    expect(request).toContain('Resume the same interview');
+    expect(request).toContain('No estimates');
+    expect(request).toContain('I would use Redis.');
+    h.live.record(sessionId, [{ type: 'live_usage', seconds: 60 }]);
+    expect(h.live.view(sessionId).costUsd).toBeCloseTo(0.30);
+    await Promise.all([h.live.end(sessionId), h.live.end(sessionId)]);
+    await h.live.end(sessionId);
+    expect(h.page).toHaveBeenCalledTimes(1);
+    expect(h.page.mock.calls[0]![0]).toMatchObject({ parentId: 'pg_parent', title: expect.stringContaining('Mock interview') });
+    expect(h.page.mock.calls[0]![0].markdown).toContain('@thread:thr_voice');
+    expect(h.live.view(sessionId).costUsd).toBeCloseTo(0.306);
+    const scoreRequest = JSON.parse(String(h.modelFetch.mock.calls.at(-1)![1]?.body));
+    expect(scoreRequest.model).toBe('gpt-5.6-sol');
+    expect(scoreRequest.input).toContain(PACK_TEXT.split('## Rubric')[1]!.split('## Interviewer rules')[0]!.trim().slice(0, 40));
+    expect(scoreRequest.input).toContain('No estimates');
+  });
+  it("retries once then writes a useful failure Page", async () => {
+    const h = interviewSetup(true);
+    const { sessionId } = await h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' });
+    await h.live.end(sessionId);
+    expect(h.modelFetch.mock.calls.filter(c => c[0].endsWith('/responses'))).toHaveLength(2);
+    expect(h.page.mock.calls[0]![0].markdown).toContain('scorecard failed:');
+    expect(h.page.mock.calls[0]![0].markdown).toContain('@thread:thr_voice');
+  });
+  it("separates monthly caps, includes scorecard usage, refuses and scores at the interview cap", async () => {
+    const h = interviewSetup(false, 0.04);
+    const normal = await h.live.start({ sdp: 'offer' });
+    h.live.record(normal.sessionId, [{ type: 'live_usage', seconds: 1200 }]);
+    const interview = await h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' });
+    expect(h.live.state()).toMatchObject({ monthUsd: 1, capUsd: 20, interviewMonthUsd: 0, interviewCapUsd: 0.04 });
+    expect(h.live.record(interview.sessionId, [{ type: 'live_usage', seconds: 60 }]).stop).toContain('interviewer');
+    await h.live.tickInterviews();
+    expect(h.live.state()).toMatchObject({ monthUsd: 1, capUsd: 20 });
+    expect(h.live.state().interviewMonthUsd).toBeCloseTo(0.056);
+    expect(h.page.mock.calls[0]![0].markdown).toContain('Interview stopped:');
+    await expect(h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' })).rejects.toThrow('cap');
+    await expect(h.live.start({ sdp: 'offer' })).resolves.toBeDefined();
+  });
+  it("ends at the pack's time limit and produces a scorecard once", async () => {
+    const h = interviewSetup();
+    const { sessionId } = await h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' });
+    h.advance(60 * 60000);
+    await h.live.tickInterviews();
+    await h.live.tickInterviews();
+    expect(h.live.view(sessionId).endedAt).toBe(NOW + 60 * 60000);
+    expect(h.page).toHaveBeenCalledTimes(1);
+  });
+  it("renders a bounded graph with boxes, arrows, groups and notes, excluding tombstones", () => {
+    expect(drawingGraph({ elements: [
+      { id: 'a', type: 'rectangle', groupIds: ['g'] }, { id: 'ta', type: 'text', containerId: 'a', text: 'Gateway' },
+      { id: 'b', type: 'rectangle', name: 'Redis' }, { id: 'arrow', type: 'arrow', startBinding: { elementId: 'a' }, endBinding: { elementId: 'b' } },
+      { id: 'tl', type: 'text', containerId: 'arrow', text: 'check' }, { id: 'n', type: 'text', text: 'p99 < 5ms' }, { id: 'gone', type: 'text', text: 'SECRET', isDeleted: true },
+    ] })).toBe('rectangle: Gateway [groups: g]\nrectangle: Redis\nGateway → Redis (check)\nNote: p99 < 5ms');
+    expect(drawingGraph({ elements: Array.from({ length: 500 }, (_, i) => ({ id: String(i), type: 'text', text: 'long note'.repeat(50) })) }).length).toBeLessThanOrEqual(2800);
   });
 });

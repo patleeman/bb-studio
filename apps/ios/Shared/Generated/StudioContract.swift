@@ -314,6 +314,7 @@ public enum Studio {
     public static let voiceLive_state = "voiceLive.state"
     public static let voiceLive_configure = "voiceLive.configure"
     public static let voiceLive_start = "voiceLive.start"
+    public static let voiceLive_reconnect = "voiceLive.reconnect"
     public static let voiceLive_tool = "voiceLive.tool"
     public static let voiceLive_event = "voiceLive.event"
     public static let voiceLive_poll = "voiceLive.poll"
@@ -1012,6 +1013,8 @@ public enum Studio {
   public typealias VoiceLiveConfigure = VoiceLiveConfigureOutput
 
   public typealias VoiceLiveStart = VoiceLiveStartOutput
+
+  public typealias VoiceLiveReconnect = VoiceLiveReconnectOutput
 
   public typealias VoiceLiveTool = VoiceLiveToolOutput
 
@@ -26635,6 +26638,9 @@ public enum Studio {
   }
 
   public struct VoiceLiveStateOutput: Sendable, Hashable, Codable {
+    public var interviewMonthUsd: Double?
+    public var interviewCapUsd: Double?
+    public var interviewProblem: String?
     public var ready: Bool?
     public var problem: String?
     public var cosName: String?
@@ -26644,7 +26650,10 @@ public enum Studio {
     public var voice: String?
     public var backendModel: VoiceLiveStateOutputBackendModel?
 
-    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveStateOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveStateOutputBackendModel? = nil) {
+    public init(interviewMonthUsd: Double? = nil, interviewCapUsd: Double? = nil, interviewProblem: String? = nil, ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveStateOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveStateOutputBackendModel? = nil) {
+      self.interviewMonthUsd = interviewMonthUsd
+      self.interviewCapUsd = interviewCapUsd
+      self.interviewProblem = interviewProblem
       self.ready = ready
       self.problem = problem
       self.cosName = cosName
@@ -26771,6 +26780,9 @@ public enum Studio {
   }
 
   public struct VoiceLiveConfigureOutput: Sendable, Hashable, Codable {
+    public var interviewMonthUsd: Double?
+    public var interviewCapUsd: Double?
+    public var interviewProblem: String?
     public var ready: Bool?
     public var problem: String?
     public var cosName: String?
@@ -26780,7 +26792,10 @@ public enum Studio {
     public var voice: String?
     public var backendModel: VoiceLiveConfigureOutputBackendModel?
 
-    public init(ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveConfigureOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveConfigureOutputBackendModel? = nil) {
+    public init(interviewMonthUsd: Double? = nil, interviewCapUsd: Double? = nil, interviewProblem: String? = nil, ready: Bool? = nil, problem: String? = nil, cosName: String? = nil, monthUsd: Double? = nil, capUsd: Double? = nil, model: VoiceLiveConfigureOutputModel? = nil, voice: String? = nil, backendModel: VoiceLiveConfigureOutputBackendModel? = nil) {
+      self.interviewMonthUsd = interviewMonthUsd
+      self.interviewCapUsd = interviewCapUsd
+      self.interviewProblem = interviewProblem
       self.ready = ready
       self.problem = problem
       self.cosName = cosName
@@ -26817,11 +26832,15 @@ public enum Studio {
   }
 
   public struct VoiceLiveStartInput: Sendable, Hashable, Codable {
+    public var mode: String?
+    public var pack: String?
     public var model: VoiceLiveStartInputModel?
     public var sdp: String?
     public var threadId: String?
 
-    public init(model: VoiceLiveStartInputModel? = nil, sdp: String? = nil, threadId: String? = nil) {
+    public init(mode: String? = nil, pack: String? = nil, model: VoiceLiveStartInputModel? = nil, sdp: String? = nil, threadId: String? = nil) {
+      self.mode = mode
+      self.pack = pack
       self.model = model
       self.sdp = sdp
       self.threadId = threadId
@@ -26951,6 +26970,32 @@ public enum Studio {
       self.voiceThreadId = voiceThreadId
       self.cosName = cosName
       self.identity = identity
+    }
+  }
+
+  public struct VoiceLiveReconnectInput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var sdp: String?
+    public var events: [StudioJSONValue]?
+
+    public init(sessionId: String? = nil, sdp: String? = nil, events: [StudioJSONValue]? = nil) {
+      self.sessionId = sessionId
+      self.sdp = sdp
+      self.events = events
+    }
+  }
+
+  public struct VoiceLiveReconnectOutput: Sendable, Hashable, Codable {
+    public var sessionId: String?
+    public var answerSdp: String?
+    public var clientSecret: String?
+    public var callsUrl: String?
+
+    public init(sessionId: String? = nil, answerSdp: String? = nil, clientSecret: String? = nil, callsUrl: String? = nil) {
+      self.sessionId = sessionId
+      self.answerSdp = answerSdp
+      self.clientSecret = clientSecret
+      self.callsUrl = callsUrl
     }
   }
 

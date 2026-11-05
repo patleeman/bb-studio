@@ -53,7 +53,7 @@ export interface BuiltinPages {
   /** `bb studio pages …` */
   cli: PluginCliRegistration["run"];
   /** Makes a page as Studio (the Bot's Memory page), returning its id. */
-  createPage(input: { projectId: string | null; title: string; icon?: string; markdown: string }): string;
+  createPage(input: { projectId: string | null; parentId?: string | null; title: string; icon?: string; markdown: string }): string;
   /** Adds a bullet under the page's "## Check-in" heading (made on top if missing); false when the line is already there. */
   addCheckin(pageId: string, line: string): boolean;
   /** A page's text as Markdown, or null when there's no such page. */
@@ -465,7 +465,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     provider,
     backup,
     cli: (argv, ctx) => cli.run(argv, ctx),
-    createPage: (input) => service.createPage({ ...input, parentId: null, actor: PLUGIN_RPC_ACTOR }).id,
+    createPage: (input) => service.createPage({ parentId: null, ...input, actor: PLUGIN_RPC_ACTOR }).id,
     markdown: (pageId) => (store.meta(pageId) ? readMarkdown(service.hub.open(pageId).doc) : null),
     whiteboards: {
       embeddings() {

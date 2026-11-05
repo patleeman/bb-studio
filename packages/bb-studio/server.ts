@@ -1268,6 +1268,21 @@ export default async function plugin(bb: BbPluginApi) {
   // Hands-free voice (src/voice/live): a speech-to-speech voice agent on the
   // phone whose tools run here, relaying visibly to the Bot and threads.
   const voiceLive = new VoiceLive({
+    interview: {
+      pack: (id) => {
+        const page = db.prepare("SELECT title, parent_id FROM pages WHERE id = ? AND archived_at IS NULL").get(id) as { title: string; parent_id: string | null } | undefined;
+        if (!page) throw new Error("Interview pack Page not found.");
+        const tag = tags.byName("interview-pack");
+        return { id, title: page.title, parentId: page.parent_id, markdown: pages.markdown(id) ?? "", tagged: !!tag && (tags.assignments().get(`pages:${id}`) ?? []).includes(tag.id) };
+      },
+      drawing: (name) => {
+        const row = (name
+          ? db.prepare("SELECT data FROM drawings WHERE name = ? AND archived_at IS NULL ORDER BY updated_at DESC LIMIT 1").get(name)
+          : db.prepare("SELECT data FROM drawings WHERE archived_at IS NULL ORDER BY updated_at DESC LIMIT 1").get()) as { data: string } | undefined;
+        try { return row ? JSON.parse(row.data) : null; } catch { return null; }
+      },
+      page: async (input) => pages.createPage({ ...input, projectId: null }),
+    },
     db,
     key: () => openaiKey(settingValues),
     settings: () => settingValues,

@@ -23,6 +23,8 @@
 //
 // It replaced the old in-thread voice mode (removed Nov 1); it keeps the
 // retired Call's tables (voice_calls, voice_call_events; append-only).
+import { DIMENSIONS, parsePack, interviewClock, drawingGraph, scorecardPrompt, scorecardSchema, scorecardMarkdown, type InterviewPack, type Evidence } from "./interview";
+import { priceFor } from "../../bot-prices";
 import { randomBytes } from "node:crypto";
 import type Database from "better-sqlite3";
 import { addRealtimeUsage, addTranscriptionUsage, EMPTY_TALLY, liveCost, realtimeCost, type RealtimeTally } from "../../bot-prices";
@@ -66,7 +68,7 @@ const WAIT_MS = 24 * 3600_000;
  * Hands-free voice's Studio settings (src/settings/schema.ts, Voice), all
  * read when a session starts: a change applies to the next one.
  */
-export const VOICE_LIVE_SETTINGS = pickSettings(["voiceLiveModel", "voiceLiveVoice", "voiceLiveBackendModel", "voiceLiveMonthlyCapUsd"]);
+export const VOICE_LIVE_SETTINGS = pickSettings(["voiceLiveModel", "voiceLiveVoice", "voiceLiveBackendModel", "voiceLiveMonthlyCapUsd", "voiceInterviewScorecardModel", "voiceInterviewMonthlyCapUsd"]);
 
 /** What the quick-settings menu may change: the next session's model, voice and backend. */
 export interface VoiceLiveChoice { model?: LiveModel; voice?: string; backendModel?: BackendModel }
@@ -81,6 +83,11 @@ export interface VoiceAutomation { id: string; name: string; state: string }
 export interface VoiceLoopGroups { needsYouNow: VoiceLoop[]; comingUp: VoiceLoop[] }
 
 export interface VoiceLiveDeps {
+  interview?: {
+    pack(id: string): { id: string; title: string; parentId: string | null; markdown: string; tagged: boolean };
+    drawing(name?: string): { elements?: Record<string, unknown>[] } | null;
+    page(input: { title: string; parentId: string | null; markdown: string }): Promise<string>;
+  };
   db: Database.Database;
   fetch?: typeof fetch;
   /** Studio's OpenAI key (src/openai-key.ts); "" when there's none. Never logged or returned. */
@@ -187,6 +194,7 @@ export class VoiceLive {
     const model = ((LIVE_MODELS as readonly string[]).includes(raw) ? raw : LIVE_MODELS[0]) as LiveModel;
     const backend = String(values.voiceLiveBackendModel ?? "");
     return {
+      interviewCapUsd: Number.isFinite(Number(values.voiceInterviewMonthlyCapUsd)) ? Math.max(0, Number(values.voiceInterviewMonthlyCapUsd)) : 100,
       capUsd: Number.isFinite(cap) && cap >= 0 ? cap : DEFAULT_CAP_USD,
       model,
       voice: voiceFor(model, values.voiceLiveVoice == null ? null : String(values.voiceLiveVoice)),
@@ -217,10 +225,12 @@ export class VoiceLive {
   private cost(row: SessionRow, events = this.events(row.id)): number | null {
     if (row.model === "gpt-live-1") {
       let seconds = 0;
+      let segmentSeconds = 0;
       const chosen = data<{ backendModel?: string }>(events.find((event) => event.kind === "config")).backendModel;
       const backend = { model: chosen ?? DEFAULT_BACKEND_MODEL, input: 0, cachedInput: 0, output: 0 };
       for (const event of events) {
-        if (event.kind === "live_usage") seconds = Math.max(seconds, Number(data<{ seconds?: number }>(event).seconds) || 0);
+        if (event.kind === "segment") { seconds += segmentSeconds; segmentSeconds = 0; }
+        if (event.kind === "live_usage") segmentSeconds = Math.max(segmentSeconds, Number(data<{ seconds?: number }>(event).seconds) || 0);
         if (event.kind === "backend_usage") {
           const usage = data<{ input_tokens?: number; cached_tokens?: number; output_tokens?: number }>(event);
           const cached = usage.cached_tokens ?? 0;
@@ -229,41 +239,44 @@ export class VoiceLive {
           backend.output += usage.output_tokens ?? 0;
         }
       }
-      return liveCost(row.model, seconds, backend);
+      const cost = liveCost(row.model, seconds + segmentSeconds, backend);
+      return cost === null ? null : cost + this.scoreCost(events);
     }
     let tally: RealtimeTally = EMPTY_TALLY;
     for (const event of events) {
       if (event.kind === "usage") tally = addRealtimeUsage(tally, data(event));
       if (event.kind === "transcription_usage") tally = addTranscriptionUsage(tally, data(event));
     }
-    return realtimeCost(row.model, tally, row.transcribe_model);
+    const cost = realtimeCost(row.model, tally, row.transcribe_model);
+    return cost === null ? null : cost + this.scoreCost(events);
   }
 
-  monthUsd(): number {
+  monthUsd(mode?: "interviewer"): number {
     // Meeting sessions (src/voice/meeting, `mt_` ids) are priced the same way and share the cap.
     const rows = this.deps.db.prepare("SELECT * FROM voice_calls WHERE (id LIKE 'vl_%' OR id LIKE 'mt_%') AND started_at >= ?").all(monthStart(this.now())) as SessionRow[];
-    return rows.reduce((sum, row) => sum + (this.cost(row) ?? 0), 0);
+    return rows.filter(row => !!this.pack(row.id) === (mode === "interviewer")).reduce((sum, row) => sum + (this.cost(row) ?? 0), 0);
   }
 
-  private capProblem(): string | null {
-    const { capUsd } = this.config();
-    const spent = this.monthUsd();
+  private capProblem(mode?: "interviewer"): string | null {
+    const config = this.config();
+    const capUsd = mode === "interviewer" ? config.interviewCapUsd : config.capUsd;
+    const spent = this.monthUsd(mode);
     if (spent < capUsd) return null;
     const next = new Date(monthStart(this.now()));
     next.setMonth(next.getMonth() + 1);
-    return `This month's hands-free voice has reached the ${usd(capUsd)} cap (about ${usd(spent)} so far). Raise the monthly limit in Studio's settings (Voice), or talk again from ${next.toLocaleDateString("en-US", { month: "long", day: "numeric" })}.`;
+    return `This month's ${mode === 'interviewer' ? 'interviewer' : 'hands-free'} voice has reached the ${usd(capUsd)} cap (about ${usd(spent)} so far). Raise the monthly limit in Studio's settings (Voice), or talk again from ${next.toLocaleDateString("en-US", { month: "long", day: "numeric" })}.`;
   }
 
-  private problem(): string | null {
+  private problem(mode?: "interviewer"): string | null {
     if (!this.deps.cos()) return "Make your Bot first: Studio → Bot. Hands-free voice relays to it.";
     if (!this.deps.mockUrl?.() && !this.deps.key()) return "Hands-free voice needs an OpenAI API key: add one in Studio's settings (OpenAI API key), or set OPENAI_API_KEY on the BB host.";
-    return this.capProblem();
+    return this.capProblem(mode);
   }
 
   state(): VoiceLiveState {
     const { capUsd, model, voice, backendModel } = this.config();
     const problem = this.problem();
-    return { ready: !problem, problem, cosName: this.deps.cos()?.name ?? null, monthUsd: this.monthUsd(), capUsd, model, voice, backendModel };
+    return { interviewMonthUsd: this.monthUsd("interviewer"), interviewCapUsd: this.config().interviewCapUsd, interviewProblem: this.problem("interviewer"), ready: !problem, problem, cosName: this.deps.cos()?.name ?? null, monthUsd: this.monthUsd(), capUsd, model, voice, backendModel };
   }
 
   /**
@@ -286,12 +299,12 @@ export class VoiceLive {
     return this.state();
   }
 
-  private async post(url: string, body: unknown, what: string): Promise<Record<string, unknown>> {
+  private async post(url: string, body: unknown, what: string, timeoutMs = 20_000): Promise<Record<string, unknown>> {
     const response = await (this.deps.fetch ?? fetch)(url, {
       method: "POST",
       headers: { authorization: `Bearer ${this.deps.key()}`, "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const text = await response.text();
     if (!response.ok) {
@@ -322,8 +335,8 @@ export class VoiceLive {
   }
 
   /** Checks the cap, builds the seed, starts the OpenAI side and opens the voice thread. */
-  async start(input: { model?: LiveModel; sdp?: string; threadId?: string } = {}) {
-    const problem = this.problem();
+  async start(input: { model?: LiveModel; sdp?: string; threadId?: string; mode?: "interviewer"; pack?: string } = {}) {
+    const problem = this.problem(input.mode);
     if (problem) throw new VoiceRefused(problem);
     const cos = this.deps.cos()!;
     const config = this.config();
@@ -333,12 +346,21 @@ export class VoiceLive {
     const { backendModel } = config;
     const mockUrl = this.deps.mockUrl?.() ?? null;
     if (!mockUrl && model === "gpt-live-1" && !input.sdp) throw new VoiceRefused("gpt-live-1 needs the phone's SDP offer: Studio creates the session with it.");
-    const { seed, ms } = await this.persona(input.threadId ?? null, cos);
+    let pack: InterviewPack | undefined;
+    if (input.mode === "interviewer") {
+      if (!input.pack || !this.deps.interview) throw new VoiceRefused("Choose an interview-pack Page.");
+      const page = this.deps.interview.pack(input.pack);
+      if (!page.tagged) throw new VoiceRefused("The Page must have the interview-pack tag.");
+      pack = parsePack(page);
+    }
+    const { seed, ms } = pack
+      ? { seed: { identity: { kind: "thread" as const, name: `Interviewer · ${pack.title}`, label: `Interviewer · ${pack.title}`, threadId: null }, text: "", missing: [] }, ms: 0 }
+      : await this.persona(input.threadId ?? null, cos);
     const launched = seed.identity.threadId;
-    const board = launched && this.deps.canvas ? await this.deps.canvas.tools(launched).catch(() => null) : null;
+    const board = !pack && launched && this.deps.canvas ? await this.deps.canvas.tools(launched).catch(() => null) : null;
     const extraTools = board?.tools ?? [];
     const canvas = extraTools.length > 0;
-    const persona = { identity: seed.identity, seed: seed.text, cosName: cos.name, canvasNote: canvas ? board?.note ?? null : null };
+    const persona = { interview: pack, identity: seed.identity, seed: seed.text, cosName: cos.name, canvasNote: canvas ? board?.note ?? null : null };
     let transport: LiveTransport = model === "gpt-live-1" ? "live-webrtc" : "realtime-webrtc";
     let answerSdp: string | null = null;
     let clientSecret: string | null = null;
@@ -359,6 +381,7 @@ export class VoiceLive {
     const startedAt = this.now();
     this.deps.db.prepare("INSERT INTO voice_calls (id, bot_id, bot_name, thread_id, model, voice, transcribe_model, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(sessionId, "cos", cos.name, null, model, voice, model === "gpt-realtime-2.1" ? REALTIME_TRANSCRIBE_MODEL : null, startedAt);
+    if (pack) this.append(sessionId, "interview", { data: pack });
     this.append(sessionId, "config", { data: { voice, backendModel: model === "gpt-live-1" ? backendModel : null } });
     this.append(sessionId, "identity", { data: { identity: seed.identity, chars: seed.text.length, ms, missing: seed.missing, canvas } });
     // The thread opens beside the call: the phone connects without waiting for it.
@@ -409,6 +432,7 @@ export class VoiceLive {
   async toolReply(sessionId: string, name: string, args: string | undefined, events: readonly LiveEvent[] = []): Promise<ToolReply> {
     const row = this.live(sessionId);
     if (events.length) this.save(sessionId, events);
+    if (this.pack(sessionId)) return this.interviewTool(row, name, args);
     const canvasOutput = await this.canvasTool(row, name, args);
     if (canvasOutput !== null) return { output: clip(canvasOutput, TOOL_OUTPUT_CHARS) };
     if (!(VOICE_TOOLS as readonly string[]).includes(name)) {
@@ -689,11 +713,11 @@ export class VoiceLive {
 
   /** Saves what the phone saw; says when the month's cap is reached, so the phone hangs up. */
   record(sessionId: string, events: readonly LiveEvent[]): { costUsd: number | null; replies: number; stop: string | null; voiceThreadId: string | null } {
-    const row = this.live(sessionId);
+    const row = this.row(sessionId);
     this.save(sessionId, events);
     const all = this.events(sessionId);
     const voiceThreadId = data<{ threadId?: string }>(all.find((event) => event.kind === "thread")).threadId ?? null;
-    return { costUsd: this.cost(row, all), replies: this.waiting(all).length, stop: this.capProblem(), voiceThreadId };
+    return { costUsd: this.cost(row, all), replies: this.waiting(all).length, stop: this.ended(all) ? "Interview ended." : this.interviewTick(sessionId) ?? this.capProblem(this.pack(sessionId) ? "interviewer" : undefined), voiceThreadId };
   }
 
   private waiting(events: readonly EventRow[]): EventRow[] {
@@ -702,6 +726,7 @@ export class VoiceLive {
   }
 
   private replyDelivery(event: EventRow, part = 1): string {
+    if (data<{ interviewNote?: boolean }>(event).interviewNote) return event.text ?? "";
     const reply = data<{ title: string; summary: string; intent?: RelayIntent }>(event);
     const intent = relayIntent(reply.intent);
     const chunk = replyChunk(event.text ?? "", part);
@@ -710,6 +735,7 @@ export class VoiceLive {
 
   poll(sessionId: string) {
     this.live(sessionId);
+    this.interviewTick(sessionId);
     const replies = this.waiting(this.events(sessionId)).map((event) => {
       const reply = data<{ title: string; summary: string }>(event);
       this.append(sessionId, "delivered", { data: { replyId: event.id } });
@@ -785,14 +811,14 @@ export class VoiceLive {
 
   private async finish(sessionId: string, events: readonly LiveEvent[]): Promise<VoiceLiveView> {
     const row = this.row(sessionId);
-    if (this.ended(this.events(sessionId))) return this.view(sessionId);
+    if (this.ended(this.events(sessionId))) { this.save(sessionId, events); return this.view(sessionId); }
     this.save(sessionId, events);
     const draft = this.view(sessionId, this.now());
     const parts = [`🎙 **Voice session · ${sessionLength(draft.durationMs)}**`];
     if (draft.costUsd != null) parts.push(`≈${usd(draft.costUsd)}`);
     if (draft.sent.length) parts.push(`sent ${draft.sent.length} message${draft.sent.length === 1 ? "" : "s"}`);
     const lines = this.transcript(this.events(sessionId));
-    if (lines.length) await this.postToVoiceThread(row, [parts.join(" · "), ...lines].join("\n\n"));
+    if (lines.length) await this.postToVoiceThread(row, [parts.join(" · "), ...lines].join("\n\n")).catch(error => this.deps.warn?.(`Transcript post failed: ${String(error)}`));
     const all = this.events(sessionId);
     const home = this.identity(sessionId)?.threadId;
     if (home && all.some((event) => event.kind === "transcript" && event.role === "user" && event.text?.trim()) &&
@@ -812,8 +838,124 @@ export class VoiceLive {
       }).catch((error) => this.deps.warn?.(`Couldn't post the voice session to its thread: ${String(error)}`));
     }
     this.append(sessionId, "ended");
+    if (this.pack(sessionId)) await this.writeScorecard(sessionId);
     this.deps.publish({ sessionId, kind: "ended" });
     return this.view(sessionId);
+  }
+
+  /** Server clock also runs while the candidate is silent or the transport is recovering. */
+  async tickInterviews(): Promise<void> {
+    const rows = this.deps.db.prepare("SELECT id FROM voice_calls WHERE id LIKE 'vl_%' AND NOT EXISTS (SELECT 1 FROM voice_call_events e WHERE e.call_id = voice_calls.id AND e.kind = 'ended')").all() as { id: string }[];
+    for (const row of rows) {
+      if (!this.pack(row.id)) continue;
+      const stop = this.interviewTick(row.id) ?? this.capProblem("interviewer");
+      if (stop) { this.append(row.id, "interview_stop", { text: stop }); await this.end(row.id); }
+    }
+  }
+
+  private pack(id: string): InterviewPack | null {
+    const event = this.events(id).find(e => e.kind === "interview");
+    return event ? data<InterviewPack>(event) : null;
+  }
+
+  private scoreCost(events: EventRow[]): number {
+    return events.filter(e => e.kind === "score_usage").reduce((sum, e) => sum + (data<{ cost: number }>(e).cost || 0), 0);
+  }
+
+  private interviewTick(id: string): string | null {
+    const pack = this.pack(id);
+    if (!pack) return null;
+    const row = this.row(id);
+    const events = this.events(id);
+    const elapsed = this.now() - row.started_at;
+    for (const stage of pack.stages) {
+      if (stage.minute * 60_000 > elapsed || events.some(e => e.kind === "stage" && data<{ minute: number }>(e).minute === stage.minute)) continue;
+      const note = `(Studio interview clock:) ${stage.minute}:00 — move to ${stage.text}. Ask one question at a time.`;
+      this.append(id, "stage", { data: { minute: stage.minute } });
+      this.append(id, "reply", { text: note, data: { title: "Interview clock", summary: note, intent: "answer", interviewNote: true } });
+      this.deps.publish({ sessionId: id, kind: "reply" });
+    }
+    if (elapsed >= pack.minutes * 60_000) return "Interview time limit reached.";
+    return null;
+  }
+
+  private async interviewTool(row: SessionRow, name: string, args?: string): Promise<ToolReply> {
+    const pack = this.pack(row.id)!;
+    try {
+      const parsed: unknown = JSON.parse(args || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Arguments must be an object.");
+      const a = parsed as Record<string, unknown>;
+      if (name === "interview_clock") return { output: JSON.stringify(interviewClock(pack, row.started_at, this.now())) };
+      if (name === "read_drawing") return { output: drawingGraph(this.deps.interview?.drawing(typeof a.name === "string" ? a.name : undefined) ?? null) };
+      if (name === "note_evidence") {
+        if (!(DIMENSIONS as readonly unknown[]).includes(a.dimension) || typeof a.observation !== "string" || !a.observation.trim() || a.observation.length > 4000 || (a.quote !== undefined && (typeof a.quote !== "string" || a.quote.length > 4000))) throw new Error("Supply a rubric dimension, observation (up to 4000 characters), and optional quote.");
+        this.append(row.id, "evidence", { data: { dimension: a.dimension, observation: a.observation, quote: a.quote, at: this.now() } });
+        return { output: "Evidence recorded." };
+      }
+      if (["end_interview", "end", "cancel"].includes(name)) { await this.end(row.id); return { output: "Interview ended. Scorecard saved." }; }
+      return { output: "This interview only permits interview_clock, read_drawing, note_evidence, end_interview, end and cancel." };
+    } catch (error) { return { output: String(error) }; }
+  }
+
+  /** A new WebRTC exchange on the same logical record. No thread or clock reset. */
+  async reconnect(input: { sessionId: string; sdp?: string; events?: LiveEvent[] }) {
+    const row = this.live(input.sessionId);
+    const pack = this.pack(row.id);
+    if (!pack) throw new Error("Reconnect is only available for interviews.");
+    this.save(row.id, input.events ?? []);
+    if (this.capProblem("interviewer")) throw new VoiceRefused(this.capProblem("interviewer")!);
+    if (this.interviewTick(row.id)) throw new Error("Interview time limit reached.");
+    const all = this.events(row.id);
+    const transcript = all.filter(e => e.kind === "transcript").map(e => `${e.role}: ${e.text}`).join("\n");
+    const resume = `Resume the same interview; do not repeat the opening. State: ${JSON.stringify({ pack: pack.id, ...interviewClock(pack, row.started_at, this.now()), transcriptSummary: transcript.slice(-6000), evidence: all.filter(e => e.kind === "evidence").map(e => data<Evidence>(e)) })}`;
+    const persona = { identity: this.identity(row.id)!, seed: "", cosName: row.bot_name, interview: pack, resume };
+    const config = data<{ backendModel?: string }>(all.find(e => e.kind === "config"));
+    let answerSdp: string | null = null, clientSecret: string | null = null;
+    if (row.model === "gpt-live-1") {
+      if (!input.sdp) throw new Error("Reconnect requires a fresh SDP offer.");
+      const created = await this.post(LIVE_SESSIONS_URL, liveSessionRequest({ persona, sdp: input.sdp, voice: row.voice, backendModel: config.backendModel }), "interview reconnect");
+      answerSdp = (created.transport as { sdp?: string })?.sdp ?? null;
+      if (!answerSdp) throw new Error("OpenAI returned no SDP answer.");
+    } else {
+      const created = await this.post(CLIENT_SECRETS_URL, realtimeSecretRequest({ persona, voice: row.voice }), "interview reconnect");
+      clientSecret = typeof created.value === "string" ? created.value : null;
+      if (!clientSecret) throw new Error("OpenAI returned no client secret.");
+    }
+    this.append(row.id, "segment", { data: { resume } });
+    return { sessionId: row.id, answerSdp, clientSecret, callsUrl: clientSecret ? REALTIME_CALLS_URL : null };
+  }
+
+  private async writeScorecard(id: string): Promise<void> {
+    if (this.events(id).some(e => e.kind === "scorecard")) return;
+    const pack = this.pack(id)!;
+    const view = this.view(id);
+    const evidence = this.events(id).filter(e => e.kind === "evidence").map(e => data<Evidence>(e));
+    const prompt = scorecardPrompt(pack, view.transcript.map(t => `${t.role}: ${t.text}`).join("\n"), evidence, drawingGraph(this.deps.interview?.drawing() ?? null));
+    const model = String(this.deps.settings().voiceInterviewScorecardModel || "gpt-5.6-sol");
+    let markdown = "", reason = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await this.post("https://api.openai.com/v1/responses", { model, instructions: "Evaluate only supplied evidence. Return valid JSON only.", input: prompt, store: false, max_output_tokens: 6000, text: { format: { type: "json_object" } } }, "interview scorecard", 90_000);
+        const usage = response.usage as { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number } } | undefined;
+        const price = priceFor(model);
+        const cached = usage?.input_tokens_details?.cached_tokens ?? 0;
+        this.append(id, "score_usage", { data: { model, usage, cost: price ? (((usage?.input_tokens ?? 0) - cached) * price.input + cached * price.cacheRead + (usage?.output_tokens ?? 0) * price.output) / 1e6 : 0 } });
+        const output = response.output as { content?: { type?: string; text?: string }[] }[] | undefined;
+        const text = output?.flatMap(o => o.content ?? []).filter(c => c.type === "output_text").map(c => c.text ?? "").join("") ?? "";
+        markdown = scorecardMarkdown(scorecardSchema.parse(JSON.parse(text)));
+        break;
+      } catch (error) { reason = error instanceof Error ? error.message : String(error); }
+    }
+    if (!markdown) markdown = `scorecard failed: ${reason}`;
+    const stageTimes = pack.stages.map((s, i) => {
+      const end = Math.min(view.durationMs, (pack.stages[i + 1]?.minute ?? pack.minutes) * 60_000);
+      return `- ${s.text.split("\n")[0]}: ${Math.max(0, (end - s.minute * 60_000) / 60_000).toFixed(1)} min`;
+    }).join("\n");
+    const stop = this.events(id).find(e => e.kind === "interview_stop")?.text ?? this.capProblem("interviewer");
+    if (stop) markdown += `\n\nInterview stopped: ${stop}`;
+    markdown += `\n\n## Time spent per scheduled stage\n\n${stageTimes}\n\nFull transcript: @thread:${view.voiceThreadId ?? "unavailable"}`;
+    const pageId = await this.deps.interview!.page({ title: `Mock interview · ${pack.title} · ${new Date(this.row(id).started_at).toISOString().slice(0, 10)}`, parentId: pack.parentId, markdown });
+    this.append(id, "scorecard", { data: { pageId }, text: markdown });
   }
 
   /**

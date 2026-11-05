@@ -69,6 +69,9 @@ export const voiceIdentitySchema = z.object({
 });
 
 export const voiceLiveStateSchema = z.object({
+  interviewMonthUsd: z.number(),
+  interviewCapUsd: z.number(),
+  interviewProblem: z.string().nullable(),
   /** Whether a session can start now (a Chief of Staff, a key, under the cap). */
   ready: z.boolean(),
   problem: z.string().nullable(),
@@ -111,6 +114,7 @@ export const voiceLiveContract = defineRpcContract({
   "voiceLive.start": {
     experimental_description: "Start a hands-free voice session: checks the monthly cap, builds its identity seed once from the launching thread (threadId; none means the Chief of Staff) and opens its voice thread. gpt-live-1: pass the WebRTC SDP offer; Studio creates the session with OpenAI and returns the answer (no credential reaches the phone). gpt-realtime-2.1: returns a 2-minute client secret; POST the offer to callsUrl with it.",
     input: z.object({
+      mode: z.literal("interviewer").optional(), pack: z.string().min(1).optional(),
       model: z.enum(LIVE_MODELS).optional(), sdp: z.string().min(1).max(100_000).optional(),
       /** The thread it was launched from: the session speaks as it (docs/voice/identity.md). None: the Chief of Staff. */
       threadId: z.string().min(1).max(200).optional(),
@@ -132,6 +136,11 @@ export const voiceLiveContract = defineRpcContract({
       /** Who the session speaks as: the pill shows `label`; relays with no target go to `threadId`. */
       identity: voiceIdentitySchema,
     }),
+  },
+  "voiceLive.reconnect": {
+    experimental_description: "Recover an interviewer transport with a new WebRTC exchange on the same session, clock, transcript and evidence log.",
+    input: z.object({ sessionId, sdp: z.string().min(1).max(100_000).optional(), events: z.array(liveEventSchema).max(200).optional() }).strict(),
+    output: z.object({ sessionId: z.string(), answerSdp: z.string().nullable(), clientSecret: z.string().nullable(), callsUrl: z.string().nullable() }),
   },
   "voiceLive.tool": {
     experimental_description: "Run one of the voice's tools (loops_list, read_replies, send_to_cos, send_to_thread, loops_act, loops_add, undo, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). Relays and loop actions happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text, and for an \"answer\" relay a waitFor: the one \"still waiting\" note to add if no reply comes in time.",
