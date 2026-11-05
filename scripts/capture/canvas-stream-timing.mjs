@@ -15,9 +15,12 @@
  *   or an img/svg.
  * - firstCard: a visible, not pending card ([data-block="card"]) shows a
  *   loaded picture or a drawn rating (.cv-card-rating with children).
- * - finalPage: canvas.get is idle (after working) and both the outer
- *   [data-canvas-page] data-canvas-rev and the frame's html data-cv-rev (the
- *   outer one when the frame has none) equal canvas.rev.
+ * - finalPage: the frame shows a committed page of the turn: its html has a
+ *   data-cv-rev (set only by a committed page, never a stream), no
+ *   data-cv-streaming and no part still pending. With a draft (canvas_page
+ *   before the full page) the draft would count; Visual Chat no longer drafts.
+ * - captionShown: the chat line shows the caption ([data-canvas-caption] p)
+ *   and the outer page isn't working.
  * - total: the first sample where canvas.get said idle.
  * - rounds: model responses (API calls) in the turn, exactly, from the staged
  *   Claude Code transcript (transcriptRounds); roundsEvents is the estimate
@@ -89,14 +92,15 @@ const FRAME_PROBE = `(() => {
   }
   const running = document.getAnimations().filter((a) => a.playState === "running").length;
   const loading = [...root.querySelectorAll("img")].filter((img) => !img.complete).length;
-  return { root: true, rev, content, cards, realCards, running, loading, pending: root.querySelectorAll("[data-cv-pending]").length, scrollHeight: document.documentElement.scrollHeight };
+  return { root: true, rev, streaming: root.hasAttribute("data-cv-streaming"), content, cards, realCards, running, loading, pending: root.querySelectorAll("[data-cv-pending]").length, scrollHeight: document.documentElement.scrollHeight };
 })()`;
 
 // The outer page: its revision and whether the page frame is there.
 const OUTER_PROBE = `(() => {
   const page = document.querySelector("[data-canvas-page]");
   const frame = document.querySelector("iframe[data-canvas-page-frame]");
-  return { rev: page ? Number(page.dataset.canvasRev ?? 0) : null, status: page?.dataset.canvasStatus ?? null, frame: !!frame, frameRev: frame ? Number(frame.dataset.pageRev ?? 0) : null, running: document.getAnimations().filter((a) => a.playState === "running").length };
+  const caption = document.querySelector("[data-canvas-caption] p")?.textContent?.trim() ?? "";
+  return { rev: page ? Number(page.dataset.canvasRev ?? 0) : null, status: page?.dataset.canvasStatus ?? null, caption: caption.length > 0 && page?.dataset.canvasStatus !== "working", frame: !!frame, frameRev: frame ? Number(frame.dataset.pageRev ?? 0) : null, running: document.getAnimations().filter((a) => a.playState === "running").length };
 })()`;
 
 // ---- browser ----
@@ -301,7 +305,7 @@ async function runOnce(n) {
   await tab.waitForSelector("[data-canvas-page]", 30_000).catch(() => {});
   await collapseSidebar();
   const at = () => Date.now() - t0;
-  const marks = { firstContent: null, firstCard: null, finalPage: null, total: null };
+  const marks = { firstContent: null, firstCard: null, finalPage: null, captionShown: null, total: null };
   let sawWorking = false;
   let canvas = null;
   let samples = 0;
@@ -324,10 +328,8 @@ async function runOnce(n) {
     if (idle && marks.total === null) marks.total = now;
     if (frame?.root && frame.content > 0 && marks.firstContent === null) { marks.firstContent = now; log(`run ${n}: firstContent ${now} ms`); }
     if (frame?.root && frame.realCards > 0 && marks.firstCard === null) { marks.firstCard = now; log(`run ${n}: firstCard ${now} ms`); }
-    if (idle && marks.finalPage === null && outer?.rev === canvas.rev) {
-      const frameRev = frame?.rev != null ? Number(frame.rev) : outer.rev;
-      if (frameRev === canvas.rev) { marks.finalPage = now; log(`run ${n}: finalPage ${now} ms (rev ${canvas.rev})`); }
-    }
+    if (marks.finalPage === null && frame?.root && frame.rev != null && Number(frame.rev) > 0 && !frame.streaming && frame.pending === 0 && frame.content > 0) { marks.finalPage = now; log(`run ${n}: finalPage ${now} ms (rev ${frame.rev})`); }
+    if (marks.captionShown === null && outer?.caption) { marks.captionShown = now; log(`run ${n}: captionShown ${now} ms`); }
     if (STILLS && marks.firstContent !== null && !shooting) {
       // Early still at firstContent + 1.5 s; screenshots every ~2 s after it, to pick the middle one later.
       const due = !stills.early ? now >= marks.firstContent + 1500 : marks.finalPage === null && now - (midShots.at(-1)?.at ?? 0) >= 2000;
@@ -336,7 +338,7 @@ async function runOnce(n) {
         shoot().then((png) => { if (!stills.early) stills.early = { at: now, png }; else midShots.push({ at: now, png }); }).catch(() => {}).finally(() => { shooting = false; });
       }
     }
-    if (marks.finalPage !== null && marks.total !== null) break;
+    if (marks.finalPage !== null && marks.total !== null && (marks.captionShown !== null || now > marks.total + 5000)) break;
     if (now > TURN_MS) throw new Error(`run ${n}: timed out after ${TURN_MS} ms; status ${canvas?.status}, rev ${canvas?.rev}, outer ${JSON.stringify(outer)}, frame ${JSON.stringify(frame)?.slice(0, 300)}`);
     await sleep(Math.max(0, SAMPLE_MS - (at() - now)));
   }
@@ -415,7 +417,7 @@ try {
     }
     await writeFile(join(OUT, "results.json"), JSON.stringify({ prompt: PROMPT, provider: PROVIDER, model: MODEL, results, failures }, null, 2));
   }
-  const columns = ["firstContent", "firstCard", "finalPage", "total", "rounds", "roundsEvents"];
+  const columns = ["firstContent", "firstCard", "finalPage", "captionShown", "total", "rounds", "roundsEvents"];
   const medians = Object.fromEntries(columns.map((column) => [column, median(results.map((result) => result[column]))]));
   await writeFile(join(OUT, "results.json"), JSON.stringify({ prompt: PROMPT, provider: PROVIDER, model: MODEL, results, failures, median: medians }, null, 2));
   const cell = (value) => String(value ?? "-").padStart(14);
