@@ -129,6 +129,43 @@ describe("the quick card's place and size", () => {
     expect(defaultRect(view, [{ left: 0, top: 0, width: 0, height: 0 }, { left: 60, top: 700, width: 400, height: 200 }])).toEqual(cardRect(DEFAULT_GEOMETRY, view));
   });
 
+  it("goes under a composer that sits high, as on the home page, never over it", () => {
+    // BB's home page in a 1280×633 window: the new-thread composer near the top, centred in the main pane.
+    const home = { width: 1280, height: 633 };
+    const composer = { left: 436, top: 64, width: 728, height: 128 };
+    const rect = defaultRect(home, [composer]);
+    expect(rect.top).toBeGreaterThanOrEqual(composer.top + composer.height + COMPOSER_GAP);
+    expect(rect.top + rect.height).toBeLessThanOrEqual(home.height - MARGIN);
+    expect(rect.left + rect.width).toBe(home.width - MARGIN);
+    expect(rect.height).toBeGreaterThanOrEqual(MIN_HEIGHT);
+    // A taller window: full size under it.
+    const tall = defaultRect({ width: 1280, height: 900 }, [composer]);
+    expect(tall).toMatchObject({ height: 630, top: 900 - MARGIN - 630 });
+  });
+
+  it("goes to the right of a composer when it fits neither above nor below", () => {
+    const composer = { left: 400, top: 300, width: 600, height: 500 };
+    const rect = defaultRect(view, [composer]);
+    expect(rect.left).toBeGreaterThanOrEqual(composer.left + composer.width + COMPOSER_GAP);
+    expect(rect.left + rect.width).toBe(view.width - MARGIN);
+    expect(rect.height).toBe(700);
+  });
+
+  it("never touches a visible composer wherever it is", () => {
+    const touches = (a: { left: number; top: number; width: number; height: number }, b: typeof a) => a.left < b.left + b.width + COMPOSER_GAP && a.left + a.width + COMPOSER_GAP > b.left && a.top < b.top + b.height + COMPOSER_GAP && a.top + a.height + COMPOSER_GAP > b.top;
+    for (const size of [{ width: 1600, height: 1000 }, { width: 1280, height: 633 }, { width: 760, height: 900 }]) {
+      for (let top = 0; top <= size.height - 100; top += 37) {
+        for (const [left, width] of [[size.width * 0.2, size.width * 0.6], [size.width * 0.5, size.width * 0.45], [16, size.width - 32]]) {
+          const composer = { left: Math.round(left!), top, width: Math.round(width!), height: 120 };
+          const rect = defaultRect(size, [composer]);
+          expect(touches(rect, composer), JSON.stringify({ size, composer, rect })).toBe(false);
+          expect(rect.top).toBeGreaterThanOrEqual(MARGIN);
+          expect(rect.top + rect.height).toBeLessThanOrEqual(size.height - MARGIN);
+        }
+      }
+    }
+  });
+
   it("keeps a safe bottom margin with no composer on screen, and where the user put it wins", () => {
     const rect = defaultRect(view, []);
     expect(rect.top + rect.height).toBe(view.height - SAFE_BOTTOM);

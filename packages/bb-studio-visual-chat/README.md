@@ -41,8 +41,9 @@ hands-free button.
 For a quick question from anywhere in BB, press **⌃⇧Space** (Ctrl+Shift+Space
 on Windows and Linux), or run **Visual Chat: Ask** from the command palette. A
 card opens over the page, bottom right, with the field focused. Until you
-move it, it sits above the thread's composer (it never covers it), or a little
-above the window's bottom when there's no composer. Type and
+move it, it never covers a composer: it sits above a thread's composer, below
+the home page's one near the top, or beside or shorter when neither fits; with
+no composer it ends a little above the window's bottom. Type and
 press Enter, and the board streams into the card. Press the shortcut again,
 or Esc, to close it.
 

@@ -68,7 +68,7 @@ export function QuickCard({ store, threadId }: { store: QuickStore; threadId: st
   const root = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const [viewport, setViewport] = useState(readViewport);
-  // null until the user moves or resizes it: then it sits in its default place, above the composer.
+  // null until the user moves or resizes it: then it sits in its default place, clear of every composer.
   const [geometry, setGeometry] = useState(loadGeometry);
   const composers = useComposerRects(geometry === null);
   // While dragging or resizing: the rectangle under the pointer.

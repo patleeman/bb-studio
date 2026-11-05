@@ -5,10 +5,12 @@
 // the user has resized it; until then it follows the window (about 40% of
 // it). Each window remembers its own (sessionStorage); a new window starts
 // from the last one saved anywhere (localStorage).
-// Until it's been moved or resized, the card sits bottom right but above
-// any BB composer under it (BB marks each with data-app-composer), so it
-// never covers the thread's composer; with no composer on screen it keeps
-// a safe margin from the bottom. Where the user put it always wins.
+// Until it's been moved or resized, the card sits at the right edge and
+// never touches a BB composer on screen (BB marks each with
+// data-app-composer): above a thread's composer at the bottom, below the
+// home page's near the top, else beside or shorter; with no composer on
+// screen it keeps a safe margin from the bottom. Where the user put it
+// always wins.
 
 export interface Viewport { width: number; height: number }
 export interface Rect { left: number; top: number; width: number; height: number }
@@ -32,6 +34,8 @@ export const DEFAULT_GEOMETRY: QuickGeometry = { x: 1, y: 1, width: null, height
 export const COMPOSER_GAP = 12;
 /** The default place stays below the page's header bar (its title and buttons) when there's room. */
 export const SAFE_TOP = 56;
+/** How short the default place may get, below MIN_HEIGHT, before it would cover a composer: a header and the chat line. */
+export const SQUEEZED_HEIGHT = 200;
 /** How far above the window's bottom the card's default place ends when no composer is on screen. */
 export const SAFE_BOTTOM = 72;
 /** BB's composers (its own APP_COMPOSER_SELECTOR); a follow-up composer's queue banner is inside it. */
@@ -64,25 +68,63 @@ export function cardRect(geometry: QuickGeometry, viewport: Viewport): Rect {
   return { left: Math.round(MARGIN + clamp01(geometry.x) * freeW), top: Math.round(MARGIN + clamp01(geometry.y) * freeH), width, height };
 }
 
+/** The stretches of [low, high] that none of `blocked` covers, top to bottom. */
+function freeSpans(low: number, high: number, blocked: readonly [number, number][]): [number, number][] {
+  const spans: [number, number][] = [];
+  let from = low;
+  for (const [top, bottom] of [...blocked].sort((a, b) => a[0] - b[0])) {
+    if (top > from) spans.push([from, Math.min(top, high)]);
+    from = Math.max(from, bottom);
+    if (from >= high) break;
+  }
+  if (from < high) spans.push([from, high]);
+  return spans.filter(([top, bottom]) => bottom > top);
+}
+
+const overlaps = (a: Rect, b: Rect) => a.left < b.left + b.width && a.left + a.width > b.left && a.top < b.top + b.height && a.top + a.height > b.top;
+
 /**
- * The card's place before the user has moved or resized it: bottom right,
- * ending above the highest composer it would overlap (`composers`, their
- * rectangles on screen), else SAFE_BOTTOM above the window's bottom, and
- * below the page's header (SAFE_TOP). It gets shorter to fit, down to its
- * minimum.
+ * The card's place before the user has moved or resized it. It never
+ * touches a composer on screen (`composers`, their rectangles), keeping
+ * COMPOSER_GAP from each, and stays below the page's header (SAFE_TOP). In order:
+ * 1. Full size at the right edge, as low as it fits: under a composer that
+ *    sits high (the home page's), above one at the bottom (a thread's).
+ * 2. Full height at the bottom right, narrower, to the right of every composer.
+ * 3. Shorter, in the tallest free stretch of the right edge (down to
+ *    SQUEEZED_HEIGHT, below its usual minimum, rather than cover a composer).
+ * With no composer on screen it ends SAFE_BOTTOM above the window's bottom.
+ * Only a window too small for any of these gets the plain bottom-right place.
  */
 export function defaultRect(viewport: Viewport, composers: readonly Rect[]): Rect {
   const base = cardRect(DEFAULT_GEOMETRY, viewport);
-  const visible = composers.filter((each) => each.width > 0 && each.height > 0 && each.top < viewport.height && each.top + each.height > 0);
-  const under = visible.filter((each) => each.left < base.left + base.width && each.left + each.width > base.left);
+  const visible = composers.filter((each) => each.width > 0 && each.height > 0 && each.top < viewport.height && each.top + each.height > 0 && each.left < viewport.width && each.left + each.width > 0);
   const minH = Math.min(MIN_HEIGHT, Math.max(0, viewport.height - 2 * MARGIN));
-  const floor = under.length ? Math.min(...under.map((each) => each.top)) - COMPOSER_GAP : visible.length ? viewport.height - MARGIN : viewport.height - SAFE_BOTTOM;
-  const bottom = clamp(Math.round(floor), MARGIN + minH, viewport.height - MARGIN);
-  const height = clamp(base.height, minH, Math.max(minH, bottom - SAFE_TOP));
-  return { left: base.left, top: bottom - height, width: base.width, height };
+  const minW = Math.min(MIN_WIDTH, Math.max(0, viewport.width - 2 * MARGIN));
+  const right = viewport.width - MARGIN;
+  const top = Math.min(SAFE_TOP, Math.max(MARGIN, viewport.height - MARGIN - minH));
+  const bottom = viewport.height - (visible.length ? MARGIN : SAFE_BOTTOM);
+  // Each composer with its gap around it.
+  const keepOut = visible.map((each) => ({ left: each.left - COMPOSER_GAP, top: each.top - COMPOSER_GAP, width: each.width + 2 * COMPOSER_GAP, height: each.height + 2 * COMPOSER_GAP }));
+  const column = { left: base.left, top: 0, width: base.width, height: viewport.height };
+  const spans = freeSpans(top, bottom, keepOut.filter((each) => overlaps(each, column)).map((each) => [each.top, each.top + each.height]));
+  // 1. Full size, as low as it fits.
+  const fits = spans.filter(([from, to]) => to - from >= base.height).at(-1);
+  if (fits) return { left: base.left, top: Math.round(fits[1] - base.height), width: base.width, height: base.height };
+  // 2. To the right of the composers, full height.
+  const height = Math.max(minH, Math.min(base.height, bottom - top));
+  const tall = { left: 0, top: bottom - height, width: viewport.width, height };
+  const beside = keepOut.filter((each) => overlaps(each, tall));
+  const edge = beside.length ? Math.max(...beside.map((each) => each.left + each.width)) : right - base.width;
+  const width = Math.min(base.width, right - edge);
+  if (width >= minW) return { left: Math.round(right - width), top: Math.round(bottom - height), width: Math.round(width), height: Math.round(height) };
+  // 3. Shorter, in the tallest free stretch (the lower one on a tie).
+  const roomiest = spans.reduce<[number, number] | null>((best, span) => (!best || span[1] - span[0] >= best[1] - best[0] ? span : best), null);
+  if (roomiest && roomiest[1] - roomiest[0] >= Math.min(minH, SQUEEZED_HEIGHT)) return { left: base.left, top: Math.round(roomiest[0]), width: base.width, height: Math.round(roomiest[1] - roomiest[0]) };
+  // A window too small for any of these.
+  return { left: base.left, top: Math.max(MARGIN, viewport.height - MARGIN - minH), width: base.width, height: minH };
 }
 
-/** Where the card goes: where the user put it (`saved`), else its default place above the composers. */
+/** Where the card goes: where the user put it (`saved`), else its default place, clear of the composers. */
 export function placeCard(saved: QuickGeometry | null, viewport: Viewport, composers: readonly Rect[]): Rect {
   return saved ? cardRect(saved, viewport) : defaultRect(viewport, composers);
 }
