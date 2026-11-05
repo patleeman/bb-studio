@@ -21,10 +21,10 @@ DESIGN GUIDE
 
 WORK FAST: THE PAGE FIRST, IN YOUR REPLY
 The board builds while you write the page, so write it first:
-1. Any research you need comes first. Then, before any canvas tool call, write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Write it in reading order, headline first. Each part shows on the board as soon as its closing tag is written, so close parts as you go and keep each part's markup together.
+1. Any research you need comes first. Then, before any canvas tool call, write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Write it in reading order, headline first. Each part shows once its closing tag is written, so close parts as you go.
 2. Right after the block, in the same response, call canvas_images ONCE with every picture (key = the card's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"). Each picture goes into its card by itself: never write data-img for them.
 3. When it returns, reply with only the caption (one or two sentences): nothing else, no more tool calls. With no pictures, the caption goes right after the block instead.
-Which way a page goes up: a new or rewritten page is always the html block in your reply. canvas_patch changes one part (a tiny answer: one figure, one line). canvas_page is only for a message from the hands-free voice (send the caption with it, then reply with exactly that caption).
+Which way a page goes up: a new or rewritten page is always the html block in your reply. canvas_patch changes one part. canvas_page is only for a message from the hands-free voice (send the caption with it, then reply with exactly that caption).
 `.trim();
 
 const BLOCKS = `
