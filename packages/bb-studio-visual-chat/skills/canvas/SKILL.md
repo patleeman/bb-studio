@@ -3,7 +3,8 @@ name: canvas
 description: >-
   Use in a Visual Chat thread (a canvas thread), where you talk with the user
   on a board instead of in a transcript. It covers designing each answer as
-  one HTML page with the canvas_* tools, telling one story with a clear reading path, pictures and
+  one HTML page written in the reply (it streams onto the board), the
+  canvas_* tools, telling one story with a clear reading path, pictures and
   drawn charts, honest data, and keeping the reply to a short spoken caption
   that adds what the board doesn't say.
 ---
@@ -16,34 +17,42 @@ thread is your memory; they never read it.
 
 ## Every turn
 
-0. **Draft first.** Unless the answer is tiny (one figure, a one-part
-   change), your first action, before any research or pictures, is a quick
-   `canvas_page` draft: the real headline and the skeleton of the shape, each
-   section with its final `data-cv-id` and a few words of placeholder. In the
-   same response, call `canvas_images` once for every picture. The full page
-   then replaces the draft with the same ids, so it glides.
+0. **Pictures first.** When the page has pictures, your first action is ONE
+   `canvas_images` call for all of them (key: the `data-cv-id` of the card
+   you'll write), with any searches you need in the same response. No draft
+   page.
 1. Decide the ONE point the user should see first and remember.
 2. Pick the shape that tells it. Let the content decide: a plan runs along a
    timeline, a showcase is a wall of pictures, two options sit side by side,
    one key figure is set huge with its evidence, a place is a map.
-3. Write the board as one page with `canvas_page` (HTML and CSS), with a
-   clear reading path: one entry point, a few strong edges, related things
-   grouped. Cut anything that doesn't serve the point.
-4. Reply with the caption under the board: a sentence or two that adds what
-   the board doesn't say (the takeaway, a caveat or a next step). Never
-   describe the board ("the board shows", "on the board", "I've laid
-   out"): start with the point.
+3. Write the board as one page **in your reply**: one fenced html block
+   (a line `` ```html ``, optionally `` ```html style=field title="…" ``, the
+   page's HTML, then `` ``` `` on its own line). The board builds while you
+   write: each part shows once its closing tag is written, so write in
+   reading order and close parts as you go. Give it a clear reading path:
+   one entry point, a few strong edges, related things grouped. Cut anything
+   that doesn't serve the point.
+4. After the block, one line: the caption under the board, a sentence or two
+   that adds what the board doesn't say (the takeaway, a caveat or a next
+   step). Never describe the board ("the board shows", "on the board", "I've
+   laid out"): start with the point. Nothing else in the reply.
+
+**Which way a page goes up:** a new or rewritten page is always the html
+block in your reply. `canvas_patch` changes one part (a tiny answer). A
+message from the hands-free voice uses `canvas_page` with its caption, and
+the reply is only that caption (the voice reads it back).
 
 ## The tools
 
 - `canvas_page({ html, title?, style?, styleReason?, caption? })`: the whole
-  board. With the final page, pass the caption so it shows at once, then
+  board, for a message from the hands-free voice. Pass the caption, then
   reply with exactly that caption.
 - `canvas_patch({ id, html })`: one part, by its `data-cv-id` (`""` removes it).
 - `canvas_read()`: the page's source and its parts.
 - `canvas_images({ items: [{ key, query?, pageUrl? }] })`: every picture
   the page needs in ONE call, looked up in parallel (key: the card's
-  `data-cv-id`, and the card gets its picture by itself, so never copy the
+  `data-cv-id` of a card on the page or in the page you write next, and the
+  card gets its picture by itself, so never copy the
   addresses into the page; query: the thing's exact name, found with Exa when a key is
   set, else on Wikipedia; pageUrl: a page's main picture). Cached for a day.
   `canvas_image({ query?, pageUrl? })` finds a single one.
@@ -98,5 +107,5 @@ The design guide with examples is in the thread's first message;
 
 When a hands-free voice session speaks for this canvas, the voice patches
 the page while it talks and passes deeper work here. When a message comes
-from the voice, do the work, rewrite the board, and reply with the short
-caption the voice reads back.
+from the voice, do the work, rewrite the board with `canvas_page` (not in
+the reply), and reply with only the short caption the voice reads back.

@@ -213,11 +213,14 @@ describe("look instructions", () => {
 });
 
 describe("speed", () => {
-  it("has the agent draft first and look all pictures up in one call", () => {
+  it("has the agent look all pictures up in one call, then write the page in its reply, with no draft", () => {
     const rules = canvasInstructions("editorial");
-    expect(rules).toContain("Draft first");
-    expect(rules).toContain("canvas_images ONCE");
-    expect(canvasFirstNote("editorial")).toContain("WORK FAST: DRAFT FIRST");
+    expect(rules).toContain("ONE canvas_images call");
+    expect(rules).toContain("IN YOUR REPLY, as one fenced html block");
+    expect(rules).toContain("No draft page");
+    expect(rules).not.toContain("Draft first");
+    expect(canvasFirstNote("editorial")).toContain("WORK FAST: PICTURES, THEN THE PAGE IN YOUR REPLY");
+    expect(canvasFirstNote("editorial")).toContain("```html title=\"Game Boy Color\"");
   });
 
   it("names the exact tools to load on Claude Code, where plugin tools are deferred, and only there", () => {

@@ -72,11 +72,35 @@ hands-free button.
   `canvas_images` and `canvas_guide`. Only canvas threads get them, with the canvas rules and
   the `canvas` skill, and each works only on the calling thread's board.
   Hands-free voice gets the same tools.
-- **Draft first:** the agent's first action on a turn is a quick draft page
-  (the real headline and the skeleton of the shape, with the final
-  `data-cv-id`s), sent with one `canvas_images` call for every picture. The
-  full page then replaces it with the same ids, so it glides. A tiny answer
-  skips the draft.
+- **The page streams:** for a new or rewritten page, the agent looks up
+  every picture in one `canvas_images` call, then writes the page in its
+  reply as one fenced html block (`` ```html ``, optionally with
+  `style=… title="…"`), and one caption line after it. BB writes a reply's
+  text to the thread's event log as it's generated
+  (`item/agentMessage/delta`); tool input doesn't stream, which is why the
+  page goes in the reply and not in `canvas_page`. While a canvas thread
+  works, the server polls its log (`threads.events.list` after the last
+  seq, every ~180 ms), assembles the text, takes the growing html block,
+  repairs it (a half tag, attribute, entity or comment is dropped, a half
+  `<style>` keeps its finished rules, a half `<script>` is dropped, open
+  elements are closed) and publishes it over realtime, at most about 6
+  times a second (`src/stream.ts`). The page reveals each `data-cv-id` part
+  once its element is closed, with a short entrance; an open part with no
+  finished part inside stays hidden (in a `cv-wall`, a pulsing tile holds
+  its place), and an open part that holds finished parts shows them.
+  Finished parts stay as they are on screen while the rest arrives, and
+  found pictures go into cards as they appear. At idle the reply's final
+  text is committed: the html block becomes the page and a version, as
+  `canvas_page` would make it, and the words outside it the caption. The
+  finished page lands on the streamed one with no flash. If the turn ends
+  without a closing fence (or the final text is missing), what arrived is
+  committed, repaired; with no html at all the board stays and the reply is
+  the caption.
+- **Which way a page goes up:** a new or rewritten page is the html block in
+  the reply; `canvas_patch` changes one part; `canvas_page` is for a message
+  from the hands-free voice (the voice reads the reply back, so that reply
+  is only the caption). Older boards, versions and the voice tools work as
+  before.
 - **Building blocks:** `data-block="card"` (a picture with its title,
   rating with source and a line), `stat` (a big figure with its evidence),
   `step` (a timeline row), `side` (a comparison column), `quote` and
@@ -111,16 +135,17 @@ hands-free button.
 - **Styles:** Editorial (a magazine spread), Field notes (a designer's
   whiteboard) and Instrument (a control room) are token sets. The agent
   picks one per board, a style you ask for wins, and the top bar shows it.
-- **Title and caption:** the canvas's title is the topic the agent names,
-  else the page's first heading. The agent sends the caption with its final
-  page (`canvas_page`'s `caption`), so it shows with the page, and its reply
-  repeats it (the reply wins if it differs, and it's what a voice reads
-  back). The caption is written to add what the board doesn't say;
+- **Title and caption:** the canvas's title is the topic the agent names
+  (the fence line's `title`, or `canvas_page`'s), else the page's first
+  heading. The caption is the reply's line after the html block; with
+  `canvas_page` the agent sends it as `caption`, so it shows with the page,
+  and its reply repeats it (the reply wins if it differs, and it's what a
+  voice reads back). The caption is written to add what the board doesn't say;
   sentences that describe the board ("The board shows…") are dropped from
   it.
 - **Versions:** each turn's finished board is saved as a version: its
-  page, style, title, the message that led to it and the caption (drafts
-  and mid-turn patches aren't versions). ‹ › and "3 / 7" beside the chat
+  page, style, title, the message that led to it and the caption (a page
+  still streaming and mid-turn patches aren't versions). ‹ › and "3 / 7" beside the chat
   line page back and forward, with the same glide, and so do ← and → while
   the field is empty; hovering shows each version's message. A message
   sent from an old version continues from it: the board goes back to that
@@ -154,7 +179,10 @@ turn in a staged BB. `scripts/capture/canvas-directions.mjs` runs real turns in
 one canvas and saves light and dark stills after each, with the style the
 agent picked. `scripts/capture/canvas-composition.mjs` runs real turns at two
 window sizes, light and dark, and can pause a page's morph for a
-mid-animation still.
+mid-animation still. `scripts/capture/canvas-stream-timing.mjs` runs one
+prompt in new canvases on a real model and times the first visible content,
+the first real card, the final page and the turn, with the model's rounds,
+and can record the page building.
 
 ## Moving from BB Studio Canvas
 
