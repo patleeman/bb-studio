@@ -868,6 +868,17 @@ describe("interviewer", () => {
     await expect(h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' })).rejects.toThrow('cap');
     await expect(h.live.start({ sdp: 'offer' })).resolves.toBeDefined();
   });
+  it("does not replay transcript or token charges when hang-up is retried", async () => {
+    const h = interviewSetup();
+    const { sessionId } = await h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' });
+    const finalEvents = [said('Final words.'), { type: 'backend_usage' as const, input_tokens: 100, cached_tokens: 0, output_tokens: 10 }];
+    await h.live.end(sessionId, finalEvents);
+    const cost = h.live.view(sessionId).costUsd;
+    await h.live.end(sessionId, finalEvents);
+    expect(h.live.view(sessionId).transcript.filter(t => t.text === 'Final words.')).toHaveLength(1);
+    expect(h.live.view(sessionId).costUsd).toBe(cost);
+    expect(h.page).toHaveBeenCalledTimes(1);
+  });
   it("ends at the pack's time limit and produces a scorecard once", async () => {
     const h = interviewSetup();
     const { sessionId } = await h.live.start({ mode: 'interviewer', pack: PACK.id, sdp: 'offer' });

@@ -811,7 +811,12 @@ export class VoiceLive {
 
   private async finish(sessionId: string, events: readonly LiveEvent[]): Promise<VoiceLiveView> {
     const row = this.row(sessionId);
-    if (this.ended(this.events(sessionId))) { this.save(sessionId, events); return this.view(sessionId); }
+    if (this.ended(this.events(sessionId))) {
+      // Live final duration is cumulative and safe to accept again. Other events
+      // may be a retried hang-up; replaying them would duplicate words or tokens.
+      this.save(sessionId, events.filter(event => event.type === "live_usage"));
+      return this.view(sessionId);
+    }
     this.save(sessionId, events);
     const draft = this.view(sessionId, this.now());
     const parts = [`🎙 **Voice session · ${sessionLength(draft.durationMs)}**`];
