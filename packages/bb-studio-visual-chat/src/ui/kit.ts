@@ -89,8 +89,15 @@ export function canvasKit(win?: unknown): CanvasKit {
   const round = (n: number) => Math.round(n * 10) / 10;
   const str = (value: unknown) => (typeof value === "string" ? value : value === null || value === undefined ? "" : String(value));
 
+  // A currency symbol given as the unit goes in front: $30, not 30$.
+  const CURRENCY = /^(?:[$€£¥₹₩₽₪฿]|US\$|C\$|A\$|NZ\$|HK\$|R\$)$/;
+  const currencyFirst = (o: Record<string, unknown>): Record<string, unknown> => {
+    const unit = typeof o.unit === "string" ? o.unit.trim() : "";
+    return CURRENCY.test(unit) && !o.prefix ? { ...o, prefix: unit, unit: undefined } : o;
+  };
+
   const fmt = (value: unknown, options?: Record<string, unknown>): string => {
-    const o = opt(options);
+    const o = currencyFirst(opt(options));
     const n = num(value);
     if (n === null) return esc(value);
     const abs = Math.abs(n);
@@ -507,8 +514,9 @@ export function canvasKit(win?: unknown): CanvasKit {
     const color = o.color ? paint(o.color) : "var(--cv-ink)";
     const n = num(value);
     // A whole number from 1900 to 2100 with no unit or currency is a year: no thousands comma.
-    const body = n === null ? esc(value) : fmt(n, { decimals: o.decimals, compact: o.compact, year: !o.unit && !o.prefix });
-    return `<div class="cv-bignum">${o.label ? `<div class="cv-bignum-label">${esc(o.label)}</div>` : ""}<div class="cv-bignum-n" style="color:${color}${size ? `;font-size:${size}px` : ""}">${o.prefix ? `<span class="cv-bignum-unit">${esc(o.prefix)}</span>` : ""}${body}${o.unit ? `<span class="cv-bignum-unit">${esc(o.unit)}</span>` : ""}</div>${o.delta !== undefined ? delta(o.delta, { invert: o.invert, unit: o.deltaUnit }) : ""}${o.sub ? `<div class="cv-bignum-sub">${esc(o.sub)}</div>` : ""}</div>`;
+    const c = currencyFirst(o);
+    const body = n === null ? esc(value) : fmt(n, { decimals: c.decimals, compact: c.compact, year: !c.unit && !c.prefix });
+    return `<div class="cv-bignum">${o.label ? `<div class="cv-bignum-label">${esc(o.label)}</div>` : ""}<div class="cv-bignum-n" style="color:${color}${size ? `;font-size:${size}px` : ""}">${c.prefix ? `<span class="cv-bignum-unit">${esc(c.prefix)}</span>` : ""}${body}${c.unit ? `<span class="cv-bignum-unit">${esc(c.unit)}</span>` : ""}</div>${o.delta !== undefined ? delta(o.delta, { invert: o.invert, unit: o.deltaUnit }) : ""}${o.sub ? `<div class="cv-bignum-sub">${esc(o.sub)}</div>` : ""}</div>`;
   };
 
   /** A quote with no frame: big type, a hanging mark, the speaker under it. options: by, role, size (px). */

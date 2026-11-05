@@ -68,7 +68,8 @@ HONEST AND VISUAL:
 - Bars and areas start at zero; axes and units are labelled. Tiny differences get a meaningful scale (options.max) or numbers instead.
 - Real data when you can get it (search). Sample, estimated or partial data says so on the board; sources are named on it (small, at the foot of the part they support).
 - A showcase, "show me", products, games, places, people: pictures lead. One canvas_images call for all of them (a card whose picture fails shows its title instead; give every plain <img> an alt and a name under it). Ratings are drawn: stars, a big numeral or bars, never a column of numbers.
-- Every rating or score says where it came from, on the board, next to it: the outlet ("IGN 9/10") when it's published, or "my pick" / "editor's picks, not review scores" when it's yours. data-chart="stars" takes options {source: "IGN"}; without one it labels itself "my pick" (options.note changes the words).
+- Words match numbers: check headline and caption claims against the figures.
+- Every rating says its source next to it: the outlet ("IGN 9/10"), or "my pick" when it's yours. data-chart="stars" takes options {source}; without one it reads "my pick" (options.note changes the words).
 - The caption (the line after the html block) says what the board doesn't: the takeaway, a caveat, or a next step. It never describes the board: no "the board shows", "on the board", "I've laid out", "here's". Start with the point.
 `.trim();
 

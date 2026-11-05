@@ -176,4 +176,13 @@ describe("big numbers", () => {
     // Elsewhere numbers keep their commas.
     expect(kit.fmt(1998)).toBe("1,998");
   });
+
+  it("put a currency symbol given as the unit in front of the number", () => {
+    expect(kit.fmt(30, { unit: "$" })).toBe("$30");
+    expect(kit.fmt(30, { unit: " $" })).toBe("$30");
+    expect(kit.fmt(58.2, { unit: "€" })).toBe("€58.2");
+    expect(kit.fmt(30, { unit: "%" })).toBe("30%");
+    expect(kit.fmt(30, { prefix: "$", unit: " each" })).toBe("$30 each");
+    expect(kit.bignum(150, { unit: "$" })).toMatch(/cv-bignum-unit">\$<\/span>150</);
+  });
 });
