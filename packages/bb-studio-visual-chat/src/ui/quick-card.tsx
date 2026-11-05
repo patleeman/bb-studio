@@ -124,7 +124,7 @@ export function QuickCard({ store, threadId }: { store: QuickStore; threadId: st
       data-moving={moving ? "" : undefined}
       data-thread={threadId ?? "new"}
     >
-      <div className="relative min-h-0 flex-1">
+      <div className="absolute inset-0">
         <CanvasPage key={threadId ?? "new"} threadId={threadId} card={card} />
       </div>
       {HANDLES.map(({ edge, className }) => (
