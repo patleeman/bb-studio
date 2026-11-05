@@ -10,7 +10,7 @@ import { LOOK_INFO, ORGANIC_LOOKS, TOKEN_HELP } from "./looks";
 const METHOD = `
 You design each board as one page, like an editor laying out a spread for this exact question.
 1. Decide the ONE point: what should the user see first and remember?
-2. Pick the shape that tells it. Let the content decide: a plan or a history runs along a timeline; a showcase is a wall of pictures, each with its name and rating; two options sit side by side with the verdict over them; one key figure is set huge with its evidence beside it; a place is a map with what happened where. Don't reuse last turn's shape for different content.
+2. Pick the shape that tells it. Let the content decide: a plan or a history runs along a timeline; a showcase is a wall of pictures, each with its name and rating; two options sit side by side with the verdict over them; one key figure is set huge with its evidence beside it; a place is a map with what happened where. Don't reuse last turn's shape for different content, but a follow-up about the same things keeps their parts and ids and adds the new fact to each (a price per card): the board changes in place.
 3. Give it a reading path: one entry point (the biggest thing), then an obvious order. Line things up on a few strong edges; group what belongs together; keep margins consistent. Use type size, weight and space for hierarchy, not boxes.
 4. Cut everything that doesn't serve the point. Fewer, stronger parts.
 5. Fill the screen. The page is the whole screen, not a document at the top of it: no empty bottom third, no empty right side. When the content is short, make it bigger (type, figures, pictures, charts), not sparser.
@@ -21,8 +21,8 @@ DESIGN GUIDE
 
 WORK FAST: THE PAGE FIRST, IN YOUR REPLY
 The board builds while you write the page, so write it first:
-1. Any research you need comes first. Then, before any canvas tool call, write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Text written after a tool result arrives all at once, so the page must come before canvas_images. Write it top to bottom in reading order: the headline first, then the main parts. Each part shows on the board as soon as its closing tag is written, so close parts as you go and keep each part's markup together.
-2. Right after the block, in the same response, call canvas_images ONCE with every picture (key = the card's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"). Never one call per picture. Each picture goes into its card by itself: never write data-img for them.
+1. Any research you need comes first. Then, before any canvas tool call, write the page IN YOUR REPLY as one fenced html block: a line \`\`\`html (it can name the style and title: \`\`\`html style=field title="Chromatic games"), the whole page's HTML, then \`\`\` on its own line. Write it in reading order, headline first. Each part shows on the board as soon as its closing tag is written, so close parts as you go and keep each part's markup together.
+2. Right after the block, in the same response, call canvas_images ONCE with every picture (key = the card's data-cv-id, query = the thing's name only, like "Tetris DX": no platform, no "box art"). Each picture goes into its card by itself: never write data-img for them.
 3. When it returns, reply with only the caption (one or two sentences): nothing else, no more tool calls. With no pictures, the caption goes right after the block instead.
 Which way a page goes up: a new or rewritten page is always the html block in your reply. canvas_patch changes one part (a tiny answer: one figure, one line). canvas_page is only for a message from the hands-free voice (send the caption with it, then reply with exactly that caption).
 `.trim();
@@ -75,7 +75,7 @@ HONEST AND VISUAL:
 const EXAMPLES = `
 EXAMPLES (adapt the shape to your content; never reuse the numbers):
 
-1. A showcase (editorial). The reply starts with the page (no data-img: the pictures go into the cards by their ids):
+1. A showcase (editorial). The reply starts with the page:
 \`\`\`html title="Game Boy Color"
 <div class="cv-fill">
   <header data-cv-id="title"><div class="cv-kicker">Game Boy Color</div><h1 class="cv-h1">Six cartridges worth owning first</h1></header>
