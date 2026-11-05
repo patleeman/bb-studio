@@ -754,16 +754,57 @@ export function canvasKit(win?: unknown): CanvasKit {
     doc.addEventListener?.("load", (event) => { if ((event.target as Element | null)?.tagName === "IMG") { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 120); } }, true);
     w.addEventListener("resize", () => { w.clearTimeout((kit as { _fitTimer?: number })._fitTimer); (kit as { _fitTimer?: number })._fitTimer = w.setTimeout(() => kit.fit!(), 150); });
 
-    // Scripts in the page run (innerHTML doesn't run them).
+    // Scripts in the page run (innerHTML doesn't run them) once the page, or the part they're in, is committed:
+    // never while it streams. They run in order, as in a parsed page: a classic script with a src loads before
+    // the next one runs, so code after it can use the library. A classic inline script runs in a block of its
+    // own, so running it again on a new version can't fail on its own let or const. A newer run stops an older one.
     const ran = new WeakSet<Element>();
-    const runScripts = (root: HTMLElement) => root.querySelectorAll("script").forEach((old) => {
-      if (ran.has(old)) return;
-      const script = doc.createElement("script");
-      ran.add(script);
-      for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
-      script.textContent = old.textContent;
-      old.replaceWith(script);
-    });
+    let scriptRun = 0;
+    const RUNS = /^(|text\/javascript|application\/javascript|module)$/;
+    const origin = new WeakMap<Element, string>();
+    const runScripts = (root: HTMLElement) => {
+      const run = ++scriptRun;
+      const queue = Array.from(root.querySelectorAll("script")).filter((old) => !ran.has(old));
+      const next = (): void => {
+        if (run !== scriptRun) return;
+        const old = queue.shift();
+        if (!old) return;
+        if (!old.isConnected) return next();
+        const type = (old.getAttribute("type") ?? "").trim().toLowerCase();
+        if (!RUNS.test(type)) { ran.add(old); return next(); } // data (application/json and the like)
+        const script = doc.createElement("script");
+        ran.add(script);
+        origin.set(script, old.outerHTML);
+        for (const a of Array.from(old.attributes)) script.setAttribute(a.name, a.value);
+        const src = old.getAttribute("src");
+        if (!src) script.textContent = type === "module" ? old.textContent : `{\n${old.textContent ?? ""}\n}`;
+        const wait = !!src && type !== "module" && !old.hasAttribute("async");
+        if (wait) {
+          script.async = false;
+          script.addEventListener("load", () => next(), { once: true });
+          script.addEventListener("error", () => next(), { once: true });
+        }
+        old.replaceWith(script);
+        if (!wait) next();
+      };
+      next();
+    };
+    /** A part with its own script (a map, say): its live element, kept when the next version leaves it unchanged. */
+    const scripted = (root: HTMLElement) => {
+      const live = new Map<string, HTMLElement>();
+      root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => { if (el.querySelector("script") && !live.has(el.dataset.cvId!)) live.set(el.dataset.cvId!, el); });
+      return live;
+    };
+    const keepScripted = (root: HTMLElement, live: Map<string, HTMLElement>) => {
+      if (!live.size) return;
+      for (const el of Array.from(root.querySelectorAll<HTMLElement>("[data-cv-id]"))) {
+        if (!el.isConnected || !el.querySelector("script")) continue;
+        const was = live.get(el.dataset.cvId!);
+        if (was && sourceOf.get(was) === sourceOf.get(el)) el.replaceWith(was);
+      }
+    };
+    /** Page-level scripts (outside any part) that ran on the page on screen, by their source. */
+    const pageScripts = (root: HTMLElement) => new Set(Array.from(root.querySelectorAll("script")).filter((s) => origin.has(s) && !s.closest("[data-cv-id]")).map((s) => origin.get(s)!));
 
     // What a part shows, to match a part that was given a new id: its picture, else its text.
     const contentKey = (el: Element): string | null => {
@@ -788,11 +829,12 @@ export function canvasKit(win?: unknown): CanvasKit {
         const parent = el.parentElement?.closest<HTMLElement>("[data-cv-id]")?.dataset.cvId ?? null;
         before.set(el.dataset.cvId!, { r: el.getBoundingClientRect(), html: el.innerHTML, clone: el.cloneNode(true) as HTMLElement, parent, key: contentKey(el) });
       });
+      const live = options.scripts === false ? new Map<string, HTMLElement>() : scripted(root);
       root.innerHTML = html;
       // Each part's source as written, so a later stream can tell which parts it changes.
       root.querySelectorAll("[data-cv-id]").forEach((el) => sourceOf.set(el, el.outerHTML));
       if (options.scripts === false) root.querySelectorAll("script").forEach((script) => script.remove());
-      else runScripts(root);
+      else { keepScripted(root, live); runScripts(root); }
       kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root);
@@ -882,7 +924,8 @@ export function canvasKit(win?: unknown): CanvasKit {
           if (!leaf(el)) continue;
           const id = el.dataset.cvId!;
           const was = Array.from(root.querySelectorAll<HTMLElement>("[data-cv-id]")).find((each) => each.dataset.cvId === id);
-          if (!was || !leaf(was) || sourceOf.get(was) === source) continue;
+          // A part that runs its own script (a map) stays as it is until the page is committed.
+          if (!was || !leaf(was) || sourceOf.get(was) === source || was.querySelector("script")) continue;
           const next = el.cloneNode(true) as HTMLElement;
           was.replaceWith(next);
           sourceOf.set(next, source);
@@ -945,8 +988,16 @@ export function canvasKit(win?: unknown): CanvasKit {
         if (source !== undefined) { sourceOf.set(el, source); innerOf.set(el, el.innerHTML); }
         if (source !== undefined || el.hasAttribute(OPEN)) fresh.push(el);
       }
+      // The same finished page landing again (with its pictures): page-level scripts that already ran don't run again.
+      const already = final ? pageScripts(root) : null;
       root.replaceChildren(frag);
-      if (final) { root.removeAttribute("data-cv-streaming"); root.setAttribute("data-cv-streamed", ""); lastStreamed = html; runScripts(root); }
+      if (final) {
+        root.removeAttribute("data-cv-streaming");
+        root.setAttribute("data-cv-streamed", "");
+        lastStreamed = html;
+        root.querySelectorAll("script").forEach((script) => { if (!ran.has(script) && !script.closest("[data-cv-id]") && already!.has(script.outerHTML)) { ran.add(script); origin.set(script, script.outerHTML); } });
+        runScripts(root);
+      }
       kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root, true);

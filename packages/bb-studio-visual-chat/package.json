@@ -41,6 +41,7 @@
     "better-sqlite3": "^12.11.1",
     "clsx": "^2.1.1",
     "esbuild": "0.28.2",
+    "jsdom": "29.0.1",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",
