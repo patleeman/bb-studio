@@ -30,6 +30,8 @@ export const MIN_HEIGHT = 320;
 export const DEFAULT_GEOMETRY: QuickGeometry = { x: 1, y: 1, width: null, height: null };
 /** The space between the card and the top of a composer it sits above. */
 export const COMPOSER_GAP = 12;
+/** The default place stays below the page's header bar (its title and buttons) when there's room. */
+export const SAFE_TOP = 56;
 /** How far above the window's bottom the card's default place ends when no composer is on screen. */
 export const SAFE_BOTTOM = 72;
 /** BB's composers (its own APP_COMPOSER_SELECTOR); a follow-up composer's queue banner is inside it. */
@@ -65,8 +67,9 @@ export function cardRect(geometry: QuickGeometry, viewport: Viewport): Rect {
 /**
  * The card's place before the user has moved or resized it: bottom right,
  * ending above the highest composer it would overlap (`composers`, their
- * rectangles on screen), else SAFE_BOTTOM above the window's bottom. It
- * gets shorter to fit, down to its minimum.
+ * rectangles on screen), else SAFE_BOTTOM above the window's bottom, and
+ * below the page's header (SAFE_TOP). It gets shorter to fit, down to its
+ * minimum.
  */
 export function defaultRect(viewport: Viewport, composers: readonly Rect[]): Rect {
   const base = cardRect(DEFAULT_GEOMETRY, viewport);
@@ -75,7 +78,7 @@ export function defaultRect(viewport: Viewport, composers: readonly Rect[]): Rec
   const minH = Math.min(MIN_HEIGHT, Math.max(0, viewport.height - 2 * MARGIN));
   const floor = under.length ? Math.min(...under.map((each) => each.top)) - COMPOSER_GAP : visible.length ? viewport.height - MARGIN : viewport.height - SAFE_BOTTOM;
   const bottom = clamp(Math.round(floor), MARGIN + minH, viewport.height - MARGIN);
-  const height = clamp(base.height, minH, bottom - MARGIN);
+  const height = clamp(base.height, minH, Math.max(minH, bottom - SAFE_TOP));
   return { left: base.left, top: bottom - height, width: base.width, height };
 }
 

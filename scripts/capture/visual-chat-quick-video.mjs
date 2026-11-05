@@ -159,6 +159,7 @@ try {
   await sleep(800);
   await summon();
   await openCard("new");
+  await sleep(700);
   await click("[data-canvas-card] [data-canvas-card-back]");
   await until(() => card(`!!card?.querySelector("[data-canvas-page-frame][data-page-ready]")`), Boolean, 10_000, "the board, dark");
   await sleep(2500);
@@ -169,6 +170,7 @@ try {
   await sleep(1200);
   await summon();
   await openCard("new");
+  await sleep(700);
   await click("[data-canvas-card] [data-canvas-card-back]");
   await until(() => card(`!!card?.querySelector("[data-canvas-page-frame][data-page-ready]")`), Boolean, 10_000, "the board, narrow");
   await sleep(2500);

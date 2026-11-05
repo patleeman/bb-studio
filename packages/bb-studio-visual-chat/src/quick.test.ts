@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QUICK_COMMAND_ID, QUICK_COMMAND_TITLE, QUICK_SHORTCUT, registerQuickCard } from "./quick-app";
 import { createQuickStore, expandHref, neighborChats } from "./ui/quick-store";
-import { cardRect, COMPOSER_GAP, DEFAULT_GEOMETRY, defaultRect, geometryOf, loadGeometry, MARGIN, MIN_HEIGHT, MIN_WIDTH, movedRect, placeCard, QUICK_GEOMETRY_KEY, resizedRect, SAFE_BOTTOM, saveGeometry } from "./ui/quick-geometry";
+import { cardRect, COMPOSER_GAP, SAFE_TOP, DEFAULT_GEOMETRY, defaultRect, geometryOf, loadGeometry, MARGIN, MIN_HEIGHT, MIN_WIDTH, movedRect, placeCard, QUICK_GEOMETRY_KEY, resizedRect, SAFE_BOTTOM, saveGeometry } from "./ui/quick-geometry";
 import { canvasHref, canvasNewHref } from "./shared";
 
 const memory = () => {
@@ -100,11 +100,13 @@ describe("the quick card's place and size", () => {
     const rect = defaultRect(view, [composer]);
     expect(rect.left + rect.width).toBe(view.width - MARGIN);
     expect(rect.top + rect.height).toBe(composer.top - COMPOSER_GAP);
-    expect(rect.height).toBe(700);
-    // A taller composer (a long draft): the card gets shorter to stay above it.
-    const tall = defaultRect(view, [{ ...composer, top: 420, height: 536 }]);
-    expect(tall.top + tall.height).toBe(420 - COMPOSER_GAP);
-    expect(tall).toMatchObject({ top: MARGIN, height: 420 - COMPOSER_GAP - MARGIN });
+    expect(rect.height).toBe(composer.top - COMPOSER_GAP - SAFE_TOP);
+    // It stays below the page's header bar.
+    expect(rect.top).toBeGreaterThanOrEqual(SAFE_TOP);
+    // A taller composer (a long draft): the card gets shorter to stay above it and below the header.
+    const tall = defaultRect(view, [{ ...composer, top: 520, height: 436 }]);
+    expect(tall.top + tall.height).toBe(520 - COMPOSER_GAP);
+    expect(tall).toMatchObject({ top: SAFE_TOP, height: 520 - COMPOSER_GAP - SAFE_TOP });
     // In a narrow window the composer spans the width: still above it.
     const narrowView = { width: 760, height: 900 };
     const narrow = defaultRect(narrowView, [{ left: 16, top: 800, width: 728, height: 84 }]);

@@ -6,7 +6,7 @@
 // goes to the field on open and back where it was on close, and Esc closes
 // it from inside unless there's a draft in the field or dictation is on.
 // Loaded from the prebuilt bundle on the first summon (src/quick-app.tsx).
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { openAppPath } from "./studio";
 import { CanvasPage, type CardProps } from "./route";
 import { COMPOSER_SELECTOR, geometryOf, loadGeometry, movedRect, placeCard, resizedRect, saveGeometry, type Edge, type Rect, type Viewport } from "./quick-geometry";
@@ -34,7 +34,8 @@ const sameRects = (a: readonly Rect[], b: readonly Rect[]) => a.length === b.len
  */
 function useComposerRects(enabled: boolean): Rect[] {
   const [rects, setRects] = useState<Rect[]>([]);
-  useEffect(() => {
+  // Measured before the card first paints, so it never shows over the composer and then jumps.
+  useLayoutEffect(() => {
     if (!enabled) return;
     const observer = new ResizeObserver(() => measure());
     let watched: Element[] = [];
