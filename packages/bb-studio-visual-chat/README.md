@@ -179,6 +179,17 @@ or Esc, to close it.
 - **Styles:** Editorial (a magazine spread), Field notes (a designer's
   whiteboard) and Instrument (a control room) are token sets. The agent
   picks one per board, a style you ask for wins, and the top bar shows it.
+- **BB's theme:** the board, the quick card and the page chrome use BB's
+  theme tokens: background, foreground, card, muted text, border, fonts and
+  radius (`src/theme.ts`, read live by `src/ui/bb-theme.ts`). So a board
+  matches BB in light, in dark and in any palette, such as Nord or Dracula.
+  A style is an accent layer on top: its type, its accent colour, its
+  highlighter and its rules. It never brings its own background. Accents,
+  chart series and good, bad and warning colours are fitted to BB's
+  background, at 4.5:1 for text and 3:1 for marks. Charts lead with BB's
+  primary colour when it has a hue. Otherwise they lead with the style's
+  accent. The page frame and custom-item frames get the resolved tokens, and
+  they restyle in place when BB's theme changes.
 - **Title and caption:** the canvas's title is the topic the agent names
   (the fence line's `title`, or `canvas_page`'s), else the page's first
   heading. The caption is the reply's line after the html block; with
