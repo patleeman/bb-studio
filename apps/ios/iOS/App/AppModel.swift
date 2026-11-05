@@ -18,9 +18,17 @@ enum Route: Hashable {
     case dashboard(id: String)
     case mini(id: String)
     case terminals(scope: TerminalScope, title: String)
+    /// Visual Chat (the studio-visual-chat plugin): its chats, and one chat (nil: a new one).
+    case visualChats
+    case visualChat(threadId: String?)
 }
 
 extension Route {
+    var isVisualChatBoard: Bool {
+        if case .visualChat = self { return true }
+        return false
+    }
+
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
@@ -195,7 +203,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://dashboard[/<id>]`, `bbstudio://mini[/<id>]`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://dashboard[/<id>]`, `bbstudio://mini[/<id>]`, `bbstudio://visual-chat[/<threadId>|/new]`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://handsfree`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`, hands-free voice started at once), `bbstudio://loops` (the Bot's Loops).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
@@ -219,6 +227,10 @@ final class AppModel: ObservableObject {
         case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
         case "dashboard", "dashboards": openStudio(kind: "dashboard", id.map { .dashboard(id: $0) })
         case "mini", "minis": openStudio(kind: "mini", id.map { .mini(id: $0) })
+        case "visual-chat":
+            // The list under the chat, so Back goes to it.
+            openStudio(kind: nil, .visualChats)
+            if let id { studioPath.append(.visualChat(threadId: id == "new" ? nil : id)) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write

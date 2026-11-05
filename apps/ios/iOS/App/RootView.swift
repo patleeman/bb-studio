@@ -66,7 +66,8 @@ struct RootView: View {
             .tag(Tab.inbox)
 
             StudioTab()
-            .toolbar(tabVisibility, for: .tabBar)
+            // A Visual Chat board fills the screen down to its chat line.
+            .toolbar(model.studioPath.last.map(\.isVisualChatBoard) == true ? .hidden : tabVisibility, for: .tabBar)
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
 
@@ -166,6 +167,7 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .thread, .pages, .page, .automations, .automation, .usage, .archived: threadsAndTools
+        case .visualChats, .visualChat: visualChat
         default: studioItems
         }
     }
@@ -192,6 +194,14 @@ struct RouteDestination: View {
         case .dashboard(let id): DashboardView(id: id).id(id)
         case .mini(let id): MiniAppView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
+        default: EmptyView()
+        }
+    }
+
+    @ViewBuilder private var visualChat: some View {
+        switch route {
+        case .visualChats: VisualChatListView()
+        case .visualChat(let threadId): VisualChatScreen(threadId: threadId).id(threadId ?? "new")
         default: EmptyView()
         }
     }

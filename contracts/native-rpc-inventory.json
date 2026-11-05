@@ -884,6 +884,54 @@
       "coverage": "literal method checked against contract"
     },
     {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_get",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_renderer",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_view",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_version",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_send",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_create",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_webpage",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/iOS/VisualChat/VisualChatView.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_list",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
       "file": "apps/ios/iOS/VoiceLive/VoiceLiveClient.swift",
       "plugin": "studio",
       "method": "voiceLive.state",

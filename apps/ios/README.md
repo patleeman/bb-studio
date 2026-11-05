@@ -249,6 +249,35 @@ server: `-qaDashboardDemo -openURL bbstudio://dashboard/qa-demo`
 `-qaDashboardWidgets w_signups,w_plans` to keep only some widgets; the IDs are
 in `iOS/Studio/DashboardDemo.swift`.
 
+## Visual Chat
+
+With the Visual Chat plugin (`studio-visual-chat`) running, the Studio tab has
+a Visual Chat card. It opens the chats (`canvas.list`) and New chat; a chat is
+the board, filling the screen, over one chat line at the bottom: the caption
+(two lines), ‹ › through the versions (`canvas.version`, `canvas.view`), the
+field, Talk's dictation and Send. A new chat and every message go out with the
+screen the user is on (`client: { kind, width, height }`: a phone, the folded
+or open Duo), so the agent composes for it. It runs on the chat's default model
+(Sonnet 5.5); there's no model picker, and hands-free voice comes later.
+
+The board is drawn by the plugin's own renderer, the same code as the desktop
+page (`canvas.renderer`: one script, kept on disk per server by its version
+and checked against it, so it downloads only when the plugin changes). It runs
+in a web view whose top document is the app's: a small host page on a
+`https://visual-chat.invalid/` origin that's never fetched, with no stored data
+(`.nonPersistent()`). The agent's page is in the same sandboxed frame as on the
+desktop (`allow-scripts`, an opaque origin), and maps, videos, songs and
+webpage parts are frames beside it, placed by the renderer. The top document
+never navigates; it reaches the app only through four bridge messages
+(`ready`, `open`, `webpage`, `rendered`, parsed strictly and only from the top
+frame). Open on a webpage part, and a link from an embed's popup, open in
+Safari's view. The page the agent is writing streams in from the plugin's
+realtime channel, as on the desktop, and the board lands on the finished page.
+A board from before pages (items) isn't drawn on the phone.
+
+`VisualChatStillsUITests` takes the stills from a staged BB
+(`TEST_RUNNER_BBGO_QA_SERVER`; see the test for its other settings).
+
 ## Dictation and hands-free voice
 
 The composer has one mic and one indicator, as on desktop (Studio's page

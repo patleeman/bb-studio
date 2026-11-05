@@ -611,6 +611,11 @@ struct StudioView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
+            if query.isEmpty, !selecting, store.plugins.contains(VisualChatPlugin.id) {
+                Section { visualChatCard }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
             if chips, showsFilter {
                 Section { kindFilter }
                     .listRowInsets(EdgeInsets())
@@ -688,6 +693,28 @@ struct StudioView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Visual Chat (its own plugin): its chats and New chat.
+    private var visualChatCard: some View {
+        Button { app.studioPath.append(.visualChats) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.3.group.bubble").font(.title2).foregroundStyle(.purple)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Visual Chat").font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    Text("Ask anything; the answer is a board.").font(.footnote).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            .contentShape(.rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 4)
+        .accessibilityIdentifier("studioVisualChat")
     }
 
     private func tile(

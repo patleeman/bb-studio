@@ -1,0 +1,1963 @@
+{
+  "pluginId": "studio-visual-chat",
+  "methods": {
+    "canvas.list": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "canvases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "itemCount": {
+                  "type": "number"
+                },
+                "look": {
+                  "type": "string",
+                  "enum": [
+                    "editorial",
+                    "field",
+                    "instrument",
+                    "classic"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "threadId",
+                "title",
+                "updatedAt",
+                "createdAt",
+                "itemCount",
+                "look"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "canvases"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "canvas": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "itemCount": {
+                    "type": "number"
+                  },
+                  "look": {
+                    "type": "string",
+                    "enum": [
+                      "editorial",
+                      "field",
+                      "instrument",
+                      "classic"
+                    ]
+                  },
+                  "execution": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "reasoningLevel": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "model",
+                          "reasoningLevel"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pendingExecution": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "reasoningLevel": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "model",
+                          "reasoningLevel"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "rev": {
+                    "type": "number"
+                  },
+                  "turn": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "failed"
+                    ]
+                  },
+                  "page": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "caption": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "headline",
+                            "caption",
+                            "stat",
+                            "line",
+                            "bar",
+                            "area",
+                            "pie",
+                            "table",
+                            "list",
+                            "ticker",
+                            "progress",
+                            "image",
+                            "custom",
+                            "quote",
+                            "timeline",
+                            "map",
+                            "multiples"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "data": {},
+                        "options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "html": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "size": {
+                          "type": "string",
+                          "enum": [
+                            "s",
+                            "m",
+                            "l",
+                            "xl"
+                          ]
+                        },
+                        "importance": {
+                          "type": "number"
+                        },
+                        "scale": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "hero",
+                                "large",
+                                "medium",
+                                "small",
+                                "tiny"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "region": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "top-left",
+                                "top",
+                                "top-right",
+                                "left",
+                                "center",
+                                "right",
+                                "bottom-left",
+                                "bottom",
+                                "bottom-right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinnedTo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "point": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "side": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "above",
+                                "below"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "bleed": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        },
+                        "rev": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "data",
+                        "options",
+                        "html",
+                        "size",
+                        "importance",
+                        "createdAt",
+                        "updatedAt",
+                        "rev"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "changes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seq": {
+                          "type": "number"
+                        },
+                        "rev": {
+                          "type": "number"
+                        },
+                        "turn": {
+                          "type": "number"
+                        },
+                        "op": {
+                          "type": "string",
+                          "enum": [
+                            "add",
+                            "update",
+                            "remove",
+                            "clear",
+                            "style",
+                            "page",
+                            "patch"
+                          ]
+                        },
+                        "itemId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "by": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "seq",
+                        "rev",
+                        "turn",
+                        "op",
+                        "itemId",
+                        "summary",
+                        "by",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "history": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seq": {
+                          "type": "number"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "seq",
+                        "role",
+                        "text",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "versions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "n": {
+                          "type": "number"
+                        },
+                        "look": {
+                          "type": "string",
+                          "enum": [
+                            "editorial",
+                            "field",
+                            "instrument",
+                            "classic"
+                          ]
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "caption": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "rev": {
+                          "type": "number"
+                        },
+                        "from": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "at": {
+                          "type": "number"
+                        },
+                        "items": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "n",
+                        "look",
+                        "title",
+                        "prompt",
+                        "caption",
+                        "rev",
+                        "from",
+                        "at",
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "viewing": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "threadId",
+                  "title",
+                  "updatedAt",
+                  "createdAt",
+                  "itemCount",
+                  "look",
+                  "execution",
+                  "pendingExecution",
+                  "rev",
+                  "turn",
+                  "status",
+                  "caption",
+                  "items",
+                  "changes",
+                  "history",
+                  "versions",
+                  "viewing"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "canvas"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.create": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          },
+          "voice": {
+            "type": "boolean"
+          },
+          "providerId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "reasoningLevel": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "look": {
+            "type": "string",
+            "enum": [
+              "editorial",
+              "field",
+              "instrument",
+              "classic"
+            ]
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "phone",
+                  "duo-folded",
+                  "duo-unfolded",
+                  "desktop"
+                ]
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 10000
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "kind",
+              "width",
+              "height"
+            ]
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "canvasId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "canvasId",
+          "threadId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.voice": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "function"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "description",
+                "parameters"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "instructions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tools",
+          "instructions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.voiceRun": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "args": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "threadId",
+          "name",
+          "args"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "output": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.version": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "n": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "threadId",
+          "n"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "n": {
+                    "type": "number"
+                  },
+                  "look": {
+                    "type": "string",
+                    "enum": [
+                      "editorial",
+                      "field",
+                      "instrument",
+                      "classic"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "caption": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rev": {
+                    "type": "number"
+                  },
+                  "from": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "at": {
+                    "type": "number"
+                  },
+                  "items": {
+                    "type": "boolean"
+                  },
+                  "page": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "board": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "headline",
+                            "caption",
+                            "stat",
+                            "line",
+                            "bar",
+                            "area",
+                            "pie",
+                            "table",
+                            "list",
+                            "ticker",
+                            "progress",
+                            "image",
+                            "custom",
+                            "quote",
+                            "timeline",
+                            "map",
+                            "multiples"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "data": {},
+                        "options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "html": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "size": {
+                          "type": "string",
+                          "enum": [
+                            "s",
+                            "m",
+                            "l",
+                            "xl"
+                          ]
+                        },
+                        "importance": {
+                          "type": "number"
+                        },
+                        "scale": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "hero",
+                                "large",
+                                "medium",
+                                "small",
+                                "tiny"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "region": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "top-left",
+                                "top",
+                                "top-right",
+                                "left",
+                                "center",
+                                "right",
+                                "bottom-left",
+                                "bottom",
+                                "bottom-right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinnedTo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "point": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "side": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "above",
+                                "below"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "bleed": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        },
+                        "rev": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "data",
+                        "options",
+                        "html",
+                        "size",
+                        "importance",
+                        "createdAt",
+                        "updatedAt",
+                        "rev"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "n",
+                  "look",
+                  "title",
+                  "prompt",
+                  "caption",
+                  "rev",
+                  "from",
+                  "at",
+                  "items",
+                  "page",
+                  "board"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.view": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "n"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "viewing": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "viewing"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.send": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          },
+          "fromVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "client": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "phone",
+                  "duo-folded",
+                  "duo-unfolded",
+                  "desktop"
+                ]
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 10000
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "kind",
+              "width",
+              "height"
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "text"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "threadId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "threadId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.models": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      },
+                      "reasoningLevels": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "defaultReasoningLevel": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "isDefault",
+                      "reasoningLevels",
+                      "defaultReasoningLevel"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "error",
+                "models"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "providers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.setModel": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "reasoningLevel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "providerId",
+          "model"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "unchanged",
+              "same-thread",
+              "new-thread-next-turn"
+            ]
+          },
+          "canvas": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "itemCount": {
+                    "type": "number"
+                  },
+                  "look": {
+                    "type": "string",
+                    "enum": [
+                      "editorial",
+                      "field",
+                      "instrument",
+                      "classic"
+                    ]
+                  },
+                  "execution": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "reasoningLevel": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "model",
+                          "reasoningLevel"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "pendingExecution": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "reasoningLevel": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "model",
+                          "reasoningLevel"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "rev": {
+                    "type": "number"
+                  },
+                  "turn": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "failed"
+                    ]
+                  },
+                  "page": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "caption": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "headline",
+                            "caption",
+                            "stat",
+                            "line",
+                            "bar",
+                            "area",
+                            "pie",
+                            "table",
+                            "list",
+                            "ticker",
+                            "progress",
+                            "image",
+                            "custom",
+                            "quote",
+                            "timeline",
+                            "map",
+                            "multiples"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "data": {},
+                        "options": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "html": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "size": {
+                          "type": "string",
+                          "enum": [
+                            "s",
+                            "m",
+                            "l",
+                            "xl"
+                          ]
+                        },
+                        "importance": {
+                          "type": "number"
+                        },
+                        "scale": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "hero",
+                                "large",
+                                "medium",
+                                "small",
+                                "tiny"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "region": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "top-left",
+                                "top",
+                                "top-right",
+                                "left",
+                                "center",
+                                "right",
+                                "bottom-left",
+                                "bottom",
+                                "bottom-right"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pinnedTo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "point": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "side": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "above",
+                                "below"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "bleed": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        },
+                        "rev": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "data",
+                        "options",
+                        "html",
+                        "size",
+                        "importance",
+                        "createdAt",
+                        "updatedAt",
+                        "rev"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "changes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seq": {
+                          "type": "number"
+                        },
+                        "rev": {
+                          "type": "number"
+                        },
+                        "turn": {
+                          "type": "number"
+                        },
+                        "op": {
+                          "type": "string",
+                          "enum": [
+                            "add",
+                            "update",
+                            "remove",
+                            "clear",
+                            "style",
+                            "page",
+                            "patch"
+                          ]
+                        },
+                        "itemId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "by": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "seq",
+                        "rev",
+                        "turn",
+                        "op",
+                        "itemId",
+                        "summary",
+                        "by",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "history": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "seq": {
+                          "type": "number"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "seq",
+                        "role",
+                        "text",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "versions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "n": {
+                          "type": "number"
+                        },
+                        "look": {
+                          "type": "string",
+                          "enum": [
+                            "editorial",
+                            "field",
+                            "instrument",
+                            "classic"
+                          ]
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "caption": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "rev": {
+                          "type": "number"
+                        },
+                        "from": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "at": {
+                          "type": "number"
+                        },
+                        "items": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "n",
+                        "look",
+                        "title",
+                        "prompt",
+                        "caption",
+                        "rev",
+                        "from",
+                        "at",
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "viewing": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "threadId",
+                  "title",
+                  "updatedAt",
+                  "createdAt",
+                  "itemCount",
+                  "look",
+                  "execution",
+                  "pendingExecution",
+                  "rev",
+                  "turn",
+                  "status",
+                  "caption",
+                  "items",
+                  "changes",
+                  "history",
+                  "versions",
+                  "viewing"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "canvas"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.webpage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "threadId",
+          "url"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "invalid",
+              "frame",
+              "card"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "card": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "site": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "image": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "title",
+                  "site",
+                  "summary",
+                  "image"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "url",
+          "source",
+          "card"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "canvas.renderer": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "js": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "js"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
