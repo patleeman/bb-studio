@@ -462,6 +462,18 @@ export class CanvasStore {
     this.found.set(canvasId, map);
   }
 
+  /** What the user wrote in this chat (their messages, oldest first): where a webpage part's URL may come from. */
+  userTexts(canvasId: string, limit = 200): string[] {
+    return (this.db.prepare("SELECT text FROM canvas_turns WHERE canvas_id = ? AND role = 'user' ORDER BY seq DESC LIMIT ?").all(canvasId, limit) as { text: string }[]).map((row) => row.text).reverse();
+  }
+  /** Webpage URLs (normalised, src/webpage.ts) this canvas may show, and where each came from. */
+  webpageSource(canvasId: string, key: string): string | null {
+    return (this.db.prepare("SELECT source FROM canvas_webpage_urls WHERE canvas_id = ? AND url = ?").get(canvasId, key) as { source: string } | undefined)?.source ?? null;
+  }
+  verifyWebpage(canvasId: string, key: string, source: string): void {
+    this.db.prepare("INSERT INTO canvas_webpage_urls (canvas_id, url, source, at) VALUES (?, ?, ?, ?) ON CONFLICT(canvas_id, url) DO NOTHING").run(canvasId, key, source, this.now());
+  }
+
   setPage(canvasId: string, html: string, by: CanvasActor, title: string | null = null): { rev: number; parts: number } {
     if (new TextEncoder().encode(html).length > CANVAS_LIMITS.pageBytes) throw new Error(`The page is over ${CANVAS_LIMITS.pageBytes / 1024} KB; make it leaner.`);
     if (!html.trim()) throw new Error("The page is empty.");

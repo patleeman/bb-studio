@@ -56,4 +56,8 @@ export const CANVAS_MIGRATIONS: string[] = [
     PRIMARY KEY (canvas_id, n)
   );
   ALTER TABLE canvases ADD COLUMN viewing INTEGER;`,
+  // Webpage parts (src/webpage.ts): the URLs a canvas may show (from the user, or the agent's own fetch or
+  // search results in the turn that used them), and each page's framing and link card, cached for a day.
+  `CREATE TABLE canvas_webpage_urls (canvas_id TEXT NOT NULL, url TEXT NOT NULL, source TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (canvas_id, url));
+  CREATE TABLE canvas_webpage_cache (url TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL);`,
 ];

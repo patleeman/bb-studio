@@ -89,8 +89,10 @@ the reply is only that caption (the voice reads it back).
 - Embeds: `<div data-embed="map" data-q="retro game stores near 10604" data-cv-id="map">`
   (also `point` with `data-lat`/`data-lon`/`data-label`, `youtube` with `data-id`,
   `spotify` with `data-kind` and `data-id`). Visual Chat frames the real thing over
-  it; never a URL, never invented coordinates. For "near X", a map embed beside a
-  list from your research.
+  it; never invented coordinates. For "near X", a map embed beside a list from
+  your research. `page` with `data-url` shows a webpage (framed, or a link card,
+  with Open) only for a URL the user gave or you fetched or found this turn;
+  never invent one.
 - No other network but https pictures from `canvas_images`.
 
 ## Claude Code

@@ -65,7 +65,7 @@ export function privateAddress(address: string): boolean {
 }
 
 /** One HTTP exchange, already connected to a checked address: what safeFetch needs back. */
-export interface Exchange { status: number; location: string | null; type: string; body: AsyncIterable<Uint8Array> | null; close(): void }
+export interface Exchange { status: number; location: string | null; type: string; body: AsyncIterable<Uint8Array> | null; close(): void; headers?: Record<string, string | string[] | undefined> }
 /**
  * Sends a GET to url, connecting to exactly this IP address (the one that was checked): a lookup that always
  * answers with it, while the Host header and TLS server name (SNI) stay the URL's host. Nothing resolves the
@@ -92,6 +92,7 @@ export const pinnedTransport: Transport = (url, address, signal) => new Promise(
       location: typeof response.headers.location === "string" ? response.headers.location : null,
       type: String(response.headers["content-type"] ?? ""),
       body: response,
+      headers: response.headers,
       close: () => response.destroy(),
     });
   });
@@ -104,7 +105,7 @@ export const pinnedTransport: Transport = (url, address, signal) => new Promise(
  * and the request connects to that exact address (pinnedTransport). At most 3 redirects, each checked the same
  * way; a time limit and a size cap.
  */
-export async function safeFetch(url: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<{ url: string; text: string; type: string }> {
+export async function safeFetch(url: string, deps: Pick<ImageDeps, "lookup" | "transport"> = {}): Promise<{ url: string; text: string; type: string; headers?: Record<string, string | string[] | undefined> }> {
   const resolve = deps.lookup ?? ((host: string) => dnsLookup(host, { all: true }));
   const transport = deps.transport ?? pinnedTransport;
   let current = url;
@@ -136,7 +137,7 @@ export async function safeFetch(url: string, deps: Pick<ImageDeps, "lookup" | "t
           if (bytes > PAGE_BYTES) { response.close(); break; }
         }
       }
-      return { url: parsed.toString(), text, type: response.type };
+      return { url: parsed.toString(), text, type: response.type, headers: response.headers };
     } finally {
       clearTimeout(timer);
     }
@@ -145,11 +146,11 @@ export async function safeFetch(url: string, deps: Pick<ImageDeps, "lookup" | "t
 }
 
 /** Tracking parameters an image address doesn't need (and shouldn't carry to the page). */
-const TRACKING = /^(utm_.*|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|_hsenc|_hsmi|ref_src|yclid|oly_.*|vero_.*)$/i;
+export const TRACKING_PARAM = /^(utm_.*|fbclid|gclid|dclid|gbraid|wbraid|msclkid|mc_cid|mc_eid|igshid|_hsenc|_hsmi|ref_src|yclid|oly_.*|vero_.*)$/i;
 export function stripTracking(raw: string): string {
   try {
     const url = new URL(raw);
-    for (const key of [...url.searchParams.keys()]) if (TRACKING.test(key)) url.searchParams.delete(key);
+    for (const key of [...url.searchParams.keys()]) if (TRACKING_PARAM.test(key)) url.searchParams.delete(key);
     return url.toString();
   } catch { return raw; }
 }

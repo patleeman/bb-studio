@@ -19,6 +19,7 @@ import { CANVAS_CHANNEL, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, CANVAS_METADAT
 import { PageStream, STREAM_EVENT_TYPES, turnPage, type EventRow, type TurnPage } from "./stream";
 import { CanvasStore, type CanvasActor } from "./store";
 import { ImageCache, type ImageDeps } from "./image";
+import { normalizeUrl, pageUrlsIn, provenanceOf, webpageInfo, webpageUrl, WebpageCache, type TurnItem } from "./webpage";
 import { CANVAS_TOOL_DESCRIPTIONS, CANVAS_TOOL_NAMES, CANVAS_TOOL_PARAMS, canvasVoiceTools, describeBoard, isCanvasTool, runCanvasTool, type CanvasToolName } from "./tools";
 
 export { CANVAS_TOOL_NAMES as CANVAS_TOOLS } from "./tools";
@@ -86,10 +87,53 @@ export const CANVAS_DEFAULT_MODEL = { providerId: CANVAS_DEFAULT_EXECUTION.provi
 const PERSONAL_PROJECT_ID = "proj_personal";
 
 /** Registers the canvas RPCs, agent tools and thread events. The plugin has run the migrations. */
-export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps; streamIntervalMs?: number } = {}): BuiltinCanvas {
+export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: { now?: () => number; images?: ImageDeps; streamIntervalMs?: number; webpages?: Pick<ImageDeps, "lookup" | "transport"> } = {}): BuiltinCanvas {
   const store = new CanvasStore(db, options.now);
   // Found pictures are reused for a day (memory and this plugin's database).
   const images: ImageDeps | undefined = options.images ? { cache: new ImageCache(db, options.now), ...options.images } : undefined;
+  // Webpage parts (src/webpage.ts): looked-up pages are reused for a day.
+  const webpages = new WebpageCache(db, options.now);
+  /** The current turn's completed items (web fetches and searches among them): the log back to the turn's start. */
+  const turnItems = async (threadId: string): Promise<TurnItem[]> => {
+    const items: TurnItem[] = [];
+    let before: number | null = null;
+    for (let page = 0; page < 5; page++) {
+      const rows = await events({ threadId, order: "desc", limit: "200", types: ["turn/started", "item/completed"], ...(before !== null ? { beforeSeq: String(before) } : {}) });
+      for (const row of rows) {
+        if (row.type === "turn/started") return items;
+        const item = row.data?.item as TurnItem | undefined;
+        if (item && (item.type === "webFetch" || item.type === "webSearch")) items.push(item);
+      }
+      if (rows.length < 200) break;
+      before = rows.at(-1)!.seq;
+    }
+    return items;
+  };
+  /**
+   * Where a webpage part's URL came from, once: the user's messages in this chat, or the agent's own fetch or
+   * search results in the current turn. A URL verified once stays verified for the canvas. Null: not verified.
+   */
+  const verifyWebpage = async (canvasId: string, threadId: string, url: string): Promise<string | null> => {
+    const key = normalizeUrl(url);
+    if (!key) return null;
+    const known = store.webpageSource(canvasId, key);
+    if (known) return known;
+    let items: TurnItem[] = [];
+    try { items = await turnItems(threadId); } catch (error) { bb.log.warn(`Visual Chat couldn't read the thread's log to check a link: ${error instanceof Error ? error.message : String(error)}`); }
+    const source = provenanceOf(url, store.userTexts(canvasId), items);
+    if (source) store.verifyWebpage(canvasId, key, source);
+    return source;
+  };
+  /** A page was committed: its webpage parts are checked now, while their turn's log is the current one. */
+  const verifyPageUrls = (canvasId: string) => {
+    const row = store.get(canvasId);
+    if (!row?.thread_id || !row.page) return;
+    const threadId = row.thread_id;
+    for (const raw of pageUrlsIn(row.page)) {
+      const url = webpageUrl(raw);
+      if (url) void verifyWebpage(canvasId, threadId, url).catch(() => {});
+    }
+  };
   /** Canvases whose thread is being made: a tool call that races the spawn waits for it. */
   const pending = new Set<Promise<unknown>>();
 
@@ -110,6 +154,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
 
   const run = async (canvasId: string, name: CanvasToolName, input: unknown, by: CanvasActor) => {
     const result = await runCanvasTool(store, canvasId, name, input, by, images);
+    if (name === "canvas_page" || name === "canvas_patch") verifyPageUrls(canvasId);
     if (result.changed) publish(canvasId);
     return result;
   };
@@ -232,6 +277,15 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       const row = store.byThread(threadId);
       if (!row) return { output: "This session isn't speaking for a canvas, so there's no board to edit." };
       return { output: (await run(row.id, name, args, "voice")).text };
+    },
+    async "canvas.webpage"({ threadId, url }) {
+      const row = store.byThread(threadId);
+      const safe = webpageUrl(url);
+      if (!row?.thread_id || !safe) return { status: "invalid" as const, url, source: null, card: null };
+      const source = await verifyWebpage(row.id, row.thread_id, safe);
+      if (!source) return { status: "unverified" as const, url: safe, source: null, card: null };
+      const info = await webpageInfo(safe, webpages, options.webpages ?? {});
+      return { status: info.framable ? "frame" as const : "card" as const, url: safe, source, card: info.card };
     },
     "canvas.version"({ threadId, n }) {
       const row = store.byThread(threadId);
@@ -383,6 +437,7 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
     try {
       if (style && store.get(canvasId)?.look !== style) store.edit(canvasId, [{ op: "style", look: style, reason: null }], "agent");
       store.setPage(canvasId, fillPictures(html.trim(), store.pictures(canvasId)).html, "agent", title);
+      verifyPageUrls(canvasId);
       return true;
     } catch (error) {
       bb.log.warn(`Visual Chat couldn't use the page in the reply: ${error instanceof Error ? error.message : String(error)}`);

@@ -12,7 +12,12 @@ export const EMBED_MESSAGE = "bb-canvas-embeds";
 export const EMBED_ORIGINS = ["https://maps.google.com", "https://www.openstreetmap.org", "https://www.youtube-nocookie.com", "https://open.spotify.com"] as const;
 /** The embed's own sandbox: its own origin (a different one from BB's), scripts, popups (BB opens them in the browser) and fullscreen video. Never top navigation. */
 export const EMBED_SANDBOX = "allow-scripts allow-same-origin allow-popups allow-presentation";
-export const EMBED_KINDS = ["map", "point", "youtube", "spotify"] as const;
+/**
+ * A webpage part's own sandbox, when its site allows framing: its own origin and scripts (pages break without
+ * storage), and nothing else: no popups, forms, downloads or top navigation. The Open button opens it in full.
+ */
+export const PAGE_SANDBOX = "allow-scripts allow-same-origin";
+export const EMBED_KINDS = ["map", "point", "youtube", "spotify", "page"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 export const SPOTIFY_KINDS = ["track", "album", "playlist"] as const;
 /** At most this many embeds on a page, and this many kept alive (hidden) for a later version. */
@@ -30,6 +35,7 @@ export interface EmbedFields {
   id?: unknown;
   kind?: unknown;
   start?: unknown;
+  url?: unknown;
 }
 
 export interface BuiltEmbed {
@@ -38,6 +44,8 @@ export interface BuiltEmbed {
   title: string;
   referrerPolicy: "no-referrer" | "strict-origin-when-cross-origin";
   allow: string;
+  /** "page": a URL the agent gave, shown only after the server checks where it came from (canvas.webpage). */
+  sandbox: string;
 }
 
 const text = (value: unknown, max: number): string | null => {
@@ -58,7 +66,13 @@ const fixed = (n: number) => String(Math.round(n * 1e6) / 1e6);
 /** The URL for an embed, from its fields, or null when a field is missing or wrong. Never takes a URL. */
 export function buildEmbed(fields: EmbedFields, mode: "light" | "dark" = "light"): BuiltEmbed | null {
   const kind = typeof fields.embed === "string" ? fields.embed.trim().toLowerCase() : "";
-  let built: BuiltEmbed | null = null;
+  let built: Omit<BuiltEmbed, "sandbox"> | null = null;
+  if (kind === "page") {
+    // The one kind with a URL from the agent: https on a public-looking host here; the server then checks it
+    // came from the user or the agent's own fetch or search (canvas.webpage) before anything is framed.
+    const url = pageUrl(fields.url);
+    return url ? { kind, url, title: text(fields.label, 120) ?? new URL(url).hostname.replace(/^www\./, ""), referrerPolicy: "no-referrer", allow: "", sandbox: PAGE_SANDBOX } : null;
+  }
   if (kind === "map") {
     // Google finds the places for a query (no key): "retro game stores near 10604".
     const q = text(fields.q, 200);
@@ -90,7 +104,18 @@ export function buildEmbed(fields: EmbedFields, mode: "light" | "dark" = "light"
   }
   if (!built) return null;
   // The allowlist, checked on the URL as built.
-  return (EMBED_ORIGINS as readonly string[]).includes(new URL(built.url).origin) ? built : null;
+  return (EMBED_ORIGINS as readonly string[]).includes(new URL(built.url).origin) ? { ...built, sandbox: EMBED_SANDBOX } : null;
+}
+
+/** A webpage part's URL: https, a host name with a dot (no IP, localhost or .local), no credentials or port. As webpageUrl on the server. */
+export function pageUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > 2000) return null;
+  let url: URL;
+  try { url = new URL(raw.trim()); } catch { return null; }
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return null;
+  const host = url.hostname.toLowerCase();
+  if (!host.includes(".") || /\.(localhost|local|internal)$/.test(host) || /^[\d.]+$/.test(host) || host.includes(":")) return null;
+  return url.toString();
 }
 
 export interface EmbedRect { x: number; y: number; w: number; h: number }

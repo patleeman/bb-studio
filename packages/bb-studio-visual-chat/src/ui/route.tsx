@@ -3,7 +3,7 @@
 // bottom: the agent's latest caption, a text field, the dictation mic and
 // the hands-free button. Loaded on demand by app.tsx.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { cn, errorMessage, HANDSFREE_START_EVENT, Icon, INSERT_EVENT, openAppPath, STATE_EVENT, TOGGLE_EVENT, useWidgetTheme } from "./studio";
 import type { canvasContract } from "../contract";
@@ -14,7 +14,7 @@ import { useBbTheme } from "./bb-theme";
 import { lookCss } from "./board-css";
 import { ModelPicker } from "./model-picker";
 import { OrganicBoard, type BoardItem } from "./organic-board";
-import { PageFrame } from "./page-frame";
+import { PageFrame, type EmbedServices } from "./page-frame";
 import { CardHeader, useCardSteps, type CardSteps } from "./quick-header";
 import { useCanvas } from "./use-canvas";
 
@@ -137,6 +137,12 @@ export function CanvasPage({ threadId, card }: { threadId: string | null; card?:
   // BB's theme tokens, live: the board's ground, text, rules and cards, under the style's accent layer.
   const bb = useBbTheme();
   const { canvas: own, stream: liveStream, send, reload } = useCanvas(threadId);
+  // Webpage parts: the server checks each URL (canvas.webpage); Open hands it to BB's openUrl when clicked.
+  const navigate = useBbNavigate();
+  const embedServices = useMemo<EmbedServices>(() => ({
+    webpage: (url) => (threadId ? rpc.call("canvas.webpage", { threadId, url }) : Promise.reject(new Error("No canvas yet."))),
+    openUrl: (url) => { navigate.openUrl(url); },
+  }), [rpc, threadId, navigate]);
   // Remember the open canvas, so coming back to Canvas reopens it (the card's chats don't change what the page reopens).
   useEffect(() => { if (!card && threadId && own) writeLast(threadId); }, [card, threadId, own]);
   const preview = usePreview(!card);
@@ -216,7 +222,7 @@ export function CanvasPage({ threadId, card }: { threadId: string | null; card?:
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : card ? "overflow-y-auto px-4 pt-1" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : (page || stream) && look !== "classic" ? (
-          <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={bb.mode} title={canvas?.title ?? "Visual Chat"} />
+          <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={bb.mode} title={canvas?.title ?? "Visual Chat"} services={embedServices} />
         ) : look !== "classic" ? (
           <OrganicBoard
             key={preview ? "preview" : "board"}

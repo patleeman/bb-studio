@@ -165,6 +165,24 @@ or Esc, to close it.
   sits as it scrolls, resizes, zooms or gets a new version. The embeds are
   clipped to the board, hide while parts glide, fade back in, and keep their
   frame (no reload) while the part and its URL stay the same.
+- **Webpage parts:** `<div data-embed="page" data-url="https://…" data-cv-id="…">`
+  shows a webpage, but only one whose URL came from the user in this chat, or
+  from the agent's own web fetch or web search results in the turn that put it
+  on the board (the thread's event log, compared as normalised URLs). A link
+  that only appears inside a fetched page doesn't count, and an unverified URL
+  shows only "Link not verified"; a URL verified once stays verified for the
+  chat (`src/webpage.ts`, `canvas.webpage`). The server then GETs the page once
+  (public addresses only, as for pictures) and caches it for a day: a page
+  without X-Frame-Options and with no closed `frame-ancestors` is framed over
+  the placeholder with sandbox `allow-scripts allow-same-origin` (no popups,
+  forms, downloads or top navigation) and no referrer; any other gets a link
+  card from its OpenGraph title, site, summary and https picture. Most big
+  sites refuse framing (GitHub, Reddit, X, Stack Overflow, the news sites);
+  Wikipedia, docs sites and small blogs allow it. Both have an **Open** button
+  that hands the URL to BB's `openUrl` when clicked: BB's browser beside the
+  board on desktop when links open in BB, else the external browser. Nothing
+  opens by itself, and nothing reads the page back to the agent. The framed
+  page runs in BB's window session, not the Browser's signed-in one.
 - **Pictures:** `canvas_images` looks a batch up in one call, in parallel;
   `canvas_image` finds one. Each returns an https address with alt text and
   its source. A query goes to Exa when an Exa API key is set, else to

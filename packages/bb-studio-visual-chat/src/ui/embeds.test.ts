@@ -5,9 +5,9 @@ import { createRoot } from "react-dom/client";
 // @ts-expect-error: as above.
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildEmbed, EMBED_MESSAGE, EMBED_ORIGINS, EMBED_SANDBOX, keepEmbeds, MAX_KEPT, readEmbedReport, type EmbedReport, type PlacedEmbed } from "./embeds";
+import { buildEmbed, EMBED_MESSAGE, EMBED_ORIGINS, EMBED_SANDBOX, keepEmbeds, MAX_KEPT, PAGE_SANDBOX, readEmbedReport, type EmbedReport, type PlacedEmbed } from "./embeds";
 import { canvasKit, type CanvasKit } from "./kit";
-import { EmbedLayer } from "./page-frame";
+import { EmbedLayer, type EmbedServices } from "./page-frame";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const YT = "dQw4w9WgXcQ", SP = "4cOdK2wGLETKBW3PvgPWqT";
@@ -212,5 +212,59 @@ describe("the page's embed reports", () => {
     cv.morph!(page, `<h1 data-cv-id="t">Gone</h1>`, false);
     await settle();
     expect(messages.at(-1)!.embeds).toEqual([]);
+  });
+});
+
+describe("webpage parts", () => {
+  const pageReport = (url: string) => readEmbedReport(report([{ id: "wiki", fields: { embed: "page", url }, rect: { x: 0, y: 0, w: 600, h: 400 } }]), "light")!;
+  it("take an https URL on a public-looking host, with the page sandbox (no popups, forms or downloads)", () => {
+    const built = buildEmbed({ embed: "page", url: "https://en.wikipedia.org/wiki/Game_Boy" })!;
+    expect(built).toMatchObject({ kind: "page", url: "https://en.wikipedia.org/wiki/Game_Boy", sandbox: PAGE_SANDBOX, referrerPolicy: "no-referrer" });
+    expect(PAGE_SANDBOX).toBe("allow-scripts allow-same-origin");
+    for (const url of ["http://en.wikipedia.org/", "https://localhost/", "https://192.168.1.2/", "javascript:alert(1)", "https://intranet/x"]) expect(buildEmbed({ embed: "page", url }), url).toBeNull();
+  });
+
+  const mount = async (services: EmbedServices, url = "https://en.wikipedia.org/wiki/Game_Boy") => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(createElement(EmbedLayer, { report: pageReport(url), services })); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    return { host, unmount: () => act(() => root.unmount()) };
+  };
+
+  it("frame a verified page that allows it, and Open hands its URL to openUrl", async () => {
+    const opened: string[] = [];
+    const asked: string[] = [];
+    const services: EmbedServices = { webpage: async (url) => { asked.push(url); return { status: "frame", url, source: "searched", card: { title: "Game Boy", site: "Wikipedia", summary: null, image: null } }; }, openUrl: (url) => opened.push(url) };
+    const { host, unmount } = await mount(services);
+    expect(asked).toEqual(["https://en.wikipedia.org/wiki/Game_Boy"]);
+    const frame = host.querySelector<HTMLIFrameElement>('[data-webpage-state="frame"]')!;
+    expect(frame.getAttribute("sandbox")).toBe(PAGE_SANDBOX);
+    expect(frame.getAttribute("src")).toBe("https://en.wikipedia.org/wiki/Game_Boy");
+    expect(frame.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(opened).toEqual([]); // never opened by itself
+    act(() => { host.querySelector<HTMLButtonElement>("[data-webpage-open]")!.click(); });
+    expect(opened).toEqual(["https://en.wikipedia.org/wiki/Game_Boy"]);
+    unmount();
+  });
+
+  it("show a link card for a page that refuses framing, with Open", async () => {
+    const opened: string[] = [];
+    const { host, unmount } = await mount({ webpage: async (url) => ({ status: "card", url, source: "fetched", card: { title: "microsoft/vscode", site: "GitHub", summary: "Visual Studio Code", image: "https://opengraph.githubassets.com/x.png" } }), openUrl: (url) => opened.push(url) }, "https://github.com/microsoft/vscode");
+    const card = host.querySelector('[data-webpage-state="card"]')!;
+    expect(card.textContent).toContain("microsoft/vscode");
+    expect(card.textContent).toContain("Visual Studio Code");
+    expect(host.querySelector("iframe")).toBeNull();
+    act(() => { host.querySelector<HTMLButtonElement>("[data-webpage-open]")!.click(); });
+    expect(opened).toEqual(["https://github.com/microsoft/vscode"]);
+    unmount();
+  });
+
+  it("show only a note for an unverified URL: no frame, no card, no Open", async () => {
+    const { host, unmount } = await mount({ webpage: async (url) => ({ status: "unverified", url, source: null, card: null }), openUrl: () => { throw new Error("never"); } }, "https://evil.example/login");
+    expect(host.querySelector('[data-webpage-state="unverified"]')!.textContent).toMatch(/not verified/);
+    expect(host.querySelector("iframe, img, [data-webpage-open]")).toBeNull();
+    unmount();
   });
 });

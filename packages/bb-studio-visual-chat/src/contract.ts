@@ -61,4 +61,14 @@ export const canvasContract = defineRpcContract({
     input: z.object({ threadId, providerId: z.string().min(1).max(100), model: z.string().min(1).max(200), reasoningLevel: z.string().max(40).nullable().optional() }),
     output: z.object({ mode: z.enum(["unchanged", "same-thread", "new-thread-next-turn"]), canvas: canvasViewSchema.nullable() }),
   },
+  "canvas.webpage": {
+    experimental_description: "A webpage part's URL on a canvas: whether it may be shown (it came from the user in this chat, or from the agent's own fetch or search results in the turn that used it), and if so whether it can be framed, with its link card.",
+    input: z.object({ threadId, url: z.string().min(1).max(2000) }),
+    output: z.object({
+      status: z.enum(["unverified", "invalid", "frame", "card"]),
+      url: z.string(),
+      source: z.string().nullable(),
+      card: z.object({ title: z.string(), site: z.string(), summary: z.string().nullable(), image: z.string().nullable() }).nullable(),
+    }),
+  },
 });

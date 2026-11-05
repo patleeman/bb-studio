@@ -822,7 +822,7 @@ export function canvasKit(win?: unknown): CanvasKit {
     // page never frames anything; it reports each committed placeholder's fields and where it sits (in the
     // frame's viewport, after scroll and zoom), and whether a version is gliding (the UI hides them until it
     // settles). Nothing is reported for a part still being written.
-    const EMBED_FIELDS = ["embed", "q", "lat", "lon", "zoom", "label", "id", "kind", "start"];
+    const EMBED_FIELDS = ["embed", "q", "lat", "lon", "zoom", "label", "id", "kind", "start", "url"];
     const committedEmbeds = new WeakSet<Element>();
     let embedsMoving = false, embedQueued = false, lastEmbeds = "", settling = 0;
     const reportEmbeds = () => {
