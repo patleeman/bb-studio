@@ -834,6 +834,7 @@ export function canvasKit(win?: unknown): CanvasKit {
     // the same as last time is kept as it is on screen (its picture, chart and entrance carry on), an open
     // part keeps its element and takes the new children, and a part that's just finished comes in.
     const sourceOf = new WeakMap<Element, string>();
+    const innerOf = new WeakMap<Element, string>();
     const PENDING = "data-cv-pending", OPEN = "data-cv-open";
     kit.stream = (rootArg: unknown, html: string, final = false) => {
       const root = rootArg as HTMLElement;
@@ -851,9 +852,9 @@ export function canvasKit(win?: unknown): CanvasKit {
         // The stream's first version: from the board on screen, as a new version would.
         kit.morph!(root, html, root.childElementCount > 0, { fit: false, scripts: false });
         root.setAttribute("data-cv-streaming", "");
-        const byId = new Map<string, string>();
-        for (const [el, source] of sources) byId.set(el.dataset.cvId!, source);
-        root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => { const source = byId.get(el.dataset.cvId!); if (source && finished(el)) sourceOf.set(el, source); });
+        const byId = new Map<string, { source: string; inner: string }>();
+        for (const [el, source] of sources) byId.set(el.dataset.cvId!, { source, inner: el.innerHTML });
+        root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => { const known = byId.get(el.dataset.cvId!); if (known && finished(el)) { sourceOf.set(el, known.source); innerOf.set(el, known.inner); } });
         return;
       }
       const shown = new Set<string>();
@@ -871,16 +872,32 @@ export function canvasKit(win?: unknown): CanvasKit {
         const was = onScreen.get(id);
         const source = sources.get(el);
         if (source !== undefined && was && sourceOf.get(was) === source) { el.replaceWith(was); continue; }
-        // An open part keeps its element, also when it finishes: its attributes and children follow the new version.
-        if (was && was.hasAttribute(OPEN) && was.tagName === el.tagName && (source !== undefined || el.hasAttribute(OPEN))) {
+        // A finished block whose attributes changed but not its children (a card that got its picture): rebuilt in
+        // place, so the card stays and only what's new in it (the picture) fades in.
+        if (source !== undefined && was && was.dataset.block && was.tagName === el.tagName && innerOf.get(was) === el.innerHTML && finished(was)) {
+          for (const attr of Array.from(was.attributes)) if (!el.hasAttribute(attr.name)) was.removeAttribute(attr.name);
+          for (const attr of Array.from(el.attributes)) if (was.getAttribute(attr.name) !== attr.value) was.setAttribute(attr.name, attr.value);
+          const before = new Set(Array.from(was.querySelectorAll("img")).map((img) => img.getAttribute("src")));
+          was.innerHTML = el.innerHTML;
+          kit.blocks!(was.parentElement ?? was);
+          sourceOf.set(was, source);
+          innerOf.set(was, el.innerHTML);
+          el.replaceWith(was);
+          if (!reduced() && typeof was.animate === "function") was.querySelectorAll("img").forEach((img) => { if (!before.has(img.getAttribute("src"))) img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: "ease-out" }); });
+          continue;
+        }
+        // A part that's still the same kind of element keeps it (open or finished): its attributes and children
+        // follow the new version, and the parts inside it are matched in turn. Blocks are rebuilt from their
+        // attributes instead, below.
+        if (was && was.tagName === el.tagName && !was.dataset.block && !el.dataset.block) {
           for (const attr of Array.from(was.attributes)) if (!el.hasAttribute(attr.name)) was.removeAttribute(attr.name);
           for (const attr of Array.from(el.attributes)) if (was.getAttribute(attr.name) !== attr.value) was.setAttribute(attr.name, attr.value);
           was.replaceChildren(...Array.from(el.childNodes));
           el.replaceWith(was);
-          if (source !== undefined) sourceOf.set(was, source);
+          if (source !== undefined) { sourceOf.set(was, source); innerOf.set(was, was.innerHTML); } else sourceOf.delete(was);
           continue;
         }
-        if (source !== undefined) sourceOf.set(el, source);
+        if (source !== undefined) { sourceOf.set(el, source); innerOf.set(el, el.innerHTML); }
         if (source !== undefined || el.hasAttribute(OPEN)) fresh.push(el);
       }
       root.replaceChildren(frag);
