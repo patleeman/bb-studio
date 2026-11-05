@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { accentOf, ORGANIC_LOOKS } from "../looks";
+import { defaultBbTheme } from "../theme";
 import { frameSrcDoc } from "./frame";
 import { canvasKit, type CanvasKit } from "./kit";
 
@@ -108,7 +109,7 @@ describe("the canvas kit", () => {
 
   it("gives every frame the look's tokens and kit, and the agent's HTML after them", () => {
     for (const look of ORGANIC_LOOKS) {
-      const doc = frameSrcDoc("<p class=\"cv-body\">hi</p>", look, "dark");
+      const doc = frameSrcDoc("<p class=\"cv-body\">hi</p>", look, defaultBbTheme("dark"));
       expect(doc).toContain(`data-cv-look="${look}"`);
       expect(doc).toContain("--cv-paper:");
       expect(doc).toContain(".cv-kicker{");

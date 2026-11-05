@@ -10,6 +10,7 @@ import type { canvasContract } from "../contract";
 import { canvasHref, canvasNewHref, CANVAS_NEW_SEGMENT, CANVAS_DEFAULT_EXECUTION, CANVAS_LIMITS, type CanvasExecution, type CanvasItem, type CanvasMeta, type CanvasTurn, type CanvasVersion, type CanvasVersionMeta, type CanvasView } from "../shared";
 import { DEFAULT_LOOK, isLook, type Look, type OrganicLook } from "../looks";
 import { Board } from "./board";
+import { useBbTheme } from "./bb-theme";
 import { lookCss } from "./board-css";
 import { ModelPicker } from "./model-picker";
 import { OrganicBoard, type BoardItem } from "./organic-board";
@@ -133,6 +134,8 @@ export interface CardProps {
 export function CanvasPage({ threadId, card }: { threadId: string | null; card?: CardProps }) {
   const rpc = useRpc<typeof canvasContract>();
   const theme = useWidgetTheme();
+  // BB's theme tokens, live: the board's ground, text, rules and cards, under the style's accent layer.
+  const bb = useBbTheme();
   const { canvas: own, stream: liveStream, send, reload } = useCanvas(threadId);
   // Remember the open canvas, so coming back to Canvas reopens it (the card's chats don't change what the page reopens).
   useEffect(() => { if (!card && threadId && own) writeLast(threadId); }, [card, threadId, own]);
@@ -160,7 +163,7 @@ export function CanvasPage({ threadId, card }: { threadId: string | null; card?:
   const stream = !preview && !snap ? liveStream : null;
   // A board written as a page always has a style (a canvas from before styles takes the default).
   const look: Look = canvas ? ((canvas.page || stream) && canvas.look === "classic" ? DEFAULT_LOOK : canvas.look) : threadId ? "classic" : newLook;
-  const css = useMemo(() => (look === "classic" ? null : lookCss(look)), [look]);
+  const css = useMemo(() => (look === "classic" ? null : lookCss(look, bb)), [look, bb]);
 
   const submit = useCallback(async (text: string) => {
     if (!threadId) {
@@ -203,7 +206,7 @@ export function CanvasPage({ threadId, card }: { threadId: string | null; card?:
   const page = canvas?.page ?? null;
   const working = canvas?.status === "working" || !!pending;
   return (
-    <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-preview={preview ? "" : undefined} data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={theme.mode}>
+    <div className={cn("canvas-page relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground", css && "cv-scope")} data-canvas-page data-canvas-preview={preview ? "" : undefined} data-canvas-status={canvas?.status ?? (pending ? "working" : "new")} data-canvas-rev={canvas?.rev ?? 0} data-cv-look={look} data-cv-mode={bb.mode}>
       {css ? <style>{css}</style> : null}
       {card ? (
         <CardHeader canvas={canvas ?? null} pending={pending} steps={steps} titleId={card.titleId} onExpand={card.onExpand} onClose={card.onClose} onDragStart={card.onDragStart} />
@@ -213,13 +216,13 @@ export function CanvasPage({ threadId, card }: { threadId: string | null; card?:
       {/* The board ends where the chat block starts, by its measured height: nothing ever draws under the caption. */}
       <div className={cn("canvas-scroll min-h-0 flex-1 overflow-x-hidden", page ? "overflow-hidden" : card ? "overflow-y-auto px-4 pt-1" : "overflow-y-auto px-8 pt-2")} style={{ marginBottom: chatHeight }} data-canvas-scroll>
         {canvas === undefined ? null : (page || stream) && look !== "classic" ? (
-          <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={theme.mode} title={canvas?.title ?? "Visual Chat"} />
+          <PageFrame html={page} stream={stream?.html ?? null} streamN={stream?.n ?? 0} rev={canvas?.rev ?? 0} look={look} mode={bb.mode} title={canvas?.title ?? "Visual Chat"} />
         ) : look !== "classic" ? (
           <OrganicBoard
             key={preview ? "preview" : "board"}
             items={items}
             look={look}
-            mode={theme.mode}
+            mode={bb.mode}
             bottomPad={24}
             empty={<p className="max-w-sm text-center text-[15px] leading-relaxed" style={{ color: "var(--cv-muted)", fontFamily: "var(--cv-font-text)" }}>{working ? "Thinking it through…" : "Ask anything. The board fills in as we talk, and changes as the conversation does."}</p>}
           />

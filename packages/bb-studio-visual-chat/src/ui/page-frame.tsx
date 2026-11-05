@@ -9,9 +9,11 @@
 // messages: the kit builds it part by part (cv.stream), and the finished page
 // lands on it the same way, so nothing flashes.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { tokenDeclarations, type OrganicLook } from "../looks";
+import type { OrganicLook } from "../looks";
+import type { BbTheme } from "../theme";
+import { useBbTheme } from "./bb-theme";
 import { canvasKit } from "./kit";
-import { kitCss } from "./kit-css";
+import { kitCss, tokenCss } from "./kit-css";
 
 export const PAGE_MESSAGE = "bb-canvas-page";
 export const STYLE_MESSAGE = "bb-canvas-style";
@@ -47,9 +49,9 @@ body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}
 .cv-wall>[data-cv-pending]{visibility:visible;background:color-mix(in srgb,var(--cv-ink) 6%,transparent);border-radius:var(--cv-radius);animation:cv-pulse 1.6s ease-in-out infinite}
 .cv-wall>[data-cv-pending]>*{visibility:hidden}`;
 
-/** The page's CSS for a style and mode: its tokens, a base, the kit's classes. */
-export function pageCss(look: OrganicLook, mode: "light" | "dark"): string {
-  return `:root{${tokenDeclarations(look, mode)};color-scheme:${mode}}${FLUID}${BASE}${kitCss(look, "")}`;
+/** The page's CSS for a style on BB's theme: its tokens, a base, the kit's classes. */
+export function pageCss(look: OrganicLook, theme: BbTheme): string {
+  return `${tokenCss(look, theme, ":root")}${FLUID}${BASE}${kitCss(look, "")}`;
 }
 
 /** The frame's document: CSP, an empty style (sent on ready), the boot script and the kit. */
@@ -81,9 +83,11 @@ export function PageFrame({ html, stream = null, streamN = 0, rev, look, mode, t
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, []);
+  // BB's theme, live: a palette switch or light/dark restyles the page in place (no reload).
+  const theme = useBbTheme();
   useEffect(() => {
-    if (ready) post({ type: STYLE_MESSAGE, css: pageCss(look, mode), look, mode });
-  }, [ready, look, mode]);
+    if (ready) post({ type: STYLE_MESSAGE, css: pageCss(look, theme), look, mode: theme.mode });
+  }, [ready, look, theme]);
   useEffect(() => {
     if (!ready) return;
     if (stream !== null) {

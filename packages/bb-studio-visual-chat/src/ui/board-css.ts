@@ -1,7 +1,8 @@
-// The page's CSS for an organic look: its tokens on the page (light, and
-// dark under data-cv-mode="dark"), the kit's classes, and each look's tile
-// chrome and ground. Scoped to .cv-scope, which the canvas page carries.
+// The page's CSS for an organic look: its tokens on BB's current theme, the
+// kit's classes, and each look's tile chrome and ground. Scoped to
+// .cv-scope, which the canvas page carries.
 import { COLOR_TOKENS, type OrganicLook } from "../looks";
+import type { BbTheme } from "../theme";
 import { kitCss, tokenCss } from "./kit-css";
 
 const S = ".cv-scope";
@@ -76,7 +77,7 @@ ${S} .cvt[data-kind=quote][data-accent=bar] .cv-quote::before{content:none}
 `;
 
 /**
- * A style switch cross-fades the palette: the color tokens are registered
+ * A style switch, or a change of BB's theme, cross-fades the palette: the color tokens are registered
  * (so they interpolate) and transition on the page. Fonts and sizes switch
  * at once, while the cards glide to their new places and fade back in.
  */
@@ -84,8 +85,7 @@ const SWITCH = COLOR_TOKENS.map((name) => `@property --cv-${name}{syntax:"<color
   + `${S}{transition:${COLOR_TOKENS.map((name) => `--cv-${name} .7s ease`).join(",")}}`
   + `@media (prefers-reduced-motion: reduce){${S}{transition:none}}`;
 
-/** Everything an organic look needs on the page, scoped to .cv-scope[data-cv-look=…]. */
-export function lookCss(look: OrganicLook): string {
-  const scope = `${S}[data-cv-look=${look}]`;
-  return tokenCss(look, scope, `${scope}[data-cv-mode=dark]`) + kitCss(look, S) + COMMON + LOOKS[look] + ACCENTS + SWITCH;
+/** Everything an organic look needs on the page, on BB's theme, scoped to .cv-scope[data-cv-look=…]. */
+export function lookCss(look: OrganicLook, theme: BbTheme): string {
+  return tokenCss(look, theme, `${S}[data-cv-look=${look}]`) + kitCss(look, S) + COMMON + LOOKS[look] + ACCENTS + SWITCH;
 }

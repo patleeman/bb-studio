@@ -70,7 +70,9 @@ the reply is only that caption (the voice reads it back).
   for one huge figure). No empty bottom third or right side. `cv.viewport()`
   gives the screen's size.
 - Colours, type and spacing come from the style's tokens (`var(--cv-…)`), so
-  a style switch restyles it. Styles: **editorial** (a magazine spread),
+  a style switch restyles it. The ground, text, rules and cards follow the
+  user's BB theme, light or dark; a style adds its type and accent on top, so
+  don't set your own page background. Styles: **editorial** (a magazine spread),
   **field** (a designer's whiteboard), **instrument** (a control room). You
   pick; a style the user names wins.
 - Mark the main parts with stable `data-cv-id` values. In a follow-up,

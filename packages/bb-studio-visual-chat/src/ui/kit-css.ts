@@ -2,6 +2,7 @@
 // cv-timeline, …) styled only with --cv-* tokens, then a layer per look.
 // The page scopes it under .cv-scope; a custom frame gets it unscoped.
 import { tokenDeclarations, type OrganicLook } from "../looks";
+import type { BbTheme } from "../theme";
 
 const BASE = (S: string) => `
 ${S} .cv-root{font-family:var(--cv-font-text);font-size:var(--cv-t-md);line-height:1.45;color:var(--cv-ink)}
@@ -223,7 +224,7 @@ export function kitCss(look: OrganicLook, scope: string): string {
   return BASE(scope) + LOOK_CSS[look](scope);
 }
 
-/** Token declarations for both modes under a scope: light by default, dark when data-cv-mode="dark". */
-export function tokenCss(look: OrganicLook, light: string, dark: string): string {
-  return `${light}{${tokenDeclarations(look, "light")}}${dark}{${tokenDeclarations(look, "dark")}}`;
+/** A look's token declarations on BB's current theme, under a selector. */
+export function tokenCss(look: OrganicLook, theme: BbTheme, selector: string): string {
+  return `${selector}{${tokenDeclarations(look, theme)};color-scheme:${theme.mode}}`;
 }
