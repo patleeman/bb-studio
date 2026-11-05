@@ -162,6 +162,7 @@ ${S} .cv-placeholder{display:flex;flex-direction:column;gap:var(--cv-s-2);min-he
 ${S} .cv-ph-box{flex:1;min-height:clamp(60px,10vh,320px);border-radius:var(--cv-radius-sm);background:color-mix(in oklab,var(--cv-rule) 55%,transparent)}
 @keyframes cv-pulse{0%,100%{opacity:.55}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){${S} .cv-card-ph,${S} .cv-ph-box{animation:none}}
+@media (max-width:520px){${S} .cv-sides{grid-auto-flow:row;grid-auto-columns:auto;gap:var(--cv-s-4)}${S} .cv-steps:not(.cv-steps-col){grid-auto-flow:row;grid-auto-columns:auto;border-top:0;border-left:3px solid var(--cv-ink)}${S} .cv-steps:not(.cv-steps-col) .cv-step{border-left:0;border-top:1px solid var(--cv-rule);padding:var(--cv-s-3)}}
 ${S} .cv-callout-pin{position:absolute;width:0;height:0;color:var(--cv-callout-color,var(--cv-ink))}
 ${S} .cv-callout-leader{position:absolute;overflow:visible;pointer-events:none}
 ${S} .cv-callout-leader line{stroke:var(--cv-callout-color,var(--cv-ink));stroke-width:1.1}

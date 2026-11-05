@@ -120,6 +120,54 @@ describe.skipIf(!chrome)("a picture wall at phone widths (headless Chrome)", () 
 });
 
 type Measured = ReturnType<typeof measure>;
+
+/** Three options side by side and a row of steps, with long single words, as agents write them for a comparison. */
+const SIDES = `<div class="cv-fill"><h1 class="cv-h1" data-cv-id="t">Clean first, then bleach</h1>
+  <div class="cv-sides" data-cv-id="ways">
+    <section data-block="side" data-cv-id="a" data-label="1 · Always first" data-title="Wash and scrub" data-points="Warm soapy water | A soft toothbrush"></section>
+    <section data-block="side" data-cv-id="b" data-label="2 · Best result" data-verdict="Pick" data-title="Peroxide gel and UV" data-points="Hydrogen peroxide cream | Sunlight or a UV lamp"></section>
+    <section data-block="side" data-cv-id="c" data-label="3 · Cheapest" data-title="Oxygen bleach soak" data-points="Sodium percarbonate | Overnight"></section>
+  </div>
+  <section class="cv-steps" data-cv-id="plan">
+    <div data-block="step" data-cv-id="s1" data-when="First · $100" data-title="Advance SP" data-line="The backlit one"></div>
+    <div data-block="step" data-cv-id="s2" data-when="Then · $120" data-title="Cartridges" data-line="Five loose carts"></div>
+    <div data-block="step" data-cv-id="s3" data-when="Last · $80" data-title="Restoration" data-line="Peroxide and a lamp"></div>
+  </section></div>`;
+
+/** Each side's and step's box, and whether any text in it is wider than the box. */
+function measureColumns(width: number, height: number) {
+  const dir = mkdtempSync(join(tmpdir(), "cv-sides-"));
+  const file = join(dir, "page.html");
+  const inner = `<!doctype html><html><head><meta charset="utf-8"><style>${pageCss("editorial", defaultBbTheme("light"))}</style>
+<script>(${canvasKit.toString()})(window);<\/script></head><body><div id="cv-page"></div>
+<script>
+window.cv.morph(document.getElementById("cv-page"), ${JSON.stringify(SIDES)}, false, { fit: false });
+const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, right: r.right, bottom: r.bottom }; };
+const items = [...document.querySelectorAll(".cv-side, .cv-step")].map((el) => ({ id: el.dataset.cvId, box: box(el),
+  spill: Math.max(0, ...[...el.querySelectorAll("*")].map((child) => child.scrollWidth - child.clientWidth)) }));
+parent.postMessage(JSON.stringify({ items }), "*");
+<\/script></body></html>`;
+  writeFileSync(file, `<!doctype html><html><body style="margin:0"><iframe id="f" style="width:${width}px;height:${height}px;border:0;display:block"></iframe>
+<script>addEventListener("message", (event) => { if (typeof event.data === "string") document.body.setAttribute("data-result", event.data); });
+document.getElementById("f").srcdoc = ${JSON.stringify(inner).replace(/<\//g, "<\\/")};</script></body></html>`);
+  const dom = execFileSync(chrome!, ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "ignore"] });
+  const raw = /data-result="([^"]*)"/.exec(dom)?.[1];
+  if (!raw) throw new Error("Chrome returned no measurement");
+  return JSON.parse(raw.replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")) as { items: { id: string; box: { x: number; y: number; right: number; bottom: number }; spill: number }[] };
+}
+
+describe.skipIf(!chrome)("sides and steps at phone widths (headless Chrome)", () => {
+  for (const [width, height] of [[382, 560], [390, 844], [466, 678]] as const) {
+    it(`stack, so no title runs into the next column, at ${width}px`, () => {
+      const { items } = measureColumns(width, height);
+      expect(items).toHaveLength(6);
+      for (const item of items) expect(item.spill, `${item.id} at ${width}px`).toBeLessThanOrEqual(1);
+      for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+        expect(overlaps(items[i]!.box, items[j]!.box), `${items[i]!.id} and ${items[j]!.id} at ${width}px`).toBe(false);
+      }
+    }, 90_000);
+  }
+});
 function cardsStayInTheirCells(result: Measured, width: number) {
   expect(result.viewport).toBe(width);
   expect(result.cards).toHaveLength(LONG.length);
