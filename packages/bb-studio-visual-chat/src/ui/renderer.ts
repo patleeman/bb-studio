@@ -46,6 +46,10 @@ const FLUID = `:root{--cv-t-xs:clamp(11px,0.5vw + 0.35vh,15px);--cv-t-sm:clamp(1
 .cv-fill{min-height:calc(100vh - 60px);display:grid;grid-template-rows:auto 1fr auto;gap:clamp(16px,3vh,44px)}
 .cv-fill > *{min-width:0}`;
 
+/**
+ * The frame's base. Below 700px (a phone; the client hint's NARROW_BOARD) a page's outer box never keeps a fixed
+ * height: it grows with its content (its min-height still fills the screen), so parts can't run into each other.
+ */
 const BASE = `html,body{margin:0;padding:0;background:var(--cv-paper);color:var(--cv-ink);font-family:var(--cv-font-text);font-size:var(--cv-t-md);line-height:1.45;-webkit-font-smoothing:antialiased;transition:background-color .6s ease,color .6s ease}
 *{box-sizing:border-box}img,svg{max-width:100%}img{display:block}
 body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}
@@ -58,7 +62,8 @@ body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}
 [data-embed="youtube"]{aspect-ratio:16/9;min-height:0}
 [data-embed="spotify"]{min-height:152px}
 [data-embed="page"]{min-height:420px}
-[data-embed="spotify"][data-kind="album"],[data-embed="spotify"][data-kind="playlist"]{min-height:352px}`;
+[data-embed="spotify"][data-kind="album"],[data-embed="spotify"][data-kind="playlist"]{min-height:352px}
+@media (max-width:700px){#cv-page>*{height:auto!important;max-height:none!important}}`;
 
 /** The page's CSS for a style on BB's theme: its tokens, a base, the kit's classes. */
 export function pageCss(look: OrganicLook, theme: BbTheme): string {

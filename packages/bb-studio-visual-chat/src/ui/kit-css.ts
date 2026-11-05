@@ -124,7 +124,8 @@ ${S} .cv-stars svg{display:block}
 ${S} .cv-stars-n{font-family:var(--cv-font-num);font-weight:var(--cv-display-weight);font-size:var(--cv-t-md);color:var(--cv-ink);font-variant-numeric:tabular-nums}
 ${S} .cv-stars-n small{font-size:0.7em;color:var(--cv-muted);font-weight:500}
 ${S} .cv-stars-note{font-family:var(--cv-font-label);font-size:var(--cv-t-xs);letter-spacing:var(--cv-label-tracking);text-transform:var(--cv-label-case);color:var(--cv-muted)}
-${S} .cv-wall{display:grid;grid-template-columns:repeat(var(--cv-cols,3),minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(14px,2vw,28px);min-height:0;height:100%}
+${S} .cv-wall{display:grid;grid-template-columns:repeat(var(--cv-cols,3),minmax(0,1fr));grid-auto-rows:minmax(min-content,1fr);gap:clamp(14px,2vw,28px);height:100%;min-height:min-content}
+${S} .cv-wall>.cv-card{min-height:min-content}
 ${S} .cv-card{display:flex;flex-direction:column;gap:var(--cv-s-2);min-width:0;min-height:0;margin:0}
 ${S} .cv-card-pic{position:relative;width:100%;aspect-ratio:var(--cv-card-ratio,3/4);border-radius:var(--cv-radius-sm);overflow:hidden;background:color-mix(in oklab,var(--cv-rule) 60%,transparent)}
 ${S} .cv-card-pic img{width:100%;height:100%;object-fit:cover;display:block}
