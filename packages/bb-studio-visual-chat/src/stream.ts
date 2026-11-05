@@ -250,7 +250,8 @@ export interface PageStreamDeps {
   onError?(error: unknown): void;
 }
 
-const PAGE_LIMIT = 500;
+/** Rows per read: BB answers "Thread event limit cannot exceed 100" above it. */
+const PAGE_LIMIT = 100;
 
 /**
  * Polls one thread's log while it works and publishes the growing page, at most every throttleMs (default 150:
@@ -261,6 +262,7 @@ export class PageStream {
   readonly text = new TurnText();
   private stopped = false;
   private loop: Promise<void> | null = null;
+  private stopping: Promise<string> | null = null;
   private lastHtml = "";
   private lastAt = -Infinity;
   private started = false;
@@ -283,16 +285,25 @@ export class PageStream {
   /** One read of the log; publishes when the page grew. */
   async poll(): Promise<void> {
     try {
-      for (let page = 0; page < 20; page++) {
-        const rows = await this.deps.list(this.text.lastSeq, PAGE_LIMIT);
-        this.text.add(rows);
-        if (rows.length < PAGE_LIMIT) break;
-      }
+      await this.read();
     } catch (error) {
       this.deps.onError?.(error);
     }
     this.flush();
   }
+
+  /** Everything new in the log, a page at a time (a page that doesn't move the seq on ends it). */
+  private async read(): Promise<void> {
+    for (let page = 0; page < 50; page++) {
+      const before = this.text.lastSeq;
+      const rows = await this.deps.list(before, PAGE_LIMIT);
+      this.text.add(rows);
+      if (rows.length < PAGE_LIMIT || this.text.lastSeq <= before) break;
+    }
+  }
+
+  /** Stops polling at once, without a last read (the log can't be read). */
+  halt(): void { this.stopped = true; }
 
   private flush(): void {
     const found = extractPage(this.text.text());
@@ -312,20 +323,18 @@ export class PageStream {
     this.deps.publish({ html, style: found.style });
   }
 
-  /** Stops polling after one last read; the turn's assembled text. */
-  async stop(): Promise<string> {
-    this.stopped = true;
-    await this.loop?.catch(() => {});
-    try {
-      for (let page = 0; page < 20; page++) {
-        const rows = await this.deps.list(this.text.lastSeq, PAGE_LIMIT);
-        this.text.add(rows);
-        if (rows.length < PAGE_LIMIT) break;
+  /** Stops polling after one last read; the turn's assembled text. Once: later calls get the same answer. */
+  stop(): Promise<string> {
+    this.stopping ??= (async () => {
+      const halted = this.stopped;
+      this.stopped = true;
+      await this.loop?.catch(() => {});
+      if (!halted) {
+        try { await this.read(); } catch (error) { this.deps.onError?.(error); }
       }
-    } catch (error) {
-      this.deps.onError?.(error);
-    }
-    return this.text.text();
+      return this.text.text();
+    })();
+    return this.stopping;
   }
 
   /** Whether anything of a page went to the page. */

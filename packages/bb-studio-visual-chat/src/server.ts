@@ -327,10 +327,15 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
       tip: async () => (await events({ threadId, order: "desc", limit: "1" }))[0]?.seq ?? 0,
       list: async (after, limit) => {
         // A log that can't be read, or a turn that runs on for half an hour, stops the stream (the idle commit still runs).
-        if (failures > 20 || Date.now() - startedAt > 30 * 60_000) { void entry.stream.stop(); return []; }
-        const rows = await events({ threadId, afterSeq: String(after), order: "asc", limit: String(limit), types: [...STREAM_EVENT_TYPES] }).catch((error) => { failures++; throw error; });
-        failures = 0;
-        return rows;
+        if (failures > 20 || Date.now() - startedAt > 30 * 60_000) { entry.stream.halt(); return []; }
+        try {
+          const rows = await events({ threadId, afterSeq: String(after), order: "asc", limit: String(limit), types: [...STREAM_EVENT_TYPES] });
+          failures = 0;
+          return rows;
+        } catch (error) {
+          if (failures++ === 0) bb.log.warn(`Visual Chat can't read the thread's events to stream its page: ${error instanceof Error ? error.message : String(error)}`);
+          throw error;
+        }
       },
       fill: (html) => fillPictures(html, store.pictures(row.id)).html,
       publish: ({ html, style }) => {

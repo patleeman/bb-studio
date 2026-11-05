@@ -576,6 +576,18 @@ describe("a page streamed in the reply", () => {
     expect(view.versions).toHaveLength(1);
   });
 
+  it("gives up on a log it can't read, without spinning, and the turn still ends", async () => {
+    const broken = { filter: () => { throw new Error("limit must be at most 200"); } } as unknown as EventRow[];
+    const { host, call, tool } = canvasHost(undefined, broken);
+    const { threadId } = await call("canvas.create", { text: "Election" });
+    await host.harness.behavior.emitThreadEvent("thread.active", { thread: { id: threadId } as never });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await tool("canvas_page", { html: PAGE }, threadId);
+    await host.harness.behavior.emitThreadEvent("thread.idle", { thread: { id: threadId } as never, lastAssistantText: "The House flipped." });
+    const view = (await call("canvas.get", { threadId })).canvas;
+    expect(view).toMatchObject({ status: "idle", caption: "The House flipped.", page: PAGE });
+  });
+
   it("commits what streamed when the turn fails", async () => {
     const { host, call, log, threadId } = await streamingCanvas();
     log.push(...deltas(REPLY.slice(0, REPLY.indexOf("</header>") + 9), 10));

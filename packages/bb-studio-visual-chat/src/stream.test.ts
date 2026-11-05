@@ -183,6 +183,20 @@ describe("streaming a page", () => {
   });
 });
 
+describe("stopping a stream", () => {
+  it("reads once more and answers every stop the same; a halted stream doesn't read again", async () => {
+    let reads = 0;
+    const stream = new PageStream({ tip: async () => 0, list: async () => { reads++; return [delta(1, "m", "hello")]; }, publish: () => {}, sleep: async () => {} });
+    const [a, b] = await Promise.all([stream.stop(), stream.stop()]);
+    expect(a).toBe("hello");
+    expect(b).toBe("hello");
+    expect(reads).toBe(1);
+    const halted = new PageStream({ tip: async () => 0, list: async () => { throw new Error("unreadable"); }, publish: () => {} });
+    halted.halt();
+    expect(await halted.stop()).toBe("");
+  });
+});
+
 describe("the end of a turn", () => {
   it("commits the reply's closed block, and the words after it are the caption", () => {
     expect(turnPage(REPLY, null)).toMatchObject({ html: PAGE, caption: "Start with Link's Awakening: it's the one everyone finishes.", complete: true });
