@@ -97,14 +97,15 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   const turnItems = async (threadId: string): Promise<TurnItem[]> => {
     const items: TurnItem[] = [];
     let before: number | null = null;
-    for (let page = 0; page < 5; page++) {
-      const rows = await events({ threadId, order: "desc", limit: "200", types: ["turn/started", "item/completed"], ...(before !== null ? { beforeSeq: String(before) } : {}) });
+    // BB pages the log at most 100 events at a time.
+    for (let page = 0; page < 10; page++) {
+      const rows = await events({ threadId, order: "desc", limit: "100", types: ["turn/started", "item/completed"], ...(before !== null ? { beforeSeq: String(before) } : {}) });
       for (const row of rows) {
         if (row.type === "turn/started") return items;
         const item = row.data?.item as TurnItem | undefined;
         if (item && (item.type === "webFetch" || item.type === "webSearch")) items.push(item);
       }
-      if (rows.length < 200) break;
+      if (rows.length < 100) break;
       before = rows.at(-1)!.seq;
     }
     return items;

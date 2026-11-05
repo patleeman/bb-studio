@@ -122,6 +122,8 @@ describe("canvas.webpage", () => {
           update: async () => ({ ok: true }),
           events: {
             list: async ({ afterSeq, beforeSeq, order, limit, types }: { afterSeq?: string; beforeSeq?: string; order?: string; limit?: string; types?: string[] }) => {
+              // As BB's API: at most 100 events a page.
+              if (Number(limit ?? 100) > 100) throw new Error("HTTP 400: Thread event limit cannot exceed 100");
               const rows = log.filter((row) => (!afterSeq || row.seq > Number(afterSeq)) && (!beforeSeq || row.seq < Number(beforeSeq)) && (!types || types.includes(row.type)));
               const sorted = order === "desc" ? [...rows].sort((a, b) => b.seq - a.seq) : rows;
               return sorted.slice(0, Number(limit ?? 100));
@@ -155,6 +157,14 @@ describe("canvas.webpage", () => {
     for (const url of ["https://a.example/invented", "https://evil.example/x", "https://a.example/ancestors"]) expect(await call("canvas.webpage", { threadId, url })).toMatchObject({ status: "unverified", card: null });
     expect(hits.length).toBe(before);
     expect(await call("canvas.webpage", { threadId, url: "http://localhost:3000/" })).toMatchObject({ status: "invalid" });
+  });
+
+  it("reads a long turn's log page by page, back to its start", async () => {
+    const log: EventRow[] = [{ seq: 1, type: "turn/started" }, item(2, { type: "webSearch", queries: ["vscode"], resultText: "https://github.com/repo" })];
+    for (let seq = 3; seq < 260; seq++) log.push(item(seq, { type: "agentMessage", text: "…" }));
+    const call = host(log);
+    const { threadId } = await call("canvas.create", { text: "vscode" });
+    expect(await call("canvas.webpage", { threadId, url: "https://github.com/repo" })).toMatchObject({ status: "card", source: "searched" });
   });
 
   it("keeps a URL verified for the chat once its turn checked it", async () => {
