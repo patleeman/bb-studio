@@ -432,7 +432,7 @@ function ChatLine({ threadId, canvas, pending, working, timeline, steps, onSubmi
           {working ? (
             <p className="flex items-center gap-2 text-muted-foreground"><span className="canvas-pulse inline-block size-1.5 rounded-full bg-primary" aria-hidden />{lastUser ? <span className="truncate opacity-80">“{lastUser}”</span> : "Thinking…"}</p>
           ) : caption ? (
-            <p className="line-clamp-3 text-foreground/80">{caption}</p>
+            <p className={cn(inCard ? "line-clamp-2 text-[14px]" : "line-clamp-3", "text-foreground/80")} title={inCard ? caption : undefined}>{caption}</p>
           ) : null}
         </div>
         <form ref={form} onSubmit={submit} className="flex items-center gap-0.5 border-b border-foreground/10 transition-colors focus-within:border-foreground/30" data-talk-field={field} data-talk-field-label={canvas ? `“${canvas.title}”` : "the new canvas"}>
