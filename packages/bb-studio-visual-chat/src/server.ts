@@ -22,6 +22,8 @@ export interface BuiltinCanvas {
   store: CanvasStore;
   /** Whether a thread backs a canvas: its metadata says so, or the store has it. */
   isCanvasThread(threadId: string, metadata?: Readonly<Record<string, unknown>>): boolean;
+  /** The same by thread id alone, waiting (up to waitMs) for a canvas thread that is being made right now. */
+  isCanvasThreadSoon(threadId: string, waitMs?: number): Promise<boolean>;
   /** The configure hook's instructions for a canvas thread, in its canvas's look (and for its provider: see canvasInstructions). */
   instructionsFor(threadId: string, metadata?: Readonly<Record<string, unknown>>, providerId?: string | null): string;
   /** For a hands-free session launched from a canvas thread: Studio's voice calls these over RPC (canvas.voice, canvas.voiceRun). */
@@ -309,6 +311,12 @@ export function registerCanvas(bb: BbPluginApi, db: Database.Database, options: 
   return {
     store,
     isCanvasThread: (threadId, metadata) => typeof metadata?.[CANVAS_METADATA_KEY] === "string" || !!store.byThread(threadId),
+    async isCanvasThreadSoon(threadId, waitMs = PENDING_WAIT_MS) {
+      if (store.byThread(threadId)) return true;
+      if (!pending.size) return false;
+      await Promise.race([Promise.allSettled([...pending]), new Promise((resolve) => setTimeout(resolve, waitMs))]);
+      return !!store.byThread(threadId);
+    },
     instructionsFor(threadId, metadata, providerId) {
       const id = metadata?.[CANVAS_METADATA_KEY];
       const row = (typeof id === "string" ? store.get(id) : null) ?? store.byThread(threadId);

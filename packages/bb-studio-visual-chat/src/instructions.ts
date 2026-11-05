@@ -20,6 +20,14 @@ export const CANVAS_RULES = [
 
 const STYLE_LINE = `Styles (you pick one per board with canvas_page's style; one the user names wins): ${ORGANIC_LOOKS.map((look) => `${look} (${LOOK_INFO[look].name}: ${LOOK_INFO[look].line})`).join("; ")}.`;
 
+/**
+ * What Visual Chat sets for its own threads on Claude Code (bb.providers.experimental_contributeEnv): tool search
+ * in threshold mode, so the canvas tools load up front while all the tools' definitions stay under 10% of the
+ * context window, instead of the default that defers every plugin tool and costs a ToolSearch round each turn.
+ * Above the threshold Claude Code defers as before, and the loading line below still names the tools.
+ */
+export const CANVAS_TOOL_SEARCH_ENV = { name: "ENABLE_TOOL_SEARCH", value: "auto", reason: "Visual Chat: load the canvas tools up front while the tool set is small, so a turn skips the ToolSearch round" } as const;
+
 /** The canvas tools by the names Claude Code gives them (BB's bridge MCP server is "bb-bridge"). */
 export const CLAUDE_CODE_CANVAS_TOOLS = ["canvas_page", "canvas_images", "canvas_patch", "canvas_read"].map((name) => `mcp__bb-bridge__${name}`);
 

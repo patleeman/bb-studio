@@ -23,4 +23,22 @@ describe("the canvas plugin", () => {
     expect(other.skills).toEqual([]);
     await host.harness.lifecycle.dispose();
   });
+
+  it("turns Claude Code's tool search to threshold mode on canvas threads only, so the canvas tools load up front", async () => {
+    // The thread comes back a little after the spawn starts, as a real spawn does.
+    const host = createFakePluginHost({ pluginId: "canvas", agentSkillIds: ["canvas"], sdk: { threads: { spawn: async () => { await new Promise((done) => setTimeout(done, 50)); return { id: "thr_canvas1" }; } } } } as never);
+    await plugin(host.bb);
+    const resolve = host.harness.registrations.providerEnvResolvers.get("claude-code")!;
+    expect(host.harness.registrations.providerEnvResolvers.has("codex")).toBe(false);
+    // Model listing (no thread) and other threads get nothing.
+    expect(await resolve({ threadId: null, projectId: null, hostId: "host" })).toEqual([]);
+    expect(await resolve({ threadId: "thr_other", projectId: "proj_personal", hostId: "host" })).toEqual([]);
+    // Asked while its thread is still being made, the canvas thread waits for it and gets the setting.
+    const creating = host.harness.behavior.callRpc("canvas.create", { text: "Show me games" });
+    await new Promise((done) => setTimeout(done, 10)); // BB asks once the spawn has started
+    expect(await resolve({ threadId: "thr_canvas1", projectId: "proj_personal", hostId: "host" })).toEqual([{ name: "ENABLE_TOOL_SEARCH", value: "auto", reason: expect.stringContaining("ToolSearch") }]);
+    await creating;
+    expect(await resolve({ threadId: "thr_canvas1", projectId: "proj_personal", hostId: "host" })).toHaveLength(1);
+    await host.harness.lifecycle.dispose();
+  });
 });

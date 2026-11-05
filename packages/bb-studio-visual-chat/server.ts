@@ -8,6 +8,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { importLegacyCanvases, legacyDatabasePaths } from "./src/legacy-import";
 import { CANVAS_MIGRATIONS } from "./src/migrations";
+import { CANVAS_TOOL_SEARCH_ENV } from "./src/instructions";
 import { CANVAS_KEY_SETTINGS, exaKey } from "./src/settings";
 import { CANVAS_TOOLS, registerCanvas } from "./src/server";
 
@@ -25,6 +26,10 @@ export default function plugin(bb: BbPluginApi) {
   // when a picture is looked up, never logged or sent anywhere but Exa. Without it, queries go to Wikipedia.
   const keys = bb.settings.define(CANVAS_KEY_SETTINGS);
   const canvas = registerCanvas(bb, db, { images: { exaKey: async () => exaKey(await keys.get()) } });
+  // Claude Code defers every plugin tool unless ENABLE_TOOL_SEARCH says otherwise: on a canvas thread (only), it
+  // runs tool search in threshold mode, so the canvas tools load up front and a turn skips the ToolSearch round.
+  // The resolver has five seconds; a thread being made right now is waited for briefly.
+  bb.providers.experimental_contributeEnv("claude-code", async ({ threadId }) => (threadId && (await canvas.isCanvasThreadSoon(threadId, 3000)) ? [{ ...CANVAS_TOOL_SEARCH_ENV }] : []));
   // A canvas's hidden thread gets the canvas tools, rules and skill; other
   // threads get nothing from this plugin. pluginMetadata is this plugin's own.
   bb.agents.configure((context) => canvas.isCanvasThread(context.thread.id, context.pluginMetadata)
