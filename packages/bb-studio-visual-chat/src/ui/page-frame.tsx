@@ -8,7 +8,11 @@
 // A page the agent is still writing (src/stream.ts) arrives as stream
 // messages: the kit builds it part by part (cv.stream), and the finished page
 // lands on it the same way, so nothing flashes.
+// Embeds (a map, a video, a song) are framed over the page by this component, not in it: the page marks a
+// placeholder (data-embed and a few fields) and reports where it sits; EmbedLayer builds the URL from the
+// fields for a fixed set of providers (src/ui/embeds.ts) and keeps each frame alive across versions.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EMBED_MESSAGE, EMBED_SANDBOX, keepEmbeds, readEmbedReport, type EmbedReport, type PlacedEmbed } from "./embeds";
 import type { OrganicLook } from "../looks";
 import type { BbTheme } from "../theme";
 import { useBbTheme } from "./bb-theme";
@@ -47,7 +51,13 @@ const BASE = `html,body{margin:0;padding:0;background:var(--cv-paper);color:var(
 body{padding:20px 32px 40px}#cv-page{min-height:calc(100vh - 60px)}
 [data-cv-pending]{visibility:hidden}
 .cv-wall>[data-cv-pending]{visibility:visible;background:color-mix(in srgb,var(--cv-ink) 6%,transparent);border-radius:var(--cv-radius);animation:cv-pulse 1.6s ease-in-out infinite}
-.cv-wall>[data-cv-pending]>*{visibility:hidden}`;
+.cv-wall>[data-cv-pending]>*{visibility:hidden}
+[data-embed]{position:relative;display:flex;align-items:center;justify-content:center;min-height:240px;padding:16px;border-radius:var(--cv-radius);border:1px solid var(--cv-rule);background:color-mix(in srgb,var(--cv-ink) 5%,var(--cv-paper));color:var(--cv-muted);font-size:var(--cv-t-sm);text-align:center;overflow:hidden}
+[data-embed]:empty::after{content:attr(data-label)}
+[data-embed="map"]:empty:not([data-label])::after{content:"Map · " attr(data-q)}
+[data-embed="youtube"]{aspect-ratio:16/9;min-height:0}
+[data-embed="spotify"]{min-height:152px}
+[data-embed="spotify"][data-kind="album"],[data-embed="spotify"][data-kind="playlist"]{min-height:352px}`;
 
 /** The page's CSS for a style on BB's theme: its tokens, a base, the kit's classes. */
 export function pageCss(look: OrganicLook, theme: BbTheme): string {
@@ -72,13 +82,16 @@ export function PageFrame({ html, stream = null, streamN = 0, rev, look, mode, t
   const frame = useRef<HTMLIFrameElement>(null);
   const srcDoc = useMemo(() => pageSrcDoc(), []);
   const [ready, setReady] = useState(false);
+  const [embedData, setEmbedData] = useState<unknown>(null);
   const shown = useRef<string | null>(null);
   const streamed = useRef<string | null>(null);
   const post = (message: unknown) => { try { frame.current?.contentWindow?.postMessage(message, "*"); } catch { /* the frame is gone */ } };
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (!frame.current || event.source !== frame.current.contentWindow) return;
-      if ((event.data as { type?: unknown } | null)?.type === PAGE_READY_MESSAGE) setReady(true);
+      const type = (event.data as { type?: unknown } | null)?.type;
+      if (type === PAGE_READY_MESSAGE) setReady(true);
+      if (type === EMBED_MESSAGE) setEmbedData(event.data);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -102,12 +115,14 @@ export function PageFrame({ html, stream = null, streamN = 0, rev, look, mode, t
     post({ type: PAGE_MESSAGE, html, animate: shown.current !== null, rev });
     shown.current = html;
   }, [ready, html, rev, stream, streamN]);
+  const embeds = useMemo(() => readEmbedReport(embedData, theme.mode), [embedData, theme.mode]);
   return (
+    <div className="relative size-full" data-canvas-page-box>
     <iframe
       ref={frame}
       title={title}
       srcDoc={srcDoc}
-      sandbox="allow-scripts"
+      sandbox={PAGE_SANDBOX}
       referrerPolicy="no-referrer"
       className="block size-full border-0 bg-transparent"
       style={{ colorScheme: mode }}
@@ -116,5 +131,56 @@ export function PageFrame({ html, stream = null, streamN = 0, rev, look, mode, t
       data-page-ready={ready || undefined}
       data-page-streaming={stream !== null || undefined}
     />
+    {embeds ? <EmbedLayer report={embeds} /> : null}
+    </div>
+  );
+}
+
+/** The page frame's own sandbox: scripts in an opaque origin (no allow-same-origin), no navigation or popups. */
+export const PAGE_SANDBOX = "allow-scripts";
+
+/**
+ * The embeds, over the page frame and clipped to it: each at its placeholder's place, hidden while a version
+ * glides and faded back in after. A frame whose part (data-cv-id) and built URL are in a later version stays
+ * the same element, so it doesn't reload; one that's gone stays alive, hidden, for a while (keepEmbeds).
+ */
+export function EmbedLayer({ report }: { report: EmbedReport }) {
+  const kept = useRef<PlacedEmbed[]>([]);
+  const entries = useMemo(() => {
+    const next = keepEmbeds(kept.current, report);
+    kept.current = next.map((entry) => entry.embed);
+    return next;
+  }, [report]);
+  if (!entries.length) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ opacity: report.moving ? 0 : 1, transition: `opacity ${report.moving ? 120 : 280}ms ease-out` }} data-canvas-embeds data-embeds-moving={report.moving || undefined}>
+      {entries.map(({ embed, shown }) => (
+        <iframe
+          key={embed.key}
+          src={embed.url}
+          title={embed.title}
+          sandbox={EMBED_SANDBOX}
+          referrerPolicy={embed.referrerPolicy}
+          allow={embed.allow}
+          allowFullScreen
+          loading="lazy"
+          className="absolute border-0"
+          style={{
+            left: embed.rect.x,
+            top: embed.rect.y,
+            width: embed.rect.w,
+            height: embed.rect.h,
+            visibility: shown ? "visible" : "hidden",
+            pointerEvents: shown && !report.moving ? "auto" : "none",
+            borderRadius: "var(--radius)",
+            background: "var(--card)",
+            boxShadow: "0 0 0 1px var(--border)",
+          }}
+          data-canvas-embed={embed.kind}
+          data-embed-key={embed.key}
+          data-embed-shown={shown || undefined}
+        />
+      ))}
+    </div>
   );
 }

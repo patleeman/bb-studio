@@ -207,7 +207,8 @@ describe("look instructions", () => {
       const note = canvasFirstNote(look);
       expect(note).toContain("DESIGN GUIDE");
       expect(note).toContain("EXAMPLES");
-      expect(note.length).toBeLessThan(16_000);
+      // The guide's embed paragraph (data-embed) took it past 16,000.
+      expect(note.length).toBeLessThan(16_500);
     }
   });
 });

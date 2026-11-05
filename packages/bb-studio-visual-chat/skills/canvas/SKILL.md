@@ -86,7 +86,12 @@ the reply is only that caption (the voice reads it back).
   data-rating, data-source, data-line), `stat`, `step`, `side`, `quote` and
   `placeholder`, in the containers `cv-wall`, `cv-steps` and `cv-sides`. The
   guide lists their attributes. They're optional.
-- No network but https pictures from `canvas_images`.
+- Embeds: `<div data-embed="map" data-q="retro game stores near 10604" data-cv-id="map">`
+  (also `point` with `data-lat`/`data-lon`/`data-label`, `youtube` with `data-id`,
+  `spotify` with `data-kind` and `data-id`). Visual Chat frames the real thing over
+  it; never a URL, never invented coordinates. For "near X", a map embed beside a
+  list from your research.
+- No other network but https pictures from `canvas_images`.
 
 ## Claude Code
 

@@ -150,6 +150,21 @@ or Esc, to close it.
   `step` (a timeline row), `side` (a comparison column), `quote` and
   `placeholder`, declared in a few `data-*` attributes the kit expands, in
   the containers `cv-wall`, `cv-steps` and `cv-sides`. They're optional.
+- **Embeds:** a real map, video or song. The page marks an empty placeholder
+  (`<div data-embed="map" data-q="retro game stores near 10604" data-cv-id="map">`;
+  also `point` with `data-lat`, `data-lon` and `data-label`, `youtube` with
+  `data-id`, and `spotify` with `data-kind` and `data-id`), and Visual Chat's
+  own UI frames the real thing over it (`src/ui/embeds.ts`). The page frame
+  itself still frames nothing. Visual Chat builds each URL from those fields
+  for four fixed origins (Google Maps' keyless `output=embed` search, the
+  OpenStreetMap export embed with a marker, youtube-nocookie and Spotify), so
+  a URL from the agent is never used. Each embed has its own sandbox
+  (`allow-scripts allow-same-origin allow-popups allow-presentation`, never
+  top navigation; its origin isn't BB's), and loads lazily once its part is
+  committed, never while it streams. The page reports where each placeholder
+  sits as it scrolls, resizes, zooms or gets a new version. The embeds are
+  clipped to the board, hide while parts glide, fade back in, and keep their
+  frame (no reload) while the part and its URL stay the same.
 - **Pictures:** `canvas_images` looks a batch up in one call, in parallel;
   `canvas_image` finds one. Each returns an https address with alt text and
   its source. A query goes to Exa when an Exa API key is set, else to

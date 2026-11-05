@@ -54,6 +54,8 @@ export interface CanvasKit {
   viewport?(): { width: number; height: number };
   /** Zooms a page that stops short of the screen up to fill it (at most 1.4x). Returns the zoom. */
   fit?(root?: unknown): number;
+  /** Reports where each committed embed placeholder ([data-embed]) sits, to Visual Chat's UI, which frames it (src/ui/embeds.ts). */
+  embeds?(): void;
   /** One building block's HTML (card, stat, step, side, quote, placeholder) from its data-* attributes, then the element's own children. */
   block(kind: unknown, attrs: Record<string, string | undefined>, inner?: string): string;
   /** Expands every [data-block] under root in place. */
@@ -739,6 +741,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       root.style.zoom = z > 1.02 ? String(z) : "";
       root.dataset.cvZoom = String(z > 1.02 ? z : 1);
       if (z > 1.02) kit.charts!(root);
+      kit.embeds?.();
       return z;
     };
     // A card's picture that fails to load gives way to its placeholder (the title), never a broken image.
@@ -815,6 +818,57 @@ export function canvasKit(win?: unknown): CanvasKit {
       return text.length >= 8 && text.length <= 400 ? `text:${text}` : null;
     };
 
+    // Embeds (src/ui/embeds.ts): placeholders marked data-embed, framed by Visual Chat's own UI over them. The
+    // page never frames anything; it reports each committed placeholder's fields and where it sits (in the
+    // frame's viewport, after scroll and zoom), and whether a version is gliding (the UI hides them until it
+    // settles). Nothing is reported for a part still being written.
+    const EMBED_FIELDS = ["embed", "q", "lat", "lon", "zoom", "label", "id", "kind", "start"];
+    const committedEmbeds = new WeakSet<Element>();
+    let embedsMoving = false, embedQueued = false, lastEmbeds = "", settling = 0;
+    const reportEmbeds = () => {
+      embedQueued = false;
+      const page = doc.getElementById("cv-page");
+      if (!page || !w.parent || w.parent === w) return;
+      const embeds: { id: string; fields: Record<string, string>; rect: { x: number; y: number; w: number; h: number } }[] = [];
+      page.querySelectorAll<HTMLElement>("[data-embed]").forEach((el, i) => {
+        if (!committedEmbeds.has(el) || el.closest("[data-cv-pending],[data-cv-open]")) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        const fields: Record<string, string> = {};
+        for (const f of EMBED_FIELDS) { const v = el.dataset[f]; if (v !== undefined) fields[f] = v; }
+        const id = el.dataset.cvId ?? el.parentElement?.closest<HTMLElement>("[data-cv-id]")?.dataset.cvId ?? `embed-${i}`;
+        embeds.push({ id, fields, rect: { x: r.left, y: r.top, w: r.width, h: r.height } });
+      });
+      const message = { type: "bb-canvas-embeds", moving: embedsMoving, embeds };
+      const json = JSON.stringify(message);
+      if (json === lastEmbeds) return;
+      lastEmbeds = json;
+      w.parent.postMessage(message, "*");
+    };
+    kit.embeds = () => {
+      if (embedQueued) return;
+      embedQueued = true;
+      if (typeof w.requestAnimationFrame === "function") w.requestAnimationFrame(reportEmbeds); else w.setTimeout(reportEmbeds, 16);
+    };
+    /** A page (or the finished stream) is committed: its placeholders can be framed, once its parts stop gliding. */
+    const commitEmbeds = (root: HTMLElement) => {
+      root.querySelectorAll("[data-embed]").forEach((el) => committedEmbeds.add(el));
+      const run = ++settling;
+      // After this call's animations are made (same task): wait for the finite ones (not a pending tile's pulse).
+      void Promise.resolve().then(() => {
+        const all = typeof doc.getAnimations === "function" ? doc.getAnimations() : [];
+        const gliding = all.filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)) && a.playState !== "finished");
+        if (!gliding.length) { embedsMoving = false; kit.embeds!(); return; }
+        embedsMoving = true;
+        reportEmbeds();
+        const done = () => { if (run !== settling) return; embedsMoving = false; kit.embeds!(); };
+        void Promise.race([Promise.all(gliding.map((a) => a.finished.catch(() => undefined))), new Promise((resolve) => w.setTimeout(resolve, 2000))]).then(() => w.setTimeout(done, 40));
+      });
+    };
+    w.addEventListener("scroll", () => kit.embeds!(), { passive: true });
+    w.addEventListener("resize", () => kit.embeds!());
+    if (typeof RO === "function") new RO(() => kit.embeds!()).observe(doc.body ?? doc.documentElement);
+
     // A new page, animated by part: parts (data-cv-id) that stay glide from where they were, relative to the
     // part they sit in; new ones come in; gone ones leave from where they were. FLIP, with the Web Animations API.
     const reduced = () => typeof w.matchMedia === "function" && w.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -839,6 +893,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       kit.hydrate!(root);
       kit.charts!(root);
       if (options.fit === false) root.style.zoom = ""; else kit.fit!(root);
+      if (options.scripts !== false) commitEmbeds(root);
       if (!animate || reduced() || typeof root.animate !== "function") return;
       const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
       const after = new Map<string, DOMRect>();
@@ -934,6 +989,7 @@ export function canvasKit(win?: unknown): CanvasKit {
           kit.charts!(next.parentElement ?? root, true);
           if (!reduced() && typeof next.animate === "function") next.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 480, delay: Math.min(changed++, 3) * 60, easing: "ease-out", fill: "backwards" });
         }
+        kit.embeds!();
         return;
       }
       if (!root.hasAttribute("data-cv-streaming") && !final) {
@@ -943,6 +999,7 @@ export function canvasKit(win?: unknown): CanvasKit {
         const byId = new Map<string, { source: string; inner: string }>();
         for (const [el, source] of sources) byId.set(el.dataset.cvId!, { source, inner: el.innerHTML });
         root.querySelectorAll<HTMLElement>("[data-cv-id]").forEach((el) => { const known = byId.get(el.dataset.cvId!); if (known && finished(el)) { sourceOf.set(el, known.source); innerOf.set(el, known.inner); } });
+        kit.embeds!();
         return;
       }
       const shown = new Set<string>();
@@ -1001,7 +1058,7 @@ export function canvasKit(win?: unknown): CanvasKit {
       kit.blocks!(root);
       kit.hydrate!(root);
       kit.charts!(root, true);
-      if (final) kit.fit!(root);
+      if (final) { kit.fit!(root); commitEmbeds(root); } else kit.embeds!();
       if (reduced() || typeof root.animate !== "function") return;
       const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
       let entering = 0;
