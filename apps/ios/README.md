@@ -274,6 +274,11 @@ frame). Open on a webpage part, and a link from an embed's popup, open in
 Safari's view. The page the agent is writing streams in from the plugin's
 realtime channel, as on the desktop, and the board lands on the finished page.
 A board from before pages (items) isn't drawn on the phone.
+On the folded Duo's outer screen the chat hides the navigation bar, whose
+buttons iOS would put in the right-hand column, and draws its own header row:
+back beside the title, as on an iPhone. The clock's column on the right is a
+real safe-area inset there, so the board and the chat line run up to it and
+leave it clear. The chat list keeps the app's usual column.
 
 `VisualChatStillsUITests` takes the stills from a staged BB
 (`TEST_RUNNER_BBGO_QA_SERVER`; see the test for its other settings).

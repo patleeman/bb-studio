@@ -84,6 +84,11 @@ struct VisualChatScreen: View {
 
     @EnvironmentObject private var app: AppModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    /// The folded Duo's outer screen: iOS puts a navigation bar's buttons in a column at the right edge there,
+    /// so this screen hides the bar and draws its own header row (back beside the title), as on an iPhone.
+    private let folded = FoldedChrome.foldedDuo
+    @State private var geometry = ""
     @StateObject private var model: VisualChatModel
     @State private var host: VisualChatBoardHost?
     @State private var text = ""
@@ -99,6 +104,7 @@ struct VisualChatScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if folded { foldedHeader }
             board
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background { GeometryReader { proxy in Color.clear.onAppear { boardSize = proxy.size }.onChange(of: proxy.size) { boardSize = $1 } } }
@@ -107,6 +113,8 @@ struct VisualChatScreen: View {
         .background(Color(.systemBackground))
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(folded ? .hidden : .automatic, for: .navigationBar)
+        .background { GeometryReader { _ in Color.clear.onAppear(perform: measureWindow) } }
         .toolbar(.hidden, for: .tabBar)
         .task {
             model.attach(app.realtime)
@@ -126,6 +134,37 @@ struct VisualChatScreen: View {
                 text = text.trimmingCharacters(in: .whitespaces).isEmpty ? words : text.trimmingCharacters(in: .whitespaces) + " " + words
             }
         }
+    }
+
+    /// The folded Duo's header: back beside the title, inside the safe area, nothing over the board.
+    private var foldedHeader: some View {
+        HStack(spacing: 10) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .circle)
+            .accessibilityLabel("Back")
+            .accessibilityIdentifier("visualChatHeaderBack")
+            Text(model.title)
+                .font(.headline)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("visualChatHeaderTitle")
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
+
+    /// For UI tests and stills: the window's real safe area and size, and the screen's.
+    private func measureWindow() {
+        guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow) else { return }
+        let inset = window.safeAreaInsets
+        let screen = window.windowScene?.screen.bounds.size ?? .zero
+        geometry = String(format: "window %.0fx%.0f screen %.0fx%.0f safe top %.0f left %.0f bottom %.0f right %.0f folded %@",
+                          window.bounds.width, window.bounds.height, screen.width, screen.height,
+                          inset.top, inset.left, inset.bottom, inset.right, folded ? "yes" : "no")
     }
 
     // MARK: The board
@@ -160,6 +199,7 @@ struct VisualChatScreen: View {
                 .foregroundStyle(.clear)
                 .frame(width: 1, height: 1)
                 .accessibilityIdentifier("visualChatBoardState")
+                .accessibilityValue(geometry)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }

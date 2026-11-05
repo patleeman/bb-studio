@@ -49,6 +49,8 @@ final class VisualChatStillsUITests: StagedServerUITestCase {
         XCTAssertTrue(waitForIdle(timeout: 300), "the turn ends")
         sleep(3)
         save("board")
+        // The window's real safe area on this device (the folded Duo's side column, if it is one), for the report.
+        note("geometry", (state.value as? String) ?? "")
 
         let back = app.buttons["visualChatBack"]
         XCTAssertTrue(back.waitForExistence(timeout: 20), "there are versions to step through")
@@ -91,6 +93,15 @@ final class VisualChatStillsUITests: StagedServerUITestCase {
             usleep(250_000)
         }
         return false
+    }
+
+    private func note(_ name: String, _ text: String) {
+        let attachment = XCTAttachment(string: text)
+        attachment.name = "\(tag)-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let folder = setting("VC_OUT") else { return }
+        try? Data(text.utf8).write(to: URL(fileURLWithPath: folder).appending(path: "\(tag)-\(name).txt"))
     }
 
     private func save(_ name: String) {
