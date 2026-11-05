@@ -1,5 +1,8 @@
 import { errorMessage } from "../../kit/format";
 
+/** The longest page title the title fields accept. */
+export const TITLE_MAX_LENGTH = 200;
+
 type Draft = { id: string; title: string; base: string; at: number; supersedes?: string };
 type Page = { title: string; updatedAt: number };
 export type TitleTransport = {

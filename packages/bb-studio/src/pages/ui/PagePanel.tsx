@@ -1,10 +1,11 @@
-import { untitled } from "../../kit/format";
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import { openAppPath } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { pagePath } from "../constants";
 import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
 import { MissingPageRecovery } from "./MissingPageRecovery";
-import { relativeTime } from "./shared";
+import { PanelTitle } from "./PanelTitle";
+import type { rpcContract } from "../contract";
 import { NoteActions } from "./notes/NoteActions";
 
 /**
@@ -13,6 +14,7 @@ import { NoteActions } from "./notes/NoteActions";
  * it when first shown.
  */
 export function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
+  const rpc = useRpc<typeof rpcContract>();
   const { page, refetch } = usePanelPage(pageId);
 
   if (page === null) return <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={refetch} onBack={onBack} backLabel={backLabel ? `Back to ${backLabel}` : undefined} />;
@@ -37,8 +39,7 @@ export function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLab
           ) : null}
           {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="studio/pages" fallback="FileText" className="size-4 shrink-0 text-muted-foreground" />}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{untitled(page.title)}</div>
-            <div className="truncate text-[11px] text-muted-foreground">Edited {relativeTime(page.updatedAt)}</div>
+            <PanelTitle key={page.id} page={page} rpc={rpc} />
           </div>
           <OpenInPages onOpen={() => openAppPath(pagePath(page.id))} />
         </header>

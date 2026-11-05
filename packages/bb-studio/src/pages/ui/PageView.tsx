@@ -20,6 +20,7 @@ import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
+import { TITLE_MAX_LENGTH } from "./page-title";
 import { NoteActions } from "./notes/NoteActions";
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
 import { PageIconPicker } from "./PageIconPicker";
@@ -398,7 +399,7 @@ export function PageView({
               ) : null}
               <TitleField
                 value={title}
-                maxLength={200}
+                maxLength={TITLE_MAX_LENGTH}
                 // A new page starts with its title, like a new document.
                 autoFocus={!page.title && !page.archived}
                 onChange={(event) => titleSave.controller.edit(event.target.value)}
