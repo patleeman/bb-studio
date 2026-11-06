@@ -3,8 +3,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ ui: { whiteboard: vi.fn(), saveWhiteboard: vi.fn() } }));
+const state = vi.hoisted(() => ({ ui: { whiteboard: vi.fn(), saveWhiteboard: vi.fn() }, realtime: new Map<string, (payload: unknown) => void>() }));
 vi.mock("./context", () => ({ usePagesUi: () => state.ui }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ useRealtime: (channel: string, handler: (payload: unknown) => void) => { state.realtime.set(channel, handler); } }));
 vi.mock("../../kit/ui/index", () => ({ Icon: () => null, cn: (...values: unknown[]) => values.filter(Boolean).join(" ") }));
 
 import { Whiteboard } from "./whiteboard";
@@ -69,4 +70,15 @@ it("keeps a failed stroke visible and retries the same stroke id", async () => {
   expect(state.ui.saveWhiteboard.mock.calls[1]![0]).toEqual(state.ui.saveWhiteboard.mock.calls[0]![0]);
   expect(host.querySelector("svg polyline")).toBeNull();
   expect(host.textContent).not.toContain("Retry save");
+});
+
+it("reloads live when this whiteboard is saved elsewhere, and only this one", async () => {
+  act(() => root.render(<Whiteboard id="drawing_1" onOpen={() => {}} />));
+  await act(async () => { await Promise.resolve(); });
+  expect(state.ui.whiteboard).toHaveBeenCalledTimes(1);
+  const push = state.realtime.get("excalidraw")!;
+  await act(async () => { push({ type: "drawing:updated", drawingId: "drawing_2", updatedAt: 2 }); await Promise.resolve(); });
+  expect(state.ui.whiteboard).toHaveBeenCalledTimes(1);
+  await act(async () => { push({ type: "drawing:updated", drawingId: "drawing_1", updatedAt: 2 }); await Promise.resolve(); });
+  expect(state.ui.whiteboard).toHaveBeenCalledTimes(2);
 });

@@ -8,12 +8,15 @@ import { Icon } from "../../kit/ui/index";
 import { cn } from "../../kit/ui/index";
 import { WHITEBOARD_COLORS, type WhiteboardStroke, type WhiteboardView } from "../whiteboard";
 import { usePagesUi } from "./context";
+import { useRealtime } from "@get-bb/plugin-sdk/app";
+import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL } from "../../draw/shared";
 
 type Tool = "pen" | "eraser";
 const EMPTY_VIEWBOX: [number, number, number, number] = [0, 0, 800, 360];
 export const WHITEBOARD_HEIGHT = { default: 320, min: 160, max: 1200, step: 40 } as const;
 const clampHeight = (value: number) => Math.round(Math.min(WHITEBOARD_HEIGHT.max, Math.max(WHITEBOARD_HEIGHT.min, value)));
-const POLL_MS = 5_000;
+/** A fallback: edits arrive live over realtime; the poll catches a missed signal. */
+const POLL_MS = 15_000;
 const SAVE_DELAY_MS = 350;
 
 /** Asked by a newly made whiteboard so it opens ready to draw. */
@@ -58,7 +61,13 @@ export function Whiteboard({ id, onOpen, height: saved, onResize }: {
     });
   }, [ui, id]);
   useEffect(load, [load]);
-  // Picks up edits made in Draw or by agents, unless a stroke is on its way.
+  // Live: an agent, the CLI, or the full editor saved this whiteboard. A stroke on its way waits for its own save.
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    const event = payload as { type?: string; drawingId?: string };
+    if (event.type !== DRAWING_UPDATE_TYPE || event.drawingId !== id) return;
+    if (!saving.current && !failedBatch.current && !queue.current.add.length && !queue.current.erase.length) load();
+  });
+  // Picks up edits made full size or by agents if a realtime signal was missed, unless a stroke is on its way.
   useEffect(() => {
     const poll = setInterval(() => {
       if (document.visibilityState === "visible" && !saving.current && !failedBatch.current && !queue.current.add.length && !queue.current.erase.length) load();
