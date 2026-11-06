@@ -312,7 +312,7 @@ struct ReplyPreviewView: View {
                     .environment(\.colorScheme, .light)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Open drawing")
+            .accessibilityLabel("Open whiteboard")
         case .design(let id, let screens):
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {

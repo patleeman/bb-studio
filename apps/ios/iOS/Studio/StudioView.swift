@@ -1004,7 +1004,7 @@ struct StudioView: View {
         switch kind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
-        case "drawing": "Whiteboards live in pages. Add one with /whiteboard in a page on BB web, or ask an agent to sketch in a page."
+        case "drawing": "Whiteboards live in pages. Make one on BB web with New → Whiteboard or /whiteboard in a page, or ask an agent to sketch one."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
         case "dashboard": "Ask an agent for a dashboard, or make one in BB on the desktop. Widgets refresh while it's open."
