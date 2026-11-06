@@ -230,6 +230,7 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => {
       const stayed = await inThread(client);
       if (stayed !== after) throw new Error(after ? "Expanding left the thread" : "main unexpectedly stayed in the thread");
       if (after && !(await client.evaluate(`!!document.querySelector('[data-whiteboard-full-size="${drawing.id}"]')`))) throw new Error("No in-place full size");
+      if (after && !(await client.evaluate(`[...document.querySelectorAll('[data-whiteboard-full-size] button')].some((b) => b.checkVisibility() && b.textContent.trim() === "Page")`))) throw new Error("Full size has no visible Page (Back)");
     } },
     // In a thread: Esc returns to the page at the same scroll.
     "thread-back": { only: "after", run: async (client, seeded) => {
@@ -255,12 +256,16 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => {
       if (await client.evaluate(`!!document.querySelector('[data-whiteboard-full-size]')`)) throw new Error("Back didn't leave full size");
       if (await scrollOf(client, drawing.id) !== before) throw new Error("Back lost the scroll");
     } },
-    // Open full size: the full editor in its own Studio tab.
+    // Open full size in the Studio app tab.
     "full-size": { run: async (client, seeded) => {
       const { page, drawing } = seeded.boards[0];
       await openPage(client, page, drawing);
+      const path = await client.evaluate("location.pathname");
       await client.clickButtonText(after ? "Open full size" : "Open drawing");
-      await client.waitForSelector(`[data-studio-workspace-editor="/plugins/studio/studio/drawings/${drawing.id}"]`, 30000);
+      // main opens a workspace tab; the prototype expands over the page, in the same tab.
+      await client.waitForSelector(after ? `[data-whiteboard-full-size="${drawing.id}"]` : `[data-studio-workspace-editor="/plugins/studio/studio/drawings/${drawing.id}"]`, 30000);
+      if (after && (await client.evaluate("location.pathname")) !== path) throw new Error("Full size navigated away from the page");
+      if (after && !(await client.evaluate(`[...document.querySelectorAll('[data-whiteboard-full-size] button')].some((b) => b.checkVisibility() && b.textContent.trim() === "Page")`))) throw new Error("Full size has no visible Page (Back)");
       await client.waitForSelector("canvas.excalidraw__canvas", 30000);
       await client.waitForText("Saved", 30000);
       await sleep(1500);
