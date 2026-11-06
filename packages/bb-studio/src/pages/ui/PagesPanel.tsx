@@ -36,7 +36,11 @@ export function usePagesData(rpc: Rpc) {
 export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: BotsState): PagesUi {
   const navigate = useBbNavigate();
   const open = useStudioOpen();
-  const openPage = useCallback((id: string) => open({ href: pagePath(id) }), [open]);
+  // A workbench tab is labelled with what it shows: a page's title from the
+  // list, an embedded item's from the last lookup the page's embeds made.
+  const titles = useRef(new Map<string, string>());
+  const pageTitle = useCallback((id: string) => pages?.find((page) => page.id === id)?.title.trim() || undefined, [pages]);
+  const openPage = useCallback((id: string) => { const title = pageTitle(id); open({ href: pagePath(id), ...(title ? { title } : {}) }); }, [open, pageTitle]);
   const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   return useMemo<PagesUi>(
     () => ({
@@ -46,12 +50,15 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
       openThread: (threadId) => open({ threadId }),
       openProject: (projectId) => navigate.toProject(projectId),
       openUrl: (url) => open({ url }),
-      openPath: (path) => open({ href: path }),
+      openPath: (path) => { const title = titles.current.get(path); open({ href: path, ...(title ? { title } : {}) }); },
       linkPreview: (url) => rpc.call("pages.linkPreview", { url }),
       studioItems: () => {
         // Every embed on a page asks; one request serves them all for a few seconds.
         if (!studioItems.current || Date.now() - studioItems.current.at > 5_000) {
-          const items = rpc.call("pages.studioItems", null).then((result) => result.items);
+          const items = rpc.call("pages.studioItems", null).then((result) => {
+            for (const item of result.items) if (item.title.trim()) titles.current.set(item.href, item.title.trim());
+            return result.items;
+          });
           studioItems.current = { at: Date.now(), items };
           items.catch(() => (studioItems.current = null));
         }
