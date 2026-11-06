@@ -18,6 +18,8 @@ export default ({ seedDrawing, pluginRpc, sleep }) => [
         if (path !== "/plugins/studio/studio") throw new Error(`The old drawing address didn't open in Studio's workspace: ${path}`);
         await close();
         // The page shows the whiteboard; Open full size opens the full editor over the page, in the same tab.
+        // The browser keeps the workspace's tabs too: start the page's shot without the drawing's tab.
+        await client.evaluate(`localStorage.removeItem('bb:studio-workspace:v1')`);
         await client.navigate(`/plugins/studio/studio/pages/${page.id}`);
         await client.waitForSelector(`svg[data-whiteboard="${drawing.id}"]`, 30000);
         const fullSize = `[data-whiteboard-full-size="${drawing.id}"]`;
