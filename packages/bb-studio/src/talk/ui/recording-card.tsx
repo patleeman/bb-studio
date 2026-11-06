@@ -1,7 +1,8 @@
 // `::recording{id="rec_…"}` in a reply: the recording's summary and the start
 // of its transcript, read-only, under a header that opens the recording.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
+import { ItemDirectiveCard, remember } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { Recording, Segment, rpcContract } from "../shared/contract";
 import { RECORDING_CHANGED, TALK_ICON, formatClock, formatLength, recordingHref } from "../shared/format";
@@ -61,7 +62,8 @@ function RecordingPreview({ recording, segments }: Loaded) {
   );
 }
 
-export function RecordingCard({ attributes }: PluginMessageDirectiveProps) {
+export function RecordingCard({ attributes, message }: PluginMessageDirectiveProps) {
+  const open = useStudioOpen({ kind: "thread", threadId: message.threadId });
   const id = attributes.id ?? "";
   const valid = isRecordingId(id);
   const loaded = remember(`recording:${id}`, useRecording(valid ? id : ""));
@@ -76,8 +78,8 @@ export function RecordingCard({ attributes }: PluginMessageDirectiveProps) {
       title={recording.title.trim() || "Untitled recording"}
       details={`Recording · ${formatLength(recording.durationMs)} · ${recording.wordCount} words`}
       body={<RecordingPreview {...loaded} />}
-      // Talk has no workbench tab: its own page shows the recording.
-      onOpen={() => openAppPath(recordingHref(encodeURIComponent(id)))}
+      // The thread's workbench shows recordings too (the Studio tab).
+      onOpen={() => open({ href: recordingHref(encodeURIComponent(id)), title: recording.title.trim() || "Untitled recording" })}
     />
   );
 }

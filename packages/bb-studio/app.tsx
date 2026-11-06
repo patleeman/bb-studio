@@ -55,6 +55,7 @@ import { onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit
 import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
 import { registerThreadContext } from "./src/ui/thread-context";
+import { StudioContainerProvider } from "./src/ui/studio-open";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -107,7 +108,12 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
 /** The thread's Studio tab; its kinds' editors load when an item opens. */
 const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 
+/** The Studio app: links in it open as Studio tabs (src/ui/studio-open.tsx). */
 function StudioRoot({ subPath }: { subPath: string }) {
+  return <StudioContainerProvider value={{ kind: "studio" }}><StudioRootView subPath={subPath} /></StudioContainerProvider>;
+}
+
+function StudioRootView({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
   // Studio opens on its tabbed workspace; the item list is only its new tab page.
   if (path === "") return <StudioWorkspace />;

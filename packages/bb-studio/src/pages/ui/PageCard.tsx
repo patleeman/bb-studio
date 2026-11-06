@@ -1,6 +1,6 @@
 // `::page{id="pg_…"}` in a reply: the page shown inline, read-only, under a
 // header that opens it in the thread's workbench, beside the chat.
-import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
+import { ItemDirectiveCard, remember } from "../../kit/app/index";
 import { untitled } from "../../kit/format";
 import { Markdown, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
@@ -9,8 +9,7 @@ import { chatMarkdown } from "./page-preview";
 import { usePanelPage } from "./use-panel-page";
 import { isPageId, pagePath } from "../constants";
 import { relativeTime } from "./shared";
-import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
-import { useOpenThreadTab } from "../../kit/app/thread-panel";
+import { useStudioOpen } from "../../ui/studio-open";
 
 
 export { isPageId };
@@ -51,8 +50,8 @@ function PageBody({ markdown }: { markdown: string | null | undefined }) {
   return <div className="px-4 py-3 text-sm"><Markdown content={markdown} /></div>;
 }
 
-export function PageCard({ attributes }: PluginMessageDirectiveProps) {
-  const openTab = useOpenThreadTab();
+export function PageCard({ attributes, message }: PluginMessageDirectiveProps) {
+  const open = useStudioOpen({ kind: "thread", threadId: message.threadId });
   const id = attributes.id ?? "";
   const valid = isPageId(id);
   const page = remember(`page:${id}`, usePanelPage(valid ? id : null).page);
@@ -68,11 +67,7 @@ export function PageCard({ attributes }: PluginMessageDirectiveProps) {
       title={page.icon ? `${page.icon} ${title}` : title}
       details={`Page · edited ${relativeTime(page.updatedAt)}`}
       body={<PageBody markdown={markdown} />}
-      onOpen={() => {
-        // The workbench when there is one; the main area otherwise.
-        if (!openTab({ actionId: STUDIO_TAB, title, params: itemParams("page", id) }))
-          openAppPath(pagePath(id));
-      }}
+      onOpen={() => open({ href: pagePath(id), title })}
     />
   );
 }

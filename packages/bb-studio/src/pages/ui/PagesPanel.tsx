@@ -1,6 +1,7 @@
 import { requestGeneration } from "../../kit/ui/request-generation";
 import { usePanelPage } from "./use-panel-page";
 import { openAppPath, studioPath } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
@@ -27,22 +28,25 @@ export function usePagesData(rpc: Rpc) {
   return { pages, bots, refetch };
 }
 
-/** What the page's blocks and mentions need to open things, shared by every view of a page. */
+/**
+ * What the page's blocks and mentions need to open things, shared by every
+ * view of a page. Opening follows the container the page is in
+ * (../../ui/studio-open.tsx): a thread's workbench, or the Studio app.
+ */
 export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: BotsState): PagesUi {
   const navigate = useBbNavigate();
-  const openPage = useCallback((id: string) => openAppPath(pagePath(id)), []);
+  const open = useStudioOpen();
+  const openPage = useCallback((id: string) => open({ href: pagePath(id) }), [open]);
   const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   return useMemo<PagesUi>(
     () => ({
       pages: pages ?? [],
       bots: bots.bots,
       openPage,
-      openThread: (threadId) => navigate.toThread(threadId),
+      openThread: (threadId) => open({ threadId }),
       openProject: (projectId) => navigate.toProject(projectId),
-      openUrl: (url) => {
-        if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
-      },
-      openPath: openAppPath,
+      openUrl: (url) => open({ url }),
+      openPath: (path) => open({ href: path }),
       linkPreview: (url) => rpc.call("pages.linkPreview", { url }),
       studioItems: () => {
         // Every embed on a page asks; one request serves them all for a few seconds.
@@ -66,7 +70,7 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
         }),
       compose: (prompt) => navigate.toCompose({ initialPrompt: prompt, focusPrompt: true }),
     }),
-    [pages, bots.bots, openPage, navigate, rpc],
+    [pages, bots.bots, openPage, open, navigate, rpc],
   );
 }
 

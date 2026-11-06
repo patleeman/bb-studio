@@ -12,6 +12,7 @@ const rpc = { call: state.call };
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => rpc,
   useBbNavigate: () => ({ toPluginPanel: state.navigate }),
+  experimental_useAppPanel: () => ({ openTab: () => false }),
   useRealtime: (_channel: string, handler: (event: unknown) => void) => {
     useEffect(() => { state.handlers.add(handler); return () => { state.handlers.delete(handler); }; }, [handler]);
   },

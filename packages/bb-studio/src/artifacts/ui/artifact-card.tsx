@@ -2,14 +2,13 @@
 // its viewer in the thread's workbench, beside the chat. Files BB can show
 // are previewed inline, as in the viewer.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember, openAppPath } from "../../kit/app/index";
+import { ItemDirectiveCard, remember } from "../../kit/app/index";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import { ArtifactBody } from "./artifact-body";
 import { ARTIFACT_ICON, ARTIFACT_UPDATE_TYPE, REALTIME_CHANNEL, artifactHref, TYPE_ICONS, TYPE_LABELS, formatBytes, isArtifactId } from "../shared";
-import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
-import { useOpenThreadTab } from "../../kit/app/thread-panel";
+import { useStudioOpen } from "../../ui/studio-open";
 
 type Artifact = NonNullable<z.infer<(typeof rpcContract)["artifacts.get"]["output"]>["artifact"]>;
 
@@ -17,7 +16,7 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
   const id = attributes.id ?? "";
   const valid = isArtifactId(id);
   const rpc = useRpc<typeof rpcContract>();
-  const openTab = useOpenThreadTab();
+  const open = useStudioOpen({ kind: "thread", threadId: message.threadId });
   const [loaded, setArtifact] = useState<Artifact | null | undefined>(undefined);
   const artifact = remember(`artifact:${id}`, valid ? loaded : null);
 
@@ -44,11 +43,7 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
       kind="artifact"
       icon={TYPE_ICONS[version.type]}
       title={artifact.title}
-      onOpen={() => {
-        // The workbench when there is one; the main area otherwise.
-        if (!openTab({ actionId: STUDIO_TAB, title: artifact.title, params: itemParams("artifact", artifact.id) }))
-          openAppPath(artifactHref(artifact.id));
-      }}
+      onOpen={() => open({ href: artifactHref(artifact.id), title: artifact.title })}
       body={version.type === "other" ? undefined : (
         // A player is a row high and an HTML page fits its height; other previews get room.
         <div className={version.type === "audio" || version.type === "html" ? "" : "h-80"}>

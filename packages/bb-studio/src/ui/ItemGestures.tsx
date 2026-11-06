@@ -2,6 +2,8 @@
 // - right-click one for Open, Open in split, Copy reference (a thread: Copy
 //   link), New thread with this;
 // - Mod-click to open it in a split.
+// Inside a thread's workbench the rule in ./studio-open.tsx applies instead:
+// Open is a workbench tab, and Mod-click opens it in the Studio app.
 // Items are marked with the kit's studioItemProps or studioThreadProps, and
 // links into plugin views and threads count too. An element's own menu, and
 // Shift+right-click, keep their usual behavior.
@@ -22,13 +24,20 @@ import {
   type OpenTarget,
 } from "../kit/app/index";
 import { useEffect, useRef, useState } from "react";
+import { containerAt, openFrom, type StudioContainer, type StudioRef } from "./studio-open";
 import { toast } from "sonner";
 
 interface Menu {
   x: number;
   y: number;
   target: OpenTarget;
+  container: StudioContainer | null;
 }
+
+const refOf = (target: OpenTarget): StudioRef => target.kind === "thread"
+  ? { threadId: target.threadId, ...(target.title ? { title: target.title } : {}) }
+  : { href: target.path, ...(target.title ? { title: target.title } : {}), ...(target.icon ? { icon: target.icon } : {}) };
+const inThread = (container: StudioContainer | null): container is Extract<StudioContainer, { kind: "thread" }> => container?.kind === "thread";
 
 /** How the menu names the split click: ⌘ on a Mac, Ctrl elsewhere. */
 const MOD_CLICK = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ Click" : "Ctrl Click";
@@ -42,6 +51,8 @@ export function ItemGestures() {
   // The listeners are added once and open through the latest `open`.
   const latestOpen = useRef(open);
   latestOpen.current = open;
+  const latestNavigate = useRef(navigate);
+  latestNavigate.current = navigate;
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -52,14 +63,16 @@ export function ItemGestures() {
       if (!target || (event.target as Element).closest(`[${STUDIO_ITEM_CLICKS_OFF}]`)) return;
       event.preventDefault();
       event.stopPropagation();
-      latestOpen.current(target, "split");
+      const container = containerAt(event.target as Element);
+      if (inThread(container)) openFrom(container, refOf(target), { alternate: true }, latestNavigate.current);
+      else latestOpen.current(target, "split");
     };
     const onContextMenu = (event: MouseEvent) => {
       if (event.defaultPrevented || event.shiftKey) return;
       const target = targetAt(event);
       if (!target) return;
       event.preventDefault();
-      setMenu({ x: event.clientX, y: event.clientY, target });
+      setMenu({ x: event.clientX, y: event.clientY, target, container: containerAt(event.target as Element) });
     };
     // Capturing, so the item's own click handler doesn't open it as well.
     document.addEventListener("click", onClick, true);
@@ -86,13 +99,27 @@ export function ItemGestures() {
             <span aria-hidden className="pointer-events-none fixed size-px" style={{ left: menu.x, top: menu.y }} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" sideOffset={0} className="w-56" aria-label={`${target.title ?? "Item"} options`}>
-            <DropdownMenuItem onSelect={() => open(target, "main")}>
-              <Icon name="ArrowUpRight" className="size-4" /> Open
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => open(target, "split")}>
-              <Icon name="Columns2" className="size-4" /> Open in split
-              <span className="ml-auto text-muted-foreground">{MOD_CLICK}</span>
-            </DropdownMenuItem>
+            {inThread(menu.container) ? (
+              <>
+                <DropdownMenuItem onSelect={() => openFrom(menu.container, refOf(target), {}, navigate)}>
+                  <Icon name="ArrowUpRight" className="size-4" /> Open
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => openFrom(menu.container, refOf(target), { alternate: true }, navigate)}>
+                  <Icon name="studio/studio" fallback="ArrowUpRight" className="size-4" /> {target.kind === "thread" ? "Open in split" : "Open in Studio"}
+                  <span className="ml-auto text-muted-foreground">{MOD_CLICK}</span>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onSelect={() => open(target, "main")}>
+                  <Icon name="ArrowUpRight" className="size-4" /> Open
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => open(target, "split")}>
+                  <Icon name="Columns2" className="size-4" /> Open in split
+                  <span className="ml-auto text-muted-foreground">{MOD_CLICK}</span>
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             {target.kind === "path" ? (
               <CopyReferenceMenuItem item={{ href: target.path, ...(target.title ? { title: target.title } : {}), ...(target.icon ? { icon: target.icon } : {}) }} />

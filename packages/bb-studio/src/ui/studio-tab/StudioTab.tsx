@@ -23,6 +23,7 @@ import { RECORDING_CHANGED } from "../../talk/shared/format";
 import { appliedKinds } from "../kinds-snapshot";
 import { runCreateEntry, startsGroup, useCreateEntries, type CreateEntry } from "../create-menu";
 import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, type CollectionKind, type TabKind, type TabKindInfo, type TabTarget } from "./model";
+import { StudioContainerProvider } from "../studio-open";
 import { applyScroll, elementPath, loadView, onViewForgotten, sameTarget, saveView, viewKey, type TabScroll } from "./view-state";
 
 const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => ({ default: module.PageTab })));
@@ -74,10 +75,13 @@ export function StudioTab({ threadId, params }: { threadId: string; params: Json
   const back = useCallback(() => setTarget({ view: "list" }), []);
   const root = useViewMemory(key, target, filter, restored?.scroll ?? null);
 
+  // Links in here open as tabs in this thread's workbench (../studio-open.tsx).
   return (
-    <div ref={root.ref} className="contents" onScrollCapture={root.onScroll} onWheelCapture={root.onUser} onPointerDownCapture={root.onUser} onKeyDownCapture={root.onUser} onTouchStartCapture={root.onUser}>
-      <TabView threadId={threadId} target={target} enabled={enabled} filter={filter} onFilter={setFilter} onTarget={setTarget} onBack={back} />
-    </div>
+    <StudioContainerProvider value={{ kind: "thread", threadId }}>
+      <div ref={root.ref} className="contents" onScrollCapture={root.onScroll} onWheelCapture={root.onUser} onPointerDownCapture={root.onUser} onKeyDownCapture={root.onUser} onTouchStartCapture={root.onUser}>
+        <TabView threadId={threadId} target={target} enabled={enabled} filter={filter} onFilter={setFilter} onTarget={setTarget} onBack={back} />
+      </div>
+    </StudioContainerProvider>
   );
 }
 
