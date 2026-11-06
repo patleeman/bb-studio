@@ -117,9 +117,10 @@ function paneSlot(from: HTMLElement): HTMLElement | null {
   return null;
 }
 
-function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | null {
+function useBarSlot(anchor: React.RefObject<HTMLElement | null>, inline = false): HTMLElement | null {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
+    if (inline) return;
     // The title bar and the view mount together; give the slot a few frames.
     let frame = 0, tries = 0, current: HTMLElement | null = null;
     const find = () => (anchor.current ? paneSlot(anchor.current) : null);
@@ -149,7 +150,7 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>): HTMLElement | 
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => { cancelAnimationFrame(frame); observer.disconnect(); };
-  }, [anchor]);
+  }, [anchor, inline]);
   return slot;
 }
 
@@ -237,6 +238,7 @@ export function ItemHeader({
   item,
   chatAction,
   className,
+  inline = false,
 }: {
   /** Where back goes, as the first crumb. */
   backLabel: string;
@@ -252,9 +254,11 @@ export function ItemHeader({
   /** Replaces the shared item chat when a view owns its conversation. Null hides it. */
   chatAction?: ReactNode;
   className?: string;
+  /** Keeps the bar in the view, with its back crumb, instead of lending it to a title bar (a view laid over another one). */
+  inline?: boolean;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
-  const slot = useBarSlot(anchor);
+  const slot = useBarSlot(anchor, inline);
   useLayoutEffect(() => slot ? markTitleBar(slot) : undefined, [slot]);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {

@@ -57,8 +57,11 @@ export function DrawingEditor({
   threadId,
   backLabel,
   onBack,
+  inlineHeader = false,
 }: {
   drawingId: string;
+  /** Laid over a page (full size): its bar stays in place, with Back. */
+  inlineHeader?: boolean;
   /** Set in a thread's panel, where the drawing can be attached. */
   threadId?: string | null;
   backLabel: string;
@@ -247,7 +250,8 @@ export function DrawingEditor({
       // After Excalidraw has taken the new size.
       frame = requestAnimationFrame(() => {
         const api = apiRef.current;
-        if (api && api.getSceneElements().length > 0) api.scrollToContent();
+        // Full size over a page (often a narrow side panel), the whole scene fits, never above 100%.
+        if (api && api.getSceneElements().length > 0) api.scrollToContent(undefined, inlineHeader ? { fitToViewport: true, viewportZoomFactor: 0.85, maxZoom: 1 } : undefined);
       });
     });
     observer.observe(element);
@@ -255,7 +259,7 @@ export function DrawingEditor({
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [loading]);
+  }, [loading, inlineHeader]);
 
   // Leaving the editor flushes the newest scene; bounded retries continue after
   // unmount. Warn before closing the browser while a scene remains unacknowledged.
@@ -533,6 +537,7 @@ export function DrawingEditor({
         item={thread}
         backLabel={backLabel}
         onBack={() => onBack()}
+        inline={inlineHeader}
         leading={
           <>
             <BarTitle

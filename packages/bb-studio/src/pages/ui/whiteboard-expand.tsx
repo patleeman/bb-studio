@@ -49,7 +49,7 @@ export function WhiteboardExpandHost({ threadId, children }: { threadId?: string
       {open ? (
         <div role="region" aria-label="Whiteboard, full size" data-whiteboard-full-size={open} className="absolute inset-0 z-40 flex flex-col bg-background">
           <Suspense fallback={null}>
-            <DrawingEditor drawingId={open} threadId={threadId ?? null} backLabel="Page" onBack={close} />
+            <DrawingEditor drawingId={open} threadId={threadId ?? null} backLabel="Page" onBack={close} inlineHeader />
           </Suspense>
         </div>
       ) : null}
