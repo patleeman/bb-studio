@@ -163,10 +163,9 @@ return [
         for (const label of ["Page", "Record a call"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
         }
-        // Whiteboards are made in a page (/whiteboard), not from New.
-        for (const label of ["Drawing", "Whiteboard"]) {
-          if (unfiltered.includes(label)) throw new Error(`New menu still offers ${label}`);
-        }
+        // New → Whiteboard (a page holding one) follows Page; there's no bare Drawing.
+        if (unfiltered.indexOf("Whiteboard") !== unfiltered.indexOf("Page") + 1) throw new Error(`New menu doesn't offer Whiteboard after Page: ${JSON.stringify(unfiltered)}`);
+        if (unfiltered.includes("Drawing")) throw new Error("New menu still offers Drawing");
         // Bots live in Teams, not Studio.
         if (unfiltered.includes("Bot")) throw new Error("The New menu still offers a bot");
         for (const kind of ["drawing", "page"]) {
@@ -266,8 +265,9 @@ return [
         await client.evaluate(`(() => {
           const nav = document.querySelector('nav[aria-label="Studio"]');
           if (nav.getBoundingClientRect().left > 120) throw new Error("The Studio list isn't in BB's sidebar");
-          // Whiteboards live in pages: no kind row of their own.
-          if (nav.querySelector('[data-kind="drawing"]')) throw new Error("The sidebar still lists drawings as a kind");
+          // Whiteboards have their row, after Pages.
+          const kinds = [...nav.querySelectorAll('[data-kind]')].map((each) => each.getAttribute('data-kind'));
+          if (kinds.indexOf("drawing") !== kinds.indexOf("page") + 1) throw new Error("The sidebar has no Whiteboards row after Pages: " + JSON.stringify(kinds));
           const pages = nav.querySelector('[data-kind="page"]');
           if (!pages || !/\\d/.test(pages.textContent)) throw new Error("The Pages kind has no count");
           pages.click();
