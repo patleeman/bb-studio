@@ -1,7 +1,7 @@
 // Whiteboards: drawings that live in pages. A page embeds one as
 // ```embed {"kind":"drawing","target":"drw_…"}```; the drawing stays in the
 // `drawings` table. These helpers find the pages a drawing is in, and gather
-// drawings no page shows (orphans) into a "Drawings" page so none is lost.
+// drawings no page shows (orphans) into a "Whiteboards" page so none is lost.
 
 /** A page, as the whiteboard tools and the editor need it. */
 export interface WhiteboardPage {
@@ -23,8 +23,12 @@ export interface WhiteboardPages {
 
 export const pagePath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
-/** The Markdown block that embeds a drawing as a whiteboard, at its default height or `height` pixels. */
-export function whiteboardMarkdown(drawingId: string, height?: number): string {
+/**
+ * The Markdown block that embeds a drawing as a whiteboard, at its default
+ * height or `height` pixels. Options, not a second argument, so
+ * `ids.map(whiteboardMarkdown)` can't pass an index as a height.
+ */
+export function whiteboardMarkdown(drawingId: string, { height }: { height?: number } = {}): string {
   return "```embed\n" + JSON.stringify({ kind: "drawing", target: drawingId, ...(height ? { height } : {}) }) + "\n```";
 }
 
@@ -82,8 +86,8 @@ export function migrateOrphanDrawings(input: {
     } else {
       state.pages[key] = input.pages.createPage({
         projectId: drawings[0]!.projectId,
-        title: "Drawings",
-        markdown: ["Drawings made before whiteboards moved into pages. Each one is a whiteboard: sketch on it here, or open it in the full editor.", ...ids.map(whiteboardMarkdown)].join("\n\n"),
+        title: "Whiteboards",
+        markdown: ["Whiteboards made before they moved into pages. Sketch on each one here, or open it full size.", ...ids.map((id) => whiteboardMarkdown(id))].join("\n\n"),
       });
     }
     moved.push(...ids);

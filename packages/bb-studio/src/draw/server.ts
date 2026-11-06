@@ -50,8 +50,20 @@ export const DRAWINGS_USAGE = [
   "  remove-elements <id> <element-id…>    Delete elements by id",
 ].join("\n");
 
+/**
+ * The old excalidraw_* names, kept as aliases of the whiteboard tools for two
+ * releases (from the release that renamed them, Nov 2026). Remove them, and
+ * this map, after that.
+ */
+export const TOOL_ALIASES = {
+  excalidraw_list_drawings: "whiteboard_list",
+  excalidraw_get_drawing: "whiteboard_get",
+  excalidraw_create_drawing: "whiteboard_create",
+  excalidraw_update_drawing: "whiteboard_update",
+} as const;
+
 /** Available in every agent session. */
-export const DRAW_TOOLS = ["excalidraw_list_drawings", "excalidraw_get_drawing", "excalidraw_create_drawing", "excalidraw_update_drawing"];
+export const DRAW_TOOLS = ["whiteboard_list", "whiteboard_get", "whiteboard_create", "whiteboard_update", ...Object.keys(TOOL_ALIASES)];
 
 export interface BuiltinDrawings {
   store: DrawingStore;
@@ -120,6 +132,19 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
       throw error;
     }
     return { row, page };
+  }
+
+  /** A new page holding one tall whiteboard: New → Whiteboard, or whiteboard_create without a page. */
+  function createWhiteboardPage(input: { projectId: string | null; title: string; name: string; by: Writer }): { row: DrawingRow; page: WhiteboardPage } {
+    const target = needPages();
+    const row = create(input.name, input.by, input.projectId);
+    try {
+      const pageId = target.createPage({ projectId: input.projectId, title: input.title, markdown: whiteboardMarkdown(row.id, { height: NEW_WHITEBOARD_PAGE_HEIGHT }) });
+      return { row, page: target.page(pageId) ?? { id: pageId, title: input.title, projectId: input.projectId, archived: false } };
+    } catch (error) {
+      remove(row.id, input.by);
+      throw error;
+    }
   }
 
   const studio = studioSchemas(z);
@@ -214,16 +239,8 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     },
     "drawings.getDrawing": ({ id }) => ({ drawing: getDrawing(id) }),
     "drawings.newWhiteboardPage"({ projectId }) {
-      const target = needPages();
-      const row = create("", "app", projectId);
-      try {
-        const title = "Untitled whiteboard";
-        const pageId = target.createPage({ projectId, title, markdown: whiteboardMarkdown(row.id, NEW_WHITEBOARD_PAGE_HEIGHT) });
-        return { drawingId: row.id, page: { id: pageId, title, href: pagePath(pageId) } };
-      } catch (error) {
-        remove(row.id, "app");
-        throw error;
-      }
+      const { row, page } = createWhiteboardPage({ projectId, title: "Untitled whiteboard", name: "", by: "app" });
+      return { drawingId: row.id, page: { id: page.id, title: page.title, href: pagePath(page.id) } };
     },
     "drawings.whiteboardPage"({ id }) {
       const page = homePage(id);
@@ -286,122 +303,157 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
   });
 
   // ---------------------------------------------------------------------
-  // Agent tools — the "multiplayer" path: while the user has a drawing open,
-  // the agent reads the live scene (excalidraw_get_drawing), edits it
-  // (excalidraw_update_drawing), and the open editor applies the change live
-  // (realtime + polling sync). Writes go through the same element-level merge
-  // as editor autosaves, so both writers' edits survive.
+  // Agent tools — the "multiplayer" path: while the user has a whiteboard
+  // open, the agent reads the live scene (whiteboard_get), edits it
+  // (whiteboard_update), and the open editor and the page's whiteboard apply
+  // the change live (realtime + polling sync). Writes go through the same
+  // element-level merge as editor autosaves, so both writers' edits survive.
+  //
+  // Each tool is also registered under its old excalidraw_* name, taking the
+  // old `drawingId`, so automations, saved prompts and skills keep working.
+  // The aliases go after two releases (see TOOL_ALIASES).
   // ---------------------------------------------------------------------
 
   const excalidrawElementSchema = z.object({ id: z.string().min(1), type: z.string().min(1) }).passthrough();
+  type ToolResult = string | { content: { type: "text"; text: string }[]; isError: true };
+  const failed = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
+  const notFound = (id: string) => failed(`Whiteboard ${id} not found.`);
+
+  function listWhiteboards(): ToolResult {
+    const rows = store.list();
+    if (!rows.length) return "No whiteboards yet. Use whiteboard_create to add one to a page, or to make a whiteboard page.";
+    const embeddings = pages?.embeddings() ?? new Map<string, WhiteboardPage[]>();
+    const lines = rows.map((r) => {
+      const m = toMeta(r);
+      const where = embeddings.get(m.id)?.map((page) => `[${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)})${page.archived ? " (archived)" : ""}`).join(", ");
+      return `- ${displayName(r)} (id ${m.id}) — ${m.elementCount} element(s), updated ${new Date(m.updatedAt).toISOString()}, ${where ? `in ${where}` : `not in a page; open it at ${drawingHref(m.id)}`}`;
+    });
+    return `Whiteboards:\n${lines.join("\n")}`;
+  }
+
+  function getWhiteboard(id: string): ToolResult {
+    const row = store.get(id);
+    if (!row) return notFound(id);
+    const scene = parseSceneData(row.data);
+    const clean = getNonDeletedElements(scene);
+    const payload = {
+      whiteboard: { id: row.id, name: displayName(row), elementCount: clean.length, updatedAt: row.updated_at, summary: sceneSummary(scene, "empty whiteboard") },
+      scene: {
+        type: "excalidraw",
+        version: 2,
+        elements: clean,
+        appState: scene?.appState ?? {},
+        // Image data URLs would push most scenes with an image past the
+        // inline limit, hiding the elements; list the files instead.
+        files: fileSummaries(scene?.files),
+      },
+    };
+    const json = JSON.stringify(payload, null, 2);
+    if (json.length > MAX_TOOL_SCENE_CHARS) {
+      const ids = clean.map((el) => (typeof el.id === "string" ? el.id : "?")).join(", ");
+      return [
+        `Whiteboard "${displayName(row)}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
+        sceneSummary(scene, "empty whiteboard"),
+        `Element ids (in z-order):\n${ids}`,
+        `To edit, pass element ids in whiteboard_update. Raw scene: bb studio whiteboards show ${row.id}`,
+      ].join("\n\n");
+    }
+    return json;
+  }
+
+  function createWhiteboardTool(input: { pageId?: string; name: string; afterBlockId?: string }, ctx: { threadId: string; projectId?: string | null }): ToolResult {
+    let made: { row: DrawingRow; page: WhiteboardPage };
+    try {
+      made = input.pageId
+        ? createWhiteboard({ pageId: input.pageId, name: input.name, afterBlockId: input.afterBlockId, by: "agent" })
+        : createWhiteboardPage({ projectId: ctx.projectId ?? null, title: input.name, name: input.name, by: "agent" });
+    } catch (error) {
+      return failed(errorMessage(error));
+    }
+    const { row, page } = made;
+    created(row.id, ctx.threadId);
+    const link = `[${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)})`;
+    return `${input.pageId ? `Added whiteboard "${input.name}" (id ${row.id}) to the page ${link}` : `Made the whiteboard page ${link} with whiteboard "${input.name}" (id ${row.id})`}. Draw on it with whiteboard_update.\n${card(row.id, page)}`;
+  }
+
+  function updateWhiteboard(input: { id: string; elements?: unknown[]; deletedElementIds?: string[]; appState?: Record<string, unknown>; files?: Record<string, unknown> }, ctx: { threadId?: string | null }): ToolResult {
+    const { id, elements, deletedElementIds, appState, files } = input;
+    const row = store.get(id);
+    if (!row) return notFound(id);
+    if ((!elements || elements.length === 0) && (!deletedElementIds || deletedElementIds.length === 0)) {
+      return failed("Nothing to do: provide elements and/or deletedElementIds.");
+    }
+    const skipped: string[] = [];
+    const merged = applyElementUpserts(row.data, (elements ?? []) as SceneElement[], { deletedElementIds, appState, files, skipped });
+    const updatedAt = write(row, merged, "agent");
+    if (ctx.threadId) edited(row.id, ctx.threadId);
+    const clean = getNonDeletedElements(merged);
+    return [
+      `Updated whiteboard "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
+      `- upserted ${(elements?.length ?? 0) - skipped.length} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
+      ...(skipped.length ? [`- NOT applied: ${skipped.join(", ")} — already deleted in the whiteboard. Use new ids to add them again.`] : []),
+      `- saved at ${new Date(updatedAt).toISOString()}`,
+      `The user's open editor and the page's whiteboard have been notified and show the change live.`,
+      card(row.id),
+    ].join("\n");
+  }
+
+  const editFields = {
+    elements: z.array(excalidrawElementSchema).max(500).optional(),
+    deletedElementIds: z.array(z.string()).max(500).optional(),
+    appState: z.record(z.string(), z.unknown()).optional(),
+    files: z.record(z.string(), z.unknown()).optional(),
+  };
+  const createFields = {
+    name: z.string().min(1).max(200).describe("The whiteboard's name; without pageId, also the new page's title"),
+    afterBlockId: z.string().min(1).optional().describe("Put the whiteboard after this block instead of at the end"),
+  };
+  const alias = (name: string) => `Old name of ${name}; it does the same. Use ${name}.`;
 
   bb.agents.registerTool({
-    name: "excalidraw_list_drawings",
+    name: "whiteboard_list",
     description:
-      "List the whiteboards in the user's BB Studio pages (Excalidraw drawings): id, name, element count, last updated, and the page each one is in. Use when the user asks you to work with a whiteboard, sketch or diagram. To read or edit one, pass its id to excalidraw_get_drawing or excalidraw_update_drawing.",
+      "List the whiteboards in the user's BB Studio pages: id, name, element count, last updated, and the page each one is in. Use when the user asks you to work with a whiteboard, sketch or diagram. To read or edit one, pass its id to whiteboard_get or whiteboard_update.",
     parameters: z.object({}),
-    execute() {
-      const rows = store.list();
-      if (!rows.length) return "No whiteboards yet. Use excalidraw_create_drawing to add one to a page.";
-      const embeddings = pages?.embeddings() ?? new Map<string, WhiteboardPage[]>();
-      const lines = rows.map((r) => {
-        const m = toMeta(r);
-        const where = embeddings.get(m.id)?.map((page) => `[${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)})${page.archived ? " (archived)" : ""}`).join(", ");
-        return `- ${displayName(r)} (id ${m.id}) — ${m.elementCount} element(s), updated ${new Date(m.updatedAt).toISOString()}, ${where ? `in ${where}` : `not in a page; open it at ${drawingHref(m.id)}`}`;
-      });
-      return `Whiteboards:\n${lines.join("\n")}`;
-    },
+    execute: () => listWhiteboards(),
   });
+  bb.agents.registerTool({ name: "excalidraw_list_drawings", description: alias("whiteboard_list"), parameters: z.object({}), execute: () => listWhiteboards() });
 
   bb.agents.registerTool({
-    name: "excalidraw_get_drawing",
+    name: "whiteboard_get",
     description:
-      "Read the current scene of a whiteboard (an Excalidraw drawing; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and excalidraw_list_drawings lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio whiteboards show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
-    parameters: z.object({ drawingId: z.string().min(1) }),
-    execute({ drawingId }) {
-      const row = store.get(drawingId);
-      if (!row) return { content: [{ type: "text", text: `Drawing ${drawingId} not found.` }], isError: true };
-      const scene = parseSceneData(row.data);
-      const clean = getNonDeletedElements(scene);
-      const payload = {
-        drawing: { id: row.id, name: displayName(row), elementCount: clean.length, updatedAt: row.updated_at, summary: sceneSummary(scene, "empty drawing") },
-        scene: {
-          type: "excalidraw",
-          version: 2,
-          elements: clean,
-          appState: scene?.appState ?? {},
-          // Image data URLs would push most drawings with an image past the
-          // inline limit, hiding the elements; list the files instead.
-          files: fileSummaries(scene?.files),
-        },
-      };
-      const json = JSON.stringify(payload, null, 2);
-      if (json.length > MAX_TOOL_SCENE_CHARS) {
-        const ids = clean.map((el) => (typeof el.id === "string" ? el.id : "?")).join(", ");
-        return [
-          `Drawing "${displayName(row)}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
-          sceneSummary(scene, "empty drawing"),
-          `Element ids (in z-order):\n${ids}`,
-          `To edit, pass element ids in excalidraw_update_drawing. Raw scene: bb studio whiteboards show ${row.id}`,
-        ].join("\n\n");
-      }
-      return json;
-    },
+      "Read the current scene of a whiteboard (Excalidraw elements; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and whiteboard_list lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio whiteboards show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use whiteboard_update.",
+    parameters: z.object({ whiteboardId: z.string().min(1) }),
+    execute: ({ whiteboardId }) => getWhiteboard(whiteboardId),
   });
+  bb.agents.registerTool({ name: "excalidraw_get_drawing", description: alias("whiteboard_get"), parameters: z.object({ drawingId: z.string().min(1) }), execute: ({ drawingId }) => getWhiteboard(drawingId) });
 
+  bb.agents.registerTool({
+    name: "whiteboard_create",
+    description:
+      "Add a new empty whiteboard to a BB Studio page and return its id. It goes at the end of the page, or after afterBlockId (a block id from pages_read). Without pageId it makes a new page holding just the whiteboard, titled with name. Then draw on it with whiteboard_update; the user sees it in the page. A whiteboard's height in a page is the embed's \"height\" in pixels (160–1200; pages_edit can change it).",
+    parameters: z.object({ pageId: z.string().min(1).optional().describe("The page to add the whiteboard to, e.g. pg_…; leave out to make a whiteboard page"), ...createFields }),
+    execute: (input, ctx) => createWhiteboardTool(input, ctx),
+  });
   bb.agents.registerTool({
     name: "excalidraw_create_drawing",
-    description:
-      "Add a new empty whiteboard (an Excalidraw drawing) to a BB Studio page and return its id. It goes at the end of the page, or after afterBlockId (a block id from pages_read). Then draw on it with excalidraw_update_drawing; the user sees it in the page.",
-    parameters: z.object({
-      pageId: z.string().min(1).describe("The page to add the whiteboard to, e.g. pg_…"),
-      name: z.string().min(1).max(200),
-      afterBlockId: z.string().min(1).optional().describe("Put the whiteboard after this block instead of at the end"),
-    }),
-    execute({ pageId, name, afterBlockId }, ctx) {
-      let made: ReturnType<typeof createWhiteboard>;
-      try {
-        made = createWhiteboard({ pageId, name, afterBlockId, by: "agent" });
-      } catch (error) {
-        return { content: [{ type: "text", text: errorMessage(error) }], isError: true };
-      }
-      const { row, page } = made;
-      created(row.id, ctx.threadId);
-      return `Added whiteboard "${name}" (id ${row.id}) to the page [${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)}). Draw on it with excalidraw_update_drawing.\n${card(row.id, page)}`;
-    },
+    description: alias("whiteboard_create"),
+    parameters: z.object({ pageId: z.string().min(1), ...createFields }),
+    execute: (input, ctx) => createWhiteboardTool(input, ctx),
   });
 
   bb.agents.registerTool({
-    name: "excalidraw_update_drawing",
+    name: "whiteboard_update",
     description:
-      "Edit a whiteboard (an Excalidraw drawing) the user may have open right now, in a page or the full editor: upsert elements and/or delete elements by id. The user's open editor updates live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped) unless it was already deleted (re-add it with a new id), so concurrent user edits to other elements are preserved. Fetch the latest scene with excalidraw_get_drawing first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from excalidraw_get_drawing and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
-    parameters: z.object({
-      drawingId: z.string().min(1),
-      elements: z.array(excalidrawElementSchema).max(500).optional(),
-      deletedElementIds: z.array(z.string()).max(500).optional(),
-      appState: z.record(z.string(), z.unknown()).optional(),
-      files: z.record(z.string(), z.unknown()).optional(),
-    }),
-    execute({ drawingId, elements, deletedElementIds, appState, files }, ctx) {
-      const row = store.get(drawingId);
-      if (!row) return { content: [{ type: "text", text: `Drawing ${drawingId} not found.` }], isError: true };
-      if ((!elements || elements.length === 0) && (!deletedElementIds || deletedElementIds.length === 0)) {
-        return { content: [{ type: "text", text: "Nothing to do: provide elements and/or deletedElementIds." }], isError: true };
-      }
-      const skipped: string[] = [];
-      const merged = applyElementUpserts(row.data, (elements ?? []) as SceneElement[], { deletedElementIds, appState, files, skipped });
-      const updatedAt = write(row, merged, "agent");
-      if (ctx.threadId) edited(row.id, ctx.threadId);
-      const clean = getNonDeletedElements(merged);
-      return [
-        `Updated drawing "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
-        `- upserted ${(elements?.length ?? 0) - skipped.length} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
-        ...(skipped.length ? [`- NOT applied: ${skipped.join(", ")} — already deleted in the drawing. Use new ids to add them again.`] : []),
-        `- saved at ${new Date(updatedAt).toISOString()}`,
-        `The user's open editor has been notified and shows the change live.`,
-        card(row.id),
-      ].join("\n");
-    },
+      "Edit a whiteboard the user may have open right now, in a page or full size: upsert elements and/or delete elements by id. The user's open editor and the page's whiteboard update live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped) unless it was already deleted (re-add it with a new id), so concurrent user edits to other elements are preserved. Fetch the latest scene with whiteboard_get first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from whiteboard_get and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
+    parameters: z.object({ whiteboardId: z.string().min(1), ...editFields }),
+    execute: ({ whiteboardId, ...rest }, ctx) => updateWhiteboard({ id: whiteboardId, ...rest }, ctx),
+  });
+  bb.agents.registerTool({
+    name: "excalidraw_update_drawing",
+    description: alias("whiteboard_update"),
+    parameters: z.object({ drawingId: z.string().min(1), ...editFields }),
+    execute: ({ drawingId, ...rest }, ctx) => updateWhiteboard({ id: drawingId, ...rest }, ctx),
   });
 
   // Studio calls bb.agents.configure once, with DRAW_TOOLS (BB allows one configuration per plugin).

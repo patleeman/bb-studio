@@ -39,7 +39,7 @@ export function mentionContext(row: DrawingRowLike): string {
     }
   }
   const head = [
-    `Excalidraw drawing "${row.name}" (id ${row.id}), updated ${new Date(
+    `Whiteboard "${row.name}" (id ${row.id}), updated ${new Date(
       row.updated_at,
     ).toISOString()}.`,
     `Link to it in replies as [${row.name.replace(/[[\]]/g, "")}](${drawingHref(row.id)}).`,
@@ -53,14 +53,14 @@ export function mentionContext(row: DrawingRowLike): string {
     head.push(`Text content:\n${textLines.map((t) => `- ${t}`).join("\n")}`);
   }
   // Point the agent at the live-editing entry points (the mention snapshot
-  // is a point-in-time copy). Native excalidraw_* tools are the primary path
-  // where available; the bb studio drawings CLI works in every session.
+  // is a point-in-time copy). Native whiteboard_* tools are the primary path
+  // where available; the bb studio whiteboards CLI works in every session.
   head.push(
-    `To edit this drawing live, prefer the excalidraw_update_drawing tool (drawingId "${row.id}") when available — ` +
-      `the user's open editor updates automatically. Otherwise use the bb studio drawings CLI: ` +
-      `read the latest scene with 'bb studio drawings show ${row.id}', then ` +
-      `'bb studio drawings merge ${row.id} <scene-file.json>' (upsert elements from a JSON file) ` +
-      `and 'bb studio drawings remove-elements ${row.id} <element-id…>' to delete. Element JSON must match ` +
+    `To edit this whiteboard live, prefer the whiteboard_update tool (whiteboardId "${row.id}") when available — ` +
+      `the user's open editor and the page update automatically. Otherwise use the bb studio whiteboards CLI: ` +
+      `read the latest scene with 'bb studio whiteboards show ${row.id}', then ` +
+      `'bb studio whiteboards merge ${row.id} <scene-file.json>' (upsert elements from a JSON file) ` +
+      `and 'bb studio whiteboards remove-elements ${row.id} <element-id…>' to delete. Element JSON must match ` +
       `the shape returned by show.`,
   );
   // Full scene data is the most useful thing for the agent (it can reason
@@ -78,7 +78,7 @@ export function mentionContext(row: DrawingRowLike): string {
     head.push(`Scene data (JSON):\n${cleanScene}`);
   } else {
     head.push(
-      `Scene data is ${cleanScene.length} bytes — too large to inline. Use the bb studio drawings show <id> command or the excalidraw_get_drawing tool to read it.`,
+      `Scene data is ${cleanScene.length} bytes — too large to inline. Use the bb studio whiteboards show <id> command or the whiteboard_get tool to read it.`,
     );
   }
   return head.join("\n\n");

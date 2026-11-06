@@ -89,6 +89,8 @@ it("embeds whiteboards in a page and finds the pages each drawing is in", async 
     expect(embeddings.get("drw_0000000000000001")?.map((page) => page.id).sort()).toEqual([made, plan].sort());
     expect(embeddings.get("drw_0000000000000002")).toEqual([{ id: plan, title: "Plan", projectId: "proj_a", archived: false }]);
     expect(pages.markdown(plan)).toMatch(/^Intro\n/);
+    // Embedded together, each whiteboard keeps the default height (no index slips in as a height).
+    expect(pages.markdown(plan)).not.toContain('"height"');
     expect(whiteboards.page("pg_missing")).toBeNull();
     expect(() => whiteboards.embed("pg_missing", ["drw_0000000000000003"])).toThrow();
   } finally { pages.dispose(); await host.harness.lifecycle.dispose(); }

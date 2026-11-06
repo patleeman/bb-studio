@@ -9,7 +9,7 @@ import { registerDashboards } from "./dashboards/server";
 
 describe("built-in item thread links", () => {
   for (const [kind, register, tool, input] of [
-    ["excalidraw", registerDraw, "excalidraw_create_drawing", { pageId: "pg_plan", name: "Plan" }],
+    ["excalidraw", registerDraw, "whiteboard_create", { pageId: "pg_plan", name: "Plan" }],
     ["design", registerDesign, "design_create", { name: "Plan" }],
     ["artifacts", registerArtifacts, "artifacts_save", { title: "Plan", name: "plan.md", content: "Plan" }],
     ["dashboards", registerDashboards, "dashboard_create", { name: "Plan" }],

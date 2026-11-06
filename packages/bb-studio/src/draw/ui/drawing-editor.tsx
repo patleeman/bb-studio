@@ -192,7 +192,7 @@ export function DrawingEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawingId]);
 
-  // Live sync with other writers (agent edits via excalidraw_update_drawing,
+  // Live sync with other writers (agent edits via whiteboard_update,
   // the CLI, or another open editor): apply remote scenes into this editor
   // and notify when one lands. Local in-progress edits win via
   // reconcileElements inside the hook.

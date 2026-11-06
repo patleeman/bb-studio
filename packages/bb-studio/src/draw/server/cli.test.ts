@@ -25,7 +25,7 @@ it("tells the agent when an upsert of a deleted element was not applied", async 
   const host = drawHost();
   try {
     const { drawing } = await host.harness.behavior.callRpc("drawings.createDrawing", { name: "Boxes" }) as { drawing: { id: string } };
-    const call = (input: object) => host.harness.behavior.callAgentTool("excalidraw_update_drawing", { drawingId: drawing.id, ...input });
+    const call = (input: object) => host.harness.behavior.callAgentTool("whiteboard_update", { whiteboardId: drawing.id, ...input });
     await call({ elements: [{ id: "box1", type: "rectangle" }] });
     await call({ deletedElementIds: ["box1"] });
     const result = await call({ elements: [{ id: "box1", type: "rectangle", x: 10 }, { id: "box2", type: "rectangle" }] });
@@ -41,12 +41,12 @@ it("shows an agent the elements of a drawing with a large image, without the ima
   try {
     const { drawing } = await host.harness.behavior.callRpc("drawings.createDrawing", { name: "Photo" }) as { drawing: { id: string } };
     const dataURL = `data:image/png;base64,${"A".repeat(500_000)}`;
-    await host.harness.behavior.callAgentTool("excalidraw_update_drawing", {
-      drawingId: drawing.id,
+    await host.harness.behavior.callAgentTool("whiteboard_update", {
+      whiteboardId: drawing.id,
       elements: [{ id: "img", type: "image", fileId: "f1" }],
       files: { f1: { mimeType: "image/png", dataURL } },
     });
-    const result = JSON.parse(String(await host.harness.behavior.callAgentTool("excalidraw_get_drawing", { drawingId: drawing.id })));
+    const result = JSON.parse(String(await host.harness.behavior.callAgentTool("whiteboard_get", { whiteboardId: drawing.id })));
     expect(result.scene.elements.map((el: { id: string }) => el.id)).toEqual(["img"]);
     expect(result.scene.files).toEqual({ f1: { id: "f1", mimeType: "image/png", dataURLChars: dataURL.length } });
   } finally {

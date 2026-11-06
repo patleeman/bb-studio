@@ -63,7 +63,7 @@ export const DRAWING_KIND: StudioKind = {
   mentionProviderId: "drawing",
 
   blurb: "Diagrams and sketches.",
-  agentHint: "Read it with excalidraw_get_drawing and change it with excalidraw_update_drawing.",
+  agentHint: "Read it with whiteboard_get and change it with whiteboard_update.",
 };
 
 const PREVIEW_CHARS = 140;

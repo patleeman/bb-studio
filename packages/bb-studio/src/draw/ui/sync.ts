@@ -1,5 +1,5 @@
 // Live drawing sync for the editor: the open editor picks up changes made by
-// other writers (an agent's excalidraw_update_drawing tool, the CLI, or
+// other writers (an agent's whiteboard_update tool, the CLI, or
 // another open editor tab) so the human and the agent work on the same
 // canvas together.
 //

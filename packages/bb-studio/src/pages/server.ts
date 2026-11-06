@@ -485,7 +485,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
       },
       embed(pageId, drawingIds, { afterBlockId, by = "agent" } = {}) {
         requireMeta(pageId);
-        const markdown = drawingIds.map(whiteboardMarkdown).join("\n\n");
+        const markdown = drawingIds.map((id) => whiteboardMarkdown(id)).join("\n\n");
         const actor = { key: PLUGIN_RPC_ACTOR, name: by === "agent" ? "Agent" : "Studio", color: actorColor(PLUGIN_RPC_ACTOR) };
         service.edit(pageId, [afterBlockId ? { op: "insert_after", block: afterBlockId, markdown } : { op: "append", markdown }], actor);
         service.hub.flush(service.hub.open(pageId));

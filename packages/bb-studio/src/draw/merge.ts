@@ -3,7 +3,7 @@
 // The database stores one scene per drawing. Writers are:
 //   - the user's open editor (full-scene autosaves, element `version` fields
 //     reflect real edits),
-//   - an agent via the `excalidraw_update_drawing` native tool or the
+//   - an agent via the `whiteboard_update` native tool or the
 //     `bb excalidraw merge` CLI (explicit element upserts + deletes).
 //
 // Merge rules (element-level, Excalidraw-style):
