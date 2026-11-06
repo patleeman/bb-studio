@@ -4,6 +4,25 @@ An audit, 2026-11-01. Nothing has been removed yet. This lists every
 standalone-Drawings piece still in Studio and iOS, with a recommendation for
 each.
 
+## Status (2026-11-06): one concept, Whiteboards
+
+Patrick asked for one concept, and approved a follow-up plan that reverses
+two of the decisions below:
+
+- Whiteboards have a sidebar row again (after Pages), and New → Whiteboard
+  makes a page holding one 640px whiteboard (`drawings.newWhiteboardPage`).
+  The kind's own `create` stays `null`, so nothing makes a whiteboard outside
+  a page.
+- The page's whiteboard is resizable (a `height` on its embed, 160–1200px)
+  and opens full size in place, over the page, in a thread's panel or the
+  Studio tab.
+- The agent tools are `whiteboard_*`; the `excalidraw_*` names stay as
+  aliases for two releases. The CLI is `bb studio whiteboards` (`drawings`
+  still works). The skill is `whiteboards`. The slash menu has one entry,
+  `/whiteboard`.
+- Stored data, the kind id `drawing`, the embed kind and the
+  `/studio/drawings/<id>` routes are unchanged.
+
 ## Status (2026-11-01)
 
 Patrick approved this list. The REMOVEs and the cheap REPOINTs are done:

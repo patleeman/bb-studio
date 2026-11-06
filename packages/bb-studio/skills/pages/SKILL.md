@@ -94,11 +94,12 @@ Pages reads and writes GitHub-flavoured Markdown plus:
 - **Embeds:** a fenced ` ```embed ` block:
   `{"kind":"bookmark|thread|page|drawing|artifact|recording|item","target":"https://… or an id","title":"…"}`.
   Bookmarks may also carry `description` and `image`; leave them out and the
-  editor fetches the link's preview when the page opens. `drawing`,
-  `artifact`, and `recording` take the item's id
-  in Excalidraw, Artifacts, or Talk. `item` embeds anything in
-  Studio, with `plugin:id` as the target (`studio_list_items` lists ids). A
-  drawing shows its picture, an artifact its content,
+  editor fetches the link's preview when the page opens. `drawing` (a
+  whiteboard), `artifact`, and `recording` take the item's id. `item` embeds
+  anything in Studio, with `plugin:id` as the target (`studio_list_items`
+  lists ids). A whiteboard shows its scene and may carry `"height"` in pixels
+  (160–1200, 320 when left out); make one with `whiteboard_create`. An
+  artifact shows its content,
   a recording its player and transcript, and the
   rest a card. To track work in a page, use checklists.
 - **Mentions:** `@[Title](page:pg_id)`,

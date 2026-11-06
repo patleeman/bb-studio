@@ -145,14 +145,15 @@ and reopening a view.
 ![Live BB screenshot of the New menu, opened from the ▾ beside the tab strip's +, with a Pages filter](assets/new-menu.png)
 
 **+** in the tab strip opens a new tab; **▾** right beside it (New item) opens
-Studio's New menu from any tab. It offers every kind Studio can make (not
-whiteboards, which pages make with `/whiteboard`), then
-Record a call and your templates, the same list as the sidebar's **+** and
-the thread's Studio tab. New items go into the project BB has open, or, with
-none open, the one the list's Project filter picks. The new tab page keeps a
-New button only when the list is empty. The capture checks that Whiteboards and
-Pages filters offer the same menu as the unfiltered collection, and that it
-offers neither Drawing nor Whiteboard.
+Studio's New menu from any tab. It offers every kind Studio can make, with
+**Whiteboard** right after Page (a new page holding one tall whiteboard,
+since whiteboards live in pages), then Record a call and your templates, the
+same list as the sidebar's **+** and the thread's Studio tab. New items go
+into the project BB has open, or, with none open, the one the list's Project
+filter picks. The new tab page keeps a New button only when the list is
+empty. The capture checks that Whiteboards and Pages filters offer the same
+menu as the unfiltered collection, that Whiteboard follows Page, and that
+there's no Drawing entry.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
@@ -352,18 +353,20 @@ The compact page header at 390 pixels, with **Item actions** open.
   embed cards for links, BB threads, and other pages. Paste a link on an
   empty line to turn it into a card; web links fetch their title,
   description, and preview image.
-- **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
-  or recording, picked by search, or makes a new drawing in the page's
+- **Studio embeds.** The `/` menu's Studio group embeds an artifact or a
+  recording, picked by search, or makes a new whiteboard (`/whiteboard`, also
+  found as `/drawing`, `/sketch` or `/diagram`) or mini app in the page's
   project and embeds it.
   Embeds stay live:
   - a recording plays in the page, with its summary, decisions and
     transcript; click a line to play from there;
-  - a drawing is an inline whiteboard: it shows the drawing, and **Sketch**
-    (or a double-click) adds a pen, an eraser and five colors. Strokes save
-    to the Studio drawing as ordinary Excalidraw elements, merged with
-    other edits, so **Open drawing** shows them in the full editor. `/whiteboard`
-    makes a new drawing in the page's project and opens it ready to draw.
-    Pages draws the scene as plain SVG and doesn't load Excalidraw;
+  - a whiteboard shows its scene, and **Sketch** (or a double-click) adds a
+    pen, an eraser and five colors. Strokes save as ordinary Excalidraw
+    elements, merged with other edits. A handle on its bottom edge sets its
+    height in this page (see [Whiteboards](#whiteboards)), and **Open full
+    size** opens the full editor over the page. `/whiteboard` makes a new one
+    in the page's project and opens it ready to draw. Pages draws the scene
+    as plain SVG and doesn't load Excalidraw until you open it full size;
   - an artifact shows its content (images, HTML, PDFs, code, text).
 
   Pasting a link to a Studio item embeds it too.
@@ -619,24 +622,28 @@ and can't call BB's API with your session.
 
 ## Whiteboards
 
-A whiteboard is an [Excalidraw](https://excalidraw.com) drawing that lives in
-a page: `/whiteboard` in a page makes one, and agents add one to a page with
-`excalidraw_create_drawing`. Each is stored as a Studio drawing and embedded
-in the page as `{"kind":"drawing","target":"drw_…"}`. Drawings used to be the
-separate Studio Draw plugin (`excalidraw`), and then a kind of their own.
-Items keep that id as their namespace (`excalidraw:<id>`) and the kind id
-`drawing`, so tags, tabs, links and chats carry over. If you still have the
-old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
+A whiteboard is an [Excalidraw](https://excalidraw.com) scene that lives in a
+page. There's one way to make one in each place: `/whiteboard` in a page,
+**New → Whiteboard** in Studio (a new page called "Untitled whiteboard"
+holding one 640px whiteboard), `whiteboard_create` for agents and
+`bb studio whiteboards create` on the command line. Each is embedded in its
+page as `{"kind":"drawing","target":"drw_…"}`, with an optional `"height"`.
+Whiteboards used to be "drawings", the separate Studio Draw plugin
+(`excalidraw`) and then a kind of their own. Items keep that id as their
+namespace (`excalidraw:<id>`) and the kind id `drawing`, so tags, tabs,
+links, filters and chats carry over. If you still have the old plugin, see
+[docs/upgrade-unified-studio.md](../../docs/upgrade-unified-studio.md).
 
-![Live BB screenshot of a whiteboard opened from its page in the full editor](assets/drawings-preview.png)
+![Live BB screenshot of a whiteboard opened full size over its page](assets/drawings-preview.png)
 
-The seeded "Checkout flow" whiteboard, opened from its page ("Checkout
-whiteboard") with **Open drawing**, in the full Excalidraw editor as a Studio
-tab, with sync status, Copy image and the ⋯ menu in the tab row: Cart,
-Payment and Confirmation boxes joined by arrows, with a "Retry payment on
-failure" note. Recapture with `BB_CAPTURE_ONLY=excalidraw`, which also opens
-it from its old `/plugins/excalidraw/drawings/<id>` address and checks that
-it lands as a Studio tab, and that **Back** names the page.
+The seeded "Checkout flow" whiteboard, opened full size from its page
+("Checkout whiteboard") with **Open full size**: the full Excalidraw editor
+covers the page in the same tab, with **Page** (back), the name, sync status,
+Chat and the ⋯ menu in its bar. Cart, Payment and Confirmation boxes are
+joined by arrows, with a "Retry payment on failure" note. Recapture with
+`BB_CAPTURE_ONLY=excalidraw`, which also opens it from its old
+`/plugins/excalidraw/drawings/<id>` address, checks that it lands as a
+Studio tab, and checks that Esc returns to the page.
 
 ![The compact drawing header](assets/drawings-compact-header.png)
 
@@ -645,43 +652,61 @@ open. Recapture with
 `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=draw-compact-header`.
 
 - **In a page.** See [Studio embeds](#pages) under Pages: the page shows the
-  whiteboard as SVG with a pen and an eraser, and **Open drawing** opens the
-  full editor.
+  whiteboard as SVG with a pen and an eraser.
+- **Height.** Drag the handle on the whiteboard's bottom edge, from 160 to
+  1200 pixels (320 by default). Focus it to use the arrow keys (Shift for
+  bigger steps, Home and End for the smallest and largest); double-click it
+  for the default. The height is saved on the page's embed, so the same
+  whiteboard can be tall in one page and short in another, and an agent can
+  set it with `pages_edit`. The width is the page's column. Read-only pages
+  have no handle. The iOS app shows a page's whiteboard as a row that opens it.
+- **Full size, in place.** **Open full size**, or a click on the whiteboard's
+  header, opens the full editor over the page wherever the page is: a
+  thread's side panel or workbench, or the Studio tab. It never takes you to
+  the Studio tab or out of a thread. **Page** in its bar, or Esc, returns to
+  the page at the same scroll. Esc that the editor uses (a text box, a menu)
+  stays with the editor. The scene fits the box when it opens.
 - **Old drawings.** At startup, Studio embeds each drawing that no page shows
-  in its project's **Drawings** page (made when needed), once each, so none is
-  lost. With no such drawings, nothing changes. Templates and archived
-  drawings stay in the library.
-- **In the library.** Whiteboards list under **Whiteboards** with
-  thumbnails, projects, search over the words on them, archive, move,
-  delete and **Copy text**. They have no sidebar row, no **New** entry and no
-  `@` suggestions of their own: they come with their page.
+  in its project's **Whiteboards** page (made when needed; older installs
+  called it **Drawings**), once each, so none is lost. With no such drawings,
+  nothing changes. Templates and archived drawings stay in the library.
+- **In the library.** Whiteboards have a **Whiteboards** row in the sidebar,
+  after Pages, and list there with thumbnails, projects, search over the
+  words on them, archive, move, delete and **Copy text**. They have no `@`
+  suggestions of their own: they come with their page.
   `/plugins/studio/studio/drawings` still opens the library filtered to them.
 - **Editor** (`/plugins/studio/studio/drawings/<id>`). Excalidraw loads the
-  first time a whiteboard opens, not with Studio. It autosaves as you work.
-  The header has an editable name, sync status, the item's chat, copy image,
-  and a menu with **Download PNG**, Move to and Delete. **Back** returns to the
-  whiteboard's page. The editor follows BB's active theme. In the editor,
-  **Attach** adds the whiteboard to the conversation as an image.
+  first time a whiteboard opens full size, not with Studio. It autosaves as
+  you work. The header has an editable name, sync status, the item's chat,
+  copy image, and a menu with **Download PNG**, Move to and Delete. **Back**
+  returns to the whiteboard's page. The editor follows BB's active theme. In
+  a thread, **Attach** adds the whiteboard to the conversation as an image.
 - **Card in the agent's reply.** When an agent adds or changes a whiteboard,
   its reply links the page (`::page{id="…"}`). Older replies' `::drawing`
   cards still show the picture, name and element count, read-only.
-- **Agent tools and skill.** `excalidraw_list_drawings` (each whiteboard with
-  its page), `excalidraw_get_drawing` (elements, app state, a text summary,
-  and image files without their data; scenes over about 400,000 characters
-  come back as element ids), `excalidraw_create_drawing` (a `pageId`, a name
-  and an optional `afterBlockId`) and `excalidraw_update_drawing` (upserts
-  and deletes up to 500 elements by id; only the elements you send change),
-  and the `draw` skill.
+- **Agent tools and skill.** `whiteboard_list` (each whiteboard with its
+  page), `whiteboard_get` (elements, app state, a text summary, and image
+  files without their data; scenes over about 400,000 characters come back
+  as element ids), `whiteboard_create` (a name, and a `pageId` with an
+  optional `afterBlockId`; without `pageId` it makes a whiteboard page) and
+  `whiteboard_update` (upserts and deletes up to 500 elements by id; only the
+  elements you send change), and the `whiteboards` skill. The old names
+  (`excalidraw_list_drawings`, `excalidraw_get_drawing`,
+  `excalidraw_create_drawing`, `excalidraw_update_drawing`, with `drawingId`)
+  still work for two releases, so automations and saved prompts keep
+  running; move them to the new names.
 - **Live co-editing.** Keep a whiteboard open and ask an agent to change it.
-  Your page or editor shows its edits live, and the agent's next read sees
-  yours. Edits merge per element; two edits to the same element resolve by
-  Excalidraw's `version`, higher wins. Deletions travel as tombstones (pruned
-  after 30 days).
-- **Commands.** `bb studio drawings list`, `create --page <page-id> <name>`,
+  Your page or editor shows its edits live (a page's whiteboard listens for
+  Studio's update signal, and checks every 15 seconds in case one was
+  missed), and the agent's next read sees yours. Edits merge per element;
+  two edits to the same element resolve by Excalidraw's `version`, higher
+  wins. Deletions travel as tombstones (pruned after 30 days).
+- **Commands.** `bb studio whiteboards list`, `create --page <page-id> <name>`,
   `show <id> [--raw]`, `rename <id> <new-name>`, `delete <id>`,
   `merge <id> <scene-file.json>` (an elements array or a full scene, with its
-  image files) and `remove-elements <id> <element-id…>`. A plugin registers
-  one CLI command, so the old `bb excalidraw …` moved under `bb studio`.
+  image files) and `remove-elements <id> <element-id…>`. `bb studio drawings …`
+  is the old name and still works. A plugin registers one CLI command, so the
+  old `bb excalidraw …` moved under `bb studio`.
 - **Export.** **Download PNG** in the editor renders in your browser. Studio's
   item menu exports PNG, SVG or the `.excalidraw` JSON, drawn on the server
   with Excalidraw's fonts (resvg's WebAssembly build loads on the first PNG).

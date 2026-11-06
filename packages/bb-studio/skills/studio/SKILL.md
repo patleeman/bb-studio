@@ -13,7 +13,7 @@ the core: one collection that lists every item from every installed add-on.
 | VS Code (built into Studio) | `studio-code` | Thread workspaces | the `studio-code` skill and six `code_*` tools |
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
-| Whiteboards (built into Studio, live in pages) | `excalidraw` | Whiteboards (kind `drawing`) | the `draw` skill, `excalidraw_*` tools and `bb studio drawings` |
+| Whiteboards (built into Studio, live in pages) | `excalidraw` | Whiteboards (kind `drawing`) | the `whiteboards` skill, `whiteboard_*` tools and `bb studio whiteboards` |
 | Dashboards (built into Studio) | `dashboards` | Dashboards: live stats, charts, tables and feeds | the `dashboards` skill, `dashboard_*` and `widget_*` tools and `bb studio dashboards` |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
 
