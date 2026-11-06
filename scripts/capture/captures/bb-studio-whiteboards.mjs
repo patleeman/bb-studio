@@ -8,7 +8,7 @@ const phase = process.env.BB_WHITEBOARDS_PHASE === "after" ? "after" : "before";
 const after = phase === "after";
 const scheme = (client, value) => client.command("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value }] });
 
-export default ({ projectId, pluginRpc, sleep }) => {
+export default ({ projectId, threadId, pluginRpc, sleep }) => {
   let seed = 1;
   const element = (type, x, y, width, height, extra = {}) => ({
     id: `wb-${type}-${seed}`, type, x, y, width, height, angle: 0, strokeColor: "#1e1e1e", backgroundColor: "transparent",
@@ -85,6 +85,36 @@ export default ({ projectId, pluginRpc, sleep }) => {
     await client.waitForText("Open questions");
   };
   const svgHeight = (client, id) => client.evaluate(`Math.round(document.querySelector('svg[data-whiteboard="${id}"]').getBoundingClientRect().height)`);
+
+  /** The thread, with the page open in its side panel's Studio tab, scrolled to the whiteboard. */
+  const pageInThread = async (client, page, drawing) => {
+    // The thread's Studio tab lists the thread's items: link the page to it, as New there does.
+    const now = Date.now();
+    await pluginRpc("studio", "linkItemThread", { thread: { threadId, ref: { pluginId: "pages", id: page.id }, role: "created", state: "active", createdAt: now, updatedAt: now, metadata: {} } });
+    await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+    await sleep(1500);
+    await dismissProblems(client);
+    await client.evaluate(`[...document.querySelectorAll("button")].find((button) => button.getAttribute("aria-label")?.startsWith("Show right panel"))?.click()`);
+    await sleep(800);
+    await client.evaluate(`(() => { const button = [...document.querySelectorAll("button")].find((each) => each.getAttribute("aria-label")?.startsWith("Open new tab")); if (!button) throw new Error("No new-tab button"); button.click(); })()`);
+    await sleep(800);
+    await client.clickButtonText("Studio");
+    const row = `[data-studio-item="/plugins/studio/studio/pages/${page.id}"]`;
+    // The tab remembers the last item it showed; a page an earlier capture deleted shows "Page unavailable".
+    for (let i = 0; i < 60; i++) {
+      if (await client.evaluate(`!!document.querySelector(${JSON.stringify(row)})`)) break;
+      if (await client.hasText("Back to Studio", 300)) await client.clickButtonText("Back to Studio");
+      await sleep(500);
+    }
+    await client.waitForSelector(row, 5000);
+    await client.evaluate(`document.querySelector(${JSON.stringify(row)}).click()`);
+    await client.waitForSelector(`svg[data-whiteboard="${drawing.id}"]`, 30000);
+    await client.waitForText("Open questions");
+    await client.evaluate(`document.querySelector('svg[data-whiteboard="${drawing.id}"]').scrollIntoView({ block: "center" })`);
+    await sleep(600);
+  };
+  const inThread = (client) => client.evaluate(`location.pathname.includes("/threads/")`);
+  const scrollOf = (client, id) => client.evaluate(`(() => { let el = document.querySelector('svg[data-whiteboard="${id}"]'); while (el && !(el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY !== "visible")) el = el.parentElement; return el ? Math.round(el.scrollTop) : -1; })()`);
 
   const shots = {
     // The Studio sidebar and library, filtered to whiteboards.
@@ -183,6 +213,47 @@ export default ({ projectId, pluginRpc, sleep }) => {
       await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
       await sleep(400);
       return { keepMouse: true };
+    } },
+    // In a thread: the page beside the transcript, in the side panel's Studio tab.
+    "thread-page": { run: async (client, seeded) => {
+      const { page, drawing } = seeded.boards[0];
+      await pageInThread(client, page, drawing);
+      if (!(await inThread(client))) throw new Error("Not in the thread");
+    } },
+    // In a thread: expand. On main it jumps to the Studio app tab; on the prototype it fills the panel.
+    "thread-expand": { run: async (client, seeded) => {
+      const { page, drawing } = seeded.boards[0];
+      await pageInThread(client, page, drawing);
+      await client.clickButtonText(after ? "Open full size" : "Open drawing");
+      await client.waitForSelector("canvas.excalidraw__canvas", 30000);
+      await sleep(1500);
+      const stayed = await inThread(client);
+      if (stayed !== after) throw new Error(after ? "Expanding left the thread" : "main unexpectedly stayed in the thread");
+      if (after && !(await client.evaluate(`!!document.querySelector('[data-whiteboard-full-size="${drawing.id}"]')`))) throw new Error("No in-place full size");
+    } },
+    // In a thread: Esc returns to the page at the same scroll.
+    "thread-back": { only: "after", run: async (client, seeded) => {
+      const { page, drawing } = seeded.boards[0];
+      await pageInThread(client, page, drawing);
+      const before = await scrollOf(client, drawing.id);
+      await client.clickButtonText("Open full size");
+      await client.waitForSelector("canvas.excalidraw__canvas", 30000);
+      await sleep(1200);
+      await client.evaluate(`document.activeElement?.blur?.()`);
+      await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+      await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+      await sleep(800);
+      if (await client.evaluate(`!!document.querySelector('[data-whiteboard-full-size]')`)) throw new Error("Esc didn't leave full size");
+      if (!(await inThread(client))) throw new Error("Not in the thread");
+      const now = await scrollOf(client, drawing.id);
+      if (now !== before) throw new Error(`The page scrolled from ${before} to ${now}`);
+      // Back (the editor's header) works too.
+      await client.clickButtonText("Open full size");
+      await client.waitForSelector("canvas.excalidraw__canvas", 30000);
+      await client.evaluate(`(() => { const back = [...document.querySelectorAll('[data-whiteboard-full-size] button')].find((b) => /Page|Back/.test(b.getAttribute("aria-label") ?? "") || /Page/.test(b.textContent)); if (!back) throw new Error("No Back in full size"); back.click(); return true; })()`);
+      await sleep(800);
+      if (await client.evaluate(`!!document.querySelector('[data-whiteboard-full-size]')`)) throw new Error("Back didn't leave full size");
+      if (await scrollOf(client, drawing.id) !== before) throw new Error("Back lost the scroll");
     } },
     // Open full size: the full editor in its own Studio tab.
     "full-size": { run: async (client, seeded) => {
