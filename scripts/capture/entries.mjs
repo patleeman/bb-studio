@@ -1,5 +1,6 @@
 /** The README capture entry modules, in capture order. Other files in captures/ are helpers. */
 import bb_studio_draw from "./captures/bb-studio-draw.mjs";
+import bb_studio_whiteboards from "./captures/bb-studio-whiteboards.mjs";
 import bb_studio_dashboards from "./captures/bb-studio-dashboards.mjs";
 import bb_studio_visual_chat from "./captures/bb-studio-visual-chat.mjs";
 import bb_studio_minis from "./captures/bb-studio-minis.mjs";
@@ -30,6 +31,7 @@ export function loadCaptures(context) {
   return [
     ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
     ...bb_studio_draw(context),
+    ...(process.env.BB_WHITEBOARDS_PHASE ? bb_studio_whiteboards(context) : []),
     ...bb_studio_dashboards(context),
     ...bb_studio_visual_chat(context),
     ...bb_studio_minis(context),
