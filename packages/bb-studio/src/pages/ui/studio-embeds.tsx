@@ -11,6 +11,7 @@ import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioE
 import { usePagesUi, type ArtifactView } from "./context";
 import { RecordingBody } from "./live-embeds";
 import { Whiteboard } from "./whiteboard";
+import { useExpandWhiteboard } from "./whiteboard-expand";
 
 // A mini app brings its own frame host; it loads when a page first shows one.
 const MiniEmbed = lazy(() => import("../../minis/ui/mini-view").then((module) => ({ default: module.MiniEmbed })));
@@ -55,12 +56,14 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   item: "GridView",
 };
 
-function ItemHeader({ item, kind, target, loading, onEdit }: {
+function ItemHeader({ item, kind, target, loading, onEdit, onOpen }: {
   item: StudioEmbedItem | null;
   kind: StudioEmbedKind | "item";
   target: string;
   loading: boolean;
   onEdit?: () => void;
+  /** Opens the item in place (a whiteboard, full size); without it the header links to the item. */
+  onOpen?: () => void;
 }) {
   const ui = usePagesUi();
   const sub = item ? studioSubtitle(item) : loading ? "Loading…" : `${kindLabel(kind)} not found`;
@@ -68,9 +71,9 @@ function ItemHeader({ item, kind, target, loading, onEdit }: {
     <button
       type="button"
       className="flex w-full cursor-pointer items-center gap-3 p-2 text-left"
-      onClick={() => item && ui.openPath(item.href)}
+      onClick={() => item && (onOpen ? onOpen() : ui.openPath(item.href))}
       onDoubleClick={onEdit}
-      title={item ? `Open ${item.title}` : undefined}
+      title={item ? (onOpen ? `Open ${item.title} full size` : `Open ${item.title}`) : undefined}
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-background text-lg text-muted-foreground">
         <ItemIcon item={item} fallback={FALLBACK_ICONS[kind]} />
@@ -79,7 +82,8 @@ function ItemHeader({ item, kind, target, loading, onEdit }: {
         <span className="block truncate text-sm font-medium text-foreground">{item?.title ?? (loading ? "" : target)}</span>
         <span className="block truncate text-xs text-muted-foreground">{sub}</span>
       </span>
-      {item ? <Icon name="ArrowUpRight" className="size-4 shrink-0 text-muted-foreground" /> : null}
+      {/* A whiteboard's toolbar has Open full size; its header needs no second arrow. */}
+      {item && !onOpen ? <Icon name="ArrowUpRight" className="size-4 shrink-0 text-muted-foreground" /> : null}
     </button>
   );
 }
@@ -120,14 +124,14 @@ function ArtifactBody({ id }: { id: string }) {
 }
 
 /** The body of a Studio embed: a picture, content, or the item's preview. */
-function ItemBody({ item, height, onResize }: { item: StudioEmbedItem } & EmbedSize) {
+function ItemBody({ item, height, onResize, onOpen }: { item: StudioEmbedItem; onOpen?: () => void } & EmbedSize) {
   const ui = usePagesUi();
   const [failed, setFailed] = useState(false);
   if (item.pluginId === "artifacts") return <ArtifactBody id={item.id} />;
   // Every Talk item, dictation or meeting, is a recording.
   if (item.pluginId === STUDIO_EMBEDS.recording.pluginId) return <RecordingBody id={item.id} />;
   // A whiteboard: its picture, a pen to add to it, and a handle to resize it in this page.
-  if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} height={height} onResize={onResize} onOpen={() => ui.openPath(item.href)} />;
+  if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} height={height} onResize={onResize} onOpen={onOpen ?? (() => ui.openPath(item.href))} />;
   // A mini app runs in place, sharing its data with every other place it shows.
   if (item.pluginId === STUDIO_EMBEDS.mini.pluginId) {
     return (
@@ -165,11 +169,17 @@ export function StudioEmbed({ kind, target, onEdit, height, onResize }: {
 
 function ItemEmbed({ kind, target, onEdit, height, onResize }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void } & EmbedSize) {
   const { item, loading } = useStudioItem(kind, target);
+  const expand = useExpandWhiteboard();
+  const ui = usePagesUi();
+  // A whiteboard opens full size where the page is; outside a page host it links to Studio.
+  const open = item?.pluginId === STUDIO_EMBEDS.drawing.pluginId
+    ? () => (expand ? expand(item.id) : ui.openPath(item.href))
+    : undefined;
   const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }) : {};
   return (
     <div className="overflow-hidden" {...link}>
-      <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />
-      {item ? <ItemBody item={item} height={height} onResize={onResize} /> : null}
+      <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} onOpen={open} />
+      {item ? <ItemBody item={item} height={height} onResize={onResize} onOpen={open} /> : null}
     </div>
   );
 }

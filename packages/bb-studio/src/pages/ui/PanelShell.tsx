@@ -1,5 +1,6 @@
 // The Page side-panel tab's frame: a page's metadata kept current, and its
 // live editor under a header.
+import { WhiteboardExpandHost } from "./whiteboard-expand";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../../kit/ui/index";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
@@ -31,8 +32,10 @@ export function PanelShell({ page, header, footer }: { page: PageMetaView; heade
   return (
     <PagesUiContext.Provider value={ui}>
       <div className="pages-doc pages-panel-tab relative flex h-full min-h-0 flex-col bg-background text-foreground">
-        {header}
-        <PanelEditor key={page.id} page={page} pages={pages ?? []} bots={bots.bots} footer={footer} />
+        <WhiteboardExpandHost>
+          {header}
+          <PanelEditor key={page.id} page={page} pages={pages ?? []} bots={bots.bots} footer={footer} />
+        </WhiteboardExpandHost>
       </div>
     </PagesUiContext.Provider>
   );

@@ -1,4 +1,5 @@
 import { untitled } from "../../kit/format";
+import { WhiteboardExpandHost } from "./whiteboard-expand";
 import { ThreadTitle, useRealtime } from "@get-bb/plugin-sdk/app";
 import { BAR_BUTTON, ItemHeader, ITEM_TITLE, useOpenMain } from "../../kit/app/index";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -373,6 +374,7 @@ export function PageView({
   return (
     // Floating chrome, the comments card and the chat are placed against this box.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
+      <WhiteboardExpandHost>
       {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-3 pb-2"><PersistenceBadge connection={connection} /></div> : null}
       <div className="min-h-0 flex-1 overflow-auto">
         <div className={cn("mx-auto w-full max-w-[828px] pt-12 pb-40 max-md:pt-6", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
@@ -542,6 +544,7 @@ export function PageView({
       />
 
       <HistoryDialog open={dialog === "history"} onClose={() => setDialog(null)} page={page} bots={bots.bots} rpc={rpc} />
+      </WhiteboardExpandHost>
     </div>
   );
 }
