@@ -91,7 +91,8 @@ BB application in a staged environment before handoff.
   added over 1,200 fake ORBIT-42 sessions that had to be deleted.
   - Start staged BBs only through `scripts/staged-bb.mjs`, using
     `BB_STAGED_DIR` and `BB_STAGED_PORT` for extra instances. It gives Codex
-    its own `CODEX_HOME` (sharing only `auth.json` through a symlink) and
+    its own fixed `CODEX_HOME`, `~/.bb-staged/codex`, with its own sign-in
+    (never a link to `~/.codex/auth.json`; the script refuses one) and
     Claude Code its own `CLAUDE_CONFIG_DIR` through a `claude` wrapper (the
     sign-in stays in the Keychain). Don't launch `bb-app` with your own
     environment.
