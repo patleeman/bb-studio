@@ -139,8 +139,8 @@ export function DrawingEditor({
         const savedDrafts = await drafts;
         if (cancelled) return;
         if (!drawing) {
-          if (savedDrafts.length) { setName("Deleted drawing"); setLoading(false); return; }
-          toast.error("Drawing not found");
+          if (savedDrafts.length) { setName("Deleted whiteboard"); setLoading(false); return; }
+          toast.error("Whiteboard not found");
           onBack(true);
           return;
         }
@@ -328,7 +328,7 @@ export function DrawingEditor({
           if (action === "copy") {
             const { drawing } = await rpc.call("drawings.recoverDrawingCopy", {
               sourceDrawingId: drawingId, draftId: draft.id, draftToken: draft.token,
-              data: draft.data, name: `${name || "Drawing"} (recovered)`.slice(0, 200), projectId: projectId.current,
+              data: draft.data, name: `${name || "Whiteboard"} (recovered)`.slice(0, 200), projectId: projectId.current,
             });
             await draftStore.remove(draft.id, draft.token);
             await checkDrafts();
@@ -337,7 +337,7 @@ export function DrawingEditor({
           }
           await rpc.call("drawings.saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });
           const { drawing } = await rpc.call("drawings.getDrawing", { id: drawingId });
-          if (!drawing) throw new Error("The drawing was removed. Your local draft is still available.");
+          if (!drawing) throw new Error("The whiteboard was removed. Your local draft is still available.");
           const scene = parseScene(drawing.data);
           baseRevision.current = drawing.updatedAt;
           loadedRef.current = true;
@@ -387,7 +387,7 @@ export function DrawingEditor({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(name.trim() || "drawing").replace(/[\\/:*?"<>|]+/g, "-")}.png`;
+      a.download = `${(name.trim() || "whiteboard").replace(/[\\/:*?"<>|]+/g, "-")}.png`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -419,7 +419,7 @@ export function DrawingEditor({
     void rpc.call("drawings.getDrawingUpdatedAt", { id: drawingId }).then(({ updatedAt }) => {
       if (updatedAt !== 0 || deleting.current) return;
       saveQueue.cancel();
-      toast.info("This drawing was deleted.");
+      toast.info("This whiteboard was deleted.");
       onBack(true);
     }).catch(() => { /* The next change event checks again. */ });
   });
@@ -431,7 +431,7 @@ export function DrawingEditor({
     void rpc.call("drawings.renameDrawing", { id: drawingId, name: trimmed }).catch((error) => toast.error(errorMessage(error)));
   }
 
-  const thread = { title: name.trim() || "Untitled drawing", href: drawingHref(drawingId) };
+  const thread = { title: name.trim() || "Untitled whiteboard", href: drawingHref(drawingId) };
 
   async function attachAsImage() {
     if (!threadId) return;
@@ -444,7 +444,7 @@ export function DrawingEditor({
         drawingId,
         pngBase64,
       });
-      toast.success("Drawing attached");
+      toast.success("Whiteboard attached");
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -469,8 +469,8 @@ export function DrawingEditor({
     try {
       await rpc.call("drawings.deleteDrawing", { id: drawingId });
       saveQueue.cancel();
-      await draftSession.discard().catch(error => toast.error(`Drawing deleted, but its local recovery draft could not be removed: ${errorMessage(error)}`));
-      toast.success("Drawing deleted");
+      await draftSession.discard().catch(error => toast.error(`Whiteboard deleted, but its local recovery draft could not be removed: ${errorMessage(error)}`));
+      toast.success("Whiteboard deleted");
       onBack(true);
     } catch (error) {
       deleting.current = false;
@@ -484,8 +484,8 @@ export function DrawingEditor({
       aria-live="polite"
       title={
         recoveryDraft ? "An unsaved local draft needs a recovery decision."
-          : !loadedRef.current ? "The drawing has not loaded."
-          : saveError ? "Changes are not saved. Retry saving before closing this drawing."
+          : !loadedRef.current ? "The whiteboard has not loaded."
+          : saveError ? "Changes are not saved. Retry saving before closing this whiteboard."
           : saving ? "Saving your changes…"
           : realtimeState === "connected"
           ? "Live — agent edits appear here automatically"
@@ -506,7 +506,7 @@ export function DrawingEditor({
   );
 
   const trailing = confirmDelete ? (
-    <ItemDeleteConfirm label="Delete this drawing?" onDelete={() => void deleteDrawing()} onCancel={() => setConfirmDelete(false)} />
+    <ItemDeleteConfirm label="Delete this whiteboard?" onDelete={() => void deleteDrawing()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
       {threadId ? (
@@ -538,8 +538,8 @@ export function DrawingEditor({
             <BarTitle
               key={`${drawingId}:${name}`}
               title={name}
-              label="Drawing name"
-              placeholder="Untitled drawing"
+              label="Whiteboard name"
+              placeholder="Untitled whiteboard"
               disabled={loading || recoveryDrafts.length > 0}
               onRename={rename}
             />
@@ -549,11 +549,11 @@ export function DrawingEditor({
         trailing={trailing}
       />
       {localError || draftLoadError ? <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
-        <span className="min-w-0 flex-1">Local recovery storage failed: {localError || draftLoadError}. Keep this drawing open until the server says Saved.</span>
+        <span className="min-w-0 flex-1">Local recovery storage failed: {localError || draftLoadError}. Keep this whiteboard open until the server says Saved.</span>
         <button type="button" className={BAR_BUTTON} onClick={() => void draftSession.retry().then(checkDrafts)}>Retry local storage</button>
       </div> : null}
-      {recoveryDraft ? <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm" role="region" aria-label="Unsaved drawing recovery">
-        <span className="min-w-0 flex-1">{baseRevision.current === recoveryDraft.baseRevision ? "An unsaved local draft is available." : "The server drawing changed or is unavailable. Save the local draft as a copy to keep both versions."}</span>
+      {recoveryDraft ? <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm" role="region" aria-label="Unsaved whiteboard recovery">
+        <span className="min-w-0 flex-1">{baseRevision.current === recoveryDraft.baseRevision ? "An unsaved local draft is available." : "The saved whiteboard changed or is unavailable. Save the local draft as a copy to keep both versions."}</span>
         {recoveryDrafts.length > 1 ? <select aria-label="Local draft to recover" value={recoveryDraft.id} onChange={event => setSelectedDraft(event.target.value)} disabled={recoveryBusy}>
           {recoveryDrafts.map(draft => <option key={draft.id} value={draft.id}>{new Date(draft.updatedAt).toLocaleString()}</option>)}
         </select> : null}
@@ -578,7 +578,7 @@ export function DrawingEditor({
       >
         {loading ? (
           <div role="status" className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Icon name="Loading" className={cn("size-4", SPIN)} /> Loading drawing…
+            <Icon name="Loading" className={cn("size-4", SPIN)} /> Loading whiteboard…
           </div>
         ) : (
           <Excalidraw

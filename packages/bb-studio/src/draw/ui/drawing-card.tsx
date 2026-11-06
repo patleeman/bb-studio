@@ -9,5 +9,5 @@ export type DrawingMeta = {
 };
 
 export function drawingName(drawing: Pick<DrawingMeta, "name">): string {
-  return drawing.name.trim() || "Untitled drawing";
+  return drawing.name.trim() || "Untitled whiteboard";
 }

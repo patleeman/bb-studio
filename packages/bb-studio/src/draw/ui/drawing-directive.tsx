@@ -51,8 +51,8 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
         <div className="flex h-72 w-full items-center justify-center bg-foreground/[0.03] p-3">
           <img src={thumbnailUrl(drawing.id, drawing.updatedAt)} alt={name} loading="lazy" className={THUMBNAIL} />
         </div>
-      ) : <p className="px-3 py-2 text-sm text-muted-foreground">This drawing is empty.</p>}
-      details={`Drawing · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
+      ) : <p className="px-3 py-2 text-sm text-muted-foreground">This whiteboard is empty.</p>}
+      details={`Whiteboard · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
       onOpen={() => {
         // The workbench when there is one; Studio otherwise.
         if (!openTab({ actionId: STUDIO_TAB, title: name, params: itemParams("drawing", id) }))

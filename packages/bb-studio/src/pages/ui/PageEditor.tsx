@@ -47,7 +47,7 @@ import {
 const HUMAN_COLOR = "#2563eb";
 
 const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
-  drawing: "Embed an Excalidraw drawing",
+  drawing: "Embed a whiteboard",
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
   mini: "Embed a mini app: an interactive app with its own data",
@@ -55,7 +55,7 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
 const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", mini: "AppWindow" };
 /** Slash items that make a new item in another add-on and embed it. */
 const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
-  { kind: "drawing", aliases: ["whiteboard", "excalidraw", "sketch", "diagram", "draw"] },
+  { kind: "drawing", aliases: ["whiteboard", "drawing", "excalidraw", "sketch", "diagram", "draw", "canvas"] },
   { kind: "mini", aliases: ["app", "widget", "interactive", "tracker", "form"] },
 ];
 
@@ -294,7 +294,8 @@ export function PageEditor({
         icon: <Icon name="MessageSquare" className="size-4" />,
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "thread" } }),
       },
-      ...(Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).map((kind) => ({
+      // A whiteboard is made here with "Whiteboard" below; an existing one is pasted as a link.
+      ...(Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).filter((kind) => kind !== "drawing").map((kind) => ({
         title: STUDIO_EMBEDS[kind].label,
         subtext: STUDIO_EMBED_SUBTEXT[kind],
         aliases: [kind, STUDIO_EMBEDS[kind].pluginId, "studio", "embed"],
@@ -305,7 +306,7 @@ export function PageEditor({
       ...STUDIO_NEW.map(({ kind, aliases }) => ({
         // A new drawing is a whiteboard to sketch on in place.
         title: kind === "drawing" ? "Whiteboard" : `New ${STUDIO_EMBEDS[kind].label.toLowerCase()}`,
-        subtext: kind === "drawing" ? "Sketch here; saved as a Studio Draw drawing" : `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
+        subtext: kind === "drawing" ? "Sketch in the page; resize it or open it full size" : `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
         aliases: [...aliases, "new", "create", "studio"],
         group: "Studio",
         icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,
