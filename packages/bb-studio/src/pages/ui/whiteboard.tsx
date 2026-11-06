@@ -1,6 +1,7 @@
-// The inline whiteboard: a Studio Draw drawing shown as SVG in the page, with
-// a pen and an eraser for quick sketches. Strokes are saved to the drawing as
-// Excalidraw elements, so "Open drawing" shows them in the full editor.
+// A whiteboard in a page: shown as SVG, with a pen and an eraser for quick
+// sketches. Strokes are saved as Excalidraw elements, so "Open full size"
+// shows them in the full editor. The bottom handle sets its height in this
+// page, saved on the page's embed block.
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { errorMessage } from "../../kit/format";
 import { Icon } from "../../kit/ui/index";
@@ -10,6 +11,8 @@ import { usePagesUi } from "./context";
 
 type Tool = "pen" | "eraser";
 const EMPTY_VIEWBOX: [number, number, number, number] = [0, 0, 800, 360];
+export const WHITEBOARD_HEIGHT = { default: 320, min: 160, max: 1200, step: 40 } as const;
+const clampHeight = (value: number) => Math.round(Math.min(WHITEBOARD_HEIGHT.max, Math.max(WHITEBOARD_HEIGHT.min, value)));
 const POLL_MS = 5_000;
 const SAVE_DELAY_MS = 350;
 
@@ -19,8 +22,18 @@ export function editWhiteboardWhenShown(id: string) {
   startInEditMode.add(id);
 }
 
-export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
+export function Whiteboard({ id, onOpen, height: saved, onResize }: {
+  id: string;
+  onOpen(): void;
+  /** Its height in this page; 0 or absent is the default. */
+  height?: number;
+  /** Saves a new height on the page's block; absent when the page is read-only. */
+  onResize?: (height: number) => void;
+}) {
   const ui = usePagesUi();
+  const [dragHeight, setDragHeight] = useState<number | null>(null);
+  const height = dragHeight ?? (saved ? clampHeight(saved) : WHITEBOARD_HEIGHT.default);
+  const [boxWidth, setBoxWidth] = useState(800);
   const [view, setView] = useState<WhiteboardView | null | undefined>(undefined);
   const [editing, setEditing] = useState(() => startInEditMode.delete(id));
   const [tool, setTool] = useState<Tool>("pen");
@@ -50,8 +63,29 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
     const poll = setInterval(() => {
       if (document.visibilityState === "visible" && !saving.current && !failedBatch.current && !queue.current.add.length && !queue.current.erase.length) load();
     }, POLL_MS);
-    return () => clearInterval(poll);
+    // Coming back from the full-size editor (another tab, or this window) shows its edits at once.
+    const refresh = () => {
+      if (document.visibilityState === "visible" && !saving.current && !queue.current.add.length && !queue.current.erase.length) load();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(poll);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [load]);
+  // The frame follows the box's shape, so a taller whiteboard gives more room to draw.
+  useEffect(() => {
+    const element = svg.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => { if (entry) setBoxWidth(Math.max(1, Math.round(entry.contentRect.width))); });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [view === null]);
+  const ratio = boxWidth / height;
+  // While sketching, the frame is fixed (so strokes land where they're drawn) and only reshaped around its centre when resized.
+  const viewBox = (editing && frame ? fitWide(frame, ratio) : null) ?? view?.viewBox ?? EMPTY_VIEWBOX;
 
   const flush = useCallback(async () => {
     timer.current = null;
@@ -97,14 +131,15 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
     }
   }, [flush]);
 
-  const viewBox = (editing ? frame : null) ?? view?.viewBox ?? EMPTY_VIEWBOX;
+
   const startEditing = () => {
-    setFrame(view?.viewBox ? fitWide(view.viewBox) : EMPTY_VIEWBOX);
+    setFrame(view?.viewBox ?? EMPTY_VIEWBOX);
     setEditing(true);
   };
   useEffect(() => {
-    if (editing && !frame && view !== undefined) setFrame(view?.viewBox ? fitWide(view.viewBox) : EMPTY_VIEWBOX);
+    if (editing && !frame && view !== undefined) setFrame(view?.viewBox ?? EMPTY_VIEWBOX);
   }, [editing, frame, view]);
+
 
   const point = (event: ReactPointerEvent): [number, number] | null => {
     const matrix = svg.current?.getScreenCTM();
@@ -154,7 +189,7 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
   };
 
   if (view === null) {
-    return <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">{error ?? "This drawing is gone."}</p>;
+    return <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">{error ?? "This whiteboard was deleted."}</p>;
   }
   const hidden = [...erased].map((each) => `g[data-id="${CSS.escape(each)}"]`).join(",");
   return (
@@ -193,7 +228,7 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
             <span className="flex-1" />
           </>
         )}
-        <ToolButton label="Open drawing" icon="ArrowUpRight" onClick={onOpen} />
+        <ToolButton label="Open full size" icon="Maximize2" onClick={onOpen} />
       </div>
       <svg
         ref={svg}
@@ -201,13 +236,14 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
         viewBox={viewBox.join(" ")}
         preserveAspectRatio="xMidYMid meet"
         className={cn(
-          "block h-[320px] w-full touch-none select-none bg-white dark:invert-[0.9] dark:hue-rotate-180",
+          "block w-full touch-none select-none bg-white dark:invert-[0.9] dark:hue-rotate-180",
           editing ? (tool === "eraser" ? "cursor-cell" : "cursor-crosshair") : "cursor-default",
         )}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        style={{ height }}
         onDoubleClick={editing ? undefined : startEditing}
       >
         {hidden ? <style>{`${hidden}{display:none}`}</style> : null}
@@ -229,6 +265,17 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
           </text>
         ) : null}
       </svg>
+      {onResize ? (
+        <ResizeHandle
+          height={height}
+          onPreview={setDragHeight}
+          onCommit={(next) => {
+            setDragHeight(null);
+            const value = next === WHITEBOARD_HEIGHT.default ? 0 : clampHeight(next);
+            if (value !== (saved ?? 0)) onResize(value);
+          }}
+        />
+      ) : null}
       {saveFailed ? (
         <div role="alert" className="flex items-center gap-2 border-t border-border px-2 py-1 text-xs">
           <Icon name="AlertCircle" className="ml-1 size-3.5 shrink-0 text-destructive" />
@@ -242,9 +289,75 @@ export function Whiteboard({ id, onOpen }: { id: string; onOpen(): void }) {
   );
 }
 
-/** Widens a drawing's frame to the whiteboard's shape, so there's room to add to it. */
-function fitWide([x, y, width, height]: [number, number, number, number]): [number, number, number, number] {
-  const ratio = EMPTY_VIEWBOX[2] / EMPTY_VIEWBOX[3];
+/**
+ * The bottom edge: drag it, or focus it and use the arrow keys (Shift for
+ * bigger steps, Home and End for the smallest and largest). Double-click
+ * puts back the default height. The height is saved when the drag ends.
+ */
+function ResizeHandle({ height, onPreview, onCommit }: { height: number; onPreview(height: number | null): void; onCommit(height: number): void }) {
+  const start = useRef<{ y: number; height: number } | null>(null);
+  const keyed = useRef<number | null>(null);
+  const commitKeys = () => {
+    if (keyed.current !== null) onCommit(keyed.current);
+    keyed.current = null;
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Whiteboard height"
+      aria-valuemin={WHITEBOARD_HEIGHT.min}
+      aria-valuemax={WHITEBOARD_HEIGHT.max}
+      aria-valuenow={height}
+      aria-valuetext={`${height} pixels tall`}
+      tabIndex={0}
+      title="Drag to resize. Double-click for the default height."
+      data-whiteboard-resize=""
+      className="group flex h-3 cursor-row-resize touch-none items-center justify-center border-t border-border bg-card/60 outline-none hover:bg-state-hover focus-visible:bg-state-hover focus-visible:ring-2 focus-visible:ring-primary"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        start.current = { y: event.clientY, height };
+      }}
+      onPointerMove={(event) => {
+        if (!start.current) return;
+        onPreview(clampHeight(start.current.height + event.clientY - start.current.y));
+      }}
+      onPointerUp={(event) => {
+        if (!start.current) return;
+        const next = clampHeight(start.current.height + event.clientY - start.current.y);
+        start.current = null;
+        onCommit(next);
+      }}
+      onPointerCancel={() => {
+        start.current = null;
+        onPreview(null);
+      }}
+      onDoubleClick={() => onCommit(WHITEBOARD_HEIGHT.default)}
+      onKeyDown={(event) => {
+        const step = event.shiftKey ? WHITEBOARD_HEIGHT.step * 4 : WHITEBOARD_HEIGHT.step;
+        const base = keyed.current ?? height;
+        const next =
+          event.key === "ArrowDown" ? base + step :
+          event.key === "ArrowUp" ? base - step :
+          event.key === "Home" ? WHITEBOARD_HEIGHT.min :
+          event.key === "End" ? WHITEBOARD_HEIGHT.max : null;
+        if (next === null) return;
+        event.preventDefault();
+        keyed.current = clampHeight(next);
+        onPreview(keyed.current);
+      }}
+      onKeyUp={commitKeys}
+      onBlur={commitKeys}
+    >
+      <span className="h-1 w-10 rounded-full bg-border group-hover:bg-muted-foreground group-focus-visible:bg-muted-foreground" />
+    </div>
+  );
+}
+
+/** Widens or heightens a frame around its centre to the whiteboard's shape, so there's room to add to it. */
+function fitWide([x, y, width, height]: [number, number, number, number], ratio: number): [number, number, number, number] {
   if (width / height < ratio) {
     const wide = height * ratio;
     return [x - (wide - width) / 2, y, wide, height];

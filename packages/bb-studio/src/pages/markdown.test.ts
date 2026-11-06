@@ -313,3 +313,24 @@ Section body
     ]);
   });
 });
+
+describe("whiteboard height", () => {
+  it("keeps a resized whiteboard's height and leaves the default out", () => {
+    const sized = '```embed\n{"kind":"drawing","target":"drw_0123456789abcdef","height":640}\n```';
+    const [block] = markdownToBlocks(sized);
+    expect(block?.props).toMatchObject({ kind: "drawing", target: "drw_0123456789abcdef", height: 640 });
+    expect(blocksToMarkdown(markdownToBlocks(sized)).trim()).toBe(sized);
+    const plain = '```embed\n{"kind":"drawing","target":"drw_0123456789abcdef"}\n```';
+    expect(markdownToBlocks(plain)[0]?.props).toMatchObject({ height: 0 });
+    expect(blocksToMarkdown(markdownToBlocks(plain)).trim()).toBe(plain);
+    // Nonsense heights read as the default.
+    expect(markdownToBlocks('```embed\n{"kind":"drawing","target":"x","height":"tall"}\n```')[0]?.props).toMatchObject({ height: 0 });
+  });
+
+  it("survives the collaborative document", () => {
+    const blocks = markdownToBlocks('```embed\n{"kind":"drawing","target":"drw_0123456789abcdef","height":480}\n```');
+    const editor = createServerEditor();
+    const back = yDocToBlocks(editor, blocksToYDoc(editor, blocks as never, DOCUMENT_FRAGMENT), DOCUMENT_FRAGMENT);
+    expect(back[0]?.props).toMatchObject({ height: 480 });
+  });
+});

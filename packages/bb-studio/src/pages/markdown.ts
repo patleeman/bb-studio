@@ -288,6 +288,7 @@ function embedBlock(value: string): PageBlock {
       title: str("title"),
       description: str("description"),
       image: str("image"),
+      height: typeof raw.height === "number" && Number.isFinite(raw.height) && raw.height > 0 ? Math.round(raw.height) : 0,
     },
   };
 }
@@ -496,9 +497,9 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
         "embed",
         JSON.stringify(
           Object.fromEntries(
-            ["kind", "target", "title", "description", "image"]
+            ["kind", "target", "title", "description", "image", "height"]
               .map((key) => [key, props[key]])
-              .filter(([, value]) => value !== undefined && value !== ""),
+              .filter(([, value]) => value !== undefined && value !== "" && value !== 0),
           ),
         ),
         indent,

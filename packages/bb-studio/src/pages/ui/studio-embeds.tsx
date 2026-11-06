@@ -120,14 +120,14 @@ function ArtifactBody({ id }: { id: string }) {
 }
 
 /** The body of a Studio embed: a picture, content, or the item's preview. */
-function ItemBody({ item }: { item: StudioEmbedItem }) {
+function ItemBody({ item, height, onResize }: { item: StudioEmbedItem } & EmbedSize) {
   const ui = usePagesUi();
   const [failed, setFailed] = useState(false);
   if (item.pluginId === "artifacts") return <ArtifactBody id={item.id} />;
   // Every Talk item, dictation or meeting, is a recording.
   if (item.pluginId === STUDIO_EMBEDS.recording.pluginId) return <RecordingBody id={item.id} />;
-  // A drawing is an inline whiteboard: its picture, and a pen to add to it.
-  if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} onOpen={() => ui.openPath(item.href)} />;
+  // A whiteboard: its picture, a pen to add to it, and a handle to resize it in this page.
+  if (item.pluginId === STUDIO_EMBEDS.drawing.pluginId) return <Whiteboard id={item.id} height={height} onResize={onResize} onOpen={() => ui.openPath(item.href)} />;
   // A mini app runs in place, sharing its data with every other place it shows.
   if (item.pluginId === STUDIO_EMBEDS.mini.pluginId) {
     return (
@@ -153,21 +153,23 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   return item.preview ? <div className="line-clamp-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">{item.preview}</div> : null;
 }
 
-export function StudioEmbed({ kind, target, onEdit }: {
+type EmbedSize = { height?: number; onResize?: (height: number) => void };
+
+export function StudioEmbed({ kind, target, onEdit, height, onResize }: {
   kind: StudioEmbedKind | "item";
   target: string;
   onEdit?: () => void;
-}) {
-  return <ItemEmbed kind={kind} target={target} onEdit={onEdit} />;
+} & EmbedSize) {
+  return <ItemEmbed kind={kind} target={target} onEdit={onEdit} height={height} onResize={onResize} />;
 }
 
-function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void }) {
+function ItemEmbed({ kind, target, onEdit, height, onResize }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void } & EmbedSize) {
   const { item, loading } = useStudioItem(kind, target);
   const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }) : {};
   return (
     <div className="overflow-hidden" {...link}>
       <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />
-      {item ? <ItemBody item={item} /> : null}
+      {item ? <ItemBody item={item} height={height} onResize={onResize} /> : null}
     </div>
   );
 }

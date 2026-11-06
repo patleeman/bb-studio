@@ -57,7 +57,7 @@ export type EmbedKind = (typeof EMBED_KINDS)[number];
  * "item" embed reaches any add-on with a `pluginId:itemId` target.
  */
 export const STUDIO_EMBEDS = {
-  drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
+  drawing: { pluginId: "excalidraw", panel: "drawings", label: "Whiteboard" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
   mini: { pluginId: "minis", panel: "minis", label: "Mini app" },
@@ -96,6 +96,8 @@ export const embedConfig = {
     description: { default: "" },
     /** A bookmark's preview image URL. */
     image: { default: "" },
+    /** A whiteboard's height in this page, in CSS pixels; 0 is the default height. */
+    height: { default: 0 },
   },
   content: "none",
 } as const;

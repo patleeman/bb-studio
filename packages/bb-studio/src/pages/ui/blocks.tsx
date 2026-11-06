@@ -252,12 +252,16 @@ function BookmarkCard({ target, title, description, image, loading, onEdit }: {
   );
 }
 
-function EmbedView({ kind, target, title, description, image, onEdit, onPreview }: {
+function EmbedView({ kind, target, title, description, image, height, onResize, onEdit, onPreview }: {
   kind: EmbedKind;
   target: string;
   title: string;
   description: string;
   image: string;
+  /** A whiteboard's saved height in this page; 0 is the default. */
+  height: number;
+  /** Saves a whiteboard's new height on the block. Absent when the page is read-only. */
+  onResize?: (height: number) => void;
   onEdit?: (target: string) => void;
   onPreview?: (preview: { title: string; description: string; image: string }) => void;
 }) {
@@ -279,7 +283,7 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
         />
       );
     }
-    return <StudioEmbed kind={kind} target={target} onEdit={onEdit ? () => setEditing(true) : undefined} />;
+    return <StudioEmbed kind={kind} target={target} height={height} onResize={onResize} onEdit={onEdit ? () => setEditing(true) : undefined} />;
   }
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
   const heading = title || page?.title || (kind === "bookmark" ? hostOf(target) : target) || "Embed";
@@ -353,6 +357,8 @@ const EmbedBlock = createReactBlockSpec(embedConfig, {
         title={block.props.title}
         description={block.props.description}
         image={block.props.image}
+        height={block.props.height}
+        onResize={editor.isEditable ? (height) => editor.updateBlock(block, { props: { height } }) : undefined}
         onEdit={editor.isEditable ? (target) => editor.updateBlock(block, { props: { target, title: "", description: "", image: "" } }) : undefined}
         onPreview={editor.isEditable ? (preview) => editor.updateBlock(block, { props: preview }) : undefined}
       />
