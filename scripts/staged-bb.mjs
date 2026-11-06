@@ -4,7 +4,7 @@
  * data directory and ports, every plugin installed from GitHub at a pushed
  * commit the way users install them, and seeded demo data. It never touches
  * ~/.bb or the BB you work in. Some fixtures are real agent replies on small
- * models, using this machine's Codex sign-in, so start takes a few minutes.
+ * models, using the staged Codex sign-in (below), so start takes a few minutes.
  *
  *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
@@ -17,15 +17,16 @@
  * every start seeds the same state.
  *
  * Agents keep their sessions inside the instance, so fixture runs never land
- * in your real session history: Codex gets its own CODEX_HOME (sharing only
- * auth.json) and Claude Code its own CLAUDE_CONFIG_DIR (its sign-in lives in
- * the Keychain). Pi can't be moved: bb passes its bridge no environment and it
+ * in your real session history: Codex and Claude Code each get a fixed staged
+ * home (~/.bb-staged/codex, ~/.bb-staged/claude) with its OWN one-time sign-in.
+ * Nothing is shared with or copied from ~/.codex or ~/.claude: a staged Codex
+ * that refreshed a shared sign-in once spent the real one's refresh token. Pi can't be moved: bb passes its bridge no environment and it
  * saves to ~/.bb/pi-bridge-sessions, so don't use Pi in fixtures.
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
-import { chmod, cp, mkdir, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { chmod, cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -54,7 +55,19 @@ if (!Number.isInteger(port) || port < 1024 || port > 65531) throw new Error(`BB_
 const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
-const codexHome = join(stagedDir, "codex-home");
+// One fixed Codex home shared by every staged BB, with its own sign-in. Never
+// the real one: Codex rotates its refresh token on use, so a staged Codex
+// sharing ~/.codex/auth.json (as a symlink, once) left the real sign-in with a
+// spent token. Sign in once with
+//   CODEX_HOME=~/.bb-staged/codex codex login --device-auth
+// It sits outside ~/.codex, so the transcript archive never sees its sessions.
+const codexHome = resolve(process.env.BB_STAGED_CODEX_HOME?.trim() || join(homedir(), ".bb-staged", "codex"));
+const realCodexHome = resolve(process.env.CODEX_HOME?.trim() || join(homedir(), ".codex"));
+for (const real of new Set([realCodexHome, resolve(homedir(), ".codex")])) {
+  if (codexHome === real || codexHome.startsWith(`${real}/`) || real.startsWith(`${codexHome}/`)) {
+    throw new Error(`Refusing to use ${codexHome} as the staged Codex home: it overlaps your real Codex home ${real}.`);
+  }
+}
 // One fixed Claude Code folder shared by every staged BB. Claude Code keys its
 // Keychain sign-in to its config folder, so a fresh folder per instance is never
 // signed in. Sign in to this one once (CLAUDE_CONFIG_DIR=~/.bb-staged/claude
@@ -283,7 +296,7 @@ async function seed({ plugins, capturePlugin, ref, version }) {
   await bb("studio", "decisions", "fallback", "codex", "gpt-6-luna", "low");
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const workspaceThread = !capturePlugin || capturePlugin === "studio" || capturePlugin === "artifacts"
-    ? await seedWorkspaceThread(project, machine, orbitDir) : null;
+    ? (stagedCodexSignedIn() ? await seedWorkspaceThread(project, machine, orbitDir) : failNoCodex()) : null;
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(
@@ -328,14 +341,35 @@ async function useStubTalkTap() {
 
 // Agents save every session to their home folder, and those folders are
 // archived as your own history. Give each one a home inside the instance.
+/**
+ * Whether the staged Codex home has its own sign-in. Throws if its auth.json
+ * is a link, or resolves to the real one, so a leftover link from the old
+ * setup can never refresh the real sign-in again.
+ */
+function failNoCodex() {
+  throw new Error(`The studio and artifacts fixtures need a Codex reply. Sign in the staged Codex home once: CODEX_HOME=${codexHome} codex login --device-auth`);
+}
+
+function stagedCodexSignedIn() {
+  const auth = join(codexHome, "auth.json");
+  let stat = null;
+  try { stat = lstatSync(auth); } catch { /* Not signed in. */ }
+  if (!stat) {
+    console.warn(`Codex in staged BBs isn't signed in yet, so Codex fixtures can't run. Sign in once with: CODEX_HOME=${codexHome} codex login --device-auth`);
+    return false;
+  }
+  const real = [join(realCodexHome, "auth.json"), join(homedir(), ".codex", "auth.json")].filter(existsSync).map((path) => realpathSync(path));
+  if (stat.isSymbolicLink() || real.includes(realpathSync(auth))) {
+    throw new Error(`${auth} links to your real Codex sign-in. Delete it and sign in the staged home on its own: CODEX_HOME=${codexHome} codex login --device-auth`);
+  }
+  return true;
+}
+
 async function useOwnAgentHomes() {
-  // Codex: auth.json is a symlink, not a copy. Codex rewrites it in place when
-  // it refreshes the sign-in, so a copy would leave ~/.codex holding a
-  // rotated-out token.
+  // Codex: the fixed staged home (codexHome) with its own sign-in. Nothing is
+  // linked or copied from the real one.
   await mkdir(codexHome, { recursive: true });
-  const realCodexHome = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
-  const auth = join(realCodexHome, "auth.json");
-  if (existsSync(auth)) await symlink(auth, join(codexHome, "auth.json"));
+  stagedCodexSignedIn();
 
   // Claude Code: bb passes it only BB_CLAUDE_CODE_EXECUTABLE and its OAuth
   // token, so a wrapper sets CLAUDE_CONFIG_DIR to the fixed staged folder
