@@ -19,6 +19,7 @@ export interface TemplateRef { pluginId: string; id: string; title: string }
 
 export type CreateEntry =
   | { type: "kind"; key: string; label: string; icon: string; pluginId: string; addOn: string; kind: ProviderKind }
+  | { type: "whiteboard"; key: "excalidraw:whiteboard"; label: string; icon: string }
   | { type: "call"; key: "talk:call"; label: string; icon: string }
   | { type: "meeting"; key: "voice:meeting"; label: string; icon: string }
   | { type: "template"; key: string; label: string; icon: string; template: TemplateRef };
@@ -32,6 +33,12 @@ export function createEntries(providers: readonly ProviderView[], { off = new Se
     .map((each, index) => ({ ...each, index }))
     .sort((a, b) => rank(a.kind.id) - rank(b.kind.id) || a.index - b.index)
     .map(({ provider, kind }): CreateEntry => ({ type: "kind", key: `${provider.pluginId}:${kind.id}`, label: kind.label, icon: kind.icon, pluginId: provider.pluginId, addOn: provider.name, kind }));
+  // A whiteboard lives in a page, so New → Whiteboard makes a page holding one, after Page.
+  const board = ready.flatMap((provider) => provider.kinds).find((kind) => kind.id === "drawing");
+  if (board && !off.has("drawing")) {
+    const at = kinds.findIndex((entry) => entry.type === "kind" && entry.kind.id === "page");
+    kinds.splice(at + 1, 0, { type: "whiteboard", key: "excalidraw:whiteboard", label: board.label, icon: board.icon });
+  }
   // A call is a Talk recording: offered wherever recordings are.
   const calls = !off.has("recording") && ready.some((provider) => provider.kinds.some((kind) => kind.id === "recording"))
     ? [{ type: "call", key: "talk:call", label: "Record a call", icon: "studio/call" } as const]
@@ -44,7 +51,8 @@ export function createEntries(providers: readonly ProviderView[], { off = new Se
 
 /** Whether a menu draws a separator before entry `index`: between the kinds and the rest. */
 export function startsGroup(entries: readonly CreateEntry[], index: number): boolean {
-  return index > 0 && entries[index]!.type !== "kind" && entries[index - 1]!.type === "kind";
+  const made = (entry: CreateEntry) => entry.type === "kind" || entry.type === "whiteboard";
+  return index > 0 && !made(entries[index]!) && made(entries[index - 1]!);
 }
 
 /**
@@ -88,6 +96,16 @@ export interface RunCreateOptions {
 export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, createKind, onCreated }: RunCreateOptions): Promise<void> {
   if (entry.type === "call") return openCallPicker();
   if (entry.type === "meeting") return startMeeting();
+  if (entry.type === "whiteboard") {
+    try {
+      const { page } = await rpc.call("drawings.newWhiteboardPage", { projectId }) as { page: { href: string } };
+      onCreated?.();
+      openAppPath(page.href);
+    } catch (cause) {
+      toast.error(`Couldn't make a whiteboard: ${errorMessage(cause)}`);
+    }
+    return;
+  }
   if (entry.type === "template") {
     const name = window.prompt("Name for this template (optional)", "");
     if (name === null) return;

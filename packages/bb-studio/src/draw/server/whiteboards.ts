@@ -23,10 +23,13 @@ export interface WhiteboardPages {
 
 export const pagePath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
-/** The Markdown block that embeds a drawing as a whiteboard. */
-export function whiteboardMarkdown(drawingId: string): string {
-  return "```embed\n" + JSON.stringify({ kind: "drawing", target: drawingId }) + "\n```";
+/** The Markdown block that embeds a drawing as a whiteboard, at its default height or `height` pixels. */
+export function whiteboardMarkdown(drawingId: string, height?: number): string {
+  return "```embed\n" + JSON.stringify({ kind: "drawing", target: drawingId, ...(height ? { height } : {}) }) + "\n```";
 }
+
+/** The height of the whiteboard New → Whiteboard makes: most of a page. */
+export const NEW_WHITEBOARD_PAGE_HEIGHT = 640;
 
 const EMBED_FENCE = /```embed[ \t]*\n([\s\S]*?)\n[ \t]*```/g;
 

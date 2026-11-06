@@ -34,18 +34,18 @@ import { mentionContext as buildMentionContext } from "./server/mention";
 import { drawingProvider } from "./server/provider";
 import { DrawingStore, displayName, toMeta, type DrawingRow, type Writer } from "./server/store";
 import { sceneThumbnail } from "./server/thumbnail";
-import { migrateOrphanDrawings, ORPHAN_MIGRATION_KEY, pagePath, type OrphanMigrationState, type WhiteboardPage, type WhiteboardPages } from "./server/whiteboards";
+import { migrateOrphanDrawings, NEW_WHITEBOARD_PAGE_HEIGHT, ORPHAN_MIGRATION_KEY, pagePath, whiteboardMarkdown, type OrphanMigrationState, type WhiteboardPage, type WhiteboardPages } from "./server/whiteboards";
 import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, drawingHref } from "./shared";
 
 const MAX_TOOL_SCENE_CHARS = 400_000;
 
 export const DRAWINGS_USAGE = [
-  "usage: bb studio drawings <command>",
-  "  list                                  List drawings",
+  "usage: bb studio whiteboards <command>",
+  "  list                                  List whiteboards",
   "  create --page <page-id> <name>        Create a whiteboard at the end of a page",
-  "  show <id> [--raw]                     Print a drawing's scene JSON (deleted elements left out unless --raw)",
-  "  rename <id> <new-name>                Rename a drawing",
-  "  delete <id>                           Delete a drawing",
+  "  show <id> [--raw]                     Print a whiteboard's scene JSON (deleted elements left out unless --raw)",
+  "  rename <id> <new-name>                Rename a whiteboard",
+  "  delete <id>                           Delete a whiteboard",
   "  merge <id> <scene-file.json>          Upsert elements from a JSON file (an elements array or a full scene)",
   "  remove-elements <id> <element-id…>    Delete elements by id",
 ].join("\n");
@@ -63,7 +63,7 @@ export interface BuiltinDrawings {
   backup: BackupHandlers;
   /** Pages registers after Drawings; until it connects, whiteboard tools say so. */
   connectPages(pages: WhiteboardPages): void;
-  /** `bb studio drawings …` */
+  /** `bb studio whiteboards …` */
   cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null; cwd?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }>;
   dispose(): void;
 }
@@ -213,6 +213,18 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
       return { drawing: toMeta(create(name, "app", projectId ?? null)) };
     },
     "drawings.getDrawing": ({ id }) => ({ drawing: getDrawing(id) }),
+    "drawings.newWhiteboardPage"({ projectId }) {
+      const target = needPages();
+      const row = create("", "app", projectId);
+      try {
+        const title = "Untitled whiteboard";
+        const pageId = target.createPage({ projectId, title, markdown: whiteboardMarkdown(row.id, NEW_WHITEBOARD_PAGE_HEIGHT) });
+        return { drawingId: row.id, page: { id: pageId, title, href: pagePath(pageId) } };
+      } catch (error) {
+        remove(row.id, "app");
+        throw error;
+      }
+    },
     "drawings.whiteboardPage"({ id }) {
       const page = homePage(id);
       return { page: page ? { id: page.id, title: page.title, href: pagePath(page.id) } : null };
@@ -304,7 +316,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
   bb.agents.registerTool({
     name: "excalidraw_get_drawing",
     description:
-      "Read the current scene of a whiteboard (an Excalidraw drawing; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and excalidraw_list_drawings lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio drawings show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
+      "Read the current scene of a whiteboard (an Excalidraw drawing; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and excalidraw_list_drawings lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio whiteboards show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use excalidraw_update_drawing.",
     parameters: z.object({ drawingId: z.string().min(1) }),
     execute({ drawingId }) {
       const row = store.get(drawingId);
@@ -330,7 +342,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
           `Drawing "${displayName(row)}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
           sceneSummary(scene, "empty drawing"),
           `Element ids (in z-order):\n${ids}`,
-          `To edit, pass element ids in excalidraw_update_drawing. Raw scene: bb studio drawings show ${row.id}`,
+          `To edit, pass element ids in excalidraw_update_drawing. Raw scene: bb studio whiteboards show ${row.id}`,
         ].join("\n\n");
       }
       return json;
@@ -404,7 +416,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     resolve: (itemId) => ({ context: mention(itemId) }),
   }));
 
-  // CLI: `bb studio drawings …`. A plugin registers one CLI command, and
+  // CLI: `bb studio whiteboards …`. A plugin registers one CLI command, and
   // Studio's is `studio`, so `bb excalidraw …` went with the old plugin.
   async function cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null; cwd?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }> {
     const [cmd, ...rest] = argv;
@@ -412,7 +424,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     switch (cmd) {
       case "list": {
         const rows = store.list();
-        if (!rows.length) return { exitCode: 0, stdout: "No drawings yet.\n" };
+        if (!rows.length) return { exitCode: 0, stdout: "No whiteboards yet.\n" };
         const lines = rows.map((r) => {
           const meta = toMeta(r);
           return `${meta.id}\t${displayName(r)}\t${meta.elementCount} elements\t${new Date(meta.updatedAt).toISOString()}`;
@@ -420,7 +432,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
         return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
       }
       case "create": {
-        const usage = { exitCode: 1, stderr: "usage: bb studio drawings create --page <page-id> <name>\n" };
+        const usage = { exitCode: 1, stderr: "usage: bb studio whiteboards create --page <page-id> <name>\n" };
         if (rest[0] !== "--page" || !rest[1]) return usage;
         const name = rest.slice(2).join(" ");
         if (!name) return usage;
@@ -434,7 +446,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
       }
       case "show": {
         const [id, flag] = rest;
-        if (!id) return { exitCode: 1, stderr: "usage: bb studio drawings show <id> [--raw]\n" };
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio whiteboards show <id> [--raw]\n" };
         const row = store.get(id);
         if (!row) return notFound(id);
         // Default view filters tombstones (deleted elements) so agents and
@@ -448,21 +460,21 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
       case "rename": {
         const [id, ...nameParts] = rest;
         const name = nameParts.join(" ");
-        if (!id || !name) return { exitCode: 1, stderr: "usage: bb studio drawings rename <id> <new-name>\n" };
+        if (!id || !name) return { exitCode: 1, stderr: "usage: bb studio whiteboards rename <id> <new-name>\n" };
         if (!store.get(id)) return notFound(id);
         changed(id, store.rename(id, name, "cli"), "cli");
         return { exitCode: 0, stdout: `renamed ${id} → ${name}\n` };
       }
       case "delete": {
         const id = rest[0];
-        if (!id) return { exitCode: 1, stderr: "usage: bb studio drawings delete <id>\n" };
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio whiteboards delete <id>\n" };
         if (!store.get(id)) return notFound(id);
         remove(id, "cli");
         return { exitCode: 0, stdout: `deleted ${id}\n` };
       }
       case "merge": {
         const [id, filePath, ...extra] = rest;
-        if (!id || !filePath || extra.length) return { exitCode: 1, stderr: "usage: bb studio drawings merge <id> <scene-file.json>\n" };
+        if (!id || !filePath || extra.length) return { exitCode: 1, stderr: "usage: bb studio whiteboards merge <id> <scene-file.json>\n" };
         const row = store.get(id);
         if (!row) return notFound(id);
         let parsed: unknown;
@@ -481,7 +493,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
       }
       case "remove-elements": {
         const [id, ...elementIds] = rest;
-        if (!id || elementIds.length === 0) return { exitCode: 1, stderr: "usage: bb studio drawings remove-elements <id> <element-id> [<element-id>…]\n" };
+        if (!id || elementIds.length === 0) return { exitCode: 1, stderr: "usage: bb studio whiteboards remove-elements <id> <element-id> [<element-id>…]\n" };
         const row = store.get(id);
         if (!row) return notFound(id);
         const merged = applyElementUpserts(row.data, [], { deletedElementIds: elementIds });

@@ -53,6 +53,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: z.string() }),
     output: z.object({ page: z.object({ id: z.string(), title: z.string(), href: z.string() }).nullable() }),
   },
+  /** New → Whiteboard: a page holding one new, tall whiteboard. */
+  "drawings.newWhiteboardPage": {
+    input: z.object({ projectId: z.string().min(1).max(200).nullable() }),
+    output: z.object({ drawingId: z.string(), page: z.object({ id: z.string(), title: z.string(), href: z.string() }) }),
+  },
   "drawings.getDrawingMeta": {
     input: z.object({ id: z.string() }),
     output: z.object({ drawing: drawingMetaSchema.nullable() }),

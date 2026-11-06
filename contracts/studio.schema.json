@@ -23378,6 +23378,63 @@
         "additionalProperties": false
       }
     },
+    "drawings.newWhiteboardPage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "drawingId": {
+            "type": "string"
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "href"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "drawingId",
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
     "drawings.getDrawingMeta": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

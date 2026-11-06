@@ -1944,7 +1944,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "backup", summary: "Save every Studio item, from every add-on, into one .zip file", usage: "bb studio backup [--out <file|folder>]" },
       { name: "restore", summary: "Restore a Studio backup; shows what would change first", usage: "bb studio restore <file> [--dry-run | --yes]" },
       { name: "artifacts", summary: "Save and read artifacts: save, list, show, export, delete", usage: "bb studio artifacts <save|list|show|export|delete> …" },
-      { name: "drawings", summary: "Create, read and edit Excalidraw drawings", usage: "bb studio drawings <list|create|show|rename|delete|merge|remove-elements> …" },
+      { name: "whiteboards", summary: "Create, read and edit whiteboards (old name: drawings)", usage: "bb studio whiteboards <list|create|show|rename|delete|merge|remove-elements> …" },
       { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
@@ -1956,7 +1956,8 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "settings") return settingsCli(argv.slice(1), studioSettings);
       if (argv[0] === "decisions") return decisions.cli(argv.slice(1));
       if (argv[0] === "artifacts") return artifacts.cli(argv.slice(1), ctx);
-      if (argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
+      // `drawings` is the old name of `whiteboards`; both stay.
+      if (argv[0] === "whiteboards" || argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
       if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "minis") return minis.cli(argv.slice(1));
@@ -2052,7 +2053,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|drawings|designs|recordings|dashboards|minis|decisions> …");
+            return usage("bb studio <list|tags|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|dashboards|minis|decisions> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

@@ -19,16 +19,26 @@ afterEach(() => vi.restoreAllMocks());
 
 it("lists the kinds Studio can make in Studio's order, then Record a call and the meeting agent, then templates", () => {
   const entries = createEntries(providers, { templates: [{ pluginId: "pages", id: "pg_t", title: "Weekly" }] });
-  expect(labels(entries)).toEqual(["Page", "Recording", "Design", "Record a call", "Start a meeting agent", "From template: Weekly"]);
-  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, true, false, false]);
+  expect(labels(entries)).toEqual(["Page", "Drawing", "Recording", "Design", "Record a call", "Start a meeting agent", "From template: Weekly"]);
+  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, false, true, false, false]);
 });
 
-it("leaves out kinds with no create mode, like whiteboards, which a page makes", () => {
-  expect(createEntries(providers).map((entry) => entry.key)).not.toContain("draw:drawing");
+it("offers a whiteboard after Page, made as a page holding one, not as a bare drawing", () => {
+  const keys = createEntries(providers).map((entry) => entry.key);
+  expect(keys).not.toContain("draw:drawing");
+  expect(keys.indexOf("excalidraw:whiteboard")).toBe(keys.indexOf("pages:page") + 1);
+  expect(createEntries(providers, { off: new Set(["drawing"]) }).map((entry) => entry.key)).not.toContain("excalidraw:whiteboard");
+});
+
+it("New → Whiteboard makes its page and opens it", async () => {
+  const call = vi.fn().mockResolvedValue({ drawingId: "drw_1", page: { id: "pg_1", title: "Untitled whiteboard", href: "/plugins/studio/studio/pages/pg_1" } });
+  const entry = createEntries(providers).find((each) => each.type === "whiteboard")!;
+  await runCreateEntry(entry, { rpc: { call }, projectId: "proj_1" });
+  expect(call).toHaveBeenCalledWith("drawings.newWhiteboardPage", { projectId: "proj_1" });
 });
 
 it("drops what Setup → Kinds turned off, and Record a call with recordings", () => {
-  expect(labels(createEntries(providers, { off: new Set(["recording", "design"]) }))).toEqual(["Page"]);
+  expect(labels(createEntries(providers, { off: new Set(["recording", "design", "drawing"]) }))).toEqual(["Page"]);
   expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Record a call");
   expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Start a meeting agent");
 });

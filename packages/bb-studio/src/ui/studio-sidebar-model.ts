@@ -17,13 +17,12 @@ export interface StudioSidebarModel {
 }
 
 /** The built-in kinds first, in this order; others follow as their add-ons list them. */
-export const KIND_ORDER = ["page", "recording", "artifact", "design"];
+export const KIND_ORDER = ["page", "drawing", "recording", "artifact", "design"];
 /**
- * Kinds that live inside pages: a whiteboard is a drawing a page embeds.
- * They stay in the library and search, but get no sidebar row. (Their kind
- * has no `create` mode, so no New menu offers them; `/whiteboard` does.)
+ * Kinds that get no sidebar row. Whiteboards live in pages but have their
+ * row, so they're easy to find; New → Whiteboard makes a page holding one.
  */
-export const IN_PAGE_KINDS: ReadonlySet<string> = new Set(["drawing"]);
+export const IN_PAGE_KINDS: ReadonlySet<string> = new Set<string>();
 export const RECENT_LIMIT = 15;
 
 const kindQuery = (id: string) => formatQuery({ filters: [{ field: "kind", value: id }], text: "" });

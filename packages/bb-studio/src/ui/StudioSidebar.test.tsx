@@ -62,8 +62,8 @@ const deferred = <T,>() => {
 test("on the Studio page it lists kinds, views, tags and recent items, with the library filter selected", async () => {
   await show();
   const kinds = [...container.querySelectorAll('[data-testid="studio-sidebar-kind"]')].map((each) => each.textContent);
-  // Whiteboards (drawings) live in pages: no row of their own.
-  expect(kinds).toEqual(["All items", "Pages2"]);
+  // Whiteboards live in pages, and have their own row after Pages.
+  expect(kinds).toEqual(["All items", "Pages2", "Whiteboards0"]);
   expect(container.querySelector('[data-kind="page"]')!.getAttribute("aria-current")).toBe("page");
   expect(container.textContent).toContain("My pages");
   expect(container.querySelector('[data-testid="studio-sidebar-tag"]')!.textContent).toBe("Launch1");
@@ -83,7 +83,7 @@ test("New offers the shared create list, Record a call and templates included", 
   await act(async () => {});
   const menu = [...container.querySelectorAll('[data-testid="menu-item"]')].map((each) => each.textContent?.trim());
   expect(menu).toEqual(createEntries(withTalk.providers as never, { templates }).map((entry) => entry.label));
-  expect(menu).toEqual(["page", "Recording", "Record a call", "Start a meeting agent", "From template: Weekly"]);
+  expect(menu).toEqual(["page", "drawing", "Recording", "Record a call", "Start a meeting agent", "From template: Weekly"]);
 });
 
 test("off the Studio page it switches to the Bots list and shows a placeholder", async () => {
