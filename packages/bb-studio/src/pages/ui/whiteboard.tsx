@@ -228,7 +228,7 @@ export function Whiteboard({ id, onOpen, height: saved, onResize }: {
             <span className="flex-1" />
           </>
         )}
-        <ToolButton label="Open full size" icon="Maximize2" onClick={onOpen} />
+        <ToolButton label="Open full size" icon="ArrowUpRight" onClick={onOpen} />
       </div>
       <svg
         ref={svg}
@@ -351,7 +351,7 @@ function ResizeHandle({ height, onPreview, onCommit }: { height: number; onPrevi
       onKeyUp={commitKeys}
       onBlur={commitKeys}
     >
-      <span className="h-1 w-10 rounded-full bg-border group-hover:bg-muted-foreground group-focus-visible:bg-muted-foreground" />
+      <span className="h-1 w-10 rounded-full bg-muted-foreground/40 group-hover:bg-muted-foreground group-focus-visible:bg-muted-foreground" />
     </div>
   );
 }
