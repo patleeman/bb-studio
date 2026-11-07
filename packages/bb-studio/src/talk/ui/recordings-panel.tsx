@@ -24,8 +24,9 @@ import {
   SECTION_TITLE,
   openAppPath,
   WORKSPACE_PATH,
-  useOpenMain,
+  wantsAlternate,
 } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage, formatBytes, shortDateTime, untitled } from "../../kit/format";
 import {
   useBbNavigate,
@@ -68,7 +69,7 @@ export function UnsentAudio() {
   const { setAside: recovered, uploadError } = useTalkState();
   const setAside = recovered ?? [];
   const status = unsentAudioState(recovered, uploadError);
-  const open = useOpenMain();
+  const open = useStudioOpen();
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
   const act = (work: () => Promise<unknown>) => {
@@ -143,7 +144,7 @@ export function UnsentAudio() {
                     <button
                       type="button"
                       className="font-medium hover:underline"
-                      onClick={() => open({ kind: "path", path: recordingHref(segment.recordingId) })}
+                      onClick={() => open({ href: recordingHref(segment.recordingId) })}
                     >
                       {shortDateTime(segment.startedAt)}
                     </button>
@@ -230,6 +231,7 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
 // ── Notes page ───────────────────────────────────────────────────────────
 function useNotes(id: string, refetch: () => void) {
   const rpc = useRpc<TalkRpcContract>();
+  const open = useStudioOpen();
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
   const make = useCallback(() => {
@@ -239,7 +241,7 @@ function useNotes(id: string, refetch: () => void) {
     setBusy(true);
     rpc.call("recordings.notes_make", { id }).then(
       ({ pageId, created }) => {
-        toast.success(created ? "Notes page made" : "Notes page updated", { action: { label: "Open", onClick: () => openAppPath(notesPath(pageId)) } });
+        toast.success(created ? "Notes page made" : "Notes page updated", { action: { label: "Open", onClick: () => open({ href: notesPath(pageId) }) } });
         refetch();
       },
       (cause) => {
@@ -259,12 +261,13 @@ function useNotes(id: string, refetch: () => void) {
 const notesPath = (pageId: string) => `/plugins/studio/studio/pages/${pageId}`;
 
 function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnType<typeof useNotes> }) {
+  const open = useStudioOpen();
   const pageId = recording.notesPageId ?? null;
   if (!notes.canMake(recording) && !pageId) return null;
   return (
     <section aria-label="Notes" className="mt-6 flex flex-wrap items-center gap-2">
       {pageId ? (
-        <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(notesPath(pageId))}>
+        <button type="button" className={OUTLINE_BUTTON} onClick={(event) => open({ href: notesPath(pageId) }, { alternate: wantsAlternate(event) })}>
           <Icon name="FileText" /> Open notes
         </button>
       ) : null}

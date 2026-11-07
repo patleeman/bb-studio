@@ -2,14 +2,15 @@
 // library shows it when filtered to recordings (Talk's own Recordings page
 // did before Talk was built into Studio), and a recording's page shows it
 // for that recording.
-import { OUTLINE_BUTTON, openWorkspaceItem, useOpenMain } from "../../kit/app/index";
+import { OUTLINE_BUTTON } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { Icon, cn } from "../../kit/ui/index";
 import { RECORDINGS_ROOT, UNSENT_PATH } from "../shared/format";
 import { useTalkState } from "./controller";
 
 export function UnsentNotice({ recordingId, className }: { recordingId?: string; className?: string }) {
   const setAside = useTalkState().setAside ?? [];
-  const open = useOpenMain();
+  const open = useStudioOpen("route");
   const count = setAside.filter((segment) => !recordingId || segment.recordingId === recordingId).length;
   if (count === 0) return null;
   const what = count === 1 ? "A piece of audio" : `${count} pieces of audio`;
@@ -26,7 +27,7 @@ export function UnsentNotice({ recordingId, className }: { recordingId?: string;
         onClick={() => {
           const href = `${RECORDINGS_ROOT}/${UNSENT_PATH}`;
           // A Studio tab with a proper title; the main view where there's no workspace.
-          if (!openWorkspaceItem({ href, title: "Unsent audio" })) open({ kind: "path", path: href });
+          open({ href, title: "Unsent audio" });
         }}
       >
         Review

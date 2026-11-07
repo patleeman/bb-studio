@@ -32,6 +32,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => host.rpc,
   useRealtime: () => {},
   useSdk: () => host.sdk,
+  experimental_useAppPanel: () => ({ openTab: () => false }),
+  useBbNavigate: () => ({ toThread: () => {}, openUrl: () => true }),
 }));
 vi.mock("../../kit/app/index", () => ({
   ICON_BUTTON: "",

@@ -9,6 +9,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => rpc,
   useRealtime: () => {},
   useSdk: () => ({}),
+  experimental_useAppPanel: () => ({ openTab: () => false }),
+  useBbNavigate: () => ({ toThread: () => {}, openUrl: () => true }),
   experimental_Icon: ({ name }: { name: string }) => React.createElement("i", { "data-icon": name }),
   ThreadTitle: ({ threadId }: { threadId: string }) => React.createElement("span", null, `thread ${threadId}`),
 }));

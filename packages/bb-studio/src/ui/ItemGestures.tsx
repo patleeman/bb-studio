@@ -2,8 +2,9 @@
 // - right-click one for Open, Open in split, Copy reference (a thread: Copy
 //   link), New thread with this;
 // - Mod-click to open it in a split.
-// Inside a thread's workbench the rule in ./studio-open.tsx applies instead:
-// Open is a workbench tab, and Mod-click opens it in the Studio app.
+// In a thread (its workbench, or a card in its transcript) the rule in
+// ./studio-open.tsx applies instead: Open is a workbench tab, and Mod-click
+// opens it in the Studio app. Elsewhere the container is what the main view shows.
 // Items are marked with the kit's studioItemProps or studioThreadProps, and
 // links into plugin views and threads count too. An element's own menu, and
 // Shift+right-click, keep their usual behavior.
@@ -24,7 +25,7 @@ import {
   type OpenTarget,
 } from "../kit/app/index";
 import { useEffect, useRef, useState } from "react";
-import { containerAt, openFrom, type StudioContainer, type StudioRef } from "./studio-open";
+import { containerAt, openFrom, routeContainer, type StudioContainer, type StudioRef } from "./studio-open";
 import { toast } from "sonner";
 
 interface Menu {
@@ -63,7 +64,7 @@ export function ItemGestures() {
       if (!target || (event.target as Element).closest(`[${STUDIO_ITEM_CLICKS_OFF}]`)) return;
       event.preventDefault();
       event.stopPropagation();
-      const container = containerAt(event.target as Element);
+      const container = containerAt(event.target as Element) ?? routeContainer();
       if (inThread(container)) openFrom(container, refOf(target), { alternate: true }, latestNavigate.current);
       else latestOpen.current(target, "split");
     };
@@ -72,7 +73,7 @@ export function ItemGestures() {
       const target = targetAt(event);
       if (!target) return;
       event.preventDefault();
-      setMenu({ x: event.clientX, y: event.clientY, target, container: containerAt(event.target as Element) });
+      setMenu({ x: event.clientX, y: event.clientY, target, container: containerAt(event.target as Element) ?? routeContainer() });
     };
     // Capturing, so the item's own click handler doesn't open it as well.
     document.addEventListener("click", onClick, true);

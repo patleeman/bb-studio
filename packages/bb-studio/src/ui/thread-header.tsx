@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { openAppPath } from "../kit/app/index";
 import { openThreadTab } from "../kit/app/thread-panel";
+import { openPathIn } from "./studio-open";
 import { untitled } from "../kit/format";
 import { LOOPS_PANE, openLoops, useLoopsEnabled } from "../loops/ui/hooks";
 import { useNeedsYou } from "../loops/ui/LoopsTab";
@@ -149,7 +150,7 @@ export const pageLinkHeaderAction: PluginThreadActionRegistration<ReadonlyMap<st
     const load = useCallback(async (threadId: string) => (await rpc.call("pages.chatPage", { threadId })).page ?? null, [rpc]);
     return useThreadLookup(threadIds, load);
   },
-  item: ({ thread, data }) => {
+  item: ({ thread, data, experimental_panel }) => {
     const page = data.get(thread.id);
     if (!page) return null;
     const title = untitled(page.title);
@@ -157,7 +158,8 @@ export const pageLinkHeaderAction: PluginThreadActionRegistration<ReadonlyMap<st
       label: title.length > 40 ? `${title.slice(0, 39).trimEnd()}…` : title,
       detail: "Open the page this thread works on",
       icon: "FileText",
-      run: () => openAppPath(`${pagePath(page.id)}/chat/${encodeURIComponent(thread.id)}`),
+      // The page beside this thread, in its workbench (src/ui/studio-open.tsx).
+      run: () => openPathIn({ kind: "thread", threadId: thread.id }, pagePath(page.id), { title, panel: experimental_panel }),
     };
   },
 };

@@ -5,12 +5,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ open: vi.fn(), inTabRow: false }));
 vi.mock("../../kit/app/index", () => ({
-  BarCrumb: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+  BarCrumb: ({ children, onClick }: { children?: React.ReactNode; onClick?: (event: React.MouseEvent) => void }) => <button onClick={onClick}>{children}</button>,
   BarSeparator: () => <span />,
-  openAppPath: state.open,
   cn: (...names: unknown[]) => names.filter(Boolean).join(" "),
   useInTabRow: () => state.inTabRow,
+  wantsAlternate: (event?: { metaKey?: boolean; ctrlKey?: boolean }) => Boolean(event?.metaKey || event?.ctrlKey),
 }));
+vi.mock("../../ui/studio-open", () => ({ useStudioOpen: () => state.open }));
 
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
 import { pagePath } from "../constants";
@@ -31,13 +32,16 @@ afterEach(() => {
   host.remove();
 });
 
-it("opens an ancestor through Studio's page path", () => {
+it("opens an ancestor by Studio's rule, Mod-click in the other place", () => {
   const parent = { id: "pg_parent", title: "Parent", icon: "📁", parentId: null } as PageMetaView;
   const page = { id: "pg_child", title: "Child", icon: "📄", parentId: parent.id } as PageMetaView;
   act(() => root.render(<PageBreadcrumbs page={page} pages={[parent, page]} />));
 
   act(() => host.querySelector("button")!.click());
-  expect(state.open).toHaveBeenCalledWith(pagePath(parent.id));
+  expect(state.open).toHaveBeenCalledWith({ href: pagePath(parent.id), title: "Parent" }, { alternate: false });
+  // Mod-click: the other place.
+  act(() => host.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true, metaKey: true })));
+  expect(state.open).toHaveBeenLastCalledWith({ href: pagePath(parent.id), title: "Parent" }, { alternate: true });
 });
 
 it("shows only the parents beside workspace tabs, folding the middle ones", () => {
@@ -52,7 +56,7 @@ it("shows only the parents beside workspace tabs, folding the middle ones", () =
   expect(parents.textContent).toContain("…");
   expect(parents.textContent).not.toContain("Child");
   act(() => parents.querySelectorAll("button")[1]!.click());
-  expect(state.open).toHaveBeenCalledWith(pagePath("pg_3"));
+  expect(state.open).toHaveBeenCalledWith({ href: pagePath("pg_3"), title: "Risks" }, { alternate: false });
 });
 
 it("shows nothing beside workspace tabs for a top-level page", () => {

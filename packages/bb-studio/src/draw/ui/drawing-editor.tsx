@@ -25,9 +25,9 @@ import {
   ItemHeader,
   ItemDeleteConfirm,
   ItemMenu,
-  useOpenMain,
   cn,
 } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 
 import { errorMessage } from "../../kit/format";
 import {
@@ -70,7 +70,8 @@ export function DrawingEditor({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const provider = useDrawingProvider();
-  const openMain = useOpenMain();
+  // The recovered copy opens where this editor is (src/ui/studio-open.tsx).
+  const openItem = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
   // Studio Chat's Chat button starts threads; the menu only offers it without one.
   const isDark = useIsDark();
   const [name, setName] = useState("");
@@ -336,7 +337,7 @@ export function DrawingEditor({
             });
             await draftStore.remove(draft.id, draft.token);
             await checkDrafts();
-            openMain({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
+            openItem({ href: drawingHref(drawing.id), title: drawing.name });
             return;
           }
           await rpc.call("drawings.saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });

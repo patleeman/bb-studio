@@ -1,5 +1,5 @@
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { openAppPath } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { Icon } from "../../kit/ui/index";
 import { pagePath } from "../constants";
 import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
@@ -15,6 +15,7 @@ import { NoteActions } from "./notes/NoteActions";
  */
 export function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
   const rpc = useRpc<typeof rpcContract>();
+  const open = useStudioOpen();
   const { page, refetch } = usePanelPage(pageId);
 
   if (page === null) return <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={refetch} onBack={onBack} backLabel={backLabel ? `Back to ${backLabel}` : undefined} />;
@@ -41,7 +42,8 @@ export function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLab
           <div className="min-w-0 flex-1">
             <PanelTitle key={page.id} page={page} rpc={rpc} />
           </div>
-          <OpenInPages onOpen={() => openAppPath(pagePath(page.id))} />
+          {/* The way out: the other place from a thread's workbench is the Studio app. */}
+          <OpenInPages onOpen={() => open({ href: pagePath(page.id), title: page.title }, { alternate: true })} />
         </header>
         {/* A temp note from the composer: Send to thread, Keep, Discard. */}
         <NoteActions pageId={page.id} layout="row" onDiscarded={onBack} />

@@ -1,7 +1,7 @@
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
 import { useEffect, useState, type ReactNode } from "react";
-import { PRIMARY_BUTTON, studioItemProps, studioThreadProps } from "../../kit/app/index";
+import { PRIMARY_BUTTON, studioItemProps, studioThreadProps, wantsAlternate } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { cn } from "../../kit/ui/index";
 import { chartSpecSchema, parseJsonWith, SERIES_COLORS, statItemsSchema } from "../chart-spec";
@@ -320,9 +320,10 @@ function EmbedView({ kind, target, title, description, image, height, onResize, 
     <button
       type="button"
       className="flex w-full cursor-pointer items-center gap-3 text-left"
-      onClick={() => {
-        if (kind === "page") ui.openPage(target);
-        else if (kind === "thread") ui.openThread(target);
+      onClick={(event) => {
+        const options = { alternate: wantsAlternate(event) };
+        if (kind === "page") ui.openPage(target, options);
+        else if (kind === "thread") ui.openThread(target, options);
         else if (/^https?:\/\//.test(target)) ui.openUrl(target);
       }}
       onDoubleClick={() => onEdit && setEditing(true)}
@@ -407,10 +408,11 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
       {...(kind === "thread"
         ? studioThreadProps(target, text)
         : studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null))}
-      onClick={() => {
-        if (kind === "page") ui.openPage(target);
-        else if (kind === "thread") ui.openThread(target);
-        else if (item) ui.openPath(item.href);
+      onClick={(event) => {
+        const options = { alternate: wantsAlternate(event) };
+        if (kind === "page") ui.openPage(target, options);
+        else if (kind === "thread") ui.openThread(target, options);
+        else if (item) ui.openPath(item.href, options);
       }}
     >
       {bot ? (

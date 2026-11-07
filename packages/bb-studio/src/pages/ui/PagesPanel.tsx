@@ -1,7 +1,7 @@
 import { requestGeneration } from "../../kit/ui/request-generation";
 import { usePanelPage } from "./use-panel-page";
 import { openAppPath, studioPath } from "../../kit/app/index";
-import { useStudioOpen } from "../../ui/studio-open";
+import { linkRef, useStudioOpen } from "../../ui/studio-open";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
@@ -40,17 +40,23 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
   // list, an embedded item's from the last lookup the page's embeds made.
   const titles = useRef(new Map<string, string>());
   const pageTitle = useCallback((id: string) => pages?.find((page) => page.id === id)?.title.trim() || undefined, [pages]);
-  const openPage = useCallback((id: string) => { const title = pageTitle(id); open({ href: pagePath(id), ...(title ? { title } : {}) }); }, [open, pageTitle]);
+  const openPage = useCallback((id: string, options?: { alternate?: boolean }) => { const title = pageTitle(id); open({ href: pagePath(id), ...(title ? { title } : {}) }, options); }, [open, pageTitle]);
   const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   return useMemo<PagesUi>(
     () => ({
       pages: pages ?? [],
       bots: bots.bots,
       openPage,
-      openThread: (threadId) => open({ threadId }),
+      openThread: (threadId, options) => open({ threadId }, options),
       openProject: (projectId) => navigate.toProject(projectId),
       openUrl: (url) => open({ url }),
-      openPath: (path) => { const title = titles.current.get(path); open({ href: path, ...(title ? { title } : {}) }); },
+      openPath: (path, options) => { const title = titles.current.get(path); open({ href: path, ...(title ? { title } : {}) }, options); },
+      openLink: (href, options) => {
+        const ref = linkRef(href);
+        if (!ref) return;
+        if ("href" in ref) { const title = titles.current.get(ref.href); open(title ? { ...ref, title } : ref, options); }
+        else open(ref, options);
+      },
       linkPreview: (url) => rpc.call("pages.linkPreview", { url }),
       studioItems: () => {
         // Every embed on a page asks; one request serves them all for a few seconds.

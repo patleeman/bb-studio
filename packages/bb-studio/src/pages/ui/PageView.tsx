@@ -1,7 +1,8 @@
 import { untitled } from "../../kit/format";
 import { WhiteboardExpandHost } from "./whiteboard-expand";
 import { ThreadTitle, useRealtime } from "@get-bb/plugin-sdk/app";
-import { BAR_BUTTON, ItemHeader, ITEM_TITLE, useOpenMain } from "../../kit/app/index";
+import { BAR_BUTTON, ItemHeader, ITEM_TITLE } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -358,9 +359,9 @@ export function PageView({
     }
   });
 
-  const open = useOpenMain();
+  const open = useStudioOpen();
   const openThread = useCallback((threadId: string) => {
-    open({ kind: "thread", threadId });
+    open({ threadId });
   }, [open]);
   const openedRoute = useRef<string | null>(null);
   useEffect(() => {

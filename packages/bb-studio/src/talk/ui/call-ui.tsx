@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useStudioSettings } from "../../settings/ui/use-settings";
 import { openAppPath } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage } from "../../kit/format";
 import { Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Icon, cn } from "../../kit/ui/index";
 import type { CallApp, CallLive, Recording, Segment, TalkRpcContract } from "../shared/contract";
@@ -69,6 +70,7 @@ function modelText(model: NonNullable<CallLive["model"]>): string {
 
 /** The bar: always on top, on every screen, while a call is recorded. */
 export function CallBar({ live, onStop }: { live: CallLive; onStop(): void }) {
+  const open = useStudioOpen("route");
   const now = useNow(true);
   const viewing = typeof location !== "undefined" && location.pathname.endsWith(recordingHref(live.recordingId));
   const note = live.error ?? (live.model ? modelText(live.model) : live.fallback ? "Local transcription failed; using BB's voice service." : null);
@@ -87,7 +89,7 @@ export function CallBar({ live, onStop }: { live: CallLive; onStop(): void }) {
           {live.phase === "recording" ? <Level value={live.levels.them} label="Them" /> : null}
           {live.phase === "recording" && live.mic ? <Level value={live.levels.me} label="Me" /> : null}
           {!viewing ? (
-            <button type="button" className="ml-1 rounded-md px-2 py-1 text-xs font-medium hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" onClick={() => openAppPath(recordingHref(live.recordingId))}>
+            <button type="button" className="ml-1 rounded-md px-2 py-1 text-xs font-medium hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" onClick={() => open({ href: recordingHref(live.recordingId) })}>
               Open
             </button>
           ) : null}
@@ -247,6 +249,7 @@ function PickerStep({ onCancel, onStarted }: { onCancel(): void; onStarted(recor
 /** App-wide: the bar while a call records, and the picker when asked for. */
 export function CallOverlay() {
   const rpc = useRpc<TalkRpcContract>();
+  const openItem = useStudioOpen("route");
   const { live, consented, refresh } = useCallLive();
   const [open, setOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -294,7 +297,7 @@ export function CallOverlay() {
                 </DialogHeader>
                 <DialogFooter>
                   <Button variant="ghost" onClick={close}>Close</Button>
-                  <Button onClick={() => { close(); openAppPath(recordingHref(live.recordingId)); }}>Open the recording</Button>
+                  <Button onClick={() => { close(); openItem({ href: recordingHref(live.recordingId) }); }}>Open the recording</Button>
                 </DialogFooter>
               </>
             ) : consented === false && !accepted ? (
@@ -302,7 +305,7 @@ export function CallOverlay() {
             ) : consented === null ? (
               <p className="py-4 text-sm text-muted-foreground">Loading…</p>
             ) : (
-              <PickerStep onCancel={close} onStarted={(recording) => { close(); refresh(); openAppPath(recordingHref(recording.id)); }} />
+              <PickerStep onCancel={close} onStarted={(recording) => { close(); refresh(); openItem({ href: recordingHref(recording.id) }); }} />
             )}
           </DialogContent>
         </Dialog>

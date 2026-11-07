@@ -1,7 +1,7 @@
 // The app-wide recording pill. BB mounts it once per window, outside every
 // route, so it stays put while the user moves between threads, and it is the
 // component that connects the controller to RPC, settings, and realtime.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   useBbContext,
@@ -14,7 +14,18 @@ import type { TalkRpcContract } from "../shared/contract";
 import { HTTP_ROOT, NEW_RECORDING_EVENT, RECORDING_CHANGED, formatClock, holdKeyCode, recordingHref, tail } from "../shared/format";
 import type { StudioCreateEventDetail } from "../../kit/contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/ui/index";
-import { openAppPath, useOpenMain } from "../../kit/app/index";
+import { type OpenTarget } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
+
+/**
+ * Talk floats over every page, so what it opens goes to the container the
+ * main view shows: a thread's workbench, or the Studio app
+ * (src/ui/studio-open.tsx). Takes the controller's targets.
+ */
+function useOpenRoute(): (target: OpenTarget) => void {
+  const open = useStudioOpen("route");
+  return useCallback((target: OpenTarget) => open(target.kind === "thread" ? { threadId: target.threadId } : { href: target.path, ...(target.title ? { title: target.title } : {}) }), [open]);
+}
 import { cn } from "../../kit/ui/index";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { SEGMENT_SECONDS } from "./segmenter";
@@ -31,7 +42,7 @@ function useControllerWiring(): void {
   const { values } = useStudioSettings();
   const { projectId, threadId } = useBbContext();
   const navigate = useBbNavigate();
-  const open = useOpenMain();
+  const open = useOpenRoute();
   useEffect(() => talk.attach(rpc), [rpc]);
   useEffect(() => talk.setNavigator(navigate, open), [navigate, open]);
   useEffect(() => {
@@ -49,7 +60,7 @@ function useControllerWiring(): void {
       event.preventDefault();
       const detail = (event as CustomEvent<Partial<StudioCreateEventDetail> | null>).detail;
       const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
-      const opened = typeof detail?.opened === "function" ? detail.opened : (href: string) => openAppPath(href);
+      const opened = typeof detail?.opened === "function" ? detail.opened : (href: string) => open({ kind: "path", path: href });
       void talk.startRecording("recording", null, null, { projectId }).then(() => {
         const { recordingId, phase } = talk.getState();
         if (recordingId && phase !== "idle") opened(recordingHref(recordingId));
@@ -57,7 +68,7 @@ function useControllerWiring(): void {
     };
     window.addEventListener(NEW_RECORDING_EVENT, onNew);
     return () => window.removeEventListener(NEW_RECORDING_EVENT, onNew);
-  }, []);
+  }, [open]);
   useRealtime(RECORDING_CHANGED, (payload) => {
     const id = (payload as { id?: unknown } | null)?.id;
     if (typeof id === "string") void talk.refresh(id);
@@ -266,7 +277,7 @@ function visibleStatus(state: TalkState, online: boolean): string {
 export function TalkOverlay() {
   useControllerWiring();
   const state = useTalkState();
-  const open = useOpenMain();
+  const open = useOpenRoute();
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
   const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);

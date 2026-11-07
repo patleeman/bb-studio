@@ -4,26 +4,28 @@
 //   that thread's workbench, one per item (BB focuses the tab already open
 //   for the same params).
 // - In the Studio app: a tab in Studio's own workspace.
-// - External URLs: BB's browser (openUrl), as before.
+// - Web URLs: BB's browser (openUrl).
 // - Mod-click (⌘ on a Mac, Ctrl elsewhere): the other place. From a thread,
 //   the item opens in the Studio app; in Studio, in a split.
 // - Threads open in BB's main view (a split with Mod), wherever you are.
-// Kinds with no in-thread view (an add-on's own page) open in BB's main area:
-// SDK 0.6.104 has no way to show another plugin's view in our tab.
+// Kinds with no in-thread view (an add-on's own page, a Studio route such as
+// the Bot page) open in BB's main area: SDK 0.6.104 has no way to show another
+// plugin's view in our tab. The container comes from the kit's
+// StudioContainerProvider (../kit/app/container.tsx).
 import { experimental_useAppPanel, useBbNavigate, type ExperimentalPanelController, type JsonValue } from "@get-bb/plugin-sdk/app";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { useCallback } from "react";
+import { routeContainer, useStudioContainer, type StudioContainer } from "../kit/app/container";
 import { openAppPath } from "../kit/app/nav";
+import { threadLinkId } from "../kit/app/studio-item";
 import { openThreadTab, requestThreadTab, type ThreadTabOpen } from "../kit/app/thread-panel";
 import { openWorkspaceItem } from "../kit/app/workspace";
 import { builtinItemAt } from "../builtins";
+import { pagePath } from "../pages/constants";
 import { itemParams, STUDIO_TAB, tabKind, type TabKind } from "./studio-tab/model";
 
-/** Where the clicked thing lives. */
-export type StudioContainer =
-  | { kind: "thread"; threadId: string | null }
-  | { kind: "studio" };
+export { containerAt, routeContainer, StudioContainerProvider, useStudioContainer, wantsAlternate, type StudioContainer } from "../kit/app/container";
 
-/** What a click opens: an item's in-app path, a thread, or an external URL. */
+/** What a click opens: an item's in-app path, a thread, or a web URL. */
 export type StudioRef =
   | { href: string; title?: string; icon?: string }
   | { threadId: string; title?: string }
@@ -53,6 +55,26 @@ export function workbenchItem(href: string): { kind: TabKind; id: string } | nul
 }
 
 /**
+ * What a link's href opens: `page:`/`thread:` references, in-app paths (also
+ * as full URLs on this origin), and web URLs. Null for an empty or unsafe href.
+ */
+export function linkRef(href: string | null | undefined, origin: string = typeof window === "undefined" ? "" : window.location.origin): StudioRef | null {
+  const value = href?.trim();
+  if (!value) return null;
+  const reference = /^(page|thread):([^\s/?#]+)$/.exec(value);
+  if (reference) return reference[1] === "page" ? { href: pagePath(decodeURIComponent(reference[2]!)) } : { threadId: decodeURIComponent(reference[2]!) };
+  let path = value.startsWith("/") && !value.startsWith("//") ? value : null;
+  if (!path) {
+    let url: URL;
+    try { url = new URL(value); } catch { return null; }
+    if (origin && url.origin === origin) path = `${url.pathname}${url.search}${url.hash}`;
+    else return /^(https?|mailto|tel):$/.test(url.protocol) ? { url: url.href } : null;
+  }
+  const threadId = threadLinkId(path);
+  return threadId ? { threadId } : { href: path };
+}
+
+/**
  * Where `ref` opens from `container` (null: not known, such as a reply card
  * outside any provider, which tries the workbench and falls back to the main
  * view, as cards always did).
@@ -75,13 +97,13 @@ export function planOpen(ref: StudioRef, container: StudioContainer | null, opti
   };
 }
 
-interface Deps {
+export interface OpenDeps {
   panel: Pick<ExperimentalPanelController, "openTab"> | null;
   navigate: Pick<ReturnType<typeof useBbNavigate>, "toThread" | "openUrl">;
 }
 
 /** Carries out a plan. Never throws; a declined workbench falls back to the main view. */
-export function runPlan(plan: OpenPlan, { panel, navigate }: Deps): void {
+export function runPlan(plan: OpenPlan, { panel, navigate }: OpenDeps): void {
   switch (plan.via) {
     case "url":
       if (!navigate.openUrl(plan.url)) window.open(plan.url, "_blank", "noopener");
@@ -107,55 +129,53 @@ export function runPlan(plan: OpenPlan, { panel, navigate }: Deps): void {
   }
 }
 
-const ContainerContext = createContext<StudioContainer | null>(null);
-
-/** The DOM mark for a container, so app overlays (ItemGestures) can tell where a click was. */
-export const CONTAINER_ATTR = "data-studio-container";
-const CONTAINER_THREAD_ATTR = "data-studio-container-thread";
-
-/** Wraps a surface that is a container: a thread's Studio tab, the Studio app. */
-export function StudioContainerProvider({ value, children }: { value: StudioContainer; children: ReactNode }) {
-  return (
-    <ContainerContext.Provider value={value}>
-      <div className="contents" {...{ [CONTAINER_ATTR]: value.kind, ...(value.kind === "thread" && value.threadId ? { [CONTAINER_THREAD_ATTR]: value.threadId } : {}) }}>
-        {children}
-      </div>
-    </ContainerContext.Provider>
-  );
+/** Opens `ref` from `container`: for code outside a component, or a header action with its panel. */
+export function openIn(container: StudioContainer | null, ref: StudioRef, options: StudioOpenOptions, deps: OpenDeps): void {
+  runPlan(planOpen(ref, container, options), deps);
 }
 
-/** The container marked around `element`, for code outside React's tree. */
-export function containerAt(element: Element | null): StudioContainer | null {
-  const marked = element?.closest(`[${CONTAINER_ATTR}]`);
-  if (!marked) return null;
-  if (marked.getAttribute(CONTAINER_ATTR) === "studio") return { kind: "studio" };
-  return { kind: "thread", threadId: marked.getAttribute(CONTAINER_THREAD_ATTR) };
+/** For code outside a component (ItemGestures, content scripts): asks the thread for its tab. */
+export function openFrom(container: StudioContainer | null, ref: StudioRef, options: StudioOpenOptions, navigate: OpenDeps["navigate"]): void {
+  openIn(container, ref, options, { panel: null, navigate });
 }
 
-export function useStudioContainer(): StudioContainer | null {
-  return useContext(ContainerContext);
+/** BB's navigation for code with no SDK context (content scripts): threads by their address. */
+const pathNavigate: OpenDeps["navigate"] = {
+  toThread: (threadId) => openAppPath(`/threads/${encodeURIComponent(threadId)}`),
+  openUrl: () => false,
+};
+
+/** Opens an in-app path by the rule from `container`, with no SDK context (a header action, a content script). */
+export function openPathIn(container: StudioContainer | null, path: string, options: { title?: string; panel?: OpenDeps["panel"] } = {}): void {
+  const ref = linkRef(path);
+  if (!ref) return;
+  openIn(container, "href" in ref && options.title ? { ...ref, title: options.title } : ref, {}, { panel: options.panel ?? null, navigate: pathNavigate });
 }
 
-/** Whether a click asks for the other place. */
-export const wantsAlternate = (event?: { metaKey?: boolean; ctrlKey?: boolean } | null): boolean => Boolean(event?.metaKey || event?.ctrlKey);
+/** Opens an in-app path by the rule, from the container the main view shows (content scripts). */
+export function openPathFromRoute(path: string): void {
+  const ref = linkRef(path);
+  if (ref) openFrom(routeContainer(), ref, {}, pathNavigate);
+}
+
+/** Where a component outside any provider stands: a fixed container, or "route" for what the main view shows. */
+export type ContainerFallback = StudioContainer | null | "route";
 
 /**
- * `open(ref, options)` by the rule above. `fallback` is the container when no
- * provider is around, such as a reply card, which knows its message's thread.
+ * `open(ref, options)` by the rule above. The container is the nearest
+ * provider's; outside one, `fallback`: a reply card passes its message's
+ * thread, a global surface "route" (decided at click time).
  */
-export function useStudioOpen(fallback: StudioContainer | null = null): (ref: StudioRef, options?: StudioOpenOptions) => void {
-  const container = useContext(ContainerContext) ?? fallback;
+export function useStudioOpen(fallback: ContainerFallback = null): (ref: StudioRef, options?: StudioOpenOptions) => void {
+  const provided = useStudioContainer();
   const panel = experimental_useAppPanel();
   const navigate = useBbNavigate();
-  const threadId = container?.kind === "thread" ? container.threadId : null;
-  const kind = container?.kind ?? null;
-  return useCallback(
-    (ref, options) => runPlan(planOpen(ref, kind === null ? null : kind === "studio" ? { kind } : { kind, threadId }, options), { panel, navigate }),
-    [kind, threadId, panel, navigate],
-  );
-}
-
-/** For code outside a component (ItemGestures): opens `ref` from `container`, asking the thread for its tab. */
-export function openFrom(container: StudioContainer | null, ref: StudioRef, options: StudioOpenOptions, navigate: Deps["navigate"]): void {
-  runPlan(planOpen(ref, container, options), { panel: null, navigate });
+  const fixed = provided ?? (fallback === "route" ? null : fallback);
+  const fromRoute = !provided && fallback === "route";
+  const kind = fixed?.kind ?? null;
+  const threadId = fixed?.kind === "thread" ? fixed.threadId : null;
+  return useCallback((ref, options) => {
+    const container = fromRoute ? routeContainer() : kind === null ? null : kind === "studio" ? { kind } : { kind, threadId };
+    runPlan(planOpen(ref, container, options), { panel, navigate });
+  }, [fromRoute, kind, threadId, panel, navigate]);
 }

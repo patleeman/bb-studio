@@ -4,7 +4,7 @@
 // the item's tools on the right: icon buttons, one labelled action (Chat),
 // and a menu. Where there is no title bar the same bar sits at the top of
 // the view.
-import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { mentionPrompt } from "../contract";
@@ -13,6 +13,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { useOpenTarget } from "./move";
+import { useStudioContainer } from "./container";
+import { openAppPath } from "./nav";
+import { openWorkspaceItem } from "./workspace";
 import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
 import { ICON_BUTTON } from "./pieces";
 
@@ -23,9 +26,21 @@ export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, it
   navigate.toCompose({ initialPrompt: mentionPrompt([item]), focusPrompt: true });
 }
 
-/** Opens the view on screen again in a split beside it. */
+/**
+ * Opens the view on screen again in a split beside it. In a thread's
+ * workbench the other place is the Studio app (src/ui/studio-open.tsx), so
+ * there it opens the item as a Studio tab instead.
+ */
 export function OpenInSplitButton({ item }: { item: ItemThread }) {
   const { open, anchor } = useOpenTarget();
+  const container = useStudioContainer();
+  if (container?.kind === "thread") {
+    return (
+      <button type="button" aria-label="Open in Studio" title="Open in Studio" className={ICON_BUTTON} onClick={() => { if (!openWorkspaceItem({ href: item.href, title: item.title })) openAppPath(item.href); }}>
+        <Icon name="ArrowUpRight" />
+      </button>
+    );
+  }
   return (
     <>
       {anchor}
@@ -182,7 +197,7 @@ export function useInTabRow(): boolean {
 }
 
 /** The parent crumb, then the item's own crumbs or title, separated like BB's breadcrumbs. */
-export function BarCrumb({ children, onClick, current = false, title }: { children: ReactNode; onClick?(): void; current?: boolean; title?: string }) {
+export function BarCrumb({ children, onClick, current = false, title }: { children: ReactNode; onClick?(event: ReactMouseEvent): void; current?: boolean; title?: string }) {
   const inTabRow = useContext(InTabRow);
   const className = cn("flex h-7 min-w-0 shrink items-center gap-1.5 truncate rounded-md px-1.5 text-sm", current ? "font-medium text-foreground" : "text-muted-foreground", onClick && "hover:bg-state-hover hover:text-foreground");
   if (inTabRow) return null;

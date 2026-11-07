@@ -23,7 +23,7 @@ import { RECORDING_CHANGED } from "../../talk/shared/format";
 import { appliedKinds } from "../kinds-snapshot";
 import { runCreateEntry, startsGroup, useCreateEntries, type CreateEntry } from "../create-menu";
 import { collectionKinds, enabledKinds, itemOpening, tabSections, tabTarget, type CollectionKind, type TabKind, type TabKindInfo, type TabTarget } from "./model";
-import { StudioContainerProvider } from "../studio-open";
+import { StudioContainerProvider, useStudioOpen } from "../studio-open";
 import { applyScroll, elementPath, loadView, onViewForgotten, sameTarget, saveView, viewKey, type TabScroll } from "./view-state";
 
 const PageView = lazy(() => import("../../pages/ui/PagePanel").then((module) => ({ default: module.PageTab })));
@@ -219,6 +219,7 @@ function Collection({
   onOpen(kind: TabKind, id: string): void;
   onSave(): void;
 }) {
+  const studioOpen = useStudioOpen();
   const rpc = useRpc<typeof rpcContract>();
   const pages = useRpc<typeof pagesContract>();
   const sdk = useSdk();
@@ -308,7 +309,8 @@ function Collection({
   };
   const create = (entry: CreateEntry) => {
     setMenu(false);
-    void runCreateEntry(entry, { rpc, projectId, createKind });
+    // A whiteboard page or a template's item opens beside this thread too.
+    void runCreateEntry(entry, { rpc, projectId, createKind, open: (href) => studioOpen({ href }) });
   };
 
   const shown = filter ? (kinds.find((each) => each.key === filter) ?? null) : null;

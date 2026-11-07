@@ -2,15 +2,14 @@
 // header that opens it in the thread's Studio tab. It doesn't load
 // Excalidraw: the picture is the server's thumbnail.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, THUMBNAIL, remember, openAppPath } from "../../kit/app/index";
+import { ItemDirectiveCard, THUMBNAIL, remember } from "../../kit/app/index";
 import { relativeTime } from "../../kit/format";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import { DRAW_ICON, DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref, isDrawingId, thumbnailUrl } from "../shared";
 import { drawingName } from "./drawing-card";
-import { itemParams, STUDIO_TAB } from "../../ui/studio-tab/model";
-import { useOpenThreadTab } from "../../kit/app/thread-panel";
+import { useStudioOpen } from "../../ui/studio-open";
 
 type DrawingMeta = NonNullable<z.infer<(typeof rpcContract)["drawings.getDrawingMeta"]["output"]>["drawing"]>;
 
@@ -33,8 +32,8 @@ function useDrawingMeta(id: string): DrawingMeta | null | undefined {
   return drawing;
 }
 
-export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
-  const openTab = useOpenThreadTab();
+export function DrawingDirective({ attributes, message }: PluginMessageDirectiveProps) {
+  const open = useStudioOpen({ kind: "thread", threadId: message.threadId });
   const id = attributes.id ?? "";
   const valid = isDrawingId(id);
   const drawing = remember(`drawing:${id}`, useDrawingMeta(valid ? id : ""));
@@ -53,11 +52,8 @@ export function DrawingDirective({ attributes }: PluginMessageDirectiveProps) {
         </div>
       ) : <p className="px-3 py-2 text-sm text-muted-foreground">This whiteboard is empty.</p>}
       details={`Whiteboard · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
-      onOpen={() => {
-        // The workbench when there is one; Studio otherwise.
-        if (!openTab({ actionId: STUDIO_TAB, title: name, params: itemParams("drawing", id) }))
-          openAppPath(drawingHref(id));
-      }}
+      // In its thread's workbench (src/ui/studio-open.tsx).
+      onOpen={() => open({ href: drawingHref(id), title: name })}
     />
   );
 }

@@ -3,7 +3,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Icon, cn } from "../../kit/ui/index";
-import { openAppPath, studioItemProps, studioThreadProps } from "../../kit/app/index";
+import { studioItemProps, studioThreadProps, wantsAlternate } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { ThreadTitle, useRpc } from "@get-bb/plugin-sdk/app";
 import { resolveChart, SERIES_COLORS } from "../../pages/chart-spec";
 import type { rpcContract as studioContract } from "../../contract";
@@ -367,6 +368,7 @@ function NoteWidget({ widget, value }: WidgetProps) {
 
 function ItemEmbed({ href }: { href: string }) {
   const rpc = useRpc<typeof studioContract>();
+  const open = useStudioOpen();
   const [item, setItem] = useState<{ title: string; preview: string | null; href: string } | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
@@ -376,7 +378,7 @@ function ItemEmbed({ href }: { href: string }) {
   if (item === undefined) return <Empty icon="Loading" spin />;
   if (!item) return <Empty icon="FileQuestion" title="Item not found">It may have been deleted or moved.</Empty>;
   return (
-    <button type="button" className="flex h-full w-full flex-col items-start gap-1 p-3 text-left hover:bg-state-hover" onClick={() => openAppPath(item.href)} {...studioItemProps({ href: item.href, title: item.title })}>
+    <button type="button" className="flex h-full w-full flex-col items-start gap-1 p-3 text-left hover:bg-state-hover" onClick={(event) => open({ href: item.href, title: item.title }, { alternate: wantsAlternate(event) })} {...studioItemProps({ href: item.href, title: item.title })}>
       <span className="flex w-full items-center gap-1.5 text-sm font-medium text-foreground"><span className="truncate">{item.title || "Untitled"}</span><Icon name="ArrowUpRight" className="size-3.5 shrink-0 text-muted-foreground" /></span>
       {item.preview ? <span className="line-clamp-4 text-xs text-muted-foreground">{item.preview}</span> : null}
     </button>
@@ -391,6 +393,7 @@ export function embedSandbox(url: string, origin = typeof window === "undefined"
 }
 
 function EmbedWidget({ widget }: WidgetProps) {
+  const open = useStudioOpen();
   const href = str(widget.options.href).trim();
   const threadId = str(widget.options.threadId).trim();
   const url = safeUrl(widget.options.url);
@@ -399,7 +402,7 @@ function EmbedWidget({ widget }: WidgetProps) {
   if (href.startsWith("/plugins/")) return <ItemEmbed href={href} />;
   if (threadId) {
     return (
-      <button type="button" className="flex h-full w-full items-start gap-2 p-3 text-left hover:bg-state-hover" onClick={() => openAppPath(`/threads/${encodeURIComponent(threadId)}`)} {...studioThreadProps(threadId)}>
+      <button type="button" className="flex h-full w-full items-start gap-2 p-3 text-left hover:bg-state-hover" onClick={(event) => open({ threadId }, { alternate: wantsAlternate(event) })} {...studioThreadProps(threadId)}>
         <Icon name="MessageSquare" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 text-sm font-medium text-foreground"><ThreadTitle threadId={threadId} /></span>
       </button>

@@ -22,10 +22,13 @@ vi.mock("@get-bb/plugin-sdk/app", () => {
     useComposer: () => state.composer,
     useRpc: () => rpc,
     experimental_useAppPanel: () => panel,
+    useBbNavigate: () => ({ toThread: vi.fn(), openUrl: () => true }),
     useRealtime: (_channel: string, handler: (payload: unknown) => void) => { state.realtime.push(handler); },
   };
 });
-vi.mock("../../../kit/app/index", () => ({ COMPOSER_BUTTON: "composer-button", useOpenTarget: () => ({ open: state.split, anchor: null }) }));
+vi.mock("../../../kit/app/index", () => ({ COMPOSER_BUTTON: "composer-button" }));
+// Where Studio's rule falls back when the thread has no side panel.
+vi.mock("../../../kit/app/nav", () => ({ openAppPath: state.split }));
 vi.mock("../../../kit/ui/index", () => ({ Icon: () => <span />, Tooltip: ({ children }: { children: unknown }) => children }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -91,13 +94,13 @@ describe("Expand to page", () => {
     expect(button.getAttribute("aria-label")).toBe("Add to notes in progress");
   });
 
-  it("opens the note in a split where the thread has no side panel", async () => {
+  it("opens the note's page in the main view where the thread has no side panel", async () => {
     state.openThreadPanel.mockReturnValue(false);
     rpc({ "notes.forThread": () => ({ note }), "notes.create": () => ({ note, appended: true }) });
     act(() => root.render(<ExpandToPage />));
     await act(async () => {});
     await act(async () => { host.querySelector<HTMLButtonElement>("[data-notes-expand]")!.click(); });
-    expect(state.split).toHaveBeenCalledWith({ kind: "path", path: note.href, title: note.title }, "split");
+    expect(state.split).toHaveBeenCalledWith(note.href);
   });
 
   it("keeps the draft when the page couldn't be made", async () => {

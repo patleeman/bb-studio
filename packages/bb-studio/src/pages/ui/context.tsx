@@ -9,17 +9,22 @@ export interface ArtifactView {
   text: string | null;
 }
 
+export interface OpenOptions { alternate?: boolean }
+
 /** What block and mention renderers need from the surrounding Pages UI. */
 export interface PagesUi {
   pages: PageMetaView[];
   bots: BotView[];
-  openPage(pageId: string): void;
-  openThread(threadId: string): void;
+  /** These open in the container the page is in (src/ui/studio-open.tsx); `alternate` (Mod-click) opens in the other place. */
+  openPage(pageId: string, options?: OpenOptions): void;
+  openThread(threadId: string, options?: OpenOptions): void;
   /** Opens a BB project. */
   openProject(projectId: string): void;
   openUrl(url: string): void;
   /** Opens a BB path, such as another add-on's item. */
-  openPath(path: string): void;
+  openPath(path: string, options?: OpenOptions): void;
+  /** Opens a link's href from page text: a web URL, an in-app path, or a page or thread reference. */
+  openLink(href: string, options?: OpenOptions): void;
   linkPreview(url: string): Promise<{ title: string; description: string; image: string }>;
   /** Items from the other Studio add-ons (drawings, artifacts, recordings…). */
   studioItems(): Promise<StudioEmbedItem[]>;
@@ -46,6 +51,7 @@ export const PagesUiContext = createContext<PagesUi>({
   openProject: () => {},
   openUrl: (url) => void window.open(url, "_blank", "noopener"),
   openPath: () => {},
+  openLink: () => {},
   linkPreview: () => Promise.reject(new Error("No link previews here.")),
   studioItems: () => Promise.resolve([]),
   artifactView: () => Promise.resolve(null),

@@ -6,6 +6,8 @@ import type { CallLive, Recording, Segment } from "../shared/contract";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
+  experimental_useAppPanel: () => ({ openTab: () => false }),
+  useBbNavigate: () => ({ toThread: () => {}, openUrl: () => true }),
   useRealtime: () => {},
   useRpc: () => ({ call: async () => ({ active: null, consented: true }) }),
 }));

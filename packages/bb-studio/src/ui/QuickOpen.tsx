@@ -1,4 +1,5 @@
-import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type OpenPlace, type OpenTarget } from "../kit/app/index";
+import { createStudioItem, Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useProjects } from "../kit/app/index";
+import { useStudioOpen } from "./studio-open";
 import { untitled } from "../kit/format";
 import { mentionPrompt } from "../kit/contract";
 import { Dialog, DialogContent, DialogTitle } from "../kit/ui/index";
@@ -47,6 +48,10 @@ function Marked({ text, ranges }: { text: string; ranges: { start: number; end: 
 
 function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const rpc = useRpc<typeof rpcContract>();
+  // Search floats over everything, so what it opens goes to the container the
+  // main view shows: over a thread, its workbench; in Studio, a tab. Mod
+  // opens it in the other place (src/ui/studio-open.tsx).
+  const open = useStudioOpen("route");
   const freshness = useSearchFreshness();
   const navigate = useBbNavigate();
   const context = useBbContext();
@@ -110,6 +115,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
         projectId,
         addOn: provider.name,
         create: async () => (await rpc.call("create", { pluginId: provider.pluginId, kind: target.id, projectId })).item.href,
+        open: (href) => open({ href }),
       });
     } });
     return [
@@ -120,30 +126,25 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       { type: "command", label: "Hand to agent", run: () => { onClose(); navigate.toCompose({ initialPrompt: results[0] ? mentionPrompt([results[0]]) : "", focusPrompt: true }); } },
       { type: "command", label: "Go to thread", run: () => { setThreadOnly(true); setQuery(""); } },
     ] satisfies Row[];
-  }, [providers, rpc, navigate, context.projectId, onClose, results]);
+  }, [providers, rpc, navigate, context.projectId, onClose, results, open]);
   const visibleCommands = commands.filter((row) => row.type === "command" && (!query || row.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
   const rows: Row[] = [...[...results].sort((a, b) => a.kind.localeCompare(b.kind) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
   useEffect(() => setSelected(0), [query]);
   useEffect(() => setSelected((index) => Math.min(index, Math.max(0, rows.length - 1))), [rows.length]);
   useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
-  const { open: openTarget, anchor } = useOpenTarget();
-  // Mod opens a result in a split, as clicking an item does anywhere.
-  const placeFor = (event: { metaKey: boolean; ctrlKey: boolean }): OpenPlace => event.metaKey || event.ctrlKey ? "split" : "main";
-  const activate = (row: Row | undefined, place: OpenPlace = "main") => {
+  const alternateFor = (event: { metaKey: boolean; ctrlKey: boolean }) => event.metaKey || event.ctrlKey;
+  const activate = (row: Row | undefined, alternate = false) => {
     if (!row) return;
     if (row.type === "command") return row.run();
     onClose();
     const threadId = threadLinkId(row.hit.href);
-    const target: OpenTarget = threadId
-      ? { kind: "thread", threadId, title: untitled(row.hit.title) }
-      : { kind: "path", path: row.hit.href, title: untitled(row.hit.title), icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon };
-    if (place === "main" && !threadId) openAppPath(row.hit.href);
-    else openTarget(target, place);
+    if (threadId) open({ threadId, title: untitled(row.hit.title) }, { alternate });
+    else open({ href: row.hit.href, title: untitled(row.hit.title), ...(kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon ? { icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)!.icon } : {}) }, { alternate });
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.nativeEvent.isComposing) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") setSelected((at) => rows.length ? (at + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length : 0);
-    else if (event.key === "Enter") activate(rows[selected], placeFor(event));
+    else if (event.key === "Enter") activate(rows[selected], alternateFor(event));
     else if (event.key === "Escape") onClose();
     else return;
     event.preventDefault(); event.stopPropagation();
@@ -167,7 +168,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
           const info = row.type === "result" ? kinds.get(`${row.hit.ref.pluginId}:${kind}`) : null;
           return <div key={row.type === "result" ? `${row.hit.ref.pluginId}:${row.hit.ref.id}` : row.label}>
             {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : kind === "command" ? "Commands" : info?.plural ?? (kind === "thread" ? "Threads" : kind)}</p> : null}
-            <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={(event) => activate(row, placeFor(event))}>
+            <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={(event) => activate(row, alternateFor(event))}>
               {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{untitled(row.hit.title)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked {...row.hit.snippet} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
             </div>
           </div>;
@@ -176,7 +177,6 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
         {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">{freshness.status?.state === "current" && !freshness.error ? "No matches." : "No matches in the available results."}</p> : null}
       </div>
       <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>esc to close</span></div>
-      {anchor}
     </DialogContent>
   </Dialog>;
 }

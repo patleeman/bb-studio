@@ -16,13 +16,13 @@ import {
   ItemDeleteConfirm,
   ItemMenu,
   cn,
-  openAppPath,
   projectName,
   useProjects,
 } from "../../kit/app/index";
 
 import { errorMessage, relativeTime, shortDateTime } from "../../kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useStudioOpen } from "../../ui/studio-open";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
 import type { rpcContract as minisContract } from "../../minis/contract";
@@ -51,6 +51,7 @@ export function ArtifactViewer({
   const rpc = useRpc<typeof rpcContract>();
   const minis = useRpc<typeof minisContract>();
   const navigate = useBbNavigate();
+  const open = useStudioOpen();
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +157,7 @@ export function ArtifactViewer({
     setBusy(true);
     try {
       const { href } = await rpc.call("artifacts.saveAsPage", { id: artifactId });
-      toast.success("Saved as a page", { action: { label: "Open", onClick: () => openAppPath(href) } });
+      toast.success("Saved as a page", { action: { label: "Open", onClick: () => open({ href }) } });
     } catch (failure) {
       toast.error(errorMessage(failure));
     } finally {
@@ -169,7 +170,7 @@ export function ArtifactViewer({
     setBusy(true);
     try {
       const { mini } = await minis.call("minis.fromArtifact", { artifactId });
-      toast.success("Made a mini app", { action: { label: "Open", onClick: () => openAppPath(miniHref(mini.id)) } });
+      toast.success("Made a mini app", { action: { label: "Open", onClick: () => open({ href: miniHref(mini.id) }) } });
     } catch (failure) {
       toast.error(errorMessage(failure));
     } finally {

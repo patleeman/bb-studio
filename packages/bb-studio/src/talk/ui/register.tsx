@@ -14,7 +14,6 @@
 // The ids are the ones the Talk plugin registered, now under Studio, so
 // commands are `studio` commands: a keybinding set on Talk's command has to be
 // set again (docs/merging-add-ons.md).
-import { openAppPath } from "../../kit/app/index";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { interceptBuiltInMic, findComposer } from "./composer-dom";
@@ -24,13 +23,15 @@ import { watchHoldToTalk } from "./hold-to-talk";
 import { TalkOverlay } from "./overlay";
 import { ComposerBridge } from "./ComposerBridge";
 import { linkRecordingMentions } from "./recording-mentions";
+import { openPathFromRoute } from "../../ui/studio-open";
 import { RecordingCard } from "./recording-card";
 import { CallOverlay, openCallPicker } from "./call-ui";
 
 export function registerTalkApp(app: PluginAppBuilder): void {
   app.contentScripts.register({
     id: "recording-links",
-    mount({ signal }) { linkRecordingMentions(openAppPath, signal); },
+    // A recording mention in a thread opens in its workbench (src/ui/studio-open.tsx).
+    mount({ signal }) { linkRecordingMentions(openPathFromRoute, signal); },
   });
   app.composer.customize({
     id: "recording-references",

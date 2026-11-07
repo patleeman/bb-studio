@@ -18,6 +18,7 @@ export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu"
 export { itemReferenceFrom } from "./item-reference";
 export { ItemDirectiveCard, remember } from "./directive-card";
 export { openAppPath, studioPath, panelHref } from "./nav";
+export { containerAt, routeContainer, StudioContainerProvider, useStudioContainer, wantsAlternate, type StudioContainer } from "./container";
 export { createStudioItem } from "./create-item";
 export {
   Badge,

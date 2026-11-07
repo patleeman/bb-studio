@@ -15,10 +15,10 @@ import {
 import { BlockNoteView } from "@blocknote/shadcn";
 // BlockNote's stylesheet without the :has() rules that slow typing everywhere in BB.
 import "./blocknote.css";
-import { itemReferenceFrom } from "../../kit/app/index";
+import { itemReferenceFrom, wantsAlternate } from "../../kit/app/index";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type MouseEvent as ReactMouseEvent } from "react";
 import { Icon } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
@@ -192,6 +192,9 @@ export function PageEditor({
             }),
         }),
       ],
+      // A link in the text opens by Studio's rule (src/ui/studio-open.tsx),
+      // through openLink below, never in a new window.
+      links: { onClick: () => true },
       uploadFile: (file: File) => uploadFile(page.id, file),
       // A file uploaded before Pages was built into Studio, at the old plugin's address.
       resolveFileUrl: async (url: string) => studioFileUrl(url),
@@ -350,6 +353,17 @@ export function PageEditor({
   // Talk dictates at the cursor. Before the user has put the cursor in the
   // page, a dictation goes at the end instead of the top.
   const fieldRef = useRef<HTMLDivElement>(null);
+  // Links in the page and its comments: in the container the page is in, a
+  // web URL in BB's browser, Mod-click in the other place. ItemGestures takes
+  // Mod-clicks on in-app links first, and cancels the click it takes.
+  const openLink = useCallback((event: ReactMouseEvent) => {
+    if (event.defaultPrevented || event.button !== 0 || event.altKey || event.shiftKey) return;
+    const link = (event.target as Element | null)?.closest?.("a[href]:not([download])");
+    const href = link?.getAttribute("href");
+    if (!href) return;
+    event.preventDefault();
+    uiRef.current.openLink(href, { alternate: wantsAlternate(event) });
+  }, []);
   const cursorPlaced = useRef(false);
   useEffect(() => {
     const field = fieldRef.current;
@@ -477,6 +491,7 @@ export function PageEditor({
         className="pages-main min-w-0 flex-1"
         {...{ [TALK_FIELD_ATTR]: fieldKey, [TALK_FIELD_LABEL_ATTR]: pageFieldLabel(page.title) }}
         onFocus={() => (cursorPlaced.current = true)}
+        onClick={openLink}
       >
         <BlockNoteViewEditor />
       </div>
@@ -485,6 +500,7 @@ export function PageEditor({
         // Positioned against the page view, so no ancestor up to it may be positioned.
         <aside
           aria-label="Comments"
+          onClick={openLink}
           className="pages-comments absolute top-14 right-3 bottom-3 z-30 flex w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[75%] max-md:w-auto max-md:rounded-b-none"
         >
           <header className="flex h-11 shrink-0 items-center justify-between border-b border-border pr-2 pl-4">

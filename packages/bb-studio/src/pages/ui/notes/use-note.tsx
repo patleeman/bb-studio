@@ -1,12 +1,10 @@
 // A thread's open note, or a page's note, kept current; and opening one
 // beside its thread. Light: the composer loads it on every thread.
-import { useOpenTarget } from "../../../kit/app/index";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
+import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
 import type { NoteView, rpcContract } from "../../notes-contract";
-import { itemParams, STUDIO_TAB } from "../../../ui/studio-tab/model";
-import { useOpenThreadTab } from "../../../kit/app/thread-panel";
+import { useStudioOpen } from "../../../ui/studio-open";
 
 export type NotesRpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -55,15 +53,15 @@ export function usePageNote(pageId: string | null) {
   );
 }
 
-/** Opens a note in its thread's side panel, beside the chat; a split where there's no side panel. Render `anchor` once. */
+/**
+ * Opens a note's page in its thread's side panel, beside the chat, by
+ * Studio's rule (src/ui/studio-open.tsx). `anchor` is kept for callers; it
+ * renders nothing now.
+ */
 export function useOpenNote(): { openNote(note: NoteView): void; anchor: ReactNode } {
-  const openTab = useOpenThreadTab();
-  const { open, anchor } = useOpenTarget();
-  const openNote = useCallback((note: NoteView) => {
-    if (openTab({ actionId: STUDIO_TAB, title: note.title, params: itemParams("page", note.pageId) })) return;
-    open({ kind: "path", path: note.href, title: note.title }, "split");
-  }, [openTab, open]);
-  return { openNote, anchor };
+  const open = useStudioOpen("route");
+  const openNote = useCallback((note: NoteView) => open({ href: pagePath(note.pageId), title: note.title }), [open]);
+  return { openNote, anchor: null };
 }
 
 /** The title without its "Notes · " prefix, for a chip that already says Notes. */

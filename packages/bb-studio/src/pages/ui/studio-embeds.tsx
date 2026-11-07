@@ -3,7 +3,7 @@
 // transcript, and the rest a card. Each opens the
 // item in its own add-on.
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { studioItemProps } from "../../kit/app/index";
+import { studioItemProps, wantsAlternate } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { cn } from "../../kit/ui/index";
 import type { StudioEmbedItem } from "../contract";
@@ -71,7 +71,7 @@ function ItemHeader({ item, kind, target, loading, onEdit, onOpen }: {
     <button
       type="button"
       className="flex w-full cursor-pointer items-center gap-3 p-2 text-left"
-      onClick={() => item && (onOpen ? onOpen() : ui.openPath(item.href))}
+      onClick={(event) => item && (onOpen && !wantsAlternate(event) ? onOpen() : ui.openPath(item.href, { alternate: wantsAlternate(event) }))}
       onDoubleClick={onEdit}
       title={item ? (onOpen ? `Open ${item.title} full size` : `Open ${item.title}`) : undefined}
     >
@@ -142,7 +142,7 @@ function ItemBody({ item, height, onResize, onOpen }: { item: StudioEmbedItem; o
   }
   if (item.thumbnailUrl && !failed) {
     return (
-      <button type="button" className="block w-full cursor-pointer border-t border-border bg-background" onClick={() => ui.openPath(item.href)}>
+      <button type="button" className="block w-full cursor-pointer border-t border-border bg-background" onClick={(event) => ui.openPath(item.href, { alternate: wantsAlternate(event) })}>
         <img
           src={item.thumbnailUrl}
           alt={item.title}

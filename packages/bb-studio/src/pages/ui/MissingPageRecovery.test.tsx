@@ -20,7 +20,7 @@ vi.mock("./connection", () => ({ PageConnection: class {
   retrySave = state.retry;
   retryRecovery = state.read;
 } }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toPluginPanel: vi.fn() }), useRpc: () => ({ call: vi.fn(async () => ({ page: null })) }) }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_useAppPanel: () => ({ openTab: () => false }), useBbNavigate: () => ({ toPluginPanel: vi.fn(), toThread: vi.fn(), openUrl: () => true }), useRpc: () => ({ call: vi.fn(async () => ({ page: null })) }) }));
 vi.mock("../../kit/app/index", () => ({
   PAGE_TITLE: "",
   SECTION_TITLE: "",

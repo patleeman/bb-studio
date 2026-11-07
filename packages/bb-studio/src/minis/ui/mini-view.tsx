@@ -3,7 +3,8 @@
 // Studio tab both show it; page blocks and chat cards show MiniEmbed.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { BarTitle, ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn, openAppPath } from "../../kit/app/index";
+import { BarTitle, ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn } from "../../kit/app/index";
+import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage, relativeTime } from "../../kit/format";
 import { Icon } from "../../kit/ui/icon";
 import type { MiniView as Mini, rpcContract } from "../contract";
@@ -118,6 +119,7 @@ export function MiniPage({ miniId, backLabel, onBack }: { miniId: string; backLa
 
 /** In the thread's Studio tab, beside the conversation. */
 export function TabMini({ miniId, threadId, backLabel, onBack }: { miniId: string; threadId: string; backLabel: string; onBack(): void }) {
+  const open = useStudioOpen();
   return (
     <MiniBody
       miniId={miniId}
@@ -130,7 +132,7 @@ export function TabMini({ miniId, threadId, backLabel, onBack }: { miniId: strin
           <div className="max-w-56 min-w-0">
             <BarTitle key={`${miniId}:${mini?.name ?? ""}`} title={mini?.name ?? ""} label="Mini app name" placeholder="Untitled mini app" disabled={!mini} onRename={rename} />
           </div>
-          <button type="button" className={cn(ICON_BUTTON, "ml-auto")} title="Open in Studio" aria-label="Open in Studio" onClick={() => openAppPath(miniHref(miniId))}>
+          <button type="button" className={cn(ICON_BUTTON, "ml-auto")} title="Open in Studio" aria-label="Open in Studio" onClick={() => open({ href: miniHref(miniId) }, { alternate: true })}>
             <Icon name="ArrowUpRight" className="size-4" />
           </button>
         </div>
@@ -350,6 +352,7 @@ function SourceSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
 type FetchEntry = z.infer<(typeof rpcContract)["minis.fetchLog"]["output"]>["entries"][number];
 
 function SettingsSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
+  const open = useStudioOpen();
   const [log, setLog] = useState<FetchEntry[] | null>(null);
   const [secret, setSecret] = useState({ name: "", header: "Authorization", value: "" });
   useEffect(() => {
@@ -433,8 +436,8 @@ function SettingsSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
           <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Copies</h3>
           <p className="text-xs text-muted-foreground">Every place this app shows, in pages, chats and here, shares its data. A copy has its own.</p>
           <div className="flex gap-2">
-            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-state-hover" onClick={() => run(rpc.call("minis.duplicate", { id: mini.id, withData: false }).then((result) => openAppPath(miniHref(result.mini.id))))}>Duplicate without data</button>
-            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-state-hover" onClick={() => run(rpc.call("minis.duplicate", { id: mini.id, withData: true }).then((result) => openAppPath(miniHref(result.mini.id))))}>Duplicate with data</button>
+            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-state-hover" onClick={() => run(rpc.call("minis.duplicate", { id: mini.id, withData: false }).then((result) => open({ href: miniHref(result.mini.id) })))}>Duplicate without data</button>
+            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-state-hover" onClick={() => run(rpc.call("minis.duplicate", { id: mini.id, withData: true }).then((result) => open({ href: miniHref(result.mini.id) })))}>Duplicate with data</button>
           </div>
         </section>
       </div>
@@ -454,6 +457,7 @@ export function MiniTile({ miniId }: { miniId: string }) {
 
 /** The app in a page block or a chat card, fitted to its content, with a strip to open it. */
 export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId: string; threadId: string | null; onOpen?(): void; chrome?: boolean }) {
+  const open = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
   const { mini, rpc } = useMini(miniId);
   if (mini === null) return <div className="flex items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm text-muted-foreground"><Icon name="AppWindow" className="size-4" /> This mini app was deleted.</div>;
   if (!mini) return <div className="h-24 animate-pulse rounded-lg border border-border/70 bg-muted/40 motion-reduce:animate-none" />;
@@ -463,7 +467,7 @@ export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId:
         <div className="flex h-8 items-center gap-1.5 border-b border-border bg-card/50 px-2.5 text-xs text-muted-foreground">
           <Icon name="AppWindow" className="size-3.5" />
           <span className="min-w-0 flex-1 truncate font-medium text-foreground">{displayName(mini)}</span>
-          <button type="button" className="rounded px-1.5 py-0.5 hover:bg-state-hover hover:text-foreground" onClick={onOpen ?? (() => openAppPath(miniHref(miniId)))}>Open</button>
+          <button type="button" className="rounded px-1.5 py-0.5 hover:bg-state-hover hover:text-foreground" onClick={onOpen ?? (() => open({ href: miniHref(miniId) }))}>Open</button>
         </div>
       ) : null}
       <MiniApp mini={mini} rpc={rpc} threadId={threadId} fit />

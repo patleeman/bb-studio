@@ -90,17 +90,19 @@ export interface RunCreateOptions {
   createKind?(entry: Extract<CreateEntry, { type: "kind" }>): Promise<void> | void;
   /** After a template made an item. */
   onCreated?(): void;
+  /** Opens what was made; Studio's rule from where the menu is (src/ui/studio-open.tsx), else the main view. */
+  open?(href: string): void;
 }
 
 /** Does what a picked entry says. Reports failures as toasts. */
-export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, createKind, onCreated }: RunCreateOptions): Promise<void> {
+export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, createKind, onCreated, open = (href) => openAppPath(href) }: RunCreateOptions): Promise<void> {
   if (entry.type === "call") return openCallPicker();
   if (entry.type === "meeting") return startMeeting();
   if (entry.type === "whiteboard") {
     try {
       const { page } = await rpc.call("drawings.newWhiteboardPage", { projectId }) as { page: { href: string } };
       onCreated?.();
-      openAppPath(page.href);
+      open(page.href);
     } catch (cause) {
       toast.error(`Couldn't make a whiteboard: ${errorMessage(cause)}`);
     }
@@ -112,7 +114,7 @@ export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, creat
     try {
       const { item } = await rpc.call("instantiateTemplate", { pluginId: entry.template.pluginId, id: entry.template.id, projectId, variables: { name } }) as { item: { href: string } };
       onCreated?.();
-      openAppPath(item.href);
+      open(item.href);
     } catch (cause) {
       toast.error(`Couldn't use template: ${errorMessage(cause)}`);
     }
@@ -123,5 +125,6 @@ export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, creat
     projectId,
     addOn: entry.addOn,
     create: async () => ((await rpc.call("create", { pluginId: entry.pluginId, kind: entry.kind.id, projectId })) as { item: { href: string } }).item.href,
+    open,
   });
 }

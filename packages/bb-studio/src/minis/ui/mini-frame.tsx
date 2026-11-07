@@ -6,10 +6,10 @@
 // every call (collections, capabilities, rate limits) again. A take the app
 // sends becomes a mention in the thread's composer, so the user sees it
 // before anything reaches the agent.
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { openAppPath } from "../../kit/app/index";
+import { linkRef, useStudioOpen, type StudioRef } from "../../ui/studio-open";
 import { composerFor } from "../../kit/composer";
 import { errorMessage } from "../../kit/format";
 import type { rpcContract } from "../contract";
@@ -60,10 +60,17 @@ function themeTokens(): Record<string, string> {
   return tokens;
 }
 
-/** Thread ids, Studio links and app paths `playground.bb.open` may go to. */
-function openTarget(target: string, navigate: ReturnType<typeof useBbNavigate>) {
-  if (/^thr_[a-zA-Z0-9]+$/.test(target)) return navigate.toThread(target);
-  if (/^\/(?:plugins|threads|projects)\//.test(target)) return openAppPath(target);
+/**
+ * Thread ids, Studio links and app paths `playground.bb.open` may go to. An
+ * item opens where the mini app is (src/ui/studio-open.tsx): beside its
+ * thread, or as a Studio tab.
+ */
+export function openTarget(target: string, open: (ref: StudioRef) => void) {
+  if (/^thr_[a-zA-Z0-9]+$/.test(target)) return open({ threadId: target });
+  if (/^\/(?:plugins|threads|projects)\//.test(target)) {
+    const ref = linkRef(target);
+    if (ref) return open(ref);
+  }
   throw new Error("bb.open takes a thread id or a BB path such as /plugins/studio/studio/pages/<id>.");
 }
 
@@ -88,7 +95,10 @@ export function MiniFrame({
   onError?(message: string | null): void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
+  // The bridge is set up once per frame; it opens through the latest opener.
+  const open = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
+  const opener = useRef(open);
+  opener.current = open;
   const frame = useRef<HTMLIFrameElement>(null);
   const [clientId] = useState(() => crypto.randomUUID());
   const dark = useDarkMode();
@@ -140,7 +150,7 @@ export function MiniFrame({
           return (await rpc.call("minis.bb.studio", { id, ...(params as { query?: string; kind?: string; limit?: number }) })).items;
         case "bb.open":
           await rpc.call("minis.bb.canOpen", { id });
-          openTarget(String(params.target), navigate);
+          openTarget(String(params.target), (ref) => opener.current(ref));
           return null;
         default:
           throw new Error(`Unknown call ${method}.`);
@@ -217,7 +227,7 @@ export function MiniFrame({
       clearInterval(heartbeat);
       rpc.call("minis.live.close", { id, clientId }).catch(() => undefined);
     };
-  }, [rpc, miniId, clientId, threadId, navigate]);
+  }, [rpc, miniId, clientId, threadId]);
 
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as MiniEvent | null;
