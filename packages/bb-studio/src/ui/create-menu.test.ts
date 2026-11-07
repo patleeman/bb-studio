@@ -37,6 +37,18 @@ it("New → Whiteboard makes its page and opens it", async () => {
   expect(call).toHaveBeenCalledWith("drawings.newWhiteboardPage", { projectId: "proj_1" });
 });
 
+it("opens what it made through the caller's opener, so a thread's Studio tab keeps it beside the thread", async () => {
+  const call = vi.fn().mockResolvedValue({ drawingId: "drw_1", page: { id: "pg_1", title: "Untitled whiteboard", href: "/plugins/studio/studio/pages/pg_1" } });
+  const open = vi.fn();
+  await runCreateEntry(createEntries(providers).find((each) => each.type === "whiteboard")!, { rpc: { call }, projectId: null, open });
+  expect(open).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_1");
+  const template = createEntries(providers, { templates: [{ pluginId: "pages", id: "pg_t", title: "Weekly" }] }).find((each) => each.type === "template")!;
+  vi.spyOn(window, "prompt").mockReturnValue("Week 12");
+  const made = vi.fn().mockResolvedValue({ item: { href: "/plugins/studio/studio/pages/pg_2" } });
+  await runCreateEntry(template, { rpc: { call: made }, projectId: null, open });
+  expect(open).toHaveBeenLastCalledWith("/plugins/studio/studio/pages/pg_2");
+});
+
 it("drops what Setup → Kinds turned off, and Record a call with recordings", () => {
   expect(labels(createEntries(providers, { off: new Set(["recording", "design", "drawing"]) }))).toEqual(["Page"]);
   expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Record a call");

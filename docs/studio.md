@@ -8,7 +8,7 @@ A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accep
 
 A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Wrap its nav panel with `retainPanel` and render `RetainedPanels` for the same path from an `experimental_appOverlay`, so an editor stays alive when the user navigates away and back.
 
-The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. In a workspace tab row it shows only the view's own tools and status: no Chat and no Open in split, since the workspace splits tabs itself. `BarCrumb`, `BarSeparator` and `BarTitle` render nothing there, because the tab names the item and renames it (double-click, F2 or **Rename**, through the hub's `rename`); tabs refresh their titles and icons when Studio announces changes.
+The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow splits behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. In a workspace tab row it shows only the view's own tools and status: no Chat and no Open in split, since the workspace splits tabs itself. In a thread's side panel the split button is **Open in Studio**, the way out of the thread (see "Where links open"). `BarCrumb`, `BarSeparator` and `BarTitle` render nothing there, because the tab names the item and renames it (double-click, F2 or **Rename**, through the hub's `rename`); tabs refresh their titles and icons when Studio announces changes.
 
 | Method | Input | Output |
 |---|---|---|
@@ -151,8 +151,52 @@ item address (`/plugins/<plugin>/<panel>/<id>`) from an add-on that opens in
 the workspace becomes a tab, and the address is replaced with the
 workspace's, so Back doesn't return to it. A sub-view, such as a page's chat
 (`/plugins/studio/studio/pages/<id>/chat/<thread>`, or the old
-`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page. Item cards and
-**Open in Pages** call `openAppPath`, which opens the tab directly.
+`/plugins/pages/pages/<id>/chat/<thread>`), keeps its own page.
+
+### Where links open
+
+One rule for every link, card and open button, in `src/ui/studio-open.tsx`:
+open in the container you're in.
+
+| From | A Studio item | ⌘/Ctrl-click | A thread | A web URL |
+|---|---|---|---|---|
+| A thread (a reply card, its side panel) | A Studio tab in that thread's side panel, one per item (`{ kind, id }` params; the same params select the open tab) | The Studio app | BB's main view (⌘: a split) | BB's browser (`openUrl`) |
+| The Studio app | A Studio workspace tab | A split | BB's main view (⌘: a split) | BB's browser |
+
+Call sites use `useStudioOpen()` and pass a ref: `{ href }` (an item's
+in-app path), `{ threadId }` or `{ url }`, plus `{ alternate }` for a
+Mod-click (`wantsAlternate(event)`). The container comes from the kit's
+`StudioContainerProvider` (`src/kit/app/container.tsx`), which the thread's
+Studio tab and the Studio app wrap around themselves; it also marks the DOM
+(`data-studio-container`) for `ItemGestures`. Outside a provider, a reply card
+passes its message's thread, and global surfaces (search, Talk, recording
+mentions in chat, the Talk "Go back" bridge) pass `"route"`, the container the
+main view shows. Code outside React uses `openPathIn` (a header action, with
+its panel) or `openPathFromRoute` (a content script). Links in a page's text
+and in its comments go through `PagesUi.openLink`, never a new window.
+`studio-open.wiring.test.tsx` fails when a new file calls `openAppPath`,
+`useOpenMain`, `useOpenThreadTab` or `openWorkspaceItem` directly; Studio
+routes that aren't items (settings, the Bot pages, Loops, Setup), old-address
+redirects and the global sidebars are allowed to.
+
+Inside a thread, the item opens through the thread view's panel
+(`experimental_useAppPanel().openTab`), or, from outside the thread view, a
+request its composer's `ThreadTabReceiver` takes. If neither opens it, the
+item's page opens in the main view.
+
+Limits that need BB core APIs, left as they are:
+
+- Links in chat replies (`/plugins/studio/studio/…` in an agent's Markdown) are
+  routed by BB itself; plugins can't handle a chat link's click, so these open
+  in the Studio app.
+- An add-on's own item page can't be shown inside Studio's tab, so add-on
+  kinds open in BB's main area.
+- There's no call to rename an open side-panel tab, so a tab keeps the title
+  it was opened with.
+- On BB 0.48.1 (web), `openTab` adds and selects the tab but doesn't reveal a
+  closed side panel, although the SDK says it does.
+
+iOS has its own navigation stacks and isn't covered here.
 
 ## Decisions in Studio
 

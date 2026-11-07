@@ -456,7 +456,7 @@ export function MiniTile({ miniId }: { miniId: string }) {
 }
 
 /** The app in a page block or a chat card, fitted to its content, with a strip to open it. */
-export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId: string; threadId: string | null; onOpen?(): void; chrome?: boolean }) {
+export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId: string; threadId: string | null; onOpen?(event?: { metaKey?: boolean; ctrlKey?: boolean }): void; chrome?: boolean }) {
   const open = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
   const { mini, rpc } = useMini(miniId);
   if (mini === null) return <div className="flex items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm text-muted-foreground"><Icon name="AppWindow" className="size-4" /> This mini app was deleted.</div>;

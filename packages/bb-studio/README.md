@@ -37,9 +37,10 @@ the pane, splits, moves to another pane, Rename, and Copy link.
 
 ### The Studio tab in a thread
 
-A thread's side panel has one **Studio** tab (**+ → Studio**) for every
+A thread's side panel has a **Studio** tab (**+ → Studio**) for every
 kind: pages, drawings, designs, dashboards, artifacts, recordings and
-dictations, and each kind an add-on registers with Studio. It opens on the
+dictations, and each kind an add-on registers with Studio. Each item opened
+from the thread gets its own tab beside the others. It opens on the
 thread's collection: **This thread** (items made or linked in it, and the
 page it was started from), then **Recent** in the thread's project. Search
 covers every kind, and the chips above the list filter to one. As in the
@@ -51,8 +52,10 @@ the library, and the tab stays on the collection; a new add-on kind appears
 with its own chip without any change to Studio. **New** offers each kind that can be made and opened here,
 makes the item in the thread's project and links it to the thread. The
 save icon opens Artifacts' save picker for the latest reply's files. Reply
-cards and **Expand to page** open the Studio tab on their item
-(`{ kind, id }` params). Kinds turned off in **Setup → Kinds** don't appear.
+cards, **Expand to page**, and links inside an open item (a page mention, an
+embed's arrow, a link in a page's text) open a Studio tab on their item
+(`{ kind, id }` params), so you never leave the thread; **Open in Pages** and
+⌘-click take an item to the Studio app instead. Kinds turned off in **Setup → Kinds** don't appear.
 The tab remembers where you left it, per thread and per tab: switch to
 another side-panel tab, reload Studio or restart BB, and it comes back on
 the same item (or the collection, with its kind chip) scrolled where it was.
@@ -1499,12 +1502,20 @@ while both are installed, each shows its own buttons.
 
 ## What you get
 
-Everything opens in BB's main view, as a tab in Studio's workspace. ⌘/Ctrl-click an item or thread link, or choose **Open in split** from
-its menu, to open it in a split instead. Right-click any Studio item or
-thread link, anywhere, for **Open**, **Open in split**, **Copy reference**
-(**Copy link** for a thread) and **New thread with this**. Item and collection
-headers have an **Open in split** button. An editor you leave stays
-open in the background, so it's as you left it when you come back.
+Links open where you are. In a thread (a card in its replies, or anything
+in its side panel), a page mention, an embed, a link in a page's text or any
+other Studio link opens as a tab in that thread's side panel, one tab per
+item; opening the same item again selects its tab. In the Studio app it opens
+as a tab in Studio's workspace. Web links open in BB's browser, and a thread
+link opens that thread. ⌘/Ctrl-click opens it in the other place: from a
+thread, in the Studio app; in Studio, in a split. Right-click any Studio item
+or thread link, anywhere, for **Open**, **Open in Studio** (in a thread's side
+panel) or **Open in split** (elsewhere), **Copy reference** (**Copy link** for
+a thread) and **New thread with this**. Item and collection headers have an
+**Open in split** button; in a thread's side panel it's **Open in Studio**.
+Search (⌘⇧K), the Talk pill and recording mentions open in the thread you're
+looking at, or in Studio. An editor you leave stays open in the background,
+so it's as you left it when you come back.
 
 - **One collection** (sidebar → Studio): every add-on's items in one list,
   with search over titles and content, filters by kind, project and

@@ -1,7 +1,7 @@
 // `::recording{id="rec_…"}` in a reply: the recording's summary and the start
 // of its transcript, read-only, under a header that opens the recording.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember } from "../../kit/app/index";
+import { ItemDirectiveCard, remember, wantsAlternate } from "../../kit/app/index";
 import { useStudioOpen } from "../../ui/studio-open";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { Recording, Segment, rpcContract } from "../shared/contract";
@@ -79,7 +79,7 @@ export function RecordingCard({ attributes, message }: PluginMessageDirectivePro
       details={`Recording · ${formatLength(recording.durationMs)} · ${recording.wordCount} words`}
       body={<RecordingPreview {...loaded} />}
       // The thread's workbench shows recordings too (the Studio tab).
-      onOpen={() => open({ href: recordingHref(encodeURIComponent(id)), title: recording.title.trim() || "Untitled recording" })}
+      onOpen={(event) => open({ href: recordingHref(encodeURIComponent(id)), title: recording.title.trim() || "Untitled recording" }, { alternate: wantsAlternate(event) })}
     />
   );
 }

@@ -2,7 +2,7 @@
 // header that opens it in the thread's Studio tab. It doesn't load
 // Excalidraw: the picture is the server's thumbnail.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, THUMBNAIL, remember } from "../../kit/app/index";
+import { ItemDirectiveCard, THUMBNAIL, remember, wantsAlternate } from "../../kit/app/index";
 import { relativeTime } from "../../kit/format";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
@@ -53,7 +53,7 @@ export function DrawingDirective({ attributes, message }: PluginMessageDirective
       ) : <p className="px-3 py-2 text-sm text-muted-foreground">This whiteboard is empty.</p>}
       details={`Whiteboard · ${drawing.elementCount} ${drawing.elementCount === 1 ? "element" : "elements"} · ${relativeTime(drawing.updatedAt)}`}
       // In its thread's workbench (src/ui/studio-open.tsx).
-      onOpen={() => open({ href: drawingHref(id), title: name })}
+      onOpen={(event) => open({ href: drawingHref(id), title: name }, { alternate: wantsAlternate(event) })}
     />
   );
 }

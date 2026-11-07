@@ -3,7 +3,7 @@
 // data with every other place it shows, and opens beside the chat.
 import { type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense } from "react";
-import { useStudioOpen } from "../../ui/studio-open";
+import { useStudioOpen, wantsAlternate } from "../../ui/studio-open";
 import { isMiniId, miniHref } from "../shared";
 
 const MiniEmbed = lazy(() => import("./mini-view").then((module) => ({ default: module.MiniEmbed })));
@@ -13,7 +13,7 @@ export function MiniCard({ attributes, message }: PluginMessageDirectiveProps) {
   // In its thread's workbench (src/ui/studio-open.tsx).
   const openItem = useStudioOpen({ kind: "thread", threadId: message.threadId });
   if (!isMiniId(id)) return null;
-  const open = () => openItem({ href: miniHref(id), title: "Mini app" });
+  const open = (event?: { metaKey?: boolean; ctrlKey?: boolean }) => openItem({ href: miniHref(id), title: "Mini app" }, { alternate: wantsAlternate(event) });
   return (
     <div className="my-2">
       <Suspense fallback={<div className="h-24 animate-pulse rounded-lg border border-border/70 bg-muted/40" />}>

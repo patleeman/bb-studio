@@ -1,6 +1,6 @@
 // `::page{id="pg_…"}` in a reply: the page shown inline, read-only, under a
 // header that opens it in the thread's workbench, beside the chat.
-import { ItemDirectiveCard, remember } from "../../kit/app/index";
+import { ItemDirectiveCard, remember, wantsAlternate } from "../../kit/app/index";
 import { untitled } from "../../kit/format";
 import { Markdown, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
@@ -67,7 +67,7 @@ export function PageCard({ attributes, message }: PluginMessageDirectiveProps) {
       title={page.icon ? `${page.icon} ${title}` : title}
       details={`Page · edited ${relativeTime(page.updatedAt)}`}
       body={<PageBody markdown={markdown} />}
-      onOpen={() => open({ href: pagePath(id), title })}
+      onOpen={(event) => open({ href: pagePath(id), title }, { alternate: wantsAlternate(event) })}
     />
   );
 }

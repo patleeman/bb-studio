@@ -1,6 +1,6 @@
 // The `::design{id="dsn_…"}` card in a reply: the newest round's screens,
 // under a header that opens the design in the thread's Studio tab.
-import { ItemDirectiveCard, remember } from "../../kit/app/index";
+import { ItemDirectiveCard, remember, wantsAlternate } from "../../kit/app/index";
 import { type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { DESIGN_ICON, designHref, frameSize, isDeck, isDesignId, screenUrl, type DesignView, type ScreenView } from "../shared";
 import { useDesign } from "./use-design";
@@ -59,7 +59,7 @@ export function DesignCard({ attributes, message }: PluginMessageDirectiveProps)
       title={name}
       details={deck ? `Deck · ${deck.steps.length} ${deck.steps.length === 1 ? "slide" : "slides"}` : decks.length ? `Deck · ${decks.length} directions to pick from` : `Design · ${design.rounds.length} ${design.rounds.length === 1 ? "round" : "rounds"} · ${screens} ${screens === 1 ? "screen" : "screens"}`}
       body={<DesignPreview design={design} />}
-      onOpen={() => open({ href: designHref(id), title: name })}
+      onOpen={(event) => open({ href: designHref(id), title: name }, { alternate: wantsAlternate(event) })}
     />
   );
 }

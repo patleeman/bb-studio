@@ -58,7 +58,8 @@ export function ItemDirectiveCard({
   body?: ReactNode;
   /** The tallest the body gets before it scrolls, in pixels. */
   bodyHeight?: number;
-  onOpen?(): void;
+  /** Gets the click, so a Mod-click can open the item in the other place. */
+  onOpen?(event?: { metaKey?: boolean; ctrlKey?: boolean }): void;
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   if (state === "deleted") {

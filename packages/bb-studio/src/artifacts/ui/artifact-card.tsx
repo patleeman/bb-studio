@@ -2,7 +2,7 @@
 // its viewer in the thread's workbench, beside the chat. Files BB can show
 // are previewed inline, as in the viewer.
 import { useCallback, useEffect, useState } from "react";
-import { ItemDirectiveCard, remember } from "../../kit/app/index";
+import { ItemDirectiveCard, remember, wantsAlternate } from "../../kit/app/index";
 import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
@@ -43,7 +43,7 @@ export function ArtifactCard({ attributes, message }: PluginMessageDirectiveProp
       kind="artifact"
       icon={TYPE_ICONS[version.type]}
       title={artifact.title}
-      onOpen={() => open({ href: artifactHref(artifact.id), title: artifact.title })}
+      onOpen={(event) => open({ href: artifactHref(artifact.id), title: artifact.title }, { alternate: wantsAlternate(event) })}
       body={version.type === "other" ? undefined : (
         // A player is a row high and an HTML page fits its height; other previews get room.
         <div className={version.type === "audio" || version.type === "html" ? "" : "h-80"}>

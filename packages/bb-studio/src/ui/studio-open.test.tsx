@@ -13,7 +13,7 @@ const nav = vi.hoisted(() => ({ openAppPath: vi.fn() }));
 vi.mock("../kit/app/nav", () => ({ openAppPath: nav.openAppPath }));
 const workspace = vi.hoisted(() => ({ openWorkspaceItem: vi.fn((_item: unknown, _placement?: unknown) => true) }));
 vi.mock("../kit/app/workspace", () => ({ openWorkspaceItem: workspace.openWorkspaceItem }));
-const { containerAt, planOpen, runPlan, StudioContainerProvider, useStudioOpen, workbenchItem } = await import("./studio-open");
+const { containerAt, linkRef, openPathIn, planOpen, routeContainer, runPlan, StudioContainerProvider, useStudioOpen, wantsAlternate, workbenchItem } = await import("./studio-open");
 const { resetThreadTabRequests, ThreadTabReceiver } = await import("../kit/app/thread-panel");
 
 const PAGE = "/plugins/studio/studio/pages/pg_b";
@@ -96,4 +96,49 @@ it("a provider sets the container for the hook and marks it for overlays", async
   open!({ href: PAGE });
   expect(workspace.openWorkspaceItem).toHaveBeenCalledWith({ href: PAGE }, "tab");
   expect(containerAt(document.body)).toBeNull();
+});
+
+it("reads the container from what the main view shows, for global surfaces", () => {
+  expect(routeContainer("/projects/proj_1/threads/thr_9")).toEqual({ kind: "thread", threadId: "thr_9" });
+  expect(routeContainer("/threads/thr_9")).toEqual({ kind: "thread", threadId: "thr_9" });
+  expect(routeContainer("/plugins/studio/studio")).toEqual(studio);
+  expect(routeContainer("/plugins/studio/studio/pages/pg_b")).toEqual(studio);
+  expect(routeContainer("/settings/general")).toBeNull();
+  expect(routeContainer("/plugins/forecast/forecast")).toBeNull();
+  expect(wantsAlternate({ metaKey: true })).toBe(true);
+  expect(wantsAlternate({ ctrlKey: true })).toBe(true);
+  expect(wantsAlternate({})).toBe(false);
+});
+
+it("parses a link's href: web URLs, in-app paths on this origin, threads and page references", () => {
+  expect(linkRef("https://example.com/a", "http://bb.local")).toEqual({ url: "https://example.com/a" });
+  expect(linkRef("mailto:a@b.c", "http://bb.local")).toEqual({ url: "mailto:a@b.c" });
+  expect(linkRef(`http://bb.local${PAGE}#x`, "http://bb.local")).toEqual({ href: `${PAGE}#x` });
+  expect(linkRef(PAGE, "http://bb.local")).toEqual({ href: PAGE });
+  expect(linkRef("/projects/p/threads/thr_1", "http://bb.local")).toEqual({ threadId: "thr_1" });
+  expect(linkRef("page:pg_b", "http://bb.local")).toEqual({ href: PAGE });
+  expect(linkRef("thread:thr_1", "http://bb.local")).toEqual({ threadId: "thr_1" });
+  expect(linkRef("javascript:alert(1)", "http://bb.local")).toBeNull();
+  expect(linkRef("//evil.example/x", "http://bb.local")).toBeNull();
+  expect(linkRef("", "http://bb.local")).toBeNull();
+});
+
+it("a header action opens through its own panel, for the thread it sits on", () => {
+  const panel = { openTab: vi.fn((_options: unknown) => true) };
+  openPathIn({ kind: "thread", threadId: "thr_a" }, PAGE, { title: "Plan", panel });
+  expect(panel.openTab).toHaveBeenCalledWith({ tab: { id: "studio", context: { kind: "thread" }, availability: "action" }, title: "Plan", params: { kind: "page", id: "pg_b" } });
+  expect(nav.openAppPath).not.toHaveBeenCalled();
+});
+
+it('"route" decides at click time: over a thread its workbench, in Studio a Studio tab', async () => {
+  let open: ReturnType<typeof useStudioOpen> | null = null;
+  const Probe = () => { open = useStudioOpen("route"); return null; };
+  await act(async () => root.render(<Probe />));
+  window.history.pushState(null, "", "/plugins/studio/studio");
+  open!({ href: PAGE });
+  expect(workspace.openWorkspaceItem).toHaveBeenCalledWith({ href: PAGE }, "tab");
+  window.history.pushState(null, "", "/projects/p/threads/thr_a");
+  open!({ href: PAGE });
+  expect(state.openTab).toHaveBeenCalledTimes(1);
+  window.history.pushState(null, "", "/");
 });

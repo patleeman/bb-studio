@@ -54,7 +54,11 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
       openLink: (href, options) => {
         const ref = linkRef(href);
         if (!ref) return;
-        if ("href" in ref) { const title = titles.current.get(ref.href); open(title ? { ...ref, title } : ref, options); }
+        if ("href" in ref) {
+          const pageId = /^\/plugins\/studio\/studio\/pages\/([^/?#]+)$/.exec(ref.href)?.[1];
+          const title = titles.current.get(ref.href) ?? (pageId ? pageTitle(decodeURIComponent(pageId)) : undefined);
+          open(title ? { ...ref, title } : ref, options);
+        }
         else open(ref, options);
       },
       linkPreview: (url) => rpc.call("pages.linkPreview", { url }),
@@ -83,7 +87,7 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
         }),
       compose: (prompt) => navigate.toCompose({ initialPrompt: prompt, focusPrompt: true }),
     }),
-    [pages, bots.bots, openPage, open, navigate, rpc],
+    [pages, bots.bots, openPage, pageTitle, open, navigate, rpc],
   );
 }
 
