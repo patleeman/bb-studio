@@ -1,4 +1,5 @@
 import { createDesktopAppUpdateService } from "./services/system/desktop-app-update.js";
+import { forkBeforeDatabase } from "./services/fork-import/first-run.js";
 import {
   AUTO_UPDATE_CHECK_MS,
   createScheduledAppUpdateService,
@@ -139,6 +140,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     dataDir: serverConfig.BB_DATA_DIR,
     logger,
   });
+  await forkBeforeDatabase(serverConfig, logger);
   let diagnosticsEnabled = () => false;
   const db = initDb(serverConfig.databasePath, {
     slowQueryThresholdMs: () => (diagnosticsEnabled() ? 25 : 100),
