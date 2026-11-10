@@ -1,3 +1,4 @@
+import { PluginSidebarSections } from "./ForkSidebarSections";
 import { useCallback, useState } from "react";
 import {
   PluginSlotMount,
@@ -42,6 +43,7 @@ export function SidebarThreadListContent({
           onNavigate={onNavigate}
         />
       )}
+      <PluginSidebarSections onNavigate={onNavigate} />
     </SidebarContent>
   );
 }
