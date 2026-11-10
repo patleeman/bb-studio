@@ -1,3 +1,4 @@
+import { ensureForkThreadWritable } from "./thread-write-guards.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
 import type { DbConnection, DbTransaction, EnvironmentRow } from "@bb/db";
 import type {
@@ -207,6 +208,7 @@ export function ensureThreadIsWritable(
   if (thread.deletedAt !== null) {
     throwThreadNotWritable(thread, "deleted", "Thread is deleted");
   }
+  ensureForkThreadWritable(thread);
 }
 
 /**

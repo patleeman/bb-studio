@@ -1,5 +1,6 @@
 import { outputJson, reportCommandResult } from "../command-result.js";
 import { createHash, randomBytes } from "node:crypto";
+import { registerForkImportCommands } from "./fork-import.js";
 import { existsSync } from "node:fs";
 import { open, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
@@ -297,6 +298,7 @@ export function registerServerCommands(
       "Manage how devices reach the bb server, and move, export, or import it",
     );
   registerServerAccessCommands(server, getUrl);
+  registerForkImportCommands(server, getUrl);
 
   const move = server
     .command("move")
