@@ -1,5 +1,7 @@
 # Codebase Guidelines
 
+This checkout is the BB Studio fork. Read [AGENTS.fork.md](AGENTS.fork.md) first; its rules come before the ones below.
+
 ## Task Completion
 
 - Carry the requested change through implementation, relevant verification, and fixes for failures it causes. Continue authorized, reversible local work without asking for approval at each step; ask when a missing user decision blocks progress.
