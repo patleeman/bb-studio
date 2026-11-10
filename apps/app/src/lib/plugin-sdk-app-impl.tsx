@@ -1,3 +1,4 @@
+import { forkPluginSdkAppImplementation } from "./plugin-sdk-app-impl.fork";
 import { applicationLinkApprovals } from "./application-url";
 import {
   LazyPluginMarkdown,
@@ -157,6 +158,7 @@ function PanelTabIcon({ tabKey }: ExperimentalPanelTabIconProps) {
 }
 
 export const pluginSdkAppImplementation = {
+  ...forkPluginSdkAppImplementation,
   experimental_getApplicationLinkApprovals: applicationLinkApprovals.list,
   experimental_revokeApplicationLinkApproval: applicationLinkApprovals.revoke,
   definePluginApp,
