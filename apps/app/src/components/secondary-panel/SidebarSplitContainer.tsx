@@ -1,3 +1,4 @@
+import { isPointInWorkbench, limitWorkbenchDrop, restoresWorkbenchSplit, useWorkbenchSplits, WORKBENCH_MAX_PANES as MAX_PANES, WORKBENCH_MOVE_PANE_CONTROLS } from "./workbenchSplits.fork";
 import {
   Fragment,
   useCallback,
@@ -16,7 +17,6 @@ import {
   computePaneRects,
   countPanes,
   listPanes,
-  MAX_PANES,
   type LayoutNode,
   type SplitLayout,
   type SplitPath,
@@ -99,7 +99,7 @@ function canMoveSidebarActiveTab(
   group: SidebarTabGroup,
   paneCount: number,
 ): boolean {
-  return group.tabIds.length > 1 ? paneCount < MAX_PANES : paneCount > 1;
+  return WORKBENCH_MOVE_PANE_CONTROLS && (group.tabIds.length > 1 ? paneCount < MAX_PANES : paneCount > 1);
 }
 
 interface SidebarSplitContainerProps {
@@ -139,7 +139,7 @@ export function SidebarSplitContainer({
   );
   const [state, setState] = useState<SidebarSplitState>(() => {
     const restored =
-      typeof window === "undefined"
+      typeof window === "undefined" || !restoresWorkbenchSplit(initialStorageValue)
         ? createSidebarSplitState(availableTabIds, activeTabId)
         : parseSidebarSplitState(
             initialStorageValue,
@@ -502,14 +502,16 @@ export function SidebarSplitContainer({
           const dx = x - startX;
           const dy = y - startY;
           if (Math.hypot(dx, dy) <= PANEL_TAB_DRAG_DISTANCE_PX) return false;
+          if (!isPointInWorkbench(targetBoundary, x, y)) return false;
           return (
             Math.abs(dy) > Math.abs(dx) ||
             chromeRect === null ||
+            x < chromeRect.left || x > chromeRect.right ||
             y < chromeRect.top ||
             y > chromeRect.bottom
           );
         },
-        decide: (targetPaneId, zone) => {
+        decide: limitWorkbenchDrop(state.layout.root, sourcePaneId, (targetPaneId, zone) => {
           if (targetPaneId === sourcePaneId) {
             if (zone === "center" || (sourceGroup?.tabIds.length ?? 0) <= 1) {
               return null;
@@ -526,7 +528,7 @@ export function SidebarSplitContainer({
             zone,
             label: zone === "center" ? "Group tab here" : `Split ${zone}`,
           };
-        },
+        }),
         onDrop: (target) => moveTab(sourcePaneId, tabId, target),
       });
     },
@@ -568,6 +570,7 @@ export function SidebarSplitContainer({
     [],
   );
 
+  useWorkbenchSplits({ panelStateId, state, fixedTabIds, commitState, moveTab, removeSplit, resize });
   const firstPane = listPanes(state.layout.root)[0];
   const moveActiveTabHandler = (paneId: string) => {
     const group = getSidebarGroupForPane(state, paneId);
