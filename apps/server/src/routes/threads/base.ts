@@ -1,5 +1,6 @@
 import { operationComplete } from "../../services/lib/operation-response.js";
 import { countUnarchivedThreadDescendants } from "../../services/threads/thread-archive.js";
+import { askBeforeThreadDelete } from "../../services/threads/thread-delete-hooks.fork.js";
 import { listThreadCascades } from "../../services/threads/thread-cascade.js";
 import { cancelAbandonedProviderCreations } from "../../services/threads/thread-environment-providers.js";
 import {
@@ -526,6 +527,7 @@ export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
       thread,
     });
     const dependents = listThreadDeletionTree(deps.db, thread.id);
+    await askBeforeThreadDelete(dependents.map((dependent) => dependent.id));
     markThreadDeleted(deps.db, deps.hub, { threadId: thread.id });
     for (const dependent of dependents) {
       const deleted = getThread(deps.db, dependent.id);
