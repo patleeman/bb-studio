@@ -115,6 +115,13 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb server access add`
 - `bb server access remove`
 - `bb server access order`
+- `bb server mirror`
+- `bb server mirror status`
+- `bb server mirror sync`
+- `bb server mirror pause`
+- `bb server mirror resume`
+- `bb server mirror thread`
+- `bb server mirror take-over`
 - `bb server move`
 - `bb server move status`
 - `bb server move cancel`
