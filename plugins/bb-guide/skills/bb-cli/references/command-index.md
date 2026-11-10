@@ -105,6 +105,13 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 ## server
 
 - `bb server`
+- `bb server mirror`
+- `bb server mirror status`
+- `bb server mirror sync`
+- `bb server mirror pause`
+- `bb server mirror resume`
+- `bb server mirror thread`
+- `bb server mirror take-over`
 - `bb server move`
 - `bb server move status`
 - `bb server move cancel`
