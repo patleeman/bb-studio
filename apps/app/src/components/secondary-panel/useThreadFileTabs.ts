@@ -1,3 +1,4 @@
+import { forkDeferUntilHandled } from "@/components/plugin/file-opener-handle.fork";
 import { useCallback, useEffect, useMemo } from "react";
 import type {
   TerminalSession,
@@ -516,7 +517,8 @@ export function useThreadFileTabs({
         recordRecentItem({ source: "thread-storage", path: request.tab.path });
       }
 
-      updateFixedPanelTabsState((state) => {
+      const update = forkDeferUntilHandled(updateFixedPanelTabsState, { openerTab, fileOpeners, behavior, viewer });
+      update((state) => {
         if (behavior === "replace-new-tab") {
           return replaceNewTabWithSecondaryPanelTabInState({ state, tab });
         }
