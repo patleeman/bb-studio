@@ -1,5 +1,10 @@
 import { experimental_PluginRpcCallError } from "../rpc-contract.js";
 import {
+  forkEventCounts,
+  forkEventLists,
+  forkFakeHooks,
+} from "./fake-plugin-host.fork.js";
+import {
   rpcInvalidationTags,
   rpcResponseTags,
   type ContractTagDeclarations,
@@ -1236,6 +1241,7 @@ function createFakePluginHostInternal(
   const threadEventHandlers: {
     [E in PluginThreadEventName]: Array<PluginThreadEventHandler<E>>;
   } = {
+    ...forkEventLists(),
     "experimental_thread.events": [],
     "experimental_thread.parentChanged": [],
     "experimental_thread.read": [],
@@ -1544,6 +1550,7 @@ function createFakePluginHostInternal(
   };
 
   const experimental_hooks: PluginHooks = {
+    ...forkFakeHooks(),
     on(hook, handler) {
       if (hooks[hook] !== null) {
         throw new Error(pluginHookAlreadyRegisteredMessage(hook));
@@ -1789,6 +1796,7 @@ function createFakePluginHostInternal(
       },
       get threadEventHandlers() {
         return {
+          ...forkEventCounts(threadEventHandlers),
           "experimental_thread.events":
             threadEventHandlers["experimental_thread.events"].length,
           "experimental_thread.parentChanged":
