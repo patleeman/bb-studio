@@ -48,7 +48,7 @@ interface DiffFilesPanelProps {
   filePathRoot?: string | null;
   scrollToPath?: string | null;
   onScrolledToPath?: () => void;
-  onOpenFileInEditor?: (path: string) => void;
+  onOpenFileInEditor?: (path: string, line?: number | null) => void;
   onOpenFilePreview?: (path: string) => void;
   onRequestFileContents?: RequestDiffFileContents;
 }
@@ -269,7 +269,7 @@ interface DiffFileRowProps {
   patchState: DiffPatchState;
   loadPath: (path: string) => void;
   retry: (path: string) => void;
-  onOpenFileInEditor?: (path: string) => void;
+  onOpenFileInEditor?: (path: string, line?: number | null) => void;
   onOpenFilePreview?: (path: string) => void;
   onRequestFileContents?: RequestDiffFileContents;
 }

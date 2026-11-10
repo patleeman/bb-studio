@@ -1,3 +1,4 @@
+import { firstChangedLine } from "./fork-first-changed-line";
 import { DiffLoadingSkeleton } from "@bb/shared-ui/diff-loading-skeleton";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useIntersectionObserver } from "usehooks-ts";
@@ -131,7 +132,7 @@ export interface DiffFileCardProps {
   patchState: DiffPatchState;
   onLoadPatch: () => void;
   onRetry: () => void;
-  onOpenFileInEditor?: (path: string) => void;
+  onOpenFileInEditor?: (path: string, line?: number | null) => void;
   onOpenFilePreview?: (path: string) => void;
   onRequestFileContents?: RequestDiffFileContents;
 }
@@ -341,7 +342,7 @@ export const DiffFileCard = memo(function DiffFileCard({
             model={headerModel}
             previousPath={entry.previousPath}
             filePathRoot={filePathRoot}
-            onOpenFileInEditor={onOpenFileInEditor}
+            onOpenFileInEditor={onOpenFileInEditor && ((path) => onOpenFileInEditor(path, firstChangedLine(patchState.patch)))}
             onOpenFilePreview={onOpenFilePreview}
             isCollapsed={isCollapsed}
             onToggleCollapsed={onToggleCollapsed}

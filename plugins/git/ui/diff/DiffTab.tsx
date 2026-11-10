@@ -138,10 +138,11 @@ function EnvironmentDiffTab({
     tabTarget?.target.kind === "commit" ? tabTarget.target.sha : null;
 
   const openFileInEditor = useCallback(
-    (path: string) => {
+    (path: string, line?: number | null) => {
       navigate.experimental_openFileExternally({
         target: { kind: "workspace", environmentId, path },
-        location: null,
+        location:
+          typeof line === "number" ? { kind: "line", line, column: null } : null,
       });
     },
     [environmentId, navigate],
