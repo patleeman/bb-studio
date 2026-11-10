@@ -1,3 +1,4 @@
+import { FORK_PERMISSION_COMPACT_LABELS } from "./unknownModelLabel.fork";
 import { useMemo } from "react";
 import type { PermissionMode } from "@bb/domain";
 import { LIST_HOVER_TRANSITION } from "@bb/shared-ui/motion";
@@ -64,7 +65,7 @@ export function PermissionModePicker({
   showWhenSingleOption = false,
 }: PermissionModePickerProps) {
   const compactOptions = useMemo(
-    () => addPermissionModeCompactLabels(options),
+    () => (FORK_PERMISSION_COMPACT_LABELS ? addPermissionModeCompactLabels(options) : [...options]),
     [options],
   );
   if (
