@@ -1,4 +1,8 @@
 import { appQueryClient } from "./lib/app-query-client";
+import {
+  FORK_WINDOW_ROUTE_PATH,
+  ForkWindowView,
+} from "./components/fork/ForkWindowView";
 import { environmentProvidersQueryOptions } from "./hooks/queries/environment-provider-queries";
 import { machineProvidersQueryOptions } from "./hooks/queries/machine-provider-queries";
 import { PluginUpdateJobsHost } from "./components/plugin/PluginUpdateJobsHost";
@@ -494,6 +498,7 @@ export function App() {
                   path={AUTH_CALLBACK_ROUTE_PATH}
                   element={<AuthCallbackView />}
                 />
+                <Route path={FORK_WINDOW_ROUTE_PATH} element={<ForkWindowView />} />
                 <Route
                   path="*"
                   element={
