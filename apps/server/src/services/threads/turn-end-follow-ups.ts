@@ -1,3 +1,4 @@
+import { isQuietTurn } from "./quiet-turn.fork.js";
 import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 import {
   events as storedEvents,
@@ -345,7 +346,8 @@ export function planTurnEnd(
     if (
       !alreadyHandledByCommandFailure &&
       !manuallyStopped &&
-      !compactionOnly
+      !compactionOnly &&
+      !isQuietTurn(deps.db, { threadId: thread.id, turnId })
     ) {
       addParentTurnNotificationFollowUp({
         failedParentNotificationThreadIds:
