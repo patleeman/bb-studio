@@ -1,3 +1,4 @@
+import { forkPluginSdkAppImplementation } from "./plugin-sdk-app-impl.fork";
 import { useConversationOutline } from "@/lib/conversation-outline";
 import { lazyComponent } from "./lazy-component";
 import { useTimelineViewport } from "@/lib/timeline-viewport";
@@ -164,6 +165,7 @@ function PanelTabIcon({ tabKey }: ExperimentalPanelTabIconProps) {
 }
 
 export const pluginSdkAppImplementation = {
+  ...forkPluginSdkAppImplementation,
   experimental_getApplicationLinkApprovals: applicationLinkApprovals.list,
   experimental_revokeApplicationLinkApproval: applicationLinkApprovals.revoke,
   definePluginApp,

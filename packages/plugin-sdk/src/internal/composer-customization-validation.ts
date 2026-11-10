@@ -1,3 +1,4 @@
+import { parseForkComposerRegions } from "./fork-composer.js";
 import type {
   ComposerCustomization,
   PluginComposerScope,
@@ -402,6 +403,7 @@ export function collectComposerCustomization(
     requireUniqueId(kind, seenIds, id);
     return {
       id,
+      ...parseForkComposerRegions(`${kind}(${id})`, raw ?? {}, onRejected),
       ...(scopes !== undefined
         ? {
             scopes: (scopes as string[]).filter(

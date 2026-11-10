@@ -1,3 +1,12 @@
+import {
+  forkNavigate,
+  forkSlotEnv,
+  forkTestHooks,
+  type ForkCapturedPluginApp,
+  type ForkNavigateCall,
+  type ForkRenderSlotOptions,
+  type ForkSlotEnv,
+} from "./app.fork.js";
 import { experimental_PluginRpcCallError } from "../rpc-contract.js";
 import { invalidateTags, pluginTagScope } from "@bb/query-tags";
 import { QueryClient } from "@tanstack/react-query";
@@ -259,6 +268,7 @@ type PluginSdkFakeTree<T> = {
  */
 export type PluginSdkTestFakes = PluginSdkFakeTree<PluginBrowserBbSdk>;
 export type NavigateCall =
+  | ForkNavigateCall
   | {
       method: "toThread";
       threadId: string;
@@ -376,7 +386,7 @@ interface TestComposerStore {
   subscribe(listener: () => void): () => void;
 }
 
-interface SlotEnv {
+interface SlotEnv extends ForkSlotEnv {
   rpcQueryHost: RpcQueryHost;
   rpcClient: PluginRpcClient;
   rpcCalls: RpcCall[];
@@ -1794,6 +1804,7 @@ function testLazy<T extends React.ComponentType<any>>(
 
 const testPluginSdkApp = {
   experimental_lazy: testLazy,
+  ...forkTestHooks(useSlotEnv),
   experimental_getApplicationLinkApprovals: async (): Promise<string[]> => [],
   experimental_revokeApplicationLinkApproval: async (
     _scheme: string | null,
@@ -2292,7 +2303,7 @@ export function installTestPluginRuntime(): void {
 // loadPluginApp — run setup, capture typed slot registrations.
 // ---------------------------------------------------------------------------
 
-export interface CapturedPluginApp {
+export interface CapturedPluginApp extends ForkCapturedPluginApp {
   /** `app.commands.register` registrations, after the host's validation. */
   commands: PluginCommandRegistration[];
   /** `app.composer.experimental_registerCommand` registrations, after the host's validation. */
@@ -2577,7 +2588,7 @@ export type PluginRpcTestHandlers<Contract extends PluginRpcContract> = {
 
 export interface RenderSlotOptions<
   Contract extends PluginRpcContract = PluginRpcContract,
-> {
+> extends ForkRenderSlotOptions {
   /**
    * Backing handlers for `useRpc().call`: method name → implementation.
    * Inputs and results are JSON-round-tripped like the wire; a method
@@ -3335,6 +3346,7 @@ export function renderSlot<
   const navigate: BbNavigate & {
     openThreadPanel(options: RetiredActionTabOpenOptions): boolean;
   } = {
+    ...forkNavigate((call) => navigateCalls.push(call)),
     toThread(threadId, threadOptions) {
       assertTestMessageSeq(threadOptions?.messageSeq);
       navigateCalls.push({
@@ -3689,6 +3701,7 @@ export function renderSlot<
     call: (_pluginId, method, input) => callRpc(method, input),
   };
   const env: SlotEnv = {
+    ...forkSlotEnv(options, (call) => navigateCalls.push(call)),
     rpcQueryHost,
     rpcClient,
     rpcCalls,

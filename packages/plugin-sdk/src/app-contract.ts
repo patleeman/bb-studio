@@ -1,4 +1,14 @@
 import type {
+  ForkBbNavigate,
+  ForkComposerCustomization,
+  ForkFileOpenerFields,
+  ForkPluginAppSlots,
+  ForkPluginSdkApp,
+  ForkTabFields,
+  ForkThreadListFields,
+} from "./app-contract.fork.js";
+export type * from "./app-contract.fork.js";
+import type {
   ExperimentalRpcKeyedMethod,
   ExperimentalRpcKeyedValue,
   experimental_PluginRpcCallError,
@@ -1166,7 +1176,7 @@ export interface ExperimentalTabReference {
   availability: "fixed" | "action";
 }
 
-type ExperimentalTabCommon = ExperimentalTabReference & {
+type ExperimentalTabCommon = ExperimentalTabReference & ForkTabFields & {
   title: string;
   icon: BbIconName;
   tooltip?: string;
@@ -1208,7 +1218,7 @@ type ExperimentalTabInput<
   context: C;
   availability: A;
   useVisible?(props: ExperimentalTabContextProps<C>): boolean;
-} & (A extends "fixed"
+} & ForkTabFields & (A extends "fixed"
   ? {
       component: ComponentType<ExperimentalTabContextProps<C>>;
       run?: never;
@@ -2967,7 +2977,7 @@ export interface PluginSidebarThreadSplit {
  * every sidebar — they are shared surfaces (other plugins live in two of
  * them), and a replaced list must not be able to remove them.
  */
-export interface PluginThreadListRegistration {
+export interface PluginThreadListRegistration extends ForkThreadListFields {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Label shown in Settings → Appearance and capability details. */
@@ -3031,7 +3041,7 @@ export interface ExperimentalSidebarNavigationRegistration {
  * and thread-storage files — never to git-ref snapshots (diff views always
  * use BB's preview).
  */
-export interface PluginFileOpenerRegistration {
+export interface PluginFileOpenerRegistration extends ForkFileOpenerFields {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Label in the "Open with" menu (e.g. "Notes editor"). */
@@ -4606,7 +4616,7 @@ export interface ExperimentalAppIcons {
 export interface PluginAppBuilder {
   experimental_icons: ExperimentalAppIcons;
   commands: PluginAppCommands;
-  slots: PluginAppSlots;
+  slots: PluginAppSlots & ForkPluginAppSlots;
   composer: PluginAppComposer;
   contentScripts: PluginAppContentScripts;
   /** Experimental managed region for actions and disclosures in the sidebar footer. */
@@ -4686,7 +4696,7 @@ export type PluginComposerScope =
     };
 
 /** One plugin-owned composer customization registration. */
-export interface ComposerCustomization {
+export interface ComposerCustomization extends ForkComposerCustomization {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /**
@@ -5743,6 +5753,7 @@ export type ExperimentalOpenTabOptions =
       title?: never;
     }
   | {
+      experimental_global?: boolean;
       tab: ExperimentalTabReference & { availability: "action" };
       params?: JsonValue;
       title?: string;
@@ -5880,7 +5891,7 @@ export interface ExperimentalSettingsTarget {
   section: ExperimentalSettingsSection;
 }
 
-export interface BbNavigate {
+export interface BbNavigate extends ForkBbNavigate {
   /**
    * Open a thread. `split: true` applies bb's split placement rules (a right
    * split by default, focus when already open, replace at the pane cap) and
@@ -6170,7 +6181,7 @@ export type ExperimentalLazyComponent<P> = (props: P) => ReactNode;
  * the real implementation and `satisfies` this interface; `bb plugin build`
  * shims the specifier to that object on `globalThis.__bbPluginRuntime`.
  */
-export interface PluginSdkApp {
+export interface PluginSdkApp extends ForkPluginSdkApp {
   /**
    * Load a component from a separate chunk instead of the plugin's startup
    * bundle. `load` is a dynamic import resolving to `{ default: Component }`,
