@@ -1,3 +1,5 @@
+import { FORK_UI_PREFERENCE_KEYS, forkUiPreferenceDefinitions } from "./ui-preferences.fork.js";
+export * from "./ui-preferences.fork.js";
 import { z } from "zod";
 import { GIT_PLUGIN_ID } from "./plugin-id.js";
 
@@ -35,6 +37,7 @@ const sidebarHiddenGroupsSchema = z
   .transform((value) => [...new Set(value)]);
 
 export const UI_PREFERENCE_KEYS = [
+  ...FORK_UI_PREFERENCE_KEYS,
   "sidebar.organizationMode",
   "sidebar.threadGrouping.environment",
   "sidebar.chronologicalSort",
@@ -75,6 +78,7 @@ function defineUiPreference<Schema extends z.ZodTypeAny>(
 }
 
 export const uiPreferenceDefinitions = {
+  ...forkUiPreferenceDefinitions,
   "sidebar.organizationMode": defineUiPreference(
     sidebarOrganizationModeSchema,
     "chronological",
