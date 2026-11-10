@@ -8,7 +8,9 @@ import type {
   SplitSide,
 } from "./types";
 
-export const MAX_PANES = 8;
+export const MAIN_SPLITS_ENABLED = false;
+export const MAX_PANES = MAIN_SPLITS_ENABLED ? 8 : 1;
+const SPLIT_TREE_MAX_PANES = 8;
 
 const MIN_SIZE = 0.15;
 const MAX_SIZE = 0.85;
@@ -180,7 +182,7 @@ export function splitPane(
   content: PaneContent,
 ): SplitLayout {
   if (
-    countPanes(layout.root) >= MAX_PANES ||
+    countPanes(layout.root) >= SPLIT_TREE_MAX_PANES ||
     findPane(layout.root, targetPaneId) === null
   ) {
     return layout;
