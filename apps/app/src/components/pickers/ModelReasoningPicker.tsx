@@ -1,3 +1,4 @@
+import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
 import {
   useCallback,
   useEffect,
@@ -303,7 +304,7 @@ export function ModelReasoningPicker({
     selectedModelOption?.label ??
     (modelIsLoading
       ? (formatModelLabel ?? formatFallbackModelLabel)(modelValue)
-      : modelValue);
+      : formatUnknownModelLabel(modelValue));
   const hasSelectedModel = selectedModelLabel.trim().length > 0;
   const showLoadingTrigger = modelIsLoading && !hasSelectedModel;
   const selectedProviderLabel = selectedProvider?.label ?? selectedProviderId;
@@ -356,10 +357,7 @@ export function ModelReasoningPicker({
   const selectedReasoningOption = reasoningOptions.find(
     (r) => r.value === reasoningValue,
   );
-  const triggerReasoningLabel = hasSelectedModel
-    ? (selectedReasoningOption?.label ??
-      (modelIsLoading ? reasoningLevelLabel(reasoningValue, undefined) : null))
-    : null;
+  const triggerReasoningLabel = forkTriggerReasoningLabel({ hasSelectedModel, modelKnown: selectedModelOption !== undefined, optionLabel: selectedReasoningOption?.label, storedLabel: reasoningLevelLabel(reasoningValue, undefined) });
 
   const isPreviewing =
     previewProviderId !== null && previewProviderId !== selectedProviderId;
