@@ -1,3 +1,5 @@
+import { withForkApiSymbols } from "./surfaces.fork";
+
 export interface PluginSurface {
   id: string;
   title: string;
@@ -37,7 +39,7 @@ export function fixtureResponsiveStrategy(
   return group.fixtureKind === "spatial" ? "scale-together" : "reflow";
 }
 
-export const SURFACE_GROUPS: SurfaceGroup[] = [
+export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
   {
     id: "app-shell",
     title: "The bb app window",
@@ -1911,7 +1913,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
       },
     ],
   },
-];
+]);
 
 export const GROUP_BY_SURFACE_ID: ReadonlyMap<
   string,
