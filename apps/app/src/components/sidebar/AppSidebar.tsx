@@ -1,3 +1,5 @@
+import { PluginSidebarSections } from "./ForkSidebarSections";
+import { useForkSidebarStyle } from "./ForkSidebarStyle";
 import {
   useCallback,
   useEffect,
@@ -356,6 +358,7 @@ export function AppSidebar({
             replacement={threadListReplacement}
             onNavigate={closeOnMobile}
           />
+          <PluginSidebarSections onNavigate={closeOnMobile} />
         </ThreadActionSurfaceVisibility>
       </SidebarContent>
       <div
@@ -400,7 +403,7 @@ export function AppSidebar({
         onOpenCustomize={navigationCustomize.open}
         splitEnabled
       >
-        <Sidebar ref={sidebarRef}>
+        <Sidebar ref={sidebarRef} {...useForkSidebarStyle()}>
           <div className="grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto]">
             {placement === "rail"
               ? navigationRegion(
