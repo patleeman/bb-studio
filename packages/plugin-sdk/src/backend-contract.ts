@@ -17,6 +17,13 @@ import type {
   ThreadTurnInitiator,
   WorkspaceProvisionType,
 } from "@bb/domain";
+import type {
+  ForkPluginEventPayloads,
+  ForkPluginHooks,
+  ForkThreadIdlePayload,
+} from "./backend-contract.fork.js";
+
+export * from "./backend-contract.fork.js";
 import type { MachineBootstrapApi } from "./machine-bootstrap.js";
 import type Database from "better-sqlite3";
 import type { Context } from "hono";
@@ -279,7 +286,7 @@ export interface PluginTurnFailedEvent {
  * `thread` is the same public DTO GET /threads/:id serves and `entry` is the
  * queued row GET /threads/:id/queued-messages serves.
  */
-export interface PluginThreadEventPayloads {
+export interface PluginThreadEventPayloads extends ForkPluginEventPayloads {
   "experimental_environment.removed": { removal: EnvironmentRemoval };
 
   /** Debounced per thread (at most once per second), with the latest sequence and current thread DTO. Reading history does not emit this event. */
@@ -317,7 +324,7 @@ export interface PluginThreadEventPayloads {
   "thread.active": { thread: ThreadResponse };
   /** Fired when a thread transitions into `idle`. `lastAssistantText` is
    * assembled the same way GET /threads/:id/output is. */
-  "thread.idle": { thread: ThreadResponse; lastAssistantText: string | null };
+  "thread.idle": { thread: ThreadResponse; lastAssistantText: string | null } & ForkThreadIdlePayload;
   /** Fired when a thread transitions into `error`. `error` is the latest
    * system/error event message, when one exists. */
   "thread.failed": { thread: ThreadResponse; error: string | null };
@@ -756,7 +763,7 @@ export type PluginHookHandler<K extends PluginHookName> = (
   | PluginHookSignatures[K]["decision"]
   | Promise<PluginHookSignatures[K]["decision"]>;
 
-export interface PluginHooks {
+export interface PluginHooks extends ForkPluginHooks {
   /**
    * Answer a hook.
    *
