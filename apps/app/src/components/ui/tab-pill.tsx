@@ -36,6 +36,7 @@ interface TabPillProps {
   labelMaxWidthClass?: string;
   closeAction: TabPillCloseAction | null;
   enlargeCloseTargetOnCoarsePointer?: boolean;
+  keepCloseVisibleWhenActive?: boolean;
 }
 
 export function TabPill({
@@ -52,6 +53,7 @@ export function TabPill({
   labelMaxWidthClass = TAB_PILL_DEFAULT_LABEL_MAX_WIDTH_CLASS,
   closeAction,
   enlargeCloseTargetOnCoarsePointer = false,
+  keepCloseVisibleWhenActive = false,
 }: TabPillProps) {
   return (
     <div
@@ -67,7 +69,7 @@ export function TabPill({
       className={cn(
         `group/tab-pill relative inline-flex h-7 shrink-0 items-center rounded-md ${LIST_HOVER_TRANSITION} max-md:pointer-coarse:h-9`,
         COARSE_POINTER_TEXT_SM_CLASS,
-        compact && "max-w-full",
+        (compact || keepCloseVisibleWhenActive) && "max-w-full",
         isActive
           ? cn(CONTEXT_SELECTION_SURFACE_CLASS, "text-foreground")
           : "text-muted-foreground hover:bg-state-hover",
@@ -102,6 +104,10 @@ export function TabPill({
             className={cn(
               TAB_PILL_LEADING_VISUAL_CLASS,
               !iconOnly && "mr-1.5",
+              closeAction &&
+                keepCloseVisibleWhenActive &&
+                isActive &&
+                "opacity-0",
               closeAction &&
                 (compact
                   ? "group-hover/tab-pill:opacity-0 group-focus-within/tab-pill:opacity-0"
@@ -141,6 +147,7 @@ export function TabPill({
           compact={compact}
           enlargeCloseTargetOnCoarsePointer={enlargeCloseTargetOnCoarsePointer}
           isActive={isActive}
+          alwaysVisible={keepCloseVisibleWhenActive && isActive}
         />
       ) : null}
     </div>
@@ -152,11 +159,13 @@ function TabPillCloseButton({
   compact,
   enlargeCloseTargetOnCoarsePointer,
   isActive,
+  alwaysVisible,
 }: {
   closeAction: TabPillCloseAction;
   compact: boolean;
   enlargeCloseTargetOnCoarsePointer: boolean;
   isActive: boolean;
+  alwaysVisible: boolean;
 }) {
   const button = (
     <button
@@ -169,6 +178,7 @@ function TabPillCloseButton({
       data-tab-pill-close
       className={cn(
         TAB_PILL_CLOSE_BUTTON_CLASS,
+        alwaysVisible && "pointer-events-auto opacity-100",
         compact &&
           "left-2 top-auto z-auto translate-y-0 group-focus-within/tab-pill:pointer-events-auto group-focus-within/tab-pill:opacity-100",
         compact && !isActive && "[@media(hover:none)]:hidden",
