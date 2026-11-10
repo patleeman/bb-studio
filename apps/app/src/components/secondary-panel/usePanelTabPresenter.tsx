@@ -1,4 +1,5 @@
 import { useCallback, type ReactNode } from "react";
+import { pluginTabInstanceIcon } from "@/lib/fork-tab-icon";
 import type { TerminalSession } from "@bb/server-contract";
 import { getEnvironmentFilePreviewSourceRef } from "@bb/client-core";
 import { COARSE_POINTER_COMPACT_ICON_SIZE_CLASS } from "@bb/shared-ui/coarse-pointer-sizing";
@@ -132,7 +133,7 @@ export function usePanelTabPresenter({
             leadingVisual: (
               <PluginItemIcon
                 pluginId={tab.pluginId}
-                icon={action?.icon ?? null}
+                icon={pluginTabInstanceIcon(tab) ?? action?.icon ?? null}
                 className={COARSE_POINTER_COMPACT_ICON_SIZE_CLASS}
               />
             ),

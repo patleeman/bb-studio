@@ -226,6 +226,7 @@ function createUiPreferences(): UiPreferenceEntries {
     "threadContextCard.collapsedSections": uiPreferenceEntry(
       "threadContextCard.collapsedSections",
     ),
+    "workbench.globalTabs": uiPreferenceEntry("workbench.globalTabs"),
   };
 }
 
