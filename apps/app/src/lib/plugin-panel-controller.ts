@@ -1,3 +1,4 @@
+import { withGlobalPlacement } from "@/lib/fork-plugin-global-tabs";
 import type {
   ExperimentalOpenTabOptions,
   ExperimentalPanelController,
@@ -44,7 +45,7 @@ export function createPluginPanelController(
 ): ExperimentalPanelController {
   return {
     openTab: (options) =>
-      getController()?.openTab(toAppTabIntent(pluginId, options)) ?? false,
+      getController()?.openTab(toAppTabIntent(pluginId, withGlobalPlacement(pluginId, options))) ?? false,
     toggleTab: (options) =>
       getController()?.toggleTab(toAppTabIntent(pluginId, options)) ?? false,
     getTabs: () => getController()?.getTabs() ?? NO_PANEL_TABS,

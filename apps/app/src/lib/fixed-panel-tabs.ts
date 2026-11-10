@@ -1,3 +1,4 @@
+import { forkFixedPanelTabsAtoms } from "./fixed-panel-tabs.fork";
 import {
   useCallback,
   useEffect,
@@ -111,9 +112,11 @@ export function resetFixedPanelTabsStateForTest(): void {
   fixedPanelTabsStateAtomFamily.setShouldRemove(null);
 }
 
+export const forkFixedPanelTabs = forkFixedPanelTabsAtoms(fixedPanelTabsStateAtomFamily, disabledFixedPanelTabsStateAtom);
+
 function getFixedPanelTabsStateAtom(threadId: string | null | undefined) {
   return hasThreadId(threadId)
-    ? fixedPanelTabsStateAtomFamily(threadId)
+    ? forkFixedPanelTabs.merged(threadId)
     : disabledFixedPanelTabsStateAtom;
 }
 
@@ -288,7 +291,7 @@ export function useFixedPanelTabsState(
   panelStateId: FixedPanelTabsPanelStateId,
   syncThreadId: FixedPanelTabsSyncThreadId,
 ): FixedPanelTabsState {
-  const stateAtom = getFixedPanelTabsStateAtom(panelStateId);
+  const stateAtom = forkFixedPanelTabs.owned(panelStateId);
   const store = useStore();
   const state = useAtomValue(stateAtom);
   const setState = useSetAtom(stateAtom);
@@ -340,7 +343,7 @@ export function useFixedPanelTabsState(
     tabsQuery.data,
   ]);
 
-  return state;
+  return useAtomValue(getFixedPanelTabsStateAtom(panelStateId));
 }
 
 export function useGetFixedPanelTabsState(
@@ -374,17 +377,17 @@ export function useUpdateFixedPanelTabsState(
       const current = store.get(stateAtom);
       const touched = applyFixedPanelTabsUpdate(current, update, Date.now());
       if (touched === null) return;
-      setState(touched);
+      const owned = forkFixedPanelTabs.ownedTabs(store, panelStateId, () => setState(touched));
       if (
         hasThreadId(syncThreadId) &&
         !areThreadTabListsEquivalent(
-          current.secondary.tabs,
-          touched.secondary.tabs,
+          owned.before,
+          owned.after,
         )
       ) {
         scheduleThreadTabsPersistence({
-          previousTabs: current.secondary.tabs,
-          tabs: touched.secondary.tabs,
+          previousTabs: owned.before,
+          tabs: owned.after,
           queryClient,
           threadId: syncThreadId,
         });
