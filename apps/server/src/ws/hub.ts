@@ -2,6 +2,7 @@ import {
   emitPluginThreadEvents,
   emitPluginThreadRead,
 } from "../services/plugins/plugin-thread-events.js";
+import { announceThreadFilesChanged } from "../services/plugins/fork-plugin-events.js";
 import { Buffer } from "node:buffer";
 import {
   realtimeSubscriptionTargetKey as subscriptionKey,
@@ -1068,6 +1069,7 @@ export class NotificationHub implements DbNotifier {
     metadata?: ThreadChangeMetadata,
   ): void {
     if (changes.includes("events-appended")) emitPluginThreadEvents(threadId);
+    if (changes.includes("events-appended")) announceThreadFilesChanged(threadId);
     if (changes.includes("read-state-changed")) emitPluginThreadRead(threadId);
     const message: ThreadChangedMessage = {
       type: "changed",
