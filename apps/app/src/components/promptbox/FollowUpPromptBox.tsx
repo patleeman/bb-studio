@@ -26,6 +26,7 @@ import type { ComposerSubmitExtras } from "@get-bb/plugin-sdk/internal/composer-
 import type { ComposerTextEffectSource } from "@/lib/composer-text-effects";
 import { modifierSubmitShortcutLabel } from "./modifier-submit-shortcut";
 import { isKeyboardFocusTarget } from "@/components/layout/useMobileVisualViewportHeight";
+import { PluginComposerFooter } from "@/components/plugin/ForkComposerFooter";
 import { ComposerBannersSlot } from "@/components/plugin/PluginComposerBanners";
 import {
   composerScopeIdentity,
@@ -822,6 +823,11 @@ function FollowUpPromptBoxWithComposer({
             {isCompactViewport ? compactEnvironmentSummary : environmentSummary}
           </div>
           <div className="flex shrink-0 items-center gap-2 max-md:gap-0">
+            <PluginComposerFooter
+              scope={
+                suppressPluginComposerCustomizations ? null : composerScope
+              }
+            />
             {sessionOptionsControl}
             {permissionControl}
             {contextWindowUsage ? (
