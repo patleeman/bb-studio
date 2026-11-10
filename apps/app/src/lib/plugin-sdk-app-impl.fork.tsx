@@ -1,0 +1,29 @@
+import type { ForkPluginSdkApp } from "@get-bb/plugin-sdk";
+import { usePluginLauncherItems } from "@/lib/fork-launcher-items";
+import { usePluginContextCard } from "@/components/thread/timeline/ForkContextCard";
+import { usePluginWindows } from "@/lib/fork-windows";
+import { readDragItem, writeDragItem } from "@/lib/fork-item-drag";
+import {
+  PluginProjectActionsContextMenu,
+  PluginProjectActionsMenu,
+} from "@/components/project/ForkProjectMenus";
+import { useAppPanes } from "./fork-app-panes";
+import { usePluginAppTheme } from "./fork-app-theme";
+import { usePluginGlobalTabs } from "./fork-plugin-global-tabs";
+import { usePluginSidebarNewItems } from "./fork-sidebar-new-items";
+import { useAppRoute } from "./plugin-navigation.fork";
+
+export const forkPluginSdkAppImplementation = {
+  experimental_useAppRoute: useAppRoute,
+  experimental_useAppPanes: useAppPanes,
+  experimental_useAppTheme: usePluginAppTheme,
+  experimental_useGlobalTabs: usePluginGlobalTabs,
+  experimental_useSidebarNewItems: usePluginSidebarNewItems,
+  experimental_useWindows: usePluginWindows,
+  experimental_useLauncherItems: usePluginLauncherItems,
+  experimental_useContextCard: usePluginContextCard,
+  experimental_writeDragItem: writeDragItem,
+  experimental_readDragItem: readDragItem,
+  experimental_ProjectActionsMenu: PluginProjectActionsMenu,
+  experimental_ProjectActionsContextMenu: PluginProjectActionsContextMenu,
+} satisfies ForkPluginSdkApp;
