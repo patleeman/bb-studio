@@ -1,3 +1,4 @@
+import { forkHostStandsIn } from "./thread-fork-hosts.fork.js";
 import { requestThreadStorageDeletion } from "./thread-lifecycle.js";
 import { seedThreadSessionOptionSelections } from "./thread-session-options.js";
 import {
@@ -277,6 +278,7 @@ function assertForkSourceHost(
       `Fork environment must name the source thread's host (${sourceEnvironment.hostId})`,
     );
   }
+  if (forkHostStandsIn(args.sourceThread, sourceEnvironment?.hostId ?? null, args.childHostId)) return;
   if (
     sourceEnvironment !== null &&
     sourceEnvironment.hostId !== args.childHostId
