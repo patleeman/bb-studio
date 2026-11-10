@@ -1,0 +1,692 @@
+diff --git a/apps/app/.ladle/machine-story-fixtures.ts b/apps/app/.ladle/machine-story-fixtures.ts
+index ef0d418bc7..7ba7598f4e 100644
+--- a/apps/app/.ladle/machine-story-fixtures.ts
++++ b/apps/app/.ladle/machine-story-fixtures.ts
+@@ -4,7 +4,9 @@ import type {
+ } from "@bb/server-contract";
+ import { machineServerAccessBlockedReason } from "../src/components/machines/machine-server-access";
+ import type { MachineAccessState } from "../src/components/settings/MachineAccessSettings";
+-import modalLogoUrl from "../../../plugins/environment-modal-sandbox/modal-logo.svg";
++
++const modalLogoUrl =
++  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
+ 
+ const noop = () => {};
+ const noopAsync = async () => {};
+diff --git a/apps/app/src/components/onboarding/onboarding-model.ts b/apps/app/src/components/onboarding/onboarding-model.ts
+index f155833646..8848853b3e 100644
+--- a/apps/app/src/components/onboarding/onboarding-model.ts
++++ b/apps/app/src/components/onboarding/onboarding-model.ts
+@@ -28,8 +28,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = "bb-official";
+ export const ONBOARDING_PLUGIN_ENTRY_IDS: readonly string[] = [
+   "browser-automation",
+   "workflows",
+-  "monaco-editor",
+-  "prompt-library",
+   "agent-annotations",
+   "ask-user-question",
+ ];
+diff --git a/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx b/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx
+index b427084784..ff54ae9b2a 100644
+--- a/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx
++++ b/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx
+@@ -1,6 +1,5 @@
+ import type { ProjectSource } from "@bb/domain";
+ import type { SystemEnvironmentProvider } from "@bb/server-contract";
+-import modalLogoUrl from "../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
+ import { EnvironmentPickerUI } from "./EnvironmentPicker";
+ import { ProjectSelector } from "./ProjectSelector";
+ import { StoryCard, StoryRow } from "../../../.ladle/story-card";
+@@ -11,6 +10,9 @@ import {
+   STORY_ENVIRONMENT_PROVIDERS,
+ } from "../../../.ladle/story-fixtures";
+ 
++const modalLogoUrl =
++  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
++
+ const localHost = makeHost({ id: HOST_IDS.local });
+ const remoteHost = makeHost({ id: HOST_IDS.local, name: "studio-mac-mini" });
+ const longRemoteHost = makeHost({
+diff --git a/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx b/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx
+index 105c0bc6af..e4003065c4 100644
+--- a/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx
++++ b/apps/app/src/components/promptbox/banner/ThreadMachineStatus.stories.tsx
+@@ -1,9 +1,11 @@
+ import type { SystemMachineProvider } from "@bb/server-contract";
+-import modalLogoUrl from "../../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
+ import { StoryCard, StoryRow } from "../../../../.ladle/story-card";
+ import { ResponsiveStage } from "./banner-story-stages";
+ import { ThreadMachineStatusBanner } from "./ThreadMachineStatus";
+ 
++const modalLogoUrl =
++  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
++
+ export default {
+   title: "promptbox/banner/Machine Status",
+ };
+diff --git a/apps/server/src/services/plugins/builtin-registry.ts b/apps/server/src/services/plugins/builtin-registry.ts
+index 7b8f53a390..0be860ba7e 100644
+--- a/apps/server/src/services/plugins/builtin-registry.ts
++++ b/apps/server/src/services/plugins/builtin-registry.ts
+@@ -65,21 +65,11 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "bb-account",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "bb-ai",
+-    pluginId: "bb-ai",
+-    defaultEnabled: true,
+-  },
+   {
+     name: "connect",
+     pluginId: "connect",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "connect-next",
+-    pluginId: "bb--connect-next",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "environment-project-checkout",
+     pluginId: "environment-project-checkout",
+@@ -95,26 +85,6 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "environment-personal-workspace",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "custom-instructions",
+-    pluginId: "custom-instructions",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "plugin-api-tester",
+-    pluginId: "plugin-api-tester",
+-    defaultEnabled: false,
+-  },
+-  {
+-    name: "inline-vis",
+-    pluginId: "inline-vis",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "monaco-editor",
+-    pluginId: "monaco-editor",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "pdf-preview",
+     pluginId: "pdf-preview",
+@@ -195,16 +165,6 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "navigation",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "prompt-library",
+-    pluginId: "bb--prompt-library",
+-    defaultEnabled: false,
+-  },
+-  {
+-    name: "mcp",
+-    pluginId: "bb--mcp",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "scheduled-send",
+     pluginId: "scheduled-send",
+@@ -220,11 +180,6 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "concurrency-limit",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "side-chat",
+-    pluginId: "side-chat",
+-    defaultEnabled: true,
+-  },
+   {
+     name: "workflows",
+     pluginId: "workflows",
+@@ -235,52 +190,17 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "bb--composer",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "github-star",
+-    pluginId: "bb--github-star",
+-    defaultEnabled: true,
+-  },
+ ].map((plugin): BundledPluginDefinition => ({
+   ...plugin,
+   autoInstall: true,
+ }));
+ 
+ export const OFFICIAL_PLUGINS = [
+-  {
+-    name: "environment-modal-sandbox",
+-    pluginId: "environment-modal-sandbox",
+-    defaultEnabled: true,
+-  },
+   {
+     name: "browser-automation",
+     pluginId: "browser-automation",
+     defaultEnabled: false,
+   },
+-  {
+-    name: "github",
+-    pluginId: "github",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "docs",
+-    pluginId: "simple-notes",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "memory",
+-    pluginId: "memory",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "tasks",
+-    pluginId: "tasks",
+-    defaultEnabled: true,
+-  },
+-  {
+-    name: "theme-preview",
+-    pluginId: "theme-preview",
+-    defaultEnabled: true,
+-  },
+ ].map((plugin): BundledPluginDefinition => ({
+   ...plugin,
+   autoInstall: false,
+diff --git a/apps/server/test/services/plugins/builtin-registry.test.ts b/apps/server/test/services/plugins/builtin-registry.test.ts
+index 8fed7050ef..a9f1a59440 100644
+--- a/apps/server/test/services/plugins/builtin-registry.test.ts
++++ b/apps/server/test/services/plugins/builtin-registry.test.ts
+@@ -15,26 +15,18 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
+   "ask-user-question",
+   "automations",
+   "bb-account",
+-  "bb-ai",
+   "bb-guide",
+   "browser-automation",
+   "concurrency-limit",
+   "connect",
+-  "custom-instructions",
+   "drafts",
+   "environment-git-worktree",
+-  "environment-modal-sandbox",
+   "environment-personal-workspace",
+   "environment-project-checkout",
+-  "github",
+-  "inline-vis",
+   "keep-awake",
+-  "memory",
+-  "monaco-editor",
+   "navigation",
+   "pdf-preview",
+   "plugin-api-docs",
+-  "plugin-api-tester",
+   "provider-acp",
+   "provider-claude-code",
+   "provider-codex",
+@@ -44,9 +36,6 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
+   "scheduled-send",
+   "secrets",
+   "side-chat",
+-  "simple-notes",
+-  "tasks",
+-  "theme-preview",
+   "thread-list",
+   "workflows",
+ ];
+diff --git a/apps/web/src/marketplace/bundled-marketplace.test.ts b/apps/web/src/marketplace/bundled-marketplace.test.ts
+index 0182b482d9..81bc29fd76 100644
+--- a/apps/web/src/marketplace/bundled-marketplace.test.ts
++++ b/apps/web/src/marketplace/bundled-marketplace.test.ts
+@@ -164,12 +164,12 @@ describe("bundled plugin setup", () => {
+   });
+ 
+   it("uses the source name for install commands", () => {
+-    const docs = bundledMarketplace().plugins.find(
+-      (entry) => entry.id === "simple-notes",
++    const browser = bundledMarketplace().plugins.find(
++      (entry) => entry.id === "browser-automation",
+     );
+-    expect(docs && bundledPluginSetup(docs)).toEqual({
++    expect(browser && bundledPluginSetup(browser)).toEqual({
+       kind: "install",
+-      command: "bb plugin install docs",
++      command: "bb plugin install browser-automation",
+     });
+     const guide = bundledMarketplace().plugins.find(
+       (entry) => entry.id === "bb-guide",
+diff --git a/apps/web/src/marketplace/bundled-marketplace.ts b/apps/web/src/marketplace/bundled-marketplace.ts
+index 0a0baadc44..a3f7e74b4c 100644
+--- a/apps/web/src/marketplace/bundled-marketplace.ts
++++ b/apps/web/src/marketplace/bundled-marketplace.ts
+@@ -11,7 +11,6 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+   "environment-git-worktree",
+   "environment-personal-workspace",
+   "environment-project-checkout",
+-  "plugin-api-tester",
+   "provider-acp",
+   "provider-claude-code",
+   "provider-codex",
+@@ -20,22 +19,12 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+ 
+ export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+   "browser-automation",
+-  "docs",
+-  "environment-modal-sandbox",
+-  "github",
+-  "memory",
+-  "tasks",
+-  "theme-preview",
+ ]);
+ 
+ export const OFF_BY_DEFAULT_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+   "agent-annotations",
+   "ask-user-question",
+-  "connect-next",
+-  "mcp",
+-  "monaco-editor",
+   "plugin-api-docs",
+-  "prompt-library",
+   "storage-retention",
+   "workflows",
+ ]);
+diff --git a/plugins/plugin-api-docs/test/mobile-guide.test.ts b/plugins/plugin-api-docs/test/mobile-guide.test.ts
+index c3d5714694..62a9cb8408 100644
+--- a/plugins/plugin-api-docs/test/mobile-guide.test.ts
++++ b/plugins/plugin-api-docs/test/mobile-guide.test.ts
+@@ -184,20 +184,15 @@ it("pages mobile panes without using annotation selection as navigation", () =>
+         '[aria-label="Next example plugin"]',
+       )!;
+     expect(previousExample().disabled).toBe(true);
+-    for (const name of [
+-      "Automations",
+-      "Docs",
+-      "GitHub",
+-      "Tasks",
+-      "Theme Preview",
+-    ]) {
++    for (const name of ["Automations", "Storage & retention [Experimental]"]) {
+       expect(examples().textContent).toContain(name);
+       expect(
+         examples().querySelectorAll(
+           '[aria-live="polite"] > span:not(.sr-only)',
+         ),
+       ).toHaveLength(1);
+-      if (name !== "Theme Preview") act(() => nextExample().click());
++      if (name !== "Storage & retention [Experimental]")
++        act(() => nextExample().click());
+     }
+     expect(nextExample().disabled).toBe(true);
+     act(() => {
+@@ -205,7 +200,7 @@ it("pages mobile panes without using annotation selection as navigation", () =>
+         new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+       );
+     });
+-    expect(examples().textContent).toContain("Tasks");
++    expect(examples().textContent).toContain("Automations");
+     expect(visiblePage()).toBe("Sidebar");
+     expect(navigate).not.toHaveBeenCalled();
+     act(() => {
+diff --git a/scripts/check-plugin-forks.mjs b/scripts/check-plugin-forks.mjs
+index be5bfd5d01..538601f93e 100644
+--- a/scripts/check-plugin-forks.mjs
++++ b/scripts/check-plugin-forks.mjs
+@@ -361,7 +361,6 @@ try {
+   }
+   const longRunningPlugins = new Set([
+     "plugins/provider-pi",
+-    "plugins/tasks",
+     "plugins/provider-codex",
+   ]);
+   const queue = [...pluginDirs].sort(
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -111,7 +111,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "BbNavigate.toPluginPanel",
+           "BbNavigate.experimental_openTerminal",
+         ],
+-        firstParty: ["Automations", "Docs", "GitHub", "Tasks", "Theme Preview"],
++        firstParty: ["Automations", "Storage & retention [Experimental]"],
+       },
+       {
+         id: "thread-row-status",
+@@ -332,13 +332,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMessageDirectiveProps",
+           "PluginMessageDirectiveOpenWorkspaceFile",
+         ],
+-        firstParty: [
+-          "Browser Automation",
+-          "Docs",
+-          "Inline visualizations",
+-          "Tasks",
+-          "Workflows",
+-        ],
++        firstParty: ["Browser Automation", "Workflows"],
+       },
+       {
+         id: "code-fence-renderers",
+@@ -373,7 +367,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMessageActionContext",
+           "ThreadChatMessageReference",
+         ],
+-        firstParty: ["Side chat"],
++        firstParty: [],
+       },
+       {
+         id: "message-metadata",
+@@ -527,14 +521,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginThreadActionItemInput.experimental_panel",
+           "PluginNewThreadPanelActionContext.experimental_panel",
+         ],
+-        firstParty: [
+-          "Docs",
+-          "Git",
+-          "GitHub",
+-          "Side chat",
+-          "Tasks",
+-          "Workflows",
+-        ],
++        firstParty: ["Git", "Workflows"],
+       },
+       {
+         id: "file-opener",
+@@ -552,7 +539,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginFileOpenerProps",
+           "PluginFileOpenerSource",
+         ],
+-        firstParty: ["Docs", "File Editor", "PDF preview"],
++        firstParty: ["PDF preview"],
+       },
+       {
+         id: "app-overlay",
+@@ -614,7 +601,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginCommandContext",
+           "PluginCommandShortcut",
+         ],
+-        firstParty: ["File Editor"],
++        firstParty: [],
+       },
+     ],
+   },
+@@ -724,7 +711,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginComposerApi.insert",
+           "ComposerMention",
+         ],
+-        firstParty: ["Agent Annotations", "Docs", "Send later", "Workflows"],
++        firstParty: ["Agent Annotations", "Send later", "Workflows"],
+       },
+       {
+         id: "mention-provider",
+@@ -741,7 +728,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMentionSearchContext",
+           "PluginMentionItem",
+         ],
+-        firstParty: ["Agent Annotations", "Docs", "GitHub", "Tasks"],
++        firstParty: ["Agent Annotations"],
+       },
+       {
+         id: "composer-rich-text",
+@@ -914,9 +901,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "BB guide",
+           "Claude Code provider",
+           "Codex provider",
+-          "Custom instructions",
+-          "GitHub",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Push notifications",
+           "Workflows",
+@@ -942,8 +926,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "bb connect",
+           "Concurrency limit",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider usage",
+           "Push notifications",
+         ],
+@@ -967,12 +949,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Send them to Settings, then reload after they save",
+         ],
+         apiSymbols: ["PluginStatusApi"],
+-        firstParty: [
+-          "Account Pooler [Experimental]",
+-          "GitHub",
+-          "Modal Sandbox [Experimental]",
+-          "Workflows",
+-        ],
++        firstParty: ["Account Pooler [Experimental]", "Workflows"],
+       },
+     ],
+   },
+@@ -1044,20 +1021,13 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Account Pooler [Experimental]",
+           "Automations",
+           "bb account",
+-          "bb cloud AI",
+           "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Push notifications",
+           "Secrets",
+-          "Tasks",
+           "Thread list",
+           "Workflows",
+         ],
+@@ -1086,23 +1056,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Ask User Question",
+           "Automations",
+           "bb account",
+-          "bb cloud AI",
+           "bb connect",
+           "BB guide",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "Inline visualizations",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Pi provider",
+           "Provider retry",
+           "Secrets",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+           "Workflows",
+         ],
+@@ -1126,13 +1088,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "bb account",
+           "bb connect",
+           "Concurrency limit",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Modal Sandbox [Experimental]",
+           "Push notifications",
+-          "Side chat",
+-          "Theme Preview",
+           "Workflows",
+         ],
+       },
+@@ -1206,25 +1163,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Agent Annotations",
+           "Automations",
+           "bb account",
+-          "bb cloud AI",
+           "bb connect",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+           "GitHub PR Status",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Provider usage",
+           "Push notifications",
+-          "Side chat",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+           "Workflows",
+           "Worktree",
+@@ -1252,11 +1199,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Modal Sandbox [Experimental]",
+           "Provider retry",
+           "Provider usage",
+           "Push notifications",
+-          "Tasks",
+           "Workflows",
+         ],
+       },
+@@ -1323,12 +1268,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginEnvironmentProviderRemoveContext",
+           "PluginEnvironmentProviderRemoveResult",
+         ],
+-        firstParty: [
+-          "Modal Sandbox [Experimental]",
+-          "Personal workspace",
+-          "Project checkout",
+-          "Worktree",
+-        ],
++        firstParty: ["Personal workspace", "Project checkout", "Worktree"],
+         experimental: true,
+       },
+       {
+@@ -1374,7 +1314,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginMachineProviderResource",
+           "PluginMachineProviderRemoveResult",
+         ],
+-        firstParty: ["Modal Sandbox [Experimental]"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -1570,19 +1510,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Agent Annotations",
+           "Automations",
+           "bb account",
+-          "bb cloud AI",
+           "bb connect",
+           "Browser Automation",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+-          "GitHub",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "Push notifications",
+-          "Side chat",
+-          "Tasks",
+           "Thread list",
+           "Workflows",
+         ],
+@@ -1638,27 +1570,18 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Account Pooler [Experimental]",
+           "ACP providers",
+           "Automations",
+-          "bb cloud AI",
+           "bb connect",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Modal Sandbox [Experimental]",
+           "Project checkout",
+           "Provider retry",
+           "Provider usage",
+           "Push notifications",
+           "Secrets",
+-          "Side chat",
+           "Storage & retention [Experimental]",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+           "Workflows",
+           "Worktree",
+@@ -1723,7 +1646,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginAiServiceDeclaration",
+           "PluginAiServiceStatus",
+         ],
+-        firstParty: ["bb cloud AI", "Codex provider"],
++        firstParty: ["Codex provider"],
+         experimental: true,
+       },
+       {
+@@ -1793,13 +1716,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Automations",
+           "bb account",
+           "bb connect",
+-          "Docs",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Provider usage",
+-          "Side chat",
+-          "Tasks",
+           "Thread list",
+         ],
+       },
+@@ -1840,22 +1757,14 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Ask User Question",
+           "Automations",
+           "bb account",
+-          "bb cloud AI",
+           "bb connect",
+           "BB guide",
+           "Browser Automation",
+           "Claude Code provider",
+           "Codex provider",
+           "Concurrency limit",
+-          "Custom instructions",
+-          "Docs",
+           "Drafts",
+-          "File Editor",
+-          "GitHub",
+-          "Inline visualizations",
+           "Keep Awake",
+-          "Memory",
+-          "Modal Sandbox [Experimental]",
+           "PDF preview",
+           "Personal workspace",
+           "Pi provider",
+@@ -1865,9 +1774,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Push notifications",
+           "Secrets",
+           "Send later",
+-          "Side chat",
+-          "Tasks",
+-          "Theme Preview",
+           "Thread list",
+           "Workflows",
+           "Worktree",
