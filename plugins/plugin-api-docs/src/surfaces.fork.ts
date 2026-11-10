@@ -1,0 +1,101 @@
+const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
+  "nav-panel": [
+    "BbNavigate.experimental_toAppPath",
+    "BbNavigate.experimental_popOut",
+    "experimental_useAppRoute",
+    "ExperimentalAppRoute",
+    "experimental_useAppPanes",
+    "ExperimentalAppPanes",
+    "ExperimentalAppPane",
+    "ExperimentalTabRegistration.experimental_instanceIcon",
+    "experimental_useGlobalTabs",
+    "ExperimentalTabRegistration.experimental_compactWhenFixed",
+    "ExperimentalGlobalTab",
+    "BbNavigate.experimental_closeFixedTab",
+    "PluginAppSlots.experimental_panelTabAction",
+    "ExperimentalPanelTabActionRegistration",
+    "ExperimentalPanelTabActionTab",
+    "experimental_useAppTheme",
+    "PluginAppSlots.experimental_launcherItem",
+    "ExperimentalLauncherItemRegistration",
+    "ExperimentalLauncherItem",
+    "experimental_useLauncherItems",
+    "PluginAppSlots.experimental_itemDrop",
+    "ExperimentalItemDropRegistration",
+    "ExperimentalItemDropTarget",
+    "ExperimentalDropMention",
+    "ExperimentalDragItem",
+    "experimental_writeDragItem",
+    "experimental_readDragItem",
+    "PluginAppSlots.experimental_closeFallback",
+    "ExperimentalCloseFallbackRegistration",
+    "PluginAppSlots.experimental_mainHeader",
+    "ExperimentalMainHeaderRegistration",
+    "PluginAppSlots.experimental_threadBanner",
+    "ExperimentalThreadBannerRegistration",
+    "ExperimentalThreadBannerProps",
+    "PluginAppSlots.experimental_threadHeader",
+    "ExperimentalThreadHeaderRegistration",
+    "ExperimentalThreadHeaderArgs",
+    "ExperimentalThreadHeaderDecoration",
+    "ExperimentalAppTheme",
+    "PluginAppSlots.experimental_skillSource",
+    "ExperimentalSkillSourceRegistration",
+    "ExperimentalSourceSkill",
+  ],
+  "thread-list": [
+    "PluginThreadListRegistration.experimental_hideSidebarHeader",
+    "PluginThreadListRegistration.experimental_useSidebarStyle",
+    "ExperimentalSidebarStyle",
+    "PluginAppSlots.experimental_sidebarNewItem",
+    "ExperimentalSidebarNewItemRegistration",
+    "ExperimentalSidebarNewItem",
+    "experimental_useSidebarNewItems",
+    "ExperimentalPaletteSearchResult.experimental_onModSelect",
+    "PluginAppSlots.experimental_sidebarSection",
+    "ExperimentalSidebarSectionRegistration",
+    "ExperimentalSidebarSectionProps",
+  ],
+  "message-actions": [
+    "PluginAppSlots.experimental_messageAction",
+    "ExperimentalMessageActionRegistration",
+    "ExperimentalMessageActionMessage",
+  ],
+  "command-palette-actions": [
+    "PluginAppSlots.experimental_paletteSearch",
+    "ExperimentalPaletteSearchRegistration",
+    "ExperimentalPaletteSearchResult",
+  ],
+  "composer-actions": [
+    "ComposerCustomization.experimental_footer",
+    "ComposerCustomization.experimental_replace",
+    "ExperimentalComposerReplace",
+    "ExperimentalComposerReplaceProps",
+  ],
+  "agent-tools": [
+    "PluginHooks.experimental_turnContext",
+    "ExperimentalTurnContextProvider",
+  ],
+  "thread-events": [
+    "PluginHooks.experimental_threadForkPoint",
+    "ExperimentalThreadForkPoint",
+  ],
+  "file-opener": [
+    "PluginFileOpenerRegistration.experimental_handleOpen",
+    "PluginFileOpenerOpenArgs",
+  ],
+};
+
+export function withForkApiSymbols<
+  Group extends { surfaces: { id: string; apiSymbols?: readonly string[] }[] },
+>(groups: Group[]): Group[] {
+  return groups.map((group) => ({
+    ...group,
+    surfaces: group.surfaces.map((surface) => {
+      const extra = FORK_API_SYMBOLS[surface.id];
+      return extra === undefined
+        ? surface
+        : { ...surface, apiSymbols: [...(surface.apiSymbols ?? []), ...extra] };
+    }),
+  }));
+}
