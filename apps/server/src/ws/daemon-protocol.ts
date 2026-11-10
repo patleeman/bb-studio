@@ -1,4 +1,5 @@
 import { reportEnvironmentHookProgress } from "../services/environments/environment-hooks.js";
+import { emitPluginHostConnected } from "../services/plugins/fork-plugin-events.js";
 import { syncDesktopBrowserTabs } from "../services/desktop-browsers.js";
 import { heartbeatSession, recordSessionRoute } from "@bb/db";
 import {
@@ -250,6 +251,7 @@ export function onDaemonSocketOpen(
     "Daemon WebSocket opened",
   );
   deps.hub.registerDaemon(args.sessionId, args.hostId, args.socket);
+  emitPluginHostConnected(args.hostId);
   handleDaemonSocketOpened(deps, { hostId: args.hostId });
   deps.sharedPorts.pushCurrentSharedPortsForHost(args.hostId);
   if (!isServerMoveSnapshotFenced(deps.db)) {
