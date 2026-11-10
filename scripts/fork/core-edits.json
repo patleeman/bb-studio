@@ -161,9 +161,19 @@
       "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events.",
       "budget": 10
     },
+    "apps/server/src/services/threads/dispatch-attempt.ts": {
+      "seam": "import-sync",
+      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message.",
+      "budget": 4
+    },
     "apps/server/src/services/threads/thread-send.ts": {
       "seam": "import-sync",
       "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path.",
+      "budget": 2
+    },
+    "apps/server/src/services/threads/thread-create.ts": {
+      "seam": "import-sync",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine.",
       "budget": 2
     },
     "apps/server/src/start-server.ts": {
