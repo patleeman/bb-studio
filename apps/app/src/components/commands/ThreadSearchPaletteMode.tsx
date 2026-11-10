@@ -1,4 +1,12 @@
 import {
+  PluginPaletteSection,
+  selectPluginPaletteRow,
+  usePluginPaletteHighlightReset,
+  usePluginPaletteOptions,
+  type PluginPaletteRow,
+} from "./ForkPaletteSearch";
+import { MAIN_SPLITS_ENABLED } from "@/lib/split-layout/ops";
+import {
   useCallback,
   useEffect,
   useId,
@@ -71,9 +79,17 @@ const NO_MATCHING_THREADS_MESSAGE = "No matching threads";
 interface ThreadSearchOption {
   lifecycle: ThreadArchiveFilter;
   row: PaletteThreadSearchRow | null;
+  plugin?: PluginPaletteRow;
 }
 
+const pluginOption = (plugin: PluginPaletteRow): ThreadSearchOption => ({
+  lifecycle: "active",
+  row: null,
+  plugin,
+});
+
 function optionKey(option: ThreadSearchOption): string {
+  if (option.plugin !== undefined) return `plugin:${option.plugin.key}`;
   return option.row?.id ?? `more:${option.lifecycle}`;
 }
 
@@ -194,7 +210,7 @@ export function ThreadSearchPaletteMode({
       threadSearch.data,
     ],
   );
-  const options = useMemo(() => {
+  const threadOptions = useMemo(() => {
     return lifecycles.flatMap((lifecycle) => {
       const rows = result.rows.filter((row) => row.lifecycle === lifecycle);
       const limit =
@@ -220,6 +236,12 @@ export function ThreadSearchPaletteMode({
       return groupOptions;
     });
   }, [expandedGroups, highlightedKey, lifecycles, result, shownCounts]);
+  const pluginPalette = usePluginPaletteOptions({
+    query,
+    threadOptions,
+    pluginOption,
+  });
+  const options = pluginPalette.options;
   const filterStateIsCurrent = previousFilterKey === filterKey;
   const grownShownCounts = growShownCounts(shownCounts, lifecycles, options);
   if (filterStateIsCurrent && grownShownCounts !== shownCounts) {
@@ -245,6 +267,13 @@ export function ThreadSearchPaletteMode({
     setHighlightedIndex(syncedHighlightedIndex);
     setHighlightedKey(syncedHighlightedKey);
   }
+  usePluginPaletteHighlightReset({
+    options,
+    leading: pluginPalette.leading,
+    optionKey,
+    setHighlightedKey,
+    setHighlightedIndex,
+  });
   const highlightOption = useCallback(
     (index: number) => {
       setHighlightedIndex(index);
@@ -271,6 +300,7 @@ export function ThreadSearchPaletteMode({
     activeIndex < 0 ? undefined : `${optionIdPrefix}-${activeIndex}`;
   const activeRow = options[activeIndex]?.row;
   const splitAvailable =
+    MAIN_SPLITS_ENABLED &&
     !isCompact &&
     splitLayout !== null &&
     countPanes(splitLayout.root) < MAX_PANES;
@@ -296,7 +326,8 @@ export function ThreadSearchPaletteMode({
   }, [activeIndex, options]);
 
   const selectOption = useCallback(
-    ({ row, lifecycle }: ThreadSearchOption, index: number, split = false) => {
+    ({ row, lifecycle, plugin }: ThreadSearchOption, index: number, split = false) => {
+      if (plugin !== undefined) return selectPluginPaletteRow(plugin, split, runAfterClose, navigate);
       if (row === null) {
         scrollOnNextHighlightRef.current = true;
         setExpandedGroups((current) => [...current, lifecycle]);
@@ -380,7 +411,7 @@ export function ThreadSearchPaletteMode({
       threadSearch.isDebouncing ||
       threadSearch.isLoading);
   let emptyMessage: string | null = null;
-  if (result.rows.length === 0) {
+  if (result.rows.length === 0 && pluginPalette.isEmpty) {
     emptyMessage =
       isLoading || isRecentLoading
         ? result.isRecent
@@ -437,6 +468,17 @@ export function ThreadSearchPaletteMode({
       value={query}
     >
       {emptyMessage === null ? (
+        <PluginPaletteSection
+          groups={pluginPalette.leading}
+          options={options}
+          activeIndex={activeIndex}
+          optionIdPrefix={optionIdPrefix}
+          modifierLabel={splitModifier}
+          onSelect={selectOption}
+          onHighlight={highlightOption}
+        />
+      ) : null}
+      {emptyMessage === null ? (
         THREAD_LIFECYCLE_OPTIONS.map(({ value: lifecycle, label }) => {
           if (!result.rows.some((row) => row.lifecycle === lifecycle)) {
             return null;
@@ -453,7 +495,7 @@ export function ThreadSearchPaletteMode({
                 {label}
               </div>
               {options.map((option, index) =>
-                option.lifecycle !== lifecycle ? null : (
+                option.lifecycle !== lifecycle || option.plugin !== undefined ? null : (
                   <div
                     key={
                       option.row === null
@@ -536,6 +578,17 @@ export function ThreadSearchPaletteMode({
       ) : (
         <PaletteStatusMessage>{emptyMessage}</PaletteStatusMessage>
       )}
+      {emptyMessage === null ? (
+        <PluginPaletteSection
+          groups={pluginPalette.trailing}
+          options={options}
+          activeIndex={activeIndex}
+          optionIdPrefix={optionIdPrefix}
+          modifierLabel={splitModifier}
+          onSelect={selectOption}
+          onHighlight={highlightOption}
+        />
+      ) : null}
     </PaletteShell>
   );
 }
