@@ -1,3 +1,4 @@
+import { isQuietTurn } from "./quiet-turn.fork.js";
 import {
   getLatestStoredThreadInterruptedDataBetweenSequences,
   getLatestStoredTurnCompletedSequence,
@@ -262,7 +263,8 @@ export function planTurnEnd(
     if (
       !alreadyHandledByCommandFailure &&
       !manuallyStopped &&
-      !compactionOnly
+      !compactionOnly &&
+      !isQuietTurn(deps.db, { threadId: thread.id, turnId })
     ) {
       addParentTurnNotificationFollowUp({
         failedParentNotificationThreadIds:
