@@ -1,3 +1,4 @@
+import { forkLatestNavigate } from "@/lib/plugin-navigation.fork";
 import {
   Component,
   createContext,
@@ -250,6 +251,7 @@ function useLatestNavigate(
   const [stable] = useState<
     BbNavigate & { openThreadPanel: ReturnType<typeof createRetiredOpenPanel> }
   >(() => ({
+    ...forkLatestNavigate(latest),
     toThread: (...args) => latest.current.toThread(...args),
     toProject: (...args) => latest.current.toProject(...args),
     toPluginPanel: (...args) => latest.current.toPluginPanel(...args),
