@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { isQuietTurn } from "../services/threads/quiet-turn.fork.js";
 import { Buffer } from "node:buffer";
 import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
 import {
@@ -555,7 +556,8 @@ async function applyEventEffects(
           if (
             !alreadyHandledByCommandFailure &&
             !manuallyStopped &&
-            !compactionOnly
+            !compactionOnly &&
+            !isQuietTurn(deps.db, { threadId: thread.id, turnId })
           ) {
             addParentTurnNotificationFollowUp({
               failedParentNotificationThreadIds,
