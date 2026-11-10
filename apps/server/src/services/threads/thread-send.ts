@@ -1,3 +1,4 @@
+import { ensureForkThreadWritable } from "./thread-write-guards.fork.js";
 import {
   getEnvironment,
   getThread,
@@ -212,6 +213,7 @@ export function ensureThreadIsWritable(
   if (thread.deletedAt !== null) {
     throwThreadNotWritable(thread, "deleted", "Thread is deleted");
   }
+  ensureForkThreadWritable(thread);
 }
 
 /**
