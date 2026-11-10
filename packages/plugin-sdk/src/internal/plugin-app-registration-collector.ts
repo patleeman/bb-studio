@@ -1,3 +1,11 @@
+import {
+  emptyForkSlots,
+  forkFileOpenerFields,
+  forkSlotMethods,
+  forkTabFields,
+  withForkThreadListFields,
+  type ForkSlotRegistrations,
+} from "./fork-slots.js";
 import type { ComponentType } from "react";
 import { z } from "zod";
 import type {
@@ -308,7 +316,7 @@ export type CollectedPluginCommandRegistration =
       defaultShortcut: CollectedCommandShortcut;
     });
 
-export interface CollectedPluginAppRegistrations {
+export interface CollectedPluginAppRegistrations extends ForkSlotRegistrations {
   homepageSections: PluginHomepageSectionRegistration[];
   settingsSections: PluginSettingsSectionRegistration[];
   appOverlays: ExperimentalAppOverlayRegistration[];
@@ -446,6 +454,7 @@ export function collectPluginAppRegistrations(
   const commandShortcutSchema = createCommandShortcutSchema();
   const sidebarFooterItems: CollectedSidebarFooterItem[] = [];
   const collected: CollectedPluginAppRegistrations = {
+    ...emptyForkSlots(),
     homepageSections: [],
     settingsSections: [],
     appOverlays: [],
@@ -605,6 +614,7 @@ export function collectPluginAppRegistrations(
       ...(availability === "action" && registration.params !== undefined
         ? { params: z.json().parse(registration.params) }
         : {}),
+      ...(availability === "action" ? forkTabFields(registration) : {}),
     };
     collected.tabs.push(validated as ExperimentalTabRegistration);
   }
@@ -710,6 +720,7 @@ export function collectPluginAppRegistrations(
   definition.setup({
     commands: { register: registerCommand },
     slots: {
+      ...forkSlotMethods(collected),
       ...legacySlotAliases,
       homepageSection(registration) {
         const kind = "slots.homepageSection";
@@ -935,11 +946,11 @@ export function collectPluginAppRegistrations(
       },
       experimental_threadList(registration) {
         collected.threadLists.push(
-          collectTitledComponent(
+          withForkThreadListFields(registration, collectTitledComponent(
             "slots.experimental_threadList",
             seenIds.threadList,
             registration,
-          ),
+          )),
         );
       },
       experimental_sidebarNavigation(registration) {
@@ -1172,6 +1183,7 @@ export function collectPluginAppRegistrations(
           return extension;
         });
         collected.fileOpeners.push({
+          ...forkFileOpenerFields(kind, registration),
           id,
           title: requireNonEmptyString(kind, "title", registration.title),
           extensions,
