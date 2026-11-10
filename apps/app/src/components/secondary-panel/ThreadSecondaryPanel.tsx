@@ -45,6 +45,12 @@ import {
 } from "./panelToggleControlState";
 import { SecondaryPanelHostLayoutContext } from "./SecondaryPanelHostLayoutContext";
 import { MobilePanelTabPager } from "./MobilePanelTabPager";
+import {
+  PinnedIconTabsDivider,
+  usePinnedFixedPanelTabs,
+  WORKBENCH_NEW_TAB_IN_EVERY_PANE,
+  WorkbenchPanelScope,
+} from "./workbenchFork";
 import { SecondaryPanelTabStrip } from "./SecondaryPanelTabStrip";
 import { ImageTabLightboxProvider } from "./ImageTabLightboxContext";
 import { FilePreviewScrollPositionContext } from "./filePreviewScrollPositionContext";
@@ -240,7 +246,7 @@ function ThreadSecondaryPanelContent({
   canNavigateTabs = true,
   areFixedTabsReady = true,
   environmentId,
-  tabs,
+  tabs: ownTabs,
   fixedTabs,
   onTabReorder,
   renderBrowserDeck,
@@ -264,6 +270,7 @@ function ThreadSecondaryPanelContent({
   renderAsDrawer,
   isAtWindowTop = false,
 }: ThreadSecondaryPanelProps) {
+  const tabs = usePinnedFixedPanelTabs(ownTabs, splitPanelStateId);
   const newTabShortcut = useAppCommandShortcut("panel.newTab");
   const togglePanelShortcut = useAppCommandShortcut("panel.toggle");
   const boundFullScreenShortcut = useAppCommandShortcut(
@@ -604,7 +611,7 @@ function ThreadSecondaryPanelContent({
     }
 
     return (
-      <>
+      <WorkbenchPanelScope panelStateId={splitPanelStateId}>
         {fixedSurfaceTabs.map((fixedTab) => (
           <PinnedIconTab
             key={fixedTab.tab.id}
@@ -625,6 +632,9 @@ function ThreadSecondaryPanelContent({
             usesDesktopChrome={usesDesktopChrome}
           />
         ))}
+        {fixedSurfaceTabs.length > 0 ? (
+          <PinnedIconTabsDivider tabs={visibleSurfaceTabs} />
+        ) : null}
         {visibleSurfaceTabs.length > 0 ? (
           <SecondaryPanelTabStrip
             activeTabId={activeSurfaceTabId}
@@ -636,7 +646,7 @@ function ThreadSecondaryPanelContent({
           />
         ) : null}
         {newTabControl}
-      </>
+      </WorkbenchPanelScope>
     );
   };
 
@@ -926,9 +936,9 @@ function ThreadSecondaryPanelContent({
           paneId: pane.paneId,
           reserveLeadingChrome: pane.isTopRow && pane.isLeftEdge,
           reserveNewTabControl:
-            isSplitPane && !pane.isFocused && showNewTabButton,
+            isSplitPane && !pane.isFocused && !WORKBENCH_NEW_TAB_IN_EVERY_PANE && showNewTabButton,
           showNewTabControl:
-            (!isSplitPane || pane.isFocused) && showNewTabButton,
+            (!isSplitPane || pane.isFocused || WORKBENCH_NEW_TAB_IN_EVERY_PANE) && showNewTabButton,
           showOuterControls: pane.showOuterControls,
           usesPaneArrangementControl: true,
           usesWindowChrome: pane.isTopRow,
