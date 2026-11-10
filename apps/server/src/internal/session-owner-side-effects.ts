@@ -1,4 +1,8 @@
 import {
+  emitPluginHostDisconnected,
+  noteDaemonInstance,
+} from "../services/plugins/fork-plugin-events.js";
+import {
   closeSession,
   getSessionById,
   listActiveHostThreads,
@@ -88,6 +92,7 @@ export async function handleHostSessionOpened(
 
   const sameDaemonInstance =
     args.previousSession?.instanceId === args.openedSession.instanceId;
+  noteDaemonInstance(args.hostId, sameDaemonInstance);
   const replacedSession =
     args.previousSession?.id === args.openedSession.id
       ? null
@@ -227,6 +232,7 @@ function handleDaemonSessionLost(
   });
 
   closeSession(deps.db, deps.hub, args.sessionId, args.reason);
+  emitPluginHostDisconnected(session.hostId, args.reason);
 
   notifyHostThreadRuntimeStatusChanged(deps, session.hostId);
   if (args.reason === "expired") {
