@@ -1,4 +1,5 @@
 import { parseApplicationUrl } from "@bb/domain/application-url";
+import { openUrlWithPlugin } from "./fork-link-handlers";
 import { openApplicationUrl } from "./application-url";
 import {
   createContext,
@@ -27,7 +28,7 @@ type UrlAnchorClickHandler = (
   event: ReactMouseEvent<HTMLAnchorElement>,
 ) => void;
 
-const InAppBrowserUrlOpenContext = createContext<OpenInAppBrowserUrl | null>(
+export const InAppBrowserUrlOpenContext = createContext<OpenInAppBrowserUrl | null>(
   null,
 );
 
@@ -79,6 +80,7 @@ function useOpenUrlByPreference(): (url: string) => boolean {
 
   return useCallback(
     (url: string) => {
+      if (openUrlWithPlugin(url)) return true;
       return openUrlByPreference({
         desktopBrowserAvailable,
         openExternalBrowser: openUrlInExternalBrowser,
