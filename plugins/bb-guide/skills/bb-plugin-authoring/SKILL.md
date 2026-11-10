@@ -32,6 +32,7 @@ the same change.
 
 ### Start, package, and release
 
+- Read references/fork-api.md and references/fork-api-host.md for the API that only the BB Studio fork has.
 - Read references/quickstart.md for the first plugin, manifest fields,
   branding, plugin ids, builds, installs, and dependencies.
 - Read references/distribution.md for exact API lookup, updates, Git or npm

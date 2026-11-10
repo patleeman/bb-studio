@@ -1,4 +1,14 @@
 import type {
+  ForkBbNavigate,
+  ForkComposerCustomization,
+  ForkFileOpenerFields,
+  ForkPluginAppSlots,
+  ForkPluginSdkApp,
+  ForkTabFields,
+  ForkThreadListFields,
+} from "./app-contract.fork.js";
+export type * from "./app-contract.fork.js";
+import type {
   ExperimentalRpcKeyedMethod,
   ExperimentalRpcKeyedValue,
   experimental_PluginRpcCallError,
@@ -1130,7 +1140,7 @@ export interface ExperimentalTabReference {
   availability: "fixed" | "action";
 }
 
-type ExperimentalTabCommon = ExperimentalTabReference & {
+type ExperimentalTabCommon = ExperimentalTabReference & ForkTabFields & {
   title: string;
   icon: BbIconName;
   tooltip?: string;
@@ -1172,7 +1182,7 @@ type ExperimentalTabInput<
   context: C;
   availability: A;
   useVisible?(props: ExperimentalTabContextProps<C>): boolean;
-} & (A extends "fixed"
+} & ForkTabFields & (A extends "fixed"
   ? {
       component: ComponentType<ExperimentalTabContextProps<C>>;
       run?: never;
@@ -2750,7 +2760,7 @@ export interface PluginSidebarThreadSplit {
  * every sidebar — they are shared surfaces (other plugins live in two of
  * them), and a replaced list must not be able to remove them.
  */
-export interface PluginThreadListRegistration {
+export interface PluginThreadListRegistration extends ForkThreadListFields {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Label shown in Settings → Appearance and capability details. */
@@ -2816,7 +2826,7 @@ export interface ExperimentalSidebarNavigationRegistration {
  * and thread-storage files — never to git-ref snapshots (diff views always
  * use BB's preview).
  */
-export interface PluginFileOpenerRegistration {
+export interface PluginFileOpenerRegistration extends ForkFileOpenerFields {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Label in the "Open with" menu (e.g. "Notes editor"). */
@@ -4253,7 +4263,7 @@ export interface ExperimentalAppIcons {
 export interface PluginAppBuilder {
   experimental_icons: ExperimentalAppIcons;
   commands: PluginAppCommands;
-  slots: PluginAppSlots;
+  slots: PluginAppSlots & ForkPluginAppSlots;
   composer: PluginAppComposer;
   contentScripts: PluginAppContentScripts;
   /** Experimental managed region for actions and disclosures in the sidebar footer. */
@@ -4322,7 +4332,7 @@ export type PluginComposerScope =
     };
 
 /** One plugin-owned composer customization registration. */
-export interface ComposerCustomization {
+export interface ComposerCustomization extends ForkComposerCustomization {
   /** Unique within the plugin; letters, digits, `-`, `_`. */
   id: string;
   /** Composer kinds where this customization is active; omit for all kinds. */
@@ -5338,6 +5348,7 @@ export type ExperimentalOpenTabOptions =
       title?: never;
     }
   | {
+      experimental_global?: boolean;
       tab: ExperimentalTabReference & { availability: "action" };
       params?: JsonValue;
       title?: string;
@@ -5436,7 +5447,7 @@ export interface BbContext {
   threadId: string | null;
 }
 
-export interface BbNavigate {
+export interface BbNavigate extends ForkBbNavigate {
   /**
    * Open a thread. `split: true` applies bb's split placement rules (a right
    * split by default, focus when already open, replace at the pane cap) and
@@ -5664,7 +5675,7 @@ export interface ExperimentalServers {
  * the real implementation and `satisfies` this interface; `bb plugin build`
  * shims the specifier to that object on `globalThis.__bbPluginRuntime`.
  */
-export interface PluginSdkApp {
+export interface PluginSdkApp extends ForkPluginSdkApp {
   /** List URL schemes approved for this BB site in the viewing client's localStorage. Core Settings uses the same implementation. */
   experimental_getApplicationLinkApprovals(): Promise<string[]>;
   /** Revoke one scheme, or all with null, for this BB site on this client. Does not grant permission. */

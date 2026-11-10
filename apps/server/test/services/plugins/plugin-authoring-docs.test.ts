@@ -234,6 +234,10 @@ const _assertAllAuthModesListed: MissingAuthMode extends never ? true : never =
 void _assertAllAuthModesListed;
 
 const THREAD_EVENT_PAYLOAD_FIELDS = {
+  "experimental_turn.interrupted": ["thread", "reason"],
+  "experimental_host.connected": ["host", "restarted"],
+  "experimental_host.disconnected": ["host", "reason"],
+  "experimental_thread.fileChanged": ["thread", "changes"],
   "experimental_thread.events": ["thread", "sequence"],
   "experimental_thread.parentChanged": ["thread", "previousParentThreadId"],
   "experimental_thread.read": ["thread"],
@@ -242,7 +246,7 @@ const THREAD_EVENT_PAYLOAD_FIELDS = {
   "experimental_environment.removed": ["removal"],
   "thread.created": ["thread"],
   "thread.active": ["thread"],
-  "thread.idle": ["thread", "lastAssistantText"],
+  "thread.idle": ["thread", "lastAssistantText", "experimental_quiet"],
   "thread.failed": ["thread", "error"],
   "thread.archived": ["thread"],
   "thread.unarchived": ["thread"],

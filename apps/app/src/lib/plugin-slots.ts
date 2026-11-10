@@ -1,3 +1,10 @@
+import {
+  EMPTY_FORK_SLOTS,
+  FORK_SLOT_KINDS,
+  stampForkSlots,
+  type ForkRegistrationSet,
+  type ForkSlotSnapshot,
+} from "./fork-slots";
 import { coreTabs } from "@/components/secondary-panel/thread-info-registration";
 import { coreMessageMetadata } from "@/components/thread/timeline/core-message-metadata";
 import { setAppIcons } from "@bb/shared-ui/icon-registry";
@@ -51,7 +58,7 @@ import {
   type CollectedSidebarNavigationRegistration,
 } from "@get-bb/plugin-sdk/internal/plugin-app-collector";
 
-export interface PluginRegistrationSet {
+export interface PluginRegistrationSet extends ForkRegistrationSet {
   homepageSections: readonly PluginHomepageSectionRegistration[];
   settingsSections: readonly PluginSettingsSectionRegistration[];
   appOverlays?: readonly ExperimentalAppOverlayRegistration[];
@@ -192,7 +199,7 @@ export interface PluginEnvironmentProviderInputsSlot
 export interface PluginMachineProviderInputsSlot
   extends PluginMachineProviderInputsRegistration, PluginSlotBase {}
 
-export interface PluginSlotSnapshot {
+export interface PluginSlotSnapshot extends ForkSlotSnapshot {
   homepageSections: readonly PluginHomepageSectionSlot[];
   settingsSections: readonly PluginSettingsSectionSlot[];
   appOverlays: readonly ExperimentalAppOverlaySlot[];
@@ -234,6 +241,7 @@ export interface PluginSlotSnapshot {
 }
 
 export const EMPTY_PLUGIN_SLOT_SNAPSHOT: PluginSlotSnapshot = {
+  ...EMPTY_FORK_SLOTS,
   homepageSections: [],
   settingsSections: [],
   appOverlays: [],
@@ -282,6 +290,7 @@ let snapshot: PluginSlotSnapshot = EMPTY_PLUGIN_SLOT_SNAPSHOT;
 type SlotKind = keyof PluginSlotSnapshot;
 
 const SLOT_KINDS: readonly SlotKind[] = [
+  ...FORK_SLOT_KINDS,
   "homepageSections",
   "settingsSections",
   "appOverlays",
@@ -369,6 +378,7 @@ function flattenRegistrations(
     ),
   ];
   return {
+    ...stampForkSlots(set, stamp),
     homepageSections: stamp(set.homepageSections),
     settingsSections: stamp(set.settingsSections),
     appOverlays: stamp(set.appOverlays),
