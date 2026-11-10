@@ -1,3 +1,4 @@
+import { forkPageWorkbenchSurface, useForkCloseFileTabCommand } from "@/components/secondary-panel/workbenchFork";
 import { AppPanelTabsPublisher } from "@/lib/app-panel-tabs";
 import {
   useCallback,
@@ -572,6 +573,7 @@ export function PluginPanelRightPanelHost({
     openNewTab();
     return true;
   });
+  useForkCloseFileTabCommand(isFocused && panel !== null && isOpen, activeTab, closeTab);
   useAppCommandHandler("panel.reopenClosedTab", () => {
     if (!isFocused || panel === null || !reopenClosedTab()) return false;
     revealPanel();
@@ -992,6 +994,7 @@ export function PluginPanelRightPanelHost({
           isOpen={isOpen}
           tabs={panelTabs}
         />
+        {forkPageWorkbenchSurface(pluginId, panel?.id ?? panelPath, panelStateId)}
         <PluginDetailRouteNavigationProvider
           onOpenPluginDetail={openPluginDetailTab}
         >
