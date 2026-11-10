@@ -1,3 +1,12 @@
+import {
+  forkNavigate,
+  forkSlotEnv,
+  forkTestHooks,
+  type ForkCapturedPluginApp,
+  type ForkNavigateCall,
+  type ForkRenderSlotOptions,
+  type ForkSlotEnv,
+} from "./app.fork.js";
 import { experimental_PluginRpcCallError } from "../rpc-contract.js";
 import { invalidateTags, pluginTagScope } from "@bb/query-tags";
 import { QueryClient } from "@tanstack/react-query";
@@ -238,6 +247,7 @@ type PluginSdkFakeTree<T> = {
  */
 export type PluginSdkTestFakes = PluginSdkFakeTree<PluginBrowserBbSdk>;
 export type NavigateCall =
+  | ForkNavigateCall
   | {
       method: "toThread";
       threadId: string;
@@ -351,7 +361,7 @@ interface TestComposerStore {
   subscribe(listener: () => void): () => void;
 }
 
-interface SlotEnv {
+interface SlotEnv extends ForkSlotEnv {
   rpcQueryHost: RpcQueryHost;
   rpcClient: PluginRpcClient;
   rpcCalls: RpcCall[];
@@ -1699,6 +1709,7 @@ function captureClipboardWrites(
 }
 
 const testPluginSdkApp = {
+  ...forkTestHooks(useSlotEnv),
   experimental_getApplicationLinkApprovals: async (): Promise<string[]> => [],
   experimental_revokeApplicationLinkApproval: async (
     _scheme: string | null,
@@ -2134,7 +2145,7 @@ export function installTestPluginRuntime(): void {
 // loadPluginApp — run setup, capture typed slot registrations.
 // ---------------------------------------------------------------------------
 
-export interface CapturedPluginApp {
+export interface CapturedPluginApp extends ForkCapturedPluginApp {
   homepageSections: PluginHomepageSectionRegistration[];
   settingsSections: PluginSettingsSectionRegistration[];
   appOverlays: ExperimentalAppOverlayRegistration[];
@@ -2368,7 +2379,7 @@ export type PluginRpcTestHandlers<Contract extends PluginRpcContract> = {
 
 export interface RenderSlotOptions<
   Contract extends PluginRpcContract = PluginRpcContract,
-> {
+> extends ForkRenderSlotOptions {
   /**
    * Backing handlers for `useRpc().call`: method name → implementation.
    * Inputs and results are JSON-round-tripped like the wire; a method
@@ -3088,6 +3099,7 @@ export function renderSlot<
   const navigate: BbNavigate & {
     openThreadPanel(options: RetiredActionTabOpenOptions): boolean;
   } = {
+    ...forkNavigate((call) => navigateCalls.push(call)),
     toThread(threadId, threadOptions) {
       navigateCalls.push({
         method: "toThread",
@@ -3423,6 +3435,7 @@ export function renderSlot<
     call: (_pluginId, method, input) => callRpc(method, input),
   };
   const env: SlotEnv = {
+    ...forkSlotEnv(options, (call) => navigateCalls.push(call)),
     rpcQueryHost,
     rpcClient,
     rpcCalls,
