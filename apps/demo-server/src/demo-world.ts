@@ -190,6 +190,7 @@ function createUiPreferences(): UiPreferenceEntries {
       "infoPanel.collapsedSections",
     ),
     "threadContextCard.pinned": uiPreferenceEntry("threadContextCard.pinned"),
+    "workbench.globalTabs": uiPreferenceEntry("workbench.globalTabs"),
   };
 }
 
