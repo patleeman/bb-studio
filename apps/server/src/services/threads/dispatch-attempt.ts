@@ -1,3 +1,4 @@
+import { startsNoTurn } from "./turnless-dispatch.fork.js";
 import {
   requestQueuedMachineReadiness,
   requestQueuedMessageDispatch,
@@ -479,6 +480,7 @@ async function runDispatchAttempt(
     waitingOn: QueuedMessageWaitingOn,
     sendAt: number | null,
   ): DispatchAttemptOutcome => {
+    if (startsNoTurn(thread, queuedMessage.input)) return { kind: "dispatched" };
     const entry = recordQueuedMessageWait(deps, {
       thread,
       message: queuedMessage,
@@ -665,7 +667,7 @@ async function runDispatchAttempt(
     }
   };
 
-  if (!sendNow && hasMessageDispatchHooks()) {
+  if (!sendNow && !startsNoTurn(thread, payload.input) && hasMessageDispatchHooks()) {
     const outcome = await runMessageDispatchHookPass(deps, {
       thread,
       threadResponse: toThreadResponseFromThread(deps, { thread }),
