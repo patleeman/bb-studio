@@ -1,0 +1,82 @@
+[
+  {
+    "dir": "bb-ai",
+    "package": "bb-plugin-bb-ai",
+    "pluginId": "bb-ai"
+  },
+  {
+    "dir": "connect-next",
+    "package": "bb-plugin-bb--connect-next",
+    "pluginId": "bb--connect-next"
+  },
+  {
+    "dir": "custom-instructions",
+    "package": "bb-plugin-custom-instructions",
+    "pluginId": "custom-instructions"
+  },
+  {
+    "dir": "docs",
+    "package": "bb-plugin-simple-notes",
+    "pluginId": "simple-notes"
+  },
+  {
+    "dir": "environment-modal-sandbox",
+    "package": "bb-plugin-environment-modal-sandbox",
+    "pluginId": "environment-modal-sandbox"
+  },
+  {
+    "dir": "github",
+    "package": "bb-plugin-github",
+    "pluginId": "github"
+  },
+  {
+    "dir": "github-star",
+    "package": "bb-plugin-bb--github-star",
+    "pluginId": "bb--github-star"
+  },
+  {
+    "dir": "inline-vis",
+    "package": "bb-plugin-inline-vis",
+    "pluginId": "inline-vis"
+  },
+  {
+    "dir": "mcp",
+    "package": "bb-plugin-bb--mcp",
+    "pluginId": "bb--mcp"
+  },
+  {
+    "dir": "memory",
+    "package": "bb-plugin-memory",
+    "pluginId": "memory"
+  },
+  {
+    "dir": "monaco-editor",
+    "package": "bb-plugin-monaco-editor",
+    "pluginId": "monaco-editor"
+  },
+  {
+    "dir": "plugin-api-tester",
+    "package": "bb-plugin-plugin-api-tester",
+    "pluginId": "plugin-api-tester"
+  },
+  {
+    "dir": "prompt-library",
+    "package": "bb-plugin-bb--prompt-library",
+    "pluginId": "bb--prompt-library"
+  },
+  {
+    "dir": "tasks",
+    "package": "bb-plugin-tasks",
+    "pluginId": "tasks"
+  },
+  {
+    "dir": "theme-preview",
+    "package": "bb-plugin-theme-preview",
+    "pluginId": "theme-preview"
+  },
+  {
+    "dir": "side-chat",
+    "package": "bb-plugin-side-chat",
+    "pluginId": "side-chat"
+  }
+]

@@ -1,0 +1,704 @@
+{
+  "skip": [
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "keeps a highlighted row in view when server rows push it down"
+    },
+    {
+      "file": "apps/app/src/lib/command-palette/palette-thread-search.test.ts",
+      "title": "ranks by match quality, then update time"
+    },
+    {
+      "file": "packages/scripts/test/plugin-forks.test.mjs",
+      "title": "rejects workspace packages published under other names"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-routes.test.ts",
+      "title": "identifies background installs with the same entry ID as catalog search"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-routes.test.ts",
+      "title": "serves status/search and validates install requests"
+    },
+    {
+      "file": "apps/server/test/services/plugins/sdk-compat.test.ts",
+      "title": "runs every first-party plugin on the current SDK"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "delegates install to the plugin service by bundled name"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "drops entries whose bundled manifest is unreadable"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "reports counts for curated entries and bundled plugins"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "lists bundled plugins and the seeded official catalog"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "matches queries against entry id, plugin id, manifest text, and tags"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "reflects install and remove in the installed flag"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/third-party-marketplaces.test.ts",
+      "title": "names a bundled official plugin with <id>@bb-official"
+    },
+    {
+      "file": "apps/server/test/services/plugins/builtin-plugins.test.ts",
+      "title": "ships each product builtin with its deliberate default"
+    },
+    {
+      "file": "apps/web/src/marketplace/public-marketplace.test.tsx",
+      "title": "labels only default-installed bundled plugins as built in"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.tab-gestures.test.tsx",
+      "title": "splits a tab dragged 16px vertically"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "keeps outer controls in the top pane of a stacked split"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "keeps an active New Tab replacement in the same split pane"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "keeps stateful pane content attached to pane identity after a move"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "maximizes one pane while preserving the mounted split for restoration"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "keeps a newly created split maximized while the right panel is full screen"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "resizes stacked panes only from vertical pointer movement"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "uses a row-resize drag guard for stacked panes"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "keeps a changed layout in memory when localStorage quota is exhausted"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/ThreadSecondaryPanel.collapseControl.test.tsx",
+      "title": "offers every existing split position from the right-panel control and moves the active tab"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/ThreadSecondaryPanel.collapseControl.test.tsx",
+      "title": "maximizes one stacked pane while keeping both tab rows mounted"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "enters thread mode from its existing command and pops one level per Escape"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "groups resting commands, hides empty plugins, and distinguishes drill-in rows"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "keeps the split column on every row when the highlighted thread is already open"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "opens on its chord and lists the commands that apply"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "uses the shared tab-pill clear affordance without running the mode command"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/sidebarSplitLayout.test.ts",
+      "title": "crosses nested groups in visual reading order and excludes maximized-away panes"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/sidebarSplitLayout.test.ts",
+      "title": "uses the existing split cap and clamps divider fractions"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "keeps unaffected shortcut controls stable while saving"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationList.test.tsx",
+      "title": "shows where a plugin panel sits when it is open in a split"
+    },
+    {
+      "file": "apps/app/src/lib/fork-app-panes.test.tsx",
+      "title": "closes the focused pane and falls back to the surviving pane's route"
+    },
+    {
+      "file": "apps/app/src/lib/fork-app-panes.test.tsx",
+      "title": "focuses a pane and moves the main view to its route"
+    },
+    {
+      "file": "apps/app/src/lib/fork-app-panes.test.tsx",
+      "title": "opens a plugin page beside a thread, then focuses it instead of opening it twice"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "clears the layout when every open pane is archived (no valid survivor)"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "closes an unfocused pane and reports the unchanged focused survivor"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "closes the focused pane and reports the survivor the URL should follow"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "does nothing when there is no layout or no target threads"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "notifies subscribers only when a split is open or changes"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/atoms.test.ts",
+      "title": "seeds a new tab from the last arrangement, then reloads its own"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/openThreadInSplit.test.ts",
+      "title": "preserves search deep-link state when creating a split"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "inserts in reading order, focuses the new pane, and enforces the cap"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "keeps focus, resizing, rearrangement, and closing usable at eight panes"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "moves a pane at the cap without changing its ID or content identity"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "rebalances seven successive default-right opens into eight equal usable panes"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "removes panes, collapses single-child splits, and selects the nearest focus"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "replaces and swaps content while applying the reference focus semantics"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/ops.test.ts",
+      "title": "resizes adjacent pairs with clamped fractions and unit split totals"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/persistence.test.ts",
+      "title": "round-trips a versioned split layout"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/persistence.test.ts",
+      "title": "round-trips and restores all eight panes with focus and sizes intact"
+    },
+    {
+      "file": "apps/app/src/lib/split-layout/persistence.test.ts",
+      "title": "round-trips mixed new-thread and plugin panel content"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.archive.test.tsx",
+      "title": "closes the pane and moves the URL to the survivor once the archive is confirmed"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.archive.test.tsx",
+      "title": "keeps an archived pane when its thread first loads, but closes it after unarchiving and archiving again"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.archive.test.tsx",
+      "title": "keeps the archived pane and its focus when unarchiving is rejected"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.archive.test.tsx",
+      "title": "restores the pane, focus, and URL when a deferred archive is rejected"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.environment-archive.test.tsx",
+      "title": "keeps an unrelated split pane open and focused when an environment is archived"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "applies spotlight pane actions to the targeted open split and preference"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "assigns exactly one top-left owner through eight-pane structural changes"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "carries maximization through focus, CLI-style open, and pane move"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "carves a plugin pane drag handle out of the macOS window-drag region"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "does not navigate after the workspace has been left"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "drops a created thread whose originating composer pane has closed"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "drops the corner reserve once an open panel hosts the toggle"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "drops the corner reserve while the hosted plugin panel holds the toggle"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "focuses an already-open pane instead of duplicating on external navigation"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "focuses plugin content controls instead of pane chrome"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "focuses the same numbered pane and transfers focus when maximized"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "gives a top-to-bottom split a full-width drag target without thickening its seam"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "gives only bottom-row split panes the shell's bottom inset"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "hosts one panel whose visibility survives focus changes between panes"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "hosts the app panel while a plugin pane is focused"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps a compact viewer on the thread they opened from another pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps a thread's open panel after focusing a plugin page"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps an archived thread when navigating over an active thread in the same pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps drag updates local and persists the resized pair once on release"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps the divider above pane headers so stacked splits stay resizable"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps the panel available for a focused new-thread pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps the right-panel resize target above a bounded pane header"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps workspace separators out of the tab order"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "leaves uninvolved panes unrendered and pane callbacks stable when focus moves in a four-pane split"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "makes only top-row split headers desktop window-drag regions"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "maximizes without changing the split tree and restores mounted pane state"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "mounts both panes with independent, threadId-keyed drafts"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "moves maximization to the newly focused pane in a four-pane split"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "moves the URL to the surviving pane when the focused pane is closed"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "moves vertically between stacked chats and preserves focus at an edge"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "navigates a focused thread pane to another thread in place"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "opens a created thread from a compact composer that is still on screen"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "opens a created thread in the focused composer pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "pauses a hidden pane timeline and refreshes it when restored"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "preserves a hidden pane's mounted scroll position through restore"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "preserves plugin-owned right panels with and without a plugin split"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "replaces the focused pane's content on external navigation without dismantling the layout"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "replaces the originating composer pane without taking focus after focus moves"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "reserves collapsed window-left chrome only for the structural top-left plugin pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "reserves the window toggle corner for a plugin pane at the top right"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "restores eight successive default-right opens, then focuses and closes with valid URL state"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "restores maximization when an engaged pane drag is cancelled"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "restores survivors when the maximized pane closes"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "reveals move targets during a maximized drag and restores after drop"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "routes arrangement actions through the existing split move operation"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "snaps a workspace divider to its equal two-pane boundary and clears its guide"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "stops the restore loop once positions settle instead of burning 30 frames"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "suppresses split maximization on compact viewports without discarding it"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "temporarily replaces panel full screen with a clean thread full screen"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "toggles the focused pane through the discoverable app command"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "creates panes five through eight, then replaces the focused pane for a ninth open"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "focuses an already-open thread instead of duplicating it"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "focuses and maximizes the targeted open thread without changing the tree"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "keeps New Thread as a singleton and focuses its existing pane"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "restores only the targeted maximized pane and toggles it back"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "splits from the focused pane and focuses the opened thread"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "updates a plugin pane's subpath without duplicating the panel"
+    },
+    {
+      "file": "apps/app/src/components/promptbox/ExecutionControls.test.tsx",
+      "title": "keeps showing the known model when model options fail to load"
+    },
+    {
+      "file": "apps/server/test/public/public-thread-fork.test.ts",
+      "title": "refuses a Side chat reply inside a running turn instead of forking an older checkpoint"
+    },
+    {
+      "file": "apps/server/test/services/plugins/builtin-plugins.test.ts",
+      "title": "loads the real side-chat builtin source"
+    },
+    {
+      "file": "apps/server/test/services/plugins/builtin-registry.test.ts",
+      "title": "prefixes every bundled plugin added after the reservation with bb--"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationList.test.tsx",
+      "title": "labels each visible destination in a row and puts hidden ones, New thread included, behind More"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationList.test.tsx",
+      "title": "scrolls the destinations, New thread among them, keeping More in view"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationList.test.tsx",
+      "title": "hides New thread from Customize like any other row"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
+      "title": "offers no New thread row in Customize navigation"
+    },
+    {
+      "file": "packages/config/test/config.test.ts",
+      "title": "uses the production data dir default in production"
+    },
+    {
+      "file": "packages/config/test/config.test.ts",
+      "title": "defaults CLI connection env to the local app instance"
+    },
+    {
+      "file": "packages/bb-app/test/index.test.ts",
+      "title": "resolves production defaults for npx startup"
+    },
+    {
+      "file": "packages/bb-app/test/index.test.ts",
+      "title": "reports the server bind host separately from the loopback connection URL"
+    },
+    {
+      "file": "packages/bb-app/test/index.test.ts",
+      "title": "keeps full-stack startup local even when managed config has a server URL"
+    },
+    {
+      "file": "packages/scripts/test/run-dev.test.ts",
+      "title": "derives stable data and ports from a managed checkout"
+    },
+    {
+      "file": "packages/scripts/test/run-dev.test.ts",
+      "title": "keeps Cloud gateway ports out of the worker band and packaged ports"
+    },
+    {
+      "file": "packages/scripts/test/run-dev.test.ts",
+      "title": "inherits parent bb skills for managed worktree dev apps"
+    },
+    {
+      "file": "packages/scripts/test/run-dev.test.ts",
+      "title": "dedupes inherited bb skills for prod-managed worktree dev apps"
+    },
+    {
+      "file": "packages/scripts/test/run-dev.test.ts",
+      "title": "inherits prod bb skills for ordinary checkout dev apps"
+    },
+    {
+      "file": "packages/scripts/test/reset-bb-data.test.ts",
+      "title": "selects prod and the current checkout instance for --all"
+    },
+    {
+      "file": "packages/scripts/test/run-host-daemon.test.ts",
+      "title": "uses the production data dir when production overrides are absent"
+    },
+    {
+      "file": "apps/desktop/test/desktop-update-provider.test.ts",
+      "title": "gives each platform its own feed file inside one release tag"
+    },
+    {
+      "file": "apps/desktop/test/electron-builder-config.test.ts",
+      "title": "keeps the updater provider pointed at desktop-latest release assets"
+    },
+    {
+      "file": "apps/desktop/test/electron-builder-config.test.ts",
+      "title": "creates a separate nightly app identity and update feed"
+    },
+    {
+      "file": "apps/app/src/components/plugin/PluginsOverview.test.tsx",
+      "title": "keeps Browse filters in the toolbar rather than a separate pill band"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "places plugin header actions before the pane close button"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "closes the only plugin page into the new-thread page"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "shows close on a compact plugin page"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.cold-open.test.tsx",
+      "title": "stays usable before its body downloads on first open and keeps typed text"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "finds commands when the query starts with a space"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "wraps at both ends of the list"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "asks before replacing a conflicting assignment and supports cancel"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "explains when a plugin default conflicts with a core shortcut"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "finds commands by their shortcut keys and modifiers"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "keeps UI edits and both reset actions on the current platform"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "records, clears, and resets a command shortcut"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "resets a shared binding to each surface's defaults while preserving other platforms"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "rolls reset-all draft state back when the mutation fails"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
+      "title": "keeps the header New thread button when stored preferences leave New thread out"
+    },
+    {
+      "file": "apps/app/src/lib/command-palette/palette-app-commands.test.ts",
+      "title": "lists only commands that apply right now"
+    },
+    {
+      "file": "apps/app/src/lib/command-palette/palette-app-commands.test.ts",
+      "title": "never lists a palette-hidden command even when it is available"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "moves the unfocused Info pane right from its own control"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "moves the unfocused Info pane top from its own control"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "moves the unfocused Info pane bottom from its own control"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "renders stacked pane headers and bodies on either side of one continuous divider"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/sidebarSplitLayout.test.ts",
+      "title": "rejects persisted layouts that exceed the shared pane cap"
+    }
+  ],
+  "removeLines": [
+    {
+      "file": "packages/plugin-build/src/builtin-server-artifacts.test.ts",
+      "line": "{ pluginDir: \"environment-modal-sandbox\" },"
+    }
+  ],
+  "skipEach": [
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "moves the active tab to the supported %s position without dragging"
+    },
+    {
+      "file": "apps/app/src/components/secondary-panel/SidebarSplitContainer.test.tsx",
+      "title": "splits the active tab from an unfocused multi-tab pane to the %s"
+    },
+    {
+      "file": "apps/app/src/components/sidebar/SidebarNavigationHost.test.tsx",
+      "title": "handles $reason"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "opens only the selected result in a split with %s"
+    },
+    {
+      "file": "apps/app/src/components/thread/ThreadActionsMenu.test.tsx",
+      "title": "lists the items for $state"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/splitThreadNavigation.test.ts",
+      "title": "focuses the target for %s and returns the preference"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "%s transfers typing focus without changing drafts or selection"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "handles a late composer and cancels pending focus on pointer activity: %s"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "keeps archived threads in a restored split focused on %s"
+    },
+    {
+      "file": "apps/app/src/components/settings/KeyboardSettingsSection.test.tsx",
+      "title": "finds the literal %s key without matching unrelated modifier shortcuts"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "shows shortcut keycaps only on desktop, including filtered plugin results (compact: %s)"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { shuffle } from "@vitest/utils/helpers";
 import { mergeConfig, type ViteUserConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
+import { FORK_SKIP_SETUP } from "./scripts/fork/vitest-project.js";
 
 const GLOBAL_OBJECT = String.raw`(?:window|globalThis|global|document|navigator|process|[A-Z][\w$]*\.prototype)`;
 const GLOBAL_TARGET = String.raw`(?:${GLOBAL_OBJECT}|\(\s*${GLOBAL_OBJECT}\s+as\b[^)]*\))`;
@@ -330,6 +331,7 @@ export function defineWorkspaceTestConfig(
         conditions: ["source"],
       },
       test: {
+        setupFiles: [FORK_SKIP_SETUP],
         globalSetup: [
           fileURLToPath(new URL("./vitest.global-tmpdir.ts", import.meta.url)),
         ],
