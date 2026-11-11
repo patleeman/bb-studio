@@ -1,4 +1,9 @@
 import { useId, useState } from "react";
+import {
+  ForkContextCardRows,
+  hasForkContextCardRows,
+  useForkContextCardOpen,
+} from "./ForkContextCard.js";
 import { Popover, PopoverContent, PopoverTrigger } from "@bb/shared-ui/popover";
 import type { ThreadContextWindowUsage } from "@bb/server-contract";
 import { useHoverPopover } from "../../ui/hooks/use-hover-popover.js";
@@ -128,6 +133,7 @@ export function ThreadContextWindowCard({
             <span>{costLabel}</span>
           </div>
         ) : null}
+        <ForkContextCardRows />
       </div>
       {details ? (
         <>
@@ -182,9 +188,10 @@ export function ThreadContextWindowIndicator({
     handleOpenChange,
   } = useHoverPopover({
     closeDelayMs: details ? 200 : CONTEXT_WINDOW_POPOVER_CLOSE_DELAY_MS,
-    hoverableContent: details !== undefined,
+    hoverableContent: details !== undefined || hasForkContextCardRows(),
   });
-  const open = defaultOpen || hoverOpen;
+  const forkOpen = useForkContextCardOpen();
+  const open = defaultOpen || hoverOpen || forkOpen.open;
 
   const usedPercent = calculateContextWindowUsagePercent(usage);
   const visualPercent = Math.min(Math.max(usedPercent, 0), 100);
@@ -203,7 +210,7 @@ export function ThreadContextWindowIndicator({
   const titleLabel = usage.estimated ? "Estimated context" : "Context window";
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={forkOpen.wrap(handleOpenChange)}>
       <PopoverTrigger asChild>
         <button
           type="button"
