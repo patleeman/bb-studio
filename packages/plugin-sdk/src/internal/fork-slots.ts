@@ -1,4 +1,5 @@
 import type {
+  ExperimentalAppBackdropRegistration,
   ExperimentalCloseFallbackRegistration,
   ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
@@ -48,6 +49,7 @@ export interface ForkSlotRegistrations {
   skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
+  appBackdrops: ExperimentalAppBackdropRegistration[];
 }
 
 export const FORK_SLOT_KINDS = [
@@ -69,6 +71,7 @@ export const FORK_SLOT_KINDS = [
   "skillSources",
   "newTabItems",
   "commandPalettes",
+  "appBackdrops",
 ] as const satisfies readonly (keyof ForkSlotRegistrations)[];
 
 export function emptyForkSlots(): ForkSlotRegistrations {
@@ -91,6 +94,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     skillSources: [],
     newTabItems: [],
     commandPalettes: [],
+    appBackdrops: [],
   };
 }
 
@@ -116,6 +120,7 @@ export function forkSlotMethods(
     skillSource: new Set<string>(),
     newTabItems: new Set<string>(),
     commandPalette: new Set<string>(),
+    appBackdrop: new Set<string>(),
   };
   return {
     experimental_sidebarNewItem(registration) {
@@ -246,6 +251,26 @@ export function forkSlotMethods(
       collected.commandPalettes.push({
         id,
         component: requireComponent(kind, registration.component),
+      });
+    },
+    experimental_appBackdrop(registration) {
+      const kind = "slots.experimental_appBackdrop";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.appBackdrop, id);
+      const component = requireComponent<
+        ExperimentalAppBackdropRegistration["component"]
+      >(kind, registration.component);
+      if (registration.useAppearance === undefined) {
+        collected.appBackdrops.push({ id, component });
+        return;
+      }
+      if (typeof registration.useAppearance !== "function") {
+        throw new Error(`${kind} "${id}": useAppearance must be a function`);
+      }
+      collected.appBackdrops.push({
+        id,
+        component,
+        useAppearance: registration.useAppearance,
       });
     },
     experimental_mainHeader(registration) {
