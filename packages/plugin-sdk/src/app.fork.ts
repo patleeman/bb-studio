@@ -94,3 +94,9 @@ export const experimental_ProjectActionsMenu = runtimeComponent(
 export const experimental_ProjectActionsContextMenu = runtimeComponent(
   "experimental_ProjectActionsContextMenu",
 );
+export const experimental_useAppCommands = runtimeFunction(
+  "experimental_useAppCommands",
+);
+export const experimental_useTabWindow = runtimeFunction(
+  "experimental_useTabWindow",
+);
