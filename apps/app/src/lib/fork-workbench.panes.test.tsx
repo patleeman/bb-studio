@@ -123,6 +123,7 @@ function mount(pages: string[]): {
   });
   registerWorkbenchSurface(() => ({
     threadId: THREAD_ID,
+    panelStateId: THREAD_ID,
     panel: fake.panel,
     openFilePreview: () => false,
     openTerminal: () => false,
