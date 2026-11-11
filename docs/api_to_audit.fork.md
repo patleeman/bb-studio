@@ -1226,3 +1226,58 @@ No core view reads it: bb's own file previews have no title row.
    than one for tab windows.
 2. `toolbar` hands out a DOM element; decide whether a slot component
    (children rendered into the bar) is the better contract.
+
+## A backdrop behind the app (`slots.experimental_appBackdrop`)
+
+`slots.experimental_appBackdrop({ id, component, useAppearance? })` draws one
+plugin's component behind bb's main window and lets it restyle bb around it.
+bb portals `component` into `<body>` in a fixed, full-window layer at
+`z-index: -10` with no pointer events and marks `<html data-fork-backdrop>`.
+`useAppearance()` runs in the plugin's scope and returns
+`{ mode?, tokens?, surfaces? }`: `mode` overrides the window's resolved light
+or dark, `tokens` are custom properties set inline on `<html>`, and
+`surfaces` (`sidebar`, `main`, `composer`, `secondaryPanel`, `header`, each
+`{ background?, backdropFilter?, edge? }`) become
+`--fork-surface-<name>-background`, `-backdrop-filter` and `-edge` on
+`<html>`, with `data-fork-surface-edge` listing the surfaces that set an
+edge. Values go through the same `CSS.supports` check as
+`experimental_useSidebarStyle`. Studio's theme engine is the caller: its
+WebGL scene is the component and its theme's colors are the appearance.
+
+**Core callers.** bb's own light and dark goes through the same path: the
+override sits inside `getPreferredTheme` in `hooks/useTheme.ts`, so the
+`.dark` class, `usePreferredTheme` (code, diff and terminal themes) and
+`experimental_useAppTheme().mode` all follow it. `ForkAppBackdropHost`
+(`components/fork/ForkAppBackdrop.tsx`) is mounted by `ForkLayoutHosts`,
+renders the first registration by plugin id, skips bare windows, and puts
+the component and the appearance probe under one `PluginSlotMount`, so a
+crash in either removes both and every override. `fork.css` makes every
+layer between the window and bb's content see-through while
+`data-fork-backdrop` is set (the window, `#root`, the layout root, the
+sidebar panel, the main inset and its framed `::before`, the thread window,
+scroll viewports, the composer footer, background-toned fades, the side
+panel) and paints each surface's variables on its root; inside the sidebar
+and the side panel it does so by setting `--sidebar` to transparent. A test
+walks every ancestor of the transcript, the composer and the thread list in
+a real `AppLayout` with a real `ThreadScreen`, framed and unframed, and
+fails on any background utility no rule clears.
+
+**Audit before stabilizing.**
+
+1. The see-through rules name bb's DOM (`data-sidebar`, `data-promptbox`,
+   `aside[data-surface-tone]`, `header`); a new opaque layer upstream breaks
+   them silently outside the paths the test walks (pages other than a
+   thread, the side panel's tab bodies).
+2. With `--sidebar` transparent, the thread list's sticky section headers
+   and the side panel's sticky rows no longer hide what scrolls under them.
+3. On a framed macOS window the main inset has a `mask-image` and a
+   `clip-path`, which the Filter Effects spec makes a backdrop root, so
+   `backdropFilter` on the header, the side panel and the composer may blur
+   only what bb draws inside the main card, not the backdrop (`main` and
+   `sidebar` are painted on elements outside it). Check in a live window and
+   decide whether bb should drop the mask while a backdrop shows.
+4. The mode override wins over the user's Appearance setting with no sign
+   of it in Settings, and the desktop window's native theme still follows
+   the setting.
+5. Only one backdrop is active (first plugin id); decide whether bb should
+   refuse a second registration.
