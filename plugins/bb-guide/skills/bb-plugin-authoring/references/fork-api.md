@@ -237,6 +237,88 @@ params, title, threadId }`; `threadId` is null on a plugin page. Keep
 Names: `ExperimentalPanelTabActionRegistration`,
 `ExperimentalPanelTabActionTab`.
 
+## A conversation's workbench
+
+- `useBbNavigate().experimental_workbench(threadId?)` → the side panel of a
+  thread view on screen in this window, for code outside that view (an agent
+  tool's handler in an always-mounted component), or null when that thread
+  is not on screen. Leave `threadId` out for the thread in the main view.
+  It returns `{ threadId, list, open, close, focus, layout, arrange,
+isTyping }`:
+  - `list()` → `{ open, selectedKey, tabs }`, every open tab (files, the
+    diff tab, terminals, browser tabs, plugin tabs, Info) as
+    `experimental_usePanelTabs()` lists them.
+  - `open(spec, { focus?, pane?, index? })` → resolves the tab's key, or
+    null when the panel declined or the tab did not appear within three
+    seconds. `spec` is `{ kind: "tab", tab: { id, pluginId? }, params?,
+    title? }` (your thread action tab: a page, a whiteboard, a design, a
+    thread; with `pluginId`, another plugin's thread action tab, which must
+    be registered with `experimental_openableByPlugins: true`, or `open`
+    resolves null; params and title work as in `openTab`),
+    `{ kind: "file", target, location? }`, `{ kind: "diff", path }`,
+    `{ kind: "url", url }` (the desktop app's in-app browser; null
+    elsewhere) or `{ kind: "terminal", terminalId }`. `focus: false` opens
+    it behind the selected tab and keeps a closed panel closed. `pane` is 1
+    or 2 (left to right) or `"new"` (a second pane on the right, made for
+    this tab); a tab already open moves there. `index` is its place in that
+    pane's tab row, as `layout().panes[n].tabs` counts without it. Pane 2
+    needs two panes and `"new"` needs one; otherwise `open` resolves null
+    and opens nothing.
+  - `close(key)`, `focus(key)` → close or select any tab by key.
+  - `layout()` → `{ panel, widthPercent, conversation, panes }`: the panel
+    open or closed, its share of the view (20 to 80), the conversation shown
+    or collapsed, and its panes left to right as `{ tabs, widthPercent }`
+    (tab keys in tab-row order, share of the panel). The side panel has one
+    pane or two side by side, never more and never stacked; a pane that
+    loses its last tab closes.
+  - `arrange({ panel?, widthPercent?, conversation?, panes?, paneWidths? })`
+    → changes those. `panes: 2` moves the selected tab into a new pane on
+    the right (the pane needs another tab); `panes: 1` moves pane 2's tabs
+    into pane 1. `paneWidths: [2, 1]` sets the two panes' ratio (each keeps
+    at least 15 percent). False, with nothing changed, when a value is out
+    of range or the panes cannot be made.
+  - `isTyping()` → true while keyboard focus is in a text field, an editable
+    element or a frame in the side panel; check it before `open` or `focus`.
+
+- `experimental_openableByPlugins: true` on an action tab registration lets
+  other plugins open that tab with `experimental_workbench(...).open`. Leave
+  it out and only your plugin opens it there. The opener chooses the params,
+  so validate them in the tab.
+
+Names: `ExperimentalWorkbench`, `ExperimentalWorkbenchOpenSpec`,
+`ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchLayout`,
+`ExperimentalWorkbenchPane`, `ExperimentalWorkbenchArrangement`,
+`ExperimentalTabRegistration.experimental_openableByPlugins`.
+
+## New Tab items
+
+- `app.slots.experimental_newTabItems({ id, title, useRecents?, search? })`
+  → your items on the side panel's New Tab page. `useRecents({ threadId })`
+  is a React hook; its items join bb's Recent list, newest first, each row
+  showing the title, the kind and the time. `search(query, { signal,
+threadId })` answers the search box (debounced, trimmed, never empty); bb
+  lists the first eight under `title`. An item is `{ id, title, kind, icon?,
+updatedAt, open, experimental_dragItem? }`; `open()` shows it, usually
+  with `openTab`. Items without a numeric `updatedAt` or an `open` function
+  are dropped. With `experimental_dragItem` (an `ExperimentalDragItem`) the
+  row is draggable: bb writes that payload as `experimental_writeDragItem`
+  does, so it drops into a side panel pane or a composer through your
+  `slots.experimental_itemDrop` handler. An invalid drag item leaves the row
+  undraggable.
+- An action tab registered with `experimental_showInNewTab: false` is left
+  out of the page's Actions list and action search; `openTab` and the rest
+  of bb still open it. `useVisible` hides a tab from the whole panel instead.
+- `experimental_newTabGroup: "New"` on an action tab registration lists the
+  tab under that heading on the New Tab page instead of under Actions.
+  Headings follow bb's Actions section, in the order registrations first
+  name them; each keeps bb's drag-to-reorder. The search box still lists
+  matching actions under Actions.
+
+Names: `ExperimentalNewTabItemsRegistration`, `ExperimentalNewTabItem`,
+`ExperimentalNewTabItem.experimental_dragItem`,
+`ExperimentalTabRegistration.experimental_showInNewTab`,
+`ExperimentalTabRegistration.experimental_newTabGroup`.
+
 ## Dragging items
 
 One drag payload for a thread, a plugin document, a side panel tab or a
@@ -253,12 +335,19 @@ event.dataTransfer)` in your own `dragover` and `drop` → the item or null.
   bb leaves a drag alone once a target inside the page accepted it.
 - `app.slots.experimental_itemDrop({ id, canDrop(item, target),
 drop(item, target) })` → takes drops on bb's own surfaces. `target` is
-  `{ zone: "workbench", threadId }` (a side panel; `threadId` null on a
-  plugin page), `{ zone: "composer", threadId, insertText(text) }` (null
-  for the new-thread composer) or `{ zone: "main" }`. `canDrop` runs on
-  every drag move: synchronous and cheap. bb outlines the zone while a
-  handler accepts, and calls `drop` on the first handler, by plugin id,
-  whose `canDrop` is true.
+  `{ zone: "workbench", threadId, pane?, index? }` (a side panel;
+  `threadId` null on a plugin page), `{ zone: "composer", threadId,
+insertText(text) }` (null for the new-thread composer) or
+  `{ zone: "main" }`. `canDrop` runs on every drag move: synchronous and
+  cheap. bb outlines the zone while a handler accepts, and calls `drop` on
+  the first handler, by plugin id, whose `canDrop` is true.
+- In a side panel, over a pane's tab row `pane` is 1 or 2 and `index` the
+  insertion point (bb draws an insertion bar there); over the right edge of
+  a panel with one pane `pane` is `"new"` (bb highlights that half, as for
+  a tab dragged there). Elsewhere in the panel both are absent and bb
+  outlines the panel. Open the item there with
+  `useBbNavigate().experimental_workbench(threadId)?.open(spec, { pane,
+index })`.
 - On the composer zone, `insertText(text)` inserts plain text at the
   composer's caret (appends when there is none).
   `insertMention({ provider, id, label })` inserts one of your own mention
@@ -311,157 +400,11 @@ Names: `ExperimentalCloseFallbackRegistration`.
   popover from the plugin's own control (a chip in the composer footer).
   `available` is false while the thread has no context ring.
 
-## Windows
-
-- `app.slots.experimental_window({ id, title, component })` → a component
-  bb can show in a window of its own, with no bb chrome around it.
-- `experimental_useWindows()` → `{ native, register, open, toggle, close }`.
-  `open(windowId, { width, height, x, y, transparent, frame, alwaysOnTop,
-clickThrough, resizable, hotkey, menuBarTitle, params })`. `hotkey` is a
-  system-wide shortcut that shows or hides the window; `menuBarTitle` adds a
-  menu bar entry; `register` sets both up without showing the window.
-  `params` reach the component as the page's query string. In a browser
-  `native` is false and `open` opens a plain popup. `hotkeyRegistered(windowId)`
-  says whether the system took the window's hotkey; another app may hold it.
-  Also `minWidth`, `minHeight`, `titleBar: "hiddenInset"` (traffic lights
-  inside the content) and `rememberBounds` (reopen at the last place and size,
-  per display). `setClickThrough(windowId, on)` switches click-through on an
-  open window; while on, the hotkey and menu bar entry turn it off instead of
-  hiding the window, and the page gets a `bb-fork-window-click-through` event.
-  `setClickThrough(windowId, false, { hold: true })` pauses it (a modifier
-  held over the window) without turning it off. `center` opens it mid-screen; `hideOnBlur` closes it when it loses focus.
-
-## Approvals
-
-- Backend: `await bb.experimental_hooks.experimental_requestApproval({ title,
-message, detail?, items?, confirmLabel? })` → `{ approved, picked }`. bb
-  shows the request in a dialog the plugin does not draw and waits up to ten
-  minutes. `picked` is the ids of the `items` the person allowed.
-- Only a person can answer: the desktop app shows a native dialog and signs
-  the answer with a key that exists only in its main process; a browser
-  must first be paired through that dialog. Agents, the CLI and plugin code
-  can ask but cannot approve, so do not build your own approve button or
-  token for anything an agent must not grant itself.
-
-## Interrupted turns and host daemons
-
-- `bb.events.on("experimental_turn.interrupted", ({ thread, reason }) => …)`:
-  a turn ended without finishing. `reason` is `manual-stop`, `host-removed`,
-  `host-daemon-restarted`, `host-connection-lost`, `provider-turn-idle` or
-  `provider`. bb also emits `thread.idle` or `thread.failed` for that turn.
-- `bb.events.on("experimental_host.connected", ({ host, restarted }) => …)`:
-  a machine's host daemon connected; `restarted` is true for a new daemon
-  process.
-- `bb.events.on("experimental_host.disconnected", ({ host, reason }) => …)`:
-  the daemon went away (`daemon-disconnect`, `expired` or `removed`).
-
-## Files an agent changed
-
-- `bb.events.on("experimental_thread.fileChanged", ({ thread, changes }) =>
-…)`: an agent in the thread finished an edit, a write or a patch.
-  `changes` is `[{ itemId, path, kind: "add" | "update" | "delete",
-movePath? }]`, in order. Use it to refresh an open editor or preview
-  without polling the thread's events.
-
-## Before a thread is deleted
-
-- Backend: `bb.experimental_hooks.experimental_beforeThreadDelete(async ({
-threadId }) => { ... })`. bb awaits it for the thread and for each thread
-  deleted with it, before anything is marked deleted. Throw to refuse the
-  deletion; the message is shown to whoever asked. One handler per plugin.
-
-## Context at the start of each turn
-
-- Backend: `bb.experimental_hooks.experimental_turnContext(({ threadId }) =>
-string | null | Promise<string | null>)`. bb calls it each time a turn
-  starts in any thread (a thread starting, or a message that starts a new
-  turn; not a message steered into a running turn) and gives the agent what
-  it returns, under "Context from the <plugin> plugin at the start of this
-  turn:", after the turn's own input. It is agent-only: the timeline does
-  not show it, and it is not stored in the thread's history. Return null for
-  threads you have nothing to say about. Bounded: bb waits at most 500 ms
-  for all plugins together, keeps at most 8000 characters per plugin, and
-  ignores a throw, a rejection or a late answer. One provider per plugin.
-  bb's own `bb.agents.contributeInstructions` and `configure` instructions
-  are different: they are read only when a provider session is built, so a
-  live session never sees later changes.
-
-Names: `ExperimentalTurnContextProvider`.
-
-## Where a fork came from
-
-- A fork's `ThreadResponse` (in `thread.created`, `bb.sdk.threads.get` and
-  `list`) has `originKind: "fork"` and `sourceThreadId`; `list` filters by
-  both. Backend: `await bb.experimental_hooks.experimental_threadForkPoint(threadId)` →
-  `{ sourceThreadId, sourceTurnId, sourceSequence } | null` adds where in
-  the source it branched: the last source turn its copied history ends with,
-  and the sequence of that turn's `turn/completed` event in the source.
-  Both are null when the fork copied no history. Resolves null for a thread
-  that is not a fork or whose source was deleted. It reads the events, so it
-  works for forks made before it existed; call it after `thread.created`
-  once the fork has started (its history is copied right after creation).
-
-Names: `ExperimentalThreadForkPoint`.
+Windows, approvals and the backend hooks are in fork-api-host.md.
 
 ## Names
 
-- `ExperimentalAppPane`
-- `ExperimentalAppPanes`
-- `ExperimentalAppRoute`
-- `ExperimentalAppTheme`
-- `ExperimentalApprovalDecision`
-- `ExperimentalApprovalRequest`
-- `ExperimentalBeforeThreadDeleteHandler`
-- `ExperimentalCompletedTurn`
-- `ExperimentalComposerReplace`
-- `ExperimentalComposerReplaceProps`
-- `ExperimentalDropMention`
-- `ExperimentalThreadForkPoint`
-- `ExperimentalTurnContextProvider`
-- `ExperimentalContextCard`
-- `ExperimentalContextCardRow`
-- `ExperimentalContextCardRowRegistration`
-- `ExperimentalGlobalTab`
-- `ExperimentalPaletteSearchRegistration`
-- `ExperimentalPaletteSearchResult`
-- `ExperimentalLinkHandlerRegistration`
-- `ExperimentalMessageActionMessage`
-- `ExperimentalMessageActionRegistration`
-- `PluginFileOpenerOpenArgs`
-- `ExperimentalProjectActionsContextMenuProps`
-- `ExperimentalProjectActionsMenuProps`
-- `ExperimentalReplyClassification`
-- `ExperimentalThreadFileChange`
-- `ExperimentalReplyClassifierRegistration`
-- `ExperimentalSidebarNewItemRegistration`
-- `ExperimentalSidebarNewItem`
-- `ExperimentalSidebarSectionProps`
-- `ExperimentalSidebarSectionRegistration`
-- `ExperimentalSidebarStyle`
-- `ExperimentalSkillSourceRegistration`
-- `ExperimentalSourceSkill`
-- `ExperimentalTurnClassification`
-- `ExperimentalWindowOptions`
-- `ExperimentalWindowRegistration`
-- `ExperimentalWindows`
-- `ExperimentalTurnInterruptedReason`
-- `FORK_PLUGIN_EVENT_NAMES`
-- `ExperimentalTurnClassifier`
-- `experimental_useAppPanes`
-- `experimental_useAppRoute`
-- `experimental_useAppTheme`
-- `experimental_useGlobalTabs`
+`ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
 
 The contract's own interfaces take the fork's members from these helper
 interfaces; plugins never name them:
-
-- `ForkBbNavigate`
-- `ForkPluginEventPayloads`
-- `ForkPluginHooks`
-- `ForkThreadIdlePayload`
-- `ForkComposerCustomization`
-- `ForkFileOpenerFields`
-- `ForkPluginAppSlots`
-- `ForkPluginSdkApp`
-- `ForkTabFields`
-- `ForkThreadListFields`
