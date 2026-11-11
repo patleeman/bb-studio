@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import { isBareWindow } from "@/lib/fork-bare-window";
 import { usePluginSlots } from "@/lib/plugin-slots";
+import { ForkWorkbenchSurface } from "./ForkWorkbenchSurface";
 
 function ForkThreadBanners({ threadId }: { threadId: string }) {
   const banners = [...(usePluginSlots().threadBanners ?? [])].sort(
@@ -33,5 +34,10 @@ function ForkThreadBanners({ threadId }: { threadId: string }) {
 
 export function forkThreadBanner(threadId: string): ReactNode {
   if (isBareWindow()) return null;
-  return <ForkThreadBanners threadId={threadId} />;
+  return (
+    <>
+      <ForkWorkbenchSurface key={threadId} threadId={threadId} />
+      <ForkThreadBanners threadId={threadId} />
+    </>
+  );
 }
