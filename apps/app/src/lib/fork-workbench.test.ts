@@ -106,6 +106,7 @@ function surface(
 ): WorkbenchSurface {
   return {
     threadId,
+    panelStateId: threadId,
     panel,
     openFilePreview: () => false,
     openTerminal: () => false,
