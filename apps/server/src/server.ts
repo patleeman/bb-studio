@@ -1,4 +1,6 @@
 import { createPluginUpdateJobs } from "./services/plugins/plugin-update-jobs.js";
+import { registerForkApprovalRoutes } from "./services/fork-approvals/index.js";
+import { registerForkImportRoutes } from "./services/fork-import/index.js";
 import { registerPluginUpdateJobRoutes } from "./routes/plugin-update-jobs.js";
 import {
   recheckEnvironmentProvisioning,
@@ -961,6 +963,8 @@ export function createApp(
   );
   registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
+  registerForkImportRoutes(publicApi, deps);
+  registerForkApprovalRoutes(publicApi);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {
     throw new ApiError(404, "not_found", "Not found");
