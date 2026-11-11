@@ -14,6 +14,7 @@ import { paneContentForPathname } from "@/views/thread-detail/splitThreadNavigat
 import { renamePluginTabs } from "./fork-tab-titles";
 import { closePluginFixedTab } from "./fork-plugin-global-tabs";
 import { popOutAppPath } from "./fork-bare-window";
+import { workbenchFor } from "./fork-workbench";
 
 export function useAppRoute(): ExperimentalAppRoute {
   const { pathname, search, hash } = useLocation();
@@ -63,6 +64,7 @@ export function useForkNavigate(pluginId: string): ForkBbNavigate {
     () => ({
       experimental_toAppPath,
       experimental_popOut: popOutAppPath,
+      experimental_workbench: (threadId) => workbenchFor(pluginId, threadId),
       experimental_renameTab: (options) =>
         renamePluginTabs(pluginId, {
           tabId: options.tab.id,
@@ -89,6 +91,8 @@ export function forkLatestNavigate(
       latest.current.experimental_renameTab(...args),
     experimental_popOut: (...args) =>
       latest.current.experimental_popOut(...args),
+    experimental_workbench: (...args) =>
+      latest.current.experimental_workbench(...args),
     experimental_closeFixedTab: (...args) =>
       latest.current.experimental_closeFixedTab(...args),
   };
