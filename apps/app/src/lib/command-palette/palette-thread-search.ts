@@ -1,5 +1,6 @@
 import { PERSONAL_PROJECT_ID, type ThreadListEntry } from "@bb/domain";
 import { fuzzyMatchText } from "@bb/fuzzy-match";
+import { forkStrongMatches } from "@/lib/fork-palette-match";
 import type {
   ThreadSearchMatch,
   ThreadSearchResponse,
@@ -163,12 +164,12 @@ function localMatchRows(
   now: number,
   sort: PaletteThreadSort,
 ): PaletteThreadSearchRow[] {
-  const titleMatches = fuzzyMatchText({
+  const titleMatches = forkStrongMatches(fuzzyMatchText({
     items: threads,
     query,
     getText: getThreadDisplayTitle,
     limit: threads.length,
-  }).sort(
+  }), query, getThreadDisplayTitle).sort(
     (left, right) =>
       right.score - left.score || right.item.updatedAt - left.item.updatedAt,
   );
@@ -176,7 +177,7 @@ function localMatchRows(
     .slice(0, PALETTE_RESULT_LIMIT)
     .map((match) => ({
       ...serverRow(match.item, [], "active", projectNamesById, now, sort),
-      highlightRanges: positionsToRanges(match.positions),
+      highlightRanges: match.forkRanges ?? positionsToRanges(match.positions),
     }));
   const remaining = PALETTE_RESULT_LIMIT - titleRows.length;
   if (remaining <= 0) return titleRows;
