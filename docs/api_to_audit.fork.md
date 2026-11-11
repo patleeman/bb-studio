@@ -692,6 +692,12 @@ go through the payload.
 5. The thread of a zone comes from the split pane that contains it, else the
    focused pane, else the route.
 6. `canDrop` runs on every `dragover`.
+7. A side panel target's `pane` and `index` are read from markup
+   (`[data-sidebar-split-tab-group]` rows sorted left to right, their
+   `[data-tab-pill]` midpoints) and the right-edge rule is bb's `pickZone`
+   on the panel, as for a tab drag. The insertion bar and the edge highlight
+   are drawn by the host, copying the split drag overlay's style, not by the
+   tab strip; core's tab reorder draws no bar of its own.
 
 ## Context at each turn start (`experimental_hooks.experimental_turnContext`)
 
@@ -918,3 +924,192 @@ filter group and wraps its list body with it. Rows use bb's `ResourceRow`.
    group of their own.
 3. bb's built-in skills have no source, so they cannot be chosen alongside
    a source except through bb's Type filter.
+
+## A conversation's workbench (`BbNavigate.experimental_workbench`)
+
+Code outside a thread view (an agent tool's handler in an always-mounted
+component) gets that thread's side panel: list every tab, open the caller's
+action tab or bb's file, diff, in-app browser and terminal tabs (into pane 1,
+pane 2 or a new pane, at an index in that pane's tab row), close or select
+any tab, read and set the panel's layout (its panes and their widths
+included), and tell whether the user is typing in the panel.
+
+The side panel has one pane, or two side by side, each with its own tab row
+and New Tab button: bb's own split code (`SidebarSplitContainer`,
+`sidebarSplitLayout.ts`) with the rules in
+`components/secondary-panel/workbenchSplitLimits.fork.ts` (at most two panes,
+a tab drag splits only to the right of a single pane and otherwise drops into
+the other pane, only a stored row of up to two panes is restored, bb's
+left/right/top/bottom move menu is off). A pane that loses its last tab
+closes (bb's reconcile). Pane sizes persist per conversation in bb's
+`bb.thread.secondaryPanelSplitLayout` key; the panel's own width per
+conversation in its width atom.
+
+**Core callers.** Every call goes through the path core uses: the thread
+view's `AppPanelController` (`openTab`, `selectTab`, `closeTab`, `close`,
+`getTabs`, the same list the tab strip and `experimental_usePanelTabs`
+read), the thread view's `openFilePreview` and `openTerminal` navigation
+capabilities, the in-app browser opener the thread view gives
+`UrlOpenRoutingProvider`, bb's diff tab reference (`GIT_DIFF_TAB_REFERENCE`,
+as the timeline's "open file diff" uses it), and the thread's own width and
+conversation-collapse atoms that the resize handle and collapse button
+write. `components/fork/ForkWorkbenchSurface.tsx`, mounted with the thread
+banners in the thread page, registers the view; `lib/fork-workbench.ts` does
+the rest. Panes go through the split container's own operations: one hook
+line in `SidebarSplitContainer.tsx` (`useWorkbenchSplits` in
+`workbenchSplits.fork.ts`) registers its `moveTab`, `removeSplit`, `resize`
+and `commitState` by panel state id (the thread id), the same calls its tab
+drag, Remove split button and divider make; the tab menu's "Move to new
+pane" and "Move to other pane" (`workbenchFork.tsx`) use that registration
+too. Core edits: exporting `InAppBrowserUrlOpenContext` from
+`lib/url-open-routing.tsx`, and the pane seam (`workbench-panes` in
+`STUDIO_FORK.md`).
+
+**Audit before stabilizing.**
+
+1. `open` learns the new tab's key by waiting (up to three seconds) for the
+   selected tab to match the request; give core's open paths a return value
+   with the key instead.
+2. `focus: false` opens and then selects the previous tab again (or closes
+   the panel again), so the panel can flash; core should take a "background"
+   flag.
+3. Placement waits for the opened tab to reach the split state, then moves
+   it with `moveTab` and reorders the pane's group; give core's open paths a
+   target pane instead. `index` counts tabs as `layout().panes[n].tabs`
+   lists them (fixed tabs first, then the pane's order), which the tab row
+   draws the same way today. `arrange({ panes: 2 })` moves the selected
+   tab, which may be Info; decide whether it should take the last tab.
+   Pane numbers are positions, not ids, so they shift when pane 1 closes.
+4. Only the thread page registers a workbench; a thread shown in a plugin
+   page's `ThreadChat` has none. `isTyping` cannot see focus inside the
+   desktop app's native browser view.
+
+## New Tab items (`slots.experimental_newTabItems`)
+
+A plugin adds its own items to the side panel's New Tab page: recent items
+merged into bb's Recent list (newest first, with kind and time) and results
+for the search box under the registration's title.
+
+**Core callers.** None: core's Recent list holds only files the thread
+opened (`threadRecentItems.ts`). The core edit in
+`components/secondary-panel/NewTabFileSearch.tsx` adds a `fork` entry kind,
+a `fork` section for search results, and merges and renders through
+`NewTabFileSearch.fork.tsx`, so keyboard navigation, the Show more toggle
+and the empty hint treat plugin rows as bb's own.
+
+**Audit before stabilizing.**
+
+1. Recent items have no shared store: each plugin keeps its own and bb only
+   merges them. A stable API should let a plugin record "opened" events into
+   bb's Recent list instead, so files and plugin items share one history.
+2. Search results appear only while a file source is searchable (the page
+   shows "No searchable source" otherwise).
+
+## Action tabs off the New Tab page (`ExperimentalTabRegistration.experimental_showInNewTab`)
+
+An action tab registered with `experimental_showInNewTab: false` is left out
+of the side panel's New Tab page: its Actions list and the actions its
+search box matches. The tab stays registered, so `openTab`, links, a fixed
+tab and the rest of bb still open it. `useVisible` stays the switch for
+hiding a tab from the whole panel. Studio's caller is its Bot, Side thread,
+New thread, Todos and VS Code tabs, which open from its own controls.
+
+**Core callers.** None: core lists every action tab whose `useVisible`
+allows it. The core edit in `components/secondary-panel/NewTabFileSearch.tsx`
+passes the page's actions through `useForkNewTabActions`
+(`NewTabFileSearch.fork.tsx`), which drops entries for those tabs. The
+registration collector takes the field through `forkTabFields`, which
+rejects any value but `false`.
+
+**Audit before stabilizing.**
+
+1. The page's entries carry only bb's `plugin-action:<pluginId>:<tabId>`
+   id, so the flag applies to every action registration of that tab id in
+   the plugin (thread and plugin page alike), not per context.
+2. Decide whether bb's own New Tab actions should take the same switch, and
+   whether a user setting should override it.
+
+## Draggable New Tab rows (`ExperimentalNewTabItem.experimental_dragItem`)
+
+A New Tab item with `experimental_dragItem` makes its Recent or search row
+draggable. On `dragstart` the row writes that item with the same
+`writeDragItem` that backs `experimental_writeDragItem`, so the drag carries
+the shared payload (`application/x-bb-item`) and bb's item drop zones (a
+side panel pane, a composer, the main view) hand it to
+`slots.experimental_itemDrop` handlers. The item is checked with
+`parseDragItem` when the row is built; an invalid one leaves the row
+undraggable.
+
+**Core callers.** None: core's own Recent rows (files) are not draggable.
+`ForkNewTabRow` in `components/secondary-panel/NewTabFileSearch.fork.tsx`
+draws every plugin row, Recent and search alike, so no core file changed.
+
+**Audit before stabilizing.**
+
+1. Core's file rows could carry a `file` drag item through the same path;
+   do that before stabilizing so plugin and core rows drag alike.
+2. The row is a native HTML drag; the side panel's own tab drags are
+   dnd-kit pointer drags. Decide on one.
+
+## Grouped New Tab actions (`ExperimentalTabRegistration.experimental_newTabGroup`)
+
+An action tab registered with `experimental_newTabGroup: "<heading>"` is
+listed on the New Tab page under that heading instead of bb's Actions.
+bb's Actions section comes first and keeps every action without a group;
+the named sections follow in the order the plugin slot snapshot first
+names them (plugin order, then registration order); an empty section is not
+drawn. Each section is bb's own `NewTabActions` list, so drag to reorder
+works within a section and writes bb's one stored order. The search box
+still lists every matching action under Actions. Studio's caller groups its
+tab kinds under "New" and "Open".
+
+**Core callers.** None: core draws one Actions list. The core edits are a
+`label` prop on `NewTabActions` (default "Actions") and one line in
+`NewTabFileSearch.tsx` that draws a `NewTabActions` per group from
+`useForkNewTabActionGroups` (`NewTabFileSearch.fork.tsx`). The registration
+collector takes the field through `forkTabFields`, which requires a
+non-empty string.
+
+**Audit before stabilizing.**
+
+1. Like `experimental_showInNewTab`, the group is matched by bb's
+   `plugin-action:<pluginId>:<tabId>` id, so it applies to every action
+   registration of that tab id in the plugin.
+2. Two plugins that name the same heading share one section; decide whether
+   sections should be per plugin.
+3. Decide whether bb's own actions (Open browser, Start terminal) should
+   join a "New" section, and whether search results should keep the
+   headings.
+
+## Opening another plugin's tab (`ExperimentalWorkbenchOpenSpec` `tab.pluginId`, `ExperimentalTabRegistration.experimental_openableByPlugins`)
+
+`experimental_workbench(...).open({ kind: "tab", tab: { pluginId, id },
+params?, title? })` opens another plugin's thread action tab, as that
+plugin's `openTab` would: the same owner, params (JSON, persisted, and the
+instance's identity) and title, and the same wait for the tab's key.
+
+Permission rule: only a thread action tab registered with
+`experimental_openableByPlugins: true` can be opened by another plugin.
+Any other target (not marked, unknown tab id, unknown or empty plugin id, a
+fixed tab, a plugin page tab) resolves null and opens nothing. A plugin id
+equal to the caller's own is the same as leaving it out. The check reads the
+plugin slot snapshot at the time of the call. The target tab gets the
+opener's params, so it must validate them. Studio's callers open the
+Workflows plugin's "workflow-run" tab (`{ runId }`), which carries the flag,
+and Visual Chat's board tab, which needs it in Visual Chat's own
+repository.
+
+**Core callers.** The open goes through `createPluginPanelController(owner,
+…).openTab`, the path the target plugin's own `openTab` uses, with the
+owner swapped for the target plugin.
+`workbenchTabOwner` in `lib/fork-workbench.ts` applies the rule. The
+Workflows plugin's registration carries the flag (one line in
+`plugins/workflows/src/app.tsx`).
+
+**Audit before stabilizing.**
+
+1. The flag is all or nothing: any plugin may open the tab with any params.
+   Decide whether a tab should name the plugins it accepts, or declare a
+   params schema bb checks.
+2. Only the workbench's `open` takes another plugin's tab; `openTab` on a
+   plugin's own panel controller does not. Decide whether it should.
