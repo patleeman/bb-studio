@@ -19,6 +19,7 @@ import {
 } from "@/lib/bb-desktop";
 import { useDesktopWindowState } from "@/hooks/useDesktopWindowState";
 import { SidebarHistoryNavigationControls } from "./SidebarHistoryNavigationControls";
+import { useForkSidebarHeader } from "./ForkSidebarHeader";
 import { useSidebarNavigationPlacement } from "./sidebarNavigationProvider";
 
 const FRAMED_CARD_TOP_BORDER_OFFSET_CLASS = "-mt-px";
@@ -41,7 +42,7 @@ export const MACOS_DRAWER_HEADER_RESERVE_CLASS =
 
 export function SidebarTopReserveRow({
   testId,
-  headerSlot,
+  headerSlot: ownHeaderSlot,
 }: {
   testId: string;
   headerSlot?: ReactNode;
@@ -56,6 +57,9 @@ export function SidebarTopReserveRow({
     windowState: desktopWindowState,
   });
   const hasRail = useSidebarNavigationPlacement() === "rail";
+  const forkHeader = useForkSidebarHeader({ headerSlot: ownHeaderSlot, hasRail, usesDesktopChrome });
+  const headerSlot = forkHeader.headerSlot;
+  if (forkHeader.dropsRow) return null;
 
   if (isFramed && headerSlot === undefined) {
     return <div data-testid={testId} className="h-2 shrink-0" />;
@@ -89,7 +93,7 @@ export function SidebarTopReserveRow({
           {headerSlot}
         </div>
       )}
-      {isFramed ? null : (
+      {isFramed || forkHeader.hidden ? null : (
         <SidebarHistoryNavigationControls
           onNavigate={closeOnMobile}
           className={cn(
