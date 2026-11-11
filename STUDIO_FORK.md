@@ -480,3 +480,40 @@ login, so Tailscale ACLs are the only gate. When the fork is stopped, remove the
 `tailscale serve --https=24443 off`.
 
 `http://127.0.0.1:24300`, started by `~/.bb-dev/workingdir-bb-studio-native-0df72774ea74/start-fork.sh` (`restart-fork.sh` stops and starts it). Data is a SQLite backup of `~/.bb` taken 10 Nov, with a new host identity, automations and retention off, Studio's bot stopped, and Codex and Claude Code pointed at `~/.bb-staged`. Screenshots are in `screenshots/` in that directory.
+
+## Theme credits (11 Nov)
+
+Copied from the Studio package's `docs/theme-credits.md`; the themes themselves live in the Studio plugin (`src/theme/`), not in this fork.
+
+The classic themes in `src/theme/builtin/classic.ts` use these projects' published palettes. Each is MIT licensed. The hex values were read from the sources below on 2026-11-11.
+
+| Theme | Source | License | Copyright |
+|---|---|---|---|
+| bb Default | https://github.com/get-bb/bb (`apps/app/src/components/ui/theme.css`; oklch tokens converted to hex) | MIT | Copyright (c) 2026 Michael Yong |
+| One Dark | https://github.com/atom/atom/tree/master/packages/one-dark-syntax (`styles/colors.less`); sidebar from `packages/one-dark-ui` (`@level-3-color`) | MIT | Copyright (c) 2016 GitHub Inc. (one-dark-syntax); Copyright (c) 2014 GitHub Inc. (one-dark-ui) |
+| Dracula | https://draculatheme.com/spec; sidebar `BGDark` from https://github.com/dracula/visual-studio-code | MIT | Copyright (c) 2023 Dracula Theme (dracula-theme); Copyright (c) 2016 Dracula Theme (visual-studio-code) |
+| Solarized Light | https://github.com/altercation/solarized | MIT | Copyright (c) 2011 Ethan Schoonover |
+| GitHub Light | https://github.com/primer/github-vscode-theme ("GitHub Light Default") | MIT | Copyright (c) 2020 Primer |
+| GitHub Dark | https://github.com/primer/github-vscode-theme ("GitHub Dark Default") | MIT | Copyright (c) 2020 Primer |
+| Nord | https://github.com/nordtheme/nord (`src/nord.css`) | MIT | Copyright (c) 2016-present Sven Greb |
+| Catppuccin Mocha | https://github.com/catppuccin/palette (`palette.json`, v1.8.0) | MIT | Copyright (c) 2021 Catppuccin |
+
+### Changes from the published palettes
+
+- One Dark: the palette is published in HSL; the hex values are converted.
+- Solarized Light: the body text is base01 (`#586e75`), not base00, and the sidebar is base3, not base2. base00 on base3, and base01 on base2, are below 4.5:1.
+- All themes: muted text, error, warning and success text are mixed toward the theme's text color at run time until they reach 4.5:1 (3:1 for success and accent) on every surface (`src/theme/look.ts`). The fills keep the published colors.
+
+### Scene themes
+
+Miami 1985, Event Horizon, Zen Garden and Forest are drawn by their own shaders in `src/theme/builtin/`. Their palettes come from Studio's design mockups (round 8, screens 8a, 8b, 8d and 8e); no published palette is used. Their fonts are system fonts named in a font stack, not bundled: Futura and Avenir Next (Miami 1985), Avenir Next (Event Horizon, Forest), Iowan Old Style, Palatino, Hoefler Text and Georgia (Zen Garden). A Mac without one falls back to the next name in the stack.
+
+| Theme | Source | License | Credit |
+|---|---|---|---|
+| Forest weather | https://open-meteo.com/ (Forecast API `current=weather_code,cloud_cover,temperature_2m`, Geocoding API for a city) | Data CC BY 4.0; free, no API key, non-commercial use | Weather data by Open-Meteo.com |
+| Forest place | The tz database (`/usr/share/zoneinfo/zone1970.tab` or `zone.tab` on this computer) | Public domain | Coordinates of the computer's time zone, rounded to 0.1° |
+
+### Methods
+
+- Event Horizon traces light through a Schwarzschild black hole. Each ray from the camera is stepped with the photon orbit equation in Cartesian form, `a = -3/2 · h² · x / r⁵` (Schwarzschild radius 1, `h = |x × v|`), which gives the same path as the Binet equation `u'' + u = 3Mu²`. The step is 0.12·r, so a pixel takes more steps near the hole and none when its ray misses the 18 r_s sphere; outside that sphere the weak-field angle `2 r_s / b` bends the ray. The disk runs from the innermost stable orbit (3 r_s) to 16 r_s with the Novikov–Thorne flux profile `F ∝ r⁻³(1 − √(r_in/r))`, temperature `T ∝ F^¼`, Keplerian speed `β = √(M/(r − 2M))`, and the shift `g = √(1 − r_s/r) / (γ(1 − β·n))`. Observed temperature is `g·T` and brightness `g⁴·F`, so the approaching side is brighter and bluer.
+- Forest's sun is placed with the low-precision solar coordinates of the Astronomical Almanac (accurate to about 0.01° between 1950 and 2050): day above 6°, night below −6°, dawn or dusk in between. With no place, the clock stands in: sunrise at 6:30, sunset at 18:30.
