@@ -1307,7 +1307,30 @@ or dark, `tokens` are custom properties set inline on `<html>`, and
 `{ background?, backdropFilter?, edge? }`) become
 `--fork-surface-<name>-background`, `-backdrop-filter` and `-edge` on
 `<html>`, with `data-fork-surface-edge` listing the surfaces that set an
-edge. Values go through the same `CSS.supports` check as
+edge. Two more surface names, `panel` and `code`, paint what sits inside
+the main view (`[data-sidebar="inset"]`) and the side panel `aside`, where
+`fork.css` remaps bb's opaque fill tokens to translucent ones while a
+backdrop shows: `--card` becomes `--fork-panel` (the `panel` background, or
+`--canvas` at 32%), `--muted`, `--secondary` and `--accent` become their
+`--ink` share over transparent instead of over `--canvas`, the `-solid`
+surface tokens become their translucent twins, and `--surface-scrim` and
+the pill gradients follow. `bg-background` there paints nothing (page roots,
+fields), `--fork-panel` when the element also has a shadow (buttons,
+selects), and `--fork-code` (the `code` background, or `--canvas` at 58%)
+with the `code` backdrop-filter (default `blur(8px)`) when it is sticky,
+absolute or fixed, so text does not scroll through a header. Code blocks
+(a recessed surface with a `pre` child, or a `pre` with its own background)
+get `--fork-code`. Left opaque without a card layout: popovers, menus,
+dialogs, tooltips and toasts (portaled outside the main view, `--popover`).
+Left opaque on purpose: state variants such as `data-[state=active]:bg-background`, semantic fills
+(`bg-primary`, `bg-foreground`, `bg-destructive`, status dots), diff and
+terminal renderers, and `bg-black` media stages.
+`ForkAppBackdrop.surfaces.test.ts` scans `apps/app/src` and
+`packages/shared-ui/src` for every unconditional background utility and
+fails on one that is neither translucent, remapped, ruled nor listed as an
+exception; `ForkAppBackdrop.layout.test.tsx` mounts a settings section, a skill page's markdown with a
+code block, the new-thread home, a plugin page and a popover in the real
+`AppLayout`. Values go through the same `CSS.supports` check as
 `experimental_useSidebarStyle`. Studio's theme engine is the caller: its
 WebGL scene is the component and its theme's colors are the appearance.
 
@@ -1329,6 +1352,99 @@ walks every ancestor of the transcript, the composer and the thread list in
 a real `AppLayout` with a real `ThreadScreen`, framed and unframed, and
 fails on any background utility no rule clears.
 
+**Card layout.** `useAppearance()` may also return
+`layout: { cards: { gap, radius } }` (finite numbers, clamped to 0–24 and
+0–28 px; anything else drops the layout). bb then sets `data-fork-cards`,
+`--fork-cards-gap` and `--fork-cards-radius` on `<html>` and removes them
+with the rest of the appearance. Under `html[data-fork-cards]`, `fork.css`
+clears the fill, blur, border, `clip-path` and mask of the sidebar panel,
+its inner sidebar, the collapsible bodies, the main inset (and its framed
+`::before`, `::after` and edge) and the inset's header, so the scene shows
+in the gutters; gives the inset the gap as margin and the card radius;
+and paints as cards, each from its surface's variables with the card
+radius, no border and `--fork-cards-shadow` (one soft, wide drop shadow
+pulled in with a negative spread so it does not darken the gutters, and no
+inner highlight or ring; a surface's `edge` is never drawn on a card, and
+the buttons inside a header pill or the composer, settings cards, fields
+and the user's message bubble lose their border color): the sidebar as one card, a
+`::before` of the sidebar's grid that spans the column holding the content
+and the footer and is hidden while the sidebar is collapsed to its rail
+(`sidebar`), the header's `data-fork-header-group` rows and the
+sidebar toggle as pills two pixels tighter than the cards
+(`--fork-cards-control-radius`, `header`), each page thread's text column
+(`main`: a sticky `::before` of the scroll content, `--fork-cards-column`
+808px wide or the pane's width if narrower, centered like bb's 760px
+column and as tall as the scroll area, which becomes a size container;
+the thread window itself paints nothing, so the scene stays sharp on both
+sides) with the composer box inside it (`composer`) over
+`--fork-cards-composer-backing`, a fade to 84% `--canvas` under the
+sticky footer that keeps the transcript from showing through, and the side panel
+`aside` (`secondary-panel`), plus any `[data-fork-card="<surface>"]`
+element outside the sidebar, the hook plugin content uses; inside the
+sidebar such an element paints nothing, so the sidebar stays one card. The
+rail `nav` and its settings cell paint nothing and get
+`--fork-cards-icon-halo`, a drop-shadow from `--canvas`, so their icons
+read on the scene. The core callers are bb's own surfaces: the same
+card rules paint bb's sidebar, header groups, thread, composer and
+side panel and plugin `data-fork-card` elements. Two upstream files carry
+a one-attribute hook (`data-fork-header-group` in `AppPageHeader.tsx` and
+`SidebarHistoryNavigationControls.tsx`). `ForkAppBackdrop.cards.test.tsx`
+renders the real `AppSidebar` (rail and list, framed and not) with an
+`AppPageHeader`, and `ForkAppBackdrop.layout.test.tsx` the real
+`AppLayout` and `ThreadScreen`; both resolve `fork.css`'s cascade by
+specificity (`test/fork-css-cascade.ts`) and check that every container
+under the gutters paints nothing and every card gets its surface's paint
+and radius, and that no card rule matches without `data-fork-cards`.
+
+**Page column cards.** Outside a thread the main view paints nothing and
+each page gets one `main` card on its content column, as tall as the page
+area, with the scene clear on both sides. A static `PageShell` (Settings and
+its subpages, project and machine settings, error states;
+`[data-page-scroll-viewport].flex-1`) gets a sticky `::before` of its
+`max-w` column, `--fork-cards-page-bleed` (40px: the column's 16px padding
+plus 24px) wider on each side, so the 760px column's card is the thread's
+808px; the scroller's parent becomes a size container, and a negative top
+margin (`--fork-cards-page-lead`) cancels the column's top padding. The
+`ToolsView` shells (Skills, Plugins and the marketplace: the fill-viewport
+wrapper that holds a `[data-resource-collection-viewport]`; a skill's or
+plugin's page: the `relative h-full overflow-hidden` wrapper of its
+scroller) get an absolute `::before`, `--fork-cards-wide-column` (1032px:
+the 984px content of `max-w-5xl` plus 24px each side) wide and centered,
+shifted by `--fork-cards-scroll-gutter` where bb reserves `md:pr-3`. These
+two are class selectors on upstream markup; the test reads the class
+strings out of `ToolsView.tsx`. The new-thread page and the thread's own
+card are not touched. Scrollers in the main view other than the thread's
+hide their idle thumb. A plugin page marks its own column card with
+`data-fork-card="main"`.
+
+**Tables wider than the column.** bb lets a markdown table break out of the
+760px column (`MarkdownTable` in `markdown-preview.tsx`: an outer `div` up to
+1100px wide, centered on the column, holding the table's scroller). Under
+cards the outer `div` gets two wings, `::before` and `::after`, painted like
+the column card and only as wide as the part of the table outside the
+808px column (`--md-content-w`, the table's measured width, minus
+`--fork-cards-column`, halved), so the glass is not doubled where the table
+overlaps the column. A start-aligned table in a nested group
+(`[--md-table-start-offset:0px]`) is not centered on the column, so it gets
+one backing under the whole table instead. Tables are the only breakout bb
+has; code blocks, images and diff cards stay inside the column.
+
+**Overlays.** With a card layout every overlay portaled to `<body>` outside
+`#root` is dense glass from `surfaces.popover` (`--fork-popover`, default
+`--canvas` at 76%, and `--fork-popover-filter`, default `blur(12px)`): any
+`.bg-popover` (menus, context menus, popovers, select lists, hover cards,
+toasts, cmdk), `[role="dialog"]` and `[role="alertdialog"]` (dialogs, the
+command palette, sheets, drawers) and Radix tooltips
+(`[data-radix-popper-content-wrapper] > .bg-primary`). They take the card
+radius and `--fork-cards-shadow`, lose their border color, and inside them
+`--state-hover`, `--accent` and `--state-active` are `--primary` at 24% and
+34%, so hover and selection carry the theme's accent; a `bg-background` or
+`bg-popover` inside one paints nothing (the palette's body, fields) and a
+focused menu item draws no outline. Dialog scrims are not touched. A
+plugin's portaled overlays that use the same classes or roles are painted
+the same way. `ForkAppBackdrop.layout.test.tsx` opens a menu, a popover, a
+tooltip and a dialog with an opaque body in the real `AppLayout`.
+
 **Audit before stabilizing.**
 
 1. The see-through rules name bb's DOM (`data-sidebar`, `data-promptbox`,
@@ -1348,3 +1464,17 @@ fails on any background utility no rule clears.
    the setting.
 5. Only one backdrop is active (first plugin id); decide whether bb should
    refuse a second registration.
+6. Card layout: the rules name bb's DOM (`nav[data-sidebar-navigation-placement]`
+   and its sibling settings cell, the grid inside `[data-sidebar="sidebar"]`
+   (found by `:has(> [data-sidebar="collapsible-body"])`),
+   `[data-sidebar="trigger"]`, `[data-thread-window]`, `aside[data-surface-tone]`);
+   check them in a live window, framed and unframed, with the rail and the
+   list, a split thread and the side panel open. Pages other than threads
+   get no `main` card; decide whether bb should mark the page body so it
+   can paint one. The inset's margins change its box; check the compact
+   drawer, the side panel shelf and the framed title bar band. Decide
+   whether the gap and radius should be tokens of the theme rather than a
+   layout option, and whether `data-fork-card` should become a public slot
+   wrapper instead of an attribute. Stabilize once Studio's themes have
+   shipped on it, both window kinds pass a live check, and the selectors
+   are covered by an upstream-owned attribute.

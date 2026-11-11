@@ -362,9 +362,14 @@
       "budget": 13
     },
     "apps/app/src/components/layout/AppPageHeader.tsx": {
-      "seam": "sidebar-header",
-      "intent": "ForkMainHistoryControls (components/sidebar/ForkSidebarHeader.tsx) is the first child of the header's content row. It draws bb's back and forward buttons there when the sidebar's thread list set experimental_hideSidebarHeader, the header owns the window's top left, and the layout is not the framed title bar (which keeps its own).",
-      "budget": 2
+      "seam": "sidebar-header, app-backdrop",
+      "intent": "ForkMainHistoryControls (components/sidebar/ForkSidebarHeader.tsx) is the first child of the header's content row. It draws bb's back and forward buttons there when the sidebar's thread list set experimental_hideSidebarHeader, the header owns the window's top left, and the layout is not the framed title bar (which keeps its own). The center's inner row carries data-fork-header-group=\"title\" and the actions row data-fork-header-group=\"actions\", so fork.css can draw them as separate pills when an app backdrop asks for a card layout.",
+      "budget": 5
+    },
+    "apps/app/src/components/sidebar/SidebarHistoryNavigationControls.tsx": {
+      "seam": "app-backdrop",
+      "intent": "The back and forward buttons' row carries data-fork-header-group=\"history\", so fork.css can draw it as one pill when an app backdrop asks for a card layout.",
+      "budget": 1
     },
     "apps/app/src/components/sidebar/SidebarChrome.tsx": {
       "seam": "sidebar-header",
