@@ -1,14 +1,64 @@
+import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { describe, expect, it, vi } from "vitest";
-import { forkWindowOptions, forkWindowUrl } from "../src/fork-windows.js";
+import {
+  forkWindowOptions,
+  forkWindowUrl,
+  registerForkWindowIpc,
+} from "../src/fork-windows.js";
+import { BB_DESKTOP_FORK_WINDOW_CHANNEL } from "../src/fork-windows-ipc.js";
 
-vi.mock("electron", () => ({
-  app: { getAppPath: () => "/app" },
-  BrowserWindow: class {},
-  globalShortcut: { register: () => true, unregister: () => {} },
-  nativeImage: { createEmpty: () => ({}) },
-  screen: {},
-  Tray: class {},
-}));
+interface FakeWindow {
+  loadURL: ReturnType<typeof vi.fn>;
+  show: ReturnType<typeof vi.fn>;
+  focus: ReturnType<typeof vi.fn>;
+}
+
+const created = vi.hoisted(() => [] as FakeWindow[]);
+
+vi.mock("electron", async () => {
+  const { vi: mock } = await import("vitest");
+  class BrowserWindow {
+    loadURL = mock.fn(() => Promise.resolve());
+    show = mock.fn();
+    focus = mock.fn();
+    close = mock.fn();
+    constructor() {
+      created.push(this);
+    }
+    on() {}
+    once() {}
+    isDestroyed() {
+      return false;
+    }
+    isVisible() {
+      return true;
+    }
+  }
+  return {
+    app: { getAppPath: () => "/app" },
+    BrowserWindow,
+    globalShortcut: { register: () => true, unregister: () => {} },
+    nativeImage: { createEmpty: () => ({}) },
+    screen: {},
+    Tray: class {},
+  };
+});
+
+function windowIpc() {
+  let handler:
+    | ((event: IpcMainInvokeEvent, request: unknown) => boolean)
+    | undefined;
+  registerForkWindowIpc({
+    handle: (channel: string, listener: typeof handler) => {
+      if (channel === BB_DESKTOP_FORK_WINDOW_CHANNEL) handler = listener;
+    },
+  } as unknown as IpcMain);
+  const sender = {
+    senderFrame: { url: "http://127.0.0.1:38986/threads/thr_1" },
+  } as unknown as IpcMainInvokeEvent;
+  return (op: string, key: string, path: string) =>
+    handler?.(sender, { op, key, path, options: {} });
+}
 
 describe("plugin windows in the desktop app", () => {
   it("only opens the bare window route on the sender's own origin", () => {
@@ -77,6 +127,64 @@ describe("plugin windows in the desktop app", () => {
       width: 480,
       height: 360,
     });
+  });
+});
+
+describe("a plugin window opened again", () => {
+  it("loads new params into the open window instead of making another", () => {
+    const invoke = windowIpc();
+    const before = created.length;
+    invoke("open", "studio/hud", "/fork-window/studio/hud?thread=a");
+    expect(created.length).toBe(before + 1);
+    const hud = created.at(-1);
+    expect(hud?.loadURL).toHaveBeenCalledTimes(1);
+
+    invoke("open", "studio/hud", "/fork-window/studio/hud?thread=a");
+    expect(created.length).toBe(before + 1);
+    expect(hud?.loadURL).toHaveBeenCalledTimes(1);
+    expect(hud?.show).toHaveBeenCalled();
+
+    invoke("open", "studio/hud", "/fork-window/studio/hud?thread=b");
+    expect(created.length).toBe(before + 1);
+    expect(hud?.loadURL).toHaveBeenCalledTimes(2);
+    expect(hud?.loadURL).toHaveBeenLastCalledWith(
+      "http://127.0.0.1:38986/fork-window/studio/hud?thread=b",
+    );
+  });
+});
+
+describe("vibrancy behind a transparent window", () => {
+  it("is macOS's active material, only for a transparent window", () => {
+    expect(
+      forkWindowOptions(
+        { transparent: true, vibrancy: "hud" },
+        undefined,
+        "darwin",
+      ),
+    ).toMatchObject({ vibrancy: "hud", visualEffectState: "active" });
+    expect(
+      forkWindowOptions(
+        { transparent: true, vibrancy: "under-window" },
+        undefined,
+        "darwin",
+      ).vibrancy,
+    ).toBe("under-window");
+    for (const options of [
+      forkWindowOptions(
+        { transparent: true, vibrancy: "hud" },
+        undefined,
+        "win32",
+      ),
+      forkWindowOptions({ vibrancy: "hud" }, undefined, "darwin"),
+      forkWindowOptions(
+        { transparent: true, vibrancy: "sidebar" as never },
+        undefined,
+        "darwin",
+      ),
+    ]) {
+      expect(options.vibrancy).toBeUndefined();
+      expect(options.visualEffectState).toBeUndefined();
+    }
   });
 });
 

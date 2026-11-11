@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import type {
+  ExperimentalAppCommand,
   ExperimentalCloseFallbackRegistration,
+  ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
   ExperimentalDragItem,
   ExperimentalItemDropRegistration,
@@ -24,6 +26,7 @@ import type {
   ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
   ExperimentalSkillSourceRegistration,
+  ExperimentalTabWindow,
   ExperimentalWindowRegistration,
   ExperimentalWorkbench,
   ExperimentalWorkbenchArrangement,
@@ -69,6 +72,7 @@ export type ForkNavigateCall =
     }
   | { method: "experimental_workbench.close"; threadId: string; key: string }
   | { method: "experimental_workbench.focus"; threadId: string; key: string }
+  | { method: "experimental_workbench.popOut"; threadId: string; key: string }
   | {
       method: "experimental_workbench.arrange";
       threadId: string;
@@ -84,6 +88,8 @@ export interface ForkSlotEnv {
   globalTabs: readonly ExperimentalGlobalTab[];
   sidebarNewItems: readonly ExperimentalSidebarNewItem[];
   launcherItems: readonly ExperimentalLauncherItem[];
+  appCommands: readonly ExperimentalAppCommand[];
+  tabWindow: ExperimentalTabWindow | null;
 }
 
 export interface ForkCapturedPluginApp {
@@ -104,6 +110,7 @@ export interface ForkCapturedPluginApp {
   closeFallbacks: ExperimentalCloseFallbackRegistration[];
   skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
+  commandPalettes: ExperimentalCommandPaletteRegistration[];
 }
 
 export interface ForkRenderSlotOptions {
@@ -123,6 +130,10 @@ export interface ForkRenderSlotOptions {
   sidebarNewItems?: readonly ExperimentalSidebarNewItem[];
   /** `experimental_useLauncherItems()` value; defaults to none. */
   launcherItems?: readonly ExperimentalLauncherItem[];
+  /** `experimental_useAppCommands()` value; defaults to none. */
+  appCommands?: readonly ExperimentalAppCommand[];
+  /** `experimental_useTabWindow()` value; defaults to null (not in a tab's own window). */
+  tabWindow?: ExperimentalTabWindow | null;
 }
 
 const TEST_ITEM_DRAG_TYPE = "application/x-bb-item";
@@ -161,6 +172,12 @@ export function forkTestHooks(
     experimental_useContextCard: () => ({ available: false, open: () => {} }),
     experimental_useLauncherItems() {
       return useSlotEnv("experimental_useLauncherItems").launcherItems;
+    },
+    experimental_useAppCommands() {
+      return useSlotEnv("experimental_useAppCommands").appCommands;
+    },
+    experimental_useTabWindow() {
+      return useSlotEnv("experimental_useTabWindow").tabWindow;
     },
     experimental_useWindows: () => ({
       native: false,
@@ -251,6 +268,10 @@ function recordingWorkbench(
       return true;
     },
     isTyping: () => false,
+    popOut(key) {
+      record({ method: "experimental_workbench.popOut", threadId, key });
+      return Promise.resolve(false);
+    },
   };
 }
 
@@ -310,6 +331,8 @@ export function forkSlotEnv(
     globalTabs: options.globalTabs ?? [],
     sidebarNewItems: options.sidebarNewItems ?? [],
     launcherItems: options.launcherItems ?? [],
+    appCommands: options.appCommands ?? [],
+    tabWindow: options.tabWindow ?? null,
     appPanes: {
       panes,
       focus(paneId) {

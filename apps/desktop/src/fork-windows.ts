@@ -28,6 +28,7 @@ import {
 
 interface Registered {
   url: string;
+  loadedUrl: string | null;
   preload: string | undefined;
   options: ForkWindowOptions;
   window: BrowserWindow | null;
@@ -46,9 +47,21 @@ function size(value: unknown, fallback: number): number {
     : fallback;
 }
 
+function forkVibrancy(
+  options: ForkWindowOptions,
+  platform: NodeJS.Platform,
+): Pick<BrowserWindowConstructorOptions, "vibrancy" | "visualEffectState"> {
+  return options.transparent === true &&
+    platform === "darwin" &&
+    (options.vibrancy === "hud" || options.vibrancy === "under-window")
+    ? { vibrancy: options.vibrancy, visualEffectState: "active" }
+    : {};
+}
+
 export function forkWindowOptions(
   options: ForkWindowOptions,
   preload: string | undefined,
+  platform: NodeJS.Platform = process.platform,
 ): BrowserWindowConstructorOptions {
   const transparent = options.transparent === true;
   const position =
@@ -72,6 +85,7 @@ export function forkWindowOptions(
       ? { titleBarStyle: "hiddenInset" as const }
       : {}),
     ...(options.center === true ? { center: true } : {}),
+    ...forkVibrancy(options, platform),
     skipTaskbar: transparent || options.hideOnBlur === true,
     show: false,
     webPreferences: {
@@ -138,6 +152,10 @@ function setClickThrough(entry: Registered, on: boolean): void {
 
 function show(entry: Registered, key: string): void {
   if (entry.window !== null && !entry.window.isDestroyed()) {
+    if (entry.loadedUrl !== entry.url) {
+      entry.loadedUrl = entry.url;
+      void entry.window.loadURL(entry.url);
+    }
     entry.window.show();
     entry.window.focus();
     return;
@@ -192,6 +210,7 @@ function show(entry: Registered, key: string): void {
   window.on("closed", () => {
     if (entry.window === window) entry.window = null;
   });
+  entry.loadedUrl = entry.url;
   void window.loadURL(entry.url);
 }
 
@@ -244,6 +263,7 @@ function register(
   if (existing !== undefined) release(existing);
   const entry: Registered = {
     url,
+    loadedUrl: existing?.loadedUrl ?? null,
     preload,
     options,
     window: existing?.window ?? null,

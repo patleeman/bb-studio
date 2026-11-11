@@ -19,7 +19,10 @@ import { PluginItemIcon } from "@/components/plugin/PluginIcon";
 import {
   globalPanelTabAppliesTo,
   globalPanelTabsAtom,
+  threadIdOfPanelState,
 } from "@/lib/fork-global-panel-tabs";
+import { canPopOutTab, popOutWorkbenchTab } from "@/lib/fork-tab-popout";
+import { findSurface } from "@/lib/fork-workbench";
 import { getBbDesktopInfo } from "@/lib/bb-desktop";
 import { closeFallbackHandled } from "@/lib/fork-close-fallback";
 import {
@@ -145,16 +148,43 @@ export function PanelTabActionMenuItems({
 }: {
   tab: SecondaryPanelRenderableTab;
 }) {
+  const panelStateId = useContext(WorkbenchPanelContext);
+  const paneMove = paneMoveFor(panelStateId, tab.tab.id);
+  const popOutThreadId = popOutThreadFor(panelStateId, tab);
   return (
     <>
       <PluginPanelTabActionItems tab={tab} />
-      <WorkbenchPaneMenuItem tabId={tab.tab.id} />
+      {paneMove === null ? null : (
+        <ContextMenuItem
+          data-workbench-pane-move=""
+          disabled={paneMove.disabled}
+          onSelect={paneMove.run}
+        >
+          {paneMove.label}
+        </ContextMenuItem>
+      )}
+      {popOutThreadId === null ? null : (
+        <ContextMenuItem
+          data-workbench-pop-out=""
+          onSelect={() => {
+            const surface = findSurface(popOutThreadId);
+            if (surface !== null) void popOutWorkbenchTab(surface, tab.tab.id);
+          }}
+        >
+          Open in new window
+        </ContextMenuItem>
+      )}
+      {paneMove === null && popOutThreadId === null ? null : (
+        <ContextMenuSeparator />
+      )}
     </>
   );
 }
 
-function WorkbenchPaneMenuItem({ tabId }: { tabId: string }) {
-  const panelStateId = useContext(WorkbenchPanelContext);
+function paneMoveFor(
+  panelStateId: string | null,
+  tabId: string,
+): { label: string; disabled: boolean; run: () => void } | null {
   const splits =
     panelStateId === null ? null : workbenchSplitsFor(panelStateId);
   if (splits === null) return null;
@@ -162,20 +192,21 @@ function WorkbenchPaneMenuItem({ tabId }: { tabId: string }) {
   const pane = panes.find((candidate) => candidate.tabIds.includes(tabId));
   if (pane === undefined) return null;
   const single = panes.length === 1;
-  return (
-    <>
-      <ContextMenuItem
-        data-workbench-pane-move=""
-        disabled={single && pane.tabIds.length < 2}
-        onSelect={() =>
-          single ? splits.moveToNewPane(tabId) : splits.moveToOtherPane(tabId)
-        }
-      >
-        {single ? "Move to new pane" : "Move to other pane"}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-    </>
-  );
+  return {
+    label: single ? "Move to new pane" : "Move to other pane",
+    disabled: single && pane.tabIds.length < 2,
+    run: () =>
+      single ? splits.moveToNewPane(tabId) : splits.moveToOtherPane(tabId),
+  };
+}
+
+function popOutThreadFor(
+  panelStateId: string | null,
+  tab: SecondaryPanelRenderableTab,
+): string | null {
+  if (panelStateId === null || tab.isPinned === true) return null;
+  const threadId = threadIdOfPanelState(panelStateId);
+  return threadId !== null && canPopOutTab(tab.tab) ? threadId : null;
 }
 
 function PluginPanelTabActionItems({

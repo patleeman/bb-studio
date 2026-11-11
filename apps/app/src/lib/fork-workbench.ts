@@ -28,6 +28,7 @@ import { GIT_DIFF_TAB_REFERENCE } from "./git-diff-tab";
 import { normalizeExperimentalFilePreviewOptions } from "./live-file-navigation";
 import { createPluginPanelController } from "./plugin-panel-controller";
 import { getPluginSlotSnapshot, isThreadTab } from "./plugin-slots";
+import { popOutWorkbenchTab } from "./fork-tab-popout";
 import { BbHttpError, sdk } from "./sdk";
 
 type JotaiStore = ReturnType<typeof createStore>;
@@ -65,7 +66,9 @@ export function resetWorkbenchSurfacesForTest(): void {
   surfaces.length = 0;
 }
 
-function findSurface(threadId: string | undefined): WorkbenchSurface | null {
+export function findSurface(
+  threadId: string | undefined,
+): WorkbenchSurface | null {
   for (let index = surfaces.length - 1; index >= 0; index -= 1) {
     const surface = surfaces[index]?.() ?? null;
     if (
@@ -490,5 +493,6 @@ export function workbenchFor(
     layout: () => readLayout(current()),
     arrange: (layout) => arrange(current(), layout),
     isTyping: () => isTypingInSidePanel(),
+    popOut: (key) => popOutWorkbenchTab(current(), key),
   };
 }
