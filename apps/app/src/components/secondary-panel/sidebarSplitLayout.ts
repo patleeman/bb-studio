@@ -1,7 +1,7 @@
+import { WORKBENCH_MAX_PANES as MAX_PANES } from "./workbenchSplitLimits.fork";
 import { z } from "zod";
 import { arrayMove } from "@bb/client-core";
 import {
-  MAX_PANES,
   countPanes,
   computePaneRects,
   findPane,
