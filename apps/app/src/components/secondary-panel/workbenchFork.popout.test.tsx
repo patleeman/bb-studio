@@ -66,6 +66,7 @@ function registerSurface() {
   const closeTab = vi.fn(() => true);
   registerWorkbenchSurface(() => ({
     threadId: "thr_1",
+    panelStateId: "thr_1",
     panel: { getTabs: () => state, closeTab } as unknown as AppPanelController,
     openFilePreview: () => false,
     openTerminal: () => false,

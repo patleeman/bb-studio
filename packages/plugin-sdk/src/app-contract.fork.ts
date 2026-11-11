@@ -471,7 +471,12 @@ export interface ExperimentalPanelTabActionRegistration {
  * document, a side panel tab or a file. A drag carries it as JSON under the
  * MIME type `application/x-bb-item`; write it with
  * `experimental_writeDragItem` and read it with `experimental_readDragItem`.
- * Experimental: see docs/api_to_audit.fork.md.
+ * Every side panel tab is a native drag source of one: a plugin action tab
+ * carries `tab`; a tab another workbench can show (plugin action tabs,
+ * workspace, host and thread storage files) carries `open`; a tab that
+ * cannot leave its window (terminal, browser, Info, Diff, New Tab, fixed
+ * tabs) carries neither and is also marked with the MIME type
+ * `application/x-bb-item-local`. Experimental: see docs/api_to_audit.fork.md.
  */
 export interface ExperimentalDragItem {
   kind: "thread" | "doc" | "tab" | "file";
@@ -489,6 +494,13 @@ export interface ExperimentalDragItem {
     params: Record<string, unknown> | undefined;
     threadId: string | null;
   };
+  /**
+   * For kind "tab": what `ExperimentalWorkbench.open` takes to show the
+   * same tab in another workbench or window. bb itself moves a tab dropped
+   * on a side panel's tab row with it; absent for a tab that cannot leave
+   * its window.
+   */
+  open?: ExperimentalWorkbenchOpenSpec;
 }
 
 /**
@@ -505,15 +517,19 @@ export interface ExperimentalDropMention {
 }
 
 /**
- * Where on bb's own surfaces a dragged item is: the side panel of a thread
- * or of a plugin page (`threadId` null), a thread's composer or the
- * new-thread composer (`threadId` null), or the rest of the main view.
+ * Where on bb's own surfaces a dragged item is: the side panel of a thread,
+ * of a plugin page (`threadId` null) or of a popped-out tab window, a
+ * thread's composer or the new-thread composer (`threadId` null), or the
+ * rest of the main view.
  * In a side panel, `pane` and `index` say where: over a pane's tab row,
  * `pane` is 1 or 2 (left to right) and `index` the insertion point among
  * that row's tabs, counted as `ExperimentalWorkbenchPane.tabs` lists them;
  * over the right edge of a side panel with one pane, `pane` is "new"; both
- * are absent elsewhere in the panel. Pass them to
- * `ExperimentalWorkbench.open` to open the item there.
+ * are absent elsewhere in the panel. `open(spec, options)` opens an item in
+ * that very panel, as `ExperimentalWorkbench.open` does for the calling
+ * plugin; it is the one way into a popped-out window's panel, where
+ * `experimental_workbench` needs a component mounted in that window. Pass
+ * `pane` and `index` to it to open the item where the drop landed.
  * The composer's three functions insert at its caret, or append when it
  * has no caret, and return false when that composer is not on screen or
  * the value is not valid. `insertText` inserts plain text.
@@ -528,6 +544,10 @@ export type ExperimentalItemDropTarget =
       threadId: string | null;
       pane?: 1 | 2 | "new";
       index?: number;
+      open(
+        spec: ExperimentalWorkbenchOpenSpec,
+        options?: ExperimentalWorkbenchOpenOptions,
+      ): Promise<string | null>;
     }
   | {
       zone: "composer";
@@ -686,20 +706,21 @@ export interface ExperimentalAppBackdropRegistration {
 }
 
 /**
- * A side panel tab shown alone in its own window ("Open in new window",
+ * A side panel tab shown in a popped-out window ("Open in new window",
  * `experimental_workbench(...).popOut`), as `experimental_useTabWindow()`
- * reports it to the tab's components. The window's bar shows `title` and
- * "Return to workbench", so the tab need not draw its own title row.
- * Experimental: see docs/api_to_audit.fork.md.
+ * reports it to the tab's components. The window's bar shows the selected
+ * tab's `title` and "Return to workbench", so the tab need not draw its own
+ * title row. Experimental: see docs/api_to_audit.fork.md.
  */
 export interface ExperimentalTabWindow {
-  /** The title the window's bar shows. */
+  /** The title the window's bar shows: the selected tab's. */
   title: string;
   /**
    * An element in the window's bar, before "Return to workbench", for the
    * tab's own controls (render into it with `createPortal`). It lays its
    * children out in a row and keeps them out of the window drag region.
-   * Null until the bar has mounted.
+   * Null until the bar has mounted, and null for every tab but the selected
+   * one.
    */
   toolbar: HTMLElement | null;
 }
@@ -1354,11 +1375,14 @@ export interface ExperimentalWorkbench {
    */
   isTyping(): boolean;
   /**
-   * Open a tab in a window of its own and close it in the side panel; the
-   * window has a Return to workbench button that opens it again in the pane
-   * it came from. Resolves false, with nothing changed, for a key that is not
-   * open, a tab that cannot be shown alone (see the Fork API reference) or a
-   * blocked popup.
+   * Open a tab in a window of its own and close it in the side panel. The
+   * window is a workbench panel of this thread: more tabs reach it by drag
+   * and drop, its last tab dragged out closes it, and its Return to
+   * workbench button opens every tab again in the panel that popped it out.
+   * In the main window `list()` does not include tabs living in windows.
+   * Resolves false, with nothing changed, for a key that is not open, a tab
+   * that cannot be shown alone (see the Fork API reference) or a blocked
+   * popup.
    */
   popOut(key: string): Promise<boolean>;
 }
