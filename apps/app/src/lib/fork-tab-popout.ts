@@ -12,7 +12,8 @@ import { workbenchSplitsFor } from "@/components/secondary-panel/workbenchSplits
 import { appQueryClient } from "./app-query-client";
 import type { FixedPanelTab } from "./fixed-panel-tabs-state";
 import { forkFixedPanelTabs } from "./fixed-panel-tabs";
-import { openPopOutWindow, popOutKey } from "./fork-bare-window";
+import { getBbDesktopInfo } from "./bb-desktop";
+import { openPopOutWindow } from "./fork-bare-window";
 import type { WorkbenchSurface } from "./fork-workbench";
 import { FORK_WINDOW_PATH_PREFIX } from "./fork-windows";
 import { normalizeExperimentalFileOpenOptions } from "./live-file-navigation";
@@ -30,10 +31,18 @@ export type TabWindowPane = 1 | 2;
 
 export interface TabWindowRequest {
   threadId: string;
+  windowId: string;
   spec: ExperimentalWorkbenchOpenSpec;
   pane: TabWindowPane;
   from: string;
   title: string;
+}
+
+export function newTabWindowId(): string {
+  return typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function locationOf(
@@ -93,11 +102,46 @@ async function environmentHostId(
   }
 }
 
+function cachedEnvironmentHostId(environmentId: string): string | null {
+  return (
+    appQueryClient.getQueryData(environmentQueryOptions(environmentId).queryKey)
+      ?.hostId ?? null
+  );
+}
+
+export function tabOpenSpecNow(
+  tab: FixedPanelTab,
+  threadId: string | null,
+): ExperimentalWorkbenchOpenSpec | null {
+  if (!canPopOutTab(tab)) return null;
+  if (tab.kind !== "host-file-preview") return specOf(tab, threadId, null);
+  const hostId =
+    tab.hostId ??
+    (tab.environmentId === null
+      ? null
+      : cachedEnvironmentHostId(tab.environmentId));
+  return hostId === null ? null : specOf(tab, threadId, hostId);
+}
+
 export async function tabOpenSpec(
   tab: FixedPanelTab,
   threadId: string,
 ): Promise<ExperimentalWorkbenchOpenSpec | null> {
   if (!canPopOutTab(tab)) return null;
+  if (tab.kind !== "host-file-preview") return specOf(tab, threadId, null);
+  const hostId =
+    tab.hostId ??
+    (tab.environmentId === null
+      ? null
+      : await environmentHostId(tab.environmentId));
+  return hostId === null ? null : specOf(tab, threadId, hostId);
+}
+
+function specOf(
+  tab: FixedPanelTab,
+  threadId: string | null,
+  hostId: string | null,
+): ExperimentalWorkbenchOpenSpec | null {
   switch (tab.kind) {
     case "plugin-panel": {
       const params = parsePersistedPluginPanelParams(tab.paramsJson);
@@ -121,25 +165,19 @@ export async function tabOpenSpec(
         tab.lineRange,
       );
     }
-    case "host-file-preview": {
-      const hostId =
-        tab.hostId ??
-        (tab.environmentId === null
-          ? null
-          : await environmentHostId(tab.environmentId));
+    case "host-file-preview":
       return hostId === null
         ? null
         : fileSpec({ kind: "host", hostId, path: tab.path }, tab.lineRange);
+    case "thread-storage-file-preview": {
+      const owner = tab.threadId ?? threadId;
+      return owner === null
+        ? null
+        : fileSpec(
+            { kind: "thread-storage", threadId: owner, path: tab.path },
+            tab.lineRange,
+          );
     }
-    case "thread-storage-file-preview":
-      return fileSpec(
-        {
-          kind: "thread-storage",
-          threadId: tab.threadId ?? threadId,
-          path: tab.path,
-        },
-        tab.lineRange,
-      );
     default:
       return null;
   }
@@ -148,6 +186,7 @@ export async function tabOpenSpec(
 export function tabWindowPath(request: TabWindowRequest): string {
   const query = new URLSearchParams({
     thread: request.threadId,
+    win: request.windowId,
     spec: JSON.stringify(request.spec),
     pane: String(request.pane),
     from: request.from,
@@ -210,10 +249,11 @@ export function parseTabWindowSearch(
   search: URLSearchParams,
 ): TabWindowRequest | null {
   const threadId = search.get("thread");
+  const windowId = search.get("win");
   const pane = search.get("pane");
   const from = search.get("from");
   const rawSpec = search.get("spec");
-  if (!threadId || !from || rawSpec === null) return null;
+  if (!threadId || !windowId || !from || rawSpec === null) return null;
   if (pane !== "1" && pane !== "2") return null;
   let parsed: unknown;
   try {
@@ -225,6 +265,7 @@ export function parseTabWindowSearch(
   if (spec === null) return null;
   return {
     threadId,
+    windowId,
     spec,
     pane: pane === "2" ? 2 : 1,
     from,
@@ -232,17 +273,40 @@ export function parseTabWindowSearch(
   };
 }
 
-function paneOf(threadId: string, key: string): TabWindowPane {
-  const panes = workbenchSplitsFor(threadId)?.panes() ?? [];
+export function paneOfTab(panelStateId: string, key: string): TabWindowPane {
+  const panes = workbenchSplitsFor(panelStateId)?.panes() ?? [];
   return panes.findIndex((pane) => pane.tabIds.includes(key)) === 1 ? 2 : 1;
 }
 
-function ownTab(
+export function ownTab(
   surface: WorkbenchSurface,
   key: string,
 ): FixedPanelTab | undefined {
-  const atom = forkFixedPanelTabs.owned(surface.threadId);
+  const atom = forkFixedPanelTabs.owned(surface.panelStateId);
   return surface.store.get(atom).secondary.tabs.find((tab) => tab.id === key);
+}
+
+export function tabWindowKey(windowId: string): string {
+  return `bb-tabwindow-${windowId}`;
+}
+
+export async function closeTabWindow(windowId: string): Promise<void> {
+  const desktop = getBbDesktopInfo()?.experimental_window;
+  if (desktop !== undefined) {
+    try {
+      await desktop({
+        op: "close",
+        key: tabWindowKey(windowId),
+        path: "",
+        options: {},
+      });
+      return;
+    } catch {
+      window.close();
+      return;
+    }
+  }
+  window.close();
 }
 
 export async function popOutWorkbenchTab(
@@ -258,15 +322,16 @@ export async function popOutWorkbenchTab(
   if (spec === null) return false;
   const request: TabWindowRequest = {
     threadId: surface.threadId,
+    windowId: newTabWindowId(),
     spec,
-    pane: paneOf(surface.threadId, key),
+    pane: paneOfTab(surface.panelStateId, key),
     from: WINDOW_INSTANCE_ID,
     title: listed.title,
   };
   const opened = await openPopOutWindow(
     tabWindowPath(request),
     { title: listed.title },
-    popOutKey(`${surface.threadId}:${JSON.stringify(spec)}`),
+    tabWindowKey(request.windowId),
   );
   if (!opened) return false;
   surface.panel.closeTab(key);
