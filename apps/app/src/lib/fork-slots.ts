@@ -1,5 +1,6 @@
 import type {
   ExperimentalCloseFallbackRegistration,
+  ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
   ExperimentalItemDropRegistration,
   ExperimentalLauncherItemRegistration,
@@ -72,11 +73,15 @@ export interface PluginSkillSourceSlot
 export interface PluginNewTabItemsSlot
   extends ExperimentalNewTabItemsRegistration, ForkSlotBase {}
 
+export interface PluginCommandPaletteSlot
+  extends ExperimentalCommandPaletteRegistration, ForkSlotBase {}
+
 export interface ForkRegistrationSet {
   itemDrops?: readonly ExperimentalItemDropRegistration[];
   closeFallbacks?: readonly ExperimentalCloseFallbackRegistration[];
   skillSources?: readonly ExperimentalSkillSourceRegistration[];
   newTabItems?: readonly ExperimentalNewTabItemsRegistration[];
+  commandPalettes?: readonly ExperimentalCommandPaletteRegistration[];
   panelTabActions?: readonly ExperimentalPanelTabActionRegistration[];
   launcherItems?: readonly ExperimentalLauncherItemRegistration[];
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
@@ -97,6 +102,7 @@ export interface ForkSlotSnapshot {
   closeFallbacks: readonly PluginCloseFallbackSlot[];
   skillSources: readonly PluginSkillSourceSlot[];
   newTabItems: readonly PluginNewTabItemsSlot[];
+  commandPalettes: readonly PluginCommandPaletteSlot[];
   panelTabActions: readonly PluginPanelTabActionSlot[];
   launcherItems: readonly PluginLauncherItemSlot[];
   mainHeaders: readonly PluginMainHeaderSlot[];
@@ -117,6 +123,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   closeFallbacks: [],
   skillSources: [],
   newTabItems: [],
+  commandPalettes: [],
   launcherItems: [],
   mainHeaders: [],
   threadBanners: [],
@@ -150,6 +157,7 @@ export const FORK_SLOT_KINDS = [
   "closeFallbacks",
   "skillSources",
   "newTabItems",
+  "commandPalettes",
 ] as const satisfies readonly (keyof ForkSlotSnapshot)[];
 
 export function stampForkSlots(
@@ -176,5 +184,6 @@ export function stampForkSlots(
     closeFallbacks: stamp(set.closeFallbacks),
     skillSources: stamp(set.skillSources),
     newTabItems: stamp(set.newTabItems),
+    commandPalettes: stamp(set.commandPalettes),
   };
 }

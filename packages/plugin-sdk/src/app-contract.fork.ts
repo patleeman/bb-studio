@@ -572,6 +572,96 @@ export interface ExperimentalCloseFallbackRegistration {
 }
 
 /**
+ * Props of a replacement quick palette (`slots.experimental_commandPalette`).
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalCommandPaletteProps {
+  /**
+   * What opened the palette: `"search"` for Search (Mod+K, the rail's Search
+   * button, the `thread.search` command), `"commands"` for the quick palette
+   * command (Shift+Mod+P). Pressing either again while the palette is open
+   * mounts the component again with the new mode.
+   */
+  initialMode: "commands" | "search";
+  /**
+   * Close the palette. `then` runs after it has closed and focus is back where
+   * it was before the palette opened, as bb runs a chosen command; run app
+   * commands that act on the focused view this way.
+   */
+  close(then?: () => void): void;
+  /**
+   * Ask `handler` first when Escape is pressed in the palette. When it
+   * returns true bb keeps the palette open and the key is handled (its
+   * `defaultPrevented` is set); false, a throw or no handler closes the
+   * palette. bb calls it before the key reaches the focused element. A new
+   * registration replaces the previous one; the returned function removes
+   * it. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_onEscape(handler: () => boolean): () => void;
+}
+
+/**
+ * Registration for `slots.experimental_commandPalette`: a component that
+ * replaces bb's quick palette (its command list and its thread search) on
+ * every entry point. bb draws it in its own palette dialog, so focus
+ * trapping, the overlay and Escape (which closes it unless the component's
+ * `experimental_onEscape` handler claims it) are bb's. The first
+ * registration by plugin id wins; with none, bb's palette shows. A crash in
+ * the component shows bb's palette instead. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalCommandPaletteRegistration {
+  /** Unique within the plugin; letters, digits, `-`, `_`. */
+  id: string;
+  component: ComponentType<ExperimentalCommandPaletteProps>;
+}
+
+/**
+ * A side panel tab shown alone in its own window ("Open in new window",
+ * `experimental_workbench(...).popOut`), as `experimental_useTabWindow()`
+ * reports it to the tab's components. The window's bar shows `title` and
+ * "Return to workbench", so the tab need not draw its own title row.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTabWindow {
+  /** The title the window's bar shows. */
+  title: string;
+  /**
+   * An element in the window's bar, before "Return to workbench", for the
+   * tab's own controls (render into it with `createPortal`). It lays its
+   * children out in a row and keeps them out of the window drag region.
+   * Null until the bar has mounted.
+   */
+  toolbar: HTMLElement | null;
+}
+
+/**
+ * One entry of bb's quick palette command list, as
+ * `experimental_useAppCommands()` lists it. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalAppCommand {
+  /**
+   * Stable across renders: `app:<command id>` for bb's commands (such as
+   * `app:thread.new`), `plugin:<plugin id>/<id>` for plugin commands, `settings:<section>` and `settings:plugin:<plugin id>`
+   * for settings pages, `plugin-page:<plugin id>/<panel id>` for plugin
+   * pages and `server:<id>` for switching servers.
+   */
+  id: string;
+  /** The title bb's palette shows, such as "New conversation". */
+  title: string;
+  /** The heading bb's palette groups it under, such as "Threads" or "Settings". */
+  group: string;
+  /** The shortcut as bb shows it, such as "⌘N"; absent when it has none. */
+  shortcut?: string;
+  /**
+   * Run it. Inside a replacement palette this closes the palette first and
+   * runs the command after focus is back, as bb's palette does.
+   */
+  run(): void;
+}
+
+/**
  * How a plugin window looks and behaves. Sizes are in points. `hotkey` is a
  * system-wide shortcut in Electron's accelerator form (such as
  * `Alt+Space`) that shows or hides the window; `menuBarTitle` adds a menu
@@ -605,6 +695,13 @@ export interface ExperimentalWindowOptions {
   center?: boolean;
   /** Close when the window loses focus (a launcher). */
   hideOnBlur?: boolean;
+  /**
+   * macOS only, with `transparent`: the system's blurred material behind the
+   * component, kept active when the window is not focused. `"hud"` is the
+   * dark heads-up material, `"under-window"` the window background one.
+   * Ignored elsewhere and without `transparent`.
+   */
+  vibrancy?: "hud" | "under-window";
   /** Passed to the window as its query string. */
   params?: Readonly<Record<string, string>>;
 }
@@ -792,6 +889,14 @@ export interface ForkPluginAppSlots {
    */
   experimental_closeFallback(
     registration: ExperimentalCloseFallbackRegistration,
+  ): void;
+  /**
+   * Replace bb's quick palette with the plugin's own component (see
+   * {@link ExperimentalCommandPaletteRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_commandPalette(
+    registration: ExperimentalCommandPaletteRegistration,
   ): void;
   /**
    * Offer an app or action to a launcher (see
@@ -1171,6 +1276,14 @@ export interface ExperimentalWorkbench {
    * `open` or `focus` to avoid taking a tab from under the user.
    */
   isTyping(): boolean;
+  /**
+   * Open a tab in a window of its own and close it in the side panel; the
+   * window has a Return to workbench button that opens it again in the pane
+   * it came from. Resolves false, with nothing changed, for a key that is not
+   * open, a tab that cannot be shown alone (see the Fork API reference) or a
+   * blocked popup.
+   */
+  popOut(key: string): Promise<boolean>;
 }
 
 /**
@@ -1344,4 +1457,22 @@ export interface ForkPluginSdkApp {
    * Experimental: see docs/api_to_audit.md.
    */
   experimental_useAppPanes(): ExperimentalAppPanes;
+  /**
+   * Everything bb's quick palette lists as commands: bb's app commands that
+   * are available now, plugin palette commands, settings pages, plugin pages
+   * and server switches, in bb's order. Inside a replacement palette the
+   * list is the one taken when the palette opened, as bb's palette takes it;
+   * elsewhere (a plugin window) it is read again after mount and whenever
+   * the window gains focus, and commands act on that window. Open a
+   * settings section without it with
+   * `useBbNavigate().experimental_toAppPath("/settings/<section>")`.
+   * Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_useAppCommands(): readonly ExperimentalAppCommand[];
+  /**
+   * The window a side panel tab was popped out to (see
+   * {@link ExperimentalTabWindow}), or null anywhere else. Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_useTabWindow(): ExperimentalTabWindow | null;
 }

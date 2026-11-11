@@ -3,11 +3,27 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
 import { usePluginSlots } from "@/lib/plugin-slots";
+import { TAB_WINDOW_ID, TAB_WINDOW_OWNER } from "@/lib/fork-tab-popout";
+import { ForkTabWindow } from "./ForkTabWindow";
 
 export const FORK_WINDOW_ROUTE_PATH = "/fork-window/:pluginId/:windowId";
 
 export function ForkWindowView() {
   const { pluginId, windowId } = useParams();
+  return pluginId === TAB_WINDOW_OWNER && windowId === TAB_WINDOW_ID ? (
+    <ForkTabWindow />
+  ) : (
+    <PluginWindowView pluginId={pluginId} windowId={windowId} />
+  );
+}
+
+function PluginWindowView({
+  pluginId,
+  windowId,
+}: {
+  pluginId: string | undefined;
+  windowId: string | undefined;
+}) {
   const [search] = useSearchParams();
   const transparent = search.get("bbTransparent") === "1";
   const slot = usePluginSlots().windows.find(

@@ -69,7 +69,14 @@ export async function popOutAppPath(options: PopOutOptions): Promise<boolean> {
   if (typeof options !== "object" || options === null) return false;
   const path = barePath(options.path, window.location.origin);
   if (path === null) return false;
-  const key = popOutKey(path);
+  return openPopOutWindow(path, options);
+}
+
+export async function openPopOutWindow(
+  path: string,
+  options: Omit<PopOutOptions, "path">,
+  key: string = popOutKey(path),
+): Promise<boolean> {
   const width = popOutSize(
     options.width,
     POP_OUT_DEFAULT_WIDTH,

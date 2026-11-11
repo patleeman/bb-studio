@@ -1,5 +1,6 @@
 import type {
   ExperimentalCloseFallbackRegistration,
+  ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
   ExperimentalItemDropRegistration,
   ForkPluginAppSlots,
@@ -46,6 +47,7 @@ export interface ForkSlotRegistrations {
   closeFallbacks: ExperimentalCloseFallbackRegistration[];
   skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
+  commandPalettes: ExperimentalCommandPaletteRegistration[];
 }
 
 export const FORK_SLOT_KINDS = [
@@ -66,6 +68,7 @@ export const FORK_SLOT_KINDS = [
   "closeFallbacks",
   "skillSources",
   "newTabItems",
+  "commandPalettes",
 ] as const satisfies readonly (keyof ForkSlotRegistrations)[];
 
 export function emptyForkSlots(): ForkSlotRegistrations {
@@ -87,6 +90,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     closeFallbacks: [],
     skillSources: [],
     newTabItems: [],
+    commandPalettes: [],
   };
 }
 
@@ -111,6 +115,7 @@ export function forkSlotMethods(
     closeFallback: new Set<string>(),
     skillSource: new Set<string>(),
     newTabItems: new Set<string>(),
+    commandPalette: new Set<string>(),
   };
   return {
     experimental_sidebarNewItem(registration) {
@@ -233,6 +238,15 @@ export function forkSlotMethods(
         throw new Error(`${kind} "${id}": close must be a function`);
       }
       collected.closeFallbacks.push({ id, close: registration.close });
+    },
+    experimental_commandPalette(registration) {
+      const kind = "slots.experimental_commandPalette";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.commandPalette, id);
+      collected.commandPalettes.push({
+        id,
+        component: requireComponent(kind, registration.component),
+      });
     },
     experimental_mainHeader(registration) {
       const kind = "slots.experimental_mainHeader";
