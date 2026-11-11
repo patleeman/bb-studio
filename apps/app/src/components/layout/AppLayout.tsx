@@ -1,3 +1,4 @@
+import { ForkLayoutHosts, isBareWindow, useForkLayoutBridge } from "@/components/fork/ForkLayout";
 import { useCorePageTitle } from "./core-page-title";
 import { type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -198,7 +199,7 @@ function SidebarStateBridge({
   usesDesktopChrome,
   children,
 }: SidebarStateBridgeProps) {
-  const [open, setOpen] = useAtom(sidebarOpenAtom);
+  const [open, setOpen] = useForkLayoutBridge(useAtom(sidebarOpenAtom));
   const hasRail = useSidebarNavigationPlacement() === "rail";
   const sidebarWidth = useAtomValue(sidebarWidthAtom);
   const sidebarLiveWidth = useAtomValue(sidebarLiveWidthAtom);
@@ -592,7 +593,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
   const startWidthRef = useRef(0);
   const liveWidthRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
-  const showHeader = !isThreadView && !isRootView && pluginPanelRoute === null;
+  const showHeader = !isBareWindow() && !isThreadView && !isRootView && pluginPanelRoute === null;
   const [desktopInfo] = useState(getBbDesktopInfo);
   const desktopWindowState = useDesktopWindowState();
   const usesDesktopChrome = shouldUseMacosDesktopChrome(desktopInfo);
@@ -827,6 +828,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 <BackToAppCommandHandler routePath={backToAppRoutePath} />
               ) : null}
               <HistoryCommandHandlers />
+              {isBareWindow() ? null : (
               <AppLayoutSidebar
                 routeSidebar={routeSidebar}
                 isSettingsActive={isGlobalSettingsView}
@@ -835,6 +837,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 settingsRoutePath={settingsRoutePath}
                 backToAppRoutePath={backToAppRoutePath}
               />
+              )}
               <SidebarInset>
                 <div
                   ref={setContentShell}
@@ -842,6 +845,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   data-app-content-shell=""
                   className="relative flex h-full min-h-0 min-w-0 w-full flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-(--bb-content-bottom-inset) pl-[env(safe-area-inset-left)] [--bb-content-bottom-inset:var(--bb-safe-area-bottom,env(safe-area-inset-bottom))]"
                 >
+                  <ForkLayoutHosts />
                   {showHeader ? (
                     <AppHeader
                       resourceSection={
@@ -864,10 +868,12 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                   </main>
                 </div>
               </SidebarInset>
+              {isBareWindow() ? null : (
               <SidebarTriggerOverlay
                 reserveMacosTrafficLights={reserveMacosTrafficLights}
                 usesDesktopChrome={usesDesktopChrome}
               />
+              )}
             </SidebarStateBridge>
             <PluginAppOverlays />
             <ThreadRowMetadataCollectors />
