@@ -104,6 +104,10 @@ describe("cleanAppearance", () => {
         composer: { backdropFilter: "blur(20px)", background: 4 },
         main: { background: "not-a-value" },
         toolbar: { background: "red" },
+        popover: {
+          background: "rgb(0 0 0 / 76%)",
+          backdropFilter: "blur(12px)",
+        },
       },
     });
     expect(appearance.mode).toBe("dark");
@@ -112,6 +116,8 @@ describe("cleanAppearance", () => {
       ["--fork-surface-sidebar-background", "rgb(0 0 0 / 40%)"],
       ["--fork-surface-sidebar-edge", "white"],
       ["--fork-surface-composer-backdrop-filter", "blur(20px)"],
+      ["--fork-surface-popover-background", "rgb(0 0 0 / 76%)"],
+      ["--fork-surface-popover-backdrop-filter", "blur(12px)"],
     ]);
     expect(appearance.edges).toEqual(["sidebar"]);
   });
@@ -121,7 +127,33 @@ describe("cleanAppearance", () => {
       const appearance = cleanAppearance(value);
       expect(appearance.mode).toBeNull();
       expect(appearance.properties.size).toBe(0);
+      expect(appearance.cards).toBeNull();
     }
+  });
+
+  it("keeps a card layout and clamps its gap and radius", () => {
+    expect(
+      cleanAppearance({ layout: { cards: { gap: 8, radius: 14 } } }).cards,
+    ).toEqual({ gap: 8, radius: 14 });
+    expect(
+      cleanAppearance({ layout: { cards: { gap: 40, radius: -3 } } }).cards,
+    ).toEqual({ gap: 24, radius: 0 });
+    expect(
+      cleanAppearance({ layout: { cards: { gap: -1, radius: 99 } } }).cards,
+    ).toEqual({ gap: 0, radius: 28 });
+  });
+
+  it.each([
+    ["no layout", {}],
+    ["a layout without cards", { layout: {} }],
+    ["cards that are not an object", { layout: { cards: true } }],
+    ["a string gap", { layout: { cards: { gap: "8", radius: 12 } } }],
+    ["a missing radius", { layout: { cards: { gap: 8 } } }],
+    ["an infinite gap", { layout: { cards: { gap: Infinity, radius: 12 } } }],
+    ["a NaN radius", { layout: { cards: { gap: 8, radius: Number.NaN } } }],
+    ["a layout array", { layout: [{ cards: { gap: 8, radius: 12 } }] }],
+  ])("drops the card layout for %s", (_name, value) => {
+    expect(cleanAppearance(value).cards).toBeNull();
   });
 });
 
@@ -249,6 +281,47 @@ describe("ForkAppBackdropHost", () => {
       root.style.getPropertyValue("--fork-surface-header-background"),
     ).toBe("");
     expect(root.style.getPropertyValue("--canvas")).toBe("white");
+  });
+
+  it("marks <html> for cards with the gap and radius only while the appearance asks for them", async () => {
+    root.style.setProperty("--fork-cards-gap", "3px");
+    const store = createAppearanceStore({
+      surfaces: { sidebar: { background: "red" } },
+    });
+    register("studio", { useAppearance: store.useAppearance });
+    const view = await act(async () => render(<ForkAppBackdropHost />));
+    expect(root.hasAttribute("data-fork-cards")).toBe(false);
+    expect(root.style.getPropertyValue("--fork-cards-gap")).toBe("3px");
+    expect(root.style.getPropertyValue("--fork-cards-radius")).toBe("");
+
+    await act(async () =>
+      store.set({
+        surfaces: { sidebar: { background: "red" } },
+        layout: { cards: { gap: 30, radius: 12.5 } },
+      }),
+    );
+    expect(root.getAttribute("data-fork-cards")).toBe("");
+    expect(root.style.getPropertyValue("--fork-cards-gap")).toBe("24px");
+    expect(root.style.getPropertyValue("--fork-cards-radius")).toBe("12.5px");
+    expect(
+      root.style.getPropertyValue("--fork-surface-sidebar-background"),
+    ).toBe("red");
+
+    await act(async () =>
+      store.set({ surfaces: { sidebar: { background: "red" } } }),
+    );
+    expect(root.hasAttribute("data-fork-cards")).toBe(false);
+    expect(root.style.getPropertyValue("--fork-cards-gap")).toBe("3px");
+    expect(root.style.getPropertyValue("--fork-cards-radius")).toBe("");
+
+    await act(async () =>
+      store.set({ layout: { cards: { gap: 8, radius: 16 } } }),
+    );
+    expect(root.style.getPropertyValue("--fork-cards-gap")).toBe("8px");
+    view.unmount();
+    expect(root.hasAttribute("data-fork-cards")).toBe(false);
+    expect(root.style.getPropertyValue("--fork-cards-gap")).toBe("3px");
+    expect(root.style.getPropertyValue("--fork-cards-radius")).toBe("");
   });
 
   it("falls back to no backdrop and no overrides when the component crashes", async () => {

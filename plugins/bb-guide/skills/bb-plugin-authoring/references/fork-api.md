@@ -147,17 +147,6 @@ source, lineRange })`. bb calls it before it opens a tab for that opener;
   `alt`, and `click` is left out when bb opens a URL without a click. Return
   true when you opened it, false to pass. Synchronous.
 
-## Quiet turns
-
-- Backend: `bb.experimental_hooks.experimental_classifyTurns(({ threadId,
-finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
-  it must be synchronous, pure and fast. A quiet turn leaves the thread
-  read, posts no completion notice to its parent and sends no notification,
-  and `thread.idle` carries `experimental_quiet`.
-- Frontend: `app.slots.experimental_replyClassifier({ id, classify(text) })`
-  → `{ quiet }` makes the thread view draw that reply as a small "Quiet
-  check" marker. Use the same rule on both sides.
-
 ## A row above the main view
 
 - `app.slots.experimental_mainHeader({ id, component })` → a row bb draws
@@ -255,7 +244,24 @@ Names: `ExperimentalSidebarStyle`.
     backdrop-filter and the color of the surface's border lines. A surface
     left out is fully see-through. Surfaces nest: the header, side panel
     and composer sit on `main`. A thread list's `experimental_useSidebarStyle`
-    still paints over the sidebar's.
+    still paints over the sidebar's. Inside the main view and side panel,
+    `panel?` (default `--canvas` 32%) paints cards, sections, page roots
+    and fields, and `code?` (default `--canvas` 58%, `blur(8px)`) code
+    blocks, sticky headers and floating bars; bb's fill tokens there turn
+    translucent. `popover?` (default `--canvas` 76%, `blur(12px)`) paints
+    overlays under `layout.cards`; without it they stay opaque.
+  - `layout: { cards: { gap, radius } }` lays bb out as floating cards
+    with `gap` px (0–24) between them and the window's edges and corner
+    radius `radius` px (0–28). Cards have no border (`edge` is not drawn),
+    only `--fork-cards-shadow`. The rail and the header sit bare on the
+    scene; the sidebar (content and footer) is one `sidebar` card, the
+    back/forward, title and actions groups and the sidebar toggle are
+    `header` pills (radius − 2 px), each thread's 808 px text column is a `main` card with
+    the composer box a `composer` card over a dense fade inside it, and the side panel a
+    `secondary-panel` card. Settings, Skills, Plugins and their pages get one `main` card on
+    their content column. Cards and their controls draw no 1px line. Any element with
+    `data-fork-card="<surface>"` outside the sidebar is painted the same way: mark your own
+    page's column card with it. `<html>` gets `data-fork-cards`, `--fork-cards-gap`, `--fork-cards-radius`.
 - The first registration by plugin id wins. A crash in `component` or a
   throw in `useAppearance` removes the backdrop and every override. Plugin
   windows, popped-out routes and popped-out tabs get none.
@@ -472,7 +478,7 @@ Names: `ExperimentalDragItem`, `ExperimentalItemDropTarget`,
   popover from the plugin's own control (a chip in the composer footer).
   `available` is false while the thread has no context ring.
 
-Windows, launcher items, popping out a route, approvals, the close command and the backend hooks are in fork-api-host.md.
+Windows, launcher items, popping out a route, approvals, the close command, quiet turns and the backend hooks are in fork-api-host.md.
 
 ## Names
 
