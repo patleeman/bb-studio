@@ -1,6 +1,7 @@
 import { ForkApprovalHost } from "./ForkApprovalHost";
 import { ForkItemDropHost } from "./ForkItemDropHost";
 import { ForkMainHeader } from "./ForkMainHeader";
+import { ForkTabReturnHost } from "./ForkTabReturnHost";
 import { ForkSidebarStyleHost } from "@/components/sidebar/ForkSidebarStyle";
 import { useNarrowWindowSidebar } from "@/components/layout/useNarrowWindowSidebar.fork";
 import { useWorkbenchForkCommands } from "@/components/secondary-panel/workbenchFork";
@@ -23,6 +24,7 @@ export function ForkLayoutHosts() {
       <ForkApprovalHost />
       <ForkItemDropHost />
       <ForkSidebarStyleHost />
+      <ForkTabReturnHost />
     </>
   );
 }
