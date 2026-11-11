@@ -3,6 +3,8 @@ import type {
   ExperimentalDragItem,
   ExperimentalDropMention,
   ExperimentalItemDropTarget,
+  ExperimentalWorkbenchOpenOptions,
+  ExperimentalWorkbenchOpenSpec,
 } from "@get-bb/plugin-sdk";
 import { createComposerHandleBinding } from "@get-bb/plugin-sdk/internal/composer-handle";
 import {
@@ -11,11 +13,14 @@ import {
 } from "./composer-editor-registry";
 import { detachedComposerController } from "./plugin-composer-handle";
 import type { FixedPanelTab } from "./fixed-panel-tabs-state";
+import { threadIdOfPanelState } from "./fork-global-panel-tabs";
 import type { PluginItemDropSlot } from "./fork-slots";
 import { panelTabActionTarget } from "./fork-panel-tab-actions";
+import { parseTabSpec, tabOpenSpecNow } from "./fork-tab-popout";
 import { pickZone, zoneBox, type Rect } from "./split-drag/zones";
 
 export const ITEM_DRAG_TYPE = "application/x-bb-item";
+export const ITEM_DRAG_LOCAL_TYPE = "application/x-bb-item-local";
 export const ITEM_DROP_ATTRIBUTE = "data-fork-item-drop";
 
 const ITEM_KINDS = ["thread", "doc", "tab", "file"] as const;
@@ -33,6 +38,7 @@ const INSERTION_BAR_WIDTH_PX = 2;
 const NEW_PANE_LABEL = "Split right";
 
 let currentDragItem: ExperimentalDragItem | null = null;
+let dropTakenHere = false;
 
 export function getCurrentDragItem(): ExperimentalDragItem | null {
   return currentDragItem;
@@ -40,6 +46,15 @@ export function getCurrentDragItem(): ExperimentalDragItem | null {
 
 export function setCurrentDragItem(item: ExperimentalDragItem | null): void {
   currentDragItem = item;
+  dropTakenHere = false;
+}
+
+export function markDropTakenHere(): void {
+  dropTakenHere = true;
+}
+
+export function wasDropTakenHere(): boolean {
+  return dropTakenHere;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,6 +90,8 @@ export function parseDragItem(raw: string): ExperimentalDragItem | null {
   }
   const tab = value.tab === undefined ? undefined : parseDragTab(value.tab);
   if (tab === null) return null;
+  const open = value.open === undefined ? undefined : parseTabSpec(value.open);
+  if (open === null) return null;
   return {
     kind,
     id,
@@ -82,14 +99,20 @@ export function parseDragItem(raw: string): ExperimentalDragItem | null {
     ...(typeof path === "string" ? { path } : {}),
     ...(typeof pluginId === "string" ? { pluginId } : {}),
     ...(tab === undefined ? {} : { tab }),
+    ...(open === undefined ? {} : { open }),
   };
 }
 
+function hasDragType(dataTransfer: DataTransfer | null, type: string): boolean {
+  return dataTransfer !== null && Array.from(dataTransfer.types).includes(type);
+}
+
 export function hasItemDrag(dataTransfer: DataTransfer | null): boolean {
-  return (
-    dataTransfer !== null &&
-    Array.from(dataTransfer.types).includes(ITEM_DRAG_TYPE)
-  );
+  return hasDragType(dataTransfer, ITEM_DRAG_TYPE);
+}
+
+export function hasLocalItemDrag(dataTransfer: DataTransfer | null): boolean {
+  return hasDragType(dataTransfer, ITEM_DRAG_LOCAL_TYPE);
 }
 
 function clearCurrentDragItem(): void {
@@ -107,6 +130,7 @@ export function writeDragItem(
   }
   dataTransfer.setData(ITEM_DRAG_TYPE, raw);
   currentDragItem = parsed;
+  dropTakenHere = false;
   window.addEventListener("dragend", clearCurrentDragItem, {
     capture: true,
     once: true,
@@ -127,18 +151,25 @@ export function panelTabDragItem(
 ): ExperimentalDragItem | null {
   if (tab.isPinned === true) return null;
   const target = panelTabActionTarget(tab.tab, panelStateId);
-  if (target === null) return null;
+  const threadId =
+    panelStateId === null ? null : threadIdOfPanelState(panelStateId);
+  const open = tabOpenSpecNow(tab.tab, threadId);
   return {
     kind: "tab",
     id: tab.tab.id,
     title: tab.label,
-    pluginId: target.pluginId,
-    tab: {
-      pluginId: target.pluginId,
-      tabId: target.tabId,
-      params: target.params,
-      threadId: target.threadId,
-    },
+    ...(target === null
+      ? {}
+      : {
+          pluginId: target.pluginId,
+          tab: {
+            pluginId: target.pluginId,
+            tabId: target.tabId,
+            params: target.params,
+            threadId: target.threadId,
+          },
+        }),
+    ...(open === null ? {} : { open }),
   };
 }
 
@@ -159,9 +190,10 @@ export interface ItemDropZone {
   zone: ExperimentalItemDropTarget["zone"];
   element: HTMLElement;
   place?: WorkbenchDropPlace;
+  point?: { x: number; y: number };
 }
 
-function paneTabGroups(panel: HTMLElement): HTMLElement[] {
+export function paneTabGroups(panel: HTMLElement): HTMLElement[] {
   return Array.from(
     panel.querySelectorAll<HTMLElement>(PANE_TAB_GROUP_SELECTOR),
   )
@@ -169,6 +201,15 @@ function paneTabGroups(panel: HTMLElement): HTMLElement[] {
     .map((group) => ({ group, left: group.getBoundingClientRect().left }))
     .sort((a, b) => a.left - b.left)
     .map(({ group }) => group);
+}
+
+export function paneUnderPoint(panel: HTMLElement, x: number): 1 | 2 | null {
+  const groups = paneTabGroups(panel);
+  if (groups.length === 0 || groups.length > 2) return null;
+  const second = groups[1];
+  return second === undefined || x < second.getBoundingClientRect().left
+    ? 1
+    : 2;
 }
 
 function insertionBar(group: DOMRect, pills: DOMRect[], index: number): Rect {
@@ -243,9 +284,12 @@ export function resolveItemDropZone(
       point === undefined
         ? null
         : workbenchDropPlace(panel, element, point.x, point.y);
-    return place === null
-      ? { zone: "workbench", element: panel }
-      : { zone: "workbench", element: panel, place };
+    return {
+      zone: "workbench",
+      element: panel,
+      ...(place === null ? {} : { place }),
+      ...(point === undefined ? {} : { point }),
+    };
   }
   const main = element.closest<HTMLElement>(MAIN_SELECTOR);
   return main === null ? null : { zone: "main", element: main };
@@ -346,9 +390,22 @@ export function insertComposerText(
   return true;
 }
 
+export type TabDropOutcome = "moved" | "opened" | null;
+
 export interface ItemDropEnvironment {
   handlers(): readonly PluginItemDropSlot[];
   threadIdOf(element: HTMLElement): string | null;
+  openInPanel(
+    element: HTMLElement,
+    pluginId: string,
+    spec: ExperimentalWorkbenchOpenSpec,
+    options: ExperimentalWorkbenchOpenOptions | undefined,
+  ): Promise<string | null>;
+  tabDrop?(
+    item: ExperimentalDragItem,
+    zone: ItemDropZone,
+    commit: boolean,
+  ): TabDropOutcome;
   insertText(threadId: string | null, text: string): boolean;
   insertMention(
     threadId: string | null,
@@ -378,10 +435,20 @@ export function itemDropTarget(
   const threadId = environment.threadIdOf(zone.element);
   if (zone.zone === "workbench") {
     const place = zone.place;
-    if (place === undefined) return { zone: "workbench", threadId };
+    const open = (
+      spec: ExperimentalWorkbenchOpenSpec,
+      options?: ExperimentalWorkbenchOpenOptions,
+    ) => environment.openInPanel(zone.element, pluginId, spec, options);
+    if (place === undefined) return { zone: "workbench", threadId, open };
     return place.pane === "new"
-      ? { zone: "workbench", threadId, pane: "new" }
-      : { zone: "workbench", threadId, pane: place.pane, index: place.index };
+      ? { zone: "workbench", threadId, pane: "new", open }
+      : {
+          zone: "workbench",
+          threadId,
+          pane: place.pane,
+          index: place.index,
+          open,
+        };
   }
   return {
     zone: "composer",
@@ -535,6 +602,10 @@ export function installItemDropHost(
     positionDropIndicator(indicator, place);
   };
 
+  const takesTab = (item: ExperimentalDragItem, zone: ItemDropZone) =>
+    environment.tabDrop !== undefined &&
+    environment.tabDrop(item, zone, false) !== null;
+
   const onDragOver = (event: DragEvent) => {
     const dataTransfer = event.dataTransfer;
     if (!hasItemDrag(dataTransfer) || dataTransfer === null) return;
@@ -549,13 +620,15 @@ export function installItemDropHost(
     const item = readDragItem(dataTransfer);
     const allowed =
       item === null
-        ? handlers.length > 0
-        : findItemDropHandler(handlers, item, (pluginId) =>
+        ? !hasLocalItemDrag(dataTransfer) &&
+          (zone.zone === "workbench" || handlers.length > 0)
+        : takesTab(item, zone) ||
+          findItemDropHandler(handlers, item, (pluginId) =>
             itemDropTarget(zone, environment, pluginId),
           ) !== null;
     if (!allowed) return mark(null);
     event.preventDefault();
-    dataTransfer.dropEffect = "copy";
+    dataTransfer.dropEffect = zone.zone === "composer" ? "copy" : "move";
     mark(zone);
   };
 
@@ -581,6 +654,11 @@ export function installItemDropHost(
       y: event.clientY,
     });
     if (zone === null) return;
+    if (environment.tabDrop?.(item, zone, true)) {
+      event.preventDefault();
+      markDropTakenHere();
+      return;
+    }
     const match = findItemDropHandler(
       environment.handlers(),
       item,
@@ -588,6 +666,7 @@ export function installItemDropHost(
     );
     if (match === null) return;
     event.preventDefault();
+    markDropTakenHere();
     runItemDrop(match.handler, item, match.target);
   };
 

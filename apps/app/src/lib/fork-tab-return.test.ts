@@ -58,6 +58,7 @@ function fakeSurface(threadId: string) {
   } as unknown as AppPanelController;
   const surface: WorkbenchSurface = {
     threadId,
+    panelStateId: threadId,
     panel,
     openFilePreview: () => false,
     openTerminal: () => false,
@@ -70,13 +71,17 @@ function fakeSurface(threadId: string) {
 const RETURN = {
   threadId: "thr_1",
   projectId: "proj_1",
-  spec: {
-    kind: "tab" as const,
-    tab: { id: "page", pluginId: "studio" },
-    params: { page: "p1" },
-    title: "Launch plan",
-  },
-  pane: 1 as const,
+  tabs: [
+    {
+      spec: {
+        kind: "tab" as const,
+        tab: { id: "page", pluginId: "studio" },
+        params: { page: "p1" },
+        title: "Launch plan",
+      },
+      pane: 1 as const,
+    },
+  ],
 };
 
 const stops: (() => void)[] = [];

@@ -7,7 +7,13 @@ import {
 } from "@/lib/fork-workbench";
 import { InAppBrowserUrlOpenContext } from "@/lib/url-open-routing";
 
-export function ForkWorkbenchSurface({ threadId }: { threadId: string }) {
+export function ForkWorkbenchSurface({
+  threadId,
+  panelStateId = threadId,
+}: {
+  threadId: string;
+  panelStateId?: string;
+}) {
   const host = useAppNavigationHost();
   const openInAppBrowser = useContext(InAppBrowserUrlOpenContext);
   const store = useStore();
@@ -15,6 +21,7 @@ export function ForkWorkbenchSurface({ threadId }: { threadId: string }) {
   useLayoutEffect(() => {
     latest.current = {
       threadId,
+      panelStateId,
       panel: host.panel,
       openFilePreview: host.openFilePreview,
       openTerminal: host.openTerminal,
