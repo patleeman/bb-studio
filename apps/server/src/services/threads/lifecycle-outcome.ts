@@ -1,3 +1,4 @@
+import { forkAfterLifecycle, forkBeforeLifecycle } from "./lifecycle-outcome.fork.js";
 import {
   getThread,
   applyThreadLifecycleEvent,
@@ -71,6 +72,7 @@ export function applyLoggedThreadLifecycleEvent(
   args: ApplyThreadLifecycleEventArgs,
 ): ApplyThreadLifecycleEventOutcome {
   const previousStatus = getThread(deps.db, args.threadId)?.status;
+  const forkBefore = forkBeforeLifecycle(deps.db, args);
   const outcome = applyThreadLifecycleEvent(deps.db, args);
   if (outcome.applied && previousStatus !== undefined) {
     recordFinishedTurn(deps.db, args.threadId, args.event, previousStatus);
@@ -85,6 +87,7 @@ export function applyLoggedThreadLifecycleEvent(
   logUnappliedThreadLifecycleEvent(deps.logger, args, outcome);
   emitPluginThreadLifecycleOutcome(outcome);
   announceTurnFailed(args, outcome);
+  forkAfterLifecycle(deps, args, outcome, previousStatus, forkBefore);
   return outcome;
 }
 
@@ -93,6 +96,7 @@ export function applyLoggedThreadLifecycleEventInTransaction(
   args: ApplyThreadLifecycleEventArgs,
 ): ApplyThreadLifecycleEventOutcome {
   const previousStatus = getThread(deps.db, args.threadId)?.status;
+  const forkBefore = forkBeforeLifecycle(deps.db, args);
   const outcome = applyThreadLifecycleEventInTransaction(deps.db, args);
   if (outcome.applied && previousStatus !== undefined) {
     recordFinishedTurn(deps.db, args.threadId, args.event, previousStatus);
@@ -100,5 +104,6 @@ export function applyLoggedThreadLifecycleEventInTransaction(
   logUnappliedThreadLifecycleEvent(deps.logger, args, outcome);
   emitPluginThreadLifecycleOutcome(outcome);
   announceTurnFailed(args, outcome);
+  forkAfterLifecycle(deps, args, outcome, previousStatus, forkBefore);
   return outcome;
 }
