@@ -1,3 +1,4 @@
+import { createForkNavigate } from "./plugin-navigation.fork";
 import { useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useNavigate, type NavigateFunction } from "react-router-dom";
@@ -113,6 +114,7 @@ function createBbNavigate(
   openThreadPanel: ReturnType<typeof createRetiredOpenPanel>;
 } {
   return {
+    ...createForkNavigate(pluginId, latest),
     toThread(threadId, options) {
       const {
         isCompact,

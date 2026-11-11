@@ -37,6 +37,7 @@ export interface UseNewTabActionsArgs {
 
 export interface NewTabActionsProps {
   actions: readonly NewTabAction[];
+  label?: string;
 }
 
 export interface NewTabAction {
@@ -169,7 +170,7 @@ export function matchNewTabActions(
   });
 }
 
-export function NewTabActions({ actions }: NewTabActionsProps) {
+export function NewTabActions({ actions, label = ACTIONS_SECTION_LABEL }: NewTabActionsProps) {
   if (actions.length === 0) {
     return null;
   }
@@ -177,7 +178,7 @@ export function NewTabActions({ actions }: NewTabActionsProps) {
   return (
     <div data-testid="new-tab-actions" className="flex min-w-0 flex-col">
       <section>
-        <LauncherSectionHeader label={ACTIONS_SECTION_LABEL} className="pb-1" />
+        <LauncherSectionHeader label={label} className="pb-1" />
         <NewTabActionList actions={actions} />
       </section>
     </div>

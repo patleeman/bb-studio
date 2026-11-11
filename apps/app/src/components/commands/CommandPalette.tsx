@@ -1,3 +1,4 @@
+import { ForkCommandPalette, forkCommandPaletteActive, forkCommandPaletteEscape } from "./ForkCommandPalette";
 import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { defineSplit } from "@/lib/define-split";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -287,7 +288,8 @@ export function CommandPalette({ threadId, projectId }: CommandPaletteProps) {
           if (action) chooseAction(action);
         }}
         onEscapeKeyDown={(event) => {
-          if (searchingThreads) {
+          if (forkCommandPaletteEscape(event)) return;
+          if (searchingThreads && !forkCommandPaletteActive()) {
             event.preventDefault();
             exitMode();
           }
@@ -295,6 +297,7 @@ export function CommandPalette({ threadId, projectId }: CommandPaletteProps) {
         data-testid="command-palette"
       >
         <DialogTitle className="sr-only">Quick palette</DialogTitle>
+        <ForkCommandPalette openCount={openCount} searching={searchingThreads} actions={actions} installedPlugins={installedPlugins} onChoose={chooseAction} runAfterClose={runAfterClose}>
         {!searchingThreads ? (
           <LazyCommandPaletteBody
             key={openCount}
@@ -313,6 +316,7 @@ export function CommandPalette({ threadId, projectId }: CommandPaletteProps) {
             runAfterClose={runAfterClose}
           />
         )}
+        </ForkCommandPalette>
       </DialogContent>
     </Dialog>
   );

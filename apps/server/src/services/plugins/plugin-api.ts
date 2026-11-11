@@ -2,6 +2,8 @@ import {
   rpcInvalidationTags,
   type ContractTagDeclarations,
 } from "@get-bb/plugin-sdk/internal/rpc-tags";
+import { forkEventHandlerLists } from "./fork-plugin-events.js";
+import { forkPluginHooks } from "../threads/turn-classifiers.fork.js";
 import {
   createThreadEventGate,
   type ThreadEventGate,
@@ -633,6 +635,7 @@ export function createPluginApi(options: {
     "experimental_thread.parentChanged": [],
     "experimental_thread.read": [],
     "experimental_terminal.input": [],
+    ...forkEventHandlerLists(),
     "experimental_host.deleted": [],
     "experimental_environment.removed": [],
     "thread.created": [],
@@ -1215,6 +1218,7 @@ export function createPluginApi(options: {
   };
 
   const experimental_hooks: PluginHooks = {
+    ...forkPluginHooks({ pluginId, assertLive, disposeHooks, db: options.db }),
     on(hook, handler) {
       assertLive();
       if (hooks[hook] !== null) {
