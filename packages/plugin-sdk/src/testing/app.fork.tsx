@@ -16,6 +16,7 @@ import type {
   ExperimentalLauncherItemRegistration,
   ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
+  ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalReplyClassifierRegistration,
@@ -24,6 +25,10 @@ import type {
   ExperimentalSidebarSectionRegistration,
   ExperimentalSkillSourceRegistration,
   ExperimentalWindowRegistration,
+  ExperimentalWorkbench,
+  ExperimentalWorkbenchArrangement,
+  ExperimentalWorkbenchLayout,
+  ExperimentalWorkbenchOpenSpec,
   ForkBbNavigate,
   ForkPluginSdkApp,
 } from "../app-contract.fork.js";
@@ -52,6 +57,22 @@ export type ForkNavigateCall =
       title?: string;
       width?: number;
       height?: number;
+    }
+  | { method: "experimental_workbench"; threadId?: string }
+  | {
+      method: "experimental_workbench.open";
+      threadId: string;
+      spec: ExperimentalWorkbenchOpenSpec;
+      focus: boolean;
+      pane?: 1 | 2 | "new";
+      index?: number;
+    }
+  | { method: "experimental_workbench.close"; threadId: string; key: string }
+  | { method: "experimental_workbench.focus"; threadId: string; key: string }
+  | {
+      method: "experimental_workbench.arrange";
+      threadId: string;
+      layout: ExperimentalWorkbenchArrangement;
     }
   | { method: "experimental_useAppPanes.focus"; paneId: string }
   | { method: "experimental_useAppPanes.close"; paneId: string };
@@ -82,6 +103,7 @@ export interface ForkCapturedPluginApp {
   itemDrops: ExperimentalItemDropRegistration[];
   closeFallbacks: ExperimentalCloseFallbackRegistration[];
   skillSources: ExperimentalSkillSourceRegistration[];
+  newTabItems: ExperimentalNewTabItemsRegistration[];
 }
 
 export interface ForkRenderSlotOptions {
@@ -164,6 +186,74 @@ export function forkTestHooks(
   };
 }
 
+const TEST_WORKBENCH_THREAD_ID = "thr_test";
+
+function recordingWorkbench(
+  threadId: string,
+  record: (call: ForkNavigateCall) => void,
+): ExperimentalWorkbench {
+  let layout: ExperimentalWorkbenchLayout = {
+    panel: "closed",
+    widthPercent: 50,
+    conversation: "shown",
+    panes: [{ tabs: [], widthPercent: 100 }],
+  };
+  return {
+    threadId,
+    list: () => ({
+      open: layout.panel === "open",
+      selectedKey: null,
+      tabs: [],
+    }),
+    open(spec, options) {
+      record({
+        method: "experimental_workbench.open",
+        threadId,
+        spec,
+        focus: options?.focus ?? true,
+        ...(options?.pane === undefined ? {} : { pane: options.pane }),
+        ...(options?.index === undefined ? {} : { index: options.index }),
+      });
+      return Promise.resolve(null);
+    },
+    close(key) {
+      record({ method: "experimental_workbench.close", threadId, key });
+      return false;
+    },
+    focus(key) {
+      record({ method: "experimental_workbench.focus", threadId, key });
+      return false;
+    },
+    layout: () => layout,
+    arrange(next) {
+      record({
+        method: "experimental_workbench.arrange",
+        threadId,
+        layout: next,
+      });
+      const { panes, paneWidths, ...rest } = next;
+      const count = panes ?? layout.panes.length;
+      if (paneWidths !== undefined && count !== 2) return false;
+      const [left, right] = paneWidths ?? [1, 1];
+      layout = {
+        ...layout,
+        ...rest,
+        panes:
+          count === 1
+            ? [{ tabs: [], widthPercent: 100 }]
+            : paneWidths === undefined && layout.panes.length === 2
+              ? layout.panes
+              : [
+                  { tabs: [], widthPercent: (100 * left) / (left + right) },
+                  { tabs: [], widthPercent: (100 * right) / (left + right) },
+                ],
+      };
+      return true;
+    },
+    isTyping: () => false,
+  };
+}
+
 export function forkNavigate(
   record: (call: ForkNavigateCall) => void,
 ): ForkBbNavigate {
@@ -192,6 +282,13 @@ export function forkNavigate(
         ...(options.params === undefined ? {} : { params: options.params }),
       });
       return true;
+    },
+    experimental_workbench(threadId) {
+      record({
+        method: "experimental_workbench",
+        ...(threadId === undefined ? {} : { threadId }),
+      });
+      return recordingWorkbench(threadId ?? TEST_WORKBENCH_THREAD_ID, record);
     },
     experimental_popOut(options) {
       record({ method: "experimental_popOut", ...options });
