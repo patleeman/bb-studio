@@ -732,7 +732,7 @@ function SplitThreadAreaContent({ routeContent }: SplitThreadAreaProps) {
         paneId={layout.focusedPaneId}
         onRequestClose={
           currentContent.kind === "thread" ||
-          currentContent.kind === "new-thread"
+          currentContent.kind === "new-thread" || currentContent.kind === "plugin-panel"
             ? null
             : () => closePane(layout.focusedPaneId)
         }
@@ -773,7 +773,7 @@ function SplitThreadAreaContent({ routeContent }: SplitThreadAreaProps) {
           reservesWindowPanelToggle={false}
           onClosePane={
             singlePaneContent.kind === "thread" ||
-            singlePaneContent.kind === "new-thread"
+            singlePaneContent.kind === "new-thread" || singlePaneContent.kind === "plugin-panel"
               ? null
               : closePane
           }
