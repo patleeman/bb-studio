@@ -1061,5 +1061,6 @@ export default definePluginApp((app) => {
     icon: "Workflow",
     component: WorkflowRunPanel,
     layout: "flush",
+    experimental_openableByPlugins: true,
   });
 });
