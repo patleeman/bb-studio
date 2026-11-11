@@ -132,3 +132,14 @@ Names: `ExperimentalThreadForkPoint`.
   close the window).
 
 Names: `ExperimentalCloseFallbackRegistration`.
+
+## Quiet turns
+
+- Backend: `bb.experimental_hooks.experimental_classifyTurns(({ threadId,
+finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
+  it must be synchronous, pure and fast. A quiet turn leaves the thread
+  read, posts no completion notice to its parent and sends no notification,
+  and `thread.idle` carries `experimental_quiet`.
+- Frontend: `app.slots.experimental_replyClassifier({ id, classify(text) })`
+  → `{ quiet }` makes the thread view draw that reply as a small "Quiet
+  check" marker. Use the same rule on both sides.
