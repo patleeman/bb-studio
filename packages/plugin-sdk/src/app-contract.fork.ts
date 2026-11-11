@@ -211,7 +211,9 @@ export interface ExperimentalMessageActionMessage {
  * `icon` is a bb icon name. `isAvailable` runs while the message renders,
  * so it must be synchronous, pure and fast; leave it out to show the item on
  * every message. A throw from `isAvailable` hides the item; a throw or
- * rejection from `run` is logged. Experimental: see
+ * rejection from `run` is logged. `experimental_replaces: "thread.fork"`
+ * hides bb's own "Fork into new thread" item on the messages this item is
+ * available for. Experimental: see
  * docs/api_to_audit.fork.md.
  */
 export interface ExperimentalMessageActionRegistration {
@@ -221,6 +223,7 @@ export interface ExperimentalMessageActionRegistration {
   icon?: string;
   isAvailable?(message: ExperimentalMessageActionMessage): boolean;
   run(message: ExperimentalMessageActionMessage): void | Promise<void>;
+  experimental_replaces?: "thread.fork";
 }
 
 /**

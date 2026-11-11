@@ -282,6 +282,9 @@ export function forkSlotMethods(
           ? {}
           : { isAvailable: registration.isAvailable }),
         run: registration.run,
+        ...(registration.experimental_replaces === "thread.fork"
+          ? { experimental_replaces: "thread.fork" as const }
+          : {}),
       });
     },
     experimental_panelTabAction(registration) {
