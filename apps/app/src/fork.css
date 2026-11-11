@@ -1,0 +1,86 @@
+@media not ((width < 48rem) and (pointer: coarse)) {
+  [data-testid="app-layout-root"]:not([data-framed])
+    :is(
+      [data-sidebar="sidebar"],
+      [data-testid="app-sidebar-trigger-overlay"],
+      [data-testid="app-desktop-sidebar-trigger"]
+    ) {
+    --bb-app-chrome-row-height: 38px;
+  }
+}
+
+:focus-visible:not(
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [contenteditable=""],
+  [contenteditable="plaintext-only"]
+) {
+  outline: 1px solid color-mix(in oklab, var(--ring) 50%, transparent);
+  outline-offset: 2px;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+:is(input, textarea, select):focus-visible {
+  --tw-ring-color: color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+@media (width >= 48rem) {
+  [data-testid="secondary-panel-shelf"][data-state="full"] {
+    width: min(560px, 85vw);
+    border-left-width: 1px;
+    box-shadow: -8px 0 24px color-mix(in oklab, var(--ink) 18%, transparent);
+  }
+}
+
+@media (width < 48rem) and (pointer: fine) {
+  [data-sidebar="panel"][data-vaul-drawer-direction="left"] {
+    --sidebar-width-mobile: min(320px, calc(100vw - 48px)) !important;
+    z-index: 45;
+    visibility: hidden;
+    translate: -100% 0;
+    box-shadow: 8px 0 24px color-mix(in oklab, var(--ink) 18%, transparent);
+    transition:
+      translate 220ms cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 220ms;
+  }
+
+  [data-sidebar="panel"][data-vaul-drawer-direction="left"][data-state="open"] {
+    visibility: visible;
+    translate: 0 0;
+    transition: translate 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  [data-sidebar="inset"][data-sidebar-shelf],
+  [data-sidebar-mobile-backdrop] {
+    translate: none !important;
+  }
+}
+
+[data-sidebar="panel"][data-fork-sidebar-background]
+  [data-sidebar="collapsible-body"] {
+  background: var(--fork-sidebar-background);
+}
+
+[data-sidebar="panel"][data-fork-sidebar-background]
+  [data-sidebar="collapsible-body"]
+  :is(
+    [data-sidebar="content"],
+    [data-sidebar="header"],
+    [data-sidebar="footer"]
+  ) {
+  background: transparent;
+}
+
+[data-sidebar="panel"][data-fork-sidebar-accent]
+  [data-sidebar="collapsible-body"] {
+  --sidebar-accent: var(--fork-sidebar-accent);
+}
