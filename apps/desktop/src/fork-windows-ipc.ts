@@ -23,6 +23,7 @@ export interface ForkWindowOptions {
   rememberBounds?: boolean;
   center?: boolean;
   hideOnBlur?: boolean;
+  vibrancy?: "hud" | "under-window";
 }
 
 export interface ForkWindowRequest {
