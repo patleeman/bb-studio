@@ -617,6 +617,75 @@ export interface ExperimentalCommandPaletteRegistration {
 }
 
 /**
+ * A surface of bb's main window that `experimental_appBackdrop` can paint:
+ * the sidebar, the main view, the composer box, the side panel and the main
+ * view's header row.
+ */
+export type ExperimentalAppSurface =
+  | "sidebar"
+  | "main"
+  | "composer"
+  | "secondaryPanel"
+  | "header";
+
+/**
+ * How bb paints one surface over an app backdrop. Each value is a CSS value
+ * for that property; one the browser cannot parse is dropped. Experimental:
+ * see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalAppSurfaceStyle {
+  /** A CSS `background`, such as a translucent color or a gradient. Default: none, so the backdrop shows through. */
+  background?: string;
+  /** A CSS `backdrop-filter`, such as `blur(24px) saturate(1.4)`. */
+  backdropFilter?: string;
+  /** A CSS color for the surface's border lines where bb draws them. */
+  edge?: string;
+}
+
+/**
+ * What an app backdrop asks of bb's main window while it is shown (see
+ * `ExperimentalAppBackdropRegistration.useAppearance`). Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalAppAppearance {
+  /**
+   * Overrides the window's resolved light or dark mode, so bb's `.dark`
+   * class, its `dark:` styles and `experimental_useAppTheme().mode` follow it.
+   */
+  mode?: "light" | "dark";
+  /**
+   * CSS custom properties set on `<html>`, such as `--canvas` or `--ink`.
+   * A name that is not `--` and letters, digits, `-` or `_`, or a value the
+   * browser cannot parse, is dropped.
+   */
+  tokens?: Record<`--${string}`, string>;
+  /** How bb paints each surface; a surface left out is fully see-through. */
+  surfaces?: Partial<
+    Record<ExperimentalAppSurface, ExperimentalAppSurfaceStyle>
+  >;
+}
+
+/**
+ * Registration for `slots.experimental_appBackdrop`: a component bb draws
+ * once per main window behind its whole layout (full window, under every
+ * surface, no pointer events). While it is shown bb's own surfaces are
+ * see-through and painted from `useAppearance`. The first registration by
+ * plugin id wins. A crash in the component or in `useAppearance` removes
+ * the backdrop and every override. Plugin windows, popped-out routes and
+ * popped-out tabs get none. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalAppBackdropRegistration {
+  /** Unique within the plugin; letters, digits, `-`, `_`. */
+  id: string;
+  component: ComponentType;
+  /**
+   * A hook bb calls in the plugin's scope in the main window. Return null,
+   * or leave a field out, for bb's own.
+   */
+  useAppearance?: () => ExperimentalAppAppearance | null;
+}
+
+/**
  * A side panel tab shown alone in its own window ("Open in new window",
  * `experimental_workbench(...).popOut`), as `experimental_useTabWindow()`
  * reports it to the tab's components. The window's bar shows `title` and
@@ -897,6 +966,14 @@ export interface ForkPluginAppSlots {
    */
   experimental_commandPalette(
     registration: ExperimentalCommandPaletteRegistration,
+  ): void;
+  /**
+   * Draw a component behind bb's main window and paint bb's surfaces over
+   * it (see {@link ExperimentalAppBackdropRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_appBackdrop(
+    registration: ExperimentalAppBackdropRegistration,
   ): void;
   /**
    * Offer an app or action to a launcher (see
