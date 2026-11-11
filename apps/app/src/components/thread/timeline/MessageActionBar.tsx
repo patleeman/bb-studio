@@ -28,6 +28,7 @@ import { cn } from "@bb/shared-ui/lib/utils";
 import type { PromptDraftAttachment } from "@bb/client-core";
 import { PluginItemIcon, pluginIconName } from "@/components/plugin/PluginIcon";
 import type { ThreadTimelinePluginMessageAction } from "./types.js";
+import { forkInlineMessageActions, forkKeepsThreadFork, forkMenuMessageActions } from "./forkMessageActions.js";
 import { formatDayMessageTime, MessageTime } from "@bb/shared-ui/message-time";
 
 function PluginActionIcon({
@@ -371,7 +372,7 @@ export function MessageActionBar({
           },
         ]
       : []),
-    ...pluginActions.map((action) => ({
+    ...forkInlineMessageActions(pluginActions).map((action) => ({
       icon: "Copy" as const,
       plugin: { pluginId: action.pluginId, icon: action.icon },
       key: action.key,
@@ -389,7 +390,8 @@ export function MessageActionBar({
           },
         ]
       : []),
-    ...(onFork
+    ...forkMenuMessageActions(pluginActions),
+    ...(onFork && forkKeepsThreadFork(pluginActions)
       ? [
           {
             icon: "Fork" as const,
