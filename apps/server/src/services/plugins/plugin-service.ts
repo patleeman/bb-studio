@@ -2,6 +2,8 @@ import {
   capturePluginUse,
   forgetPluginRecommendation,
 } from "./plugin-use-telemetry.js";
+import { registerForkPluginEvents } from "./fork-plugin-events.js";
+import { forkIdleFields } from "../threads/quiet-turn.fork.js";
 import { rpcResponseTags } from "@get-bb/plugin-sdk/internal/rpc-tags";
 import type {
   PluginRpcDiscoveryQuery,
@@ -1436,6 +1438,13 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     },
 
     events: {
+      ...(registerForkPluginEvents({
+        emit: emitThreadEvent,
+        db: deps.db,
+        buildThreadDto,
+        toHostRecord,
+      }),
+      {}),
       emitEnvironmentRemoved(removal) {
         emitThreadEvent("experimental_environment.removed", () => ({
           removal,
@@ -1472,6 +1481,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       },
       emitThreadIdle(thread) {
         emitThreadEvent("thread.idle", () => ({
+          ...forkIdleFields(deps.db, thread.id),
           thread: buildThreadDto(thread),
           lastAssistantText: getLatestTurnFinalOutput(deps.db, thread.id),
         }));
