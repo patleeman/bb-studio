@@ -10,6 +10,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useQuietReply } from "@/lib/fork-reply-classifiers";
+import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
+import { useForkMessageActions, withForkMessageMenu } from "./forkMessageActions.js";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import { TimelineImageGallery } from "./TimelineImageGallery";
@@ -818,6 +821,13 @@ function ConversationRow({
     row.role === "user"
       ? latestActionableUserMessageId
       : latestActionableAssistantMessageId;
+  if (
+    useQuietReply(row.text) &&
+    row.role === "assistant" &&
+    row.id !== streamingAssistantMessageId
+  ) {
+    return <QuietTurnMarker />;
+  }
   return (
     <ConversationRowContent
       row={row}
@@ -854,6 +864,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
   streaming,
 }: ConversationRowContentProps) {
   const composerHost = usePluginComposerHost();
+  const forkMessageActions = useForkMessageActions();
   const {
     canSpawnChild,
     inlineMessageEditor,
@@ -902,10 +913,10 @@ const ConversationRowContent = memo(function ConversationRowContent({
           actions: consumerMessageActions,
           message: messageReference,
         });
-  const rowPluginActions =
+  const rowPluginActions = withForkMessageMenu(forkMessageActions, row,
     rowConsumerActions.length === 0
       ? rowSlotActions
-      : [...(rowSlotActions ?? []), ...rowConsumerActions];
+      : [...(rowSlotActions ?? []), ...rowConsumerActions]);
   const isSettledMessage =
     row.role === "user" ? row.turnRequest.status !== "pending" : !streaming;
   const onCopyLink =
