@@ -1,15 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@bb/shared-ui/button";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
-import { getEnvironmentFilePreviewSourceAtRef } from "@bb/client-core";
-import { PluginPanelTabContent } from "@/components/plugin/PluginPanelActions";
-import {
-  LazyHostScopedFilePreviewTabContent,
-  LazyThreadStorageFilePreviewTabContent,
-  LazyWorkspaceFilePreviewTabContent,
-} from "@/components/secondary-panel/lazySecondaryPanelComponents";
 import { useThread } from "@/hooks/queries/thread-queries";
 import {
   getBbDesktopInfo,
@@ -18,76 +11,41 @@ import {
   MACOS_WINDOW_DRAG_CLASS,
   shouldUseMacosDesktopChrome,
 } from "@/lib/bb-desktop";
+import type { FixedPanelTab } from "@/lib/fixed-panel-tabs-state";
 import {
+  closeTabWindow,
+  paneOfTab,
   parseTabWindowSearch,
+  tabOpenSpec,
+  type TabWindowPane,
   type TabWindowRequest,
 } from "@/lib/fork-tab-popout";
-import { requestTabReturn } from "@/lib/fork-tab-return";
-import { TabWindowContext } from "@/lib/fork-tab-window";
-import { toFilePreviewLineRange } from "@/lib/live-file-navigation";
+import { requestTabReturn, type ReturnedTab } from "@/lib/fork-tab-return";
+import { tabWindowPanelStateId } from "@/lib/fork-tab-window-panel";
+import { workbenchSplitsFor } from "@/components/secondary-panel/workbenchSplits.fork";
+import {
+  ForkTabWindowPanel,
+  type TabWindowPanelState,
+} from "./ForkTabWindowPanel";
 
-function TabWindowContent({
-  request,
-  environmentId,
-}: {
-  request: TabWindowRequest;
-  environmentId: string | null;
-}) {
-  const { spec, threadId } = request;
-  const environment = useMemo(
-    () => (environmentId === null ? null : { id: environmentId }),
-    [environmentId],
+export async function returnedTabsOf(
+  request: TabWindowRequest,
+  tabs: readonly FixedPanelTab[],
+): Promise<ReturnedTab[]> {
+  const panelStateId = tabWindowPanelStateId(
+    request.threadId,
+    request.windowId,
   );
-  if (spec.kind === "tab") {
-    return (
-      <PluginPanelTabContent
-        tab={{
-          id: "fork-tab-window",
-          kind: "plugin-panel",
-          actionId: spec.tab.id,
-          pluginId: spec.tab.pluginId ?? "",
-          paramsJson:
-            spec.params === undefined ? null : JSON.stringify(spec.params),
-          title: spec.title ?? request.title,
-        }}
-        context={{ kind: "thread", threadId, environment }}
-      />
-    );
+  const paneCount = workbenchSplitsFor(panelStateId)?.panes().length ?? 1;
+  const returned: ReturnedTab[] = [];
+  for (const tab of tabs) {
+    const spec = await tabOpenSpec(tab, request.threadId);
+    if (spec === null) continue;
+    const pane: TabWindowPane =
+      paneCount < 2 ? request.pane : paneOfTab(panelStateId, tab.id);
+    returned.push({ spec, pane });
   }
-  if (spec.kind !== "file") return null;
-  const lineRange = toFilePreviewLineRange(spec.location ?? null);
-  const { target } = spec;
-  switch (target.kind) {
-    case "workspace":
-      return (
-        <LazyWorkspaceFilePreviewTabContent
-          activePath={target.path}
-          environmentId={target.environmentId}
-          isPanelOpen
-          lineRange={lineRange}
-          source={getEnvironmentFilePreviewSourceAtRef(target.experimental_ref)}
-          threadId={threadId}
-        />
-      );
-    case "host":
-      return (
-        <LazyHostScopedFilePreviewTabContent
-          activePath={target.path}
-          hostId={target.hostId}
-          isPanelOpen
-          lineRange={lineRange}
-        />
-      );
-    case "thread-storage":
-      return (
-        <LazyThreadStorageFilePreviewTabContent
-          activePath={target.path}
-          isPanelOpen
-          lineRange={lineRange}
-          threadId={target.threadId}
-        />
-      );
-  }
+  return returned;
 }
 
 export function ForkTabWindow() {
@@ -98,29 +56,37 @@ export function ForkTabWindow() {
   }).data;
   const [state, setState] = useState<"idle" | "pending" | "failed">("idle");
   const [toolbar, setToolbar] = useState<HTMLElement | null>(null);
-  const title = request?.title ?? "";
-  const tabWindow = useMemo(() => ({ title, toolbar }), [title, toolbar]);
+  const [panelState, setPanelState] = useState<TabWindowPanelState | null>(
+    null,
+  );
   const macChrome = shouldUseMacosDesktopChrome(getBbDesktopInfo());
+  const title = panelState?.activeTitle ?? request?.title ?? "";
 
   useEffect(() => {
-    if (request !== null && request.title !== "")
-      document.title = request.title;
+    if (title !== "") document.title = title;
+  }, [title]);
+
+  const closeWindow = useCallback(() => {
+    if (request !== null) void closeTabWindow(request.windowId);
   }, [request]);
 
   if (request === null) return null;
 
   const returnToWorkbench = () => {
     setState("pending");
-    void requestTabReturn({
-      threadId: request.threadId,
-      projectId: thread?.projectId ?? null,
-      spec: request.spec,
-      pane: request.pane,
-      from: request.from,
-    }).then((ok) => {
-      if (ok) window.close();
-      else setState("failed");
-    });
+    void returnedTabsOf(request, panelState?.tabs ?? [])
+      .then((tabs) =>
+        requestTabReturn({
+          threadId: request.threadId,
+          projectId: thread?.projectId ?? null,
+          tabs,
+          from: request.from,
+        }),
+      )
+      .then((ok) => {
+        if (ok) closeWindow();
+        else setState("failed");
+      });
   };
 
   return (
@@ -140,8 +106,11 @@ export function ForkTabWindow() {
               : "pl-3",
           )}
         >
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-            {request.title}
+          <span
+            className="min-w-0 flex-1 truncate text-sm text-foreground"
+            data-fork-tab-window-title=""
+          >
+            {title}
           </span>
           <div
             ref={setToolbar}
@@ -168,12 +137,13 @@ export function ForkTabWindow() {
           </Button>
         </header>
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <TabWindowContext.Provider value={tabWindow}>
-            <TabWindowContent
-              request={request}
-              environmentId={thread?.environmentId ?? null}
-            />
-          </TabWindowContext.Provider>
+          <ForkTabWindowPanel
+            request={request}
+            environmentId={thread?.environmentId ?? null}
+            toolbar={toolbar}
+            onState={setPanelState}
+            onEmpty={closeWindow}
+          />
         </div>
       </div>
     </TooltipProvider>
