@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import type {
+  ExperimentalAppBackdropRegistration,
   ExperimentalAppCommand,
   ExperimentalCloseFallbackRegistration,
   ExperimentalCommandPaletteRegistration,
@@ -111,6 +112,7 @@ export interface ForkCapturedPluginApp {
   skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
+  appBackdrops: ExperimentalAppBackdropRegistration[];
 }
 
 export interface ForkRenderSlotOptions {
