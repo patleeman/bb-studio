@@ -6,6 +6,7 @@ import type {
   ExperimentalLauncherItemRegistration,
   ExperimentalLinkHandlerRegistration,
   ExperimentalMainHeaderRegistration,
+  ExperimentalNewTabItemsRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
@@ -44,6 +45,7 @@ export interface ForkSlotRegistrations {
   itemDrops: ExperimentalItemDropRegistration[];
   closeFallbacks: ExperimentalCloseFallbackRegistration[];
   skillSources: ExperimentalSkillSourceRegistration[];
+  newTabItems: ExperimentalNewTabItemsRegistration[];
 }
 
 export const FORK_SLOT_KINDS = [
@@ -63,6 +65,7 @@ export const FORK_SLOT_KINDS = [
   "itemDrops",
   "closeFallbacks",
   "skillSources",
+  "newTabItems",
 ] as const satisfies readonly (keyof ForkSlotRegistrations)[];
 
 export function emptyForkSlots(): ForkSlotRegistrations {
@@ -83,6 +86,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     itemDrops: [],
     closeFallbacks: [],
     skillSources: [],
+    newTabItems: [],
   };
 }
 
@@ -106,6 +110,7 @@ export function forkSlotMethods(
     itemDrop: new Set<string>(),
     closeFallback: new Set<string>(),
     skillSource: new Set<string>(),
+    newTabItems: new Set<string>(),
   };
   return {
     experimental_sidebarNewItem(registration) {
@@ -325,6 +330,29 @@ export function forkSlotMethods(
         useSkills: registration.useSkills,
       });
     },
+    experimental_newTabItems(registration) {
+      const kind = "slots.experimental_newTabItems";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.newTabItems, id);
+      const { useRecents, search } = registration;
+      if (useRecents === undefined && search === undefined) {
+        throw new Error(`${kind} "${id}": give useRecents, search or both`);
+      }
+      for (const [name, value] of [
+        ["useRecents", useRecents],
+        ["search", search],
+      ] as const) {
+        if (value !== undefined && typeof value !== "function") {
+          throw new Error(`${kind} "${id}": ${name} must be a function`);
+        }
+      }
+      collected.newTabItems.push({
+        id,
+        title: requireNonEmptyString(kind, "title", registration.title),
+        ...(useRecents === undefined ? {} : { useRecents }),
+        ...(search === undefined ? {} : { search }),
+      });
+    },
     experimental_paletteSearch(registration) {
       const kind = "slots.experimental_paletteSearch";
       const id = requireSlotId(kind, registration?.id);
@@ -343,17 +371,47 @@ export function forkSlotMethods(
 
 type ForkTabFields = Pick<
   ExperimentalTabRegistration,
-  "experimental_instanceIcon" | "experimental_compactWhenFixed"
+  | "experimental_instanceIcon"
+  | "experimental_compactWhenFixed"
+  | "experimental_showInNewTab"
+  | "experimental_newTabGroup"
+  | "experimental_openableByPlugins"
 >;
 
 export function forkTabFields(registration: ForkTabFields): ForkTabFields {
+  const showInNewTab = registration.experimental_showInNewTab;
+  if (showInNewTab !== undefined && showInNewTab !== false) {
+    throw new Error(
+      `slots.experimental_tab: "experimental_showInNewTab" must be false when set`,
+    );
+  }
+  const newTabGroup = registration.experimental_newTabGroup;
+  const openableByPlugins = registration.experimental_openableByPlugins;
+  if (openableByPlugins !== undefined && openableByPlugins !== true) {
+    throw new Error(
+      `slots.experimental_tab: "experimental_openableByPlugins" must be true when set`,
+    );
+  }
   return {
+    ...(newTabGroup === undefined
+      ? {}
+      : {
+          experimental_newTabGroup: requireNonEmptyString(
+            "slots.experimental_tab",
+            "experimental_newTabGroup",
+            newTabGroup,
+          ),
+        }),
+    ...(openableByPlugins === true
+      ? { experimental_openableByPlugins: true }
+      : {}),
     ...(typeof registration.experimental_instanceIcon === "function"
       ? { experimental_instanceIcon: registration.experimental_instanceIcon }
       : {}),
     ...(registration.experimental_compactWhenFixed === true
       ? { experimental_compactWhenFixed: true }
       : {}),
+    ...(showInNewTab === false ? { experimental_showInNewTab: false } : {}),
   };
 }
 
