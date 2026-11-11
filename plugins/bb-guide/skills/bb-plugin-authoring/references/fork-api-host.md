@@ -21,6 +21,10 @@ clickThrough, resizable, hotkey, menuBarTitle, params })`. `hotkey` is a
   hiding the window, and the page gets a `bb-fork-window-click-through` event.
   `setClickThrough(windowId, false, { hold: true })` pauses it (a modifier
   held over the window) without turning it off. `center` opens it mid-screen; `hideOnBlur` closes it when it loses focus.
+  `vibrancy: "hud" | "under-window"` with `transparent` puts macOS's blurred
+  material behind the component, active even unfocused; other systems
+  ignore it. Opening a window that is already open with other `params`
+  loads the new address in the same window, which keeps its place and size.
 
 ## Approvals
 

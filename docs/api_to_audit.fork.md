@@ -519,6 +519,12 @@ own on this path yet.
 3. Windows are not restored after the app restarts; the plugin registers
    them again when its frontend loads in the main window.
 4. In a browser only a plain popup is possible.
+5. `vibrancy` (`"hud"`, `"under-window"`) applies only to transparent
+   windows on macOS, with `visualEffectState: "active"`; it is fixed when the
+   window is made, so a window already open keeps its material.
+6. Opening a window that is open with other `params` loads the new address
+   in the same window (a page load, not an in-page navigation); the window
+   keeps its bounds and nothing closes.
 
 ## `PluginFileOpenerRegistration.experimental_handleOpen` (`@get-bb/plugin-sdk/app`)
 
@@ -1113,3 +1119,110 @@ Workflows plugin's registration carries the flag (one line in
    params schema bb checks.
 2. Only the workbench's `open` takes another plugin's tab; `openTab` on a
    plugin's own panel controller does not. Decide whether it should.
+
+## Replacing the quick palette (`slots.experimental_commandPalette`, `experimental_useAppCommands`)
+
+`slots.experimental_commandPalette({ id, component })` puts one plugin's
+component in bb's quick palette dialog in place of bb's command list and
+thread search; the component gets `{ initialMode, close(then?),
+experimental_onEscape(handler) }`.
+`experimental_useAppCommands()` lists what bb's palette lists as commands,
+`{ id, title, group, shortcut?, run }`. Studio draws one omnibar for Mod+K and
+its own launcher window with them.
+
+**Core callers.** Every entry point already ends in `CommandPalette`'s two
+command handlers (`palette.open` and `thread.search`; the rail's Search
+button and Mod+K dispatch `thread.search`), so the replacement is one
+wrapper there: `ForkCommandPalette` (`components/commands/ForkCommandPalette.tsx`)
+renders the first registration by plugin id, keyed by bb's open counter, or
+bb's own body when there is none or the component crashed. bb's Escape mode
+exit is skipped while a replacement is registered
+(`forkCommandPaletteActive`), so Escape closes. Before that, the dialog's
+`onEscapeKeyDown` asks the handler the component registered with
+`experimental_onEscape` (`forkCommandPaletteEscape`); when it returns true
+the key is prevented and the dialog stays open. Radix listens for Escape in
+the capture phase on the document, so the handler runs before the
+component's own key handlers; Studio's omnibar clears its query this way, as
+its launcher window does. `close(then)` is bb's
+`runAfterClose`. Inside the palette `experimental_useAppCommands()` reads the
+actions `CommandPalette` built when it opened and runs them through bb's
+`chooseAction` (record recent, close, run after focus returns); settings,
+plugin pages and server switches are built with the builders
+`CommandPaletteBody` uses (`buildSettingsPaletteActions`,
+`buildPluginPagePaletteActions`, its server rows). Outside the palette the
+hook builds the command actions with `CommandPalette`'s builders
+(`buildAppCommandActions`, `buildPluginPaletteActions`,
+`buildPluginComposerCommandActions`) against the current window.
+
+**Audit before stabilizing.**
+
+1. The composition of the command list is copied from `CommandPalette`'s
+   `buildActions` and `CommandPaletteBody`'s settings, page and server rows;
+   extract one shared builder that both bb's palette and the hook call.
+2. Outside the palette availability is read with no target (no focused
+   element) and refreshed on mount and window focus only; core has no
+   change signal for command handlers.
+3. bb has no keywords for its commands; `group` is bb's display heading,
+   not a stable category.
+4. Only one replacement can be active (first plugin id); decide whether bb
+   should refuse a second registration instead.
+5. `experimental_onEscape` keeps one handler per window, the last one
+   registered. Decide whether it should be a prop callback bb calls instead
+   of a registration, and whether bb's own palette body should leave search
+   mode through the same path.
+
+## Tabs in their own window (`ExperimentalWorkbench.popOut`)
+
+`experimental_workbench(threadId).popOut(key)` and the tab menu's "Open in
+new window" show a side panel tab alone in a window
+(`/fork-window/_bb/tab?thread=…&spec=…&pane=…&from=…&title=…`, through the
+pop-out window opener of `experimental_popOut`) and close it in the panel.
+The window's "Return to workbench" asks the window that popped it out (over
+the `bb-fork-tab-window` BroadcastChannel) to open the tab again with
+`experimental_workbench(threadId).open(spec, { pane })`; that window shows
+the conversation first if it moved on. With no answer in 600 ms, any window
+showing the conversation takes it.
+
+**Core callers.** The tab menu item and `popOut` share
+`popOutWorkbenchTab` (`lib/fork-tab-popout.ts`): the tab is read from the
+thread's own panel tab state, turned into the `open` spec that recreates it,
+and closed with the panel controller's `closeTab`, the close button's path.
+The window draws the tab with bb's own tab content components
+(`PluginPanelTabContent`, `LazyWorkspaceFilePreviewTabContent`,
+`LazyHostScopedFilePreviewTabContent`,
+`LazyThreadStorageFilePreviewTabContent`) inside `ForkWindowView`'s route.
+Reopening is `workbenchFor(...).open`, the same as plugins call.
+
+**Audit before stabilizing.**
+
+1. Only tabs `open` can recreate pop out: plugin action tabs and workspace,
+   host and thread storage file tabs. Terminals (closing the tab ends the
+   terminal), in-app browser tabs (a native view of the main window), Info,
+   Diff and fixed tabs (not closable), New Tab, attachment previews and
+   file opener tabs stay. Each needs a way to move rather than close.
+2. The tab window lives outside bb's layout and route, so `useBbContext()`
+   reports no thread there; a tab reads its `threadId` prop.
+3. When several windows show the conversation and the opener is gone, each
+   reopens the tab.
+4. Window bounds are remembered per thread and tab spec.
+
+## The tab's own window (`experimental_useTabWindow`)
+
+`experimental_useTabWindow()` returns `{ title, toolbar }` inside a tab
+window and null elsewhere. The window's bar shows `title`; `toolbar` is an
+element in the bar, before "Return to workbench" and outside the window drag
+region, that a tab renders its controls into with `createPortal`. Studio's
+page and item headers leave out their title row there and move their
+actions to `toolbar`.
+
+**Core callers.** `ForkTabWindow` provides it (`lib/fork-tab-window.ts`)
+around bb's own tab content components, with the title it draws in its bar.
+No core view reads it: bb's own file previews have no title row.
+
+**Audit before stabilizing.**
+
+1. Decide whether this should be one general "host draws the title" signal
+   that also covers nav panel title bars and the workspace tab row, rather
+   than one for tab windows.
+2. `toolbar` hands out a DOM element; decide whether a slot component
+   (children rendered into the bar) is the better contract.
