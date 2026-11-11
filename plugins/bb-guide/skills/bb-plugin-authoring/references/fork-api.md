@@ -156,18 +156,6 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
   → `{ quiet }` makes the thread view draw that reply as a small "Quiet
   check" marker. Use the same rule on both sides.
 
-## Launcher items
-
-- `app.slots.experimental_launcherItem({ id, title, icon, section, keywords?,
-order?, run })` → an app (`section: "apps"`) or action (`"actions"`) a
-  launcher can list and run. `run` is called in the launcher's window, so it
-  must work from any window.
-- `experimental_useLauncherItems()` → every plugin's items, for the plugin
-  that draws the launcher (Studio's, on a window with `center` and
-  `hideOnBlur`).
-
-Names: `ExperimentalLauncherItemRegistration`, `ExperimentalLauncherItem`.
-
 ## A row above the main view
 
 - `app.slots.experimental_mainHeader({ id, component })` → a row bb draws
@@ -241,6 +229,37 @@ experimental_useSidebarStyle })` → while this list is the sidebar's, bb
   parse is dropped.
 
 Names: `ExperimentalSidebarStyle`.
+
+## A backdrop behind the app
+
+- `app.slots.experimental_appBackdrop({ id, component, useAppearance? })` →
+  bb draws `component` once per main window behind its whole layout: full
+  window, under every surface, with no pointer events (a WebGL scene, an
+  image). bb's own surfaces turn see-through (the window, the sidebar, the
+  main view, its header, the side panel and the composer box) while
+  `useAppearance()`, a hook bb calls in your plugin's scope, returns
+  `{ mode?, tokens?, surfaces? }`, or always if you leave the hook out. A
+  null keeps bb's own look, with your component still drawn under it:
+  - `mode: "light" | "dark"` overrides this window's light or dark, so
+    bb's `.dark` class, its `dark:` styles and
+    `experimental_useAppTheme().mode` follow your theme. bb's own setting
+    is back when you leave it out.
+  - `tokens: { "--canvas": "…", "--ink": "…" }` are set on `<html>`. A
+    name that is not `--` plus letters, digits, `-` or `_`, or a value the
+    browser cannot parse, is dropped. Inside the sidebar and the side panel
+    bb sets `--sidebar` to transparent; paint them with `surfaces`.
+  - `surfaces: { sidebar?, main?, composer?, secondaryPanel?, header? }`,
+    each `{ background?, backdropFilter?, edge? }`: a CSS background, a CSS
+    backdrop-filter and the color of the surface's border lines. A surface
+    left out is fully see-through. Surfaces nest: the header, side panel
+    and composer sit on `main`. A thread list's `experimental_useSidebarStyle`
+    still paints over the sidebar's.
+- The first registration by plugin id wins. A crash in `component` or a
+  throw in `useAppearance` removes the backdrop and every override. Plugin
+  windows, popped-out routes and popped-out tabs get none.
+
+Names: `ExperimentalAppBackdropRegistration`, `ExperimentalAppAppearance`,
+`ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`.
 
 ## Skills on bb's Skills page
 
@@ -418,18 +437,6 @@ index })`.
 Names: `ExperimentalDragItem`, `ExperimentalItemDropTarget`,
 `ExperimentalItemDropRegistration`, `ExperimentalDropMention`.
 
-## Pop out a route
-
-- `useBbNavigate().experimental_popOut({ path, title?, width?, height? })`
-  → `Promise<boolean>`: opens any bb route (a thread `/threads/<id>`, a
-  plugin panel, the `path` of a dragged item) in a window of its own with
-  no sidebar, rail, plugin main header or bb page header; everything else
-  works as in the main window. In the desktop app it is a native window that
-  remembers its size and place per path; in a browser, a popup. Popping out
-  an open path focuses its window. Defaults to 960 by 720. Resolves false
-  when `path` is not a bb route of this origin (it must start with `/`) or
-  the popup was blocked.
-
 ## The close command
 
 - `app.slots.experimental_closeFallback({ id, close() })` → what Mod+W
@@ -452,11 +459,11 @@ Names: `ExperimentalCloseFallbackRegistration`.
   popover from the plugin's own control (a chip in the composer footer).
   `available` is false while the thread has no context ring.
 
-Windows, approvals and the backend hooks are in fork-api-host.md.
+Windows, launcher items, popping out a route, approvals and the backend hooks are in fork-api-host.md.
 
 ## Names
 
-`ExperimentalAppCommand`, `ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCommandPaletteProps`, `ExperimentalCommandPaletteRegistration`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppCommands`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
+`ExperimentalAppAppearance`, `ExperimentalAppBackdropRegistration`, `ExperimentalAppCommand`, `ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCommandPaletteProps`, `ExperimentalCommandPaletteRegistration`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppCommands`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
 
 The contract's own interfaces take the fork's members from these helper
 interfaces; plugins never name them:
