@@ -7,7 +7,15 @@ import {
   createPluginPanelFixedPanelTab,
   createTerminalFixedPanelTab,
 } from "@/lib/fixed-panel-tabs-state";
-import { ITEM_DRAG_TYPE } from "@/lib/fork-item-drag";
+import {
+  ITEM_DRAG_LOCAL_TYPE,
+  ITEM_DRAG_TYPE,
+  setCurrentDragItem,
+} from "@/lib/fork-item-drag";
+import {
+  getPanelTabDragSource,
+  resetPanelTabDragForTest,
+} from "@/lib/fork-tab-move";
 import { globalPanelTabsAtom } from "@/lib/fork-global-panel-tabs";
 import {
   resetPluginSlotStoreForTest,
@@ -214,6 +222,7 @@ describe("plugin items in a side panel tab's menu", () => {
 describe("dragging a side panel tab", () => {
   class TestDataTransfer {
     dropEffect = "none";
+    effectAllowed = "uninitialized";
     private readonly data = new Map<string, string>();
 
     get types(): string[] {
@@ -229,85 +238,106 @@ describe("dragging a side panel tab", () => {
     }
   }
 
-  class TestDragEvent extends MouseEvent {
-    readonly dataTransfer: TestDataTransfer | null;
-
-    constructor(
-      type: string,
-      init: MouseEventInit & { dataTransfer?: TestDataTransfer } = {},
-    ) {
-      super(type, init);
-      this.dataTransfer = init.dataTransfer ?? null;
-    }
-  }
-
-  const view = window as unknown as Record<string, unknown>;
-
   afterEach(() => {
-    delete view.DataTransfer;
-    delete view.DragEvent;
-    Reflect.deleteProperty(document, "elementsFromPoint");
+    resetPanelTabDragForTest();
+    setCurrentDragItem(null);
   });
 
-  function dragOnto(tabName: string, target: Element): string[] {
-    const received: string[] = [];
-    target.addEventListener("dragover", (event) => event.preventDefault());
-    target.addEventListener("drop", (event) => {
-      received.push(
-        (event as TestDragEvent).dataTransfer?.getData(ITEM_DRAG_TYPE) ?? "",
-      );
-    });
-    view.DataTransfer = TestDataTransfer;
-    view.DragEvent = TestDragEvent;
-    document.elementsFromPoint = () => [target];
-    const tab = screen.getByRole("button", { name: tabName });
-    fireEvent.mouseDown(tab, { button: 0, clientX: 10, clientY: 10 });
-    fireEvent.mouseMove(document, { clientX: 60, clientY: 80 });
-    fireEvent.mouseMove(document, { clientX: 90, clientY: 120 });
-    fireEvent.mouseUp(document, { clientX: 90, clientY: 120 });
-    return received;
-  }
-
-  function renderWithTarget(): HTMLElement {
+  function renderStrip(): HTMLElement {
     register();
     getDefaultStore().set(globalPanelTabsAtom, [bot]);
     const { container } = render(
-      <div>
-        <Strip
-          panelStateId="thr_1"
-          tabs={[
-            renderable(terminal, "Terminal"),
-            renderable(page, "Launch plan"),
-            renderable(bot, "Bot"),
-          ]}
-        />
-        <div data-testid="target" />
-      </div>,
+      <Strip
+        panelStateId="thr_1"
+        tabs={[
+          renderable(terminal, "Terminal"),
+          renderable(page, "Launch plan"),
+          renderable(bot, "Bot"),
+        ]}
+      />,
     );
-    return container.querySelector<HTMLElement>('[data-testid="target"]')!;
+    return container;
   }
 
-  it("carries a plugin action tab as the shared item payload", () => {
-    const target = renderWithTarget();
-    const received = dragOnto("Launch plan", target);
-    expect(received.map((raw) => JSON.parse(raw) as unknown)).toEqual([
-      {
-        kind: "tab",
-        id: page.id,
-        title: "Launch plan",
+  function dragHandleOf(tabName: string): HTMLElement {
+    const pill = screen
+      .getByRole("button", { name: tabName })
+      .closest("[data-tab-pill]");
+    const handle = pill?.parentElement;
+    if (!(handle instanceof HTMLElement)) throw new Error("no tab handle");
+    return handle;
+  }
+
+  function startDrag(tabName: string): TestDataTransfer {
+    const dataTransfer = new TestDataTransfer();
+    fireEvent.dragStart(dragHandleOf(tabName), { dataTransfer });
+    return dataTransfer;
+  }
+
+  it("makes a plugin action tab a native drag source with the shared item payload and its open spec", () => {
+    renderStrip();
+    const handle = dragHandleOf("Launch plan");
+    expect(handle.getAttribute("draggable")).toBe("true");
+    const dataTransfer = startDrag("Launch plan");
+    expect(dataTransfer.effectAllowed).toBe("all");
+    expect(dataTransfer.types).toEqual([ITEM_DRAG_TYPE]);
+    expect(JSON.parse(dataTransfer.getData(ITEM_DRAG_TYPE))).toEqual({
+      kind: "tab",
+      id: page.id,
+      title: "Launch plan",
+      pluginId: "studio",
+      tab: {
         pluginId: "studio",
-        tab: {
-          pluginId: "studio",
-          tabId: "page",
-          params: { page: "p1" },
-          threadId: "thr_1",
-        },
+        tabId: "page",
+        params: { page: "p1" },
+        threadId: "thr_1",
       },
-    ]);
+      open: {
+        kind: "tab",
+        tab: { id: "page", pluginId: "studio" },
+        params: { page: "p1" },
+        title: "Launch plan",
+      },
+    });
+    expect(getPanelTabDragSource()).toMatchObject({
+      panelStateId: "thr_1",
+      key: page.id,
+    });
   });
 
-  it("carries nothing for bb's own tabs", () => {
-    const target = renderWithTarget();
-    expect(dragOnto("Terminal", target)).toEqual([]);
+  it("marks bb's own tabs that cannot leave the window, and does not drag fixed tabs at all", () => {
+    renderStrip();
+    const dataTransfer = startDrag("Terminal");
+    expect(dataTransfer.types).toEqual([ITEM_DRAG_TYPE, ITEM_DRAG_LOCAL_TYPE]);
+    expect(JSON.parse(dataTransfer.getData(ITEM_DRAG_TYPE))).toEqual({
+      kind: "tab",
+      id: terminal.id,
+      title: "Terminal",
+    });
+    const fixed = screen
+      .getByRole("button", { name: "Bot" })
+      .closest("[data-tab-pill]")?.parentElement;
+    expect(fixed?.getAttribute("draggable")).not.toBe("true");
+  });
+
+  it("closes the tab when its drag ended as a move somewhere else, and keeps it otherwise", () => {
+    const tabs = [
+      renderable(terminal, "Terminal"),
+      renderable(page, "Launch plan"),
+    ];
+    register();
+    render(<Strip panelStateId="thr_1" tabs={tabs} />);
+    const handle = dragHandleOf("Launch plan");
+    const moved = new TestDataTransfer();
+    fireEvent.dragStart(handle, { dataTransfer: moved });
+    moved.dropEffect = "move";
+    fireEvent.dragEnd(handle, { dataTransfer: moved });
+    expect(tabs[1]?.onClose).toHaveBeenCalledTimes(1);
+
+    const kept = new TestDataTransfer();
+    fireEvent.dragStart(handle, { dataTransfer: kept });
+    kept.dropEffect = "none";
+    fireEvent.dragEnd(handle, { dataTransfer: kept });
+    expect(tabs[1]?.onClose).toHaveBeenCalledTimes(1);
   });
 });
