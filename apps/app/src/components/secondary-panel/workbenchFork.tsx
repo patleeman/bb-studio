@@ -4,9 +4,10 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type DragEvent as ReactDragEvent,
   type ReactNode,
 } from "react";
-import { useDndMonitor } from "@dnd-kit/core";
+import { MouseSensor, useDndMonitor } from "@dnd-kit/core";
 import { isSecondaryFileTab } from "@bb/client-core";
 import type { FixedPanelTab } from "@/lib/fixed-panel-tabs-state";
 import { useAtomValue } from "jotai";
@@ -29,8 +30,10 @@ import {
   beginPointerItemDrag,
   PANEL_TAB_STRIP_SELECTOR,
   panelTabDragItem,
+  sidePanelOf,
   type PointerItemDrag,
 } from "@/lib/fork-item-drag";
+import { beginPanelTabDrag, endPanelTabDrag } from "@/lib/fork-tab-move";
 import {
   availablePanelTabActions,
   panelTabActionTarget,
@@ -41,6 +44,39 @@ import type { SecondaryPanelRenderableTab } from "./secondaryPanelTab";
 import { workbenchSplitsFor } from "./workbenchSplits.fork";
 
 export const WORKBENCH_NEW_TAB_IN_EVERY_PANE = true;
+
+export class InertMouseSensor extends MouseSensor {
+  static override activators = [] as typeof MouseSensor.activators;
+}
+
+export interface PanelTabNativeDragProps {
+  draggable: true;
+  onDragStart(event: ReactDragEvent<HTMLElement>): void;
+  onDragEnd(event: ReactDragEvent<HTMLElement>): void;
+}
+
+export function usePanelTabNativeDrag(
+  tab: SecondaryPanelRenderableTab,
+): PanelTabNativeDragProps | null {
+  const panelStateId = useContext(WorkbenchPanelContext);
+  if (tab.isPinned === true || isFixedPanelTab(tab)) return null;
+  return {
+    draggable: true,
+    onDragStart(event) {
+      const item = panelTabDragItem(tab, panelStateId);
+      if (item === null || event.dataTransfer === null) return;
+      beginPanelTabDrag(event.dataTransfer, item, {
+        panelStateId: panelStateId ?? "",
+        key: tab.tab.id,
+        panel: sidePanelOf(event.currentTarget),
+        close: tab.onClose,
+      });
+    },
+    onDragEnd(event) {
+      endPanelTabDrag(event.dataTransfer?.dropEffect);
+    },
+  };
+}
 
 const WorkbenchPanelContext = createContext<string | null>(null);
 

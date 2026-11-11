@@ -35,6 +35,7 @@ type JotaiStore = ReturnType<typeof createStore>;
 
 export interface WorkbenchSurface {
   threadId: string;
+  panelStateId: string;
   panel: AppPanelController;
   openFilePreview(intent: AppFilePreviewIntent): boolean;
   openTerminal(session: TerminalSession): boolean;
@@ -307,7 +308,7 @@ export function readWorkbenchPanes(
 function readLayout(surface: WorkbenchSurface): ExperimentalWorkbenchLayout {
   const tabs = surface.panel.getTabs();
   return {
-    panes: readWorkbenchPanes(workbenchSplitsFor(surface.threadId), tabs),
+    panes: readWorkbenchPanes(workbenchSplitsFor(surface.panelStateId), tabs),
     panel: tabs.open ? "open" : "closed",
     widthPercent: surface.store.get(
       getThreadSecondaryPanelWidthPercentAtom(surface.threadId),
@@ -363,7 +364,7 @@ function arrange(
   }
   if (
     (panes !== undefined || paneWidths !== undefined) &&
-    !arrangePanes(workbenchSplitsFor(surface.threadId), panes, paneWidths)
+    !arrangePanes(workbenchSplitsFor(surface.panelStateId), panes, paneWidths)
   ) {
     return false;
   }
@@ -455,7 +456,7 @@ export function workbenchFor(
     async open(spec, options) {
       const surface = current();
       const placement = readOpenPlacement(options);
-      const splits = workbenchSplitsFor(surface.threadId);
+      const splits = workbenchSplitsFor(surface.panelStateId);
       const owner = workbenchTabOwner(pluginId, spec);
       if (
         owner === null ||
