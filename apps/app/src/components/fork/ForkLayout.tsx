@@ -1,3 +1,4 @@
+import { ForkAppBackdropHost } from "./ForkAppBackdrop";
 import { ForkApprovalHost } from "./ForkApprovalHost";
 import { ForkItemDropHost } from "./ForkItemDropHost";
 import { ForkMainHeader } from "./ForkMainHeader";
@@ -20,6 +21,7 @@ export function useForkLayoutBridge([storedOpen, setStoredOpen]: readonly [
 export function ForkLayoutHosts() {
   return (
     <>
+      <ForkAppBackdropHost />
       <ForkMainHeader />
       <ForkApprovalHost />
       <ForkItemDropHost />
