@@ -1,4 +1,5 @@
 import {
+  Fragment,
   type CSSProperties,
   type MouseEventHandler,
   type PointerEvent as ReactPointerEvent,
@@ -15,7 +16,6 @@ import {
   closestCenter,
   DndContext,
   DragOverlay,
-  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -54,6 +54,15 @@ import {
   type SecondaryPanelRenderableTab,
   type SecondaryPanelTabReorderHandler,
 } from "./secondaryPanelTab";
+import {
+  FixedPanelTabGroupEnd,
+  fixedPanelTabsFirst,
+  InertMouseSensor,
+  PanelTabActionMenuItems,
+  PanelTabItemDragSource,
+  useFixedPanelTabDisplay,
+  usePanelTabNativeDrag,
+} from "./workbenchFork";
 
 const CHEVRON_SCROLL_STEP_PX = 140;
 
@@ -131,12 +140,13 @@ interface SortablePanelTabProps {
 
 export function SecondaryPanelTabStrip({
   activeTabId,
-  tabs,
+  tabs: stripTabs,
   onBeginTabDrag,
   onReorderTab,
   usesDesktopChrome,
   isPanelOpen,
 }: SecondaryPanelTabStripProps) {
+  const tabs = useMemo(() => fixedPanelTabsFirst(stripTabs), [stripTabs]);
   const stripRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -156,7 +166,7 @@ export function SecondaryPanelTabStrip({
     consumeDragClickSuppression,
   } = useDragClickSuppression();
   const dragDisabled = tabs.length < 2;
-  const mouseSensor = useSensor(MouseSensor, {
+  const mouseSensor = useSensor(InertMouseSensor, {
     activationConstraint: { distance: PANEL_TAB_DRAG_DISTANCE_PX },
   });
   const touchSensor = useSensor(
@@ -392,13 +402,14 @@ export function SecondaryPanelTabStrip({
         onDragCancel={handleDragCancel}
         onDragEnd={handleDragEnd}
       >
+        <PanelTabItemDragSource tabs={tabs} />
         <SortableContext
           items={tabIds}
           strategy={horizontalListSortingStrategy}
         >
-          {tabs.map((tab) => (
+          {tabs.map((tab, index) => (
+            <Fragment key={tab.tab.id}>
             <SortablePanelTab
-              key={tab.tab.id}
               activeTabRef={activeTabRef}
               contextMenuDisabled={isCompactViewport}
               dragDisabled={dragDisabled}
@@ -409,6 +420,8 @@ export function SecondaryPanelTabStrip({
               tab={tab}
               tabs={tabs}
             />
+              <FixedPanelTabGroupEnd tab={tab} nextTab={tabs[index + 1]} />
+            </Fragment>
           ))}
         </SortableContext>
         {createPortal(
@@ -482,7 +495,7 @@ export function SecondaryPanelTabStrip({
           <div
             ref={contentRef}
             data-secondary-panel-tab-content
-            className="flex w-max items-center gap-1"
+            className="flex w-max max-w-full items-center gap-1"
           >
             {dndTabs}
           </div>
@@ -502,7 +515,7 @@ export function SecondaryPanelTabStrip({
 function SortablePanelTab({
   activeTabRef,
   contextMenuDisabled,
-  dragDisabled,
+  dragDisabled: stripDragDisabled,
   isActive,
   noDragClass,
   onBeginTabDrag,
@@ -510,6 +523,9 @@ function SortablePanelTab({
   tab,
   tabs,
 }: SortablePanelTabProps) {
+  const fixed = useFixedPanelTabDisplay(tab);
+  const nativeDrag = usePanelTabNativeDrag(tab);
+  const dragDisabled = stripDragDisabled || fixed.isFixed;
   const { isDragging, listeners, setNodeRef, transform, transition } =
     useSortable({
       id: tab.tab.id,
@@ -548,22 +564,25 @@ function SortablePanelTab({
         <div
           ref={setTabRef}
           style={style}
+          title={fixed.compact ? tab.label : undefined}
           className={cn(
-            "shrink-0",
-            !dragDisabled && "cursor-grab active:cursor-grabbing",
+            fixed.compact ? "shrink-0" : "min-w-[5.5rem] shrink",
+            (nativeDrag !== null || !dragDisabled) && "cursor-grab active:cursor-grabbing",
             isDragging && "opacity-40",
             noDragClass,
           )}
           onPointerDown={(event) => {
-            onBeginTabDrag?.(tabId, event);
+            if (nativeDrag === null) onBeginTabDrag?.(tabId, event);
             sortablePointerDown?.(event);
           }}
           {...sortableListeners}
+          {...nativeDrag}
         >
           <PanelTab tab={tab} isActive={isActive} />
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent aria-label={`${tab.label} tab actions`}>
+        <PanelTabActionMenuItems tab={tab} />
         <ContextMenuItem
           disabled={!canCloseSelf}
           onSelect={() => onCloseTabs(tabId, "self")}
@@ -640,15 +659,18 @@ function PanelTab({
 }) {
   const title =
     tab.statusLabel === null ? tab.label : `${tab.label} (${tab.statusLabel})`;
+  const iconOnly = useFixedPanelTabDisplay(tab).compact;
   return (
     <TabPill
       label={tab.label}
+      {...(iconOnly ? { iconOnly, ariaLabel: title } : {})}
       leadingVisual={tab.leadingVisual}
       secondaryLabel={tab.statusLabel === null ? null : `(${tab.statusLabel})`}
       title={title}
       isActive={isActive}
       onSelect={tab.onSelect}
       labelMaxWidthClass="max-w-[160px]"
+      keepCloseVisibleWhenActive
       enlargeCloseTargetOnCoarsePointer={
         tab.tab.kind === "workspace-file-preview" ||
         tab.tab.kind === "host-file-preview" ||
