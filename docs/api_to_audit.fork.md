@@ -823,7 +823,12 @@ the items to the row's plugin actions through `withForkMessageMenu`, and
 `MessageActionBar.tsx` takes them out of the inline candidates and puts them
 in the menu (`forkInlineMessageActions`, `forkMenuMessageActions`); the rules
 are in `components/thread/timeline/forkMessageActions.ts`. bb's own Fork item
-is not registered through the slot.
+is not registered through the slot. A registration with
+`experimental_replaces: "thread.fork"` hides bb's "Fork into new thread" on
+every message its `isAvailable` allows (`forkKeepsThreadFork`, one condition
+in `MessageActionBar.tsx`); Studio sets it on "Fork conversation from here",
+which is available in Bot conversations and workers only, so other threads
+keep bb's item.
 
 **Audit before stabilizing.**
 
