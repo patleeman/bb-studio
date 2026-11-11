@@ -5,6 +5,12 @@ import {
   type BbDesktopServerChoice,
   type BbDesktopServerList,
 } from "@bb/desktop-contract";
+import { BB_DESKTOP_FORK_ANSWER_APPROVAL_CHANNEL } from "./fork-approvals-ipc.js";
+import { STUDIO_BUILD } from "./studio-release.fork.js";
+import {
+  BB_DESKTOP_FORK_WINDOW_CHANNEL,
+  type ForkWindowRequest,
+} from "./fork-windows-ipc.js";
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { appCommandIdSchema, type AppCommandId } from "@bb/domain";
 import {
@@ -541,6 +547,11 @@ const bbDesktopApi: BbDesktopApi = {
   openExternalUrl(url: string): void {
     ipcRenderer.send(BB_DESKTOP_OPEN_EXTERNAL_URL_CHANNEL, url);
   },
+  experimental_answerApproval: (approvalId: string) =>
+    ipcRenderer.invoke(BB_DESKTOP_FORK_ANSWER_APPROVAL_CHANNEL, approvalId),
+  experimental_window: (request: ForkWindowRequest) =>
+    ipcRenderer.invoke(BB_DESKTOP_FORK_WINDOW_CHANNEL, request),
+  experimental_studioBuild: STUDIO_BUILD,
   async openServerDaemonLogs(): Promise<void> {
     await ipcRenderer.invoke(BB_DESKTOP_OPEN_SERVER_DAEMON_LOGS_CHANNEL);
   },
