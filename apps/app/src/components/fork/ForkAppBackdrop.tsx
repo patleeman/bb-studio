@@ -16,6 +16,9 @@ import { usePluginSlots } from "@/lib/plugin-slots";
 
 export const FORK_BACKDROP_ATTRIBUTE = "data-fork-backdrop";
 export const FORK_SURFACE_EDGE_ATTRIBUTE = "data-fork-surface-edge";
+export const FORK_CARDS_ATTRIBUTE = "data-fork-cards";
+export const FORK_CARDS_GAP_PROPERTY = "--fork-cards-gap";
+export const FORK_CARDS_RADIUS_PROPERTY = "--fork-cards-radius";
 
 const SURFACE_NAMES = {
   sidebar: "sidebar",
@@ -23,6 +26,9 @@ const SURFACE_NAMES = {
   composer: "composer",
   secondaryPanel: "secondary-panel",
   header: "header",
+  panel: "panel",
+  code: "code",
+  popover: "popover",
 } as const satisfies Record<ExperimentalAppSurface, string>;
 
 const SURFACE_FIELDS = [
@@ -34,21 +40,43 @@ const SURFACE_FIELDS = [
 const NO_BACKDROPS: readonly PluginAppBackdropSlot[] = [];
 const TOKEN_NAME = /^--[A-Za-z0-9_-]+$/u;
 const MAX_TOKENS = 500;
+const MAX_CARDS_GAP = 24;
+const MAX_CARDS_RADIUS = 28;
+
+export interface ForkCardsLayout {
+  gap: number;
+  radius: number;
+}
 
 export interface ForkAppearance {
   mode: ForkThemeMode | null;
   properties: ReadonlyMap<string, string>;
   edges: readonly string[];
+  cards: ForkCardsLayout | null;
 }
 
 const NO_APPEARANCE: ForkAppearance = {
   mode: null,
   properties: new Map(),
   edges: [],
+  cards: null,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function clampPixels(value: unknown, max: number): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.min(max, Math.max(0, value));
+}
+
+function cleanCards(layout: unknown): ForkCardsLayout | null {
+  if (!isRecord(layout) || !isRecord(layout.cards)) return null;
+  const gap = clampPixels(layout.cards.gap, MAX_CARDS_GAP);
+  const radius = clampPixels(layout.cards.radius, MAX_CARDS_RADIUS);
+  if (gap === null || radius === null) return null;
+  return { gap, radius };
 }
 
 export function cleanAppearance(value: unknown): ForkAppearance {
@@ -78,7 +106,7 @@ export function cleanAppearance(value: unknown): ForkAppearance {
       if (field === "edge") edges.push(name);
     }
   }
-  return { mode, properties, edges };
+  return { mode, properties, edges, cards: cleanCards(value.layout) };
 }
 
 function appearanceKey(appearance: ForkAppearance): string {
@@ -86,6 +114,7 @@ function appearanceKey(appearance: ForkAppearance): string {
     appearance.mode,
     [...appearance.properties],
     appearance.edges,
+    appearance.cards,
   ]);
 }
 
@@ -94,7 +123,13 @@ export function applyAppearance(
   appearance: ForkAppearance,
 ): () => void {
   const previous = new Map<string, [string, string]>();
-  for (const [name, value] of appearance.properties) {
+  const properties = new Map(appearance.properties);
+  if (appearance.cards !== null) {
+    properties.set(FORK_CARDS_GAP_PROPERTY, `${appearance.cards.gap}px`);
+    properties.set(FORK_CARDS_RADIUS_PROPERTY, `${appearance.cards.radius}px`);
+    root.setAttribute(FORK_CARDS_ATTRIBUTE, "");
+  }
+  for (const [name, value] of properties) {
     previous.set(name, [
       root.style.getPropertyValue(name),
       root.style.getPropertyPriority(name),
@@ -108,6 +143,7 @@ export function applyAppearance(
   return () => {
     setForkThemeModeOverride(null);
     root.removeAttribute(FORK_SURFACE_EDGE_ATTRIBUTE);
+    root.removeAttribute(FORK_CARDS_ATTRIBUTE);
     for (const [name, [value, priority]] of previous) {
       if (value === "") root.style.removeProperty(name);
       else root.style.setProperty(name, value, priority);
@@ -148,12 +184,13 @@ function AlwaysActive({ slot }: { slot: PluginAppBackdropSlot }) {
 }
 
 function readAppearanceKey(key: string): ForkAppearance {
-  const [mode, properties, edges] = JSON.parse(key) as [
+  const [mode, properties, edges, cards] = JSON.parse(key) as [
     ForkThemeMode | null,
     [string, string][],
     string[],
+    ForkCardsLayout | null,
   ];
-  return { mode, properties: new Map(properties), edges };
+  return { mode, properties: new Map(properties), edges, cards };
 }
 
 const BackdropLayer = memo(function BackdropLayer({
