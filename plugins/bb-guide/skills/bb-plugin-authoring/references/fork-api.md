@@ -336,19 +336,27 @@ isTyping }`:
     element or a frame in the side panel; check it before `open` or `focus`.
   - `popOut(key)` → `Promise<boolean>`: shows a tab in a window of its own
     and closes it in the panel, as the tab menu's "Open in new window" does.
-    The window has a "Return to workbench" button that opens the tab again
-    in the pane it came from (pane 2 is made again when it is gone) in the
-    window that popped it out, showing the conversation there first if
-    needed, or else in another window showing the conversation. Plugin
-    action tabs and workspace, host and thread storage file tabs pop out.
-    False, nothing changed, for anything else (terminals, browser tabs,
-    Info, Diff, New Tab, attachments, fixed tabs, file opener tabs), an
-    unknown key or a blocked popup. In the window a tab gets its
-    `threadId` and `environment` props; `useBbContext()` has no thread.
+    The window is a workbench panel of the thread with its own tab state
+    (never the main window's): more tabs reach it by drag and drop, its tabs
+    reorder, split into two panes and drag out as in the main window, its
+    title follows the selected tab, and it closes when its last tab is
+    dragged out. In that window `experimental_workbench(threadId)` from a
+    component mounted there is that window's panel; `list()` in the main
+    window does not include tabs living in windows. Its "Return to
+    workbench" button opens every tab again in the panel that popped the
+    first one out (pane 2 is made again when it is gone), showing the
+    conversation there first if needed, or else in another window showing
+    the conversation. Plugin action tabs and workspace, host and thread
+    storage file tabs pop out. False, nothing changed, for anything else
+    (terminals, browser tabs, Info, Diff, New Tab, attachments, fixed tabs,
+    file opener tabs), an unknown key or a blocked popup. In the window a
+    tab gets its `threadId` and `environment` props; `useBbContext()` has no
+    thread.
 - `experimental_useTabWindow()` → `{ title, toolbar } | null`: non-null in a
-  tab's own window, whose bar shows `title`, so leave out your own title row
-  there. `toolbar` is an element in that bar before "Return to workbench"
-  (null until it mounts); `createPortal` the tab's other controls into it.
+  popped-out window, whose bar shows the selected tab's `title`, so leave
+  out your own title row there. `toolbar` is an element in that bar before
+  "Return to workbench" (null until it mounts, and null for a tab that is
+  not selected); `createPortal` the tab's other controls into it.
 
 - `experimental_openableByPlugins: true` on an action tab registration lets
   other plugins open that tab with `experimental_workbench(...).open`. Leave
@@ -395,30 +403,36 @@ Names: `ExperimentalNewTabItemsRegistration`, `ExperimentalNewTabItem`,
 One drag payload for a thread, a plugin document, a side panel tab or a
 file: JSON of `ExperimentalDragItem` under the MIME type
 `application/x-bb-item`. `{ kind: "thread" | "doc" | "tab" | "file", id,
-title, path?, pluginId?, tab? }`; `tab` is `{ pluginId, tabId, params,
-threadId }` for kind `"tab"`.
+title, path?, pluginId?, tab?, open? }`; for kind `"tab"`, `tab` is
+`{ pluginId, tabId, params, threadId }` (a plugin action tab) and `open` is
+the `ExperimentalWorkbench.open` spec that shows the same tab elsewhere.
 
 - `experimental_writeDragItem(event.dataTransfer, item)` in your
   `dragstart` → makes your element a source. `experimental_readDragItem(
-event.dataTransfer)` in your own `dragover` and `drop` → the item or null.
-  Gate on `event.dataTransfer.types.includes("application/x-bb-item")`,
+event.dataTransfer)` in your own `dragover` and `drop` → the item or null
+  (null in `dragover` for another window's drag: its data is sealed until
+  `drop`). Gate on `event.dataTransfer.types.includes("application/x-bb-item")`,
   and call `preventDefault()` in `dragover` and `drop` on your own targets:
   bb leaves a drag alone once a target inside the page accepted it.
 - `app.slots.experimental_itemDrop({ id, canDrop(item, target),
 drop(item, target) })` → takes drops on bb's own surfaces. `target` is
-  `{ zone: "workbench", threadId, pane?, index? }` (a side panel;
-  `threadId` null on a plugin page), `{ zone: "composer", threadId,
-insertText(text) }` (null for the new-thread composer) or
-  `{ zone: "main" }`. `canDrop` runs on every drag move: synchronous and
-  cheap. bb outlines the zone while a handler accepts, and calls `drop` on
-  the first handler, by plugin id, whose `canDrop` is true.
+  `{ zone: "workbench", threadId, pane?, index?, open }` (a side panel:
+  a thread's, a plugin page's with `threadId` null, or a popped-out tab
+  window's), `{ zone: "composer", threadId, insertText(text) }` (null for
+  the new-thread composer) or `{ zone: "main" }`. `canDrop` runs on every
+  drag move: synchronous and cheap. bb outlines the zone while a handler
+  accepts, and calls `drop` on the first handler, by plugin id, whose
+  `canDrop` is true. While a drag from another window is over a surface, bb
+  asks no handler (the item is sealed) and shows the move cursor; on `drop`
+  it asks as usual, and a drop no handler takes ends with effect `none`.
 - In a side panel, over a pane's tab row `pane` is 1 or 2 and `index` the
   insertion point (bb draws an insertion bar there); over the right edge of
-  a panel with one pane `pane` is `"new"` (bb highlights that half, as for
-  a tab dragged there). Elsewhere in the panel both are absent and bb
-  outlines the panel. Open the item there with
-  `useBbNavigate().experimental_workbench(threadId)?.open(spec, { pane,
-index })`.
+  a panel with one pane `pane` is `"new"` (bb highlights that half). Elsewhere
+  in the panel both are absent and bb outlines the panel. Open the item
+  there with `target.open(spec, { pane, index })`: it is
+  `experimental_workbench(threadId).open` bound to that very panel, and the
+  one way into a popped-out window's panel, where no component of yours is
+  mounted to call `useBbNavigate()`.
 - On the composer zone, `insertText(text)` inserts plain text at the
   composer's caret (appends when there is none).
   `insertMention({ provider, id, label })` inserts one of your own mention
@@ -427,26 +441,23 @@ index })`.
   `insertThreadMention({ id, title })` inserts bb's own thread pill, as
   typing @ and picking the thread does. Each returns false when that
   composer is not on screen or the value is not valid.
-- A plugin action tab dragged out of a side panel's tab strip is a source
-  already: your targets get `dragenter`, `dragover`, `dragleave` and `drop`
-  with `{ kind: "tab", id, title, pluginId, tab }`. bb's file, diff and
-  terminal tabs and fixed tabs carry nothing. These events come from bb's
-  own pointer drag, so there is no native drag image and the drag cannot
-  leave the window.
+- Every side panel tab is a native drag source (a drag image, and the drag
+  can leave the window): your targets get `dragenter`, `dragover`,
+  `dragleave` and `drop` with `{ kind: "tab", id, title, pluginId?, tab?,
+open? }`. Plugin action tabs and workspace, host and thread storage file
+  tabs carry `open`; terminal, browser, Info, Diff, New Tab and fixed tabs
+  carry neither `tab` nor `open`, and their drag also has the type
+  `application/x-bb-item-local`: it can be dropped only in its own window.
+- A tab dropped on a side panel's tab row is bb's own move, before any
+  handler: in its own window it is reordered or moved between panes; in
+  another window it opens there from `open` and the source window closes it
+  when its `dragend` reports `dropEffect` `"move"`. bb sets `"move"` on the
+  workbench and main zones and `"copy"` on the composer, so a source that
+  closes on `"move"` keeps its tab after a composer drop. A handler that
+  takes a tab on the main zone in the same window closes the source itself.
 
 Names: `ExperimentalDragItem`, `ExperimentalItemDropTarget`,
 `ExperimentalItemDropRegistration`, `ExperimentalDropMention`.
-
-## The close command
-
-- `app.slots.experimental_closeFallback({ id, close() })` → what Mod+W
-  closes when it is not closing a side panel tab: bb asks when keyboard
-  focus is outside the side panel, or the panel has no closable selected
-  tab. Return true when you closed something; bb then does nothing else.
-  Return false to leave bb's own behavior (in the desktop app that can
-  close the window).
-
-Names: `ExperimentalCloseFallbackRegistration`.
 
 ## The context popover
 
@@ -459,7 +470,7 @@ Names: `ExperimentalCloseFallbackRegistration`.
   popover from the plugin's own control (a chip in the composer footer).
   `available` is false while the thread has no context ring.
 
-Windows, launcher items, popping out a route, approvals and the backend hooks are in fork-api-host.md.
+Windows, launcher items, popping out a route, approvals, the close command and the backend hooks are in fork-api-host.md.
 
 ## Names
 
