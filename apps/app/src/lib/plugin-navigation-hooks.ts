@@ -1,3 +1,4 @@
+import { useForkNavigate } from "./plugin-navigation.fork";
 import { useCallback, useContext, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
@@ -66,6 +67,7 @@ export function useBbNavigate(): BbNavigate {
   const queryClient = useQueryClient();
   const isCompact = useIsCompactViewport();
   const setRootComposeProjectId = useSetRootComposeProjectId();
+  const fork = useForkNavigate(pluginId);
   const toThread = useCallback<BbNavigate["toThread"]>(
     (threadId, options) => {
       onNavigate?.();
@@ -207,6 +209,7 @@ export function useBbNavigate(): BbNavigate {
   );
   return useMemo<BbNavigate & { openThreadPanel: typeof openThreadPanel }>(
     () => ({
+      ...fork,
       toThread,
       toProject,
       toPluginPanel,
@@ -218,6 +221,7 @@ export function useBbNavigate(): BbNavigate {
       openUrl,
     }),
     [
+      fork,
       toThread,
       toProject,
       toPluginPanel,
