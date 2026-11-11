@@ -1,3 +1,4 @@
+import { ForkNewTabResults, ForkNewTabRow, useForkNewTab, useForkNewTabActionGroups, useForkNewTabActions, type ForkNewTabEntry } from "./NewTabFileSearch.fork";
 import {
   useCallback,
   useEffect,
@@ -97,7 +98,8 @@ interface FileSearchMessageProps {
 type FileSearchSectionEntry =
   | { kind: "action"; action: NewTabAction }
   | { kind: "suggestion"; suggestion: FilePathSearchSuggestion }
-  | { kind: "recent"; item: ThreadRecentItem };
+  | { kind: "recent"; item: ThreadRecentItem }
+  | ForkNewTabEntry;
 
 interface FileSearchSectionItem {
   entry: FileSearchSectionEntry;
@@ -111,7 +113,7 @@ interface FileSearchSection {
 
 type LauncherKeyDownHandler = (event: KeyboardEvent<HTMLElement>) => void;
 type FileSearchSource = FilePathSearchSuggestion["source"];
-type FileSearchSectionKind = "actions" | "files" | "recent";
+type FileSearchSectionKind = "actions" | "files" | "fork" | "recent";
 
 interface GroupFileSearchSectionsArgs {
   actions: readonly NewTabAction[];
@@ -139,12 +141,14 @@ const FILE_SEARCH_LIMIT = 20;
 const FILE_SEARCH_SECTION_ORDER: readonly FileSearchSectionKind[] = [
   "actions",
   "files",
+  "fork",
   "recent",
 ];
 
 const FILE_SEARCH_SECTION_LABELS = {
   actions: "Actions",
   files: "Files",
+  fork: "",
   recent: "Recent",
 } satisfies Record<FileSearchSectionKind, string>;
 
@@ -165,6 +169,7 @@ function getFileSearchEntryId(entry: FileSearchSectionEntry): string {
   if (entry.kind === "action") {
     return entry.action.id;
   }
+  if (entry.kind === "fork") return entry.item.domId;
   if (entry.kind === "recent") {
     return `${RECENT_ENTRY_ID_PREFIX}-${entry.item.source}-${encodeURIComponent(
       entry.item.path,
@@ -220,7 +225,7 @@ function groupFileSearchSections({
   }
 
   for (const entry of recentEntries) {
-    ensureSection("recent").items.push({ entry, index: 0 });
+    ensureSection(entry.kind === "fork" ? entry.item.section : "recent").items.push({ entry, index: 0 });
   }
 
   let nextIndex = 0;
@@ -458,13 +463,14 @@ export function NewTabFileSearch({
   hostId,
   currentThreadId,
   autoFocus,
-  actions,
+  actions: registeredActions,
   initialQuery = "",
   onAutoFocusHandled,
   onSelect,
   recentItemsThreadId,
   showFileSearch = true,
 }: NewTabFileSearchProps) {
+  const actions = useForkNewTabActions(registeredActions);
   const quickOpenShortcut = useAppCommandShortcut("file.quickOpen");
   const inputRef = useRef<HTMLInputElement>(null);
   const focusFrameRef = useRef<number | null>(null);
@@ -480,8 +486,9 @@ export function NewTabFileSearch({
     recentItemsThreadId === undefined
       ? defaultRecentItemsThreadId
       : recentItemsThreadId;
-  const recentItems = useThreadRecentItems(recentItemsStorageThreadId);
   const trimmedQuery = query.trim();
+  const fork = useForkNewTab({ recentItems: useThreadRecentItems(recentItemsStorageThreadId), query: trimmedQuery, threadId: recentItemsStorageThreadId });
+  const recentItems = fork.recents;
   const hasQuery = trimmedQuery.length > 0;
   const {
     suggestions,
@@ -512,12 +519,9 @@ export function NewTabFileSearch({
         : recentItems.slice(0, THREAD_RECENT_ITEMS_VISIBLE_LIMIT),
     [isRecentExpanded, recentItems],
   );
-  const recentEntries = useMemo<FileSearchSectionEntry[]>(
-    () =>
-      hasQuery
-        ? []
-        : visibleRecentItems.map((item) => ({ kind: "recent", item })),
-    [hasQuery, visibleRecentItems],
+  const recentEntries = useMemo<readonly FileSearchSectionEntry[]>(
+    () => (hasQuery ? fork.results : visibleRecentItems),
+    [fork.results, hasQuery, visibleRecentItems],
   );
   const sections = useMemo(
     () =>
@@ -626,6 +630,7 @@ export function NewTabFileSearch({
           activeEntry.action.onSelect();
           return;
         }
+        if (activeEntry.kind === "fork") return activeEntry.item.open();
         if (activeEntry.kind === "recent") {
           handleRecentSelect(activeEntry.item);
           return;
@@ -650,7 +655,7 @@ export function NewTabFileSearch({
   const searchLabel =
     actions.length > 0 ? "Search files and actions" : "Search files";
 
-  const idleActions = <NewTabActions actions={actions} />;
+  const idleActions = useForkNewTabActionGroups(actions).map((group) => <NewTabActions key={group.label ?? ""} label={group.label} actions={group.actions} />);
 
   if (!showFileSearch) {
     return <div className="flex min-w-0 flex-col gap-3">{idleActions}</div>;
@@ -658,6 +663,7 @@ export function NewTabFileSearch({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      {fork.node}
       <div className="relative min-w-0">
         <Icon
           name="Search"
@@ -821,6 +827,7 @@ function NewTabResults({
         <div id={listboxId} role="listbox" aria-label="Search results">
           {sections.map((section, sectionIndex) => {
             const spaced = sectionIndex > 0 || hasRecentSectionPredecessor;
+            if (section.kind === "fork") return <ForkNewTabResults key="fork" items={section.items} activeIndex={activeIndex} nowMs={nowMs} onActivateIndex={onActivateIndex} spaced={spaced} />;
             return (
               <section
                 key={section.kind}
@@ -853,6 +860,7 @@ function NewTabResults({
                         />
                       );
                     }
+                    if (entry.kind === "fork") return <ForkNewTabRow key={id} item={entry.item} isActive={isActive} nowMs={nowMs} onActivate={onActivate} />;
                     if (entry.kind === "suggestion") {
                       return (
                         <FileResultRow
