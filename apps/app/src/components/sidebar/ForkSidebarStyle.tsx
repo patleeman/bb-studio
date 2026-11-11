@@ -19,7 +19,7 @@ const MAX_CSS_VALUE_LENGTH = 2000;
 const NO_THREAD_LISTS: PluginSlotSnapshot["threadLists"] = [];
 
 export function cleanSidebarCssValue(
-  property: "background" | "color",
+  property: string,
   value: unknown,
 ): string | null {
   if (typeof value !== "string") return null;

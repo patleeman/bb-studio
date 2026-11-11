@@ -105,6 +105,13 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "ExperimentalTabRegistration.experimental_showInNewTab",
     "ExperimentalTabRegistration.experimental_newTabGroup",
   ],
+  "app-overlay": [
+    "PluginAppSlots.experimental_appBackdrop",
+    "ExperimentalAppBackdropRegistration",
+    "ExperimentalAppAppearance",
+    "ExperimentalAppSurface",
+    "ExperimentalAppSurfaceStyle",
+  ],
   "file-opener": [
     "PluginFileOpenerRegistration.experimental_handleOpen",
     "PluginFileOpenerOpenArgs",
