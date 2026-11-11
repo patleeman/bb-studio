@@ -1,4 +1,5 @@
 import type {
+  ExperimentalAppBackdropRegistration,
   ExperimentalCloseFallbackRegistration,
   ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
@@ -76,12 +77,16 @@ export interface PluginNewTabItemsSlot
 export interface PluginCommandPaletteSlot
   extends ExperimentalCommandPaletteRegistration, ForkSlotBase {}
 
+export interface PluginAppBackdropSlot
+  extends ExperimentalAppBackdropRegistration, ForkSlotBase {}
+
 export interface ForkRegistrationSet {
   itemDrops?: readonly ExperimentalItemDropRegistration[];
   closeFallbacks?: readonly ExperimentalCloseFallbackRegistration[];
   skillSources?: readonly ExperimentalSkillSourceRegistration[];
   newTabItems?: readonly ExperimentalNewTabItemsRegistration[];
   commandPalettes?: readonly ExperimentalCommandPaletteRegistration[];
+  appBackdrops?: readonly ExperimentalAppBackdropRegistration[];
   panelTabActions?: readonly ExperimentalPanelTabActionRegistration[];
   launcherItems?: readonly ExperimentalLauncherItemRegistration[];
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
@@ -103,6 +108,7 @@ export interface ForkSlotSnapshot {
   skillSources: readonly PluginSkillSourceSlot[];
   newTabItems: readonly PluginNewTabItemsSlot[];
   commandPalettes: readonly PluginCommandPaletteSlot[];
+  appBackdrops: readonly PluginAppBackdropSlot[];
   panelTabActions: readonly PluginPanelTabActionSlot[];
   launcherItems: readonly PluginLauncherItemSlot[];
   mainHeaders: readonly PluginMainHeaderSlot[];
@@ -124,6 +130,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   skillSources: [],
   newTabItems: [],
   commandPalettes: [],
+  appBackdrops: [],
   launcherItems: [],
   mainHeaders: [],
   threadBanners: [],
@@ -158,6 +165,7 @@ export const FORK_SLOT_KINDS = [
   "skillSources",
   "newTabItems",
   "commandPalettes",
+  "appBackdrops",
 ] as const satisfies readonly (keyof ForkSlotSnapshot)[];
 
 export function stampForkSlots(
@@ -185,5 +193,6 @@ export function stampForkSlots(
     skillSources: stamp(set.skillSources),
     newTabItems: stamp(set.newTabItems),
     commandPalettes: stamp(set.commandPalettes),
+    appBackdrops: stamp(set.appBackdrops),
   };
 }
