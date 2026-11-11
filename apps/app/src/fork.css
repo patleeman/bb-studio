@@ -84,3 +84,85 @@
   [data-sidebar="collapsible-body"] {
   --sidebar-accent: var(--fork-sidebar-accent);
 }
+
+html[data-fork-backdrop],
+html[data-fork-backdrop] body,
+html[data-fork-backdrop] #root,
+html[data-fork-backdrop] [data-testid="app-layout-root"],
+html[data-fork-backdrop] [data-sidebar="inset"]::before,
+html[data-fork-backdrop] [data-sidebar="inset"] [data-thread-window],
+html[data-fork-backdrop] [data-sidebar="inset"] [data-page-scroll-viewport],
+html[data-fork-backdrop] [data-sidebar="inset"] [data-scroll-footer] > div {
+  background: transparent;
+}
+
+html[data-fork-backdrop]
+  [data-sidebar="inset"]
+  [data-overflow-fade-tone="background"] {
+  background: none;
+}
+
+html[data-fork-backdrop] [data-sidebar="panel"],
+html[data-fork-backdrop] [data-testid="secondary-panel-shelf"],
+html[data-fork-backdrop] aside[data-surface-tone="sidebar"] {
+  --sidebar: transparent;
+}
+
+html[data-fork-backdrop] [data-sidebar="panel"] {
+  background: var(--fork-surface-sidebar-background, transparent);
+  -webkit-backdrop-filter: var(--fork-surface-sidebar-backdrop-filter, none);
+  backdrop-filter: var(--fork-surface-sidebar-backdrop-filter, none);
+}
+
+html[data-fork-backdrop] [data-sidebar="inset"] {
+  background: var(--fork-surface-main-background, transparent);
+  -webkit-backdrop-filter: var(--fork-surface-main-backdrop-filter, none);
+  backdrop-filter: var(--fork-surface-main-backdrop-filter, none);
+}
+
+html[data-fork-backdrop] [data-sidebar="inset"] header {
+  background: var(--fork-surface-header-background, transparent);
+  -webkit-backdrop-filter: var(--fork-surface-header-backdrop-filter, none);
+  backdrop-filter: var(--fork-surface-header-backdrop-filter, none);
+}
+
+html[data-fork-backdrop] aside[data-surface-tone="sidebar"] {
+  background: var(--fork-surface-secondary-panel-background, transparent);
+  -webkit-backdrop-filter: var(
+    --fork-surface-secondary-panel-backdrop-filter,
+    none
+  );
+  backdrop-filter: var(--fork-surface-secondary-panel-backdrop-filter, none);
+}
+
+html[data-fork-backdrop] [data-promptbox] {
+  background: var(--fork-surface-composer-background, transparent);
+  -webkit-backdrop-filter: var(--fork-surface-composer-backdrop-filter, none);
+  backdrop-filter: var(--fork-surface-composer-backdrop-filter, none);
+}
+
+html[data-fork-surface-edge~="sidebar"] [data-sidebar="panel"],
+html[data-fork-surface-edge~="sidebar"] [data-sidebar="collapsible-body"] {
+  border-color: var(--fork-surface-sidebar-edge);
+}
+
+html[data-fork-surface-edge~="main"] [data-sidebar="inset-edge"] {
+  border-color: var(--fork-surface-main-edge);
+}
+
+html[data-fork-surface-edge~="main"] [data-sidebar="inset"]::after {
+  background: var(--fork-surface-main-edge);
+}
+
+html[data-fork-surface-edge~="header"] [data-sidebar="inset"] header {
+  border-color: var(--fork-surface-header-edge);
+}
+
+html[data-fork-surface-edge~="secondary-panel"]
+  aside[data-surface-tone="sidebar"] {
+  border-color: var(--fork-surface-secondary-panel-edge);
+}
+
+html[data-fork-surface-edge~="composer"] [data-promptbox] {
+  border-color: var(--fork-surface-composer-edge);
+}

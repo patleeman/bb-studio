@@ -26,6 +26,30 @@ clickThrough, resizable, hotkey, menuBarTitle, params })`. `hotkey` is a
   ignore it. Opening a window that is already open with other `params`
   loads the new address in the same window, which keeps its place and size.
 
+## Launcher items
+
+- `app.slots.experimental_launcherItem({ id, title, icon, section, keywords?,
+order?, run })` → an app (`section: "apps"`) or action (`"actions"`) a
+  launcher can list and run. `run` is called in the launcher's window, so it
+  must work from any window.
+- `experimental_useLauncherItems()` → every plugin's items, for the plugin
+  that draws the launcher (Studio's, on a window with `center` and
+  `hideOnBlur`).
+
+Names: `ExperimentalLauncherItemRegistration`, `ExperimentalLauncherItem`.
+
+## Pop out a route
+
+- `useBbNavigate().experimental_popOut({ path, title?, width?, height? })`
+  → `Promise<boolean>`: opens any bb route (a thread `/threads/<id>`, a
+  plugin panel, the `path` of a dragged item) in a window of its own with
+  no sidebar, rail, plugin main header or bb page header; everything else
+  works as in the main window. In the desktop app it is a native window that
+  remembers its size and place per path; in a browser, a popup. Popping out
+  an open path focuses its window. Defaults to 960 by 720. Resolves false
+  when `path` is not a bb route of this origin (it must start with `/`) or
+  the popup was blocked.
+
 ## Approvals
 
 - Backend: `await bb.experimental_hooks.experimental_requestApproval({ title,
