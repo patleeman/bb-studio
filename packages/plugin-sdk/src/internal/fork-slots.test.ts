@@ -352,3 +352,25 @@ describe("experimental_tab experimental_newTabGroup and experimental_openableByP
     }
   });
 });
+
+describe("slots.experimental_commandPalette", () => {
+  it("keeps the component and rejects a missing component or a repeated id", () => {
+    const component = () => null;
+    expect(
+      collect((app) =>
+        app.slots.experimental_commandPalette({ id: "omni", component }),
+      ).commandPalettes,
+    ).toEqual([{ id: "omni", component }]);
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_commandPalette({ id: "omni" } as never),
+      ),
+    ).toThrow(/component/u);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_commandPalette({ id: "omni", component });
+        app.slots.experimental_commandPalette({ id: "omni", component });
+      }),
+    ).toThrow(/omni/u);
+  });
+});
