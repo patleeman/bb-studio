@@ -1,3 +1,4 @@
+import { withForkCloseGuard } from "./bb-desktop.fork";
 import {
   MACOS_TRAFFIC_LIGHT_CLUSTER_WIDTH_PX,
   MACOS_TRAFFIC_LIGHT_INSET_PX,
@@ -61,7 +62,7 @@ export function getBbDesktopInfo(): BbDesktopInfoResult {
   if (typeof window === "undefined") {
     return null;
   }
-  return window.bbDesktop ?? null;
+  return withForkCloseGuard(window.bbDesktop ?? null);
 }
 
 export function shouldUseMacosDesktopChrome(
