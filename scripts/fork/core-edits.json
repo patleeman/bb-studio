@@ -16,6 +16,11 @@
       "intent": "Plugin rows join the thread search list. usePluginPaletteOptions (ForkPaletteSearch.tsx) merges them before and after the thread options; usePluginPaletteHighlightReset must stay AFTER the effect that sets the highlighted key from activeIndex, or the highlight starts on the first thread instead of the first plugin row; PluginPaletteSection draws them. This file keeps the plugin field on an option, its key, a one-line select branch (selectPluginPaletteRow: Mod+Enter runs experimental_onModSelect, else navigate to the row's path), the empty-state check and the two section renders. The main-view split shortcut is gated by MAIN_SPLITS_ENABLED. Fork imports sit at the top of the file.",
       "budget": 61
     },
+    "apps/app/src/components/commands/CommandPalette.tsx": {
+      "seam": "command-palette",
+      "intent": "One fork import at the top of the file (ForkCommandPalette.tsx). The dialog's body (bb's command list or ThreadSearchPaletteMode) is wrapped in <ForkCommandPalette>, given openCount, searchingThreads, actions, installedPlugins, chooseAction and runAfterClose; it draws the first slots.experimental_commandPalette registration instead of its children, and the children when there is none or it crashed. The Escape handler first returns when forkCommandPaletteEscape(event) is true (the replacement's experimental_onEscape handler claimed the key), then keeps the dialog open to leave search mode only when forkCommandPaletteActive() is false, so Escape otherwise closes a replacement.",
+      "budget": 6
+    },
     "apps/app/src/components/layout/AppLayout.tsx": {
       "seam": "narrow-window, workbench, approvals, main-header, item-drag, pop-out",
       "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window, and useWorkbenchForkCommands is mounted there (panel.close and the desktop close request go to slots.experimental_closeFallback first). ForkLayoutHosts is the first child of the content shell: ForkMainHeader (slots.experimental_mainHeader rows above the header and main view), ForkApprovalHost (pending approvals to the desktop dialog or bb's own) ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop) and ForkSidebarStyleHost (runs the sidebar thread list's experimental_useSidebarStyle). In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader.",
@@ -208,7 +213,7 @@
     },
     "packages/plugin-sdk/src/app.ts": {
       "seam": "sdk-tables",
-      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, sidebar New items, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, two project menus). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
+      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, sidebar New items, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, two project menus, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
       "budget": 1
     },
     "packages/plugin-sdk/src/backend-contract.ts": {
