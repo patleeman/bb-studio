@@ -1,3 +1,4 @@
+import { forkThemeModeOverride, subscribeForkThemeModeOverride } from "@/lib/fork-theme-mode";
 import * as React from "react";
 import { getDefaultStore } from "jotai";
 import { atomWithStorage } from "jotai/utils";
@@ -56,7 +57,7 @@ function getSystemTheme(): Theme {
 
 function getPreferredTheme(): Theme {
   const themePreference = getThemePreference();
-  return themePreference === "system" ? getSystemTheme() : themePreference;
+  return forkThemeModeOverride() ?? (themePreference === "system" ? getSystemTheme() : themePreference);
 }
 
 export function setPreferredTheme(themePreference: ThemePreference): void {
@@ -99,6 +100,7 @@ function ensureThemeObserver() {
   getDefaultStore().sub(themePreferenceAtom, emitTheme);
 
   subscribeMediaQuery(DARK_COLOR_SCHEME_QUERY, emitTheme);
+  subscribeForkThemeModeOverride(emitTheme);
 }
 
 export function initializePreferredTheme(): void {
