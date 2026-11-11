@@ -17,6 +17,7 @@ import { applyCachedAppThemeCss } from "./lib/themes";
 import { installStaleChunkRecovery } from "./lib/stale-chunk-recovery";
 import { moveStylesheetPropertiesToRegistry } from "./lib/stylesheet-property-registry";
 import "./app.css";
+import "./fork.css";
 
 installStaleChunkRecovery();
 installForeignDomMutationGuard();
