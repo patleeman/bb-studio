@@ -20,6 +20,7 @@ import { installStaleChunkRecovery } from "./lib/stale-chunk-recovery";
 import { moveStylesheetPropertiesToRegistry } from "./lib/stylesheet-property-registry";
 import { installTouchSelectionPassthrough } from "./lib/touch-selection-passthrough";
 import "./app.css";
+import "./fork.css";
 
 installStaleChunkRecovery();
 installForeignDomMutationGuard();
