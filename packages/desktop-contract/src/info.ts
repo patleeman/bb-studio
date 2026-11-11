@@ -1,3 +1,4 @@
+import type { ForkDesktopApi } from "./info.fork.js";
 import type { BbDesktopServerChoice } from "./servers.js";
 import { z } from "zod";
 import type { BbDesktopBrowserApi } from "./browser.js";
@@ -67,7 +68,7 @@ export interface BbDesktopAttentionThreads {
   unreadThreadIds: string[];
 }
 
-export interface BbDesktopApi extends BbDesktopInfo {
+export interface BbDesktopApi extends BbDesktopInfo, ForkDesktopApi {
   browser: BbDesktopBrowserApi;
   getServerChoices?(): Promise<BbDesktopServerChoice[]>;
   listServerChoices?(): Promise<BbDesktopServerChoice[]>;

@@ -18,7 +18,7 @@ import { showMutationErrorToast } from "@/lib/mutation-errors";
 import { resolveThread } from "@/lib/cached-thread";
 import { PARENT_NOTIFICATIONS_OPTIONS } from "@/lib/parent-notifications";
 import { getThreadRoutePath } from "@/lib/route-paths";
-import { countPanes, listPanes } from "@/lib/split-layout";
+import { countPanes, listPanes, MAIN_SPLITS_ENABLED } from "@/lib/split-layout";
 import { splitLayoutAtom } from "@/lib/split-layout/atoms";
 
 function coreThreadAction<Data>(
@@ -66,7 +66,7 @@ function useSplitAvailability(): SplitAvailability {
     .join("\n");
   return useMemo(
     () => ({
-      available: !isCompact,
+      available: MAIN_SPLITS_ENABLED && !isCompact,
       focusedThreadId,
       otherPaneThreadIds: new Set(
         otherPaneThreadIdsKey === "" ? [] : otherPaneThreadIdsKey.split("\n"),

@@ -1,4 +1,7 @@
+import { studioAboutVersion } from "./studio-desktop.fork.js";
 import { resolveBbAppRuntimeState } from "../../../packages/bb-app/src/launcher.js";
+import { registerForkApprovalIpc } from "./fork-approvals.js";
+import { registerForkWindowIpc } from "./fork-windows.js";
 import { pathToFileURL } from "node:url";
 import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
@@ -509,7 +512,7 @@ function readDesktopAboutFacts(applicationName: string): DesktopAboutFacts {
     osType: osType(),
     platform: process.platform,
     pluginSdkVersion: process.env.BB_DESKTOP_PLUGIN_SDK_VERSION ?? "",
-    version: getDesktopVersion(process.env.BB_DESKTOP_VERSION),
+    version: studioAboutVersion(getDesktopVersion(process.env.BB_DESKTOP_VERSION)),
   };
 }
 
@@ -2406,6 +2409,8 @@ function registerDesktopUpdateIpc(): void {
       );
     }
   });
+  registerForkApprovalIpc(ipcMain, dialog);
+  registerForkWindowIpc(ipcMain);
   ipcMain.handle(BB_DESKTOP_GET_INFO_CHANNEL, () => {
     return getCurrentDesktopInfo();
   });
