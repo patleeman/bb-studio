@@ -16,6 +16,7 @@ import {
   type ImperativePanelGroupHandle,
 } from "react-resizable-panels";
 import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
+import { useForkPanelDrawer } from "@/lib/fork-narrow-panel";
 import { useResponsiveDrawerRealization } from "@bb/shared-ui/responsive-overlay";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { CompactSecondaryPanelShelf } from "./CompactSecondaryPanelShelf";
@@ -109,7 +110,7 @@ export function SecondaryPanelLayout({
     [renderWorkspacePanel, widthPercentAtom],
   );
   const secondaryPanelHost = paneContext?.secondaryPanelHost ?? null;
-  const renderAsDrawer = useIsCompactViewport();
+  const renderAsDrawer = useForkPanelDrawer(useIsCompactViewport());
   const sidebarDrawerShowing = useSyncExternalStore(
     subscribeCompactSidebarDrawerShowing,
     isCompactSidebarDrawerShowing,
