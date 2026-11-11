@@ -1,3 +1,4 @@
+import { forkAfterLifecycle } from "../lifecycle-outcome.fork.js";
 import {
   getActiveStoredTurnId,
   getEnvironment,
@@ -297,7 +298,7 @@ export function runThreadLifecycleInTransaction(
     refusal: null,
     statusChanged: written.statusChanged,
     stopRoute: transition.stopRoute,
-    thread: written.thread,
+    thread: forkAfterLifecycle(deps.db, input, thread, written.thread, transition.effects),
     threadId,
   };
 }
