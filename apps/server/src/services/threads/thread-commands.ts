@@ -4,6 +4,7 @@ import {
   hasLiveChildThread,
   hasStoredSpawnAgentToolCall,
 } from "@bb/db";
+import { withTurnContext } from "./turn-context.fork.js";
 import {
   PromptInput,
   PromptMode,
@@ -307,6 +308,7 @@ export async function buildThreadStartCommand(
   args: ThreadStartCommandArgs,
 ): Promise<Extract<HostDaemonCommand, { type: "thread.start" }>> {
   await deps.providerRegistry.whenRegistrationsSettled();
+  args = await withTurnContext(args.thread.id, args);
   const runtimeContext = await resolveThreadRuntimeCommandConfig(deps, {
     thread: args.thread,
     environment: args.environment,
@@ -404,6 +406,7 @@ export async function prepareTurnSubmitCommandPayload(
   args: PrepareTurnSubmitCommandPayloadArgs,
 ): Promise<PreparedTurnSubmitCommandPayload> {
   await deps.providerRegistry.whenRegistrationsSettled();
+  args = await withTurnContext(args.thread.id, args, args.target.mode === "start");
   const providerThreadId = requireProviderThreadId(
     args.providerThreadId ??
       requireDispatchableProviderThreadId(deps, args.thread.id),
