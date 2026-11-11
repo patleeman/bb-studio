@@ -6,6 +6,7 @@ import type {
   ExperimentalLinkHandlerRegistration,
   ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
+  ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
@@ -68,10 +69,14 @@ export interface PluginCloseFallbackSlot
 export interface PluginSkillSourceSlot
   extends ExperimentalSkillSourceRegistration, ForkSlotBase {}
 
+export interface PluginNewTabItemsSlot
+  extends ExperimentalNewTabItemsRegistration, ForkSlotBase {}
+
 export interface ForkRegistrationSet {
   itemDrops?: readonly ExperimentalItemDropRegistration[];
   closeFallbacks?: readonly ExperimentalCloseFallbackRegistration[];
   skillSources?: readonly ExperimentalSkillSourceRegistration[];
+  newTabItems?: readonly ExperimentalNewTabItemsRegistration[];
   panelTabActions?: readonly ExperimentalPanelTabActionRegistration[];
   launcherItems?: readonly ExperimentalLauncherItemRegistration[];
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
@@ -91,6 +96,7 @@ export interface ForkSlotSnapshot {
   itemDrops: readonly PluginItemDropSlot[];
   closeFallbacks: readonly PluginCloseFallbackSlot[];
   skillSources: readonly PluginSkillSourceSlot[];
+  newTabItems: readonly PluginNewTabItemsSlot[];
   panelTabActions: readonly PluginPanelTabActionSlot[];
   launcherItems: readonly PluginLauncherItemSlot[];
   mainHeaders: readonly PluginMainHeaderSlot[];
@@ -110,6 +116,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   itemDrops: [],
   closeFallbacks: [],
   skillSources: [],
+  newTabItems: [],
   launcherItems: [],
   mainHeaders: [],
   threadBanners: [],
@@ -142,6 +149,7 @@ export const FORK_SLOT_KINDS = [
   "itemDrops",
   "closeFallbacks",
   "skillSources",
+  "newTabItems",
 ] as const satisfies readonly (keyof ForkSlotSnapshot)[];
 
 export function stampForkSlots(
@@ -167,5 +175,6 @@ export function stampForkSlots(
     itemDrops: stamp(set.itemDrops),
     closeFallbacks: stamp(set.closeFallbacks),
     skillSources: stamp(set.skillSources),
+    newTabItems: stamp(set.newTabItems),
   };
 }

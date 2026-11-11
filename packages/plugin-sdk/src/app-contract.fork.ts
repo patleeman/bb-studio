@@ -1,5 +1,10 @@
 import type { ComponentType, ReactNode } from "react";
-import type { PluginFileOpenerSource } from "./app-contract.js";
+import type {
+  ExperimentalFileLocation,
+  ExperimentalLiveFileTarget,
+  ExperimentalPanelTabs,
+  PluginFileOpenerSource,
+} from "./app-contract.js";
 import type { JsonValue } from "./json-value.js";
 
 /**
@@ -246,6 +251,30 @@ export interface ForkTabFields {
    * docs/api_to_audit.fork.md.
    */
   experimental_compactWhenFixed?: boolean;
+  /**
+   * Set to false to leave this action tab out of the New Tab page's Actions
+   * list and its action search. The tab stays registered: `openTab`, links
+   * and the rest of bb still open it. Leave it out to list the tab. Applies
+   * to every action registration of the tab's id in the plugin. Ignored on
+   * fixed-availability tabs. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_showInNewTab?: false;
+  /**
+   * A section heading for this action tab on the New Tab page, such as
+   * "New" or "Open". Sections follow the order in which registrations first
+   * name them, after bb's own Actions section, which keeps the tabs without
+   * one. The action search still lists every match under Actions. Ignored on
+   * fixed-availability tabs. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_newTabGroup?: string;
+  /**
+   * Set to true to let other plugins open this thread action tab with
+   * `experimental_workbench(...).open({ kind: "tab", tab: { pluginId, id } })`.
+   * Left out, only this plugin opens it there. The opener's params reach the
+   * tab as they do with `openTab`, so treat them as untrusted input. Ignored
+   * on fixed-availability tabs. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_openableByPlugins?: true;
 }
 
 /**
@@ -479,6 +508,12 @@ export interface ExperimentalDropMention {
  * Where on bb's own surfaces a dragged item is: the side panel of a thread
  * or of a plugin page (`threadId` null), a thread's composer or the
  * new-thread composer (`threadId` null), or the rest of the main view.
+ * In a side panel, `pane` and `index` say where: over a pane's tab row,
+ * `pane` is 1 or 2 (left to right) and `index` the insertion point among
+ * that row's tabs, counted as `ExperimentalWorkbenchPane.tabs` lists them;
+ * over the right edge of a side panel with one pane, `pane` is "new"; both
+ * are absent elsewhere in the panel. Pass them to
+ * `ExperimentalWorkbench.open` to open the item there.
  * The composer's three functions insert at its caret, or append when it
  * has no caret, and return false when that composer is not on screen or
  * the value is not valid. `insertText` inserts plain text.
@@ -488,7 +523,12 @@ export interface ExperimentalDropMention {
  * Experimental: see docs/api_to_audit.fork.md.
  */
 export type ExperimentalItemDropTarget =
-  | { zone: "workbench"; threadId: string | null }
+  | {
+      zone: "workbench";
+      threadId: string | null;
+      pane?: 1 | 2 | "new";
+      index?: number;
+    }
   | {
       zone: "composer";
       threadId: string | null;
@@ -811,6 +851,69 @@ export interface ForkPluginAppSlots {
   experimental_skillSource(
     registration: ExperimentalSkillSourceRegistration,
   ): void;
+  /**
+   * Add the plugin's items to the side panel's New Tab page: recent items
+   * merged into its Recent list, and results for its search box (see
+   * {@link ExperimentalNewTabItemsRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_newTabItems(
+    registration: ExperimentalNewTabItemsRegistration,
+  ): void;
+}
+
+/**
+ * One plugin item on the side panel's New Tab page. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalNewTabItem {
+  /** Unique within the registration. */
+  id: string;
+  title: string;
+  /** What the item is, such as "Page" or "Whiteboard"; shown after the title. */
+  kind: string;
+  /** A bb icon name or an emoji; the plugin's icon when left out. */
+  icon?: string;
+  /** Epoch milliseconds; orders Recent and is shown as a relative time. */
+  updatedAt: number;
+  /** Shows the item, usually with `openTab`. */
+  open(): void;
+  /**
+   * Makes the item's row draggable. bb writes this as the drag payload, as
+   * `experimental_writeDragItem` does, so the row drops on bb's item drop
+   * targets (a side panel pane, a composer) and reaches
+   * `slots.experimental_itemDrop` handlers like any other dragged item. A
+   * value that is not a valid drag item leaves the row undraggable.
+   */
+  experimental_dragItem?: ExperimentalDragItem;
+}
+
+/**
+ * Registration for `slots.experimental_newTabItems`. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalNewTabItemsRegistration {
+  /** Unique within the plugin; letters, digits, `-`, `_`. */
+  id: string;
+  /** Heading of the search results group, such as "Pages". */
+  title: string;
+  /**
+   * A React hook bb calls while a New Tab page shows, with the conversation
+   * the side panel belongs to (null on a plugin page or the New thread
+   * screen). Its items join bb's Recent list, newest first.
+   */
+  useRecents?(context: {
+    threadId: string | null;
+  }): readonly ExperimentalNewTabItem[];
+  /**
+   * Results for the search box, called debounced with the trimmed, non-empty
+   * query; `signal` aborts when the query changes. bb lists the first eight
+   * under `title`.
+   */
+  search?(
+    query: string,
+    context: { signal: AbortSignal; threadId: string | null },
+  ): Promise<readonly ExperimentalNewTabItem[]>;
 }
 
 /**
@@ -919,6 +1022,155 @@ export interface ForkBbNavigate {
     width?: number;
     height?: number;
   }): Promise<boolean>;
+  /**
+   * The side panel ("workbench") of a conversation on screen, for code that
+   * is not inside that thread's view, such as an agent tool's handler. Leave
+   * `threadId` out for the conversation in the main view. Null when that
+   * thread's view is not on screen in this window. Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_workbench(threadId?: string): ExperimentalWorkbench | null;
+}
+
+/**
+ * What `ExperimentalWorkbench.open` shows. `tab` is a thread action tab (a
+ * page, a whiteboard, a thread), opened as `openTab` opens it: the calling
+ * plugin's own, or, with `tab.pluginId`, another plugin's tab registered
+ * with `experimental_openableByPlugins: true` (any other resolves null);
+ * `diff` is bb's diff tab for one changed file. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export type ExperimentalWorkbenchOpenSpec =
+  | {
+      kind: "tab";
+      tab: { id: string; pluginId?: string };
+      params?: JsonValue;
+      title?: string;
+    }
+  | {
+      kind: "file";
+      target: ExperimentalLiveFileTarget;
+      location?: ExperimentalFileLocation | null;
+    }
+  | { kind: "diff"; path: string }
+  | { kind: "url"; url: string }
+  | { kind: "terminal"; terminalId: string };
+
+/**
+ * One pane of the side panel, with its own tab row. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalWorkbenchPane {
+  /** The keys of the pane's tabs, in the order its tab row shows them. */
+  tabs: string[];
+  /** The pane's share of the side panel's width, 0 to 100. */
+  widthPercent: number;
+}
+
+/**
+ * The side panel's layout, as `layout()` reports it. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalWorkbenchLayout {
+  /** Whether the side panel shows. */
+  panel: "open" | "closed";
+  /** The side panel's share of the thread view's width, 20 to 80. */
+  widthPercent: number;
+  /** Collapsed: the side panel fills the view and the conversation is hidden. */
+  conversation: "shown" | "collapsed";
+  /**
+   * The panes, left to right: one, or two side by side. A narrow window's
+   * side panel drawer always has one.
+   */
+  panes: ExperimentalWorkbenchPane[];
+}
+
+/**
+ * What `ExperimentalWorkbench.arrange` changes; leave out what stays.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalWorkbenchArrangement {
+  panel?: "open" | "closed";
+  /** Clamped to 20 to 80. */
+  widthPercent?: number;
+  conversation?: "shown" | "collapsed";
+  /**
+   * One pane, or two side by side. Going to two moves the selected tab of
+   * the one pane into a new pane on the right, so that pane needs two tabs;
+   * going to one moves pane 2's tabs into pane 1.
+   */
+  panes?: 1 | 2;
+  /**
+   * The two panes' widths as a ratio, such as `[2, 1]`; both positive. Each
+   * pane keeps at least 15 percent of the panel. Needs two panes.
+   */
+  paneWidths?: [number, number];
+}
+
+/**
+ * Where `ExperimentalWorkbench.open` puts a tab. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalWorkbenchOpenOptions {
+  /**
+   * False opens the tab behind the selected tab and leaves a closed side
+   * panel closed. Default true.
+   */
+  focus?: boolean;
+  /**
+   * Pane 1 or 2 (left to right), or "new": a second pane on the right,
+   * made for this tab. A tab already open moves there. Pane 2 needs two
+   * panes and "new" needs one; otherwise `open` resolves null and opens
+   * nothing. Left out, a new tab opens in the focused pane and an open one
+   * stays where it is.
+   */
+  pane?: 1 | 2 | "new";
+  /**
+   * The tab's place in its pane's tab row, counted as
+   * `ExperimentalWorkbenchPane.tabs` lists them without it; past the end
+   * means last. Left out, a new tab goes where bb puts it and an open one
+   * keeps its place. Not applied in a narrow window's drawer.
+   */
+  index?: number;
+}
+
+/**
+ * One conversation's side panel. Tabs are named by
+ * `ExperimentalPanelTab.key`; keys change when a tab is reopened.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalWorkbench {
+  readonly threadId: string;
+  /** The open tabs of every kind, in tab strip order, and the selected one. */
+  list(): ExperimentalPanelTabs;
+  /**
+   * Open a tab, or select it when it is already open, and resolve its key;
+   * null when the side panel declined (an unknown tab, no in-app browser for
+   * a URL, a terminal that is not this thread's, a pane that is not there)
+   * or the tab did not appear within three seconds.
+   */
+  open(
+    spec: ExperimentalWorkbenchOpenSpec,
+    options?: ExperimentalWorkbenchOpenOptions,
+  ): Promise<string | null>;
+  /** Close a tab as its close button does; false for fixed tabs and unknown keys. */
+  close(key: string): boolean;
+  /** Select a tab and show the side panel; false for an unknown key. */
+  focus(key: string): boolean;
+  /** The side panel's current layout. */
+  layout(): ExperimentalWorkbenchLayout;
+  /**
+   * Change any part of the layout. False, and nothing changed, for a value
+   * out of range, two panes the panel cannot make, or pane widths without
+   * two panes.
+   */
+  arrange(layout: ExperimentalWorkbenchArrangement): boolean;
+  /**
+   * True while the user is typing in this side panel: keyboard focus is in a
+   * text field, an editable element or a frame inside it. Check it before
+   * `open` or `focus` to avoid taking a tab from under the user.
+   */
+  isTyping(): boolean;
 }
 
 /**

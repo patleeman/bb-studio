@@ -203,3 +203,152 @@ describe("slots.experimental_skillSource", () => {
     ).toThrow();
   });
 });
+
+describe("slots.experimental_newTabItems", () => {
+  it("keeps the title and the hooks given, and rejects a registration with neither", () => {
+    const useRecents = () => [];
+    const search = () => Promise.resolve([]);
+    const collected = collect((app) => {
+      app.slots.experimental_newTabItems({
+        id: "pages",
+        title: "Pages",
+        useRecents,
+      });
+      app.slots.experimental_newTabItems({
+        id: "boards",
+        title: "Boards",
+        search,
+      });
+    });
+    expect(collected.newTabItems).toEqual([
+      { id: "pages", title: "Pages", useRecents },
+      { id: "boards", title: "Boards", search },
+    ]);
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_newTabItems({ id: "a", title: "A" }),
+      ),
+    ).toThrow(/give useRecents, search or both/u);
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_newTabItems({
+          id: "a",
+          title: "A",
+          search: "nope",
+        } as never),
+      ),
+    ).toThrow(/search must be a function/u);
+  });
+});
+
+describe("experimental_tab experimental_showInNewTab", () => {
+  const component = () => null;
+  const tab = {
+    title: "Bot",
+    icon: "Bot",
+    component,
+    context: { kind: "thread" },
+    availability: "action",
+  } as const;
+
+  it("keeps false on an action tab and leaves the field out by default", () => {
+    const collected = collect((app) => {
+      app.slots.experimental_tab({
+        ...tab,
+        id: "hidden",
+        experimental_showInNewTab: false,
+      });
+      app.slots.experimental_tab({ ...tab, id: "plain" });
+    });
+    expect(
+      collected.tabs.map((entry) => [
+        entry.id,
+        entry.experimental_showInNewTab,
+      ]),
+    ).toEqual([
+      ["hidden", false],
+      ["plain", undefined],
+    ]);
+    expect(Object.hasOwn(collected.tabs[1]!, "experimental_showInNewTab")).toBe(
+      false,
+    );
+  });
+
+  it("rejects any other value", () => {
+    for (const value of [true, "no", 0]) {
+      expect(() =>
+        collect((app) =>
+          app.slots.experimental_tab({
+            ...tab,
+            id: "bad",
+            experimental_showInNewTab: value as never,
+          }),
+        ),
+      ).toThrow(/experimental_showInNewTab" must be false when set/u);
+    }
+  });
+});
+
+describe("experimental_tab experimental_newTabGroup and experimental_openableByPlugins", () => {
+  const component = () => null;
+  const tab = {
+    title: "Run",
+    icon: "Workflow",
+    component,
+    context: { kind: "thread" },
+    availability: "action",
+  } as const;
+
+  it("keeps a group name and true on an action tab and leaves both out by default", () => {
+    const collected = collect((app) => {
+      app.slots.experimental_tab({
+        ...tab,
+        id: "run",
+        experimental_newTabGroup: "Open",
+        experimental_openableByPlugins: true,
+      });
+      app.slots.experimental_tab({ ...tab, id: "plain" });
+    });
+    expect(
+      collected.tabs.map((entry) => [
+        entry.id,
+        entry.experimental_newTabGroup,
+        entry.experimental_openableByPlugins,
+      ]),
+    ).toEqual([
+      ["run", "Open", true],
+      ["plain", undefined, undefined],
+    ]);
+    expect(Object.hasOwn(collected.tabs[1]!, "experimental_newTabGroup")).toBe(
+      false,
+    );
+    expect(
+      Object.hasOwn(collected.tabs[1]!, "experimental_openableByPlugins"),
+    ).toBe(false);
+  });
+
+  it("rejects an empty or non-string group and any openable value but true", () => {
+    for (const value of ["", 3]) {
+      expect(() =>
+        collect((app) =>
+          app.slots.experimental_tab({
+            ...tab,
+            id: "bad",
+            experimental_newTabGroup: value as never,
+          }),
+        ),
+      ).toThrow(/experimental_newTabGroup" must be a non-empty string/u);
+    }
+    for (const value of [false, "yes", 1]) {
+      expect(() =>
+        collect((app) =>
+          app.slots.experimental_tab({
+            ...tab,
+            id: "bad",
+            experimental_openableByPlugins: value as never,
+          }),
+        ),
+      ).toThrow(/experimental_openableByPlugins" must be true when set/u);
+    }
+  });
+});
