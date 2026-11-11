@@ -31,6 +31,16 @@
       "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page.",
       "budget": 8
     },
+    "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
+      "seam": "new-tab-items",
+      "intent": "Plugin New Tab items flow through NewTabFileSearch.fork.tsx: useForkNewTab merges plugin recents into the recent list and gives search results; a `fork` entry kind and a `fork` section (between files and recent) render them with ForkNewTabRow and ForkNewTabResults, Enter opens them, and {fork.node} mounts the plugins' useRecents collectors. The `actions` prop is renamed registeredActions and passed through useForkNewTabActions, which drops action tabs registered with experimental_showInNewTab: false from the Actions list and action search. The idle Actions list is drawn as one NewTabActions per group from useForkNewTabActionGroups, with the group's label (bb's Actions first, then experimental_newTabGroup headings). The fork import sits at the top of the file.",
+      "budget": 32
+    },
+    "apps/app/src/components/secondary-panel/NewTabActions.tsx": {
+      "seam": "new-tab-items",
+      "intent": "NewTabActions takes an optional label prop for its section heading, defaulting to \"Actions\", so the New Tab page can draw one reorderable list per experimental_newTabGroup heading.",
+      "budget": 5
+    },
     "apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx": {
       "seam": "narrow-window",
       "intent": "renderAsDrawer goes through useForkPanelDrawer (lib/fork-narrow-panel.ts): below 1000px wide the side panel uses bb's compact drawer (an overlay the panel shortcut toggles) instead of sitting inline; fork.css narrows that drawer on non-phone widths.",
@@ -57,13 +67,13 @@
       "budget": 31
     },
     "apps/app/src/components/secondary-panel/SidebarSplitContainer.tsx": {
-      "seam": "splits-off",
-      "intent": "WORKBENCH_SPLITS_ENABLED = false (workbenchFork.tsx): the panel has one pane (no restored split state, moveTab returns early, no move-active-tab handler, each a condition on one line), and tab cycling works without splits.",
-      "budget": 6
+      "seam": "workbench-panes",
+      "intent": "bb's split container, limited by workbenchSplitLimits.fork.ts through one fork import at the top of the file: MAX_PANES is WORKBENCH_MAX_PANES (2); a stored layout is restored only when restoresWorkbenchSplit accepts it (a row of up to two panes); canMoveSidebarActiveTab is false while WORKBENCH_MOVE_PANE_CONTROLS is false (no left/right/top/bottom move grid); a tab drag engages only inside the panel (isPointInWorkbench) and also when it leaves its pane's tab row sideways; limitWorkbenchDrop wraps decide (one pane: right edge only; two panes: the other pane, as a center drop). One hook line, useWorkbenchSplits, before the first early return, hands moveTab, removeSplit, resize and commitState to the menu items and the plugin API.",
+      "budget": 13
     },
     "apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx": {
-      "seam": "workbench",
-      "intent": "usePinnedFixedPanelTabs marks the fixed plugin tabs that apply to this panel as pinned, which is what removes their close button and keeps them out of Close other tabs and the mobile pager's close. WorkbenchPanelScope wraps the tab row so tab menu items know which panel they are in. PinnedIconTabsDivider follows bb's own icon tabs when no fixed plugin tab does.",
+      "seam": "workbench, workbench-panes",
+      "intent": "usePinnedFixedPanelTabs marks the fixed plugin tabs that apply to this panel as pinned, which is what removes their close button and keeps them out of Close other tabs and the mobile pager's close. WorkbenchPanelScope wraps the tab row so tab menu items know which panel they are in. PinnedIconTabsDivider follows bb's own icon tabs when no fixed plugin tab does. WORKBENCH_NEW_TAB_IN_EVERY_PANE gives every split pane its own New Tab button (one condition in each of the two new-tab lines of renderPane).",
       "budget": 20
     },
     "apps/app/src/components/secondary-panel/usePanelTabPresenter.tsx": {
@@ -112,9 +122,9 @@
       "budget": 14
     },
     "apps/app/src/lib/split-layout/ops.ts": {
-      "seam": "splits-off",
-      "intent": "MAIN_SPLITS_ENABLED = false caps the main view at one pane (MAX_PANES).",
-      "budget": 3
+      "seam": "splits-off, workbench-panes",
+      "intent": "MAIN_SPLITS_ENABLED = false caps the main view at one pane (MAX_PANES). splitPane keeps upstream's tree limit of 8 (SPLIT_TREE_MAX_PANES), since every main-view caller checks MAX_PANES before splitting and the side panel's split needs the shared operation.",
+      "budget": 6
     },
     "apps/app/src/lib/thread-actions/thread-action-registry.tsx": {
       "seam": "app-route",
@@ -277,9 +287,9 @@
       "budget": 1
     },
     "apps/app/src/lib/url-open-routing.tsx": {
-      "seam": "link-handlers",
-      "intent": "Before bb opens a clicked link by the user's preference, it asks plugin link handlers (openUrlWithPlugin, lib/fork-link-handlers.ts); a handler that returns true has opened it.",
-      "budget": 2
+      "seam": "link-handlers, workbench-api",
+      "intent": "Before bb opens a clicked link by the user's preference, it asks plugin link handlers (openUrlWithPlugin, lib/fork-link-handlers.ts); a handler that returns true has opened it. InAppBrowserUrlOpenContext is exported so the workbench seam (fork-workbench.ts) opens a URL in the thread view's in-app browser.",
+      "budget": 4
     },
     "apps/server/src/services/threads/lifecycle-outcome.ts": {
       "seam": "plugin-events, quiet-turns",
@@ -370,6 +380,21 @@
       "seam": "skill-sources",
       "intent": "SkillsOverview calls useForkSkillSources (components/tools/ForkSkillSources.tsx, imported at the top of the file) after visibleSkills with the normalized query, whether bb's Type or Provider filter is set, and whether bb's list has rows or is loading or failed; its filterGroups are spread last into the filter menu's groups, and its body(libraryBody) replaces the band div around the library body, adding each slots.experimental_skillSource's rows under bb's list.",
       "budget": 5
+    },
+    "apps/app/src/components/secondary-panel/sidebarSplitLayout.ts": {
+      "seam": "workbench-panes",
+      "intent": "MAX_PANES is WORKBENCH_MAX_PANES (2) from workbenchSplitLimits.fork.ts, imported at the top of the file in place of the shared cap, so moveSidebarTab and the stored-state schema allow two panes while the main view stays at one.",
+      "budget": 2
+    },
+    "apps/app/src/lib/thread-actions/core-thread-actions.ts": {
+      "seam": "splits-off",
+      "intent": "The \"Open in split\" thread action is unavailable while MAIN_SPLITS_ENABLED is false (one condition, plus the import).",
+      "budget": 4
+    },
+    "plugins/workflows/src/app.tsx": {
+      "seam": "workbench-api",
+      "intent": "The workflow-run action tab is registered with experimental_openableByPlugins: true, so other plugins (Studio) open a run in a thread's side panel with experimental_workbench(...).open. One added line.",
+      "budget": 1
     }
   }
 }
