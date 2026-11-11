@@ -649,14 +649,30 @@ export interface ExperimentalCommandPaletteRegistration {
 /**
  * A surface of bb's main window that `experimental_appBackdrop` can paint:
  * the sidebar, the main view, the composer box, the side panel and the main
- * view's header row.
+ * view's header row, plus two kinds of surface inside the main view and the
+ * side panel. `panel` is every card, settings section, page root and field
+ * there (`--card`, `bg-background`); left out, it is `--canvas` at 32%.
+ * `code` is code blocks, sticky headers and floating bars there, which stay
+ * denser so text reads over what scrolls under them; left out, it is
+ * `--canvas` at 58%, and its `backdropFilter` (default `blur(8px)`) applies
+ * to the sticky and floating ones only. `popover` is every overlay bb
+ * portals to `<body>` under `layout.cards` (menus, popovers, select lists,
+ * hover cards, tooltips, dialogs, drawers, toasts, the command palette, and
+ * a plugin's own that use `bg-popover` or `role="dialog"`): left out, it is
+ * `--canvas` at 76% with `blur(12px)`; they take the card radius and
+ * shadow, no border, and their hover and selection fills are `--primary` at
+ * 24% and 34%. Without `layout.cards` overlays stay opaque. None of the
+ * three draws an `edge`.
  */
 export type ExperimentalAppSurface =
   | "sidebar"
   | "main"
   | "composer"
   | "secondaryPanel"
-  | "header";
+  | "header"
+  | "panel"
+  | "code"
+  | "popover";
 
 /**
  * How bb paints one surface over an app backdrop. Each value is a CSS value
@@ -693,6 +709,25 @@ export interface ExperimentalAppAppearance {
   surfaces?: Partial<
     Record<ExperimentalAppSurface, ExperimentalAppSurfaceStyle>
   >;
+  /**
+   * How bb lays its surfaces out over the backdrop. With `cards`, the
+   * sidebar (its content and footer, as one card), the header's groups, the
+   * main view and the side panel become rounded cards with `gap` pixels
+   * (0 to 24) between them and the window's edges and corner radius
+   * `radius` (0 to 28), each painted from its surface in `surfaces`; the
+   * composer is a card inside the main view's card, the rail sits bare on
+   * the scene, and the scene shows in the gaps. Cards have no border: a
+   * surface's `edge` is not drawn, only a faint inner highlight and a soft
+   * shadow (`--fork-cards-shadow`). Outside a thread, a page's content
+ * column is the main card (as tall as the page area, centered, the scene
+ * clear beside it), and a table wider than a thread's column gets the same
+ * glass under the part outside it. bb sets `data-fork-cards` and the custom
+   * properties `--fork-cards-gap` and `--fork-cards-radius` on `<html>`. Any
+   * element outside the sidebar with `data-fork-card="sidebar" | "main" |
+   * "header" | "composer" | "secondary-panel"` is painted as a card from
+   * that surface. Leave it out for bb's own layout.
+   */
+  layout?: { cards: { gap: number; radius: number } };
 }
 
 /**
