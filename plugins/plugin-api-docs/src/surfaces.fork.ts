@@ -61,6 +61,11 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "ExperimentalMessageActionRegistration",
     "ExperimentalMessageActionMessage",
   ],
+  "message-directives": [
+    "PluginAppSlots.experimental_linkHandler",
+    "ExperimentalLinkHandlerRegistration",
+    "ExperimentalLinkClick",
+  ],
   "command-palette-actions": [
     "PluginAppSlots.experimental_commandPalette",
     "ExperimentalCommandPaletteRegistration",
