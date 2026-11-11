@@ -173,7 +173,8 @@ run })` → an item in the ··· menu of chat messages, in the main thread
 messageId, turnId, role, sourceSeqEnd }`; `role` is `"user"` or
   `"assistant"` and `turnId` is null outside a turn. Keep `isAvailable`
   synchronous and cheap; it runs while the message renders, and a throw
-  hides the item. To fork the conversation after the message, call
+  hides the item. `experimental_replaces: "thread.fork"` hides bb's own
+  Fork item where yours shows. To fork after the message, call
   `useSdk().threads.fork({ sourceThreadId: message.threadId, sourceSeqEnd:
 message.sourceSeqEnd })` (or `bb.sdk.threads.fork` from the backend).
 
