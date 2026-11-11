@@ -374,3 +374,52 @@ describe("slots.experimental_commandPalette", () => {
     ).toThrow(/omni/u);
   });
 });
+
+describe("slots.experimental_appBackdrop", () => {
+  it("keeps the component and the appearance hook", () => {
+    const component = () => null;
+    const useAppearance = () => ({ mode: "dark" as const });
+    expect(
+      collect((app) => {
+        app.slots.experimental_appBackdrop({
+          id: "scene",
+          component,
+          useAppearance,
+        });
+        app.slots.experimental_appBackdrop({ id: "plain", component });
+      }).appBackdrops,
+    ).toEqual([
+      { id: "scene", component, useAppearance },
+      { id: "plain", component },
+    ]);
+  });
+
+  it("rejects a missing component, a non-function hook, a bad id or a repeated id", () => {
+    const component = () => null;
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_appBackdrop({ id: "scene" } as never),
+      ),
+    ).toThrow(/component/u);
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_appBackdrop({
+          id: "scene",
+          component,
+          useAppearance: "dark",
+        } as never),
+      ),
+    ).toThrow(/useAppearance must be a function/u);
+    expect(() =>
+      collect((app) =>
+        app.slots.experimental_appBackdrop({ id: "a b", component }),
+      ),
+    ).toThrow(/experimental_appBackdrop/u);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_appBackdrop({ id: "scene", component });
+        app.slots.experimental_appBackdrop({ id: "scene", component });
+      }),
+    ).toThrow(/scene/u);
+  });
+});
