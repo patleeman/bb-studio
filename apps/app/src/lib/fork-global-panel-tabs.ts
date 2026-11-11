@@ -13,6 +13,10 @@ import {
   subscribePluginSlots,
   type PluginSlotSnapshot,
 } from "./plugin-slots";
+import {
+  isTabWindowPanelState,
+  threadIdOfTabWindowState,
+} from "./fork-tab-window-panel";
 
 export const GLOBAL_PANEL_TABS_STORAGE_KEY = "bb.globalPanelTabs.v1";
 const PLUGIN_PAGE_STATE_PREFIX = "plugin-panel:";
@@ -20,6 +24,9 @@ const ROOT_COMPOSE_STATE_ID = "root-compose";
 const PLUGINS_BROWSE_STATE_ID = "plugins-browse";
 
 export function threadIdOfPanelState(panelStateId: string): string | null {
+  if (isTabWindowPanelState(panelStateId)) {
+    return threadIdOfTabWindowState(panelStateId);
+  }
   return panelStateId === ROOT_COMPOSE_STATE_ID ||
     panelStateId === PLUGINS_BROWSE_STATE_ID ||
     panelStateId.startsWith(PLUGIN_PAGE_STATE_PREFIX)
@@ -145,7 +152,8 @@ export function globalPanelTabAppliesTo(
 ): GlobalPanelTabApplies {
   if (
     panelStateId === ROOT_COMPOSE_STATE_ID ||
-    panelStateId === PLUGINS_BROWSE_STATE_ID
+    panelStateId === PLUGINS_BROWSE_STATE_ID ||
+    isTabWindowPanelState(panelStateId)
   ) {
     return () => false;
   }

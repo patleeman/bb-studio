@@ -105,6 +105,7 @@ function fakeSurface(tabs: FixedPanelTab[], panelTabs: ExperimentalPanelTab[]) {
   } as unknown as AppPanelController;
   const surface: WorkbenchSurface = {
     threadId: "thr_1",
+    panelStateId: "thr_1",
     panel,
     openFilePreview: () => false,
     openTerminal: () => false,
@@ -176,6 +177,7 @@ describe("the tab window's address", () => {
     if (spec === null) throw new Error("no spec");
     const request = {
       threadId: "thr_1",
+      windowId: "win_1",
       spec,
       pane: 2 as const,
       from: WINDOW_INSTANCE_ID,
@@ -191,6 +193,7 @@ describe("the tab window's address", () => {
   it("rejects a missing thread, a pane other than 1 or 2 and a spec it cannot show", () => {
     const good = new URLSearchParams({
       thread: "thr_1",
+      win: "win_1",
       pane: "1",
       from: "w",
       title: "t",
@@ -207,6 +210,7 @@ describe("the tab window's address", () => {
       return parseTabWindowSearch(next);
     };
     expect(without("thread")).toBeNull();
+    expect(without("win")).toBeNull();
     expect(without("pane", "3")).toBeNull();
     expect(without("spec", "{")).toBeNull();
     expect(

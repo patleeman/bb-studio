@@ -665,27 +665,57 @@ During `dragover` browsers hide drag data, so the item of a drag that
 started in this window is kept in a module variable; a drag from another
 window is allowed when any handler exists and decided on drop.
 
-bb's side panel tabs are dragged with dnd-kit's pointer sensors, not the
-browser's drag and drop. `PanelTabItemDragSource` watches that drag and, for
-a plugin action tab, dispatches `dragenter`, `dragover`, `dragleave` and
-`drop` events that carry the payload to the element under the pointer,
-outside the strip the tab came from. Plugin targets and bb's own zones get
-the same events as from a browser drag.
+bb's side panel tabs are native drag sources (11 Nov): the strip's tab
+wrapper is `draggable`, and `usePanelTabNativeDrag` (`workbenchFork.tsx`)
+writes the payload in `dragstart` through `beginPanelTabDrag`
+(`lib/fork-tab-move.ts`). The item is `{ kind: "tab", id: key, title,
+pluginId?, tab?, open? }`: `tab` for a plugin action tab, `open` (the
+`ExperimentalWorkbench.open` spec, `tabOpenSpecNow`) for every tab another
+window can show; a tab that cannot leave its window carries neither and the
+drag also gets the type `application/x-bb-item-local`, which another
+window's host refuses in `dragover`. The pointer sensor of dnd-kit is
+replaced by an inert one, so the mouse never starts a dnd-kit sort and never
+starts bb's pane drag (`onBeginTabDrag`); touch keeps dnd-kit's sensor, the
+sort and `PanelTabItemDragSource`'s synthesized events.
+
+A tab dropped on a side panel is bb's own move, decided before any handler
+(`tabDropOutcome`): a tab of this window dropped on the panel it came from
+(the drag source's `aside` is the zone's) is placed with
+`workbenchSplitsFor(panelStateId).place` (reorder, the other pane, a pane's
+body puts it last, the right edge of a single pane makes a new pane); a tab
+from another panel or window with `open` is opened in the target panel's
+workbench (`openTabSpecIn`, the drop's `pane` and `index`, then without
+them) and the source window closes it when its `dragend` reports
+`dropEffect` `"move"` (`endPanelTabDrag`); a same-window source closes once
+the open resolved a key. The host sets `dropEffect` `"move"` on the
+workbench and main zones and `"copy"` on the composer; a drop nothing took
+is not cancelled, so the source sees `"none"`. `markDropTakenHere` keeps a
+same-window drop a plugin handler took from also closing the source on
+`"move"`. A workbench target also carries `open(spec, options)`, bound to
+the panel the drop landed in and to the handler's plugin id
+(`ItemDropEnvironment.openInPanel`), the one way a handler opens into a
+popped-out window's panel.
 
 **Core callers.** `components/fork/ForkItemDropHost.tsx`, mounted in
-`AppLayout.tsx`; `PanelTabItemDragSource` in
-`components/secondary-panel/workbenchFork.tsx`, one line in
-`SecondaryPanelTabStrip.tsx`; the rules are in `lib/fork-item-drag.ts`.
-Core has no item drag of its own: its file drops and tab reordering do not
-go through the payload.
+`AppLayout.tsx` and in each popped-out tab window (`ForkTabWindowPanel.tsx`,
+with the window's thread id); `usePanelTabNativeDrag`, `InertMouseSensor`
+and `PanelTabItemDragSource` in `components/secondary-panel/workbenchFork.tsx`,
+a few lines in `SecondaryPanelTabStrip.tsx`; the rules are in
+`lib/fork-item-drag.ts` and `lib/fork-tab-move.ts`. Core's mouse tab
+reorder, pane drag and the pop-out all go through the payload now; its file
+drops do not.
 
 **Audit before stabilizing.**
 
-1. Tab drags are synthesized events: no drag image beyond dnd-kit's
-   overlay, no drop effect cursor, and they cannot leave the window. Decide
-   whether tabs should use the browser's drag and drop.
-2. A tab dropped outside its strip is still reordered by dnd-kit when the
-   pointer ends nearest another tab.
+1. The source learns of a cross-window drop only from `dragend`'s
+   `dropEffect`; the target's open is asynchronous, so a tab whose open
+   fails after the source closed is lost. Decide whether to confirm over a
+   channel instead.
+2. A drag from another window is sealed during `dragover`: the host accepts
+   on the workbench zone whenever the drag is not local, and on the main and
+   composer zones when any handler exists, then decides on drop. A bb file
+   tab over another window's main view shows the move cursor and drops
+   nothing.
 3. The zone markers are test ids and data attributes that were not made for
    this; give each zone a named attribute.
 4. `insertText`, `insertMention` and `insertThreadMention` find the
@@ -696,7 +726,7 @@ go through the payload.
    resolves through that plugin's mention provider at send time; check this
    stays true if the handle grows lifecycle rules.
 5. The thread of a zone comes from the split pane that contains it, else the
-   focused pane, else the route.
+   focused pane, else the route (or the window's thread in a tab window).
 6. `canDrop` runs on every `dragover`.
 7. A side panel target's `pane` and `index` are read from markup
    (`[data-sidebar-split-tab-group]` rows sorted left to right, their
@@ -704,6 +734,11 @@ go through the payload.
    on the panel, as for a tab drag. The insertion bar and the edge highlight
    are drawn by the host, copying the split drag overlay's style, not by the
    tab strip; core's tab reorder draws no bar of its own.
+8. `index` from the markup counts every pill, Info and Diff included, and
+   `place` resolves `before` from the pane's tab ids in the same order; a
+   drop before a non-closable tab lands last in the pane.
+9. Touch still reorders through dnd-kit; a touch drag cannot leave the
+   window.
 
 ## Context at each turn start (`experimental_hooks.experimental_turnContext`)
 
@@ -1174,50 +1209,75 @@ hook builds the command actions with `CommandPalette`'s builders
 ## Tabs in their own window (`ExperimentalWorkbench.popOut`)
 
 `experimental_workbench(threadId).popOut(key)` and the tab menu's "Open in
-new window" show a side panel tab alone in a window
-(`/fork-window/_bb/tab?thread=…&spec=…&pane=…&from=…&title=…`, through the
-pop-out window opener of `experimental_popOut`) and close it in the panel.
-The window's "Return to workbench" asks the window that popped it out (over
-the `bb-fork-tab-window` BroadcastChannel) to open the tab again with
-`experimental_workbench(threadId).open(spec, { pane })`; that window shows
-the conversation first if it moved on. With no answer in 600 ms, any window
+new window" move a side panel tab into a popped-out window
+(`/fork-window/_bb/tab?thread=…&win=…&spec=…&pane=…&from=…&title=…`, through
+the pop-out window opener of `experimental_popOut`, one desktop window per
+`win`) and close it in the panel. The window is a workbench panel of the
+thread (`ForkTabWindowPanel.tsx`): bb's own `ThreadSecondaryPanel` with its
+split container, under the panel state id `tab-window:<win>:<thread>`
+(`lib/fork-tab-window-panel.ts`; `threadIdOfPanelState` reads the thread
+back out, global fixed tabs do not apply), no server sync, no Info, Diff,
+New Tab or terminals. The window seeds itself once from the address's
+`spec` (a `sessionStorage` flag per `win`, so a reload does not reopen a tab
+dragged away), registers a workbench surface for the thread with that panel
+state id (so `experimental_workbench(threadId)` from a component mounted in
+the window is the window's panel, and `workbenchSplitsFor` is keyed by the
+surface's `panelStateId`), mounts the item drop host with the window's
+thread id, follows the selected tab's label in `document.title` and its
+bar, and closes itself (the desktop `close` op by window key, else
+`window.close()`) once it has had a tab and has none. Tabs reach it by drag
+and drop; its tabs reorder, split and drag out as in the main window. The
+main window keeps no record of tabs living in windows: `list()` does not
+include them. "Return to workbench" turns every tab into its `open` spec
+and asks the window that popped the first one out (over the
+`bb-fork-tab-window` BroadcastChannel, one message with a `tabs` list) to
+open them again with `experimental_workbench(threadId).open(spec, { pane })`;
+with one pane in the window every tab goes to the pane the first came from,
+with two panes each goes to its own pane number. That window shows the
+conversation first if it moved on. With no answer in 600 ms, any window
 showing the conversation takes it.
 
 **Core callers.** The tab menu item and `popOut` share
 `popOutWorkbenchTab` (`lib/fork-tab-popout.ts`): the tab is read from the
-thread's own panel tab state, turned into the `open` spec that recreates it,
-and closed with the panel controller's `closeTab`, the close button's path.
-The window draws the tab with bb's own tab content components
-(`PluginPanelTabContent`, `LazyWorkspaceFilePreviewTabContent`,
-`LazyHostScopedFilePreviewTabContent`,
-`LazyThreadStorageFilePreviewTabContent`) inside `ForkWindowView`'s route.
-Reopening is `workbenchFor(...).open`, the same as plugins call.
+panel's own tab state, turned into the `open` spec that recreates it, and
+closed with the panel controller's `closeTab`, the close button's path. A
+drop into the window goes through `ForkItemDropHost` and
+`tabDropOutcome`/`openTabSpecIn` as in the main window. Reopening is
+`workbenchFor(...).open`, the same as plugins call.
 
 **Audit before stabilizing.**
 
-1. Only tabs `open` can recreate pop out: plugin action tabs and workspace,
-   host and thread storage file tabs. Terminals (closing the tab ends the
-   terminal), in-app browser tabs (a native view of the main window), Info,
-   Diff and fixed tabs (not closable), New Tab, attachment previews and
-   file opener tabs stay. Each needs a way to move rather than close.
+1. Only tabs `open` can recreate pop out or drop into a window: plugin
+   action tabs and workspace, host and thread storage file tabs. Terminals
+   (closing the tab ends the terminal), in-app browser tabs (a native view
+   of the main window), Info, Diff and fixed tabs (not closable), New Tab,
+   attachment previews and file opener tabs stay. Each needs a way to move
+   rather than close.
 2. The tab window lives outside bb's layout and route, so `useBbContext()`
-   reports no thread there; a tab reads its `threadId` prop.
+   reports no thread there; a tab reads its `threadId` prop. Plugin app
+   overlays are not mounted there either, which is why a drop target
+   carries its own `open`.
 3. When several windows show the conversation and the opener is gone, each
-   reopens the tab.
-4. Window bounds are remembered per thread and tab spec.
+   reopens the tabs.
+4. Window bounds are remembered per window id, so every pop-out starts at
+   the default size; the window's tab state stays in `localStorage` until
+   bb's panel state prune removes it.
+5. Closing the window with its close button drops its tabs; decide whether
+   that should return them instead.
 
 ## The tab's own window (`experimental_useTabWindow`)
 
-`experimental_useTabWindow()` returns `{ title, toolbar }` inside a tab
-window and null elsewhere. The window's bar shows `title`; `toolbar` is an
-element in the bar, before "Return to workbench" and outside the window drag
-region, that a tab renders its controls into with `createPortal`. Studio's
-page and item headers leave out their title row there and move their
-actions to `toolbar`.
+`experimental_useTabWindow()` returns `{ title, toolbar }` inside a popped-out
+window and null elsewhere. The window's bar shows the selected tab's
+`title`; `toolbar` is an element in the bar, before "Return to workbench"
+and outside the window drag region, that the selected tab renders its
+controls into with `createPortal` (null for a tab that is not selected).
+Studio's page and item headers leave out their title row there and move
+their actions to `toolbar`.
 
-**Core callers.** `ForkTabWindow` provides it (`lib/fork-tab-window.ts`)
-around bb's own tab content components, with the title it draws in its bar.
-No core view reads it: bb's own file previews have no title row.
+**Core callers.** `ForkTabWindowPanel` provides it (`lib/fork-tab-window.ts`)
+around each tab's content, with the title the bar draws. No core view reads
+it: bb's own file previews have no title row.
 
 **Audit before stabilizing.**
 

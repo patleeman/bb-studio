@@ -12,11 +12,15 @@ const RETURN_TIMEOUT_MS = 10_000;
 const SURFACE_WAIT_MS = 5000;
 const SURFACE_POLL_MS = 100;
 
+export interface ReturnedTab {
+  spec: ExperimentalWorkbenchOpenSpec;
+  pane: TabWindowPane;
+}
+
 export interface TabReturn {
   threadId: string;
   projectId: string | null;
-  spec: ExperimentalWorkbenchOpenSpec;
-  pane: TabWindowPane;
+  tabs: ReturnedTab[];
 }
 
 type ReturnMessage =
@@ -30,6 +34,14 @@ function openChannel(): BroadcastChannel | null {
     : null;
 }
 
+function readTab(value: unknown): ReturnedTab | null {
+  if (typeof value !== "object" || value === null) return null;
+  const tab = value as Record<string, unknown>;
+  const spec = parseTabSpec(tab.spec);
+  if (spec === null || (tab.pane !== 1 && tab.pane !== 2)) return null;
+  return { spec, pane: tab.pane };
+}
+
 function readMessage(data: unknown): ReturnMessage | null {
   if (typeof data !== "object" || data === null) return null;
   const message = data as Record<string, unknown>;
@@ -39,13 +51,14 @@ function readMessage(data: unknown): ReturnMessage | null {
     return { type: "returned", id: message.id, ok: message.ok === true };
   }
   if (message.type !== "return") return null;
-  const spec = parseTabSpec(message.spec);
+  const tabs = Array.isArray(message.tabs) ? message.tabs.map(readTab) : null;
   if (
-    spec === null ||
+    tabs === null ||
+    tabs.length === 0 ||
+    tabs.some((tab) => tab === null) ||
     typeof message.threadId !== "string" ||
     (message.to !== null && typeof message.to !== "string") ||
-    (message.projectId !== null && typeof message.projectId !== "string") ||
-    (message.pane !== 1 && message.pane !== 2)
+    (message.projectId !== null && typeof message.projectId !== "string")
   ) {
     return null;
   }
@@ -55,8 +68,7 @@ function readMessage(data: unknown): ReturnMessage | null {
     to: message.to,
     threadId: message.threadId,
     projectId: message.projectId,
-    spec,
-    pane: message.pane,
+    tabs: tabs as ReturnedTab[],
   };
 }
 
@@ -75,7 +87,18 @@ async function waitForSurface(threadId: string): Promise<boolean> {
   return true;
 }
 
-export async function reopenReturnedTab(
+async function reopenOne(threadId: string, tab: ReturnedTab): Promise<boolean> {
+  const workbench = workbenchFor(specOwner(tab.spec), threadId);
+  if (workbench === null) return false;
+  const pane =
+    tab.pane === 2 && workbench.layout().panes.length < 2 ? "new" : tab.pane;
+  const key =
+    (await workbench.open(tab.spec, { pane })) ??
+    (await workbench.open(tab.spec));
+  return key !== null;
+}
+
+export async function reopenReturnedTabs(
   request: TabReturn,
   showThread: (threadId: string, projectId: string) => void,
 ): Promise<boolean> {
@@ -84,16 +107,11 @@ export async function reopenReturnedTab(
     showThread(request.threadId, request.projectId);
     if (!(await waitForSurface(request.threadId))) return false;
   }
-  const workbench = workbenchFor(specOwner(request.spec), request.threadId);
-  if (workbench === null) return false;
-  const pane =
-    request.pane === 2 && workbench.layout().panes.length < 2
-      ? "new"
-      : request.pane;
-  const key =
-    (await workbench.open(request.spec, { pane })) ??
-    (await workbench.open(request.spec));
-  return key !== null;
+  let ok = true;
+  for (const tab of request.tabs) {
+    if (!(await reopenOne(request.threadId, tab))) ok = false;
+  }
+  return ok;
 }
 
 export function listenForTabReturns(
@@ -110,7 +128,7 @@ export function listenForTabReturns(
       return;
     }
     channel.postMessage({ type: "ack", id: message.id });
-    void reopenReturnedTab(message, showThread)
+    void reopenReturnedTabs(message, showThread)
       .catch(() => false)
       .then((ok) => {
         if (ok) window.focus();
@@ -124,9 +142,12 @@ export function requestTabReturn(
   request: TabReturn & { from: string },
 ): Promise<boolean> {
   const channel = openChannel();
-  if (channel === null) return Promise.resolve(false);
+  if (channel === null || request.tabs.length === 0) {
+    channel?.close();
+    return Promise.resolve(false);
+  }
   const id = `${WINDOW_INSTANCE_ID}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`;
-  const { from, ...tab } = request;
+  const { from, ...tabs } = request;
   return new Promise((resolve) => {
     let acked = false;
     let broadened = false;
@@ -137,7 +158,7 @@ export function requestTabReturn(
       resolve(ok);
     };
     const send = (to: string | null) => {
-      channel.postMessage({ type: "return", id, to, ...tab });
+      channel.postMessage({ type: "return", id, to, ...tabs });
       timers.push(
         setTimeout(() => {
           if (acked) return;

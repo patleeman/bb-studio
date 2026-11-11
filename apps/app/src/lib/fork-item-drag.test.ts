@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createPluginPanelFixedPanelTab,
   createTerminalFixedPanelTab,
+  createWorkspaceFilePreviewFixedPanelTab,
 } from "./fixed-panel-tabs-state";
 import {
   beginPointerItemDrag,
@@ -161,6 +162,7 @@ function installHost(
   return installItemDropHost(document, {
     handlers: () => handlers,
     threadIdOf: () => "thr_1",
+    openInPanel: () => Promise.resolve(null),
     insertText: () => true,
     insertMention: () => true,
     insertThreadMention: () => true,
@@ -280,7 +282,7 @@ describe("the drag payload", () => {
     ).toThrow(/not a drag item/);
   });
 
-  it("describes a plugin action tab and nothing else", () => {
+  it("describes a plugin action tab with its open spec, and bb's own tabs without one", () => {
     const page = createPluginPanelFixedPanelTab({
       pluginId: "studio",
       actionId: "page",
@@ -300,26 +302,47 @@ describe("the drag payload", () => {
         params: { page: "p1" },
         threadId: "thr_1",
       },
+      open: {
+        kind: "tab",
+        tab: { id: "page", pluginId: "studio" },
+        params: { page: "p1" },
+        title: "Launch plan",
+      },
     });
+    const terminal = createTerminalFixedPanelTab({ terminalId: "term_1" });
     expect(
-      panelTabDragItem({ tab: page, label: "Launch plan" }, "root-compose")?.tab
-        ?.threadId,
-    ).toBeNull();
+      panelTabDragItem({ tab: terminal, label: "Terminal" }, "thr_1"),
+    ).toEqual({ kind: "tab", id: terminal.id, title: "Terminal" });
     expect(
       panelTabDragItem(
         { tab: page, label: "Launch plan", isPinned: true },
-        "t",
-      ),
-    ).toBeNull();
-    expect(
-      panelTabDragItem(
-        {
-          tab: createTerminalFixedPanelTab({ terminalId: "term_1" }),
-          label: "Terminal",
-        },
         "thr_1",
       ),
     ).toBeNull();
+    const file = createWorkspaceFilePreviewFixedPanelTab({
+      environmentId: "env_1",
+      projectId: "proj_1",
+      tab: {
+        path: "src/app.ts",
+        lineRange: null,
+        source: { kind: "working-tree" },
+        statusLabel: null,
+      },
+    });
+    expect(panelTabDragItem({ tab: file, label: "app.ts" }, "thr_1")).toEqual({
+      kind: "tab",
+      id: file.id,
+      title: "app.ts",
+      open: {
+        kind: "file",
+        target: {
+          kind: "workspace",
+          environmentId: "env_1",
+          path: "src/app.ts",
+        },
+        location: null,
+      },
+    });
   });
 });
 
@@ -370,7 +393,10 @@ describe("installItemDropHost", () => {
     const event = fire("drop", app.panelBody, itemData());
     expect(asked).toEqual(["alpha", "beta"]);
     expect(dropped).toEqual([
-      ["beta", { zone: "workbench", threadId: "thr_1" }],
+      [
+        "beta",
+        { zone: "workbench", threadId: "thr_1", open: expect.any(Function) },
+      ],
     ]);
     expect(event.defaultPrevented).toBe(true);
   });
@@ -588,6 +614,7 @@ describe("a drop in a side panel with panes", () => {
       threadId: "thr_1",
       pane: 1,
       index: 1,
+      open: expect.any(Function),
     });
     expect(dropTarget(strip, { x: 500, y: 10 })).toMatchObject({
       pane: 1,
@@ -614,10 +641,12 @@ describe("a drop in a side panel with panes", () => {
       zone: "workbench",
       threadId: "thr_1",
       pane: "new",
+      open: expect.any(Function),
     });
     expect(dropTarget(body, { x: 200, y: 300 })).toEqual({
       zone: "workbench",
       threadId: "thr_1",
+      open: expect.any(Function),
     });
   });
 
@@ -637,7 +666,11 @@ describe("a drop in a side panel with panes", () => {
         x: 390,
         y: 300,
       }),
-    ).toEqual({ zone: "workbench", threadId: "thr_1" });
+    ).toEqual({
+      zone: "workbench",
+      threadId: "thr_1",
+      open: expect.any(Function),
+    });
   });
 });
 
