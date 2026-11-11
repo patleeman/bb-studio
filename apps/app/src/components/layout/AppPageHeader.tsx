@@ -1,3 +1,4 @@
+import { ForkHeaderTitle } from "@/components/fork/ForkTitleHost";
 import { useRef, useState, type ReactNode, type Ref } from "react";
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import {
@@ -29,6 +30,7 @@ import { useDesktopWindowState } from "@/hooks/useDesktopWindowState";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { scrollPageToTop } from "@/lib/page-scroll-to-top";
 import { resolveWindowTopLeftReserveClassName } from "./windowTopLeftReserve";
+import { ForkMainHistoryControls } from "@/components/sidebar/ForkSidebarHeader";
 
 export const HEADER_ICON_BUTTON_CLASS = COARSE_POINTER_HEADER_ICON_BUTTON_CLASS;
 
@@ -140,17 +142,21 @@ export function AppPageHeader({
           windowTopLeftReserveClassName,
         )}
       >
+        <ForkMainHistoryControls ownsWindowTopLeft={ownsWindowTopLeft} />
         {center ? (
           <div className="flex min-w-0 flex-1 items-center">
-            <div className="pointer-events-auto flex min-w-0 max-w-full items-center gap-2">
+            <ForkHeaderTitle>
+            <div data-fork-header-group="title" className="pointer-events-auto flex min-w-0 max-w-full items-center gap-2">
               {center}
             </div>
+            </ForkHeaderTitle>
           </div>
         ) : (
           <div className="min-w-0 flex-1" />
         )}
         {actions ? (
           <div
+            data-fork-header-group="actions"
             className={cn(
               "pointer-events-auto flex shrink-0 items-center gap-1",
               usesDesktopChrome && MACOS_WINDOW_NO_DRAG_CLASS,
