@@ -38,6 +38,7 @@ import {
 import { useSidebarRename } from "@/components/sidebar/SidebarInlineRename";
 import { useThreadActions } from "@/components/thread/ThreadActionsProvider";
 import { ThreadTitle } from "@/components/thread/ThreadTitleMentions";
+import { useForkThreadHeader } from "@/components/fork/ForkThreadHeader";
 import {
   PluginThreadHeaderTitle,
   usePluginThreadHeaderTitleSlot,
@@ -110,6 +111,7 @@ export function ThreadDetailHeader({
   const threadId = thread.id;
   const headerActions = useThreadHeaderActionEntries(thread);
   const pluginTitleSlot = usePluginThreadHeaderTitleSlot();
+  const forkHeader = useForkThreadHeader(threadId, threadTitle);
   const [primaryAction, ...secondaryActions] = headerActions;
   const { renameThreadAsync } = useThreadActions();
   const handleRename = useCallback(
@@ -186,7 +188,7 @@ export function ThreadDetailHeader({
   const handleTitleDoubleClick = () => {
     if (!isEditing && pluginTitleSlot === null) startEditingFromDoubleClick();
   };
-  const coreTitle = <ThreadTitle title={threadTitle} />;
+  const coreTitle = <ThreadTitle title={forkHeader.title} />;
   const TitleElement = pluginTitleSlot === null || isEditing ? "p" : "div";
   const rightPanelIconName = RIGHT_PANEL_TOGGLE_ICON_NAME;
   const mountRightPanelToggle = secondaryPanelHost === null;
@@ -238,6 +240,7 @@ export function ThreadDetailHeader({
           )}
         </TitleElement>
       </div>
+      {forkHeader.after}
       {actionsMenu == null ? null : (
         <span
           className={cn(
