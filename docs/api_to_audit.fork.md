@@ -423,13 +423,20 @@ URL by the user's preference asks the handlers first, in plugin-id order; the
 first that returns true wins, and a handler that throws is skipped.
 
 **Core callers.** `useOpenUrlByPreference` in `lib/url-open-routing.tsx`
-calls `openUrlWithPlugin` (`lib/fork-link-handlers.ts`), so chat replies,
-previews and every other surface that routes through it are covered.
+calls `openUrlWithPlugin(url)` (`lib/fork-link-handlers.ts`), so chat
+replies, previews and every other surface that routes through it are
+covered. Clicks are asked with their modifiers by a capturing click listener
+on the document that `fork-link-handlers.ts` installs while any plugin has a
+handler: a click with ⌘, Ctrl or Shift on any `a[href]`, and a plain click on
+a link to a bb route inside rendered Markdown (`[data-markdown-preview]`),
+call `openUrlWithPlugin(href, { modifiers })`; a handler that takes it stops
+the click before bb's own anchor handling. Synthetic clicks (bb's own
+`openPathInSplit`) are not asked.
 
 **Audit before stabilizing.**
 
-1. A modifier-click is left to the browser and is not asked; decide whether
-   handlers should see it with the modifier.
+1. The capture is DOM-level; decide whether bb's anchors (`RouteAnchor`,
+   `MarkdownAnchor`, `PluginUrlLink`) should ask with the click instead.
 2. Decide whether handlers should declare patterns, so bb can tell a link is
    handled before a click (for a tooltip or an icon).
 
