@@ -79,6 +79,39 @@ subtitle?, path }` rows; it is debounced, called with the trimmed query
   like an in-app link. bb shows the first five rows, drops rows whose path
   is not a bb route, and logs a rejection without breaking the palette.
 
+## Replace the quick palette
+
+- `app.slots.experimental_commandPalette({ id, component })` → bb opens
+  `component` instead of its own quick palette, command list and thread
+  search both, on every entry point: Search (Mod+K, the rail's Search
+  button, the `thread.search` command) and the palette command
+  (Shift+Mod+P). It is drawn in bb's palette dialog, so the overlay, focus
+  trap and Escape (which closes it) stay bb's. Props:
+  `{ initialMode, close, experimental_onEscape }`.
+  `initialMode` is `"search"` or `"commands"` by entry point; pressing an
+  entry point while it is open mounts the component again with that mode.
+  `close(then?)` closes the dialog and runs `then` once focus is back where
+  it was. `experimental_onEscape(handler)` → bb asks `handler()` first on
+  Escape, before the key reaches the focused element; true keeps the palette
+  open (clear a query that way), false or a throw closes it. It returns the
+  function that removes the handler, so call it in `useEffect`. The first
+  registration by plugin id wins; none leaves bb's palette. A crash in
+  `component` shows bb's palette.
+- `experimental_useAppCommands()` → what bb's palette lists as commands:
+  bb's available app commands, plugin palette commands, settings pages,
+  plugin pages and server switches, each `{ id, title, group, shortcut?,
+run() }`. `id` is bb's palette id (`app:thread.new`, `settings:general`,
+  `plugin:<plugin>/<id>`); `shortcut` is the label bb shows (`⌘N`). Inside
+  the replacement palette the list is taken when the palette opens and
+  `run()` closes it first, as bb's palette does. Elsewhere (a plugin window)
+  it is read again on mount and on window focus, and runs in that window.
+  bb lists no keywords. A settings section opens with
+  `experimental_toAppPath("/settings/<section>")`.
+
+Names: `ExperimentalCommandPaletteRegistration`,
+`ExperimentalCommandPaletteProps`, `ExperimentalAppCommand`,
+`experimental_useAppCommands`.
+
 ## Rename an open tab
 
 - `useBbNavigate().experimental_renameTab({ tab: { id }, params?, title })` →
@@ -234,6 +267,9 @@ run })` → an item in the right-click menu of plugin action tabs in the
 params, title, threadId }`; `threadId` is null on a plugin page. Keep
   `isAvailable` synchronous and cheap; it runs while the menu renders.
 
+bb's own "Open in new window" item is in the same menu for every tab
+`experimental_workbench(...).popOut` can pop out.
+
 Names: `ExperimentalPanelTabActionRegistration`,
 `ExperimentalPanelTabActionTab`.
 
@@ -279,6 +315,21 @@ isTyping }`:
     of range or the panes cannot be made.
   - `isTyping()` → true while keyboard focus is in a text field, an editable
     element or a frame in the side panel; check it before `open` or `focus`.
+  - `popOut(key)` → `Promise<boolean>`: shows a tab in a window of its own
+    and closes it in the panel, as the tab menu's "Open in new window" does.
+    The window has a "Return to workbench" button that opens the tab again
+    in the pane it came from (pane 2 is made again when it is gone) in the
+    window that popped it out, showing the conversation there first if
+    needed, or else in another window showing the conversation. Plugin
+    action tabs and workspace, host and thread storage file tabs pop out.
+    False, nothing changed, for anything else (terminals, browser tabs,
+    Info, Diff, New Tab, attachments, fixed tabs, file opener tabs), an
+    unknown key or a blocked popup. In the window a tab gets its
+    `threadId` and `environment` props; `useBbContext()` has no thread.
+- `experimental_useTabWindow()` → `{ title, toolbar } | null`: non-null in a
+  tab's own window, whose bar shows `title`, so leave out your own title row
+  there. `toolbar` is an element in that bar before "Return to workbench"
+  (null until it mounts); `createPortal` the tab's other controls into it.
 
 - `experimental_openableByPlugins: true` on an action tab registration lets
   other plugins open that tab with `experimental_workbench(...).open`. Leave
@@ -288,7 +339,8 @@ isTyping }`:
 Names: `ExperimentalWorkbench`, `ExperimentalWorkbenchOpenSpec`,
 `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchLayout`,
 `ExperimentalWorkbenchPane`, `ExperimentalWorkbenchArrangement`,
-`ExperimentalTabRegistration.experimental_openableByPlugins`.
+`ExperimentalTabRegistration.experimental_openableByPlugins`,
+`experimental_useTabWindow`, `ExperimentalTabWindow`.
 
 ## New Tab items
 
@@ -404,7 +456,7 @@ Windows, approvals and the backend hooks are in fork-api-host.md.
 
 ## Names
 
-`ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
+`ExperimentalAppCommand`, `ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCommandPaletteProps`, `ExperimentalCommandPaletteRegistration`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppCommands`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
 
 The contract's own interfaces take the fork's members from these helper
 interfaces; plugins never name them:
