@@ -314,16 +314,26 @@ export interface ExperimentalReplyClassifierRegistration {
 }
 
 /**
+ * The click a link handler is asked for, when there is one: its modifier
+ * keys. Left out when bb opens a URL without a click (a command, a tool).
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalLinkClick {
+  modifiers: { meta: boolean; ctrl: boolean; shift: boolean; alt: boolean };
+}
+
+/**
  * Registration for `slots.experimental_linkHandler`. `handle` is called when
  * someone clicks a link that bb would open itself (in a chat reply, a file
- * preview, a terminal), before bb opens it. Return true when the plugin
- * opened it; return false to let the next handler or bb have it. It must be
- * synchronous and must not throw for links it does not know. Experimental:
- * see docs/api_to_audit.fork.md.
+ * preview, a terminal), before bb opens it, and for a click with a modifier
+ * key on any link in the app, with the modifiers in `click`. Return true when
+ * the plugin opened it; return false to let the next handler or bb have it.
+ * It must be synchronous and must not throw for links it does not know.
+ * Experimental: see docs/api_to_audit.fork.md.
  */
 export interface ExperimentalLinkHandlerRegistration {
   id: string;
-  handle(url: string): boolean;
+  handle(url: string, click?: ExperimentalLinkClick): boolean;
 }
 
 /**
