@@ -1,4 +1,4 @@
-# Fork API (BB Studio): windows, approvals and backend hooks
+# Fork API (BB Studio): windows, approvals, the close command and backend hooks
 
 The rest of the fork-only API, with the same rules as fork-api.md: every member is experimental, and a plugin that also runs on stock bb checks each one exists before using it. The names are listed in fork-api.md.
 
@@ -121,3 +121,14 @@ Names: `ExperimentalTurnContextProvider`.
   once the fork has started (its history is copied right after creation).
 
 Names: `ExperimentalThreadForkPoint`.
+
+## The close command
+
+- `app.slots.experimental_closeFallback({ id, close() })` → what Mod+W
+  closes when it is not closing a side panel tab: bb asks when keyboard
+  focus is outside the side panel, or the panel has no closable selected
+  tab. Return true when you closed something; bb then does nothing else.
+  Return false to leave bb's own behavior (in the desktop app that can
+  close the window).
+
+Names: `ExperimentalCloseFallbackRegistration`.
