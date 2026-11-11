@@ -348,8 +348,8 @@
     },
     "apps/app/src/components/thread/timeline/MessageActionBar.tsx": {
       "seam": "message-menu",
-      "intent": "Plugin actions keyed as fork menu items (forkMessageActions.ts) are left out of the inline candidates (forkInlineMessageActions) and added to the \u00b7\u00b7\u00b7 menu after Add to chat and before Fork (forkMenuMessageActions).",
-      "budget": 4
+      "intent": "Plugin actions keyed as fork menu items (forkMessageActions.ts) are left out of the inline candidates (forkInlineMessageActions) and added to the ··· menu after Add to chat and before Fork (forkMenuMessageActions). bb's own Fork item is left out when forkKeepsThreadFork(pluginActions) is false: a plugin item on that message declared experimental_replaces: \"thread.fork\".",
+      "budget": 6
     },
     "apps/app/src/lib/bb-desktop.ts": {
       "seam": "close-fallback",
