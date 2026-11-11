@@ -1,3 +1,5 @@
+import { forkComposerArea } from "@/components/fork/ForkComposerReplace";
+import { forkThreadBanner } from "@/components/fork/ForkThreadBanners";
 import {
   useCallback,
   useEffect,
@@ -588,7 +590,7 @@ export function ThreadScreen({
   );
 
   const chrome = composer?.environmentChrome;
-  const promptArea = composer ? (
+  const bbPromptArea = composer ? (
     <ThreadDetailPromptArea
       composerId={
         presentation.kind === "page"
@@ -631,6 +633,7 @@ export function ThreadScreen({
       thread={thread}
     />
   ) : null;
+  const promptArea = forkComposerArea(thread.id, bbPromptArea);
 
   switch (presentation.kind) {
     case "page":
@@ -639,6 +642,7 @@ export function ThreadScreen({
           data-thread-window=""
           className="flex h-full min-h-0 min-w-0 flex-col overflow-clip"
         >
+          {forkThreadBanner(thread.id)}
           <PageShell
             key={thread.id}
             scrollBehavior="bottom-anchor"
