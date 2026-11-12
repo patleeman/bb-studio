@@ -9,6 +9,7 @@ import type {
   ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalFirstRunRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
@@ -54,6 +55,9 @@ export interface PluginThreadBannerSlot
 export interface PluginModelLoadNoticeSlot
   extends ExperimentalModelLoadNoticeRegistration, ForkSlotBase {}
 
+export interface PluginFirstRunSlot
+  extends ExperimentalFirstRunRegistration, ForkSlotBase {}
+
 export interface PluginThreadHeaderSlot
   extends ExperimentalThreadHeaderRegistration, ForkSlotBase {}
 
@@ -96,6 +100,7 @@ export interface ForkRegistrationSet {
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
   threadBanners?: readonly ExperimentalThreadBannerRegistration[];
   modelLoadNotices?: readonly ExperimentalModelLoadNoticeRegistration[];
+  firstRuns?: readonly ExperimentalFirstRunRegistration[];
   threadHeaders?: readonly ExperimentalThreadHeaderRegistration[];
   forkMessageActions?: readonly ExperimentalMessageActionRegistration[];
   contextCardRows?: readonly ExperimentalContextCardRowRegistration[];
@@ -119,6 +124,7 @@ export interface ForkSlotSnapshot {
   mainHeaders: readonly PluginMainHeaderSlot[];
   threadBanners: readonly PluginThreadBannerSlot[];
   modelLoadNotices: readonly PluginModelLoadNoticeSlot[];
+  firstRuns: readonly PluginFirstRunSlot[];
   threadHeaders: readonly PluginThreadHeaderSlot[];
   forkMessageActions: readonly PluginMessageActionMenuSlot[];
   contextCardRows: readonly PluginContextCardRowSlot[];
@@ -141,6 +147,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   mainHeaders: [],
   threadBanners: [],
   modelLoadNotices: [],
+  firstRuns: [],
   threadHeaders: [],
   forkMessageActions: [],
   panelTabActions: [],
@@ -164,6 +171,7 @@ export const FORK_SLOT_KINDS = [
   "mainHeaders",
   "threadBanners",
   "modelLoadNotices",
+  "firstRuns",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -193,6 +201,7 @@ export function stampForkSlots(
     mainHeaders: stamp(set.mainHeaders),
     threadBanners: stamp(set.threadBanners),
     modelLoadNotices: stamp(set.modelLoadNotices),
+    firstRuns: stamp(set.firstRuns),
     threadHeaders: stamp(set.threadHeaders),
     forkMessageActions: stamp(set.forkMessageActions),
     panelTabActions: stamp(set.panelTabActions),
