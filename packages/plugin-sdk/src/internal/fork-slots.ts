@@ -10,6 +10,7 @@ import type {
   ExperimentalMainHeaderRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalMessageActionRegistration,
+  ExperimentalModelLoadNoticeRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
@@ -40,6 +41,7 @@ export interface ForkSlotRegistrations {
   contextCardRows: ExperimentalContextCardRowRegistration[];
   mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
+  modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
   panelTabActions: ExperimentalPanelTabActionRegistration[];
@@ -62,6 +64,7 @@ export const FORK_SLOT_KINDS = [
   "contextCardRows",
   "mainHeaders",
   "threadBanners",
+  "modelLoadNotices",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -85,6 +88,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     contextCardRows: [],
     mainHeaders: [],
     threadBanners: [],
+    modelLoadNotices: [],
     threadHeaders: [],
     forkMessageActions: [],
     panelTabActions: [],
@@ -111,6 +115,7 @@ export function forkSlotMethods(
     contextCardRow: new Set<string>(),
     mainHeader: new Set<string>(),
     threadBanner: new Set<string>(),
+    modelLoadNotice: new Set<string>(),
     threadHeader: new Set<string>(),
     messageAction: new Set<string>(),
     panelTabAction: new Set<string>(),
@@ -287,6 +292,15 @@ export function forkSlotMethods(
       const id = requireSlotId(kind, registration?.id);
       requireUniqueId(kind, seenIds.threadBanner, id);
       collected.threadBanners.push({
+        id,
+        component: requireComponent(kind, registration.component),
+      });
+    },
+    experimental_modelLoadNotice(registration) {
+      const kind = "slots.experimental_modelLoadNotice";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.modelLoadNotice, id);
+      collected.modelLoadNotices.push({
         id,
         component: requireComponent(kind, registration.component),
       });

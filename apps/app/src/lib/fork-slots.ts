@@ -8,6 +8,7 @@ import type {
   ExperimentalLinkHandlerRegistration,
   ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
+  ExperimentalModelLoadNoticeRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
@@ -50,6 +51,9 @@ export interface PluginMainHeaderSlot
 export interface PluginThreadBannerSlot
   extends ExperimentalThreadBannerRegistration, ForkSlotBase {}
 
+export interface PluginModelLoadNoticeSlot
+  extends ExperimentalModelLoadNoticeRegistration, ForkSlotBase {}
+
 export interface PluginThreadHeaderSlot
   extends ExperimentalThreadHeaderRegistration, ForkSlotBase {}
 
@@ -91,6 +95,7 @@ export interface ForkRegistrationSet {
   launcherItems?: readonly ExperimentalLauncherItemRegistration[];
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
   threadBanners?: readonly ExperimentalThreadBannerRegistration[];
+  modelLoadNotices?: readonly ExperimentalModelLoadNoticeRegistration[];
   threadHeaders?: readonly ExperimentalThreadHeaderRegistration[];
   forkMessageActions?: readonly ExperimentalMessageActionRegistration[];
   contextCardRows?: readonly ExperimentalContextCardRowRegistration[];
@@ -113,6 +118,7 @@ export interface ForkSlotSnapshot {
   launcherItems: readonly PluginLauncherItemSlot[];
   mainHeaders: readonly PluginMainHeaderSlot[];
   threadBanners: readonly PluginThreadBannerSlot[];
+  modelLoadNotices: readonly PluginModelLoadNoticeSlot[];
   threadHeaders: readonly PluginThreadHeaderSlot[];
   forkMessageActions: readonly PluginMessageActionMenuSlot[];
   contextCardRows: readonly PluginContextCardRowSlot[];
@@ -134,6 +140,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   launcherItems: [],
   mainHeaders: [],
   threadBanners: [],
+  modelLoadNotices: [],
   threadHeaders: [],
   forkMessageActions: [],
   panelTabActions: [],
@@ -156,6 +163,7 @@ export const FORK_SLOT_KINDS = [
   "contextCardRows",
   "mainHeaders",
   "threadBanners",
+  "modelLoadNotices",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -184,6 +192,7 @@ export function stampForkSlots(
     contextCardRows: stamp(set.contextCardRows),
     mainHeaders: stamp(set.mainHeaders),
     threadBanners: stamp(set.threadBanners),
+    modelLoadNotices: stamp(set.modelLoadNotices),
     threadHeaders: stamp(set.threadHeaders),
     forkMessageActions: stamp(set.forkMessageActions),
     panelTabActions: stamp(set.panelTabActions),

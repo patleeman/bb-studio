@@ -962,6 +962,30 @@ export interface ExperimentalContextCard {
 }
 
 /**
+ * Props for a `slots.experimental_modelLoadNotice` component: the model list
+ * that failed to load, as bb's model picker shows it. `code` is the
+ * failure's code (`failed`, `auth_required`, `timeout`,
+ * `missing_executable`, `provider_unavailable`); `detail` is the server's
+ * message, or null. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalModelLoadNoticeProps {
+  providerLabel: string;
+  code: string;
+  detail: string | null;
+}
+
+/**
+ * Registration for `slots.experimental_modelLoadNotice`: a component bb
+ * draws under "Could not load models for …" wherever it shows a model list
+ * failure. It draws its own content and returns null to add nothing.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalModelLoadNoticeRegistration {
+  id: string;
+  component: ComponentType<ExperimentalModelLoadNoticeProps>;
+}
+
+/**
  * Slots the fork adds beside `PluginAppSlots`.
  */
 export interface ForkPluginAppSlots {
@@ -994,6 +1018,14 @@ export interface ForkPluginAppSlots {
    */
   experimental_threadBanner(
     registration: ExperimentalThreadBannerRegistration,
+  ): void;
+  /**
+   * Draw a notice under a model list failure (see
+   * {@link ExperimentalModelLoadNoticeRegistration}). Notices are stacked in
+   * plugin-id order. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_modelLoadNotice(
+    registration: ExperimentalModelLoadNoticeRegistration,
   ): void;
   /**
    * Change the title text and add a node after it in each thread's header
