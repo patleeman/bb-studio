@@ -5,7 +5,7 @@ import { STARTER_BOT, STARTER_PROVIDER_ORDER, starterFirstChatPrompt } from "./s
 
 export const ONBOARDING_FILE = join("plugins", "studio", "onboarding.json");
 
-export type OnboardingReason = "ran" | "bots" | "import" | "threads";
+export type OnboardingReason = "ran" | "bots" | "import" | "threads" | "unsupported";
 
 export interface OnboardingDone {
   version: 1;
@@ -61,7 +61,12 @@ export interface OnboardingDeps {
   providers(): Promise<readonly OnboardingProviderState[]>;
   seedBot(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }>;
   startFirstChat(input: { botId: string; providerId: string; prompt: string }): Promise<string | null>;
+  idleThreads?: boolean;
   now?(): number;
+}
+
+export function idleThreadRefused(error: unknown): boolean {
+  return /input must contain at least one entry/i.test(error instanceof Error ? error.message : String(error));
 }
 
 const flagPath = (dataDir: string) => join(dataDir, ONBOARDING_FILE);
@@ -152,12 +157,21 @@ async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
   let flag = decideOnboarding(deps.dataDir, deps.db, now);
   if (flag.state === "done" || !deps.db.open) return flag;
   if (flag.state === "waiting") {
-    if (existingData(deps.dataDir, deps.db) === "bots") {
-      const done: OnboardingDone = { version: 1, state: "done", reason: "bots", at: now, botId: null, welcomeThreadId: null, opened: true };
+    const finish = (reason: Exclude<OnboardingReason, "ran">): OnboardingDone => {
+      const done: OnboardingDone = { version: 1, state: "done", reason, at: now, botId: null, welcomeThreadId: null, opened: true };
       writeOnboarding(deps.dataDir, done);
       return done;
+    };
+    const existing = existingData(deps.dataDir, deps.db);
+    if (existing) return finish(existing);
+    if (deps.idleThreads === false) return finish("unsupported");
+    let bot: { id: string; threadId: string };
+    try {
+      bot = await deps.seedBot({ name: STARTER_BOT.name, avatar: STARTER_BOT.avatar });
+    } catch (error) {
+      if (idleThreadRefused(error)) return finish("unsupported");
+      throw error;
     }
-    const bot = await deps.seedBot({ name: STARTER_BOT.name, avatar: STARTER_BOT.avatar });
     await showBotSidebar(deps.sdk).catch(() => false);
     flag = { version: 1, state: "seeded", at: now, botId: bot.id, welcomeThreadId: bot.threadId, opened: false };
     writeOnboarding(deps.dataDir, flag);
@@ -165,7 +179,10 @@ async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
   const providerId = readyProvider(await deps.providers());
   if (!providerId || !deps.db.open) return flag;
   const threadId = await deps.startFirstChat({ botId: flag.botId, providerId, prompt: starterFirstChatPrompt(STARTER_BOT.name) });
-  const done: OnboardingDone = { version: 1, state: "done", reason: "ran", at: now, botId: flag.botId, welcomeThreadId: threadId ?? flag.welcomeThreadId, opened: flag.opened };
+  const welcomeThreadId = threadId ?? flag.welcomeThreadId;
+  const latest = readFlag(deps.dataDir);
+  const opened = welcomeThreadId === flag.welcomeThreadId && (flag.opened || (latest?.state !== "waiting" && latest?.welcomeThreadId === welcomeThreadId && !!latest.opened));
+  const done: OnboardingDone = { version: 1, state: "done", reason: "ran", at: now, botId: flag.botId, welcomeThreadId, opened };
   writeOnboarding(deps.dataDir, done);
   return done;
 }

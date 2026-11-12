@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it } from "vitest";
 import { FORK_HOOKS, forkOnly, isForkSdk, onForkHost } from "./kit/app/host-sdk";
+import { forkHooks } from "./onboarding-register";
 
 const STOCK_SLOTS = [
   "experimental_tab", "threadPanelAction", "experimental_threadHeaderAction", "experimental_sidebarHeader", "homepageSection",
@@ -59,3 +60,9 @@ it("registers its whole frontend on stock BB, with its pages on the rail", async
   for (const panel of panels) expect(panel).not.toHaveProperty("experimental_hideFromNavigation");
   expect(calls.filter((call) => call.slot === "experimental_appOverlay").map((call) => call.registration.id)).toContain("new-menu");
 }, 60_000);
+
+it("skips seeding the starter Bot's idle Main on a backend without the fork's hooks", () => {
+  expect(forkHooks({})).toBe(false);
+  expect(forkHooks({ experimental_hooks: { on() {}, recheck() {} } })).toBe(false);
+  expect(forkHooks({ experimental_hooks: { experimental_threadForkPoint: async () => null } })).toBe(true);
+});

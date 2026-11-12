@@ -19,7 +19,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function studio(threadList: string = "__automatic__") {
+async function studio(threadList: string = "__automatic__", options: { refuseIdle?: boolean; idleThreads?: boolean } = {}) {
   const providerStates: { providerId: string; status: string; loginCommand: string | null }[] = [{ providerId: "claude-code", status: "not_installed", loginCommand: "claude /login" }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }, { providerId: "acp-omp", status: "ready", loginCommand: null }];
   const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
@@ -44,9 +44,10 @@ async function studio(threadList: string = "__automatic__") {
     },
     threads: {
       spawn: (async (args: Record<string, unknown>) => {
+        const idle = Array.isArray(args.input) && args.input.length === 0;
+        if (idle && options.refuseIdle) throw new Error("Invalid request: input must contain at least one entry");
         spawns.push(args);
         const id = `thr_${spawns.length}`;
-        const idle = Array.isArray(args.input) && args.input.length === 0;
         const thread = { ...makeThreadResponse({ id, projectId: String(args.projectId), title: String(args.title), status: idle ? "pending" : "active" }), providerId: String(args.providerId ?? "codex"), queuedMessageCount: 0 };
         threads.set(id, thread as Thread);
         if (!idle) turns.push(id);
@@ -79,6 +80,7 @@ async function studio(threadList: string = "__automatic__") {
     providers: async () => providerStates,
     seedBot: (input) => bots.seedStarter(input),
     startFirstChat: (input) => bots.startFirstChat(input),
+    ...(options.idleThreads === undefined ? {} : { idleThreads: options.idleThreads }),
     now: () => 1_000,
   });
   const connect = (providerId: string) => { for (const state of providerStates) if (state.providerId === providerId) state.status = "ready"; };
@@ -122,16 +124,53 @@ describe("first-run onboarding", () => {
     expect(markWelcomeOpened(env.dataDir)).toBe(false);
   });
 
-  it("moves Main to the connected provider when it was made on another, still with one Bot and one Main", async () => {
+  it("moves Main to the connected provider when it was made on another, never deleting the Main the user opened, and opens the new one", async () => {
     const env = await studio();
     await env.run();
+    expect(markWelcomeOpened(env.dataDir)).toBe(true);
     env.connect("claude-code");
     const done = await env.run();
-    expect(done).toMatchObject({ state: "done", reason: "ran", welcomeThreadId: "thr_2" });
+    expect(done).toMatchObject({ state: "done", reason: "ran", welcomeThreadId: "thr_2", opened: false });
     expect(env.spawns[1]).toMatchObject({ providerId: "claude-code", input: hidden(starterFirstChatPrompt(STARTER_BOT.name)), pluginMetadata: { handoffFrom: "thr_1" } });
-    expect(env.deleted).toEqual(["thr_1"]);
+    expect(env.deleted).toEqual([]);
+    expect(env.threads.has("thr_1")).toBe(true);
     expect(env.bots.stored(BOT_ID)!.threadId).toBe("thr_2");
     expect(env.bots.list()).toHaveLength(1);
+    expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_2", botId: BOT_ID, opened: false });
+  });
+
+  it("keeps the user's open of Main when it lands while the first chat starts", async () => {
+    const env = await studio();
+    await env.run();
+    const send = env.bots.startFirstChat.bind(env.bots);
+    env.bots.startFirstChat = async (input) => { markWelcomeOpened(env.dataDir); return await send(input); };
+    env.connect("codex");
+    expect(await env.run()).toMatchObject({ state: "done", reason: "ran", welcomeThreadId: "thr_1", opened: true });
+  });
+
+  it("on a BB that can't make an idle thread, marks onboarding done once instead of retrying", async () => {
+    const stock = await studio("__automatic__", { idleThreads: false });
+    expect(await stock.run()).toMatchObject({ state: "done", reason: "unsupported", botId: null, welcomeThreadId: null, opened: true });
+    expect(stock.spawns).toEqual([]);
+    const refused = await studio("__automatic__", { refuseIdle: true });
+    expect(await refused.run()).toMatchObject({ state: "done", reason: "unsupported" });
+    expect(readFlag(refused.dataDir)).toMatchObject({ state: "done", reason: "unsupported" });
+    expect(await refused.run()).toMatchObject({ reason: "unsupported" });
+    expect(refused.bots.list()).toEqual([]);
+    expect(refused.prefs.get("sidebar.threadListProvider")?.value).toBe("__automatic__");
+  });
+
+  it("after a failed seed, gives no starter Bot to a user who started threads meanwhile", async () => {
+    const env = await studio();
+    const seed = env.bots.seedStarter.bind(env.bots);
+    let fail = true;
+    env.bots.seedStarter = async (input) => { if (fail) throw new Error("host not connected"); return await seed(input); };
+    await expect(env.run()).rejects.toThrow("host not connected");
+    expect(readFlag(env.dataDir)).toMatchObject({ state: "waiting" });
+    fail = false;
+    bbDatabase(env.dataDir, ["thr_mine"]);
+    expect(await env.run()).toMatchObject({ state: "done", reason: "threads" });
+    expect(env.bots.list()).toEqual([]);
   });
 
   it("leaves Main alone when the user already wrote in it", async () => {
