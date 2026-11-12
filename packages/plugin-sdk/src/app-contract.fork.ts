@@ -1285,7 +1285,9 @@ export interface ForkBbNavigate {
    * The side panel ("workbench") of a conversation on screen, for code that
    * is not inside that thread's view, such as an agent tool's handler. Leave
    * `threadId` out for the conversation in the main view. Null when that
-   * thread's view is not on screen in this window. Experimental: see
+   * thread's view is not on screen in this window. Pass
+   * `"page:<pluginId>/<panelId>"` for the side panel of your own nav-panel
+   * page; the result's `threadId` is that key. Experimental: see
    * docs/api_to_audit.fork.md.
    */
   experimental_workbench(threadId?: string): ExperimentalWorkbench | null;
