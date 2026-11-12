@@ -719,15 +719,26 @@ export interface ExperimentalAppAppearance {
    * the scene, and the scene shows in the gaps. Cards have no border: a
    * surface's `edge` is not drawn, only a faint inner highlight and a soft
    * shadow (`--fork-cards-shadow`). Outside a thread, a page's content
- * column is the main card (as tall as the page area, centered, the scene
- * clear beside it), and a table wider than a thread's column gets the same
- * glass under the part outside it. bb sets `data-fork-cards` and the custom
+   * column is the main card (as tall as the page area, centered, the scene
+   * clear beside it), and a table wider than a thread's column gets the same
+   * glass under the part outside it. bb sets `data-fork-cards` and the custom
    * properties `--fork-cards-gap` and `--fork-cards-radius` on `<html>`. Any
    * element outside the sidebar with `data-fork-card="sidebar" | "main" |
    * "header" | "composer" | "secondary-panel"` is painted as a card from
    * that surface. Leave it out for bb's own layout.
+   *
+   * With `titleRow: true` a page's title is the first row of its card, not
+   * a pill in the bar: bb moves the header's title group (title,
+   * breadcrumbs, a thread's rename field and menu) into the element marked
+   * `data-fork-title-host` under the header's parent and sets
+   * `data-fork-title-rows` on `<html>`. bb's Settings, Skills and Plugins
+   * pages carry a host; a plugin marks one in its own content (an empty
+   * element it styles itself), and a page with no host keeps its title in
+   * the bar. Page, transcript and list scrollers reserve no scrollbar
+   * gutter under `cards` and show a thin overlay thumb on hover and scroll;
+   * mark a plugin's own scroller `data-fork-overlay-scroll` for the same.
    */
-  layout?: { cards: { gap: number; radius: number } };
+  layout?: { cards: { gap: number; radius: number; titleRow?: boolean } };
 }
 
 /**
