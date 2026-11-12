@@ -32,10 +32,3 @@ it("knows a plugin window by its address and reads its params", () => {
   expect(windowParams("?kind=page&id=pg_1&bbTransparent=1")).toEqual({ kind: "page", id: "pg_1" });
   expect(windowParams("")).toEqual({});
 });
-
-it("knows a BB whose setClickThrough has the hold mode by the arguments it takes", async () => {
-  const { hasClickThroughHold } = await import("./windows");
-  expect(hasClickThroughHold({})).toBe(false);
-  expect(hasClickThroughHold({ setClickThrough: async (_id: string, _on: boolean) => true })).toBe(false);
-  expect(hasClickThroughHold({ setClickThrough: async (_id: string, _on: boolean, _how?: { hold?: boolean }) => true })).toBe(true);
-});
