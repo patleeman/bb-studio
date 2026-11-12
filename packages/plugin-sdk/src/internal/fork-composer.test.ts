@@ -71,4 +71,21 @@ describe("composer customization experimental_footer", () => {
       "experimental_footer",
     );
   });
+
+  it("keeps a context placement and refuses any other", () => {
+    const component = () => null;
+    const { parsed, rejected } = collect({
+      id: "cache",
+      experimental_footer: [
+        { id: "clock", component, placement: "context" },
+        { id: "chip", component, placement: "end" },
+      ],
+    });
+    expect(parsed?.experimental_footer).toEqual([
+      { id: "clock", component, placement: "context" },
+    ]);
+    expect(rejected).toEqual([
+      'composer.customize(cache).experimental_footer[1]: "placement" must be "context" when set',
+    ]);
+  });
 });

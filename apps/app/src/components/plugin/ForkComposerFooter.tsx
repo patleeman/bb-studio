@@ -67,10 +67,14 @@ function useResolvedComposerFooter(
 
 export function PluginComposerFooter({
   scope,
+  placement = "start",
 }: {
   scope: PluginComposerScope | null;
+  placement?: "start" | "context";
 }) {
-  const items = useResolvedComposerFooter(scope?.kind ?? null);
+  const items = useResolvedComposerFooter(scope?.kind ?? null).filter(
+    ({ item }) => (item.placement ?? "start") === placement,
+  );
   return items.map(({ key, pluginId, customizationId, item }) => (
     <div
       key={key}
