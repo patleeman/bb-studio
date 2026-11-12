@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import type { BotThreadRecord, ForkedFrom } from "./bot-threads";
 import type { SideKind, SideThreads, TimelineRow } from "./bot-side-threads";
 import type { ReasoningLevel } from "./kit/reasoning";
+import type { ThreadSeeds } from "./thread-seeds";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -33,6 +34,7 @@ export interface MessageThreadDeps {
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
   changed(threadId: string): void;
   log(message: string): void;
+  seeds?: Pick<ThreadSeeds, "ready" | "put">;
 }
 
 export class MessageThreads {
@@ -87,17 +89,21 @@ export class MessageThreads {
   }
 
   private async fromTranscript(threadId: string, upToSeq: number, title: string, environment: SeedEnvironment | null): Promise<{ id: string; projectId?: string | null; providerId?: string | null }> {
-    const { sdk } = this.deps;
+    const { sdk, seeds } = this.deps;
+    if (!seeds?.ready()) {
+      this.deps.log("This BB can't give an idle thread the transcript as context, so no thread was started.");
+      throw new Error("Couldn't start a thread from that message.");
+    }
     const parent = await sdk.threads.get({ threadId }) as { projectId: string; providerId?: string | null; environmentId?: string | null; model?: string | null };
     const where = environment ?? (parent.environmentId ? { type: "reuse", environmentId: parent.environmentId } : { type: "project-default" });
-    const seed = transcriptSeed(await this.deps.sides.transcript(threadId, upToSeq));
+    const seed = transcriptSeed(await this.deps.sides.transcript(threadId, upToSeq), SEED_CONTEXT_MAX);
     try {
-      return await sdk.threads.spawn({
+      const made = await sdk.threads.spawn({
         projectId: parent.projectId, ...(parent.providerId ? { providerId: parent.providerId } : {}), ...(parent.model ? { model: parent.model } : {}),
-        title, visibility: "visible", environment: where,
-        input: [{ type: "text", text: seed, mentions: [], visibility: "agent-only" }],
-        startedOnBehalfOf: { initiator: "agent", senderThreadId: threadId },
+        title, visibility: "visible", environment: where, input: [],
       } as never) as { id: string; projectId?: string | null; providerId?: string | null };
+      seeds.put(made.id, seed);
+      return made;
     } catch (error) {
       this.deps.log(`Starting a thread from the transcript failed: ${error instanceof Error ? error.message : String(error)}`);
       throw new Error("Couldn't start a thread from that message.");
@@ -127,10 +133,11 @@ export class MessageThreads {
 }
 
 const SEED_MAX = 60_000;
+export const SEED_CONTEXT_MAX = 6_000;
 
-export function transcriptSeed(rows: readonly TimelineRow[]): string {
+export function transcriptSeed(rows: readonly TimelineRow[], max = SEED_MAX): string {
   const lines = rows.map((row) => `${row.role === "assistant" ? "Assistant" : "User"}: ${row.text!.trim()}`);
   let text = lines.join("\n\n");
-  if (text.length > SEED_MAX) text = `…\n\n${text.slice(text.length - SEED_MAX)}`;
+  if (text.length > max) text = `…\n\n${text.slice(text.length - max)}`;
   return `This thread continues an earlier conversation. Here it is, up to the message the user is replying to (the last one):\n\n${text}`;
 }

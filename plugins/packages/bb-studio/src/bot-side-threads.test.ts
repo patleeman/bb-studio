@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { countReplies, SIDE_CHAT_SEED_PREFIX, SideThreads, snippet, type TimelineRow } from "./bot-side-threads";
+import { countReplies, inferSideKind, KIND_RECORDED_SINCE, SIDE_CHAT_SEED_PREFIX, SideThreads, snippet, type TimelineRow } from "./bot-side-threads";
 import { MIGRATIONS } from "./migrations";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -11,7 +11,7 @@ const PAGES = [
   { rows: [{ id: "r1", kind: "conversation", role: "assistant", text: "Older reply", sourceSeqEnd: 10 }], timelinePage: { olderCursor: null } },
 ];
 
-type Thread = { id: string; status: string; archivedAt: number | null; originPluginId?: string; sourceThreadId?: string; title?: string | null; updatedAt?: number; createdAt?: number };
+type Thread = { id: string; status: string; archivedAt: number | null; originPluginId?: string | null; originKind?: string | null; visibility?: string; sourceThreadId?: string; title?: string | null; updatedAt?: number; createdAt?: number };
 
 function setup() {
   const threads = new Map<string, Thread>();
@@ -41,6 +41,17 @@ function setup() {
   const fork = (id: string, messageId: string, createdAt?: number) => { make({ id, sourceThreadId: "bot1", ...(createdAt === undefined ? {} : { createdAt }) }); side.record(id, "bot", "bot1", messageId); };
   return { side, threads, changed, forkRows, userSideChat, fork, db };
 }
+
+it("marks rows from before the kind check for one correction, and records a seed table", async () => {
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio" });
+  dispose.push(() => harness.lifecycle.dispose());
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS.slice(0, -1));
+  db.prepare("INSERT INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at) VALUES ('old', 'bot', 'bot1', 'r1', 1)").run();
+  bb.storage.migrate(db, MIGRATIONS);
+  expect(db.prepare("SELECT kind, kind_checked FROM bot_side_threads WHERE thread_id = 'old'").get()).toEqual({ kind: "reply", kind_checked: 0 });
+  expect(db.prepare("SELECT COUNT(*) AS n FROM thread_seeds").get()).toEqual({ n: 0 });
+});
 
 it("keeps its table through the migrations, with the last replier", () => {
   const { db } = setup();
@@ -125,20 +136,30 @@ it("finds a message's place in the conversation, on older pages too", async () =
   expect(await side.message("bot1", "missing")).toBeNull();
 });
 
-it("lists a message's reply thread and its forks apart, and leaves out empty or failed ones", async () => {
+it("lists a message's reply thread and its forks apart, and leaves out an empty reply thread but never a fork", async () => {
   const { side, forkRows, fork, threads } = setup();
   fork("t1", "r1");
   side.record("f1", "bot", "bot1", "r1", 20, "fork");
   threads.set("f1", { id: "f1", status: "idle", archivedAt: null });
   side.record("f2", "bot", "bot1", "r1", 30, "fork");
   threads.set("f2", { id: "f2", status: "error", archivedAt: null });
-  expect(await side.list("bot1")).toEqual([]);
+  expect((await side.list("bot1")).map((each) => [each.kind, each.threadId, each.conversations, each.replies])).toEqual([["fork", "f2", 2, 0]]);
   forkRows.set("t1", [{ id: "a", kind: "conversation", role: "assistant", text: "One.", turnId: "x", createdAt: 50 }]);
   forkRows.set("f1", [{ id: "b", kind: "conversation", role: "user", initiator: "user", text: "Try B.", turnId: "y", createdAt: 60 }]);
   forkRows.set("f2", []);
   await side.recountAll();
-  expect((await side.list("bot1")).map((each) => [each.kind, each.threadId, each.conversations])).toEqual([["reply", "t1", 1], ["fork", "f1", 1]]);
+  expect((await side.list("bot1")).map((each) => [each.kind, each.threadId, each.conversations])).toEqual([["reply", "t1", 1], ["fork", "f1", 2]]);
   expect(await side.newest("bot1", "r1")).toBe("t1");
+});
+
+it("shows a new fork with no replies under its message, and an empty reply thread still reopens from the message", async () => {
+  const { side, fork, threads } = setup();
+  side.record("f1", "bot", "bot1", "r3", 20, "fork");
+  threads.set("f1", { id: "f1", status: "pending", archivedAt: null });
+  fork("t1", "r1");
+  expect(await side.list("bot1")).toEqual([expect.objectContaining({ messageId: "r3", threadId: "f1", kind: "fork", replies: 0, conversations: 1, working: false })]);
+  expect(await side.newest("bot1", "r1")).toBe("t1");
+  expect(await side.newest("bot1", "r3")).toBeNull();
 });
 
 it("links forks made from a message to that message, once", () => {
@@ -147,8 +168,57 @@ it("links forks made from a message to that message, once", () => {
     VALUES ('f1', 'bot', 'conversation', 0, 'bot1', 'r1', 'user', 7, 7), ('f2', 'bot', 'conversation', 0, 'bot1', NULL, 'reconciled', 8, 8), ('w1', 'bot', 'worker', 0, 'bot1', 'r1', 'reconciled', 9, 9)`).run();
   expect(side.linkForks()).toEqual(["f1"]);
   expect(side.forThread("f1")).toEqual({ botId: "bot", sourceThreadId: "bot1", messageId: "r1" });
+  expect(db.prepare("SELECT kind, kind_checked FROM bot_side_threads WHERE thread_id = 'f1'").get()).toEqual({ kind: "fork", kind_checked: 1 });
   expect(side.linkForks()).toEqual([]);
-  expect(side.record("f1", "bot", "bot1", "r1")).toBe(false);
+  expect(side.record("f1", "bot", "bot1", "r1", 7, "fork")).toBe(false);
+});
+
+it("keeps the kind Studio recorded when the link got there first", () => {
+  const { side, db } = setup();
+  db.prepare(`INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, forked_from_thread_id, forked_from_message_id, source, created_at, updated_at)
+    VALUES ('t1', 'bot', 'conversation', 0, 'bot1', 'r1', 'user', 7, 7)`).run();
+  side.linkForks();
+  expect(side.record("t1", "bot", "bot1", "r1", 7, "reply")).toBe(true);
+  expect(db.prepare("SELECT kind FROM bot_side_threads WHERE thread_id = 't1'").get()).toEqual({ kind: "reply" });
+});
+
+it("corrects the kind of rows recorded before kinds existed, once, from what BB says about each thread", async () => {
+  const { side, db, threads } = setup();
+  const before = KIND_RECORDED_SINCE - 60_000;
+  const after = KIND_RECORDED_SINCE + 60_000;
+  const rows: [string, number, boolean, Partial<Thread> | null][] = [
+    ["titled_fork", after, false, { title: "Main · fork", originKind: "fork", originPluginId: "studio" }],
+    ["titled_thread", before, true, { title: "Main · thread", originKind: "fork", originPluginId: "studio" }],
+    ["bb_fork", after, true, { originKind: "fork", originPluginId: null }],
+    ["old_fork", before, true, { originKind: "fork", originPluginId: "studio", visibility: "visible" }],
+    ["side_chat", before, true, { originKind: "fork", originPluginId: "side-chat" }],
+    ["hidden_reply", before, false, { originKind: "fork", originPluginId: "studio", visibility: "hidden" }],
+    ["unsure", after, true, { originKind: "fork", originPluginId: "studio", visibility: "visible" }],
+    ["gone", before, true, null],
+  ];
+  for (const [id, at, linked, thread] of rows) {
+    db.prepare("INSERT INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at, kind, kind_checked) VALUES (?, 'bot', 'bot1', 'r1', ?, 'reply', 0)").run(id, at);
+    if (linked) db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, forked_from_thread_id, forked_from_message_id, source, created_at, updated_at) VALUES (?, 'bot', 'conversation', 0, 'bot1', 'r1', 'user', ?, ?)").run(id, at, at);
+    if (thread) threads.set(id, { id, status: "idle", archivedAt: null, ...thread });
+  }
+  expect(await side.correctKinds()).toBe(3);
+  const kinds = Object.fromEntries((db.prepare("SELECT thread_id, kind, kind_checked FROM bot_side_threads").all() as { thread_id: string; kind: string; kind_checked: number }[]).map((row) => [row.thread_id, `${row.kind}:${row.kind_checked}`]));
+  expect(kinds).toEqual({
+    titled_fork: "fork:1", titled_thread: "reply:1", bb_fork: "fork:1", old_fork: "fork:1",
+    side_chat: "reply:1", hidden_reply: "reply:1", unsure: "reply:1",
+  });
+  expect(db.prepare("SELECT COUNT(*) AS n FROM bot_threads").get()).toEqual({ n: 6 });
+  threads.set("titled_fork", { ...threads.get("titled_fork")!, title: "Main · thread" });
+  expect(await side.correctKinds()).toBe(0);
+  expect(db.prepare("SELECT kind FROM bot_side_threads WHERE thread_id = 'titled_fork'").get()).toEqual({ kind: "fork" });
+});
+
+it("infers a fork from its title, its maker, or a link made before Studio recorded replies", () => {
+  expect(inferSideKind({ kind: "reply", createdAt: 0, linked: false }, { title: "Main · fork" })).toBe("fork");
+  expect(inferSideKind({ kind: "fork", createdAt: 0, linked: true }, { title: "Main · thread" })).toBe("reply");
+  expect(inferSideKind({ kind: "reply", createdAt: KIND_RECORDED_SINCE, linked: true }, { originKind: "fork", originPluginId: "studio" })).toBe("reply");
+  expect(inferSideKind({ kind: "reply", createdAt: KIND_RECORDED_SINCE - 1, linked: true }, { originKind: "fork", originPluginId: "studio" })).toBe("fork");
+  expect(inferSideKind({ kind: "reply", createdAt: KIND_RECORDED_SINCE - 1, linked: false }, { originKind: "fork", originPluginId: "studio" })).toBe("reply");
 });
 
 it("lists a Bot's threads for its sidebar, latest first", async () => {

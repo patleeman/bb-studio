@@ -117,6 +117,7 @@ import { BotSignal, type BotChange } from "./src/bot-signal";
 import { BOT_THREADS_CHANNEL } from "./src/bot-threads-contract";
 import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
 import { registerLiveActivity } from "./src/live-activity";
+import { ThreadSeeds } from "./src/thread-seeds";
 import { registerBotFinish } from "./src/bot-finish";
 import { studioInstructions } from "./src/agent-instructions";
 import { activityOf, conversationInstructions } from "./src/bot-threads";
@@ -1001,6 +1002,7 @@ export default async function plugin(bb: BbPluginApi) {
     botThreadsSignal ??= setTimeout(() => { botThreadsSignal = null; bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }, 250);
     botSignal.add(changes);
   };
+  const threadSeeds = new ThreadSeeds(db);
   const botThreads = registerBotThreads(bb, db, {
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id) })),
     signals: () => ({
@@ -1024,12 +1026,13 @@ export default async function plugin(bb: BbPluginApi) {
     mirrorLive: (threadIds) => readMirrorLive(bb.server.experimental_dataDir, threadIds),
     mirrored: (since) => readMirroredSince(bb.server.experimental_dataDir, since),
     sideThreads,
+    seeds: threadSeeds,
     defaultModel: (botId) => bots.defaultModel(botId),
   });
   const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
-  const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message) });
+  const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message), seeds: threadSeeds });
   // Finishing a conversation (src/bot-finish.ts): its summary to memory, Main gets the card, then archived.
   const botFinish = registerBotFinish(bb, {
     db, threads: botThreads.store, mainOf: (botId) => bots.stored(botId)?.threadId ?? null,

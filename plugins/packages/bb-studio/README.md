@@ -3420,20 +3420,30 @@ of Staff", with the same thread and check-ins; rename it from its page.
     links in the theme's accent color, no emoji, pill or border: "2 replies
     · Last reply 4:13 PM" (Intl time today, the date before) with the last
     replier (the Bot's presence, or your mark), "Replying…" while it works,
-    and "Forked here · 1 conversation" for forks. An empty or failed thread
-    shows nothing. Replies count your messages and the Bot's turns, only
+    and "Forked here · 1 conversation" for forks. A fork always shows its
+    line, even before anyone writes in it. A reply thread with no replies
+    shows nothing; the message's reply icon reopens it. Replies count your messages and the Bot's turns, only
     those after the fork: the history a fork copies keeps its original
     times. They are recounted when a thread starts or finishes a turn, and
     for every thread when the plugin starts. A link opens the newest thread
-    of its kind in the side panel.
+    of its kind in the side panel. Each row in `bot_side_threads` records its
+    `kind` (`reply` or `fork`); a fork made outside Studio, such as BB's own
+    fork, is linked as a `fork`. Rows from before kinds existed are corrected
+    once (`kind_checked`, `correctKinds`): a "· fork" or "· thread" title
+    decides, side chats and hidden threads are replies, BB's own forks and
+    forks linked before Studio recorded reply threads are forks, and the rest
+    stay replies. Only `kind` changes.
   - **The sidebar**: a fork's work and needs-you show on the row of the
     conversation it was forked from (through a chain of forks), else on
     Main (`foldForks` in `src/bot-threads.ts`).
   - **A parent BB can't fork** (no provider session to copy, a turn not
-    finished): the thread starts from the transcript instead, a new thread
-    on the parent's provider, model and environment seeded with the
-    conversation up to the message as agent-only context
-    (`startedOnBehalfOf`), so it waits idle for the first message. The fork
+    finished): the thread starts from the transcript instead, a new idle
+    thread on the parent's provider, model and environment (a plugin's root
+    thread with no input, the fork's idle-thread seam). No turn runs until
+    you write. Its first turn gets the conversation up to the message, last
+    6,000 characters, as per-turn context (`thread_seeds`,
+    `src/thread-seeds.ts`, through `experimental_turnContext`). On a BB
+    without that hook, nothing starts and you see the error. The fork
     core restarts a fork whose session copy fails at its first start the
     same way (`fork-start-fallback.fork.ts`). No raw error reaches the user.
   - Side chats bb's side-chat plugin made (mirrored from bb) are matched to
