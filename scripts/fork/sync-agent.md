@@ -1,11 +1,11 @@
 # Daily fork sync: brief for the agent
 
-You keep the BB Studio fork in step with upstream bb. Work in `~/workingdir/bb-studio-native`. Read `AGENTS.fork.md` first.
+You keep the BB Studio fork in step with upstream bb. Work in `~/workingdir/bb-studio-app-desktop`, the worktree of the BB Studio repository that has the `desktop` branch checked out; never in `desktop/` on `main`. Read `AGENTS.fork.md` first.
 
 ## Hard limits
 
 - Never push, never open a pull request or an issue, never post anything on GitHub.
-- Never check out, move, reset or rebase `exp/studio-native`. The only ref you may move is the local branch `exp/studio-native-candidate`, and only through `sync.mjs`.
+- Never move, reset or rebase `desktop`, and never touch `main`. The only ref you may move is the local branch `desktop-candidate`, and only through `sync.mjs`. Promoting the candidate (`git reset --hard desktop-candidate` on `desktop`), `scripts/import-desktop.mjs` on `main` and the push are not yours to do.
 - Work only inside the throwaway worktree that `sync.mjs` creates under `../.bb-studio-fork-sync/`. Do not start or restart any running bb instance.
 
 ## Steps

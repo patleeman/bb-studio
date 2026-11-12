@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,17 +19,28 @@ function run(command, args, options) {
 function pluginDirs(argv) {
   if (argv.length > 0) return argv.map((dir) => resolve(dir));
   const optionsPath = join(homedir(), ".bb-studio-import.json");
-  if (!existsSync(optionsPath)) return [];
+  if (!existsSync(optionsPath)) return monorepoPluginDirs();
   const { pluginPaths } = JSON.parse(readFileSync(optionsPath, "utf8"));
   return Object.values(pluginPaths ?? {}).filter(
     (dir) => typeof dir === "string",
   );
 }
 
+function monorepoPluginDirs() {
+  const packages = [
+    resolve(root, "..", "bb-studio-app", "plugins", "packages"),
+    resolve(root, "..", "plugins", "packages"),
+  ].find((dir) => existsSync(dir));
+  if (packages === undefined) return [];
+  return readdirSync(packages)
+    .map((name) => join(packages, name))
+    .filter((dir) => existsSync(join(dir, "package.json")));
+}
+
 const dirs = pluginDirs(process.argv.slice(2));
 if (dirs.length === 0) {
   console.error(
-    "usage: node scripts/fork/build-plugins.mjs [plugin dir ...] (default: pluginPaths in ~/.bb-studio-import.json)",
+    "usage: node scripts/fork/build-plugins.mjs [plugin dir ...] (default: pluginPaths in ~/.bb-studio-import.json, or every package in the monorepo's plugins/packages)",
   );
   process.exit(2);
 }

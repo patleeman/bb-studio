@@ -444,6 +444,25 @@ Each upstream file the fork edits is in exactly one hand commit, so a conflict i
 
 **`scripts/fork/sync.mjs`.** `node scripts/fork/sync.mjs --fetch` replays the fork onto `upstream/main` in a throwaway worktree under `../.bb-studio-fork-sync/`: it cherry-picks the hand commits (git rerere replays recorded conflict resolutions), checks the core diff against the ledger, runs the three scripts, commits their output with the trailer, and runs typecheck, build and the server, web, plugin-build and SDK tests (`--checks none|quick|full`). It writes a report beside the worktree. On success it moves the local branch `exp/studio-native-candidate` and nothing else; it never checks out or moves `exp/studio-native`, and it pushes nothing. On a conflict it stops, leaves the worktree, and prints the commands to continue. With `--onto` set to the current base it is a reproduction check: the result must have the same tree as the source branch.
 
+## Monorepo (12 Nov)
+
+The fork lives in the BB Studio monorepo, on its `desktop` branch. It replaces the local-only branch `exp/studio-native` of the old `bb` clone; where older sections of this file say `exp/studio-native`, `exp/studio-native-candidate` or `bb-studio-native`, read `desktop`, `desktop-candidate` and `bb-studio-app-desktop`.
+
+- **`desktop` branch** (worktree `~/workingdir/bb-studio-app-desktop`): this stack, unchanged in shape. Paths are bb-root-relative, it descends from `upstream/main`, and each sync rewrites it. The ledger, `check-core-diff.mjs` and the reproduction check run here.
+- **`main` branch** (worktree `~/workingdir/bb-studio-app`): the monorepo. `desktop/` there is a tree snapshot of this branch, written by `scripts/import-desktop.mjs` as a merge commit whose second parent is the stack tip. Nobody edits `desktop/` on `main`. `plugins/` there is the Studio plugins with their history, in their own pnpm workspace.
+- **Invariant:** `git rev-parse main:desktop` equals `git rev-parse 'desktop^{tree}'` (`node scripts/import-desktop.mjs --check` on `main`).
+- **Scripts.** `sync.mjs` defaults to `--source desktop --candidate desktop-candidate`, refuses to run inside `main`'s `desktop/`, and takes its work folder from `BB_STUDIO_SYNC_DIR` (default `../.bb-studio-fork-sync`, as before). `check-core-diff.mjs` has the same refusal. `build-plugins.mjs`, with no arguments and no `~/.bb-studio-import.json`, builds every package in `../bb-studio-app/plugins/packages`.
+- **Remotes.** `origin` is the BB Studio repository (the `pre-push` hook on `main` names it). `upstream` is `get-bb/bb` with the push URL set to `DISABLED`, only `main` fetched and no tags. A `pre-push` hook on `main` (`scripts/git-hooks/pre-push`) refuses every other remote and every ref but `main`, `desktop` and `v*` tags. GitHub Actions is off for the repository, so upstream's workflows at this branch's root do not run.
+
+Daily flow:
+
+1. `node scripts/fork/sync.mjs --fetch` here. It moves only `desktop-candidate`.
+2. Promote: `git reset --hard desktop-candidate` on `desktop`, with a clean tree.
+3. `node scripts/import-desktop.mjs` on `main`.
+4. `git push origin main && git push --force-with-lease origin desktop`.
+
+A core change outside a sync: commit it below the generated commits, run `check-core-diff.mjs`, regenerate with `node scripts/fork/sync.mjs --source <work branch> --onto <current base> --candidate desktop-candidate`, promote, import. `docs/REIMPORT.md` on `main` has the commands.
+
 ## Roadmap (approved 10 Nov)
 
 Worked in this order, one milestone at a time. Core edits are allowed but stay small and ledgered; local branches only; each chunk is checked on the second instance before `:24300` restarts. iPhone work is on hold, and changes should stay easy to lift into a separate repo.
