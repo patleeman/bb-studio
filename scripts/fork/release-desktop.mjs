@@ -42,6 +42,7 @@ const HELP = `Build, sign, notarize and draft a BB Studio desktop release.
                                         [--repo owner/name] [--from build|sign|publish]
                                         [--dry-run]
   node scripts/fork/release-desktop.mjs --no-bump --notes-only [--since <ref>]
+  node scripts/fork/release-desktop.mjs --no-bump --build-only
 
 Run it in the desktop worktree. The Studio version is apps/desktop/studio-release.fork.json.
 
@@ -63,6 +64,14 @@ Run it in the desktop worktree. The Studio version is apps/desktop/studio-releas
                      sign (notarize, staple, zip, feed files) or publish.
 --dry-run            Check, draft the notes and print the plan. Nothing is
                      built, tagged, pushed or uploaded.
+--build-only         Build the app and DMG in <work>/build-v<version> and stop:
+                     signed when CSC_NAME is set, never notarized, tagged or
+                     uploaded. For testing a fresh install.
+
+Studio and Visual Chat are bundled with the app as built-in plugins
+(scripts/fork/bundle-studio-plugins.mjs): plugins/ is taken from the
+monorepo's origin/main, installed with pnpm and built with the release
+worktree's CLI into bb-app's builtin-plugins before electron-builder runs.
 
 It builds in <work>/release-v<version> (BB_STUDIO_SYNC_DIR, default
 ../.bb-studio-fork-sync), signs with CSC_NAME, notarizes with the App Store
@@ -85,6 +94,7 @@ if (flag("--help")) {
 
 const REPO = option("--repo", "patleeman/bb-studio");
 const DRY = flag("--dry-run");
+const BUILD_ONLY = flag("--build-only");
 const STEPS = ["build", "sign", "publish"];
 const FROM = option("--from", "build");
 const PROFILE = process.env.BB_STUDIO_NOTARY_PROFILE ?? "bbstudio-notary";
@@ -352,6 +362,7 @@ function preflight() {
   }
   const signs =
     !flag("--notes-only") &&
+    !BUILD_ONLY &&
     option("--version", null) === null &&
     option("--bump", null) === null;
   if (signs && DRY) {
@@ -481,6 +492,7 @@ function build(dir, version) {
     plan(`git worktree add --detach ${dir} desktop`);
     plan("pnpm install --frozen-lockfile && pnpm build");
     plan("apps/desktop: pnpm run prepare-runtime && pnpm run build");
+    plan(`git archive origin/main plugins into ${dir}-plugins, pnpm install --frozen-lockfile there, bundle-studio-plugins.mjs into bb-app's builtin-plugins`);
     plan("apps/desktop: node scripts/run-electron-builder.mjs --mac --arm64 --publish never (CSC_NAME)");
     return;
   }
@@ -496,6 +508,7 @@ function build(dir, version) {
   run(dir, "pnpm", ["build"]);
   run(desktop, "pnpm", ["run", "prepare-runtime"]);
   run(desktop, "pnpm", ["run", "build"]);
+  bundleStudioPlugins(dir);
   rmSync(join(desktop, "release"), { recursive: true, force: true });
   run(desktop, process.execPath, [
     "scripts/run-electron-builder.mjs",
@@ -507,6 +520,28 @@ function build(dir, version) {
   run(dir, "git", ["checkout", "--", "apps/web/src/routeTree.gen.ts"], {
     allowFailure: true,
   });
+}
+
+function bundleStudioPlugins(dir) {
+  const target = git(monorepo, "rev-parse", "origin/main");
+  const work = `${dir}-plugins`;
+  rmSync(work, { recursive: true, force: true });
+  mkdirSync(work, { recursive: true });
+  const archive = spawnSync(
+    "sh",
+    ["-c", 'git archive "$1" plugins | tar -x -C "$2"', "sh", target, work],
+    { cwd: monorepo, stdio: "inherit" },
+  );
+  if (archive.status !== 0) fail("git archive of plugins/ failed");
+  run(join(work, "plugins"), "pnpm", ["install", "--frozen-lockfile"]);
+  run(dir, process.execPath, [
+    "scripts/fork/bundle-studio-plugins.mjs",
+    "--packages",
+    join(work, "plugins", "packages"),
+    "--out",
+    join(dir, "packages", "bb-app", "server", "dist", "builtin-plugins"),
+  ]);
+  console.log(`  bundled Studio and Visual Chat from origin/main ${target.slice(0, 10)}`);
 }
 
 function releaseFiles(desktop, version) {
@@ -762,6 +797,13 @@ async function main() {
   }
 
   const version = current;
+  if (BUILD_ONLY) {
+    const dir = join(syncRoot, `build-v${version}`);
+    const files = releaseFiles(join(dir, "apps/desktop"), version);
+    build(dir, version);
+    if (!DRY) console.log(`\nBuilt ${files.app}\n  and ${files.dmg}`);
+    return;
+  }
   const tags = studioTags();
   const since = option("--since", null) ?? tags.filter((tag) => tag !== `v${version}`).at(-1) ?? null;
   const published = tags.includes(`v${version}`)
