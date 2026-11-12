@@ -1,3 +1,4 @@
+import { applyStudioBuilderConfig, readStudioBuild } from "./studio-release.fork.mjs";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -204,6 +205,7 @@ function resolveElectronBuilderConfig(baseConfig, env, electronBuilderArgs) {
       url: createDesktopUpdateReleaseBaseUrl(releaseConfig.releaseTag),
     },
   ];
+  applyStudioBuilderConfig(config, readStudioBuild(env));
 
   return {
     config,
