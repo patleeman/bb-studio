@@ -143,3 +143,23 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
 - Frontend: `app.slots.experimental_replyClassifier({ id, classify(text) })`
   → `{ quiet }` makes the thread view draw that reply as a small "Quiet
   check" marker. Use the same rule on both sides.
+
+## Title rows in cards
+
+`layout: { cards: { gap, radius, titleRow: true } }` in an app backdrop's
+`useAppearance()` makes a page's title the first row of its card. bb sets
+`data-fork-title-rows` on `<html>` and moves the header's title group (the
+title, breadcrumbs, a thread's rename field and its menu, and your
+`experimental_threadHeader` node) into the first element marked
+`data-fork-title-host` under the header's parent. The nodes move; they do
+not remount, and they return to the bar when the host or the flag goes.
+
+- bb's Settings, Skills and Plugins pages carry a host and draw the row:
+  44 px, sticky, the card's width, with dense blurred glass that shows once
+  the page scrolls (`--fork-title-row-background`, `--fork-title-row-filter`).
+- Your own page or a thread: render an empty `<div data-fork-title-host="">`
+  where the title should go and style it yourself. A page with no host keeps
+  its title in the bar.
+- Under `cards`, bb's page, transcript and list scrollers reserve no
+  scrollbar gutter and show a thin overlay thumb on hover and scroll. Mark
+  your own scroller `data-fork-overlay-scroll` for the same.
