@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { bots, pages, memory, automations, todos, threads } from "./demo-data.mjs";
+import { bots, pages, memory, automations, todos, threads, skills } from "./demo-data.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scratch = join(here, "scratch.sh");
@@ -97,6 +97,12 @@ const insert = todos.map((todo, index) => {
   return `INSERT OR REPLACE INTO bot_loops VALUES ('${record.id}', '${JSON.stringify(record).replace(/'/g, "''")}');`;
 }).join("\n");
 execFileSync("sqlite3", [join(data, "plugins/studio/data.db")], { input: insert });
+
+// Skills the Bots saved, written to Studio's store directly (bot_skill_write is a tool only the Bot's own thread has).
+const q = (text) => `'${String(text).replace(/'/g, "''")}'`;
+execFileSync("sqlite3", [join(data, "plugins/studio/data.db")], {
+  input: skills.map((skill, index) => `INSERT OR REPLACE INTO bot_skills (bot_id, name, description, body, created_at, updated_at, state, pinned, used_at) VALUES (${q(botIds[skill.bot])}, ${q(skill.name)}, ${q(skill.description)}, ${q(skill.body)}, ${now - (20 + index) * 86_400_000}, ${now - (2 + index) * 86_400_000}, 'active', ${skill.pinned ? 1 : 0}, ${now - skill.usedAgo});`).join("\n"),
+});
 
 // Reload Studio so it sorts the seeded threads into conversations and workers,
 // then mark the conversation that needs you.

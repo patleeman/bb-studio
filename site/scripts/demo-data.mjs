@@ -288,3 +288,15 @@ export const automations = [
   { bot: "atlas", name: "Nightly link check", instruction: "Check the docs site for broken links.", cron: "0 2 * * *" },
   { bot: "scout", name: "Garden sensors", instruction: "Read the soil sensors and tell me if anything is low.", cron: "0 */3 * * *" },
 ];
+
+// Skills the Bots saved from their work (Studio's bot_skills table).
+export const skills = [
+  { bot: "atlas", name: "release-notes", description: "Draft release notes from merged pull requests, grouped by area.", pinned: true, usedAgo: 14 * HOUR,
+    body: "1. List the pull requests merged since the last tag.\n2. Group them by area: app, docs, infrastructure.\n3. Write one plain line per change.\n4. Save the draft to the Library and ask for a review." },
+  { bot: "atlas", name: "link-check", description: "Check the docs site for broken links and open a worker to fix them.", usedAgo: 9 * HOUR,
+    body: "1. Crawl the docs site from the sitemap.\n2. Collect every link that answers 404 or times out.\n3. Report them as a table in Main.\n4. Offer a worker to fix them." },
+  { bot: "atlas", name: "trip-planning", description: "Plan a short trip: route, day plans, bookings to make and a packing list.", usedAgo: 3 * 24 * HOUR,
+    body: "1. Ask for dates, budget and what matters most.\n2. Sketch the route on a whiteboard.\n3. Write one page per day.\n4. Add todos for each booking." },
+  { bot: "atlas", name: "weekly-review", description: "Sum up the week: what shipped, what slipped, and what needs a decision.", usedAgo: 6 * 24 * HOUR,
+    body: "1. Read the week's Main and finished conversations.\n2. List what shipped and what slipped.\n3. Name the decisions that are waiting." },
+];

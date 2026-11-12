@@ -21,11 +21,13 @@
   <nav class="nav" aria-label="Sections">
     <a class="brand" href="#main"><img src="icon.png" alt="" width="28" height="28"> BB Studio</a>
     <ul>
-      <li><a href="#bots">Bots</a></li>
-      <li><a href="#pages">Bot pages</a></li>
-      <li><a href="#workbench">Workbench</a></li>
+      <li><a href="#philosophy">Philosophy</a></li>
+      <li><a href="#spaces">Bot spaces</a></li>
       <li><a href="#themes">Themes</a></li>
-      <li><a href="#credits">Credits</a></li>
+      <li><a href="#pages">Bot pages</a></li>
+      <li><a href="#accounts">Accounts</a></li>
+      <li><a href="#iphone">iPhone</a></li>
+      <li><a href="#download">Download</a></li>
     </ul>
   </nav>
 </header>
@@ -36,24 +38,32 @@
   <div class="hero-text">
     <h1>BB Studio</h1>
     <p class="lead">A desktop app where you work with AI agents through your Bots.</p>
-    <p>Each Bot is a space of its own: a Main conversation, parallel conversations, the workers it runs, and its own memory, library, todos and automations. You talk to the Bot. The Bot runs the work and comes back to you when it needs you.</p>
-    <p class="fork-line">A very opinionated fork of the excellent <a href="https://github.com/get-bb/bb">bb</a>, by Michael Yong.</p>
+    <p>Each Bot is a space of its own: a Main conversation, parallel conversations, the workers it runs, and its own memory, library, todos, automations and skills. You talk to the Bot. The Bot runs the work and comes back to you when it needs you.</p>
+    <p class="fork-line">A very opinionated fork of the excellent <a href="https://github.com/get-bb/bb">bb</a>, by Michael Yong. MIT License. <a href="#download">Download</a></p>
   </div>
   <figure class="shot hero-shot">
     {{pic theme-miami-1985 "BB Studio with the Miami 1985 theme. The sidebar shows the Bot Atlas with its pages, four conversations and its workers. The Main conversation shows a morning summary with a table of broken links, two replies and the workers line above the composer." "(min-width: 1180px) 1100px, 94vw" eager}}
   </figure>
 </section>
 
+<section id="philosophy" class="stack">
+  <h2>The philosophy</h2>
+  <div class="intro">
+    <p><a href="https://github.com/get-bb/bb">bb</a> is an excellent open source app for running AI coding agents, by Michael Yong, under the MIT License. It runs agent threads from Claude Code, Codex, Pi and other providers on your own machines, organized by project.</p>
+    <p>BB Studio is a very opinionated fork of it. It makes one choice and builds the app around it: you work through Bots. A Bot has a name, a look, a memory and its own pages, and every conversation, worker and file belongs to one. The Studio plugins come built in, so pages, whiteboards, designs, dashboards and mini apps are part of the app.</p>
+    <p>The fork stays thin: bb's core is kept, its license file is unchanged, and BB Studio's changes are replayed onto bb's latest code as bb moves on.</p>
+  </div>
+</section>
+
 <section id="bots" class="band">
   <div class="text">
-    <h2>Bots are the interface</h2>
-    <p>You work with your Bots, not with a list of threads. BB Studio is a collaboration between you and your Bots: you set the direction, they do the work, and you see what they are doing.</p>
+    <h2>You work with your Bots</h2>
+    <p>You work with your Bots, not with a list of threads. It is a collaboration: you set the direction and make the calls, the Bot does the work, and you can see what it is doing at any time.</p>
     <ul class="facts">
       <li><strong>Main.</strong> Each Bot has a Main conversation. Reports and alerts arrive there.</li>
-      <li><strong>Conversations.</strong> Open as many conversations with a Bot as you need. Each has its own transcript and model. All of them share the Bot's memory, skills and todos.</li>
-      <li><strong>Workers.</strong> A Bot starts workers for longer jobs. Workers are read-only: you watch them, and you steer them through the Bot.</li>
       <li><strong>Needs you.</strong> A conversation that waits on you is outlined in amber, with the reason on its second line. The Bot's icon in the switcher gets an amber mark.</li>
       <li><strong>Awareness.</strong> Each conversation knows what the Bot's other conversations and workers are doing.</li>
+      <li><strong>Several Bots.</strong> The switcher at the bottom of the sidebar moves between them. Each keeps its own theme, presence and pages.</li>
     </ul>
   </div>
   <figure class="shot side">
@@ -61,47 +71,33 @@
   </figure>
 </section>
 
-<section class="band reverse">
-  <div class="text">
-    <h2>Workers and approvals</h2>
-    <p>A worker opens read-only, with its state in the header. In place of a composer it has one box: Ask the Bot about this worker. Your question goes to the Bot, in the conversation that owns the worker.</p>
-    <p>When a worker needs an approval, the card shows in that conversation, not in the worker. It names the worker and shows the command and its folder. Deny, approve once, or approve for that worker.</p>
-    <figure class="shot inline">
-      {{pic approval "An approval card at the top of Main: Refactor the settings form asks for your approval. Adds a dependency for the new toggle rows. Command: pnpm add @radix-ui/react-switch. Buttons: Deny, Approve for this worker, Approve." "(min-width: 900px) 520px, 94vw"}}
+<section id="spaces" class="stack">
+  <h2>Bot spaces</h2>
+  <p class="intro">A Bot's space holds its conversations and its workers, side by side in the sidebar. Open as many conversations with a Bot as you need. Each has its own transcript and model, and all of them share the Bot's memory, skills and todos.</p>
+  <div class="band reverse">
+    <div class="text">
+      <h3>Workers</h3>
+      <p>A Bot starts workers for longer jobs. A worker opens read-only, with its state in the header. In place of a composer it has one box: Ask the Bot about this worker. Your question goes to the Bot, in the conversation that owns the worker.</p>
+      <h3>Approvals</h3>
+      <p>When a worker needs an approval, the card shows in the conversation that owns it, not in the worker. It names the worker and shows the command and its folder. Deny, approve once, or approve for that worker.</p>
+      <figure class="shot inline">
+        {{pic approval "An approval card at the top of Main: Refactor the settings form asks for your approval. Adds a dependency for the new toggle rows. Command: pnpm add @radix-ui/react-switch. Buttons: Deny, Approve for this worker, Approve." "(min-width: 900px) 520px, 94vw"}}
+      </figure>
+    </div>
+    <figure class="shot">
+      {{pic worker "A worker thread, Fix broken docs links, marked Running. Its transcript shows the task and the first reply. At the bottom, a box reads Ask the Bot about this worker, and sends to Atlas in Main." "(min-width: 900px) 620px, 94vw"}}
     </figure>
   </div>
-  <figure class="shot">
-    {{pic worker "A worker thread, Fix broken docs links, marked Running. Its transcript shows the task and the first reply. At the bottom, a box reads Ask the Bot about this worker, and sends to Atlas in Main." "(min-width: 900px) 620px, 94vw"}}
+  <h3>Threads and forks</h3>
+  <p class="note">Point at a Bot's reply and choose Reply in thread. The thread opens in the side panel, beside the conversation. Under the message, a row shows how many replies the thread has and when the last one came. A fork of a message becomes a conversation of its own, at the same level as the others, with a link to where it came from.</p>
+  <figure class="shot inline-wide">
+    {{pic replies "Under a reply from Atlas: the message actions with the Reply in thread icon at the end, and below them the row 2 replies, 1h ago." "(min-width: 900px) 620px, 94vw"}}
   </figure>
-</section>
-
-<section id="pages" class="stack">
-  <h2>Bot pages</h2>
-  <p class="intro">Every Bot has the same pages, one click from its sidebar.</p>
-  <div class="grid two">
-    <figure class="shot">
-      {{pic page-memory "The Memory page for Atlas: topic filters and five records, such as orbit-web ships on Thursdays and notes are reviewed by Wednesday noon." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>Memory.</strong> A core profile and dated records the Bot saves and searches. A finished conversation leaves a summary here.</figcaption>
-    </figure>
-    <figure class="shot">
-      {{pic page-library "The Library page for Atlas: pages made by you, such as Release notes: 2.4, Team note: 2.4 and Lisbon: four days, with kind filters for pages, whiteboards, designs, apps and artifacts." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>Library.</strong> The Bot's files: pages, whiteboards, designs, apps and artifacts, grouped by conversation.</figcaption>
-    </figure>
-    <figure class="shot">
-      {{pic page-todos "The Todos page for Atlas: Today has Water the tomatoes at 4:07 PM, Choose a countertop and Review the 2.4 release notes. Later has Replace the furnace filter, Reply to the book club when Juniper finishes the list, and Book the Sintra train when you get home." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>Todos.</strong> Things to do, decide or read, each with its trigger: a time, an event or a place.</figcaption>
-    </figure>
-    <figure class="shot">
-      {{pic page-automations "The Automations page for Atlas: Maintenance, Morning summary and Nightly link check, each with its kind, schedule and last run." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>Automations.</strong> Check-ins, reminders and scheduled runs, each paused or running on its own schedule.</figcaption>
-    </figure>
-  </div>
-  <p class="note">The Archive page holds older and finished conversations and older workers. A finished conversation opens read-only, with Reopen.</p>
-</section>
-
-<section id="workbench" class="stack">
-  <h2>The workbench</h2>
-  <p class="intro">Documents open beside the conversation, in a side panel with up to two panes. Links, cards in replies, search results and the Bot itself open things there.</p>
+  <figure class="shot wide">
+    {{pic replies-open "Main with Atlas on the left, with the replies row under the morning summary, and the thread open in the side panel on the right: a question about the book club, three discussion questions in reply, and Forked from Atlas above its composer." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <h3>The workbench</h3>
+  <p class="note">Documents open beside the conversation, in a side panel with up to two panes. Links, cards in replies, search results and the Bot itself open things there.</p>
   <figure class="shot wide">
     {{pic workbench "Main with Atlas on the left and the workbench on the right in two panes: the page Release notes: 2.4 and the page Book club: reading list." "(min-width: 1180px) 1100px, 94vw"}}
   </figure>
@@ -119,7 +115,7 @@
 
 <section id="themes" class="stack">
   <h2>Themes</h2>
-  <p class="intro">Each Bot has its own theme. A scene theme is a live WebGL scene behind frosted glass cards. A Classic theme is a solid palette. Workers, finished runs and things that need you show up in the scene.</p>
+  <p class="intro">Each Bot has its own theme. There are nine scene themes and eight Classic ones. A scene theme is a live WebGL scene behind frosted glass cards. Workers, finished runs and things that need you show up in the scene.</p>
   <div class="grid themes">
     {{theme theme-miami-1985 "Miami 1985" "A striped sun, palms, wireframe hills and a neon grid. Workers are chrome gliders."}}
     {{theme theme-event-horizon "Event Horizon" "A ray-traced black hole with a lensed disk. Workers are orbiting particles."}}
@@ -138,7 +134,7 @@
     {{clip clip-aurora-fjord "Aurora Fjord in motion: the aurora curtains move over the fjord."}}
   </div>
   <h3>Classic</h3>
-  <p>Eight Classic themes use published palettes: bb Default, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord and Catppuccin Mocha.</p>
+  <p>A Classic theme is a solid palette with no scene. The eight use published palettes: bb Default, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord and Catppuccin Mocha.</p>
   <div class="grid two">
     {{theme theme-github-light "GitHub Light" ""}}
     {{theme theme-catppuccin-mocha "Catppuccin Mocha" ""}}
@@ -171,35 +167,64 @@
   </figure>
 </section>
 
-<section class="stack">
-  <h2>Studio items</h2>
-  <p class="intro">Everything you and your Bots make is in one collection, with search, tags and stars. Each item opens as a tab in the workbench or in a window of its own.</p>
-  <ul class="items">
-    <li><strong>Pages</strong> with dictation, checklists and comments.</li>
-    <li><strong>Whiteboards</strong> inside pages.</li>
-    <li><strong>Designs</strong> made in rounds of screens, with comments.</li>
-    <li><strong>Artifacts</strong> that the agents save.</li>
-    <li><strong>Dashboards</strong> of widgets with live data.</li>
-    <li><strong>Mini apps</strong> that run in a sandbox.</li>
-    <li><strong>Recordings</strong> of calls and voice notes, with transcripts.</li>
-    <li><strong>Visual Chat</strong> boards.</li>
-  </ul>
+<section id="pages" class="stack">
+  <h2>Bot pages</h2>
+  <p class="intro">Every Bot has the same pages. Memory, Library, Automations and Todos are one click from its sidebar; Skills is in the Bot's controls. A row on any page opens its item in the workbench.</p>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic page-memory "The Memory page for Atlas: topic filters and five records, such as orbit-web ships on Thursdays and notes are reviewed by Wednesday noon." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Memory.</strong> A core profile and dated records the Bot saves and searches. A finished conversation leaves a summary here.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-library "The Library page for Atlas: pages made by you, such as Release notes: 2.4, Team note: 2.4 and Lisbon: four days, with kind filters for pages, whiteboards, designs, apps and artifacts." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Library.</strong> The Bot's files: pages, whiteboards, designs, apps and artifacts, grouped by conversation.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-todos "The Todos page for Atlas: Today has Water the tomatoes at 4:07 PM, Choose a countertop and Review the 2.4 release notes. Later has Replace the furnace filter, Reply to the book club when Juniper finishes the list, and Book the Sintra train when you get home." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Todos.</strong> Things to do, decide or read, each with its trigger: a time, an event or a place.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-automations "The Automations page for Atlas: Maintenance, Morning summary and Nightly link check, each with its kind, schedule and last run." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Automations.</strong> Check-ins, reminders and scheduled runs, each paused or running on its own schedule.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-skills "The Skills part of Atlas's controls: four skills the Bot saved, release-notes (pinned), link-check, trip-planning and weekly-review, each with its one-line description." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Skills.</strong> Procedures the Bot learned from its own work and saved. It reviews its work in the background and keeps them current. Pin a skill to keep it, or share it so every agent can use it.</figcaption>
+    </figure>
+  </div>
+  <p class="note">The Archive page holds older and finished conversations and older workers. A finished conversation opens read-only, with Reopen.</p>
 </section>
 
-<section class="stack">
-  <h2>Threads and forks</h2>
-  <p class="intro">Point at a Bot's reply and choose Reply in thread. The thread opens in the side panel, beside the conversation. Under the message, a row shows how many replies the thread has and when the last one came. A fork of a message becomes a conversation of its own, at the same level as the others, with a link to where it came from. In the sidebar, Book club: Thursday shows ⑂ Main.</p>
-  <figure class="shot inline-wide">
-    {{pic replies "Under a reply from Atlas: the message actions with the Reply in thread icon at the end, and below them the row 2 replies, 1h ago." "(min-width: 900px) 620px, 94vw"}}
-  </figure>
-  <figure class="shot wide">
-    {{pic replies-open "Main with Atlas on the left, with the replies row under the morning summary, and the thread open in the side panel on the right: a question about the book club, three discussion questions in reply, and Forked from Atlas above its composer." "(min-width: 1180px) 1100px, 94vw"}}
+<section id="accounts" class="band">
+  <div class="text">
+    <h2>Accounts</h2>
+    <p>Accounts, in the sidebar footer, lists every sign-in your agents run on, in one place.</p>
+    <ul class="facts">
+      <li><strong>Status.</strong> Each account shows Ready, Signed out, Error, Limited or Off.</li>
+      <li><strong>Limits.</strong> Its 5-hour and 7-day windows and per-model limits, with reset times.</li>
+      <li><strong>Threads.</strong> The threads that ran on that account in the last hour.</li>
+      <li><strong>Sign in.</strong> Sign in again from the account's row.</li>
+    </ul>
+    <p>When an account signs out or a window passes 90%, a small card says so, with one button: Sign in, Use other account or Switch model. Tokens stay with the account pooler; nothing in the app shows them.</p>
+  </div>
+  <figure class="shot side accounts">
+    {{pic accounts "Accounts open from the sidebar footer: two Claude accounts and one Codex account, each with its status, its 5-hour and 7-day windows as bars with reset times, and the threads pinned to it." "(min-width: 900px) 460px, 94vw"}}
   </figure>
 </section>
 
-<section class="stack">
+<section id="iphone" class="stack">
   <h2>iPhone</h2>
-  <p class="intro">An iPhone app is in progress. It follows the same model: your Bots, their Main, conversations and workers, and approvals from the phone. It is not released yet.</p>
+  <p class="intro">An iPhone app is in progress and in testing through TestFlight. It follows the same model: your Bots, their Main, conversations and workers, approvals and notifications from the phone, and Studio pages. It is not available to the public yet.</p>
+</section>
+
+<section id="download" class="stack download">
+  <h2>Download</h2>
+  <div class="intro">
+    <p>BB Studio is a desktop app for macOS. Releases are published on GitHub.</p>
+    <p data-release-status><strong>Coming soon.</strong> There is no published release yet.</p>
+    <p data-release-link hidden><a class="button" href="https://github.com/patleeman/bb-studio/releases/latest">Download <span data-release-name>the latest release</span></a></p>
+    <p class="note">Source: <a href="https://github.com/patleeman/bb-studio">github.com/patleeman/bb-studio</a>. MIT License.</p>
+  </div>
 </section>
 
 <section id="credits" class="stack credits">
@@ -214,7 +239,7 @@
     <li><strong>Weather in Forest and Kyoto Garden:</strong> <a href="https://open-meteo.com/">Open-Meteo</a>, data under CC BY 4.0.</li>
   </ul>
   <p>The full list is in the <a href="NOTICE.txt">NOTICE</a> file.</p>
-  <p class="note">The screenshots show a demo with made-up Bots, conversations and data.</p>
+  <p class="note">The screenshots show a demo with made-up Bots, conversations, accounts and data.</p>
 </section>
 
 </main>

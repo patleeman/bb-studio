@@ -136,3 +136,14 @@ figcaption strong { color: #fff; }
 .theme figcaption strong { display: block; font-family: "Jost", sans-serif; font-weight: 500; font-size: 1.05rem; }
 
 .foot { max-width: var(--max); margin: 0 auto; padding: 40px 20px 60px; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--glass-edge); }
+
+/* Download */
+.button {
+  display: inline-block; padding: 10px 20px; border-radius: 10px;
+  background: var(--accent); color: #1a0830; font-weight: 600; text-decoration: none;
+}
+.button:hover { color: #1a0830; background: #ffa3ea; }
+[hidden] { display: none !important; }
+.shot.accounts img { width: 460px; max-width: 100%; }
+@media (max-width: 900px) { .shot.accounts img { width: 100%; } }
+.grid + .note { margin-top: 28px; }

@@ -5,10 +5,12 @@
 #
 #   scratch.sh start | stop | bb <cli args...> | wipe
 #
-# Env: DESKTOP (the bb-studio-app-desktop worktree), SCRATCH (default /tmp/bbsite).
+# Env: DESKTOP (a built bb-studio-app-desktop tree), SCRATCH (default /tmp/bbsite),
+# BB_CLI (the bb CLI to call, default $DESKTOP/apps/cli/dist/index.js).
 set -eu
 DESKTOP="${DESKTOP:-$HOME/workingdir/bb-studio-app-desktop}"
 SCRATCH="${SCRATCH:-/tmp/bbsite}"
+BB_CLI="${BB_CLI:-$DESKTOP/apps/cli/dist/index.js}"
 DATA="$SCRATCH/data"
 PORT=38994
 DAEMON_PORT=38995
@@ -39,7 +41,7 @@ case "${1:-}" in
     shift
     exec env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin \
       BB_DATA_DIR="$DATA" BB_SERVER_URL="http://127.0.0.1:$PORT" \
-      node "$DESKTOP/apps/cli/dist/index.js" "$@"
+      node "$BB_CLI" "$@"
     ;;
   wipe)
     rm -rf "$SCRATCH"

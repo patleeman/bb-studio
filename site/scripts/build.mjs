@@ -1,7 +1,7 @@
 // Builds the static site into dist/: expands the {{pic}}, {{theme}}, {{clip}}
 // and {{srcset}} tags in src/index.html from the images in assets/, and copies
 // the rest. Every URL is relative, so the site works under any base path
-// (for example https://patleeman.github.io/bb-studio-site/).
+// (for example https://patleeman.github.io/bb-studio/).
 //
 //   node scripts/build.mjs
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";

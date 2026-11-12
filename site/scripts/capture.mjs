@@ -52,9 +52,38 @@ const approval = (on) => sql(join(data, "bb.db"), `UPDATE pending_interactions S
 
 const STUB = `(() => { const noop = () => {}; const off = () => noop; const info = { platform: "macos", appVersion: "0.0.0", updateStatus: { state: "idle" } }; const browser = { attach: noop, detach: noop, navigate: noop, goBack: noop, goForward: noop, reload: noop, stop: noop, setBounds: noop, setVisible: noop, onState: off, onOpenTab: off }; window.bbDesktop = { ...info, browser, checkForUpdates: async () => info, getInfo: async () => info, installUpdate: async () => {}, onChange: off, onWindowStateChange: off, getWindowState: async () => ({ isFullScreen: false }), openExternalUrl: noop, setTheme: noop }; })();`;
 
+// Accounts: the scratch server has no Account Pooler and no provider signed
+// in, so its accounts.status is empty plus a "No provider signed in" card.
+// Every page gets a made-up status instead: fictional accounts with demo
+// thread titles, no emails, no tokens. The Accounts panel draws it as it
+// would draw a real one.
+const NOW = Date.now();
+const HOUR_MS = 3_600_000;
+const win = (id, label, percent, inHours) => ({ id, label, percent, resetAt: NOW + inHours * HOUR_MS, rejected: percent >= 100 });
+const pinned = (...keys) => keys.map((key) => ({ threadId: ids[key], title: { "atlas-main": "Main", "w-links": "Fix broken docs links", "w-settings": "Refactor the settings form" }[key] ?? key })).filter((t) => t.threadId);
+const ACCOUNTS = {
+  checkedAt: NOW,
+  sources: [
+    { source: "studio", name: "BB Studio", state: "on" },
+    { source: "bb", name: "bb", state: "off" },
+    { source: "local", name: "This Mac", state: "on" },
+  ],
+  accounts: [
+    { key: "studio:demo-claude-1", id: "demo-claude-1", source: "studio", provider: "claude", name: "Claude", label: "Personal", state: "ready", message: null,
+      windows: [win("five_hour", "5h", 34, 2.5), win("seven_day", "7d", 61, 70)], models: [win("opus", "Opus", 48, 70)], pinned: pinned("atlas-main", "w-links"), signIn: "demo-claude-1" },
+    { key: "studio:demo-claude-2", id: "demo-claude-2", source: "studio", provider: "claude", name: "Claude", label: "Studio", state: "limited", message: null,
+      windows: [win("five_hour", "5h", 100, 1.2), win("seven_day", "7d", 83, 30)], models: [], pinned: [], signIn: "demo-claude-2" },
+    { key: "studio:demo-codex-1", id: "demo-codex-1", source: "studio", provider: "codex", name: "Codex", label: "Personal", state: "ready", message: null,
+      windows: [win("primary", "5h", 8, 4), win("secondary", "7d", 22, 120)], models: [], pinned: pinned("w-settings"), signIn: "demo-codex-1" },
+  ],
+  warnings: [],
+  dismissed: [],
+};
+
 const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2, reducedMotion: "no-preference" });
 await ctx.addInitScript(STUB);
+await ctx.route("**/api/v1/plugins/studio/rpc/accounts.status", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, result: ACCOUNTS }) }));
 const page = await ctx.newPage();
 const wait = (ms) => page.waitForTimeout(ms);
 async function go(path, settle = 7000) {
@@ -123,6 +152,35 @@ for (const [name, path] of Object.entries(PAGES)) {
   if (!want(name)) continue;
   await go(path);
   await shot(name);
+}
+
+// ---- Skills, in the Bot's controls ----------------------------------------
+if (want("page-skills")) {
+  await go(`/plugins/studio/studio/bot/${bots.Atlas}/controls#skills`);
+  await page.mouse.move(1590, 990);
+  await shot("page-skills");
+}
+
+// ---- Accounts, opened from the sidebar footer ----------------------------
+if (want("accounts")) {
+  // A taller window, so the panel shows all three accounts.
+  await page.setViewportSize({ width: 1600, height: 1700 });
+  await go(main());
+  await page.getByText("Accounts", { exact: true }).last().click();
+  await wait(2500);
+  // The panel caps its height and scrolls; lift the cap so one shot holds every account.
+  // (Studio's list caps at 70vh; bb's footer disclosure at 20rem with a measured height.)
+  await page.evaluate(() => {
+    let el = document.querySelector("[data-account]");
+    for (let i = 0; el && i < 8; i++, el = el.parentElement) {
+      el.style.maxHeight = "none";
+      if (el.style.height) el.style.height = "auto";
+    }
+  });
+  await wait(800);
+  await page.mouse.move(1590, 1690);
+  await shot("accounts", { x: 40, y: 40, width: 290, height: 1650 });
+  await page.setViewportSize({ width: 1600, height: 1000 });
 }
 
 // ---- Cmd+K ---------------------------------------------------------------
@@ -213,6 +271,7 @@ if (CLIPS.some((id) => want(`clip-${id}`))) {
     setTheme("Atlas", id);
     const rec = await browser.newContext({ viewport: { width: 1280, height: 800 }, recordVideo: { dir: join(tmp, id), size: { width: 1280, height: 800 } } });
     await rec.addInitScript(STUB);
+    await rec.route("**/api/v1/plugins/studio/rpc/accounts.status", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, result: ACCOUNTS }) }));
     const p = await rec.newPage();
     await p.goto(ORIGIN + main(), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(16000);
