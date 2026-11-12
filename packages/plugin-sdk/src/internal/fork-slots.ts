@@ -11,6 +11,7 @@ import type {
   ExperimentalNewTabItemsRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalFirstRunRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
@@ -42,6 +43,7 @@ export interface ForkSlotRegistrations {
   mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
+  firstRuns: ExperimentalFirstRunRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
   panelTabActions: ExperimentalPanelTabActionRegistration[];
@@ -65,6 +67,7 @@ export const FORK_SLOT_KINDS = [
   "mainHeaders",
   "threadBanners",
   "modelLoadNotices",
+  "firstRuns",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -89,6 +92,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     mainHeaders: [],
     threadBanners: [],
     modelLoadNotices: [],
+    firstRuns: [],
     threadHeaders: [],
     forkMessageActions: [],
     panelTabActions: [],
@@ -116,6 +120,7 @@ export function forkSlotMethods(
     mainHeader: new Set<string>(),
     threadBanner: new Set<string>(),
     modelLoadNotice: new Set<string>(),
+    firstRun: new Set<string>(),
     threadHeader: new Set<string>(),
     messageAction: new Set<string>(),
     panelTabAction: new Set<string>(),
@@ -304,6 +309,16 @@ export function forkSlotMethods(
         id,
         component: requireComponent(kind, registration.component),
       });
+    },
+    experimental_firstRun(registration) {
+      const kind = "slots.experimental_firstRun";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.firstRun, id);
+      collected.firstRuns.push(
+        registration.component === undefined
+          ? { id }
+          : { id, component: requireComponent(kind, registration.component) },
+      );
     },
     experimental_threadHeader(registration) {
       const kind = "slots.experimental_threadHeader";
