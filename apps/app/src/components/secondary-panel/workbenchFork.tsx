@@ -43,6 +43,8 @@ import { usePluginSlots } from "@/lib/plugin-slots";
 import type { SecondaryPanelRenderableTab } from "./secondaryPanelTab";
 import { workbenchSplitsFor } from "./workbenchSplits.fork";
 
+export { forkPageWorkbenchSurface } from "@/components/fork/ForkWorkbenchSurface";
+
 export const WORKBENCH_NEW_TAB_IN_EVERY_PANE = true;
 
 export class InertMouseSensor extends MouseSensor {
