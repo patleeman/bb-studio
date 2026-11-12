@@ -120,7 +120,7 @@ export function createDesktopAppUpdateService(args: {
         ? { desktopUpdateSupported: true as const }
         : {}),
       support: { kind: "unsupported", reason: "desktop" },
-      current: { commit: null, version: args.currentVersion },
+      current: { commit: null, version: info?.version ?? args.currentVersion },
       available:
         info?.updateAvailable === true && version !== null
           ? {

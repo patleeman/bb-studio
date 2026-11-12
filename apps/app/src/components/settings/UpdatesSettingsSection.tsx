@@ -1,3 +1,4 @@
+import { ForkStudioBase } from "./ForkStudioBase";
 import {
   useEffect,
   useRef,
@@ -255,6 +256,7 @@ function RowName({
       {current === null && trailing === null ? null : (
         <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-2">
           <RowVersions current={current} latest={latest} />
+          <ForkStudioBase version={current} />
           {trailing}
         </span>
       )}
