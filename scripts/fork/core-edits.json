@@ -58,8 +58,8 @@
     },
     "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx": {
       "seam": "workbench-global-tabs",
-      "intent": "Plugin pages show fixed plugin tabs in their side panel (through the merged tab state). One call, useForkCloseFileTabCommand (workbenchFork.tsx), between the panel.newTab and panel.reopenClosedTab handlers, keeps Mod+W closing the active file tab there.",
-      "budget": 2
+      "intent": "Plugin pages show fixed plugin tabs in their side panel (through the merged tab state). One call, useForkCloseFileTabCommand (workbenchFork.tsx), between the panel.newTab and panel.reopenClosedTab handlers, keeps Mod+W closing the active file tab there. One line inside the AppNavigationHostProvider, after the AppPanelTabsPublisher, mounts forkPageWorkbenchSurface(pluginId, panel id, panelStateId) so experimental_workbench(\"page:<pluginId>/<panelId>\") reaches this page's panel.",
+      "budget": 3
     },
     "apps/app/src/components/promptbox/FollowUpPromptBox.tsx": {
       "seam": "composer-footer",
