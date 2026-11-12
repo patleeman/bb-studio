@@ -164,8 +164,9 @@ public enum Mobile {
     public var botId: String?
     public var conversationId: String?
     public var workerId: String?
+    public var interactionId: String?
 
-    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, category: String? = nil, loopId: String? = nil, actions: [NotifyInputActionsItem]? = nil, loopKind: NotifyInputLoopKind? = nil, options: [String]? = nil, coalesceKey: String? = nil, botId: String? = nil, conversationId: String? = nil, workerId: String? = nil) {
+    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, category: String? = nil, loopId: String? = nil, actions: [NotifyInputActionsItem]? = nil, loopKind: NotifyInputLoopKind? = nil, options: [String]? = nil, coalesceKey: String? = nil, botId: String? = nil, conversationId: String? = nil, workerId: String? = nil, interactionId: String? = nil) {
       self.title = title
       self.body = body
       self.kind = kind
@@ -181,6 +182,7 @@ public enum Mobile {
       self.botId = botId
       self.conversationId = conversationId
       self.workerId = workerId
+      self.interactionId = interactionId
     }
   }
 

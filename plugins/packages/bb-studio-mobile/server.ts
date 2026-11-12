@@ -30,7 +30,7 @@ import {
   type ExpoMessage,
   type ExpoTicket,
 } from "./apns.js";
-import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
+import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { isQuietCompletion } from "./notifications.js";
 import { activityTokenSchema, botIdSchema, deviceIdSchema, liveActivityPayload, liveActivityPriority, liveActivityPushSchema, LiveActivityTokens, MOBILE_MIGRATIONS, tokenKindSchema } from "./live-activities.js";
 import { describeMobileMigration, LEGACY_KEY_PATH_KEY, LEGACY_MOBILE_SETTINGS, migrateMobileSettings, MOBILE_MIGRATED_KEY, MOBILE_SETTINGS, mobileConstants } from "./settings.js";
@@ -50,6 +50,9 @@ const MAX_MUTED = 500;
 const DEVICES_KEY = "devices";
 /** Threads the app has notifications for; see clear.ts. */
 const NOTIFIED_KEY = "notified-threads";
+const NOTIFIED_WORKERS_KEY = "notified-workers";
+const STUDIO_PLUGIN_ID = "studio";
+const pushIdsOutput = z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }).passthrough();
 /** Reading a thread has no event, so notified threads are checked this often. */
 const CLEAR_INTERVAL_MS = 60_000;
 /** Coalesces thread events into one check. */
@@ -73,6 +76,7 @@ export const notifyInput = z.object({
   botId: botIdSchema.optional(),
   conversationId: threadRef.optional(),
   workerId: threadRef.optional(),
+  interactionId: threadRef.optional(),
 }).superRefine((input, context) => {
   if ((input.conversationId || input.workerId) && !input.botId) context.addIssue({ code: "custom", path: ["botId"], message: "A conversation or worker needs its Bot." });
   if (input.workerId && !input.conversationId) context.addIssue({ code: "custom", path: ["conversationId"], message: "A worker needs the conversation it reports to." });
@@ -225,53 +229,77 @@ export default async function plugin(bb: BbPluginApi) {
    * BB's pending-interaction pushes carry only the thread. Add the interaction
    * so the app can offer Approve/Deny or a reply box on the lock screen.
    */
-  async function enrichInteractions(messages: ExpoMessage[]): Promise<void> {
-    const lookups = new Map<string, Promise<Record<string, unknown> | null>>();
-    const lookup = async (threadId: string) => {
-      try {
-        const interactions = await bb.sdk.threads.interactions.list({ threadId });
-        const pending = interactions.find((interaction) => interaction.status === "pending");
-        if (!pending) return null;
-        const payload = pending.payload as {
-          kind: string;
-          subject?: { kind?: string };
-          availableDecisions?: string[];
-          questions?: Array<{ multiSelect?: boolean; allowFreeText?: boolean; options?: Array<{ label: string }> }>;
-        };
-        // One single-select question gets a button per option (the app's notification extension builds them).
-        const question = payload.questions?.length === 1 ? payload.questions[0] : undefined;
-        const choices = question && !question.multiSelect ? (question.options ?? []).slice(0, MAX_CHOICES) : [];
-        return {
-          interactionId: pending.id,
-          interactionKind: payload.kind,
-          ...(payload.subject?.kind ? { subjectKind: payload.subject.kind } : {}),
-          ...(payload.availableDecisions ? { decisions: payload.availableDecisions } : {}),
-          ...(choices.length > 0
-            ? { choices: choices.map((option) => option.label.slice(0, 40)), choiceFreeText: question?.allowFreeText === true }
-            : {}),
-        };
-      } catch (error) {
-        bb.log.warn(`interaction lookup failed for ${threadId}: ${error instanceof Error ? error.message : String(error)}`);
-        return null;
-      }
-    };
+  type Lookups = Map<string, Promise<Record<string, unknown> | null>>;
+  async function interactionDetails(lookups: Lookups, threadId: string, interactionId: string | undefined): Promise<Record<string, unknown> | null> {
+    const key = `${threadId}\u0000${interactionId ?? ""}`;
+    if (!lookups.has(key)) lookups.set(key, lookupInteraction(threadId, interactionId));
+    return lookups.get(key)!;
+  }
+  async function lookupInteraction(threadId: string, interactionId: string | undefined): Promise<Record<string, unknown> | null> {
+    try {
+      const interactions = await bb.sdk.threads.interactions.list({ threadId });
+      const pending = interactions.find((interaction) => interaction.status === "pending" && (interactionId === undefined || interaction.id === interactionId));
+      if (!pending) return null;
+      const payload = pending.payload as {
+        kind: string;
+        subject?: { kind?: string };
+        availableDecisions?: string[];
+        questions?: Array<{ multiSelect?: boolean; allowFreeText?: boolean; options?: Array<{ label: string }> }>;
+      };
+      // One single-select question gets a button per option (the app's notification extension builds them).
+      const question = payload.questions?.length === 1 ? payload.questions[0] : undefined;
+      const choices = question && !question.multiSelect ? (question.options ?? []).slice(0, MAX_CHOICES) : [];
+      return {
+        interactionId: pending.id,
+        interactionKind: payload.kind,
+        ...(payload.subject?.kind ? { subjectKind: payload.subject.kind } : {}),
+        ...(payload.availableDecisions ? { decisions: payload.availableDecisions } : {}),
+        ...(choices.length > 0
+          ? { choices: choices.map((option) => option.label.slice(0, 40)), choiceFreeText: question?.allowFreeText === true }
+          : {}),
+      };
+    } catch (error) {
+      bb.log.warn(`interaction lookup failed for ${threadId}: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
+  async function enrichInteractions(messages: ExpoMessage[], lookups: Lookups): Promise<void> {
     await Promise.all(
       messages.map(async (message) => {
-        const threadId = message.data?.threadId;
-        if (message.data?.kind !== "pending-interaction" || typeof threadId !== "string") return;
-        if (!lookups.has(threadId)) lookups.set(threadId, lookup(threadId));
-        const extra = await lookups.get(threadId)!;
+        const data = message.data;
+        const threadId = typeof data?.workerId === "string" ? data.workerId : data?.threadId;
+        if (data?.kind !== "pending-interaction" || typeof threadId !== "string") return;
+        const extra = await interactionDetails(lookups, threadId, typeof data.interactionId === "string" ? data.interactionId : undefined);
         if (extra) message.data = { ...message.data, ...extra };
       }),
     );
+  }
+
+  async function sentByStudio(message: ExpoMessage, lookups: Lookups, owners: Map<string, Promise<boolean>>): Promise<boolean> {
+    const data = message.data;
+    const threadId = data?.threadId;
+    if (data?.kind !== "pending-interaction" || typeof threadId !== "string" || data.workerId !== undefined) return false;
+    const details = await interactionDetails(lookups, threadId, undefined);
+    if (details?.interactionKind !== "approval" || details.subjectKind === "plan") return false;
+    if (!owners.has(threadId)) {
+      owners.set(threadId, bb.sdk.plugins.callRpc({
+        pluginId: STUDIO_PLUGIN_ID, method: "bot_push_ids", input: { threadId } as never, outputSchema: pushIdsOutput,
+        signal: AbortSignal.timeout(5_000),
+      }).then((ids) => typeof ids.workerId === "string" && ids.workerId === threadId && typeof ids.conversationId === "string", () => false));
+    }
+    return owners.get(threadId)!;
   }
 
   async function deliver(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
+    const lookups: Lookups = new Map();
+    const owners = new Map<string, Promise<boolean>>();
+    const studios = await Promise.all(messages.map((message) => isQuietCompletion(message) ? true : sentByStudio(message, lookups, owners)));
     messages.forEach((message, index) => {
-      if (isQuietCompletion(message)) {
+      if (studios[index]) {
         tickets[index] = { status: "ok" };
         return;
       }
@@ -283,8 +311,8 @@ export default async function plugin(bb: BbPluginApi) {
     if (muted.size > 0) {
       for (let position = apnsIndexes.length - 1; position >= 0; position--) {
         const index = apnsIndexes[position]!;
-        const threadId = messages[index]!.data?.threadId;
-        if (typeof threadId === "string" && muted.has(threadId)) {
+        const data = messages[index]!.data;
+        if ([data?.threadId, data?.workerId].some((id) => typeof id === "string" && muted.has(id))) {
           tickets[index] = { status: "ok" };
           apnsIndexes.splice(position, 1);
         }
@@ -292,7 +320,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
 
     if (apnsIndexes.length > 0) {
-      await enrichInteractions(apnsIndexes.map((index) => messages[index]!));
+      await enrichInteractions(apnsIndexes.map((index) => messages[index]!), lookups);
       for (const index of apnsIndexes) messages[index]!.data = { ...messages[index]!.data, serverId };
       const apns = await apnsConfig();
       await Promise.all(
@@ -315,8 +343,10 @@ export default async function plugin(bb: BbPluginApi) {
     const deliveryIndexes = [...apnsIndexes, ...expoIndexes];
     await rememberDevices(deliveryIndexes.map((index) => messages[index]!), deliveryIndexes.map((index) => tickets[index]!));
     await rememberNotified(apnsIndexes.flatMap((index) => {
-      const threadId = messages[index]!.data?.threadId;
-      return tickets[index]?.status === "ok" && typeof threadId === "string" ? [threadId] : [];
+      const { threadId, workerId } = messages[index]!.data ?? {};
+      return tickets[index]?.status === "ok" && typeof threadId === "string"
+        ? [{ threadId, ...(typeof workerId === "string" && workerId !== threadId ? { workerId } : {}) }]
+        : [];
     }));
     const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
@@ -348,11 +378,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   /** Serializes read-modify-write of the notified threads. */
   let notifiedQueue: Promise<void> = Promise.resolve();
-  function withNotified(fn: (notified: Notified) => Promise<Notified>): Promise<void> {
+  function withNotified(fn: (notified: Notified, workers: NotifiedWorkers) => Promise<{ notified: Notified; workers: NotifiedWorkers }>): Promise<void> {
     notifiedQueue = notifiedQueue
       .then(async () => {
         const notified = (await bb.storage.kv.get<Notified>(NOTIFIED_KEY)) ?? {};
-        await bb.storage.kv.set(NOTIFIED_KEY, await fn(notified));
+        const workers = (await bb.storage.kv.get<NotifiedWorkers>(NOTIFIED_WORKERS_KEY)) ?? {};
+        const next = await fn(notified, workers);
+        await bb.storage.kv.set(NOTIFIED_KEY, next.notified);
+        if (Object.keys(workers).length > 0 || Object.keys(next.workers).length > 0) await bb.storage.kv.set(NOTIFIED_WORKERS_KEY, next.workers);
       })
       .catch((error: unknown) => {
         bb.log.warn(`clearing notifications: ${error instanceof Error ? error.message : String(error)}`);
@@ -360,13 +393,16 @@ export default async function plugin(bb: BbPluginApi) {
     return notifiedQueue;
   }
 
-  function rememberNotified(threadIds: string[]): Promise<void> {
-    if (threadIds.length === 0) return Promise.resolve();
-    return withNotified(async (notified) => noteNotified(notified, threadIds, Date.now()));
+  function rememberNotified(entries: Array<{ threadId: string; workerId?: string }>): Promise<void> {
+    if (entries.length === 0) return Promise.resolve();
+    return withNotified(async (notified, workers) => ({
+      notified: noteNotified(notified, entries.map((entry) => entry.threadId), Date.now()),
+      workers: noteWorkers(workers, entries),
+    }));
   }
 
   const readWarnings = new Map<string, number>();
-  async function readState(threadId: string): Promise<ThreadReadState | null | undefined> {
+  async function readState(threadId: string, workers: readonly string[]): Promise<ThreadReadState | null | undefined> {
     try {
       // Only a missing thread establishes deletion. A failed interactions
       // request must not turn a still-pending approval into a clear push.
@@ -375,9 +411,9 @@ export default async function plugin(bb: BbPluginApi) {
         throw error;
       });
       if (!thread) return null;
-      const interactions = await bb.sdk.threads.interactions.list({ threadId });
+      const lists = await Promise.all([threadId, ...workers].map((id) => bb.sdk.threads.interactions.list({ threadId: id })));
       readWarnings.delete(threadId);
-      return { ...thread, hasPendingInteraction: interactions.some((interaction) => interaction.status === "pending") };
+      return { ...thread, hasPendingInteraction: lists.some((interactions) => interactions.some((interaction) => interaction.status === "pending")) };
     } catch (error) {
       const now = Date.now();
       if (!readWarnings.has(threadId) || now - readWarnings.get(threadId)! >= 5 * CLEAR_INTERVAL_MS) {
@@ -389,13 +425,13 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   function clearReadNotifications(): Promise<void> {
-    return withNotified(async (notified) => {
+    return withNotified(async (notified, workers) => {
       const threadIds = Object.keys(notified);
       for (const id of readWarnings.keys()) if (!(id in notified)) readWarnings.delete(id);
-      if (threadIds.length === 0) return notified;
+      if (threadIds.length === 0) return { notified, workers: {} };
       const apns = await apnsConfig();
-      if ("missing" in apns) return notified;
-      const states = Object.fromEntries(await Promise.all(threadIds.map(async (id) => [id, await readState(id)] as const)));
+      if ("missing" in apns) return { notified, workers };
+      const states = Object.fromEntries(await Promise.all(threadIds.map(async (id) => [id, await readState(id, workers[id] ?? [])] as const)));
       const { clear, keep } = partition(notified, states, Date.now());
       const observed = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
       let devices = Object.keys(observed)
@@ -431,7 +467,7 @@ export default async function plugin(bb: BbPluginApi) {
           return current;
         });
       }
-      return keep;
+      return { notified: keep, workers: keptWorkers(workers, keep) };
     });
   }
 
@@ -489,7 +525,7 @@ export default async function plugin(bb: BbPluginApi) {
       const devices = Object.entries((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
         .flatMap(([to, seen]) => (now - seen > DEVICE_TTL_MS ? [] : [to]));
       // Without a thread there is nothing to reply to, so leave out the kind that adds a reply box.
-      const bot = { ...(input.botId ? { botId: input.botId } : {}), ...(input.conversationId ? { conversationId: input.conversationId } : {}), ...(input.workerId ? { workerId: input.workerId } : {}) };
+      const bot = { ...(input.botId ? { botId: input.botId } : {}), ...(input.conversationId ? { conversationId: input.conversationId } : {}), ...(input.workerId ? { workerId: input.workerId } : {}), ...(input.interactionId ? { interactionId: input.interactionId } : {}) };
       const data = input.threadId
         ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}), ...bot }
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}), ...bot };
@@ -501,7 +537,7 @@ export default async function plugin(bb: BbPluginApi) {
         : [];
       const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
       const sent = tickets.filter((ticket, index) => ticket.status === "ok" &&
-        !(devices[index]!.startsWith(APNS_TOKEN_PREFIX) && input.threadId && muted.has(input.threadId))).length;
+        !(devices[index]!.startsWith(APNS_TOKEN_PREFIX) && [input.threadId, input.workerId].some((id) => id && muted.has(id)))).length;
       return { ok: true as const, sent };
     },
     async push_status() {

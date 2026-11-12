@@ -799,13 +799,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Threads a host restart cut off (src/thread-resume.ts): resumed with a
   // marker, at most twice an hour each; past that, a line in the owning Bot's
   // chat for it to triage (a Bot's thread) or a phone push (any other).
-  function botPushIds(threadId: string): { botId?: string; conversationId?: string; workerId?: string } {
-    const rec = botThreads.store.get(threadId);
-    if (!rec) return {};
-    if (rec.kind === "conversation") return { botId: rec.botId, conversationId: rec.threadId };
-    const conversationId = rec.ownerConversationId ?? bots.stored(rec.botId)?.threadId ?? null;
-    return conversationId ? { botId: rec.botId, conversationId, workerId: rec.threadId } : { botId: rec.botId };
-  }
+  const botPushIds = (threadId: string) => botThreads.pushIds(threadId);
   const threadOwner = (threadId: string): ThreadOwner | null => {
     const bot = bots.list().find((each) => bots.chain(each.id).includes(threadId))
       ?? (() => { const runner = runners.forThread(threadId); return runner ? bots.stored(runner.bot_id) : null; })()
@@ -846,6 +840,9 @@ export default async function plugin(bb: BbPluginApi) {
     cleared: (threadId) => { botThreads.store.clearNeedsYouFrom(threadId); },
   });
   bb.events.on("interaction.pending", ({ thread, interaction }) => void nudges.pending(thread, interaction as never).catch((error) => bb.log.warn(`Bot nudge: ${errorText(error)}`)));
+  bb.events.on("interaction.pending", ({ thread, interaction }) => void botThreads.approvalPush(thread, interaction as never).then((push) => push && bb.sdk.plugins.callRpc({
+    pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: push as never,
+  })).catch((error) => bb.log.warn(`Worker approval push failed: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
   bb.events.on("thread.idle", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
   const threadResume = new ThreadResume({

@@ -537,3 +537,142 @@ describe("Live Activities", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 });
+
+describe("worker approvals", () => {
+  const device = "b".repeat(64);
+  const approval = (id: string, subject = "command") => ({
+    id, status: "pending",
+    payload: { kind: "approval", subject: { kind: subject, command: "pnpm test" }, availableDecisions: ["allow_once", "allow_for_session", "deny"] },
+  });
+  const studioPush = {
+    title: "Dot · Fork redesign", body: "Fable lead needs your approval: pnpm test", kind: "pending-interaction", threadId: "thr_conv",
+    projectId: "proj_studio", botId: "dot", conversationId: "thr_conv", workerId: "thr_w", interactionId: "int_1", coalesceKey: "worker-approval:int_1",
+  } as const;
+
+  async function approvalHost(options: { pending?: Record<string, unknown[]>; studio?: (threadId: string) => Promise<unknown>; read?: { lastReadAt: number; latestAttentionAt: number } } = {}) {
+    const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+    const pending = new Map(Object.entries(options.pending ?? {}));
+    const studioCalls: string[] = [];
+    const callRpc = vi.fn(async (call: { pluginId: string; method: string; input?: { threadId: string } }) => {
+      if (call.pluginId !== "studio" || call.method !== "bot_push_ids") throw new Error("unknown plugin");
+      studioCalls.push(call.input!.threadId);
+      if (!options.studio) throw new Error("plugin is not running");
+      return options.studio(call.input!.threadId);
+    });
+    const host = createFakePluginHost({ pluginId: "mobile", settings: { apnsKey: key, apnsKeyId: "test" },
+      sdk: {
+        threads: {
+          get: async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, ...(options.read ?? { lastReadAt: 0, latestAttentionAt: 1000 }) }),
+          interactions: { list: async ({ threadId }: { threadId: string }) => pending.get(threadId) ?? [] },
+        },
+        plugins: { callRpc },
+      } as never,
+    });
+    await plugin(host.bb);
+    await host.bb.storage.kv.set("devices", { ["apns:" + device]: Date.now() });
+    const push = async (messages: ExpoMessage[]) => (await host.harness.behavior.fetchHttp("POST", "/push", { body: JSON.stringify(messages), headers: { "content-type": "application/json" } })).json();
+    return { ...host, pending, push, studioCalls };
+  }
+
+  it("sends Studio's worker approval with the Bot, its conversation, the worker and the interaction, as BB_APPROVAL", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_0"), approval("int_1")] } });
+    try {
+      expect(await host.harness.behavior.callRpc("notify", studioPush)).toEqual({ ok: true, sent: 1 });
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.headers).toMatchObject({ ":path": `/3/device/${device}`, "apns-push-type": "alert", "apns-collapse-id": "worker-approval:int_1" });
+      expect(JSON.parse(requests[0]!.body)).toEqual({
+        aps: { alert: { title: "Dot · Fork redesign", body: "Fable lead needs your approval: pnpm test" }, sound: "default", "thread-id": "thr_conv", category: "BB_APPROVAL" },
+        kind: "pending-interaction", threadId: "thr_conv", projectId: "proj_studio",
+        botId: "dot", conversationId: "thr_conv", workerId: "thr_w", interactionId: "int_1",
+        interactionKind: "approval", subjectKind: "command", decisions: ["allow_once", "allow_for_session", "deny"],
+        serverId: expect.any(String),
+      });
+      expect(host.studioCalls).toEqual([]);
+      expect(await host.bb.storage.kv.get("notified-threads")).toEqual({ thr_conv: expect.any(Number) });
+      expect(await host.bb.storage.kv.get("notified-workers")).toEqual({ thr_conv: ["thr_w"] });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("enriches from workerId when the sender gives no interactionId", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_9")] } });
+    try {
+      const { interactionId: _omitted, ...withoutId } = studioPush;
+      await host.harness.behavior.callRpc("notify", withoutId);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ threadId: "thr_conv", workerId: "thr_w", interactionId: "int_9", aps: { category: "BB_APPROVAL" } });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("drops BB's own push for a worker's approval, since Studio sends it", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_1")] }, studio: async (threadId) => ({ botId: "dot", conversationId: "thr_conv", workerId: threadId }) });
+    try {
+      const bbPush = { to: "apns:" + device, title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w", projectId: "proj_studio" } };
+      const expoPush = { to: "ExponentPushToken[other]", title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w" } };
+      vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("must not forward"); }));
+      expect(await host.push([bbPush, expoPush])).toEqual({ data: [{ status: "ok" }, { status: "ok" }] });
+      expect(requests).toEqual([]);
+      expect(host.studioCalls).toEqual(["thr_w"]);
+      expect(await host.bb.storage.kv.get("notified-threads")).toBeUndefined();
+      expect(await host.harness.behavior.callRpc("notify", studioPush)).toEqual({ ok: true, sent: 1 });
+      expect(requests).toHaveLength(1);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("keeps BB's push for plans, for threads Studio calls no worker, and when Studio can't be reached", async () => {
+    const requests = recordingSession();
+    const cases = [
+      { pending: { thr_w: [approval("int_p", "plan")] }, studio: async () => ({ botId: "dot", conversationId: "thr_conv", workerId: "thr_w" }), category: "BB_PLAN" },
+      { pending: { thr_w: [approval("int_c")] }, studio: async () => ({ botId: "dot", conversationId: "thr_w" }), category: "BB_APPROVAL" },
+      { pending: { thr_w: [approval("int_x")] }, category: "BB_APPROVAL" },
+    ];
+    for (const each of cases) {
+      const host = await approvalHost(each);
+      try {
+        await host.push([{ to: "apns:" + device, title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w" } }]);
+        expect(JSON.parse(requests.at(-1)!.body)).toMatchObject({ threadId: "thr_w", aps: { "thread-id": "thr_w", category: each.category } });
+      } finally { await host.harness.lifecycle.dispose(); }
+    }
+    expect(requests).toHaveLength(3);
+  });
+
+  it("still enriches an old-shape push (thread only) and accepts keys it doesn't know", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_a: [approval("int_a")] } });
+    try {
+      await host.push([{ to: "apns:" + device, title: "Thread", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_a", projectId: "proj_demo" } }]);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ threadId: "thr_a", interactionId: "int_a", interactionKind: "approval", aps: { "thread-id": "thr_a", category: "BB_APPROVAL" } });
+      expect(JSON.parse(requests[0]!.body)).not.toHaveProperty("workerId");
+      expect(await host.harness.behavior.callRpc("notify", { title: "Result", body: "Done", kind: "turn-finished", threadId: "thr_a", projectId: "proj_demo", futureKey: 1 } as never)).toEqual({ ok: true, sent: 1 });
+      expect(await host.harness.behavior.callRpc("notify", { title: "Result", body: "[PASS]", kind: "turn-finished", threadId: "thr_a", projectId: "proj_demo", interactionId: "int_a" })).toEqual({ ok: true, sent: 0 });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("keeps the conversation's notification while the worker's approval waits, and clears it once answered", async () => {
+    vi.useFakeTimers();
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_1")] }, read: { lastReadAt: 2000, latestAttentionAt: 1000 } });
+    try {
+      await host.harness.behavior.callRpc("notify", studioPush);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(requests).toHaveLength(1);
+      expect(await host.bb.storage.kv.get("notified-threads")).toEqual({ thr_conv: expect.any(Number) });
+      host.pending.set("thr_w", [{ ...approval("int_1"), status: "resolved" }]);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(JSON.parse(requests.at(-1)!.body)).toMatchObject({ clearThreadIds: ["thr_conv"] });
+      expect(await host.bb.storage.kv.get("notified-threads")).toEqual({});
+      expect(await host.bb.storage.kv.get("notified-workers")).toEqual({});
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("drops the push on the phone when the worker is muted", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_1")] } });
+    try {
+      await host.bb.storage.kv.set("muted-threads", ["thr_w"]);
+      expect(await host.harness.behavior.callRpc("notify", studioPush)).toEqual({ ok: true, sent: 0 });
+      expect(requests).toEqual([]);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+});

@@ -60,6 +60,17 @@ hands-free voice).
 - **`needs-you`.** A new kind for a conversation that needs Patrick. It needs
   `botId` and `conversationId`, and `threadId` must be the conversation. It
   has no category, so no lock-screen actions.
+- **Worker approvals.** Studio sends one push per approval a Bot's worker
+  waits on: kind `pending-interaction`, `threadId` and `conversationId` the
+  conversation that shows its card, `workerId` the worker, `interactionId` the
+  approval, and the title "Bot · Conversation". The relay looks the interaction
+  up on `workerId` (the given `interactionId` when set), so the push gets
+  `BB_APPROVAL`. BB's own `pending-interaction` push for a worker's approval
+  (no `workerId`) is dropped once Studio's `bot_push_ids` calls its thread a
+  worker; plans, questions, and a Studio that can't be reached keep BB's push.
+  The conversation's notification clears only once it is read and the
+  worker's approval no longer waits. A phone mute on the worker or the
+  conversation mutes it.
 - **Older apps.** The app before this change reads only `threadId` and
   `serverId` and ignores `kind`, so a `needs-you` push shows as a plain alert
   and a tap opens the conversation as a thread. The new keys are extra data it

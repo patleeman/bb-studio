@@ -205,6 +205,7 @@ public enum Studio {
     public static let presence_check_reply = "presence_check_reply"
     public static let bot_worker_approval = "bot_worker_approval"
     public static let bot_conversation_approvals = "bot_conversation_approvals"
+    public static let bot_push_ids = "bot_push_ids"
     public static let bot_worker_approval_resolve = "bot_worker_approval_resolve"
     public static let chat_viewing = "chat.viewing"
     public static let chat_subject = "chat.subject"
@@ -838,6 +839,8 @@ public enum Studio {
   public typealias BotWorkerApproval = BotWorkerApprovalOutput
 
   public typealias BotConversationApprovals = BotConversationApprovalsOutput
+
+  public typealias BotPushIds = BotPushIdsOutput
 
   public typealias BotWorkerApprovalResolve = BotWorkerApprovalResolveOutput
 
@@ -21712,6 +21715,26 @@ public enum Studio {
 
     public init(approvals: [BotConversationApprovalsOutputApprovalsItem]? = nil) {
       self.approvals = approvals
+    }
+  }
+
+  public struct BotPushIdsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotPushIdsOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var conversationId: String?
+    public var workerId: String?
+
+    public init(botId: String? = nil, conversationId: String? = nil, workerId: String? = nil) {
+      self.botId = botId
+      self.conversationId = conversationId
+      self.workerId = workerId
     }
   }
 

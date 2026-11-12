@@ -250,6 +250,27 @@ it("lists the approvals a conversation's workers wait on, for its live cards; a 
   expect((await server.rpc.bot_conversation_approvals({ threadId: "thr_main" })).approvals).toEqual([]);
 }, 10_000);
 
+it("builds a worker approval's phone push for its conversation, with the ids Studio Mobile matches BB's own push against", async () => {
+  const { server } = await setup();
+  const approval = (id: string, subject = "command") => ({ id, status: "pending", payload: { kind: "approval", reason: null, availableDecisions: ["allow_once", "deny"], subject: { kind: subject, itemId: "i", command: `git push ${id}` } } });
+  const lead = { id: "lead", projectId: "proj_studio" };
+  expect(server.rpc.bot_push_ids({ threadId: "lead" })).toEqual({ botId: "dot", conversationId: "redesign", workerId: "lead" });
+  expect(server.rpc.bot_push_ids({ threadId: "redesign" })).toEqual({ botId: "dot", conversationId: "redesign" });
+  expect(server.rpc.bot_push_ids({ threadId: "nope" })).toEqual({});
+  expect(await server.approvalPush(lead, approval("int_1"))).toEqual({
+    title: "Dot · Fork redesign", body: "Fable lead: sidebar rewrite needs your approval: git push int_1", kind: "pending-interaction",
+    threadId: "redesign", projectId: "proj_studio", botId: "dot", conversationId: "redesign", workerId: "lead", interactionId: "int_1", coalesceKey: "worker-approval:int_1",
+  });
+  expect(await server.approvalPush(lead, approval("int_p", "plan"))).toBeNull();
+  expect(await server.approvalPush(lead, { id: "int_q", status: "pending", payload: { kind: "user_question" } })).toBeNull();
+  expect(await server.approvalPush(lead, { ...approval("int_r"), status: "resolved" })).toBeNull();
+  expect(await server.approvalPush({ id: "redesign" }, approval("int_c"))).toBeNull();
+  expect(await server.approvalPush({ id: "nope" }, approval("int_n"))).toBeNull();
+  server.store.archived("redesign", true);
+  expect(server.rpc.bot_push_ids({ threadId: "lead" })).toEqual({ botId: "dot", conversationId: "thr_main", workerId: "lead" });
+  expect(await server.approvalPush(lead, approval("int_2"))).toMatchObject({ title: "Dot · Main", threadId: "thr_main", conversationId: "thr_main", workerId: "lead", interactionId: "int_2" });
+});
+
 it("forks a conversation from a message: BB forks after it, and the fork is the same Bot's conversation linked back, whatever was guessed first", async () => {
   const { server, fork, threads } = await setup();
   threads.set("redesign", { ...threads.get("redesign")!, status: "active" });
