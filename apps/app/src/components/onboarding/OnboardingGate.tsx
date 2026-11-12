@@ -1,3 +1,4 @@
+import { ForkFirstRun, useForkFirstRun } from "@/components/fork/ForkFirstRun";
 import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
 import { ScreenPaintSignal } from "@/components/ScreenPaintSignal";
@@ -43,6 +44,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
 
   const settings = configQuery.data?.generalSettings;
   const completedAt = settings?.onboardingCompletedAt;
+  const forkFirstRun = useForkFirstRun(completedAt === null && !firstRunClosed);
   const prefetchInstallInfo = completedAt === null;
   const primaryHost = usePrimaryHost({ enabled: prefetchInstallInfo });
   useHostProviderCliStatus({
@@ -68,6 +70,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   }
 
   const firstRun = settings.onboardingCompletedAt === null && !firstRunClosed;
+  if (firstRun && forkFirstRun !== null) return <ForkFirstRun state={forkFirstRun} />;
   if (!firstRun && !firstRunClosed) return children;
   const entry = seenBefore ? "replay" : "first_run";
 
