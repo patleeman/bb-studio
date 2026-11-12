@@ -177,9 +177,9 @@
       "budget": 4
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events.",
-      "budget": 10
+      "seam": "quiet-turns, plugin-events, bundled-studio",
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio and Visual Chat reconcile as built-ins when their bundles are in the app; an existing install of the same id from another source (a path install) is left alone.",
+      "budget": 13
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
       "seam": "import-sync",
