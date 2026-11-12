@@ -260,11 +260,11 @@ Names: `ExperimentalSidebarStyle`.
     the composer box a `composer` card over a dense fade inside it, and the side panel a
     `secondary-panel` card. Settings, Skills, Plugins and their pages get one `main` card on
     their content column. Cards and their controls draw no 1px line. Any element with
-    `data-fork-card="<surface>"` outside the sidebar is painted the same way: mark your own
-    page's column card with it. `<html>` gets `data-fork-cards`, `--fork-cards-gap`, `--fork-cards-radius`.
-- The first registration by plugin id wins. A crash in `component` or a
-  throw in `useAppearance` removes the backdrop and every override. Plugin
-  windows, popped-out routes and popped-out tabs get none.
+    `data-fork-card="<surface>"` outside the sidebar is painted the same way: mark your own page's
+    column card with it. `<html>` gets `data-fork-cards`, `--fork-cards-gap`, `--fork-cards-radius`.
+    `titleRow: true` puts each page's title in its card ("Title rows in cards", fork-api-host.md).
+- The first registration by plugin id wins. A crash in `component` or a throw in `useAppearance`
+  removes the backdrop and every override. Plugin windows, popped-out routes and tabs get none.
 
 Names: `ExperimentalAppBackdropRegistration`, `ExperimentalAppAppearance`,
 `ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`.
