@@ -2,6 +2,7 @@ import { ForkAppBackdropHost } from "./ForkAppBackdrop";
 import { ForkApprovalHost } from "./ForkApprovalHost";
 import { ForkItemDropHost } from "./ForkItemDropHost";
 import { ForkMainHeader } from "./ForkMainHeader";
+import { ForkOverlayScrollbarHost } from "./ForkOverlayScrollbar";
 import { ForkTabReturnHost } from "./ForkTabReturnHost";
 import { ForkSidebarStyleHost } from "@/components/sidebar/ForkSidebarStyle";
 import { useNarrowWindowSidebar } from "@/components/layout/useNarrowWindowSidebar.fork";
@@ -27,6 +28,7 @@ export function ForkLayoutHosts() {
       <ForkItemDropHost />
       <ForkSidebarStyleHost />
       <ForkTabReturnHost />
+      <ForkOverlayScrollbarHost />
     </>
   );
 }
