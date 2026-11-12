@@ -68,8 +68,8 @@
     },
     "apps/app/src/components/promptbox/FollowUpPromptBox.tsx": {
       "seam": "composer-footer",
-      "intent": "Renders PluginComposerFooter (ForkComposerFooter.tsx, which resolves the slots' experimental_footer items itself) in the row under an existing thread's input, before bb's own controls.",
-      "budget": 6
+      "intent": "Renders PluginComposerFooter (ForkComposerFooter.tsx, which resolves the slots' experimental_footer items itself) in the row under an existing thread's input, before bb's own controls. The context-window ring sits in a data-fork-context-control wrapper with PluginComposerFooter placement=\"context\" before it, so a plugin item (Studio's prompt-cache clock) and the ring read as one control.",
+      "budget": 10
     },
     "apps/app/src/components/secondary-panel/SecondaryPanelTabStrip.tsx": {
       "seam": "workbench, item-drag",
