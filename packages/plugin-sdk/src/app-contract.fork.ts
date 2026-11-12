@@ -986,6 +986,29 @@ export interface ExperimentalModelLoadNoticeRegistration {
 }
 
 /**
+ * Props for a `slots.experimental_firstRun` component. `finish()` marks bb's
+ * first run done (the same setting bb's own setup screens set) and shows the
+ * app. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalFirstRunProps {
+  finish(): void;
+}
+
+/**
+ * Registration for `slots.experimental_firstRun`: the plugin takes over bb's
+ * first run. On a data dir whose first run is not done, bb waits for plugin
+ * frontends to settle; when a plugin registered this slot, bb draws its
+ * `component` full-window instead of bb's setup screens, or, with no
+ * component, marks the first run done at once and shows the app. The first
+ * registration in plugin-id order wins. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalFirstRunRegistration {
+  id: string;
+  component?: ComponentType<ExperimentalFirstRunProps>;
+}
+
+/**
  * Slots the fork adds beside `PluginAppSlots`.
  */
 export interface ForkPluginAppSlots {
@@ -1027,6 +1050,12 @@ export interface ForkPluginAppSlots {
   experimental_modelLoadNotice(
     registration: ExperimentalModelLoadNoticeRegistration,
   ): void;
+  /**
+   * Take over bb's first run (see
+   * {@link ExperimentalFirstRunRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_firstRun(registration: ExperimentalFirstRunRegistration): void;
   /**
    * Change the title text and add a node after it in each thread's header
    * (see {@link ExperimentalThreadHeaderRegistration}). Experimental: see

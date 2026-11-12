@@ -164,6 +164,15 @@ not remount, and they return to the bar when the host or the flag goes.
   scrollbar gutter and show a thin overlay thumb on hover and scroll. Mark
   your own scroller `data-fork-overlay-scroll` for the same.
 
+## bb's first run
+
+- `app.slots.experimental_firstRun({ id, component? })` → takes over bb's
+  setup screens on a data dir whose first run is not done. bb waits for
+  plugin frontends to load, then draws `component` full-window with
+  `{ finish }`; `finish()` marks the first run done and shows the app. With
+  no component bb finishes at once. The first registration by plugin id
+  wins; without one bb shows its own screens.
+
 ## The workbench of your own page
 
 A nav-panel page has the same side panel as a thread. Reach it with
