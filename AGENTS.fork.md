@@ -45,6 +45,10 @@ Tooling and notes, then seams, then features, then the generated commits at the 
 
 `node scripts/fork/sync.mjs --fetch` replays the fork onto `upstream/main` in a throwaway worktree, regenerates, runs the checks and moves the local branch `desktop-candidate`. It never touches `desktop`. `scripts/fork/sync-agent.md` is the brief for the agent that runs it. `STUDIO_FORK.md` has the details. After a clean sync: `git reset --hard desktop-candidate` on `desktop` (clean tree), `node scripts/import-desktop.mjs` on `main`, then `git push origin main && git push --force-with-lease origin desktop`.
 
+## Releasing
+
+BB Studio has its own version line (`apps/desktop/studio-release.fork.json`, 1.0.0 and up) and updates from the GitHub releases of the public repository `patleeman/bb-studio`. Release with `node scripts/fork/release-desktop.mjs` (`--help`); it only ever creates draft releases. `STUDIO_FORK.md`, "Version line, updates and releases", has the steps.
+
 ## Resolving a conflict
 
 Trial replays and syncs run with git rerere off (`git -c rerere.enabled=false`); never let a recorded resolution replay unseen. Put a fork import at the very top of an upstream file, above upstream's first import, so it touches one upstream line, not two.
