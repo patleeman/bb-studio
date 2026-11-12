@@ -25,14 +25,14 @@ it("puts Fork conversation from here in a message's ··· menu in place of BB's
   expect(registered[0]!.isAvailable({ ...message, sourceSeqEnd: Number.NaN })).toBe(false);
 });
 
-it("forks after the message and opens the new conversation; a refusal is a toast and opens nothing", async () => {
+it("forks after the message and opens the fork beside its conversation; a refusal is a plain toast and opens nothing", async () => {
   const call = vi.fn(async () => ({ threadId: "fork_1" }));
   const open = vi.fn();
   expect(await forkFromHere(message, { call, open })).toBe("fork_1");
   expect(call).toHaveBeenCalledWith("bot_fork_conversation", { threadId: "main", messageId: "msg_1", turnId: "turn_1", sourceSeqEnd: 12 });
-  expect(open).toHaveBeenCalledWith("fork_1");
+  expect(open).toHaveBeenCalledWith("fork_1", "main");
   open.mockClear();
   expect(await forkFromHere(message, { call: vi.fn(async () => { throw new Error("That thread isn't one of a Bot's conversations."); }), open })).toBeNull();
   expect(open).not.toHaveBeenCalled();
-  expect(toast.error).toHaveBeenCalledWith("That thread isn't one of a Bot's conversations.");
+  expect(toast.error).toHaveBeenCalledWith("Couldn't fork the conversation.");
 });

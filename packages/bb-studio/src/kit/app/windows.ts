@@ -49,7 +49,7 @@ export interface HostWindows {
   open(windowId: string, options?: HostWindowOptions): Promise<boolean>;
   toggle(windowId: string, options?: HostWindowOptions): Promise<boolean>;
   close(windowId: string): Promise<boolean>;
-  /** Whether the window's hotkey took; false when another app holds it. Newer BBs only (src/hud/hotkey.ts reads it by name). */
+  /** Whether the window's hotkey took; false when another app holds it. Newer BBs only (src/windows/hotkey.ts reads it by name). */
   hotkeyRegistered?(windowId: string): Promise<boolean>;
   /**
    * Switches click-through on an open window. While it is on, the window's

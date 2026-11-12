@@ -41,7 +41,6 @@ import { isReadOnlyMirror, MirrorBox, useMirrorStatus } from "../mirror-banner";
 import { doneLabel, splitWorkers } from "./model";
 import { FinishedBox, isFinished } from "./finish";
 import { ConversationApprovals, ConversationApprovalsBanner } from "./ConversationApprovals";
-import { canPopOut, PopOutHudButton, useCanPopOutToHud } from "../../hud/ui/pop-out";
 
 export type ReadOnlyKind = "worker" | "mirror" | "finished" | null;
 
@@ -201,29 +200,25 @@ export function conversationHeader(info: Pick<BotThreadInfo, "isMain" | "botName
 
 /**
  * BB's thread header (`experimental_threadHeader`), one row: a worker's state
- * after its title, a conversation's Bot after its title, in muted text; and
- * on every thread but a worker, "Pop out to HUD" as a small muted icon at the
- * end (src/hud/ui/pop-out.tsx), where this window can pop one out.
+ * after its title, a conversation's Bot after its title, in muted text.
  */
-export interface ThreadHeaderParts { title: string | null; detail: ReactNode; popOut: ReactNode; worker: boolean }
+export interface ThreadHeaderParts { title: string | null; detail: ReactNode; worker: boolean }
 
 export function useThreadHeaderParts({ threadId }: { threadId: string }): ThreadHeaderParts {
   const live = useLive("bot_thread_info", { threadId }, { pollMs: 30_000 });
   const info = live.data?.info ?? null;
-  const popOut = useCanPopOutToHud() && canPopOut(live.data ? info : undefined) ? <PopOutHudButton threadId={threadId} /> : null;
-  if (info?.kind === "worker") return { title: null, detail: <WorkerState info={info} label={workerShortLabel(info)} />, popOut: null, worker: true };
+  if (info?.kind === "worker") return { title: null, detail: <WorkerState info={info} label={workerShortLabel(info)} />, worker: true };
   const header = info ? conversationHeader(info) : null;
-  return { title: header?.title ?? null, detail: header ? <span data-testid="conversation-bot" className="truncate text-xs text-muted-foreground">with {header.bot}</span> : null, popOut, worker: false };
+  return { title: header?.title ?? null, detail: header ? <span data-testid="conversation-bot" className="truncate text-xs text-muted-foreground">with {header.bot}</span> : null, worker: false };
 }
 
 export function useStudioThreadHeader({ threadId }: { threadId: string }): ThreadHeaderDecoration | null {
-  const { title, detail, popOut, worker } = useThreadHeaderParts({ threadId });
+  const { title, detail, worker } = useThreadHeaderParts({ threadId });
   if (worker) return { after: <span className="studio-root">{detail}</span> };
-  if (!detail) return popOut ? { after: <span className="studio-root inline-flex items-center">{popOut}</span> } : null;
+  if (!detail) return null;
   const after = (
     <span className="studio-root inline-flex min-w-0 items-center gap-2">
       {detail}
-      {popOut}
     </span>
   );
   return title ? { title, after } : { after };

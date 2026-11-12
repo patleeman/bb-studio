@@ -1,3 +1,4 @@
+import { STUDIO_NO_RELEASE_MESSAGE } from "./desktop-app-update.fork.js";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -136,7 +137,7 @@ export function createDesktopAppUpdateService(args: {
         info?.supported === true && (updaterUnavailable || version === null)
           ? {
               reason: "fetch-failed",
-              message: "Couldn't check for a newer bb release.",
+              message: STUDIO_NO_RELEASE_MESSAGE,
             }
           : null,
       activity,

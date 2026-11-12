@@ -139,12 +139,11 @@ export function BotCacheSummary({ threadId, isExpanded, onToggle }: { threadId: 
   );
 }
 
-const CHIP = "inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs";
-
-/** The footer chip's words: "cache 59m", "cache cold", "cache off" (UX review 2, item 10). */
 export function chipText(indicator: CacheIndicator): string {
-  return `cache ${indicator.text ?? "off"}`;
+  return indicator.text ?? "off";
 }
+
+const RING_CHIP = "inline-flex h-6 shrink-0 items-center gap-0.5 rounded-md pl-1 pr-0.5 text-xs leading-none text-muted-foreground";
 
 function ChipFace({ indicator }: { indicator: CacheIndicator }) {
   return (
@@ -166,16 +165,26 @@ export function BotCacheChip({ threadId }: { threadId: string }) {
   return cacheInHostCard() ? <HostCardChip threadId={threadId} /> : <BotCachePopover threadId={threadId} />;
 }
 
+function RingFace({ indicator }: { indicator: CacheIndicator }) {
+  return (
+    <>
+      <Icon name="Clock" className={`size-3 ${indicator.tone === "amber" ? "text-warning" : ""}`} aria-hidden />
+      <span className={`tabular-nums ${indicator.tone === "amber" ? "text-warning" : ""}`}>{indicator.text}</span>
+    </>
+  );
+}
+
 function HostCardChip({ threadId }: { threadId: string }) {
   const { state } = useBotCache(threadId);
   const card = useHostContextCard!();
   if (!state) return null;
   const indicator = cacheIndicator(state);
-  if (!card.available) return <span data-testid="bot-cache-chip" aria-label={indicator.label} title={indicator.label} className={CHIP}><ChipFace indicator={indicator} /></span>;
+  if (indicator.text === null || indicator.text === "cold") return null;
+  if (!card.available) return <span data-testid="bot-cache-chip" aria-label={indicator.label} className={RING_CHIP}><RingFace indicator={indicator} /></span>;
   return (
-    <button type="button" data-testid="bot-cache-chip" aria-label={`${indicator.label}. Show details`} title={indicator.label} onClick={() => card.open()}
-      className={`${CHIP} outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring`}>
-      <ChipFace indicator={indicator} />
+    <button type="button" data-testid="bot-cache-chip" aria-label={`${indicator.label}. Show details`} onClick={() => card.open()}
+      className={`${RING_CHIP} cursor-pointer outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring`}>
+      <RingFace indicator={indicator} />
     </button>
   );
 }

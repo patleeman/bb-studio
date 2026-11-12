@@ -9,9 +9,8 @@ const state = vi.hoisted(() => ({
   navigate: { toThread: vi.fn(), openUrl: vi.fn((_url: string) => true) },
   openLink: vi.fn(async (_link: unknown, _options: unknown) => ({ via: "workbench", pane: null, opened: true })),
   open: vi.fn(),
-  showHud: vi.fn(async (_threadId?: string) => true),
   windows: { native: true, register: vi.fn(async () => true), open: vi.fn(async () => true), toggle: vi.fn(async () => true), close: vi.fn(async () => true) },
-  settings: { hudEnabled: true, hudHotkey: "", launcherHotkey: "Alt+Space" } as Record<string, unknown>,
+  settings: { launcherHotkey: "Alt+Space" } as Record<string, unknown>,
   items: [] as { key: string; pluginId: string; id: string; title: string; icon: string; section: "apps" | "actions"; keywords?: string[]; order?: number; run: () => void | Promise<void> }[],
   commands: [] as { id: string; title: string; group: string; shortcut?: string; run: () => void }[],
 }));
@@ -29,7 +28,6 @@ vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ v
 vi.mock("../../kit/ui/index", () => ({ Icon: () => null, cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") }));
 vi.mock("../../ui/studio-open", () => ({ useStudioOpen: () => state.open }));
 vi.mock("../../links/open", () => ({ LinksBridge: () => null, useOpenLink: () => state.openLink }));
-vi.mock("../../hud/ui/HudBridge", () => ({ showHud: state.showHud }));
 vi.mock("../../ui/live", () => ({ useCall: () => vi.fn() }));
 vi.mock("../../ui/thread-header", () => ({ useThreadLookup: () => new Map() }));
 vi.mock("./Omnibar", async (original) => {
@@ -81,13 +79,12 @@ beforeEach(() => {
   root = createRoot(host);
   close.mockClear();
   state.open.mockClear();
-  state.showHud.mockClear();
   state.navigate.toThread.mockClear();
   state.navigate.openUrl.mockClear();
   state.openLink.mockClear();
   vi.mocked(Omnibar).mockClear();
   state.items = [];
-  registerLauncherItems({ experimental_launcherItem: (item: (typeof STUDIO_LAUNCHER_ITEMS)[number]) => { state.items.push({ ...item, keywords: [...(item.keywords ?? [])], key: `studio/${item.id}`, pluginId: "studio" }); } }, true);
+  registerLauncherItems({ experimental_launcherItem: (item: (typeof STUDIO_LAUNCHER_ITEMS)[number]) => { state.items.push({ ...item, keywords: [...(item.keywords ?? [])], key: `studio/${item.id}`, pluginId: "studio" }); } });
   state.commands = [{ id: "plugin-page:roadmaps/board", title: "Roadmap board", group: "Plugin pages", run: vi.fn() }, { id: "app:window.new", title: "New window", group: "Window and layout", shortcut: "⇧⌘N", run: vi.fn() }];
   state.rpc.mockReset().mockImplementation(async (method: string) => {
     if (method === "newtab_recents") return { entries: [{ id: "page:pg_1", title: "Roadmap", kind: "Page", icon: "FileText", updatedAt: 25, ref: { kind: "page", id: "pg_1" } }, { id: "conversation:thr_2", title: "Plan the offsite", kind: "Conversation", icon: "MessageSquare", updatedAt: 20, ref: { kind: "conversation", id: "thr_2" } }] };
@@ -96,7 +93,6 @@ beforeEach(() => {
     if (method === "bot_thread_info") return { info: { threadId: "thr_cur", botId: "bot_1", botName: "Chief of Staff", kind: "conversation" } };
     if (method === "bot_spaces") return { bots: [{ id: "bot_1", name: "Chief of Staff", mainThreadId: "thr_main" }, { id: "bot_2", name: "Home", mainThreadId: "thr_home" }], currentBotId: "bot_1" };
     if (method === "bot_ask") return { threadId: (state.rpc.mock.lastCall?.[1] as { to: { kind: string; threadId?: string } }).to.kind === "new" ? "thr_new" : (state.rpc.mock.lastCall?.[1] as { to: { threadId: string } }).to.threadId, projectId: null };
-    if (method === "hud.get") return { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_main" }, working: false };
     return { ok: true };
   });
   localStorage.clear();
@@ -135,21 +131,17 @@ it("search mode (⌘K, the rail's Search) starts on the recent conversations and
   expect(calls("newtab_recents")).toEqual([{ threadId: "thr_cur" }]);
 });
 
-it("commands mode lists everything: no BB Studio app in BB itself, Pop out to HUD for this conversation, a switch to the other Bot, BB's commands", async () => {
+it("commands mode lists everything: no BB Studio app in BB itself, a switch to the other Bot, BB's commands", async () => {
   await mount("commands");
   expect(sections()).toEqual(["Apps", "Actions", "Recent", "Commands", "Settings"]);
   expect(titles()).not.toContain("BB Studio");
-  expect(titles()).toEqual(expect.arrayContaining(["HUD", "VS Code", "New conversation", "Pop out to HUD", "Switch to Home", "Roadmap board", "New window"]));
+  expect(titles()).toEqual(expect.arrayContaining(["VS Code", "New conversation", "Switch to Home", "Roadmap board", "New window"]));
   expect(titles()).not.toContain("Switch to Chief of Staff");
-  await type("pop out");
-  await press("Enter");
-  expect(close).toHaveBeenCalledTimes(1);
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-  expect(state.showHud).toHaveBeenCalledWith("thr_cur");
+  expect(titles().some((title) => /hud|pop out/i.test(title ?? ""))).toBe(false);
   await type("new window");
   await press("Enter");
   expect(state.commands[1]!.run).toHaveBeenCalledTimes(1);
-  expect(close).toHaveBeenCalledTimes(1);
+  expect(close).not.toHaveBeenCalled();
   await type("vs code");
   close.mockImplementationOnce((then?: () => void) => { act(() => root.unmount()); root = createRoot(host); then?.(); });
   await press("Enter");

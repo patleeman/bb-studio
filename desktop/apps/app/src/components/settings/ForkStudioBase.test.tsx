@@ -2,6 +2,8 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import type { SystemAppUpdateStatus } from "@bb/server-contract";
+import { STUDIO_RELEASES_URL } from "./ForkStudioBase";
 import { BbAppUpdateRows } from "./UpdatesSettingsSection";
 
 const studioBuild = {
@@ -90,5 +92,67 @@ describe("ForkStudioBase", () => {
       />,
     );
     expect(view.container.querySelector("[data-fork-studio-base]")).toBeNull();
+  });
+
+  function serverRow(blocked: SystemAppUpdateStatus["blocked"]) {
+    window.bbDesktop = {
+      experimental_studioBuild: studioBuild,
+    } as unknown as Window["bbDesktop"];
+    const status: SystemAppUpdateStatus = {
+      activity: { phase: "idle" },
+      available: null,
+      blocked,
+      current: { commit: null, version: "1.0.0" },
+      lastResult: null,
+      autoUpdate: false,
+      availableSkipped: false,
+      runningThreadCount: 0,
+      scheduled: null,
+      support: { kind: "unsupported", reason: "desktop" },
+      desktopUpdateSupported: true,
+    };
+    return render(
+      <BbAppUpdateRows
+        systemVersion={undefined}
+        appUpdate={status}
+        desktopInfo={null}
+        isDesktop={false}
+        onRetryAppCheck={() => {}}
+        onRelaunchDesktop={null}
+        onRetryDesktop={null}
+        releaseNotes={{
+          version: "0.49.0",
+          panelId: "notes",
+          expanded: false,
+          onToggle: () => {},
+        }}
+      />,
+    );
+  }
+
+  it("says no BB Studio release was found, offers Check and hides the changelog", () => {
+    const view = serverRow({
+      reason: "fetch-failed",
+      message: "No BB Studio release found.",
+    });
+    expect(screen.getByText("No BB Studio release found.")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Check for BB Studio releases/ })
+        .textContent,
+    ).toBe("Check");
+    expect(screen.queryByRole("button", { name: /Retry/ })).toBeNull();
+    expect(screen.queryByText("Changelog")).toBeNull();
+    expect(
+      view.container.querySelector("[aria-label^='Changelog for bb']"),
+    ).toBeNull();
+  });
+
+  it("links the changelog to BB Studio's releases once a release is found", () => {
+    serverRow(null);
+    const link = screen.getByText("Changelog").closest("a");
+    expect(link?.getAttribute("href")).toBe(STUDIO_RELEASES_URL);
+    expect(link?.getAttribute("href")).toBe(
+      "https://github.com/patleeman/bb-studio/releases",
+    );
   });
 });

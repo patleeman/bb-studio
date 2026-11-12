@@ -25,7 +25,6 @@ vi.mock("../../kit/app/index", () => ({
   DropdownMenu: () => null, DropdownMenuTrigger: () => null, DropdownMenuContent: () => null, DropdownMenuItem: () => null,
 }));
 vi.mock("./ConversationApprovals", () => ({ ConversationApprovals: () => null, ConversationApprovalsBanner: () => null }));
-vi.mock("../../hud/ui/pop-out", () => ({ useCanPopOutToHud: () => false, canPopOut: () => false, PopOutHudButton: () => null }));
 
 import { ConversationWorkersLine, ReadOnlyFallbackBanner } from "./ReadOnlyComposer";
 

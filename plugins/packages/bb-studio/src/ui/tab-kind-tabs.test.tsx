@@ -9,6 +9,7 @@ it("registers the Bot pages and the New … actions beside a conversation, named
   registerTabKindTabs({ slots: { experimental_tab: (tab: never) => { tabs.push(tab); } } });
   expect(tabs.map((tab) => [tab.id, tab.title, tab.context.kind, typeof tab.run])).toEqual([
     ["memory", "Memory", "thread", "undefined"],
+    ["bot-skills", "Skills", "thread", "undefined"],
     ["library", "Library", "thread", "undefined"],
     ["bot-automations", "Automations", "thread", "undefined"],
     ["archive", "Archive", "thread", "undefined"],

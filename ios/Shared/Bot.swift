@@ -205,7 +205,7 @@ extension BBClient {
         struct Output: Decodable { var threads: [BotSideThread] }
         do {
             let output: Output = try await rpc("studio", Studio.Method.bot_side_threads, ["threadId": .string(threadId)])
-            return Dictionary(output.threads.map { ($0.messageId, $0) }, uniquingKeysWith: { first, _ in first })
+            return Dictionary(output.threads.filter { $0.kind != "fork" }.map { ($0.messageId, $0) }, uniquingKeysWith: { first, _ in first })
         } catch where Self.isMissingRPC(error) {
             return [:]
         }
@@ -708,6 +708,8 @@ public struct BotSideThread: Codable, Hashable, Sendable {
     public var working: Bool
     public var lastReplyRole: String? = nil
     public var botId: String? = nil
+    /// "reply" (Reply in thread) or "fork" (Fork conversation); absent from older Studios.
+    public var kind: String? = nil
 
     /// "2 replies · 5m ago", "Working…", "Thread".
     public func label(now: Date = .now) -> String {

@@ -113,3 +113,13 @@ it("a thread bb's list hides still gets a menu target, unless its project is unk
   expect(hiddenThreadTarget({ threadId: "t1", projectId: "p1" }, "failed")?.status).toBe("error");
   expect(hiddenThreadTarget({ threadId: "t1", projectId: null }, "idle")).toBeNull();
 });
+
+it("a thread that never started and has nothing queued is not working; one with a queued message is", () => {
+  const rows = [conversation({ threadId: "main", isMain: true, running: true })];
+  const idle = new Map([["main", { id: "main", status: "pending", runtimeStatus: "pending" }]]);
+  expect(conversationLines(rows, idle, null)[0]!.running).toBe(false);
+  const queued = new Map([["main", { id: "main", status: "pending", queuedMessageCount: 1 }]]);
+  expect(conversationLines(rows, queued, null)[0]!.running).toBe(true);
+  const starting = new Map([["main", { id: "main", status: "starting" }]]);
+  expect(conversationLines(rows, starting, null)[0]!.running).toBe(true);
+});

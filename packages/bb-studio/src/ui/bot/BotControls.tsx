@@ -21,6 +21,7 @@ import { BotCacheSection } from "./BotCache";
 import { BotMaintenance } from "./BotMaintenance";
 import { BotAttention } from "./BotAttention";
 import { botPath } from "./selection";
+import { skillsPagePath } from "../skills/paths";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 type Section = { id: string; label: string };
@@ -97,6 +98,7 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
           )}
           {external ? null : (
             <Part id="skills" title="Skills">
+              <Row label="Skills page" action={<button type="button" className={OUTLINE_BUTTON} aria-label="Open skills" onClick={() => openAppPath(`/plugins/studio/studio/${skillsPagePath(bot.id)}`)}>Open<Icon name="ArrowUpRight" /></button>} />
               <div className="text-sm"><SkillsList botId={bot.id} /></div>
             </Part>
           )}

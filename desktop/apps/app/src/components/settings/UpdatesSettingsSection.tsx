@@ -1,4 +1,4 @@
-import { ForkStudioBase } from "./ForkStudioBase";
+import { ForkStudioBase, forkStudioCheckLabel, forkStudioReleaseLink } from "./ForkStudioBase";
 import {
   useEffect,
   useRef,
@@ -522,7 +522,8 @@ export function BbAppUpdateRows({
   isChecking = false,
   releaseNotes = null,
 }: BbAppUpdateRowsProps) {
-  const notesLink =
+  const studioReleaseLink = forkStudioReleaseLink({ appUpdate, desktopInfo });
+  const notesLink = studioReleaseLink !== undefined ? studioReleaseLink :
     releaseNotes === null ? null : (
       <ReleaseNotesToggleButton {...releaseNotes} />
     );
@@ -535,8 +536,8 @@ export function BbAppUpdateRows({
     onRetryAppCheck === null ? null : (
       <RowStateControl
         state="latest-unknown"
-        buttonLabel="Retry"
-        actionLabel="Retry the release check"
+        buttonLabel={forkStudioCheckLabel("Retry", "Check")}
+        actionLabel={forkStudioCheckLabel("Retry the release check", "Check for BB Studio releases")}
         loading={isChecking}
         onClick={onRetryAppCheck}
       />

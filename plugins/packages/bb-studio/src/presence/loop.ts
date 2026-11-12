@@ -8,7 +8,6 @@ export interface LoopEnvironment {
   request(run: (time: number) => void): number;
   cancel(handle: number): void;
   active(): boolean;
-  shown(): boolean;
   reduced(): boolean;
   watch(changed: () => void): () => void;
 }
@@ -24,7 +23,6 @@ export class PresenceLoop {
   private last: number | null = null;
   private unwatch: (() => void) | null = null;
   private cursor = 0;
-  private holds = 0;
   frames = 0;
   drawn = 0;
 
@@ -34,7 +32,7 @@ export class PresenceLoop {
   get size(): number { return this.items.size; }
 
   private live(): boolean {
-    return !this.env.reduced() && (this.holds > 0 ? this.env.shown() : this.env.active());
+    return !this.env.reduced() && this.env.active();
   }
 
   add(item: LoopItem): () => void {
@@ -47,18 +45,6 @@ export class PresenceLoop {
       this.owed.delete(item);
       if (!this.items.size) { this.unwatch?.(); this.unwatch = null; }
       this.sync(false);
-    };
-  }
-
-  runUnfocused(): () => void {
-    this.holds++;
-    this.sync(false);
-    let held = true;
-    return () => {
-      if (!held) return;
-      held = false;
-      this.holds--;
-      this.sync(true);
     };
   }
 
@@ -102,7 +88,6 @@ export function browserEnvironment(view: Window): LoopEnvironment {
     request: (run) => view.requestAnimationFrame(run),
     cancel: (handle) => view.cancelAnimationFrame(handle),
     active: () => doc.visibilityState !== "hidden" && doc.hasFocus(),
-    shown: () => doc.visibilityState !== "hidden",
     reduced: () => !!motion?.matches,
     watch: (changed) => {
       view.addEventListener("focus", changed);

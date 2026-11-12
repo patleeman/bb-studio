@@ -269,8 +269,6 @@ const ALLOWED = new Set([
   "src/links/open.ts",
   // "Studio: Show the Bot" goes to a conversation (a thread): it opens no item.
   "src/ui/conversations/show-bot.ts",
-  // A Bot's skill on BB's Skills page opens its Controls, a Studio route, not an item.
-  "src/ui/bot/skill-sources.ts",
   // A drop on BB's main view opens what was dropped there: that is what the drop means.
   "src/ui/item-drop.ts",
   // A Bot page's header opens the Bot's page, a Studio route, from the Bot's name.

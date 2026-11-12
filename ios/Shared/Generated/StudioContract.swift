@@ -205,6 +205,7 @@ public enum Studio {
     public static let presence_check_reply = "presence_check_reply"
     public static let bot_worker_approval = "bot_worker_approval"
     public static let bot_conversation_approvals = "bot_conversation_approvals"
+    public static let bot_push_ids = "bot_push_ids"
     public static let bot_worker_approval_resolve = "bot_worker_approval_resolve"
     public static let chat_viewing = "chat.viewing"
     public static let chat_subject = "chat.subject"
@@ -838,6 +839,8 @@ public enum Studio {
   public typealias BotWorkerApproval = BotWorkerApprovalOutput
 
   public typealias BotConversationApprovals = BotConversationApprovalsOutput
+
+  public typealias BotPushIds = BotPushIdsOutput
 
   public typealias BotWorkerApprovalResolve = BotWorkerApprovalResolveOutput
 
@@ -5972,6 +5975,7 @@ public enum Studio {
     case recording
     case board
     case memory
+    case skills
     case library
     case automations
     case todos
@@ -6002,6 +6006,7 @@ public enum Studio {
       case "recording": self = .recording
       case "board": self = .board
       case "memory": self = .memory
+      case "skills": self = .skills
       case "library": self = .library
       case "automations": self = .automations
       case "todos": self = .todos
@@ -6034,6 +6039,7 @@ public enum Studio {
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")
       case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
       case .library: try container.encode("library")
       case .automations: try container.encode("automations")
       case .todos: try container.encode("todos")
@@ -6113,6 +6119,7 @@ public enum Studio {
     case recording
     case board
     case memory
+    case skills
     case library
     case automations
     case todos
@@ -6143,6 +6150,7 @@ public enum Studio {
       case "recording": self = .recording
       case "board": self = .board
       case "memory": self = .memory
+      case "skills": self = .skills
       case "library": self = .library
       case "automations": self = .automations
       case "todos": self = .todos
@@ -6175,6 +6183,7 @@ public enum Studio {
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")
       case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
       case .library: try container.encode("library")
       case .automations: try container.encode("automations")
       case .todos: try container.encode("todos")
@@ -13303,6 +13312,30 @@ public enum Studio {
     }
   }
 
+  public enum BotSideThreadsOutputThreadsItemKind: Sendable, Hashable, Codable {
+    case reply
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "reply": self = .reply
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .reply: try container.encode("reply")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSideThreadsOutputThreadsItem: Sendable, Hashable, Codable {
     public var messageId: String?
     public var threadId: String?
@@ -13311,8 +13344,10 @@ public enum Studio {
     public var lastReplyAt: Double?
     public var lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole?
     public var working: Bool?
+    public var kind: BotSideThreadsOutputThreadsItemKind?
+    public var conversations: Double?
 
-    public init(messageId: String? = nil, threadId: String? = nil, botId: String? = nil, replies: Double? = nil, lastReplyAt: Double? = nil, lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole? = nil, working: Bool? = nil) {
+    public init(messageId: String? = nil, threadId: String? = nil, botId: String? = nil, replies: Double? = nil, lastReplyAt: Double? = nil, lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole? = nil, working: Bool? = nil, kind: BotSideThreadsOutputThreadsItemKind? = nil, conversations: Double? = nil) {
       self.messageId = messageId
       self.threadId = threadId
       self.botId = botId
@@ -13320,6 +13355,8 @@ public enum Studio {
       self.lastReplyAt = lastReplyAt
       self.lastReplyRole = lastReplyRole
       self.working = working
+      self.kind = kind
+      self.conversations = conversations
     }
   }
 
@@ -14268,10 +14305,12 @@ public enum Studio {
   public struct BotSkillHistoryInput: Sendable, Hashable, Codable {
     public var botId: String?
     public var before: Int?
+    public var name: String?
 
-    public init(botId: String? = nil, before: Int? = nil) {
+    public init(botId: String? = nil, before: Int? = nil, name: String? = nil) {
       self.botId = botId
       self.before = before
+      self.name = name
     }
   }
 
@@ -21712,6 +21751,26 @@ public enum Studio {
 
     public init(approvals: [BotConversationApprovalsOutputApprovalsItem]? = nil) {
       self.approvals = approvals
+    }
+  }
+
+  public struct BotPushIdsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotPushIdsOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var conversationId: String?
+    public var workerId: String?
+
+    public init(botId: String? = nil, conversationId: String? = nil, workerId: String? = nil) {
+      self.botId = botId
+      self.conversationId = conversationId
+      self.workerId = workerId
     }
   }
 

@@ -308,7 +308,7 @@ describe("the theme engine", () => {
     expect(engine.snapshot().needsYou).toBe(0);
   });
 
-  it("in the HUD, recolors the page itself without a scene", () => {
+  it("in a plugin window, recolors the page itself without a scene", () => {
     engine.dispose();
     engine = new ThemeEngine(deps({ scenes: false, publish: undefined }));
     engine.show({ key: "home:dracula", theme: DRACULA, appearance: defaultAppearance(DRACULA) }, "light");

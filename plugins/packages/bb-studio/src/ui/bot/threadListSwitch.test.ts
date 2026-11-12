@@ -87,6 +87,11 @@ describe("listSwitch", () => {
     expect(listSwitch(NATIVE, null, "x")).toEqual({});
     expect(listSwitch("other/list", null, null)).toEqual({});
   });
+  it("replaces automatic with the Bot sidebar where Studio adds to BB's sidebar", () => {
+    expect(listSwitch(AUTO, null, null, "studio/everything")).toEqual({ set: "studio/everything" });
+    expect(listSwitch("studio/everything", null, null, "studio/everything")).toEqual({});
+    expect(listSwitch(NATIVE, null, null, "studio/everything")).toEqual({});
+  });
 });
 
 describe("the last Bot thread", () => {

@@ -93,15 +93,12 @@ enum BotShell {
         guard let view else { return [] }
         var out: [BotConversationLine] = []
         var seen: Set<String> = []
-        func add(_ conversation: BotConversation, depth: Int) {
-            guard seen.insert(conversation.threadId).inserted else { return }
+        for conversation in view.conversations where seen.insert(conversation.threadId).inserted {
             let line = secondLine(conversation)
             out.append(BotConversationLine(threadId: conversation.threadId, title: conversation.title.isEmpty ? "Untitled" : conversation.title,
-                                           forkedFrom: depth > 0 ? conversation.forkedFrom?.title : nil, depth: depth,
+                                           forkedFrom: nil, depth: 0,
                                            updatedAt: conversation.updatedAt, tone: line.tone, text: line.text))
-            for child in view.threads(of: conversation.threadId) { add(child, depth: depth + 1) }
         }
-        for conversation in view.topLevel { add(conversation, depth: 0) }
         return out
     }
 
@@ -156,6 +153,42 @@ final class BotShellModel: ObservableObject {
         detailPath = []
         selection = .conversation(threadId)
         compactColumn = .detail
+    }
+
+    func open(_ item: BotShellItem) {
+        landed = true
+        detailPath = []
+        selection = item
+        compactColumn = .detail
+    }
+
+    private var pendingPush: Route?
+
+    func takePendingPush() -> [Route] {
+        defer { pendingPush = nil }
+        return pendingPush.map { [$0] } ?? []
+    }
+
+    func follow(_ link: BotShellLink, store: BotSpacesStore) {
+        switch link {
+        case .thread(let id, let worker):
+            open(worker ? .worker(id) : .conversation(id))
+        case .page(let page, let botId):
+            if let botId, botId != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, store.spaces?.bots.contains(where: { $0.id == botId }) == true {
+                show(botId, store: store, compact: true)
+            }
+            open(.page(page))
+        case .push(let route):
+            landed = true
+            compactColumn = .detail
+            if selection == nil, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
+               let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id)) {
+                pendingPush = route
+                selection = .conversation(main)
+            } else {
+                detailPath.append(route)
+            }
+        }
     }
 
     func showList() {

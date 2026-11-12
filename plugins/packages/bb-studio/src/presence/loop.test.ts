@@ -2,18 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import { MAX_STEP, PresenceLoop, type LoopEnvironment } from "./loop";
 
 function setup(cap?: number) {
-  const world = { active: true, shown: true, reduced: false, queued: [] as ((time: number) => void)[], requests: 0, cancels: 0, watchers: new Set<() => void>() };
+  const world = { active: true, reduced: false, queued: [] as ((time: number) => void)[], requests: 0, cancels: 0, watchers: new Set<() => void>() };
   const env: LoopEnvironment = {
     request: (run) => { world.requests++; world.queued.push(run); return world.requests; },
     cancel: () => { world.cancels++; world.queued.length = 0; },
     active: () => world.active,
-    shown: () => world.shown,
     reduced: () => world.reduced,
     watch: (changed) => { world.watchers.add(changed); return () => { world.watchers.delete(changed); }; },
   };
   const loop = new PresenceLoop(env, cap);
   const step = (time: number) => { const run = world.queued.shift(); run?.(time); return !!run; };
-  const change = (next: Partial<Pick<typeof world, "active" | "shown" | "reduced">>) => { Object.assign(world, next); for (const watcher of [...world.watchers]) watcher(); };
+  const change = (next: Partial<Pick<typeof world, "active" | "reduced">>) => { Object.assign(world, next); for (const watcher of [...world.watchers]) watcher(); };
   const item = (seen = true) => { const made = { seen, frame: vi.fn(), still: vi.fn(), visible: () => made.seen }; return made; };
   return { world, loop, step, change, item };
 }
@@ -99,24 +98,5 @@ describe("the shared presence loop", () => {
     const total = (each: (typeof items)[number]) => each.frame.mock.calls.reduce((sum, call) => sum + (call[0] as number), 0);
     expect(total(items[0]!)).toBeCloseTo(0.1, 5);
     expect(total(items[1]!)).toBeCloseTo(0.1, 5);
-  });
-
-  it("keeps running in a window that asked to run unfocused, and stops there when the window is hidden", () => {
-    const { world, loop, step, change, item } = setup();
-    const one = item();
-    loop.add(one);
-    change({ active: false });
-    expect(loop.running).toBe(false);
-    const release = loop.runUnfocused();
-    expect(loop.running).toBe(true);
-    step(0); step(16);
-    expect(one.frame).toHaveBeenCalledTimes(2);
-    change({ shown: false });
-    expect(loop.running).toBe(false);
-    change({ shown: true });
-    expect(loop.running).toBe(true);
-    release();
-    expect(loop.running).toBe(false);
-    expect(world.queued).toHaveLength(0);
   });
 });

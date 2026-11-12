@@ -19,7 +19,9 @@ errors, and useful completion replies still notify normally.
 ## Actionable notifications
 
 Before delivering a `pending-interaction` push, the relay looks up the
-thread's pending interactions. It adds `interactionId`, `interactionKind`,
+thread's pending interactions (the `workerId`'s when the push has one, and
+the given `interactionId` when set). BB's own push for a Bot worker's approval
+is dropped: Studio sends that one under the worker's conversation. It adds `interactionId`, `interactionKind`,
 `subjectKind`, and `decisions` to the push data, then sets `aps.category`:
 
 | Category | When | Actions in the app |

@@ -7,11 +7,11 @@ const { hasHostWindows, hostWindowId, inHostWindow, NO_HOST_WINDOWS, registerHos
 it("on a BB without windows, nothing registers and every call answers false", async () => {
   expect(hasHostWindows).toBe(false);
   expect(windowsHookOf({ useRpc() {} })).toBeNull();
-  expect(registerHostWindow({ navPanel() {} }, { id: "hud", title: "HUD", component: () => null })).toBe(false);
+  expect(registerHostWindow({ navPanel() {} }, { id: "launcher", title: "Launcher", component: () => null })).toBe(false);
   const windows = useHostWindows();
   expect(windows).toBe(NO_HOST_WINDOWS);
   expect(windows.native).toBe(false);
-  expect(await Promise.all([windows.register("hud"), windows.open("hud"), windows.toggle("hud"), windows.close("hud")])).toEqual([false, false, false, false]);
+  expect(await Promise.all([windows.register("launcher"), windows.open("launcher"), windows.toggle("launcher"), windows.close("launcher")])).toEqual([false, false, false, false]);
 });
 
 it("on a BB with windows, reads the hook and registers through the slot", () => {
@@ -19,13 +19,13 @@ it("on a BB with windows, reads the hook and registers through the slot", () => 
   expect(windowsHookOf({ experimental_useWindows: () => host })?.()).toBe(host);
   const seen: unknown[] = [];
   const slots = { taken: seen, experimental_window(registration: unknown) { this.taken.push(registration); } };
-  const registration = { id: "hud", title: "HUD", component: () => null };
+  const registration = { id: "launcher", title: "Launcher", component: () => null };
   expect(registerHostWindow(slots, registration)).toBe(true);
   expect(seen).toEqual([registration]);
 });
 
 it("knows a plugin window by its address and reads its params", () => {
-  expect(inHostWindow("/fork-window/studio/hud")).toBe(true);
+  expect(inHostWindow("/fork-window/studio/launcher")).toBe(true);
   expect(inHostWindow("/plugins/studio/studio")).toBe(false);
   expect(hostWindowId("/fork-window/studio/item-2")).toBe("item-2");
   expect(hostWindowId("/threads/thr_1")).toBeNull();

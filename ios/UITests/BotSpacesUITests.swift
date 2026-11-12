@@ -29,7 +29,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         let main = list.buttons["conversation-thr_botdemo01"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         XCTAssertTrue(main.label.contains("Push bb-studio-native to origin?"), "the needs-you reason is on line 2: \(main.label)")
-        XCTAssertTrue(list.buttons["conversation-thr_demo_thread"].label.contains("Forked from Main"), "a thread sits under its parent")
+        XCTAssertFalse(list.buttons["conversation-thr_demo_thread"].exists, "a thread lives at its message, not in the list")
         XCTAssertTrue(list.buttons["worker-thr_demo_w2"].exists, "a running worker")
         XCTAssertTrue(app.buttons["space-dot-bot_home"].label.contains("needs you"), "Home's dot is amber")
         shot("list-needs")
@@ -62,12 +62,19 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30))
         back()
         XCTAssertTrue(list.waitForExistence(timeout: 10))
+        app.buttons["BotSpaceMore"].tap()
+        XCTAssertFalse(app.buttons["All BB threads"].exists, "the threads moved to Settings")
+        XCTAssertTrue(app.buttons["Studio"].exists)
+        app.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio opens over the list")
+        app.navigationBars["Studio"].swipeDown(velocity: .fast)
+        XCTAssertTrue(app.navigationBars["Studio"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(list.waitForExistence(timeout: 10))
         app.buttons["BotSpaceSettings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10), "Settings opens over the list")
-        app.swipeDown(velocity: .fast)
-        XCTAssertTrue(list.waitForExistence(timeout: 10))
-        app.buttons["BotSpaceMore"].tap()
-        app.buttons["All BB threads"].tap()
+        let all = app.buttons["settingsAllThreads"]
+        XCTAssertTrue(all.waitForExistence(timeout: 10), "Settings → All BB threads")
+        all.tap()
         XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10), "the Threads list opens")
     }
 

@@ -5751,6 +5751,7 @@
                         "recording",
                         "board",
                         "memory",
+                        "skills",
                         "library",
                         "automations",
                         "todos",
@@ -5873,6 +5874,7 @@
                         "recording",
                         "board",
                         "memory",
+                        "skills",
                         "library",
                         "automations",
                         "todos",
@@ -14969,6 +14971,16 @@
                 },
                 "working": {
                   "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "reply",
+                    "fork"
+                  ]
+                },
+                "conversations": {
+                  "type": "number"
                 }
               },
               "required": [
@@ -14978,7 +14990,9 @@
                 "replies",
                 "lastReplyAt",
                 "lastReplyRole",
-                "working"
+                "working",
+                "kind",
+                "conversations"
               ],
               "additionalProperties": false
             }
@@ -16437,6 +16451,11 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           }
         }
       },
@@ -28922,6 +28941,38 @@
         "required": [
           "approvals"
         ],
+        "additionalProperties": false
+      }
+    },
+    "bot_push_ids": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string"
+          },
+          "workerId": {
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       }
     },

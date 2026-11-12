@@ -53,6 +53,8 @@ it("adopts side chats from bb's side-chat plugin, by the message they quote", as
   const whole = userSideChat("Older reply");
   await side.created(whole);
   const part = userSideChat("Ship **Friday**.");
+  threads.get(whole.id)!.status = "active";
+  threads.get(part.id)!.status = "active";
   const listed = await side.list("bot1");
   expect(side.forThread(whole.id)).toEqual({ botId: "bot", sourceThreadId: "bot1", messageId: "r1" });
   expect(side.forThread(part.id)).toEqual({ botId: "bot", sourceThreadId: "bot1", messageId: "r3" });
@@ -76,6 +78,11 @@ it("counts user messages and Bot turns, newest replier last", () => {
   expect(countReplies([rows])).toEqual({ replies: 3, lastReplyAt: 130, lastReplyRole: "user" });
   expect(countReplies([[{ id: "a3", kind: "conversation", role: "assistant", text: "Done.", turnId: "t3", createdAt: 140 }], rows])).toEqual({ replies: 4, lastReplyAt: 140, lastReplyRole: "assistant" });
   expect(countReplies([[]])).toEqual({ replies: 0, lastReplyAt: null, lastReplyRole: null });
+  const started = [
+    { id: "f:user-seed:10", kind: "conversation", role: "user", initiator: "user", text: "Why not Monday?", turnId: "t1", createdAt: 200 },
+    { id: "f:user-seed:2", kind: "conversation", role: "user", initiator: "user", text: `${SIDE_CHAT_SEED_PREFIX}Ship Friday.`, turnId: null, createdAt: 190 },
+  ] satisfies TimelineRow[];
+  expect(countReplies([started])).toMatchObject({ replies: 1, lastReplyRole: "user" });
 });
 
 it("recounts a thread's replies from its timeline and shows the last replier under the message", async () => {
@@ -84,7 +91,7 @@ it("recounts a thread's replies from its timeline and shows the last replier und
   changed.mockClear();
   forkRows.set("t1", [{ id: "u1", kind: "conversation", role: "user", initiator: "user", text: "Why Friday?", turnId: "a", createdAt: 1_000 }]);
   await side.recount("t1");
-  expect((await side.list("bot1"))[0]).toEqual({ messageId: "r3", threadId: "t1", botId: "bot", replies: 1, lastReplyAt: 1_000, lastReplyRole: "user", working: false });
+  expect((await side.list("bot1"))[0]).toEqual({ messageId: "r3", threadId: "t1", botId: "bot", replies: 1, lastReplyAt: 1_000, lastReplyRole: "user", working: false, kind: "reply", conversations: 1 });
   forkRows.set("t1", [...forkRows.get("t1")!, { id: "a1", kind: "conversation", role: "assistant", text: "QA.", turnId: "a", createdAt: 2_000 }]);
   await Promise.all([side.recount("t1"), side.recount("t1")]);
   await side.recount("t1");
@@ -105,7 +112,7 @@ it("sums a message's threads, and its newest one is what the row and Reply in th
   forkRows.set("t2", [{ id: "b", kind: "conversation", role: "user", initiator: "user", text: "Two.", turnId: "y", createdAt: 9 }]);
   await side.recount("t1");
   await side.recount("t2");
-  expect(await side.list("bot1")).toEqual([{ messageId: "r1", threadId: "t2", botId: "bot", replies: 2, lastReplyAt: 9, lastReplyRole: "user", working: false }]);
+  expect(await side.list("bot1")).toEqual([{ messageId: "r1", threadId: "t2", botId: "bot", replies: 2, lastReplyAt: 9, lastReplyRole: "user", working: false, kind: "reply", conversations: 2 }]);
   expect(await side.newest("bot1", "r1")).toBe("t2");
   threads.get("t2")!.archivedAt = 1;
   expect(await side.newest("bot1", "r1")).toBe("t1");
@@ -116,6 +123,22 @@ it("finds a message's place in the conversation, on older pages too", async () =
   const { side } = setup();
   expect(await side.message("bot1", "r1")).toMatchObject({ id: "r1", sourceSeqEnd: 10 });
   expect(await side.message("bot1", "missing")).toBeNull();
+});
+
+it("lists a message's reply thread and its forks apart, and leaves out empty or failed ones", async () => {
+  const { side, forkRows, fork, threads } = setup();
+  fork("t1", "r1");
+  side.record("f1", "bot", "bot1", "r1", 20, "fork");
+  threads.set("f1", { id: "f1", status: "idle", archivedAt: null });
+  side.record("f2", "bot", "bot1", "r1", 30, "fork");
+  threads.set("f2", { id: "f2", status: "error", archivedAt: null });
+  expect(await side.list("bot1")).toEqual([]);
+  forkRows.set("t1", [{ id: "a", kind: "conversation", role: "assistant", text: "One.", turnId: "x", createdAt: 50 }]);
+  forkRows.set("f1", [{ id: "b", kind: "conversation", role: "user", initiator: "user", text: "Try B.", turnId: "y", createdAt: 60 }]);
+  forkRows.set("f2", []);
+  await side.recountAll();
+  expect((await side.list("bot1")).map((each) => [each.kind, each.threadId, each.conversations])).toEqual([["reply", "t1", 1], ["fork", "f1", 1]]);
+  expect(await side.newest("bot1", "r1")).toBe("t1");
 });
 
 it("links forks made from a message to that message, once", () => {
@@ -160,7 +183,7 @@ it("counts only what's added after the fork, not the 30 messages it copied", asy
   const history = seeded(30);
   forkRows.set("t1", history);
   await side.recount("t1");
-  expect((await side.list("bot1"))[0]).toMatchObject({ replies: 0, lastReplyAt: null, lastReplyRole: null });
+  expect(await side.list("bot1")).toEqual([]);
   const asked: TimelineRow = { id: "u1", kind: "conversation", role: "user", initiator: "user", text: "Why Friday?", turnId: "n1", createdAt: FORKED_AT + 50 };
   forkRows.set("t1", [...history, asked]);
   await side.recount("t1");

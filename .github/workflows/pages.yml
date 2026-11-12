@@ -1,12 +1,9 @@
 name: Pages
 
+# Manual only for now: a deploy makes the site public at
+# https://patleeman.github.io/bb-studio/. Restore the push trigger
+# (branches: main; paths: site/**, this file) once Patrick approves going public.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "site/**"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

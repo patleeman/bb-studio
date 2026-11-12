@@ -688,16 +688,6 @@ final class ThreadModel: ObservableObject {
         }
     }
 
-    /// Opens a side chat about `text` and returns its thread.
-    func sideChat(about text: String) async -> String? {
-        guard let client else { return nil }
-        do {
-            return try await client.sideChat(from: threadId, about: text)
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-            return nil
-        }
-    }
 
     func stop() async {
         guard !stopping, let client else { return }

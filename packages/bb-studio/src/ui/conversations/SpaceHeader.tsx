@@ -4,7 +4,7 @@
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
 // menu (Edit space…, Default model: what its new conversations start on,
-// Archive: the older page, Show HUD, New Bot); then the Bot's pages as rows: Memory, Library,
+// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Library,
 // Automations and Todos (the primary Bot's, with Todos on; the count is what
 // needs Patrick now). The row of the page on screen is selected.
 import type { ReactNode } from "react";
@@ -17,13 +17,14 @@ import type { TabKindId } from "../../tab-kinds";
 export const STUDIO_ROOT_PATH = "/plugins/studio/studio";
 export const AUTOMATIONS_PATH = "/plugins/studio/automations";
 
-export type SpacePage = "memory" | "library" | "automations" | "todos";
+export type SpacePage = "memory" | "skills" | "library" | "automations" | "todos";
 
 /** Which of the Bot's pages the main view shows, if any. */
 export function spacePageAt(pathname: string): SpacePage | null {
   const path = pathname.replace(/\/+$/, "");
   if (path === STUDIO_ROOT_PATH) return "library";
   if (/^\/plugins\/studio\/studio\/memory(?:\/|$)/.test(path)) return "memory";
+  if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "skills";
   if (path === AUTOMATIONS_PATH || path.startsWith(`${AUTOMATIONS_PATH}/`)) return "automations";
   if (/^\/plugins\/studio\/studio\/bot\/[^/]+\/loops$/.test(path)) return "todos";
   return null;
@@ -55,7 +56,6 @@ export interface SpaceMenu {
   defaultModel(): void;
   /** The Bot's older and finished conversations and workers (the older page). */
   archive(): void;
-  showHud: (() => void) | null;
   newBot(): void;
 }
 
@@ -95,7 +95,6 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
             <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>Edit space…</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.defaultModel}>Default model</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.archive}>Archive</DropdownMenuItem>
-            {menu.showHud ? <DropdownMenuItem onSelect={menu.showHud}>Show HUD</DropdownMenuItem> : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={menu.newBot}>New Bot</DropdownMenuItem>
           </DropdownMenuContent>
@@ -103,6 +102,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
       </div>
       <nav aria-label="Bot pages" className="mt-2 flex flex-col gap-px">
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
+        {row("skills", "Skills", <Icon name="BookOpen" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
         {row("automations", "Automations", <Icon name="Clock" className="size-4" />)}
         {todos !== null ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null) : null}

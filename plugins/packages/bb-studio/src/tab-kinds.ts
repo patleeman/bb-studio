@@ -32,6 +32,7 @@ export const TAB_IDS = {
   code: CODE_TAB,
   todos: "loops",
   memory: "memory",
+  skills: "bot-skills",
   library: "library",
   automations: "bot-automations",
   archive: "archive",
@@ -46,7 +47,7 @@ export type TabKindId =
   | "conversation" | "worker" | "bot"
   | "page" | "whiteboard" | "design" | "app" | "dashboard" | "artifact" | "recording"
   | "board"
-  | "memory" | "library" | "automations" | "todos" | "archive"
+  | "memory" | "skills" | "library" | "automations" | "todos" | "archive"
   | "automation" | "todo" | "record"
   | "vscode"
   | "file" | "diff" | "browser" | "terminal" | "workflow";
@@ -188,6 +189,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     surfaces: { newTab: "had", recent: "had", sidebarDrag: { na: "Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search." }, workbenchOpen: "added", chatLink: "had" },
   },
   botPage("memory", "Memory", "Brain", TAB_IDS.memory),
+  botPage("skills", "Skills", "BookOpen", TAB_IDS.skills, "added"),
   botPage("library", "Library", "studio/library", TAB_IDS.library),
   botPage("automations", "Automations", "Clock", TAB_IDS.automations),
   botPage("todos", "Todos", "ListTodo", TAB_IDS.todos),
@@ -259,7 +261,7 @@ export function tabOpenFor(ref: TabRef, title?: string | null): StudioTabOpen | 
     }
     case "bot":
       if (ref.kind === "bot") return ref.id ? tab({ botId: ref.id }) : null;
-      return tab(ref.id && (ref.kind === "memory" || ref.kind === "archive") ? { botId: ref.id } : null);
+      return tab(ref.id && (ref.kind === "memory" || ref.kind === "skills" || ref.kind === "archive") ? { botId: ref.id } : null);
     default: return tab(null);
   }
 }
@@ -309,6 +311,7 @@ export function pathFor(ref: TabRef): string | null {
     case "bot": return id ? `${STUDIO_ROOT}/bot/${enc(id)}` : null;
     case "board": return id ? `/plugins/${VISUAL_CHAT_PLUGIN}/canvas/${enc(id)}` : null;
     case "memory": return `${STUDIO_ROOT}/memory${id ? `/${enc(id)}` : ""}`;
+    case "skills": return `${STUDIO_ROOT}/skills${id ? `/${enc(id)}` : ""}`;
     case "library": return STUDIO_ROOT;
     case "automations": return "/plugins/studio/automations";
     case "todos": return id ? `${STUDIO_ROOT}/bot/${enc(id)}/loops` : null;
@@ -344,6 +347,7 @@ export function refOfPath(pathname: string): TabRef | null {
   const [first = "", second, third, ...rest] = path.slice(STUDIO_ROOT.length + 1).split("/");
   const id = second ? decode(second) : null;
   if (first === "memory") return rest.length || third ? null : { kind: "memory", id };
+  if (first === "skills") return rest.length || third ? null : { kind: "skills", id };
   if (first === "conversations") return rest.length || third ? null : { kind: "archive", id };
   if (first === "automation" || first === "todo" || first === "record") return id && !third && !rest.length ? { kind: first, id } : null;
   if (first === "bot") {

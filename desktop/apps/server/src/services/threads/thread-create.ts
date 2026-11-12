@@ -1,3 +1,4 @@
+import { createsIdleThread } from "./idle-thread.fork.js";
 import { forkHostStandsIn } from "./thread-fork-hosts.fork.js";
 import { requestThreadStorageDeletion } from "./thread-lifecycle.js";
 import { seedThreadSessionOptionSelections } from "./thread-session-options.js";
@@ -503,6 +504,7 @@ async function createPendingThreadAndAttemptFirstDispatch(
         : { historyCopy: FORK_HISTORY_COPY_MARK }),
     }),
   });
+  if (createsIdleThread(args.request)) return getThreadSafe(deps, thread.id);
   let execution: Awaited<ReturnType<typeof buildExecutionOptions>>;
   try {
     seedThreadSessionOptionSelections(deps, {
@@ -813,7 +815,7 @@ export async function createThreadFromRequest(
             request.environment.machine.hostId,
           )
         : undefined;
-  const catalogDefault = await resolveCatalogDefaultModel(deps, {
+  const catalogDefault = createsIdleThread(request) ? null : await resolveCatalogDefaultModel(deps, {
     ...(modelCatalogCwd !== undefined ? { cwd: modelCatalogCwd } : {}),
     defaultModel: inheritedDefaultModel,
     hostId: childHostId,

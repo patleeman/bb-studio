@@ -11,13 +11,15 @@ export interface LiveThread {
   id: string;
   status?: string;
   runtimeStatus?: string;
+  queuedMessageCount?: number;
   hasPendingInteraction?: boolean;
   updatedAt?: number;
   displayTitle?: string;
 }
 
 const BUSY = new Set(["starting", "active", "stopping", "provisioning", "pending"]);
-const isBusy = (thread: LiveThread | undefined) => !!thread && (BUSY.has(thread.status ?? "") || BUSY.has(thread.runtimeStatus ?? ""));
+const idlePending = (thread: LiveThread) => thread.status === "pending" && !((thread.queuedMessageCount ?? 0) > 0);
+const isBusy = (thread: LiveThread | undefined) => !!thread && !idlePending(thread) && (BUSY.has(thread.status ?? "") || BUSY.has(thread.runtimeStatus ?? ""));
 
 export interface SpaceDot {
   id: string;

@@ -29,6 +29,7 @@ export const STUDIO_LIST_PROVIDER = `studio/${STUDIO_LIST_ID}`;
 const STUDIO_LISTS = new Set([BOT_LIST_PROVIDER, STUDIO_LIST_PROVIDER]);
 /** BB's bundled thread list. */
 export const NATIVE_LIST_PROVIDER = "thread-list/thread-list";
+export const EVERYTHING_LIST_PROVIDER = "studio/everything";
 export const AUTOMATIC_PROVIDER = "__automatic__";
 
 /** True on the Bot page (/plugins/studio/studio/bot and anything under it). */
@@ -157,7 +158,7 @@ export interface ListSwitch {
  * Studio list), and the remembered previous choice. Pure, so the rules are
  * tested directly.
  */
-export function listSwitch(current: string, want: string | null, saved: string | null): ListSwitch {
+export function listSwitch(current: string, want: string | null, saved: string | null, automatic: string = NATIVE_LIST_PROVIDER): ListSwitch {
   if (want) {
     if (current === want) return {};
     // From one Studio list to the other, keep the user's choice remembered.
@@ -168,7 +169,7 @@ export function listSwitch(current: string, want: string | null, saved: string |
     return { set: back, save: null };
   }
   // Automatic would choose a Studio list once Studio registers it.
-  if (current === AUTOMATIC_PROVIDER) return { set: NATIVE_LIST_PROVIDER };
+  if (current === AUTOMATIC_PROVIDER) return { set: automatic };
   return {};
 }
 
@@ -214,17 +215,17 @@ export function syncThreadList(sdk: PluginBrowserBbSdk, pathname: string): Promi
  * sidebar instead of replacing the list: a Studio list left selected by an
  * earlier version would otherwise name a list that is no longer registered.
  */
-export function restoreThreadList(sdk: PluginBrowserBbSdk): Promise<void> {
-  return apply(sdk, null).catch(() => {});
+export function restoreThreadList(sdk: PluginBrowserBbSdk, automatic: string = NATIVE_LIST_PROVIDER): Promise<void> {
+  return apply(sdk, null, automatic).catch(() => {});
 }
 
-async function apply(sdk: PluginBrowserBbSdk, want: string | null) {
+async function apply(sdk: PluginBrowserBbSdk, want: string | null, automatic: string = NATIVE_LIST_PROVIDER) {
   // Another window can write between our read and write; a stale revision fails, so read again once.
   for (let attempt = 0; ; attempt++) {
     const { preferences } = await sdk.system.uiPreferences.list();
     const pref = (preferences as Record<string, { value: unknown; revision: number } | undefined>)[PREFERENCE_KEY];
     if (!pref) return;
-    const step = listSwitch(String(pref.value), want, readSaved());
+    const step = listSwitch(String(pref.value), want, readSaved(), automatic);
     if (step.set === undefined) { if (step.save !== undefined) writeSaved(step.save); return; }
     try {
       await sdk.system.uiPreferences.set({ key: PREFERENCE_KEY, value: step.set, expectedRevision: pref.revision } as never);

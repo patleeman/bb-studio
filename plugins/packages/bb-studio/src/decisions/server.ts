@@ -101,16 +101,16 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
     if (problems.length) {
       checks.push({ id: "jev-settings", status: "degraded", title: "A Jev provider setting is invalid", detail: problems.join(" ") });
     }
-    if (!routes.length) {
+    if (!routes.length && current.mode === "off") {
       checks.push({
         id: "jev-route",
-        status: current.mode === "off" ? "broken" : "degraded",
+        status: "broken",
         title: "No Jev provider is set up",
-        detail: current.mode === "off"
-          ? "The fallback model is off too, so Smart Queue queues every message as a follow-up and other plugins' decisions fail. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key."
-          : "Every decision goes to the fallback model, which starts a full agent thread and takes seconds instead of milliseconds. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
+        detail: "The fallback model is off too, so Smart Queue queues every message as a follow-up and other plugins' decisions fail. Add a TypeSafe, Vercel AI Gateway, OpenRouter or OpenCode Zen key.",
         fix: { label: "Add a key", path: pluginSettingsPath(bb.pluginId) },
       });
+    } else if (!routes.length) {
+      checks.push({ id: "jev-route", status: "ok", title: "Jev is off; decisions use the fallback model" });
     } else if (jevFailure && Date.now() - jevFailure.at < jevFailureWindowMs) {
       checks.push({
         id: "jev-failing",

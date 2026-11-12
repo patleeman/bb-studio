@@ -234,6 +234,10 @@ export const workerApprovalSchemas = {
     input: z.object({ threadId: threadIdSchema }),
     output: z.object({ approvals: z.array(z.object({ worker: z.object({ threadId: z.string(), title: z.string(), projectId: z.string().nullable() }), approval: approvalView })) }),
   },
+  bot_push_ids: {
+    input: z.object({ threadId: threadIdSchema }),
+    output: z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }),
+  },
   /** Approve or deny it, through BB's own resolution; answers where it stands then. */
   bot_worker_approval_resolve: {
     input: z.object({ threadId: threadIdSchema, interactionId: interactionIdSchema, decision: z.enum(["allow_once", "allow_for_session", "deny"]) }),
@@ -278,5 +282,26 @@ export function workerApprovalRpc(deps: { sdk: Sdk; title(threadId: string, thre
       // BB may report it resolving for a moment; the card reads it again.
       return { approval: after ? viewOf(after) : { ...viewOf(interaction), state: decision === "deny" ? "denied" as const : decision === "allow_for_session" ? "approved-session" as const : "approved" as const } };
     },
+  };
+}
+
+export type WorkerApprovalPush = {
+  title: string; body: string; kind: "pending-interaction"; threadId: string; projectId: string;
+  botId: string; conversationId: string; workerId: string; interactionId: string; coalesceKey: string;
+};
+
+export function workerApprovalPush(input: { botId: string; botName: string; conversationId: string; conversationTitle: string; workerId: string; workerTitle: string; projectId: string; interaction: Interaction }): WorkerApprovalPush {
+  const { interaction } = input;
+  return {
+    title: `${input.botName} · ${input.conversationTitle}`.slice(0, 200),
+    body: `${input.workerTitle} needs your approval: ${shortApproval(interaction)}`.slice(0, 4000),
+    kind: "pending-interaction",
+    threadId: input.conversationId,
+    projectId: input.projectId,
+    botId: input.botId,
+    conversationId: input.conversationId,
+    workerId: input.workerId,
+    interactionId: interaction.id,
+    coalesceKey: `worker-approval:${interaction.id}`,
   };
 }

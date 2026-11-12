@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { existsSync } from "node:fs";
 import type { BotThreadRecord, ForkedFrom } from "./bot-threads";
-import type { SideThreads } from "./bot-side-threads";
+import type { SideKind, SideThreads, TimelineRow } from "./bot-side-threads";
 import type { ReasoningLevel } from "./kit/reasoning";
 
 type Sdk = BbPluginApi["sdk"];
@@ -26,8 +26,9 @@ export type SeedEnvironment =
 
 export interface MessageThreadDeps {
   sdk: Sdk;
-  sides: Pick<SideThreads, "newest" | "record" | "message">;
+  sides: Pick<SideThreads, "newest" | "record" | "message" | "transcript">;
   source(threadId: string): Promise<Pick<BotThreadRecord, "botId"> | null>;
+  title(threadId: string): Promise<string>;
   recordFork(threadId: string, botId: string, from: ForkedFrom): void;
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
   changed(threadId: string): void;
@@ -49,7 +50,7 @@ export class MessageThreads {
   }
 
   fork(ref: MessageRef): Promise<MessageThread> {
-    return this.create(ref);
+    return this.create(ref, "fork");
   }
 
   private async reuseOrCreate(ref: MessageRef): Promise<MessageThread> {
@@ -58,18 +59,23 @@ export class MessageThreads {
       const thread = await this.deps.sdk.threads.get({ threadId: existing }).catch(() => null) as { projectId?: string | null } | null;
       return { threadId: existing, projectId: thread?.projectId ?? null, created: false };
     }
-    return await this.create(ref);
+    return await this.create(ref, "reply");
   }
 
-  private async create(ref: MessageRef): Promise<MessageThread> {
+  private async create(ref: MessageRef, kind: SideKind): Promise<MessageThread> {
     const source = await this.deps.source(ref.threadId);
     if (!source) throw new Error("That thread isn't one of a Bot's conversations.");
     const sourceSeqEnd = ref.sourceSeqEnd ?? (await this.deps.sides.message(ref.threadId, ref.messageId))?.sourceSeqEnd;
     if (sourceSeqEnd === undefined || sourceSeqEnd === null) throw new Error("Couldn't find that message in the conversation.");
     const environment = await this.seedEnvironment(ref.threadId);
-    const fork = await this.deps.sdk.threads.fork({ sourceThreadId: ref.threadId, sourceSeqEnd, visibility: "visible", ...(environment ? { environment } : {}) } as never) as { id: string; projectId?: string | null; providerId?: string | null };
+    const title = `${await this.deps.title(ref.threadId)} · ${kind === "fork" ? "fork" : "thread"}`;
+    const fork = await this.deps.sdk.threads.fork({ sourceThreadId: ref.threadId, sourceSeqEnd, visibility: "visible", title, ...(environment ? { environment } : {}) } as never)
+      .catch(async (error: unknown) => {
+        this.deps.log(`Forking at ${ref.messageId} failed, starting from the transcript: ${error instanceof Error ? error.message : String(error)}`);
+        return await this.fromTranscript(ref.threadId, sourceSeqEnd, title, environment);
+      }) as { id: string; projectId?: string | null; providerId?: string | null };
     this.deps.recordFork(fork.id, source.botId, { threadId: ref.threadId, messageId: ref.messageId, turnId: ref.turnId ?? null });
-    this.deps.sides.record(fork.id, source.botId, ref.threadId, ref.messageId);
+    this.deps.sides.record(fork.id, source.botId, ref.threadId, ref.messageId, Date.now(), kind);
     const preset = this.deps.defaultModel(source.botId);
     const providerId = fork.providerId ?? (await this.deps.sdk.threads.get({ threadId: fork.id }).catch(() => null))?.providerId ?? null;
     if (preset && providerId === preset.providerId) {
@@ -78,6 +84,24 @@ export class MessageThreads {
     }
     this.deps.changed(fork.id);
     return { threadId: fork.id, projectId: fork.projectId ?? null, created: true };
+  }
+
+  private async fromTranscript(threadId: string, upToSeq: number, title: string, environment: SeedEnvironment | null): Promise<{ id: string; projectId?: string | null; providerId?: string | null }> {
+    const { sdk } = this.deps;
+    const parent = await sdk.threads.get({ threadId }) as { projectId: string; providerId?: string | null; environmentId?: string | null; model?: string | null };
+    const where = environment ?? (parent.environmentId ? { type: "reuse", environmentId: parent.environmentId } : { type: "project-default" });
+    const seed = transcriptSeed(await this.deps.sides.transcript(threadId, upToSeq));
+    try {
+      return await sdk.threads.spawn({
+        projectId: parent.projectId, ...(parent.providerId ? { providerId: parent.providerId } : {}), ...(parent.model ? { model: parent.model } : {}),
+        title, visibility: "visible", environment: where,
+        input: [{ type: "text", text: seed, mentions: [], visibility: "agent-only" }],
+        startedOnBehalfOf: { initiator: "agent", senderThreadId: threadId },
+      } as never) as { id: string; projectId?: string | null; providerId?: string | null };
+    } catch (error) {
+      this.deps.log(`Starting a thread from the transcript failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error("Couldn't start a thread from that message.");
+    }
   }
 
   async seedEnvironment(threadId: string): Promise<SeedEnvironment | null> {
@@ -100,4 +124,13 @@ export class MessageThreads {
     if (!environment.environmentProviderId && environment.path && existsSync(environment.path)) return { type: "host", hostId, workspace: { type: "unmanaged", path: environment.path } };
     return { type: "project-default" };
   }
+}
+
+const SEED_MAX = 60_000;
+
+export function transcriptSeed(rows: readonly TimelineRow[]): string {
+  const lines = rows.map((row) => `${row.role === "assistant" ? "Assistant" : "User"}: ${row.text!.trim()}`);
+  let text = lines.join("\n\n");
+  if (text.length > SEED_MAX) text = `…\n\n${text.slice(text.length - SEED_MAX)}`;
+  return `This thread continues an earlier conversation. Here it is, up to the message the user is replying to (the last one):\n\n${text}`;
 }

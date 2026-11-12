@@ -10,7 +10,6 @@ const state = vi.hoisted(() => ({
   mirror: null as { mirrored: boolean; readOnly?: boolean } | null,
   call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({ conversationId: "conv", projectId: null })),
   toThread: vi.fn(),
-  canPopOut: false,
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbContext: () => ({ threadId: state.threadId, projectId: null }),
@@ -39,11 +38,6 @@ vi.mock("../../kit/app/index", () => ({
   DropdownMenuItem: ({ children, onSelect, ...rest }: { children: React.ReactNode; onSelect?: () => void }) => <div role="menuitem" {...rest} onClick={() => onSelect?.()}>{children}</div>,
 }));
 vi.mock("./ConversationApprovals", () => ({ ConversationApprovals: () => null, ConversationApprovalsBanner: () => null }));
-vi.mock("../../hud/ui/pop-out", () => ({
-  useCanPopOutToHud: () => state.canPopOut,
-  canPopOut: (info: { kind: string } | null | undefined) => info !== undefined && info?.kind !== "worker",
-  PopOutHudButton: ({ threadId }: { threadId: string }) => <button type="button" data-testid="hud-pop-out" data-thread={threadId} />,
-}));
 
 import { ConversationWorkersLine, ReadOnlyComposer, ReadOnlyFallbackBanner, readOnlyKind, registerReadOnlyComposer, setWorkerStatusInHeader, setWorkerStatusOnTop, useReadOnly, useStudioThreadHeader, WorkerFromRow, WorkerStatusBanner } from "./ReadOnlyComposer";
 
@@ -73,7 +67,6 @@ beforeEach(() => {
   state.toThread.mockClear();
   setWorkerStatusOnTop(false);
   setWorkerStatusInHeader(false);
-  state.canPopOut = false;
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
@@ -272,29 +265,6 @@ it("decorates BB's thread header in one row: a worker's state as a dot and muted
   // A thread no Bot has keeps BB's header.
   await act(async () => { root.render(<Header threadId="other" />); });
   expect(host.innerHTML).toBe("");
-});
-
-it("puts Pop out to HUD in the header of every conversation, as a small icon after the title, and never on a worker's", async () => {
-  state.canPopOut = true;
-  state.infos = { ...state.infos, main: { ...conversation, threadId: "main", isMain: true, title: "Chief of Staff" } };
-  await act(async () => { root.render(<Header threadId="main" />); });
-  expect($("h1")?.textContent).toBe("Main");
-  expect($('[data-testid="conversation-bot"]')?.textContent).toBe("with Chief of Staff");
-  expect($('[data-testid="hud-pop-out"]')?.dataset.thread).toBe("main");
-  await act(async () => { root.render(<Header threadId="conv" />); });
-  expect($('[data-testid="hud-pop-out"]')?.dataset.thread).toBe("conv");
-  // A thread no Bot has keeps BB's title and gets only the icon.
-  await act(async () => { root.render(<Header threadId="other" />); });
-  expect($("h1")?.textContent).toBe("BB title");
-  expect($('[data-testid="hud-pop-out"]')?.dataset.thread).toBe("other");
-  await act(async () => { root.render(<Header threadId="w1" />); });
-  expect($('[data-testid="worker-state"]')).not.toBeNull();
-  expect($('[data-testid="hud-pop-out"]')).toBeNull();
-  // Where this window can't pop one out (no plugin windows, the HUD off), no icon.
-  state.canPopOut = false;
-  await act(async () => { root.render(<Header threadId="conv" />); });
-  expect($('[data-testid="hud-pop-out"]')).toBeNull();
-  expect($('[data-testid="conversation-bot"]')).not.toBeNull();
 });
 
 it("with the state in the header, draws no row under it; a waiting worker's box says where to answer", async () => {

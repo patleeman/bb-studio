@@ -17,10 +17,15 @@ struct BotSpacesRoot: View {
             .environment(\.botConversation, context)
             .id(shell.selection)
         }
-        .onChange(of: shell.selection) { _, _ in shell.detailPath = [] }
+        .onChange(of: shell.selection) { _, _ in shell.detailPath = shell.takePendingPush() }
         .onAppear { shell.land(store) }
         .onChange(of: store.spaces) { _, _ in shell.land(store) }
         .onChange(of: store.views) { _, _ in shell.land(store) }
+        .onChange(of: app.shellLink, initial: true) { _, link in
+            guard let link, store.spaces != nil else { return }
+            app.shellLink = nil
+            shell.follow(link, store: store)
+        }
         .onChange(of: app.botRoute, initial: true) { _, route in
             guard let route, store.spaces != nil else { return }
             app.botRoute = nil
@@ -57,7 +62,11 @@ struct BotSpacesRoot: View {
         case .conversation(let id), .worker(let id):
             ThreadView(threadId: id).id(id)
         case .page(let page):
-            BotPagePlaceholder(page: page)
+            let bot = BotShell.shownBot(store.spaces, chosen: shell.shownBotId)
+            BotPageScreen(page: page, bot: bot, open: { [shell] in shell.open($0) }, openMain: { [shell, store] in
+                if let main = BotShell.mainThreadId(bot, view: bot.flatMap { store.view(for: $0.id) }) { shell.openConversation(main) }
+            }, refresh: { [store] in Task { await store.refresh() } })
+            .id(bot?.id)
         case nil:
             ContentUnavailableView("No conversation selected", systemImage: Symbols.thread)
         }
@@ -140,6 +149,7 @@ struct BotSpaceList: View {
                     .buttonStyle(.plain)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .accessibilityLabel(page.title)
+                    .accessibilityIdentifier("BotPage-\(page.rawValue)")
                     if page != BotPage.allCases.last { Spacer(minLength: 4) }
                 }
             }
@@ -251,7 +261,6 @@ struct BotSpaceList: View {
             })
             Spacer()
             Menu {
-                Button { app.tab = .inbox } label: { Label("All BB threads", systemImage: "bubble.left.and.bubble.right") }
                 Button { app.tab = .studio } label: { Label("Studio", systemImage: "square.stack") }
             } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.medium)).frame(width: 44, height: 44)
@@ -348,15 +357,5 @@ struct BotSpaceDots: View {
         .glassEffect(.regular, in: .capsule)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("BotSpaceDots")
-    }
-}
-
-struct BotPagePlaceholder: View {
-    let page: BotPage
-
-    var body: some View {
-        ContentUnavailableView(page.title, systemImage: page.symbol, description: Text("Coming soon."))
-            .navigationTitle(page.title)
-            .navigationBarTitleDisplayMode(.inline)
     }
 }

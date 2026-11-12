@@ -33,7 +33,7 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); element.remove(); setTabNavigator(null); resetBotThreadsForTest(); vi.unstubAllGlobals(); });
 const render = (node: React.ReactNode) => act(async () => { root.render(node); });
 const settled = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
-const view = (fields: Partial<SideThreadView>): SideThreadView => ({ messageId: "m1", threadId: "thr_reply", botId: "dot", replies: 2, lastReplyAt: Date.now() - 5 * 60_000, lastReplyRole: "assistant", working: false, ...fields });
+const view = (fields: Partial<SideThreadView>): SideThreadView => ({ messageId: "m1", threadId: "thr_reply", botId: "dot", replies: 2, lastReplyAt: Date.now() - 5 * 60_000, lastReplyRole: "assistant", working: false, kind: "reply", conversations: 1, ...fields });
 
 it("opens a message's thread in the side panel of the conversation it came from", async () => {
   expect(await openThreadBeside("thr_main", "thr_reply", host.toThread)).toBe(true);
@@ -60,18 +60,26 @@ it("shows Reply in thread on a Bot's replies only, and opens the thread beside t
   expect(workbench.open).toHaveBeenCalledWith(expect.objectContaining({ params: { threadId: "thr_reply" } }), { focus: true });
 });
 
-it("shows the reply count with the last replier: the Bot's presence, or your mark", async () => {
+it("shows the reply count and last reply's time as a quiet link, Replying… while it works, and nothing for an empty thread", async () => {
   const onOpen = vi.fn();
-  await render(<ThreadIndicator thread={view({})} onOpen={onOpen} />);
-  expect(element.textContent).toBe("💬 2 replies · 5m ago");
+  const now = new Date(2026, 10, 12, 18, 0).getTime();
+  const at = new Date(2026, 10, 12, 16, 13).getTime();
+  await render(<ThreadIndicator thread={view({ lastReplyAt: at })} onOpen={onOpen} now={now} />);
+  expect(element.textContent).toMatch(/^2 replies · Last reply 4:13\sPM$/);
+  expect(element.textContent).not.toContain("💬");
+  const link = element.querySelector<HTMLButtonElement>("[data-studio-side-thread]")!;
+  expect(link.className).toContain("text-primary");
+  expect(link.className).not.toMatch(/rounded|border|bg-state/);
   expect(element.querySelector('[data-testid="bot-presence"]')).not.toBeNull();
-  expect(element.querySelector('[data-testid="user-mark"]')).toBeNull();
-  await render(<ThreadIndicator thread={view({ replies: 1, lastReplyRole: "user" })} onOpen={onOpen} />);
-  expect(element.textContent).toBe("💬 1 reply · 5m ago");
+  await render(<ThreadIndicator thread={view({ replies: 1, lastReplyRole: "user", lastReplyAt: at })} onOpen={onOpen} now={now} />);
+  expect(element.textContent).toMatch(/^1 reply · Last reply/);
   expect(element.querySelector('[data-testid="user-mark"]')).not.toBeNull();
-  expect(element.querySelector('[data-testid="bot-presence"]')).toBeNull();
-  await render(<ThreadIndicator thread={view({ replies: 0, lastReplyRole: null, lastReplyAt: null })} onOpen={onOpen} />);
-  expect(element.textContent).toBe("💬 Thread");
+  await render(<ThreadIndicator thread={view({ working: true })} onOpen={onOpen} now={now} />);
+  expect(element.textContent).toBe("Replying…");
+  await render(<ThreadIndicator thread={view({ kind: "fork", conversations: 1 })} onOpen={onOpen} now={now} />);
+  expect(element.textContent).toBe("Forked here · 1 conversation");
   element.querySelector<HTMLButtonElement>("[data-studio-side-thread]")!.click();
   expect(onOpen).toHaveBeenCalledTimes(1);
+  await render(<ThreadIndicator thread={view({ replies: 0, lastReplyRole: null, lastReplyAt: null })} onOpen={onOpen} now={now} />);
+  expect(element.querySelector("[data-studio-side-thread]")).toBeNull();
 });

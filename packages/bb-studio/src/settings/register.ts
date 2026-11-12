@@ -12,7 +12,6 @@ import { describeMigration, LEGACY_SETTINGS, migrateSettings, needsSettingsMigra
 import { StudioSettingsStore } from "./store";
 import { SETTINGS_CHANNEL } from "./schema";
 import { loopTimeZone } from "./constants";
-import { clearOldHudHotkey } from "../hud/migrate";
 
 const MOBILE_PLUGIN_ID = "mobile";
 /** After a migration, Studio reloads itself this long after loading, so BB's page drops the old fields. */
@@ -50,8 +49,6 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
       bb.log.warn(`Couldn't move Studio's settings into its own storage; trying again next load: ${errorMessage(error)}`);
     }
   }
-  // The HUD's old default shortcut is the launcher's now (src/hud/migrate.ts).
-  await clearOldHudHotkey(bb.storage.kv, store).catch((error) => bb.log.warn(`Couldn't clear the HUD's old shortcut: ${errorMessage(error)}`));
   const settings = await combineSettings(
     { get: () => keys.get(), experimental_set: (values) => keys.experimental_set(values as never), onChange: (listener) => keys.onChange(listener) },
     store,

@@ -107,7 +107,7 @@ describe("contrast on every surface", () => {
     expect(resolveLook(GRID, { ...defaults(GRID), glass: 0 }, "dark").alpha.main).toBe(0);
   });
 
-  it("measures the HUD over any wallpaper, black to white", () => {
+  it("measures the hud glass over any wallpaper, black to white", () => {
     const look = resolveLook(GRID, defaults(GRID), "dark");
     const backgrounds = surfaceBackgrounds(hexToRgb("#010609"), look.alpha.hud, backdropRange(GRID, "hud", 1));
     expect(backgrounds.map(rgbToHex)).toHaveLength(2);
@@ -175,7 +175,7 @@ describe("the tokens", () => {
     expect(tokens["--font-sans"]).toBe(GRID.type.body);
   });
 
-  it("leave the transcript to the host's column card with no backing of their own, keep a thread banner inside that column, give a full card only to a plugin page that has no column card of its own, make filter pills light glass with the selected one denser, card the composer's replacement, draw no 1px line on them or on the replacement's buttons, and leave the HUD and side-panel threads alone", () => {
+  it("leave the transcript to the host's column card with no backing of their own, keep a thread banner inside that column, give a full card only to a plugin page that has no column card of its own, make filter pills light glass with the selected one denser, card the composer's replacement, draw no 1px line on them or on the replacement's buttons, and leave side-panel threads alone", () => {
     const tokens = lookTokens(resolveLook(GRID, defaults(GRID), "dark"));
     expect(tokens["--studio-glass-main"]).toBe("color-mix(in oklab, var(--canvas) 3%, transparent)");
     expect(tokens["--studio-blur-main"]).toBe("0px");
@@ -221,7 +221,6 @@ describe("the tokens", () => {
     for (const selector of Object.values(HALO_SELECTORS)) expect(halo).toContain(selector);
     expect(halo).toContain("{ text-shadow: var(--studio-halo); }");
     expect(HALO_SELECTORS.sidebar).toBe('html[data-studio-glass] [data-sidebar="sidebar"]');
-    expect(THEME_CSS).not.toContain("[data-studio-hud]");
   });
 
   it("tints a glass diff's line-number gutter like the diff body over the scene, not a darker canvas strip", () => {
@@ -341,7 +340,7 @@ describe("the title row under glass", () => {
     expect(group).toContain("flex: 1;");
     expect(group).toContain("background: transparent;");
     expect(rule(`${TITLE_BOX} [data-fork-thread-header-after], ${TITLE_BOX} [data-fork-thread-header-after] > .studio-root`)).toBe(" flex: 1; ");
-    expect(rule(`${TITLE_BOX} [data-fork-thread-header-after] [data-testid="hud-pop-out"], ${TITLE_BOX} [data-fork-header-group="title"] > span:last-child`)).toBe(" margin-left: auto; ");
+    expect(rule(`${TITLE_BOX} [data-fork-header-group="title"] > span:last-child`)).toBe(" margin-left: auto; ");
     expect(rule(`${HEADER_ROW} > :has(> [data-fork-header-group="actions"]), ${HEADER_ROW} > [data-fork-header-group="actions"]`)).toBe(" margin-left: auto; ");
     expect(rule(`${boxes} > *`)).toBe(" pointer-events: auto; ");
   });

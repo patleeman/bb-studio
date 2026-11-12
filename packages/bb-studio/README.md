@@ -234,7 +234,7 @@ own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
 **Agent replies** (the Next row and reactions), **Threads** (Smart Queue,
 resume after a restart, Todos and page history), **Windows** (the launcher's
-shortcut, the HUD and its optional shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Jev** (the
+shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Jev** (the
 provider, its connection test, the fallback model and your own endpoint) and
 **Advanced** (Smart Queue batch confidence). Last, **Phone notifications**
 shows Studio Mobile's push status and **Send a test push**. The Attention
@@ -496,7 +496,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   nothing; and **···**: **Edit space…**, **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
   **Archive** (the older page, `/plugins/studio/studio/conversations/<botId>`),
-  **Show HUD** where BB opens plugin windows, then New Bot. Bot info and
+  then New Bot. Bot info and
   Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
   icon group). Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
@@ -510,8 +510,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   `/plugins/studio/studio/new-conversation/<botId>/<projectId>`, seeded with
   the Bot's default model and Main's project; pick any other model before
   sending; `bot_conversation_start` makes the thread this Bot's): Main first, then the others
-  by last activity, two lines each: the title (13px, medium; a fork adds
-  "⑂ source" in small muted text) and its age; then its latest reply (12px,
+  by last activity, two lines each: the title (13px, medium) and its age; then its latest reply (12px,
   the ink at 55%), with a spinner while
   it works. The conversation that needs you is outlined in amber, with
   "Needs you: <reason>" on its second line. The row on screen is
@@ -772,7 +771,8 @@ engine that paints the scene and maps the theme onto BB's tokens
   `src/theme/tokens.ts` under `html[data-studio-glass]`, also tints thread
   banners with it), `composer` (the composer, Studio's composer
   replacements and the side panel, the densest at 0.42–0.5), `main` (kept
-  in theme packages; no surface uses it under a scene theme) and `hud`.
+  in theme packages; no surface uses it under a scene theme) and `hud`
+  (menus, popovers, tooltips, dialogs and the palette, with a 12 px blur).
   The glass is clear enough that the scene's shapes and colors read
   through every card; the halo, not the tint, keeps text readable. A main
   view that shows no main-view thread (Memory, Library, Settings, a plugin
@@ -783,8 +783,8 @@ engine that paints the scene and maps the theme onto BB's tokens
   A classic theme's glass is opaque, with no cards, backings or halo. The
   scene and the colors crossfade on a Bot switch; the scene pauses when the
   window isn't frontmost, holds a still frame under reduced motion and
-  renders smaller on battery. The HUD recolors its own window, with no
-  scene, and keeps its own glass. On a BB without the slot the main window
+  renders smaller on battery. A plugin window of Studio's recolors itself,
+  with no scene. On a BB without the slot the main window
   keeps BB's own look; on a BB without the card layout the surfaces keep
   their full-size glass.
 - **Movers stay in the open.** Cards are frosted glass, so a crisp shape
@@ -825,7 +825,7 @@ engine that paints the scene and maps the theme onto BB's tokens
 - **Save applies at once.** The saved appearance shows until the Bot list
   has it (or for 30 s), so the old theme doesn't flash back.
 - **Checks** gate every save: text and UI contrast on every surface text
-  sits on (sidebar, transcript, composer, HUD) in every variant, at the
+  sits on (sidebar, transcript, composer, `hud` glass) in every variant, at the
   default settings and at full intensity with no glass, on the card's glass
   over the theme's declared backdrop (its darkest and brightest blurred
   color behind text). On the sidebar and transcript cards the halo counts
@@ -871,7 +871,7 @@ A Bot's icon is its presence (`src/presence`): a form drawn live on a
 canvas in the theme's colors, changing with what the Bot is doing. It
 shows in the sidebar header (36 px), the Bot switcher (24 px), the Bots
 list (28 px for the selected Bot, 22 px for the others), the Bot row of a thread's
-info, the HUD's bar and the theme popover.
+info and the theme popover.
 
 - **Forms** (`forms.ts`): orb, tesseract (a real 4D rotation), torus
   knot, particle swarm, Möbius ribbon, polyhedron (icosahedron,
@@ -1163,7 +1163,7 @@ fork's `experimental_linkHandler`, with the click's modifiers), chat cards,
 links in pages and on whiteboards, mini apps' `bb.open`, Cmd+K and the
 launcher's rows, the Bot pages' rows and the agent's `workbench_open` all go
 through it. In the
-HUD, the launcher and any popped-out window the rule runs in bb's main window
+launcher and any popped-out window the rule runs in bb's main window
 (`window.runInMain { kind: "link" }`). A link to something that is gone
 opens a **Not found** tab with the kind, the id and the link as typed
 (`links.resolve` checks a thread, item, Bot or file in one call). It is
@@ -1433,8 +1433,7 @@ worker).
 ## Windows
 
 In a BB that can open plugins in windows of their own (the BB Studio desktop
-app), Studio has three kinds: the launcher, the HUD, and an item in a window
-of its own. On stable BB none of this shows, and Studio works as before.
+app), Studio has two kinds: the launcher and an item in a window of its own. On stable BB none of this shows, and Studio works as before.
 
 ### The launcher and Cmd+K
 
@@ -1454,8 +1453,8 @@ Results come in groups, the group with the best match first:
 - **Ask <Bot>: "…"**: anything typed. A sentence (three words or more that
   don't start an app or action's name) puts it first; otherwise it is last.
   **Enter** sends it to the current conversation (Cmd+K: the one on screen,
-  else the shown Bot's last one; the launcher: your primary Bot's chat, with
-  the reply in the HUD, or in BB with the HUD off). **⇧Enter** starts a new
+  else the shown Bot's last one; the launcher: the current Bot's Main, shown
+  in BB's main window). **⇧Enter** starts a new
   conversation of that Bot with it, on the Bot's default model.
 - **Conversations and files** (**Recent** with nothing typed): every kind in
   the tab kinds registry (conversations, workers, pages, whiteboards,
@@ -1463,10 +1462,10 @@ Results come in groups, the group with the best match first:
   VS Code), found by title and by Studio's search. They open as the registry
   says: a conversation in the main view, an item beside the conversation on
   screen; **⌘Enter** in a split. The launcher opens them in the main window.
-- **Apps**: BB Studio (launcher only), HUD, VS Code, Visual Chat when it is
+- **Apps**: BB Studio (launcher only), VS Code, Visual Chat when it is
   installed, and any app another plugin registers.
-- **Actions**: New conversation, Ask the Bot, New page, **Pop out to HUD**
-  (Cmd+K, on a conversation), **Switch to <Bot>** for each other Bot.
+- **Actions**: New conversation, Ask the Bot, New page, **Switch to <Bot>**
+  for each other Bot.
 - **Commands**: every BB command `experimental_useAppCommands()` lists (app
   commands, plugin commands, plugin pages, servers), with its shortcut. From
   the launcher they run in the main window.
@@ -1498,54 +1497,7 @@ Plugins add their own rows with BB's launcher slot,
 way (`src/launcher/items.ts`) and lists every plugin's through
 `experimental_useLauncherItems()`. `run` is called in the launcher's window.
 
-### The HUD
-
-**The HUD** is a conversation popped out into a see-through window that
-floats over other apps and every Space: your primary Bot's chat, or the
-conversation you popped out. It is BB's own chat: the transcript as a thread
-shows it (rendered Markdown, collapsed tool rows), following new output, with
-BB's composer as one rounded bar at the bottom (model, reasoning and mode,
-the mic, send or stop). The HUD has no title bar and no panel: the
-transcript sits on macOS's blurred HUD material (`vibrancy: "hud"`) and a
-light tint that is clear at the top and thickens toward the bar, older
-messages fade out toward the top, and the text has a soft halo in
-the theme's background colour so it reads on any wallpaper.
-
-- **Pop out to HUD** is on every conversation (not on a worker): a small
-  icon after its title in the header, and a row in its ··· menu and the
-  sidebar row's menu. It opens the HUD on that conversation, where the HUD
-  was last; an open HUD loads it in place, at its size. **Pop back in**, at the bar's right end, shows the conversation
-  in BB's main window and closes the HUD.
-- **bb** in the menu bar shows and hides it. So do the **HUD** row in the
-  launcher, **Show HUD** in the Bot sidebar's ··· menu and **Show HUD** on
-  the Bot page; these show the primary Bot's chat when the HUD isn't open. It
-  has no system-wide shortcut unless you set one (`hudHotkey`, empty by
-  default). ⌥Space stays the launcher's.
-- Drag it by the bar's empty parts; drag an edge or a corner to resize it (no
-  smaller than 320×240). BB reopens it where it was last shown or hidden, at
-  that size, on that display, and after a restart. The first time it opens at
-  480×600, bottom right.
-- The eye turns on **click-through**: clicks pass to the app underneath. It
-  is off every time the HUD opens. While it is on, a coloured strip at the
-  top says so and names the ways back:
-  - **bb** in the menu bar, or the HUD's shortcut if it has one, turns it off
-    and focuses the HUD;
-  - hold **⌥** with the pointer over the HUD to use it meanwhile; it goes
-    back to click-through when you let go or the pointer leaves. On a BB
-    whose `setClickThrough` takes `{ hold: true }` this only pauses passing
-    clicks: click-through stays on, so **bb** in the menu bar and the HUD's
-    shortcut still only turn click-through off and never hide the HUD;
-  - **Esc** turns it off when the HUD has focus, and so does the eye while ⌥
-    is held.
-- Turn the HUD off, or give it a shortcut, in **Settings → Plugins → Studio →
-  Windows** (`hudEnabled`, `hudHotkey`). Off removes the menu bar entry and
-  the shortcut. If another app holds the shortcut you pick, the row says so
-  and offers others; the HUD has no fallback shortcut of its own.
-- The HUD's shortcut used to default to ⌥Space, which is the launcher's now.
-  A stored HUD shortcut of ⌥Space or ⌃⌥Space is cleared once when Studio
-  updates; set a different one if you want it back.
-- In a browser the HUD is a plain popup with the same chat, and has no
-  click-through.
+### Items in windows
 
 **Open in new window** is in an item's menus: right-click an item anywhere,
 the menu of a sidebar row, and the item's own menu. The window
@@ -3342,8 +3294,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_skill_write` (name, one-line description, Markdown steps) and fixes
   one in place with `bot_skill_patch` (exact text → new text). Only the
   Bot's thread has these: they live in Studio's `bot_skills` table. Its
-  instructions list each skill's name and one-line description, and it
-  loads the full skill with `bot_skill_view` (`bot_skill_list` lists them).
+  instructions list up to eight skills (pinned, then most recently used)
+  by name and one-line description, and say how many more there are.
+  `skill_search` finds the rest on demand: it ranks the Bot's own
+  non-archived skills by its words in their names, descriptions and full
+  text (BM25, names weigh most) and returns the best with a body snippet.
+  It loads the full skill with `bot_skill_view` (`bot_skill_list` lists them).
   Writes and patches return advisory notes, never blocking: a body that
   reads like a log of one session (dates, PR numbers, "we tried"), one over
   about 8,000 characters, or a name close to another skill's. BB
@@ -3353,12 +3309,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
   `bb skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it. See "Skills that learn" below.
-  On the fork, BB's **Skills** page lists each Bot's own skills too, under
-  the Bot's name, with one Source filter option per Bot
-  (`slots.experimental_skillSource`, `src/ui/bot/skill-sources.ts`); a row
-  opens the Bot's Controls at Skills. BB takes a source's name when the
-  plugin loads, so the Bots are the ones this browser last saw; a new or
-  renamed Bot shows after the next reload.
+  Each Bot has a **Skills** page (`skills/<botId>`, `src/ui/skills/`) on
+  the Bot-page template, beside Memory: its skills (archived ones apart),
+  each opening to its body and its versions with diffs and Revert, Delete,
+  Restore for archived ones, and History, every version of every skill,
+  deletes included. On the fork Studio hides BB's own Skills page, its
+  sidebar row and General's "bb CLI skills" (`slots.experimental_hideHostEntries`),
+  and refuses BB's public skill registry (skills.sh search, reads and
+  installs, from the app, the CLI, the SDK and agents) through
+  `experimental_skillsRegistryPolicy` until a person turns **Public skill
+  registry** on in Settings, which needs BB's approval dialog
+  (`src/skills-registry.ts`). The harnesses' own skill folders
+  (`~/.claude/skills`, `~/.agents/skills`) and plugin skills are left alone.
 - **Skills that learn** (`src/skill-learning.ts`; after Hermes Agent's
   background review and curator). A Studio bot reviews its own work in the
   background and keeps its skills current. External bots learn on their own
@@ -3434,34 +3396,46 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `src/ui/bot/SideThreads.tsx`, `src/ui/bot/reply-in-thread.ts`; table
   `bot_side_threads`; `bot_thread_reply`, `bot_fork_conversation`,
   `bot_side_threads`, `bot_side_threads_for_bot`, `bot_side_thread_open`).
-  A thread and a fork are one object: a conversation of the same Bot at the
-  same level, forked after a message and linked back to it (its
-  `bot_threads` row has `forked_from_message_id`, and `bot_side_threads`
-  records the message). `MessageThreads` is the one path that makes them.
+  A reply thread and a fork are both a conversation of the same Bot, forked
+  after a message and linked back to it (its `bot_threads` row has
+  `forked_from_message_id`; `bot_side_threads` records the message and the
+  kind, `reply` or `fork`). `MessageThreads` is the one path that makes them.
+  Neither gets a row in Conversations: each lives at its message.
   - **Reply in thread**: on a Bot's replies, a small icon in the message's
     action row, shown on hover (`slots.experimental_messageMetadata` with
-    `placement: "actionRow"`). It opens the message's newest thread, or makes
-    one (`bot_thread_reply`, which finds the fork point from the timeline),
-    and opens it as a Conversation tab in the conversation's side panel
-    (the workbench, through `openTabRef`; the main view where there is
-    none). iOS's **Reply in thread** (`bot_side_thread_open`) takes the
-    same path.
+    `placement: "actionRow"`), the only way in until it has replies. It
+    opens the message's newest reply thread, or makes one
+    (`bot_thread_reply`, which finds the fork point from the timeline), and
+    opens it as a Conversation tab in the conversation's side panel (the
+    workbench, through `openTabRef`; the main view where there is none).
+    iOS's **Reply in thread** (`bot_side_thread_open`) takes the same path.
   - **Fork conversation from here** in a message's **···** menu
     (`src/ui/conversations/fork-from-here.ts`, `bot_fork_conversation`,
     where BB has the fork's `slots.experimental_messageAction`) always makes
-    a new fork and opens it in the main view. It records the message too.
-  - **The row under the message**: "💬 2 replies · 5m ago" with the last
-    replier: the Bot's presence for its replies, your mark for yours. It
-    counts your messages and the Bot's turns in all the message's threads,
-    only those after the fork: the history a fork copies keeps its original
-    times, so rows older than the thread itself don't count. It is recounted
-    from each thread's timeline when it starts or finishes a turn, and for
-    every thread when the plugin starts, and opens the newest in the side
-    panel. An app overlay draws it
-    into a footer under the message (`ThreadIndicators`), in any of a Bot's
-    conversations.
-  - **The sidebar** lists each thread under Conversations as a child of its
-    source ("⑂ Main").
+    a new fork and opens it in the side panel too; it opens full size from
+    there.
+  - Titles: "Main · thread" for a reply thread, "Main · fork" for a fork
+    (the parent conversation's title).
+  - **Under the message**, an app overlay (`ThreadIndicators`) draws quiet
+    links in the theme's accent color, no emoji, pill or border: "2 replies
+    · Last reply 4:13 PM" (Intl time today, the date before) with the last
+    replier (the Bot's presence, or your mark), "Replying…" while it works,
+    and "Forked here · 1 conversation" for forks. An empty or failed thread
+    shows nothing. Replies count your messages and the Bot's turns, only
+    those after the fork: the history a fork copies keeps its original
+    times. They are recounted when a thread starts or finishes a turn, and
+    for every thread when the plugin starts. A link opens the newest thread
+    of its kind in the side panel.
+  - **The sidebar**: a fork's work and needs-you show on the row of the
+    conversation it was forked from (through a chain of forks), else on
+    Main (`foldForks` in `src/bot-threads.ts`).
+  - **A parent BB can't fork** (no provider session to copy, a turn not
+    finished): the thread starts from the transcript instead, a new thread
+    on the parent's provider, model and environment seeded with the
+    conversation up to the message as agent-only context
+    (`startedOnBehalfOf`), so it waits idle for the first message. The fork
+    core restarts a fork whose session copy fails at its first start the
+    same way (`fork-start-fallback.fork.ts`). No raw error reaches the user.
   - Side chats bb's side-chat plugin made (mirrored from bb) are matched to
     the message they quote and count the same way.
   It starts on the Bot's default model when that is on the fork's provider
@@ -3579,7 +3553,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_resume`, `bot_stop`, `bot_activity` (`bot_pause` and `bot_stop` work only
   in the Bot's own chat or its handoff chain; threads it started, its runners
   and other threads are refused and the user uses Studio → Bot); only the Bot's thread also gets
-  `bot_profile_update`, `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
+  `bot_profile_update`, `bot_skill_list`, `skill_search`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
   `bot_skill_delete` and `bot_history_search`.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory

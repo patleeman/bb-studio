@@ -11,10 +11,8 @@ const state = vi.hoisted(() => ({
   navigate: { toThread: vi.fn(), toCompose: vi.fn(), toPluginPanel: vi.fn() },
   windows: false,
   loopsOn: false,
-  showHud: vi.fn(async () => true),
 }));
 vi.mock("../../kit/app/windows", () => ({ get hasHostWindows() { return state.windows; } }));
-vi.mock("../../hud/ui/HudBridge", () => ({ showHud: state.showHud }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => state.navigate,
   experimental_useSidebarThreads: () => ({ threads: state.sidebarThreads, projects: [] }),
@@ -110,7 +108,7 @@ it("draws the current Bot: its name, conversations in two lines with the needs-y
   expect(rows[1]!.querySelector('[data-testid="conversation-line"]')?.getAttribute("data-tone")).toBe("running");
   expect(rows[2]!.hasAttribute("data-needs-you")).toBe(true);
   expect(rows[2]!.querySelector('[data-testid="conversation-line"]')?.textContent).toBe("Needs you: cut titles at the end or the middle?");
-  expect(rows[2]!.querySelector('[data-testid="forked-from"]')?.textContent).toBe("⑂ Fork redesign");
+  expect(rows[2]!.querySelector('[data-testid="forked-from"]')).toBeNull();
   expect(rows[0]!.textContent).toContain("4m");
   const workers = $$('[data-testid="worker-row"]');
   expect(workers.map((row) => [row.dataset.status, row.querySelector('[data-testid="worker-tag"]')?.textContent ?? null])).toEqual([["running", "bb-studio-native"]]);
@@ -272,14 +270,12 @@ it("rows carry no native tooltip of their own", async () => {
   }
 });
 
-it("offers Show HUD in the Bot menu where BB has plugin windows", async () => {
+it("has the same Bot menu where BB has plugin windows", async () => {
   state.windows = true;
   try {
     await mount();
     const items = $$('[data-testid="menu"] [role="menuitem"]');
-    expect(items.map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "Show HUD", "New Bot"]);
-    act(() => (items.find((item) => item.textContent === "Show HUD") as HTMLElement).click());
-    expect(state.showHud).toHaveBeenCalledTimes(1);
+    expect(items.map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "New Bot"]);
   } finally { state.windows = false; }
 });
 
@@ -375,7 +371,9 @@ describe("the Bot's space (round 7)", () => {
 
   it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Library", "Automations"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Automations"]);
+    await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", {});
     await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });

@@ -27,34 +27,33 @@ it("lists BB's commands under Commands and its settings pages under Settings, wi
   expect(commands[0]!.run).toHaveBeenCalledTimes(1);
 });
 
-it("Studio's own: a switch to each other Bot, Pop out to HUD for the conversation on screen, each settings section and a toggle for each on/off setting", async () => {
-  const runners: StudioCommandRunners = { switchBot: vi.fn(), popOut: vi.fn(), openSettings: vi.fn(), setSetting: vi.fn(async () => {}) };
-  const settings = { ...effectiveSettings({}), hudEnabled: true, loopsEnabled: false };
-  const entries = studioCommandEntries({ bots: [{ id: "dot", name: "Chief of Staff" }, { id: "home", name: "Home" }], currentBotId: "dot", popOutThreadId: "thr_1", settings, windows: true }, runners);
+it("Studio's own: a switch to each other Bot, each settings section and a toggle for each on/off setting", async () => {
+  const runners: StudioCommandRunners = { switchBot: vi.fn(), openSettings: vi.fn(), setSetting: vi.fn(async () => {}) };
+  const settings = { ...effectiveSettings({}), loopsEnabled: false, autoResumeThreads: true };
+  const entries = studioCommandEntries({ bots: [{ id: "dot", name: "Chief of Staff" }, { id: "home", name: "Home" }], currentBotId: "dot", settings, windows: true }, runners);
   const byTitle = (title: string) => entries.find((each) => each.title === title)!;
-  expect(entries.filter((each) => each.section === "actions").map((each) => each.title)).toEqual(["Pop out to HUD", "Switch to Home"]);
+  expect(entries.filter((each) => each.section === "actions").map((each) => each.title)).toEqual(["Switch to Home"]);
   expect(entries.some((each) => each.title === "Switch to Chief of Staff")).toBe(false);
   await byTitle("Switch to Home").run();
   expect(runners.switchBot).toHaveBeenCalledWith("home");
-  await byTitle("Pop out to HUD").run();
-  expect(runners.popOut).toHaveBeenCalledWith("thr_1");
   expect(entries.filter((each) => each.key.startsWith("studio:settings:")).map((each) => each.title)).toEqual([
     "Studio settings: Voice", "Studio settings: Recordings and calls", "Studio settings: Agent replies", "Studio settings: Threads", "Studio settings: Windows", "Studio settings: Jev", "Studio settings: Advanced",
   ]);
   await byTitle("Studio settings: Voice").run();
   expect(runners.openSettings).toHaveBeenCalledWith("voice");
-  expect([byTitle("HUD").detail, byTitle("Todos").detail]).toEqual(["On", "Off"]);
-  await byTitle("HUD").run();
+  expect([byTitle("Resume after a restart").detail, byTitle("Todos").detail]).toEqual(["On", "Off"]);
+  await byTitle("Resume after a restart").run();
   await byTitle("Todos").run();
-  expect(vi.mocked(runners.setSetting).mock.calls).toEqual([["hudEnabled", false], ["loopsEnabled", true]]);
-  const bare = studioCommandEntries({ bots: [], currentBotId: null, popOutThreadId: null, settings: null, windows: false }, runners);
-  expect(bare.some((each) => each.title === "Pop out to HUD" || each.title === "HUD" || each.title === "Studio settings: Windows")).toBe(false);
+  expect(vi.mocked(runners.setSetting).mock.calls).toEqual([["autoResumeThreads", false], ["loopsEnabled", true]]);
+  expect(entries.some((each) => /hud/i.test(each.title) || /hud/i.test(each.key))).toBe(false);
+  const bare = studioCommandEntries({ bots: [], currentBotId: null, settings: null, windows: false }, runners);
+  expect(bare.some((each) => each.title === "Studio settings: Windows")).toBe(false);
   expect(bare.every((each) => each.section === "settings")).toBe(true);
 });
 
 it("themes: Next theme and Previous theme with their shortcuts, then Theme: <name> for each in the picker's order, ending with None", async () => {
-  const runners: StudioCommandRunners = { switchBot: vi.fn(), popOut: vi.fn(), openSettings: vi.fn(), setSetting: vi.fn(async () => {}), applyTheme: vi.fn(), cycleTheme: vi.fn() };
-  const input = { bots: [{ id: "dot", name: "Chief of Staff" }], currentBotId: "dot", popOutThreadId: null, settings: null, windows: false };
+  const runners: StudioCommandRunners = { switchBot: vi.fn(), openSettings: vi.fn(), setSetting: vi.fn(async () => {}), applyTheme: vi.fn(), cycleTheme: vi.fn() };
+  const input = { bots: [{ id: "dot", name: "Chief of Staff" }], currentBotId: "dot", settings: null, windows: false };
   const themes = [{ id: "miami", name: "Miami" }, { id: "nord", name: "Nord" }, { id: null, name: "None" }];
   const entries = studioCommandEntries({ ...input, themes, themeShortcuts: { next: "⌃⌥T", previous: "⌃⌥⇧T" } }, runners);
   const own = entries.filter((each) => each.key.startsWith("studio:theme"));

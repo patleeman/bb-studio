@@ -28,7 +28,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { latestLine, repoTag, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
+import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -57,13 +57,12 @@ const row = (r: Row): ActivityRow => ({
   startedAt: r.started_at, endedAt: r.ended_at, updatedAt: r.updated_at,
 });
 
-const BUSY = new Set(["starting", "active", "stopping", "pending", "provisioning"]);
 const titleOf = (thread: Partial<ThreadFacts>) => thread.title?.trim() || thread.titleFallback?.trim() || null;
 
 /** The state BB's thread record says (a seed for threads with no row yet). */
-export function stateOf(thread: Pick<ThreadFacts, "status" | "hasPendingInteraction">): ActivityState {
+export function stateOf(thread: Pick<ThreadFacts, "status" | "hasPendingInteraction" | "queuedMessageCount">): ActivityState {
   if (thread.hasPendingInteraction) return "needs-you";
-  if (BUSY.has(thread.status ?? "")) return "running";
+  if (threadRunning(thread)) return "running";
   if (thread.status === "error") return "failed";
   return "idle";
 }

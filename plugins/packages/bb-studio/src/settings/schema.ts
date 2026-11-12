@@ -78,10 +78,8 @@ export const STUDIO_SETTINGS = {
   exportDeletedThreads: { group: "threads", type: "boolean", label: "Export deleted threads", description: "If the file cannot be written, the thread is not deleted.", default: false },
   exportDeletedThreadsFolder: { group: "threads", type: "string", label: "Export folder", description: "An absolute folder path on the BB server, such as /Users/you/bb-thread-exports. One .jsonl file per thread.", default: "", maxLength: 500 },
 
-  // Windows (only a BB with plugin windows uses them; src/launcher, src/hud)
+  // Windows (only a BB with plugin windows uses them; src/launcher)
   launcherHotkey: { group: "windows", type: "string", label: "Launcher shortcut", description: "Written like Alt+Space or Control+Shift+L. Empty for none.", default: "Alt+Space", maxLength: 40 },
-  hudEnabled: { group: "windows", type: "boolean", label: "HUD", description: "Off removes its menu bar entry and its shortcut.", default: true },
-  hudHotkey: { group: "windows", type: "string", label: "HUD shortcut", description: "Written like Control+Shift+H. Empty for none.", default: "", maxLength: 40 },
 
   // Jev
   decisions_jevProvider: { group: "jev", type: "select", label: "Jev provider", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },

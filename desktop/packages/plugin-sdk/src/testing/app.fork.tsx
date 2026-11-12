@@ -22,6 +22,9 @@ import type {
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalFirstRunRegistration,
+  ExperimentalModelPickerGateRegistration,
+  ExperimentalHideHostEntriesRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalReplyClassifierRegistration,
   ExperimentalSidebarNewItem,
@@ -105,6 +108,9 @@ export interface ForkCapturedPluginApp {
   mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
+  firstRuns: ExperimentalFirstRunRegistration[];
+  modelPickerGates: ExperimentalModelPickerGateRegistration[];
+  hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
   panelTabActions: ExperimentalPanelTabActionRegistration[];

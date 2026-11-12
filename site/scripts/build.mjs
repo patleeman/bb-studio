@@ -1,7 +1,7 @@
 // Builds the static site into dist/: expands the {{pic}}, {{theme}}, {{clip}}
 // and {{srcset}} tags in src/index.html from the images in assets/, and copies
 // the rest. Every URL is relative, so the site works under any base path
-// (for example https://patleeman.github.io/bb-studio-site/).
+// (for example https://patleeman.github.io/bb-studio/).
 //
 //   node scripts/build.mjs
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -44,7 +44,7 @@ function webpSize(path) {
   return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff };
 }
 function theme(name, title, text) {
-  const alt = `BB Studio with the ${title} theme on the Main conversation of the Bot Atlas.`;
+  const alt = `BB Studio with the ${title} theme on the Main conversation with Atlas.`;
   return `<figure class="shot theme">
       ${pic(name, alt, "(min-width: 1100px) 350px, (min-width: 900px) 45vw, 94vw")}
       <figcaption><strong>${esc(title)}</strong>${text ? esc(text) : ""}</figcaption>

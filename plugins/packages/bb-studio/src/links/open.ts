@@ -1,7 +1,7 @@
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import type { hudContract } from "../hud/contract";
+import type { windowsContract } from "../windows/contract";
 import { routeContainer } from "../kit/app/container";
 import { member, workbenchOf } from "../kit/app/host-sdk";
 import { openAppPath } from "../kit/app/nav";
@@ -84,7 +84,7 @@ export function routesLink(input: LinkInput): boolean {
 
 export function useOpenLink(): (input: LinkInput, options: OpenLinkOptions) => Promise<LinkOutcome> {
   const navigate = useBbNavigate();
-  const rpc = useRpc<typeof linksContract & typeof hudContract>();
+  const rpc = useRpc<typeof linksContract & typeof windowsContract>();
   return useCallback((input, options) => openLinkWith(linkDeps({ navigate, rpc: rpc as unknown as Rpc }), input, options).catch((error: unknown): LinkOutcome => ({ via: "none", reason: error instanceof Error ? error.message : String(error) })), [navigate, rpc]);
 }
 
@@ -99,7 +99,7 @@ export function useOpenCard(threadId: string, source: LinkSource = "card"): (lin
 
 export function LinksBridge() {
   const navigate = useBbNavigate();
-  const rpc = useRpc<typeof linksContract & typeof hudContract>();
+  const rpc = useRpc<typeof linksContract & typeof windowsContract>();
   useEffect(() => setLinkRuntime({ navigate, rpc: rpc as unknown as Rpc }), [navigate, rpc]);
   return null;
 }

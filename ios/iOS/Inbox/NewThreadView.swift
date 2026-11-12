@@ -6,7 +6,6 @@ struct NewThreadView: View {
     private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var projectId = ""
-    @State private var projects: [Project] = []
     @State private var environments: [ThreadEnvironment] = []
     @State private var workspace = "default"
     @State private var baseBranch = ""
@@ -19,7 +18,6 @@ struct NewThreadView: View {
     @State private var focused = false
     @State private var creating = false
     @State private var error: String?
-    @State private var creatingProject = false
 
     // Execution options. Empty means the project default.
     @State private var defaults: ExecutionChoice?
@@ -66,17 +64,10 @@ struct NewThreadView: View {
             .modifier(TalkDraft(talk: talk, draft: $text, typed: $talkTyped))
             .modifier(TalkLifecycle(talk: talk))
             .onChange(of: talk.error) { _, error in if let error { self.error = error } }
-            .sheet(isPresented: $creatingProject) {
-                NewProjectView { project in
-                    if !projects.contains(where: { $0.id == project.id }) { projects.append(project) }
-                    projectId = project.id
-                }
-            }
             .task {
                 // Like desktop, a thread needs no project: it starts in the personal one.
                 if projectId.isEmpty { projectId = NewThreadProject.personalId }
                 guard let loaded = try? await client.projects() else { return }
-                projects = loaded
                 projectId = NewThreadProject.resolve(saved: projectId, projects: loaded)
             }
             .task(id: projectId) {
@@ -100,7 +91,6 @@ struct NewThreadView: View {
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    placeChip
                     workspaceChip
                 }
             }
@@ -140,26 +130,6 @@ struct NewThreadView: View {
     private var canStart: Bool {
         (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty) && !projectId.isEmpty && !creating
             && !dictation.blocksSend
-    }
-
-    /// The project the thread starts in. Optional, as on desktop: "No project"
-    /// is BB's personal project.
-    private var placeChip: some View {
-        Menu {
-            Section("Project") {
-                Picker("Project", selection: $projectId) {
-                    Text(NewThreadProject.personalLabel).tag(NewThreadProject.personalId)
-                    ForEach(projects) { Text($0.name).tag($0.id) }
-                }
-                .pickerStyle(.inline)
-            }
-            Button { creatingProject = true } label: { Label("New project…", systemImage: "folder.badge.plus") }
-                .accessibilityIdentifier("newThreadNewProject")
-        } label: {
-            chip(NewThreadProject.label(projectId, projects: projects),
-                 systemImage: projectId == NewThreadProject.personalId ? "folder.badge.minus" : "folder")
-        }
-        .accessibilityIdentifier("newThreadProject")
     }
 
     private var workspaceChip: some View {

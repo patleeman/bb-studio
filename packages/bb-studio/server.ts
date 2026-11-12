@@ -7,6 +7,9 @@ import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerWorkbenchAgent, WORKBENCH_TOOLS } from "./src/workbench-agent/server";
 import { cutOffByHost, listenForHostEvents } from "./src/kit/host-events";
 import { registerThreadExportHook } from "./src/thread-export-hook";
+import { createSkillsRegistryGate } from "./src/skills-registry";
+import { skillsRegistryContract } from "./src/skills-registry-contract";
+import { hostApproval } from "./src/kit/host-approval";
 import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
 import { registerDecisions } from "./src/decisions/server";
 import { BotMaintenance } from "./src/bot-maintenance";
@@ -32,7 +35,7 @@ import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
-import { registerHud } from "./src/hud/server";
+import { registerWindowRelay } from "./src/windows/server";
 import { MeetingLive } from "./src/voice/meeting/meeting";
 import { registerMeeting } from "./src/voice/meeting/register";
 import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
@@ -91,12 +94,12 @@ import { readPreview, readView, tonightContract, writePreview, writeView } from 
 import { ThemeService } from "./src/theme/service";
 import { ThemeGpuRouter } from "./src/theme/gpu-server";
 import { THEME_GPU_CHANNEL } from "./src/theme/gpu";
-import { themeTools } from "./src/theme/agent-tools";
+import { THEME_TOOLS, themeTools } from "./src/theme/agent-tools";
 import { runThemeCli } from "./src/theme/cli";
 import { PresenceStore } from "./src/presence/store";
 import { PresenceService } from "./src/presence/service";
 import { PRESENCE_CHECK_CHANNEL, PresenceCheckRouter } from "./src/presence/check-router";
-import { presenceTools } from "./src/presence/agent-tools";
+import { PRESENCE_TOOLS, presenceTools } from "./src/presence/agent-tools";
 import { runPresenceCli } from "./src/presence/cli";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
@@ -159,7 +162,7 @@ import { healthContract } from "./src/health-contract";
 import { registerAuth } from "./src/auth/register";
 import { AUTH_USAGE, authCli } from "./src/auth/cli";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
-import { markWelcomeOpened, readOnboarding, runOnboarding, welcomeThreadOf } from "./src/onboarding";
+import { registerOnboarding } from "./src/onboarding-register";
 import { ACCOUNTS_USAGE, accountsCli } from "./src/accounts/cli";
 import { formatSetup, SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
@@ -296,6 +299,11 @@ export default async function plugin(bb: BbPluginApi) {
     explore.update(next);
   });
   registerThreadExportHook(bb, () => ({ enabled: settingValues.exportDeletedThreads === true, folder: typeof settingValues.exportDeletedThreadsFolder === "string" ? settingValues.exportDeletedThreadsFolder : "" }));
+  const skillsRegistry = createSkillsRegistryGate({ hooks: (bb as { experimental_hooks?: object }).experimental_hooks, kv: bb.storage.kv, approval: hostApproval(bb) });
+  bb.rpc.register(skillsRegistryContract, {
+    "skillsRegistry.state": () => skillsRegistry.state(),
+    "skillsRegistry.set": ({ enabled }) => skillsRegistry.set(enabled),
+  });
   // Reactions keep only settings: copy the old plugin's once, in the background.
   const reactionsImport = {
     plugins: bb.sdk.plugins,
@@ -378,7 +386,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "bot_threads_list", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "skill_search", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "bot_threads_list", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /**
    * Every conversation of a Bot gets these too (src/bot-threads-server.ts):
    * its conversations and workers, and raising something with the user. A
@@ -432,7 +440,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -799,13 +807,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Threads a host restart cut off (src/thread-resume.ts): resumed with a
   // marker, at most twice an hour each; past that, a line in the owning Bot's
   // chat for it to triage (a Bot's thread) or a phone push (any other).
-  function botPushIds(threadId: string): { botId?: string; conversationId?: string; workerId?: string } {
-    const rec = botThreads.store.get(threadId);
-    if (!rec) return {};
-    if (rec.kind === "conversation") return { botId: rec.botId, conversationId: rec.threadId };
-    const conversationId = rec.ownerConversationId ?? bots.stored(rec.botId)?.threadId ?? null;
-    return conversationId ? { botId: rec.botId, conversationId, workerId: rec.threadId } : { botId: rec.botId };
-  }
+  const botPushIds = (threadId: string) => botThreads.pushIds(threadId);
   const threadOwner = (threadId: string): ThreadOwner | null => {
     const bot = bots.list().find((each) => bots.chain(each.id).includes(threadId))
       ?? (() => { const runner = runners.forThread(threadId); return runner ? bots.stored(runner.bot_id) : null; })()
@@ -846,6 +848,9 @@ export default async function plugin(bb: BbPluginApi) {
     cleared: (threadId) => { botThreads.store.clearNeedsYouFrom(threadId); },
   });
   bb.events.on("interaction.pending", ({ thread, interaction }) => void nudges.pending(thread, interaction as never).catch((error) => bb.log.warn(`Bot nudge: ${errorText(error)}`)));
+  bb.events.on("interaction.pending", ({ thread, interaction }) => void botThreads.approvalPush(thread, interaction as never).then((push) => push && bb.sdk.plugins.callRpc({
+    pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: push as never,
+  })).catch((error) => bb.log.warn(`Worker approval push failed: ${errorText(error)}`)));
   bb.events.on("thread.active", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
   bb.events.on("thread.idle", ({ thread }) => void nudges.settled(thread.id).catch(() => {}));
   const threadResume = new ThreadResume({
@@ -1021,33 +1026,7 @@ export default async function plugin(bb: BbPluginApi) {
     sideThreads,
     defaultModel: (botId) => bots.defaultModel(botId),
   });
-  const onboardingDir = bb.server.experimental_dataDir;
-  let onboardingRunning = true;
-  void runOnboarding({
-    dataDir: onboardingDir, db, sdk: bb.sdk as never,
-    createBot: async (input) => {
-      const made = (await bots.create(input)).bot;
-      if (!made) throw new Error("The Bot wasn't made.");
-      return made;
-    },
-    recordConversation: (threadId, botId) => {
-      botThreads.store.recordConversation(threadId, botId);
-      botThreadsChanged([{ botId, kinds: ["conversations"] }]);
-    },
-  })
-    .then((flag) => { if (flag.reason === "ran") bb.log.info(`Onboarding made ${flag.botId} and the Welcome conversation ${flag.welcomeThreadId}.`); })
-    .catch((error) => bb.log.warn(`Onboarding failed; retrying next startup: ${errorText(error)}`))
-    .finally(() => { onboardingRunning = false; });
-  const welcomeView = () => {
-    const flag = readOnboarding(onboardingDir);
-    if (!flag) return { threadId: null, opened: false, pending: onboardingRunning, bot: null };
-    const welcome = welcomeThreadOf(onboardingDir);
-    const bot = welcome ? bots.stored(welcome.botId) : null;
-    return {
-      threadId: welcome && bot ? welcome.threadId : null, opened: welcome?.opened ?? true, pending: false,
-      bot: bot ? { id: bot.id, name: bot.name, primary: !!bot.primary, presence: bots.presenceOf(bot.id), appearance: bot.appearance ?? null } : null,
-    };
-  };
+  const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
   const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message) });
@@ -1440,8 +1419,8 @@ export default async function plugin(bb: BbPluginApi) {
     bot_side_thread_open: async ({ threadId, messageId }) => { const opened = await botThreads.messageThreads.reply({ threadId, messageId }); return { threadId: opened.threadId, created: opened.created }; },
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? botThreads.store.get(threadId)?.botId ?? null }),
     bot_thread_release: ({ threadId }) => ownedThreads.release(threadId),
-    bot_welcome: () => welcomeView(),
-    bot_welcome_opened: () => ({ ok: markWelcomeOpened(onboardingDir) }),
+    bot_welcome: onboarding.bot_welcome,
+    bot_welcome_opened: onboarding.bot_welcome_opened,
     bot_thread_adopt: ({ botId, threadId }) => { const bot = bots.stored(botId); if (!bot) throw new Error("That bot isn't there anymore."); return ownedThreads.adopt(threadId, bot.id); },
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
@@ -1455,7 +1434,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
     bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
     // Deprecated for one release: old iOS clients receive an empty pending list.
-    bot_skill_history: ({ botId, before }) => ({ versions: bots.skillHistory(botId, before) }),
+    bot_skill_history: ({ botId, before, name }) => ({ versions: bots.skillHistory(botId, before, name) }),
     bot_skill_revert: ({ botId, versionId }) => { bots.revertSkill(versionId, botId); return { reverted: true }; },
     bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),
     bot_automation_create: ({ botId, ...input }) => automations.create(input as never, botId),
@@ -1842,8 +1821,7 @@ export default async function plugin(bb: BbPluginApi) {
     warn: (message) => bb.log.warn(message),
   });
   registerVoiceLive(bb, voiceLive);
-  // The HUD window (src/hud): the primary Bot's last lines, a send to its chat, and "Open in BB" from a plugin window.
-  registerHud(bb, () => bots.stored());
+  registerWindowRelay(bb);
   // Meeting mode (src/voice/meeting): a named voice participant in an in-person
   // meeting. Each lookup is its own back-office thread, under the Bot like voice threads.
   const meeting = new MeetingLive({
@@ -1934,6 +1912,16 @@ export default async function plugin(bb: BbPluginApi) {
     execute: (_input, ctx) => {
       const list = bots.skills(ownBot(ctx.threadId)).filter((skill) => skill.state !== "archived");
       return list.map((skill) => `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${skill.description}`).join("\n") || "No skills yet.";
+    },
+  });
+  bb.agents.registerTool({
+    name: "skill_search",
+    description: "Search your own skills by words: their names, descriptions and full text. Returns the best matches first; load one with bot_skill_view before you follow it.",
+    parameters: z.object({ query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(20).optional() }),
+    execute: ({ query, limit }, ctx) => {
+      const hits = bots.searchSkills(query, limit ?? 5, ownBot(ctx.threadId));
+      if (!hits.length) return `No skill of yours matches "${query}".`;
+      return hits.map((hit, index) => `${index + 1}. ${hit.name}: ${hit.description} (matched ${hit.fields.join(", ")})${hit.snippet ? `\n   ${hit.snippet}` : ""}`).join("\n");
     },
   });
   bb.agents.registerTool({

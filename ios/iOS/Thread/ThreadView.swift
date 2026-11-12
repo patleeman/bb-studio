@@ -471,11 +471,11 @@ struct ThreadView: View {
                 openingFile = OpenFile(path: path)
                 return .handled
             }
-            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
-                return .systemAction
+            if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
+                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
+                return .handled
             }
-            if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
-            return .handled
+            return followLink(url)
         })
         .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
         .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
@@ -711,10 +711,9 @@ struct ThreadView: View {
                 let editable = worker == nil ? lastUserRowId : nil
                 // Once, not per row: it searches every row while Find is open.
                 let match = currentMatch
-                let sideChat = conversation == nil && !isWorker && runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
                 ForEach(items) { item in
                     // One view per item, so scrolling to the item lands on the divider.
-                    timelineItem(item, unread: unread, editable: editable, match: match, sideChat: sideChat)
+                    timelineItem(item, unread: unread, editable: editable, match: match)
                     .onGeometryChange(for: TranscriptResizeAnchor.Row.self) { proxy in
                         let isMessage: Bool
                         if case .message = item { isMessage = true } else { isMessage = false }
@@ -864,8 +863,7 @@ struct ThreadView: View {
     }
 
     /// One item of `timeline`, built apart so the timeline type-checks quickly.
-    @ViewBuilder private func timelineItem(_ item: TimelineItem, unread: String?, editable: String?, match: String?,
-                                           sideChat: ((String) -> Void)?) -> some View {
+    @ViewBuilder private func timelineItem(_ item: TimelineItem, unread: String?, editable: String?, match: String?) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if item.id == unread { UnreadDivider() }
             Group {
@@ -878,7 +876,6 @@ struct ThreadView: View {
                         reactionItems: reactionSettings.items,
                         quote: { quote($0) },
                         select: { selecting = SelectionText(text: $0) },
-                        sideChat: sideChat,
                         edit: row.id == editable ? startEditing : nil,
                         saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
                         thread: sideThreads[row.id], replier: conversation?.look,
@@ -1271,12 +1268,6 @@ struct ThreadView: View {
         }
     }
 
-    private func openSideChat(_ text: String) {
-        Task {
-            if let id = await model.sideChat(about: text) { open(.thread(id: id)) }
-        }
-    }
-
     private var conversation: BotConversationContext? {
         guard let shell, shell.kind == .conversation, shell.threadId == model.threadId else { return nil }
         return shell
@@ -1405,6 +1396,21 @@ struct ThreadView: View {
         if let shell { shell.push(route) } else { app.path.append(route) }
     }
 
+    private func followLink(_ url: URL) -> OpenURLAction.Result {
+        guard let target = Links.parse(url.absoluteString, origin: client.baseURL) else { return .systemAction }
+        switch target {
+        case .external:
+            return .systemAction
+        case .entity(let ref) where (ref.kind == .file || ref.kind == .diff) && ref.id != nil:
+            openingFile = OpenFile(path: ref.id ?? "")
+        case .entity(let ref) where ref.kind == .conversation && botChrome != nil:
+            botChrome?.openThread(ref.id ?? "")
+        default:
+            app.openLink(target, threadId: model.threadId) { open($0) }
+        }
+        return .handled
+    }
+
     private func push(_ route: Route) {
         if let shell { shell.push(route) } else { app.push(route) }
     }
@@ -1434,8 +1440,7 @@ struct ThreadView: View {
         Task {
             do {
                 let id = try await client.forkConversation(threadId: threadId, messageId: row.id, sourceSeqEnd: seq)
-                shell?.refresh()
-                shell?.openConversation(id)
+                showThread(id)
             } catch {
                 model.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL)
             }
@@ -2054,11 +2059,11 @@ extension ThreadView {
                 openingFile = OpenFile(path: path)
                 return .handled
             }
-            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
-                return .systemAction
+            if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
+                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
+                return .handled
             }
-            if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
-            return .handled
+            return followLink(url)
         }
     }
 
@@ -2123,12 +2128,11 @@ extension ThreadView {
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
-        let sideChat = conversation == nil && !isWorker && runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
         let inConversation = conversation != nil
         return ThreadTranscriptActions(
             bot: botChrome?.bot, projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
-            select: { selecting = SelectionText(text: $0) }, edit: startEditing, sideChat: sideChat,
+            select: { selecting = SelectionText(text: $0) }, edit: startEditing,
             saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
             openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
             messageThread: inConversation ? { replyInThread($0) } : nil,

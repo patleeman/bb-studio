@@ -7,16 +7,17 @@ export const FORK_FROM_HERE = "Fork conversation from here";
 
 export interface ForkDeps {
   call(method: "bot_fork_conversation", input: { threadId: string; messageId: string; turnId: string | null; sourceSeqEnd: number }): Promise<{ threadId: string }>;
-  open(threadId: string): void;
+  open(threadId: string, sourceThreadId: string): void;
 }
 
 export async function forkFromHere(message: MessageActionMessage, deps: ForkDeps): Promise<string | null> {
   try {
     const { threadId } = await deps.call("bot_fork_conversation", { threadId: message.threadId, messageId: message.messageId, turnId: message.turnId, sourceSeqEnd: message.sourceSeqEnd });
-    deps.open(threadId);
+    deps.open(threadId, message.threadId);
     return threadId;
   } catch (cause) {
-    toast.error(errorMessage(cause) || "Couldn't fork the conversation.");
+    console.warn("Fork conversation failed", errorMessage(cause));
+    toast.error("Couldn't fork the conversation.");
     return null;
   }
 }

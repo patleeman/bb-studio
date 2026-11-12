@@ -12,7 +12,7 @@ import { useSceneSignals } from "./signals";
 import { CARD_GAP, CARD_RADIUS, lookTokens } from "./tokens";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "./ui/state";
 
-/** Menus, popovers, tooltips, dialogs and the palette over a scene: the HUD's dense glass with a lighter blur. */
+/** Menus, popovers, tooltips, dialogs and the palette over a scene: the `hud` glass with a lighter blur. */
 export const POPOVER_FILTER = "blur(12px) saturate(var(--studio-glass-saturate))";
 const blurOf = (surface: Surface) => `blur(var(--studio-blur-${surface})) saturate(var(--studio-glass-saturate))`;
 

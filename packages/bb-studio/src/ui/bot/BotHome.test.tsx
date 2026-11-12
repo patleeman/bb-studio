@@ -685,7 +685,7 @@ test("the cache segment shows a Clock and time, turns amber near expiry, dims co
   const chip = container.querySelector('[data-testid="bot-cache-chip"]') as HTMLButtonElement;
   expect(chip.title).toBe("Prompt cache: 59m left");
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: 59m left");
-  expect(chip.textContent).toBe("cache 59m");
+  expect(chip.textContent).toBe("59m");
   expect(chip.querySelector('[data-icon="Clock"]')).not.toBeNull();
   expect(container.querySelector('[data-testid="bot-cache-details"]')?.textContent).toContain("cold send ≈");
   expect(container.querySelector('[data-testid="bot-cache-details"]')?.textContent).toContain("warming ≈");
@@ -693,12 +693,12 @@ test("the cache segment shows a Clock and time, turns amber near expiry, dims co
 
   state.data = { bot_cache_state: { ...warm, warmUntil: now } };
   await show(<BotCacheChip threadId="thr_bot" />);
-  expect(chip.textContent).toBe("cache cold");
+  expect(chip.textContent).toBe("cold");
   expect((chip.querySelector('[data-icon="Clock"]') as HTMLElement).className).toContain("text-muted-foreground/40");
 
   state.data = { bot_cache_state: off };
   await show(<BotCacheChip threadId="thr_bot" />);
-  expect(chip.textContent).toBe("cache off");
+  expect(chip.textContent).toBe("off");
   expect(chip.getAttribute("aria-label")).toBe("Prompt cache: Warming off");
 });
 

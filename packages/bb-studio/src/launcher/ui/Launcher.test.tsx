@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   rpc: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => null),
   client: null as unknown,
   windows: { native: true, register: vi.fn(async () => true), open: vi.fn(async (_id: string, _options?: object) => true), toggle: vi.fn(async () => true), close: vi.fn(async (_id: string) => true) },
-  settings: { hudEnabled: true, hudHotkey: "", launcherHotkey: "Alt+Space" } as Record<string, unknown>,
+  settings: { launcherHotkey: "Alt+Space" } as Record<string, unknown>,
   set: vi.fn(async (_patch: Record<string, unknown>) => {}),
   items: [] as { key: string; pluginId: string; id: string; title: string; icon: string; section: "apps" | "actions"; keywords?: string[]; order?: number; run: () => void | Promise<void> }[],
   commands: [] as { id: string; title: string; group: string; shortcut?: string; run: () => void }[],
@@ -29,7 +29,6 @@ vi.mock("../../ui/create-menu", () => ({ createEntries: () => [{ type: "kind", k
 vi.mock("../../ui/new-menu", () => ({ entryFor: (_kind: string, entries: unknown[]) => entries[0] ?? null }));
 vi.mock("../../ui/kinds-snapshot", () => ({ appliedKinds: () => null }));
 
-import { HUD_WINDOW_ID } from "../../hud/shared";
 import { registerLauncherItems, STUDIO_LAUNCHER_ITEMS } from "../items";
 import { LAUNCHER_WINDOW_ID } from "../shared";
 import { LauncherWindow } from "./Launcher";
@@ -69,20 +68,18 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  state.settings = { hudEnabled: true, hudHotkey: "", launcherHotkey: "Alt+Space", loopsEnabled: false };
+  state.settings = { launcherHotkey: "Alt+Space", loopsEnabled: false };
   state.set.mockClear();
   state.openLink.mockClear();
   state.items = [];
-  registerLauncherItems({ experimental_launcherItem: (item: (typeof STUDIO_LAUNCHER_ITEMS)[number]) => { state.items.push({ ...item, keywords: [...(item.keywords ?? [])], key: `studio/${item.id}`, pluginId: "studio" }); } }, true);
+  registerLauncherItems({ experimental_launcherItem: (item: (typeof STUDIO_LAUNCHER_ITEMS)[number]) => { state.items.push({ ...item, keywords: [...(item.keywords ?? [])], key: `studio/${item.id}`, pluginId: "studio" }); } });
   visualChat.mockReset();
   state.items.push({ key: "visual-chat/app", pluginId: "visual-chat", id: "app", title: "Visual Chat", icon: "MessageCircle", section: "apps", order: 30, run: visualChat });
   state.commands = [{ id: "app:window.new", title: "New window", group: "Window and layout", shortcut: "⇧⌘N", run: vi.fn() }, { id: "app:thread.new", title: "New conversation", group: "Threads", shortcut: "⌘N", run: vi.fn() }];
   state.rpc.mockReset().mockImplementation(async (method: string, body: unknown) => {
     if (method === "newtab_recents") return { entries: [conversation("thr_1", "Fix the build", 30), { id: "page:pg_1", title: "Roadmap", kind: "Page", icon: "FileText", updatedAt: 25, ref: { kind: "page", id: "pg_1" } }, conversation("thr_2", "Plan the offsite", 20)] };
     if (method === "newtab_search") return { entries: [] };
-    if (method === "hud.get") return { bot: { id: "bot_1", name: "Dot", threadId: "thr_bot" }, working: false };
-    if (method === "hud.send") return { threadId: "thr_bot" };
-    if (method === "bot_ask") return { threadId: "thr_new", projectId: "proj_personal" };
+    if (method === "bot_ask") return { threadId: (body as { to: { kind: string } }).to.kind === "new" ? "thr_new" : "thr_home", projectId: "proj_personal" };
     if (method === "overview") return { providers: [] };
     if (method === "bot_spaces") return { bots: [{ id: "bot_1", name: "Dot", mainThreadId: "thr_main" }, { id: "bot_2", name: "Home", mainThreadId: "thr_home" }], currentBotId: "bot_2" };
     if (method === "searchAll") {
@@ -104,8 +101,9 @@ afterEach(() => {
 it("opens on the search field with apps, actions, the recent conversations and files, then BB's commands and Studio's settings", async () => {
   await mount();
   expect(document.activeElement).toBe(input());
-  expect(titles().slice(0, 11)).toEqual(["BB Studio", "HUD", "Visual Chat", "VS Code", "New conversation", "Ask the Bot", "New page", "Switch to Dot", "Fix the build", "Roadmap", "Plan the offsite"]);
-  expect(titles()[11]).toBe("New window");
+  expect(titles().slice(0, 10)).toEqual(["BB Studio", "Visual Chat", "VS Code", "New conversation", "Ask the Bot", "New page", "Switch to Dot", "Fix the build", "Roadmap", "Plan the offsite"]);
+  expect(titles()[10]).toBe("New window");
+  expect(titles().some((title) => /hud/i.test(title ?? ""))).toBe(false);
   expect(titles()).not.toContain("Switch to Home");
   expect(titles().filter((title) => title === "New conversation")).toHaveLength(1);
   expect(sections()).toEqual(["Apps", "Actions", "Recent", "Commands", "Settings"]);
@@ -121,27 +119,27 @@ it("moves with the arrows and Tab, Enter runs the row, then closes the launcher"
   await press("ArrowDown");
   expect(selected()).toBe(2);
   await press("Tab");
-  expect(selected()).toBe(4);
+  expect(selected()).toBe(3);
   await press("Tab", { shiftKey: true });
   expect(selected()).toBe(0);
   await press("ArrowDown");
   await press("Enter");
-  expect(state.windows.open).toHaveBeenCalledWith(HUD_WINDOW_ID, expect.objectContaining({ menuBarTitle: "bb", rememberBounds: true }));
+  expect(visualChat).toHaveBeenCalledTimes(1);
   expect(state.windows.close).toHaveBeenCalledWith(LAUNCHER_WINDOW_ID);
 });
 
 it("⌘ and a number runs that row: another plugin's app, a conversation in the main window", async () => {
   await mount();
-  await press("3", { metaKey: true });
+  await press("2", { metaKey: true });
   expect(visualChat).toHaveBeenCalledTimes(1);
   expect(state.windows.close).toHaveBeenCalledWith(LAUNCHER_WINDOW_ID);
-  await press("9", { metaKey: true });
+  await press("8", { metaKey: true });
   expect(state.openLink).toHaveBeenCalledWith("bb://conversation/thr_1", { source: "launcher", title: "Fix the build", modifiers: { meta: false, shift: false } });
 });
 
 it("Studio's rows open the main window where they say: the start, VS Code, the current Bot's Main, a new page, another Bot", async () => {
   await mount();
-  for (const pick of ["1", "4", "5", "6", "7", "8"]) {
+  for (const pick of ["1", "3", "4", "5", "6", "7"]) {
     await press(pick, { metaKey: true });
     await act(async () => {});
   }
@@ -158,7 +156,7 @@ it("filters as you type, finds documents through Studio's search, and Esc clears
   await type("offsite");
   expect(calls("searchAll").at(-1)).toMatchObject({ query: "offsite" });
   expect(calls("newtab_search").at(-1)).toMatchObject({ query: "offsite", threadId: null });
-  expect(titles()).toEqual(["Offsite budget", "Plan the offsite", "Ask Dot: “offsite”"]);
+  expect(titles()).toEqual(["Offsite budget", "Plan the offsite", "Ask Home: “offsite”"]);
   await press("Enter");
   expect(state.openLink).toHaveBeenCalledWith("bb://page/pg_9", { source: "launcher", title: "Offsite budget", modifiers: { meta: false, shift: false } });
   await press("Enter", { shiftKey: true });
@@ -172,15 +170,15 @@ it("filters as you type, finds documents through Studio's search, and Esc clears
   expect(state.windows.close).toHaveBeenCalledWith(LAUNCHER_WINDOW_ID);
 });
 
-it("a sentence is sent to the Bot's chat on Enter, and the HUD loads the reply in place", async () => {
+it("a sentence is sent to the current Bot's Main on Enter, and BB's main window shows it", async () => {
   await mount();
   await type("what should I do next");
-  expect(titles()[0]).toBe("Ask Dot: “what should I do next”");
+  expect(titles()[0]).toBe("Ask Home: “what should I do next”");
   expect(selected()).toBe(0);
   await press("Enter");
-  expect(calls("hud.send")).toEqual([{ text: "what should I do next" }]);
-  expect(state.windows.close).not.toHaveBeenCalledWith(HUD_WINDOW_ID);
-  expect(state.windows.open).toHaveBeenCalledWith(HUD_WINDOW_ID, expect.objectContaining({ menuBarTitle: "bb", vibrancy: "hud", params: { threadId: "thr_bot" } }));
+  expect(calls("bot_ask")).toEqual([{ text: "what should I do next", to: { kind: "thread", threadId: "thr_home" } }]);
+  expect(state.windows.open).not.toHaveBeenCalled();
+  expect(calls("window.openInMain")).toEqual([{ path: "/threads/thr_home" }]);
   expect(state.windows.close).toHaveBeenCalledWith(LAUNCHER_WINDOW_ID);
 });
 
@@ -188,9 +186,8 @@ it("Shift+Enter on Ask starts a new conversation of the Bot with it", async () =
   await mount();
   await type("plan the offsite agenda");
   await press("Enter", { shiftKey: true });
-  expect(calls("hud.send")).toEqual([]);
-  expect(calls("bot_ask")).toEqual([{ text: "plan the offsite agenda", to: { kind: "new", botId: "bot_1" } }]);
-  expect(state.windows.open).toHaveBeenCalledWith(HUD_WINDOW_ID, expect.objectContaining({ params: { threadId: "thr_new" } }));
+  expect(calls("bot_ask")).toEqual([{ text: "plan the offsite agenda", to: { kind: "new", botId: "bot_2" } }]);
+  expect(calls("window.openInMain")).toEqual([{ path: "/threads/thr_new" }]);
 });
 
 it("runs BB's commands, typed addresses and setting toggles where they belong", async () => {
@@ -214,21 +211,10 @@ it("runs BB's commands, typed addresses and setting toggles where they belong", 
   expect(state.set).toHaveBeenCalledWith({ loopsEnabled: true });
 });
 
-it("with the HUD off, leaves the HUD app out and shows the Bot's answer in BB instead", async () => {
-  state.settings = { hudEnabled: false, hudHotkey: "", launcherHotkey: "Alt+Space" };
-  await mount();
-  expect(titles().slice(0, 4)).not.toContain("HUD");
-  await type("what should I do next");
-  await press("Enter");
-  expect(state.windows.open).not.toHaveBeenCalled();
-  expect(calls("window.openInMain")).toEqual([{ path: "/threads/thr_bot" }]);
-});
-
 it("stays open and says why when a row fails", async () => {
   state.rpc.mockImplementation(async (method: string) => {
-    if (method === "hud.get") return { bot: { id: "bot_1", name: "Dot", threadId: "thr_bot" }, working: false };
-    if (method === "hud.send") throw new Error("Dot is paused.");
-    return method === "newtab_recents" || method === "newtab_search" ? { entries: [] } : method === "bot_spaces" ? { bots: [], currentBotId: null } : [];
+    if (method === "bot_ask") throw new Error("Dot is paused.");
+    return method === "newtab_recents" || method === "newtab_search" ? { entries: [] } : method === "bot_spaces" ? { bots: [{ id: "bot_1", name: "Dot", mainThreadId: "thr_main" }], currentBotId: "bot_1" } : [];
   });
   await mount();
   await type("what should I do next");
@@ -237,9 +223,9 @@ it("stays open and says why when a row fails", async () => {
   expect(state.windows.close).not.toHaveBeenCalled();
 });
 
-it("registers nothing on a BB without the launcher slot, and no HUD app where BB has no plugin windows", () => {
-  expect(registerLauncherItems({}, true)).toBe(false);
+it("registers nothing on a BB without the launcher slot, and Studio's apps and actions where it has one", () => {
+  expect(registerLauncherItems({})).toBe(false);
   const ids: string[] = [];
-  expect(registerLauncherItems({ experimental_launcherItem: (item: { id: string }) => { ids.push(item.id); } }, false)).toBe(true);
+  expect(registerLauncherItems({ experimental_launcherItem: (item: { id: string }) => { ids.push(item.id); } })).toBe(true);
   expect(ids).toEqual(["studio", "vscode", "new-conversation", "ask-bot", "new-page"]);
 });

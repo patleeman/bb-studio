@@ -58,7 +58,7 @@ export function registerThreadContext(app: PluginAppBuilder): void {
   // item 10). Elsewhere the context row above the composer keeps it.
   const inFooter = registerCacheCardRow(app.slots);
   if (inFooter) {
-    app.composer.customize(withComposerFooter({ id: "bot-cache-footer", scopes: ["thread"] as const }, [{ id: "cache", component: BotCacheFooter }]));
+    app.composer.customize(withComposerFooter({ id: "bot-cache-footer", scopes: ["thread"] as const }, [{ id: "cache", component: BotCacheFooter, placement: "context" }]));
   } else app.slots.experimental_threadContextSegment({
     id: "bot-cache",
     title: "Prompt cache",

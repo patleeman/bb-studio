@@ -23,7 +23,6 @@ import { agoWords, clockAt, failedRuns, failedTitle, inSentence, type FailedRun,
 import { useOpenThread } from "./workspace";
 import { botPath } from "./selection";
 import { noteBotName } from "../page-bar";
-import { ShowHudButton } from "../../hud/ui/ShowHudButton";
 import { usePendingQuestions } from "../../loops/ui/LoopsTab";
 import { openLoops, useLoopActions, useLoopsEnabled } from "../../loops/ui/hooks";
 import { dueLabel } from "../../loops/ui/model";
@@ -184,7 +183,6 @@ export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
             : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
           {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
-          {bot.primary ? <ShowHudButton /> : null}
           <button type="button" className={OUTLINE_BUTTON} data-testid="bot-controls" onClick={() => openAppPath(controlsPath(bot.id))}><Icon name="SlidersHorizontal" />Controls</button>
         </div>
       </header>

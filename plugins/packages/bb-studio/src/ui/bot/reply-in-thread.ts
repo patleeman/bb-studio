@@ -1,4 +1,3 @@
-import { relativeTime } from "../../kit/format";
 import type { SideThreadView } from "../../contract";
 
 const FOOTER = "data-studio-thread-footer";
@@ -8,11 +7,20 @@ export function threadInPath(pathname: string): string | null {
   return /\/threads\/([^/?#]+)/.exec(pathname)?.[1] ?? null;
 }
 
-export function sideThreadLabel(thread: Pick<SideThreadView, "replies" | "working" | "lastReplyAt">, now = Date.now()): string {
+export function replyTime(at: number, now = Date.now(), locale?: string): string {
+  const when = new Date(at);
+  const today = new Date(now);
+  if (when.toDateString() === today.toDateString()) return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(when);
+  const sameYear = when.getFullYear() === today.getFullYear();
+  return new Intl.DateTimeFormat(locale, sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" }).format(when);
+}
+
+export function sideThreadLabel(thread: Pick<SideThreadView, "replies" | "working" | "lastReplyAt" | "kind" | "conversations">, now = Date.now(), locale?: string): string | null {
+  if (thread.kind === "fork") return `Forked here · ${thread.conversations === 1 ? "1 conversation" : `${thread.conversations} conversations`}`;
+  if (thread.working) return "Replying…";
+  if (!thread.replies) return null;
   const replies = thread.replies === 1 ? "1 reply" : `${thread.replies} replies`;
-  if (thread.working) return thread.replies ? `${replies} · working…` : "Working…";
-  if (!thread.replies) return "Thread";
-  return thread.lastReplyAt ? `${replies} · ${relativeTime(thread.lastReplyAt, now)}` : replies;
+  return thread.lastReplyAt ? `${replies} · Last reply ${replyTime(thread.lastReplyAt, now, locale)}` : replies;
 }
 
 export type Chat = { chat: boolean; threads: SideThreadView[] };
@@ -21,7 +29,7 @@ export interface ThreadFooter {
   key: string;
   host: HTMLElement;
   sourceThreadId: string;
-  thread: SideThreadView;
+  threads: SideThreadView[];
 }
 
 const columnOf = (row: HTMLElement) => [...row.querySelectorAll<HTMLElement>("[data-message-column]")].find((each) => each.closest("[data-timeline-row-id]") === row);
@@ -36,7 +44,7 @@ export function isChatReply(row: HTMLElement, threadId: string): boolean {
 function makeFooter(): HTMLDivElement {
   const footer = document.createElement("div");
   footer.setAttribute(FOOTER, "");
-  Object.assign(footer.style, { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px", margin: "4px 0 2px" } satisfies Partial<CSSStyleDeclaration>);
+  Object.assign(footer.style, { display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: "12px", rowGap: "2px", margin: "2px 0 0" } satisfies Partial<CSSStyleDeclaration>);
   return footer;
 }
 
@@ -62,7 +70,7 @@ export function mountSideThreadRows(
 
   const publish = () => {
     const list = [...footers.values()];
-    const signature = `${Math.floor(Date.now() / 60_000)}|${list.map((each) => `${each.key}:${JSON.stringify(each.thread)}`).join("|")}`;
+    const signature = `${Math.floor(Date.now() / 60_000)}|${list.map((each) => `${each.key}:${JSON.stringify(each.threads)}`).join("|")}`;
     if (signature === shown) return;
     shown = signature;
     show(list);
@@ -74,18 +82,19 @@ export function mountSideThreadRows(
     const known = threadId ? chats.get(threadId) : undefined;
     if (threadId && (!known || (known.data.chat && Date.now() - known.at > REFRESH_MS))) fetchChat(threadId);
     const chat = known?.data.chat === true ? known.data : null;
-    const byMessage = new Map((chat?.threads ?? []).map((thread) => [thread.messageId, thread]));
+    const byMessage = new Map<string, SideThreadView[]>();
+    for (const thread of chat?.threads ?? []) byMessage.set(thread.messageId, [...byMessage.get(thread.messageId) ?? [], thread]);
     for (const message of document.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
       const host = [...message.querySelectorAll<HTMLElement>(`[${FOOTER}]`)].find((each) => each.closest("[data-timeline-row-id]") === message);
       const messageId = message.getAttribute("data-timeline-row-id") ?? "";
-      const thread = chat && threadId && isChatReply(message, threadId) ? byMessage.get(messageId) : undefined;
-      if (!thread || !threadId) {
+      const threads = chat && threadId && isChatReply(message, threadId) ? byMessage.get(messageId) : undefined;
+      if (!threads?.length || !threadId) {
         if (host) { footers.delete(host); host.remove(); }
         continue;
       }
       const footer = host ?? makeFooter();
       if (!host) (columnOf(message) ?? message).appendChild(footer);
-      footers.set(footer, { key: messageId, host: footer, sourceThreadId: threadId, thread });
+      footers.set(footer, { key: messageId, host: footer, sourceThreadId: threadId, threads });
     }
     for (const host of [...footers.keys()]) if (!host.isConnected) footers.delete(host);
     publish();

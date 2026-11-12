@@ -16,8 +16,7 @@ are unchanged, and old `bbgo://` links still open.
 | Home: the BB web sidebar on the phone, following its organization (BB's Thread List preferences). Automations, Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
-| New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app). | `iOS/Inbox/NewThreadView.swift` |
-| New thread is a chat: an empty conversation with the composer focused at the bottom (⌘↩ to start). Chips above it pick the project (optional, as on desktop: "No project" starts the thread in BB's personal project, the default when none is remembered) and the workspace (project default, project checkout, new worktree with a base branch, or an existing environment); the composer's model button picks provider, model, reasoning and permissions. All start on the project's defaults | `iOS/Inbox/NewThreadView.swift` |
+| New thread is a chat: an empty conversation with the composer focused at the bottom (⌘↩ to start). There is no project picker: a thread starts in the remembered project, else BB's personal one. A chip above the composer picks the workspace (project default, project checkout, new worktree with a base branch, or an existing environment); the composer's model button picks provider, model, reasoning and permissions. All start on the project's defaults | `iOS/Inbox/NewThreadView.swift` |
 | New project, from the project chip's menu as on desktop: pick the machine, type or browse to the folder on it, and the name defaults to the folder's (`POST /api/v1/projects` with a `local_path` source). The new project is selected for the thread | `iOS/Inbox/NewProjectView.swift`, `Shared/Projects.swift` |
 | Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. File paths in messages (inline code like `docs/plan.md:12`, or Markdown file links) open in the file viewer, including absolute paths outside the workspace like `/tmp/shot.png`, read from the thread's host. The ⋯ menu has Find in thread, Rename, Model & permissions, Mute notifications, Open in BB web, Share link, and Copy Thread ID (also on a thread row's long-press) | `iOS/Thread/ThreadView.swift` |
 | Live updates fetch only what changed: new rows since the last sequence, and the thread or its approvals only when those changed | `iOS/Thread/ThreadModel.swift` |
@@ -46,9 +45,9 @@ are unchanged, and old `bbgo://` links still open.
 | Custom instructions: edit the text BB adds to every agent's system prompt (Settings → Agents) | `iOS/App/CustomInstructionsView.swift` |
 | Usage, in Settings: each pooled Claude and Codex account's 5-hour and weekly limits, with reset times | `iOS/Tools/UsageView.swift` |
 | Send later: long-press Send for 30 minutes, 1 hour, 3 hours, tomorrow at 9, or a picked time | `iOS/Thread/SendLater.swift` |
-| Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
 | A Bot's conversations (the Bot's list as home): + New conversation (`bot_conversation_start`); Reply in thread under and in the menu of every reply (`bot_thread_reply`), opening the thread as a sheet (pushed on iPad and the unfolded Duo), with "💬 N replies · time" and the last replier's mark under the message (`bot_side_threads`); Fork conversation from a reply's menu (`bot_fork_conversation`), opening as its own conversation under its parent; the model chip in the header (`thread_model`) and Model and Finish (`bot_finish`) in ···; "N workers from here" above the composer; a compact input with dictation first. Side chat is hidden there. `[PASS]` reads "Quiet check" | `iOS/Bot/BotConversationChrome.swift`, `Shared/BotConversations.swift`, `ThreadView` |
 | A Bot's workers open read-only, from the list's Workers (and its "N done") or the "N workers from here" line: the worker's transcript with no composer, its title and status in the header with the list's glyph (Running, Waiting for your approval, Waiting on an answer, Failed or Done, and how long ago), and over where the composer was its Bot, the conversation it works for (opens it) and its branch. "Ask the Bot about this worker…" sends the question with dictation to the Bot in that conversation (Main when it has none; `bot_worker_ask`) and goes there, back down the stack when it was open under the worker. A worker waiting on a question offers Answer it here; one waiting on an approval shows what it waits on with a link to the conversation that has its card ("Push to origin · Main ›"), and isn't resolved there. No Stop, edit or side chat on a worker. Status comes from `bot_threads_view` and `bot_thread_info` | `iOS/Bot/BotConversationChrome.swift`, `Shared/BotWorkers.swift`, `ThreadView` |
+| A Bot's pages, from the five buttons in its list's header, as desktop's: Memory (the core profile folded with its length against the cap, opening in Pages to edit; records with search, topic chips from the data, sort, New, and a record's source, what it replaced, Edit as a new record and Archive or Restore; replaced records folded; `memory.*`), Library (the Bot's files by conversation, kind or date, with search and Kind chips, lookalikes folded with a count, 8 rows then "N more", each opening in its Studio viewer; Visual Chat from its ⋯; `bot_library`), Todos (the Todos screen), Automations (the Bot's automations, pushed) and Archive (older and finished conversations and older workers, with search and All, Conversations, Workers and Failed; a finished one shows its summary and Reopen; `bot_threads_older`, `bot_finished`, `bot_reopen`) | `iOS/Bot/BotPages.swift`, `iOS/Bot/BotPagesModel.swift` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Installed plugin status and errors in Settings → Plugins. Today (Studio), Pages (Studio Pages), Drawings (Studio Draw) and Automations show "Install <plugin> to use this." when their plugin is missing or not running, instead of BB's raw 404 or 503 text | `iOS/Tools/PluginStatusView.swift`, `Shared/BBClient.swift` |
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
@@ -90,6 +89,7 @@ are unchanged, and old `bbgo://` links still open.
 | Spotlight indexes open threads and Studio pages, recordings, whiteboards, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
 | URL scheme `bbstudio://thread/<id>`, `reply/<id>` (opens the thread and its reply), `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`), `drawing[/<id>]` (also `drawings`; both open Studio on Whiteboards, and an id opens that whiteboard), `artifact/<id>`, `design/<id>`, `recording/<id>`, `new`, `capture`, `dictate`, `record`, `write`, `handsfree` (hands-free voice), `bots` (the list), `bot[/<id>]` (also `chief`, and the old `web`, for the primary bot), `bot-talk` (also `chief-talk`; opens hands-free voice and starts it, or ends it), `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
+| BB links (`bb://<kind>/<id>`, desktop's router ported to Swift, `iOS/App/Links.swift`): in replies, pages and cards, `bb://`, `::page{…}`-style directives, `page:`/`thread:` references and BB's own addresses open natively, checked first with `links.resolve` ("Not found: …" when gone). `bbstudio://<kind>/<id>` is the same link for every kind (conversation, worker, bot, the five Bot pages, automation, todo, record, page, whiteboard, design, app, dashboard, artifact, recording, board); with the Bot's list as home they open in it, threads included. Files and diffs open from their thread, browser links in Safari; VS Code, terminals and workflow runs say where they open. `bb` itself isn't registered with iOS, so it never clashes with BB's own app | `iOS/App/Links.swift`, `iOS/App/AppModel.swift` |
 | A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads and pages; open a page, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
@@ -450,7 +450,7 @@ points, bottom pinning, split-only back-button hiding, and keyboard layout. See
 `BotSpacesUITests` checks the Bot's list as home offline (`-qaSpacesDemo
 list|needs` with `-qaBotDemo chat`: three local Bots, no server): launch opens
 Main, Back shows the list, the needs-you row and amber dot, switching Bots by
-dot and by swiping the header, and Settings and All BB threads from the list.
+dot and by swiping the header, Studio from the list's ⋯, and Settings → All BB threads.
 `TEST_RUNNER_STEP4_OUT` keeps its PNGs. Without Bot spaces on the server the
 tab bar stays (`LaunchTabUITests`).
 
@@ -467,12 +467,26 @@ running worker from the workers line with Ask going back to Main, and a worker
 waiting on an approval showing its status only. `TEST_RUNNER_STEP6_OUT` keeps
 its PNGs.
 
+`BotPagesUITests` opens each Bot page from the list's header offline
+(`-qaSpacesDemo list` with `-qaBotDemo chat`; `BotSpacesDemo.State` answers
+`memory.*`, `bot_library`, `bot_threads_older`, `bot_finished` and
+`bot_reopen`, and `-qaLoopsDemo` answers Todos): Memory's profile, topic
+filter, a record's edit and a new record; Library's groups, folding, Kind
+filter and a design opening; Todos and Automations; Archive's Failed filter,
+a finished conversation's summary, and Reopen bringing it back to the list.
+`TEST_RUNNER_STEP8_OUT` keeps its PNGs.
+
 `ApprovalsUITests` checks worker approvals offline (`-qaSpacesDemo needs` with
 `-qaBotDemo chat`; `BotSpacesDemo.State` answers `bot_conversation_approvals`
 and `bot_worker_approval_resolve`): the card in Main, Approve settling it and
 the worker running again, and the waiting worker's marker opening Main.
 `-qaNoDemoApprovals` leaves the card out (`ConversationsUITests`).
 `TEST_RUNNER_STEP7_OUT` keeps its PNGs.
+
+`LinksUITests` opens `bbstudio://` links offline in the Bot's list
+(`-qaSpacesDemo list`; `BotSpacesDemo.State` answers `links.resolve`): a Bot
+page, a worker, a memory record, and a conversation that's gone ("Not
+found"). `TEST_RUNNER_STEP9_OUT` keeps its PNGs.
 
 `StudioPagingUITests` swipes Studio between its kinds and drags an item row
 partway open (`/tmp/qa-studio-paging-*.png`).

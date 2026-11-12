@@ -1,4 +1,3 @@
-import { POP_OUT_LABEL } from "../hud/shared";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS, type SettingGroup, type StudioSettingKey, type StudioSettingValues } from "../settings/schema";
 import type { LauncherEntry } from "./rank";
 
@@ -42,14 +41,12 @@ export interface StudioCommandInput {
   themeShortcuts?: { next?: string; previous?: string };
   bots: readonly StudioCommandBot[];
   currentBotId: string | null;
-  popOutThreadId: string | null;
   settings: StudioSettingValues | null;
   windows: boolean;
 }
 
 export interface StudioCommandRunners {
   switchBot(botId: string): void | Promise<void>;
-  popOut(threadId: string): void | Promise<void>;
   openSettings(group: SettingGroup): void | Promise<void>;
   setSetting(key: StudioSettingKey, value: boolean): Promise<void>;
   applyTheme?(themeId: string | null): void | Promise<void>;
@@ -83,10 +80,6 @@ export function studioCommandEntries(input: StudioCommandInput, runners: StudioC
     key: `studio:bot:${bot.id}`, title: `Switch to ${bot.name}`, icon: "Bot", section: "actions", keywords: ["bot", "space"], order: 30 + index,
     run: () => runners.switchBot(bot.id),
   }));
-  const popOut: RunnableEntry[] = input.popOutThreadId ? [{
-    key: "studio:pop-out-hud", title: POP_OUT_LABEL, icon: "AppWindow", section: "actions", keywords: ["hud", "window", "float"], order: 25,
-    run: () => runners.popOut(input.popOutThreadId!),
-  }] : [];
   const sections = groups.map((group): RunnableEntry => ({
     key: `studio:settings:${group.id}`, title: `Studio settings: ${group.title}`, icon: "SlidersHorizontal", section: "settings", keywords: ["settings", "preferences"],
     run: () => runners.openSettings(group.id),
@@ -98,5 +91,5 @@ export function studioCommandEntries(input: StudioCommandInput, runners: StudioC
       detail: on ? "On" : "Off", run: () => runners.setSetting(key, !on),
     };
   }) : [];
-  return [...popOut, ...switches, ...themeCommandEntries(input, runners), ...sections, ...toggles];
+  return [...switches, ...themeCommandEntries(input, runners), ...sections, ...toggles];
 }

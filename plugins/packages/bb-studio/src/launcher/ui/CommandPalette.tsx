@@ -3,8 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { BotThreadInfo } from "../../bot-threads-contract";
 import type { rpcContract } from "../../contract";
-import { useHudHotkey } from "../../hud/hotkey";
-import { canPopOut, popOutToHud, useCanPopOutToHud } from "../../hud/ui/pop-out";
 import { routeContainer } from "../../kit/app/container";
 import type { CommandPaletteProps } from "../../kit/app/host-sdk";
 import { openAppPath } from "../../kit/app/nav";
@@ -19,7 +17,7 @@ import { useOpenLink } from "../../links/open";
 import { linkFor } from "../../links/router";
 import { appCommandEntries, studioCommandEntries } from "../commands";
 import { applyThemeToShownBot, cycleTheme, shownBotThemeChoices, THEME_NEXT_COMMAND, THEME_PREVIOUS_COMMAND } from "../../theme/ui/quick";
-import { isHudItem, setLauncherRuntime } from "../items";
+import { setLauncherRuntime } from "../items";
 import type { LauncherRow } from "../rank";
 import { Omnibar, type OmnibarRun } from "./Omnibar";
 import { launcherEntry, useAppCommandList, useLauncherItems, useSpaces } from "./omnibar-data";
@@ -39,17 +37,14 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
   const openLink = useOpenLink();
   const windows = useHostWindows();
   const { values, set } = useStudioSettings();
-  const hudOn = values?.hudEnabled === true;
-  const hudHotkey = useHudHotkey(values?.hudHotkey ?? "").inUse;
   const items = useLauncherItems();
   const commands = useAppCommandList();
   const spaces = useSpaces();
-  const popOutAllowed = useCanPopOutToHud();
   const [threadId] = useState(() => { const container = routeContainer(); return container?.kind === "thread" ? container.threadId : null; });
   const [info, setInfo] = useState<BotThreadInfo | null | undefined>(undefined);
   const [themes] = useState(shownBotThemeChoices);
 
-  useEffect(() => { setLauncherRuntime({ rpc: rpc as unknown as Rpc, windows, hudHotkey }); }, [rpc, windows, hudHotkey]);
+  useEffect(() => { setLauncherRuntime({ rpc: rpc as unknown as Rpc, windows }); }, [rpc, windows]);
 
   useEffect(() => {
     if (!threadId) return;
@@ -63,10 +58,10 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
 
   const entries = useMemo(() => {
     const own = [
-      ...items.filter((item) => !(item.pluginId === STUDIO_PLUGIN_ID && item.id === MAIN_WINDOW_APP) && (hudOn || !isHudItem(item))).map((item) => ({ ...launcherEntry(item), run: later(item.run) })),
+      ...items.filter((item) => !(item.pluginId === STUDIO_PLUGIN_ID && item.id === MAIN_WINDOW_APP)).map((item) => ({ ...launcherEntry(item), run: later(item.run) })),
       ...studioCommandEntries({
         themes, themeShortcuts: { next: commands.find((command) => command.id === THEME_NEXT_ID)?.shortcut, previous: commands.find((command) => command.id === THEME_PREVIOUS_ID)?.shortcut },
-        bots: spaces.bots, currentBotId: shownBotId, popOutThreadId: threadId && popOutAllowed && canPopOut(info) ? threadId : null, settings: values, windows: hasHostWindows,
+        bots: spaces.bots, currentBotId: shownBotId, settings: values, windows: hasHostWindows,
       }, {
         switchBot: (botId) => {
           const index = spaces.bots.findIndex((bot) => bot.id === botId) + 1;
@@ -75,7 +70,6 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
           const target = landingThread(spaces.bots.find((bot) => bot.id === botId), lastConversation(botId), null);
           if (target) navigate.toThread(target);
         },
-        popOut: (id) => popOutToHud(id),
         openSettings: (group) => { if (group === "voice") requestVoiceSection(); openAppPath(STUDIO_SETTINGS_PATH); },
         setSetting: (key, value) => set({ [key]: value }),
         applyTheme: async (themeId) => { await applyThemeToShownBot(themeId); },
@@ -83,7 +77,7 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
       }).map((entry) => ({ ...entry, run: later(entry.run) })),
     ];
     return [...own, ...appCommandEntries(themes.length ? commands.filter((command) => command.id !== THEME_NEXT_ID && command.id !== THEME_PREVIOUS_ID) : commands, own)];
-  }, [items, hudOn, spaces, shownBotId, threadId, popOutAllowed, info, values, set, navigate, commands, themes]);
+  }, [items, spaces, shownBotId, values, set, navigate, commands, themes]);
   const runs = useMemo(() => new Map(entries.map((entry) => [entry.key, entry])), [entries]);
 
   const ask = async (text: string, fresh: boolean): Promise<string> => {

@@ -188,9 +188,9 @@ describe("openLink", () => {
     expect(deps.popOut).not.toHaveBeenCalled();
   });
 
-  it("in the HUD or a popped-out window, relays the link and the rule to the main window", async () => {
+  it("in a popped-out window, relays the link and the rule to the main window", async () => {
     const { deps } = fakeDeps({ inMain: () => false });
-    expect(await openLink(entity(SAMPLE.page, "bb://page/x"), { source: "hud", modifiers: { shift: true } }, deps)).toEqual({ via: "relay", how: "window" });
+    expect(await openLink(entity(SAMPLE.page, "bb://page/x"), { source: "window", modifiers: { shift: true } }, deps)).toEqual({ via: "relay", how: "window" });
     expect(deps.relay).toHaveBeenCalledWith("bb://page/x", "window");
     expect(deps.resolve).not.toHaveBeenCalled();
     expect(deps.openTab).not.toHaveBeenCalled();

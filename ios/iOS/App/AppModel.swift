@@ -21,6 +21,7 @@ enum Route: Hashable {
     /// Visual Chat (the studio-visual-chat plugin): its chats, and one chat (nil: a new one).
     case visualChats
     case visualChat(threadId: String?)
+    case memoryRecord(id: String)
 }
 
 extension Route {
@@ -89,6 +90,12 @@ enum BotRoute: Hashable {
     case list, primary, bot(String)
 }
 
+enum BotShellLink: Hashable {
+    case thread(String, worker: Bool)
+    case page(BotPage, botId: String?)
+    case push(Route)
+}
+
 enum Tab: Hashable {
     case inbox, studio, bot, settings
 }
@@ -120,6 +127,7 @@ final class AppModel: ObservableObject {
     @Published var botDraft: String?
     /// Set to show the Bot's Loops (the morning card's "N more", `bbstudio://loops`).
     @Published var botShowsLoops = false
+    @Published var shellLink: BotShellLink?
 
     /// The last thread opened.
     var lastThreadId: String {
@@ -214,6 +222,10 @@ final class AppModel: ObservableObject {
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
+        if let target = Self.linkTarget(url, inSpaces: inSpaces) {
+            openLink(target)
+            return
+        }
         switch url.host() {
         case "capture": sheet = .capture
         case "thread": if let id { openThread(id) }
@@ -251,6 +263,93 @@ final class AppModel: ObservableObject {
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox
+        }
+    }
+
+    var inSpaces: Bool { BotSpacesStore.shared.useSpaces }
+
+    nonisolated static let legacyLinkHosts: Set<String> = ["page", "recording", "artifact", "design", "dashboard", "bot", "automations", "file"]
+
+    nonisolated static func linkTarget(_ url: URL, inSpaces: Bool) -> LinkTarget? {
+        let host = url.host() ?? ""
+        let routed: Bool
+        if host == "thread" {
+            routed = inSpaces
+        } else if let kind = LinkKind(rawValue: host) {
+            routed = !legacyLinkHosts.contains(kind.rawValue) || (inSpaces && kind != .file)
+        } else {
+            routed = false
+        }
+        guard routed else { return nil }
+        let text = host == "thread" ? "bb://conversation" + url.path(percentEncoded: true) : url.absoluteString
+        guard case .entity(let ref)? = Links.parse(text) else { return nil }
+        return .entity(ref)
+    }
+
+    func openLink(_ target: LinkTarget, threadId: String? = nil, push: ((Route) -> Void)? = nil) {
+        switch target {
+        case .external(let url):
+            UIApplication.shared.open(url)
+        case .action:
+            flash("That opens on your Mac.")
+        case .entity(let ref):
+            guard Links.needsResolution(ref) else { return follow(Links.destination(ref), push: push) }
+            let client = client
+            Task {
+                let resolution = try? await client.resolveLink(ref, threadId: threadId)
+                guard client.baseURL == self.client.baseURL else { return }
+                if resolution?.found == false { return flash("Not found: \(ref.link)") }
+                follow(Links.destination(ref), push: push)
+            }
+        }
+    }
+
+    func follow(_ destination: LinkDestination, push: ((Route) -> Void)? = nil) {
+        switch destination {
+        case .thread(let id, let worker):
+            if inSpaces {
+                tab = .bot
+                shellLink = .thread(id, worker: worker || BotSpacesStore.shared.views.values.contains { $0.workers.contains { $0.threadId == id } })
+            } else {
+                openThread(id)
+            }
+        case .bot(let id):
+            openBots(.bot(id))
+        case .botPage(let page, let botId):
+            if inSpaces {
+                tab = .bot
+                shellLink = .page(page, botId: botId)
+            } else {
+                switch page {
+                case .todos: openLoops()
+                case .automations: open(.automations)
+                default: openBots(botId.map(BotRoute.bot) ?? .primary)
+                }
+            }
+        case .automation:
+            follow(.botPage(.automations, botId: nil), push: push)
+        case .todo:
+            follow(.botPage(.todos, botId: nil), push: push)
+        case .record(let id):
+            follow(.route(.memoryRecord(id: id)), push: push)
+        case .route(let route):
+            if let push {
+                push(route)
+            } else if inSpaces {
+                tab = .bot
+                shellLink = .push(route)
+            } else if case .visualChat(let threadId) = route {
+                openStudio(kind: nil, .visualChats)
+                studioPath.append(.visualChat(threadId: threadId))
+            } else {
+                openStudio(kind: nil, route)
+            }
+        case .safari(let url):
+            UIApplication.shared.open(url)
+        case .threadFiles:
+            flash("Open files and diffs from their thread.")
+        case .elsewhere(let message):
+            flash(message)
         }
     }
 

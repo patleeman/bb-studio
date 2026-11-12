@@ -14,6 +14,7 @@ export const SAMPLE_REFS: Record<TabKindId, TabRef> = {
   recording: { kind: "recording", id: "rec_0123456789" },
   board: { kind: "board", id: "thr_board" },
   memory: { kind: "memory", id: "bot_main" },
+  skills: { kind: "skills", id: "bot_main" },
   library: { kind: "library", id: null },
   automations: { kind: "automations", id: null },
   todos: { kind: "todos", id: "bot_main" },
@@ -56,7 +57,6 @@ export const LINK_AUDIT_SOURCES: readonly LinkAuditSource[] = [
   { id: "palette", name: "Cmd+K", path: "src/launcher/ui/CommandPalette.tsx run", test: "src/launcher/ui/CommandPalette.test.tsx" },
   { id: "launcher", name: "Launcher", path: "src/launcher/ui/Launcher.tsx run", test: "src/launcher/ui/Launcher.test.tsx" },
   { id: "agent", name: "workbench_open", path: "src/workbench-agent/server.ts linkedInput", test: "src/workbench-agent/workbench-agent.test.ts" },
-  { id: "hud", name: "HUD", path: "src/hud/ui/HudBridge.tsx runRelayed (window.runInMain link)", test: "src/hud/ui/HudBridge.test.ts; src/hud/hud.test.ts; src/links/router.test.ts (relay)" },
   { id: "window", name: "Popped-out window", path: "src/links/open.ts inMainWindow, LinksBridge in each window", test: "src/links/open.test.ts; src/links/router.test.ts (relay)" },
   { id: "botPage", name: "Bot page row", path: "src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Archive)", test: "src/ui/bot-page/open-row.test.tsx; each page's test" },
 ];

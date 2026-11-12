@@ -24,6 +24,7 @@ const SAMPLE: Record<TabKindId, TabRef> = {
   recording: { kind: "recording", id: "rec_0123456789" },
   board: { kind: "board", id: "thr_board" },
   memory: { kind: "memory", id: "bot_main" },
+  skills: { kind: "skills", id: "bot_main" },
   library: { kind: "library", id: null },
   automations: { kind: "automations", id: null },
   todos: { kind: "todos", id: "bot_main" },
@@ -145,7 +146,7 @@ describe("naming", () => {
   it("lists the New Tab Actions under New and Open, titled New <kind>, Open <kind> or the page's name", () => {
     expect(NEW_TAB_ACTIONS.map((action) => `${action.group}: ${action.title}`)).toEqual([
       "New: New conversation", "New: New page", "New: New whiteboard", "New: New design", "New: New app", "New: New dashboard",
-      "Open: Open conversation", "Open: Open page", "Open: Memory", "Open: Library", "Open: Automations", "Open: Todos", "Open: Archive", "Open: VS Code",
+      "Open: Open conversation", "Open: Open page", "Open: Memory", "Open: Skills", "Open: Library", "Open: Automations", "Open: Todos", "Open: Archive", "Open: VS Code",
     ]);
     // bb's action search lists matches under one heading: no two titles are the same.
     expect(new Set(NEW_TAB_ACTIONS.map((action) => action.title)).size).toBe(NEW_TAB_ACTIONS.length);

@@ -6,7 +6,7 @@
 //   node capture.mjs <ids.json> <out-dir> [shot ...]
 // Needs `playwright` resolvable (see README: npm i in a tools dir, NODE_PATH).
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,9 +52,38 @@ const approval = (on) => sql(join(data, "bb.db"), `UPDATE pending_interactions S
 
 const STUB = `(() => { const noop = () => {}; const off = () => noop; const info = { platform: "macos", appVersion: "0.0.0", updateStatus: { state: "idle" } }; const browser = { attach: noop, detach: noop, navigate: noop, goBack: noop, goForward: noop, reload: noop, stop: noop, setBounds: noop, setVisible: noop, onState: off, onOpenTab: off }; window.bbDesktop = { ...info, browser, checkForUpdates: async () => info, getInfo: async () => info, installUpdate: async () => {}, onChange: off, onWindowStateChange: off, getWindowState: async () => ({ isFullScreen: false }), openExternalUrl: noop, setTheme: noop }; })();`;
 
-const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
+// Accounts: the scratch server has no Account Pooler and no provider signed
+// in, so its accounts.status is empty plus a "No provider signed in" card.
+// Every page gets a made-up status instead: fictional accounts with demo
+// thread titles, no emails, no tokens. The Accounts panel draws it as it
+// would draw a real one.
+const NOW = Date.now();
+const HOUR_MS = 3_600_000;
+const win = (id, label, percent, inHours) => ({ id, label, percent, resetAt: NOW + inHours * HOUR_MS, rejected: percent >= 100 });
+const pinned = (...keys) => keys.map((key) => ({ threadId: ids[key], title: { "atlas-main": "Main", "w-links": "Fix broken docs links", "w-settings": "Refactor the settings form" }[key] ?? key })).filter((t) => t.threadId);
+const ACCOUNTS = {
+  checkedAt: NOW,
+  sources: [
+    { source: "studio", name: "BB Studio", state: "on" },
+    { source: "bb", name: "bb", state: "off" },
+    { source: "local", name: "This Mac", state: "on" },
+  ],
+  accounts: [
+    { key: "studio:demo-claude-1", id: "demo-claude-1", source: "studio", provider: "claude", name: "Claude", label: "Personal", state: "ready", message: null,
+      windows: [win("five_hour", "5h", 34, 2.5), win("seven_day", "7d", 61, 70)], models: [win("opus", "Opus", 48, 70)], pinned: pinned("atlas-main", "w-links"), signIn: "demo-claude-1" },
+    { key: "studio:demo-claude-2", id: "demo-claude-2", source: "studio", provider: "claude", name: "Claude", label: "Studio", state: "limited", message: null,
+      windows: [win("five_hour", "5h", 100, 1.2), win("seven_day", "7d", 83, 30)], models: [], pinned: [], signIn: "demo-claude-2" },
+    { key: "studio:demo-codex-1", id: "demo-codex-1", source: "studio", provider: "codex", name: "Codex", label: "Personal", state: "ready", message: null,
+      windows: [win("primary", "5h", 8, 4), win("secondary", "7d", 22, 120)], models: [], pinned: pinned("w-settings"), signIn: "demo-codex-1" },
+  ],
+  warnings: [],
+  dismissed: [],
+};
+
+const browser = await chromium.launch({ args: ["--use-mock-keychain", "--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2, reducedMotion: "no-preference" });
 await ctx.addInitScript(STUB);
+await ctx.route("**/api/v1/plugins/studio/rpc/accounts.status", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, result: ACCOUNTS }) }));
 const page = await ctx.newPage();
 const wait = (ms) => page.waitForTimeout(ms);
 async function go(path, settle = 7000) {
@@ -96,7 +125,7 @@ setTheme("Atlas", "miami-1985");
 if (want("approval")) {
   approval(true);
   await go(main());
-  await shot("approval", { x: 560, y: 40, width: 820, height: 200 });
+  await shot("approval", { x: 560, y: 40, width: 820, height: 178 });
   await shot("main-with-approval");
 }
 
@@ -125,6 +154,76 @@ for (const [name, path] of Object.entries(PAGES)) {
   await shot(name);
 }
 
+// ---- Studio items: each in its own tab ------------------------------------
+const features = existsSync(join(dirname(idsFile), "features.json")) ? JSON.parse(readFileSync(join(dirname(idsFile), "features.json"), "utf8")) : null;
+if (features) {
+  const ITEMS = {
+    "item-page": `/plugins/studio/studio/pages/${features.page}`,
+    "item-design": `/plugins/studio/studio/designs/${features.design}`,
+    "item-whiteboard": `/plugins/studio/studio/drawings/${features.whiteboard}`,
+    "item-dashboard": `/plugins/studio/studio/dashboards/${features.dashboard}`,
+    "item-mini": `/plugins/studio/studio/minis/${features.mini}`,
+    "item-artifact": `/plugins/studio/studio/artifacts/${features.artifacts["release-timeline.svg"]}`,
+    "item-recording": `/plugins/studio/studio/recordings/${features.recording}`,
+    "item-collection": `/plugins/studio/studio`,
+    "item-canvas": `/plugins/studio-visual-chat/canvas/${features.canvasThread}`,
+    "item-code": `/plugins/studio/studio/workspaces/${features.workspace}`,
+  };
+  for (const [name, path] of Object.entries(ITEMS)) {
+    if (!want(name)) continue;
+    await go(path, name === "item-code" ? 15000 : 9000);
+    if (name === "item-design") {
+      // Zoom out until the round's three screens fit.
+      for (let i = 0; i < 5; i++) { await page.getByRole("button", { name: "Zoom out" }).first().click().catch(() => {}); await wait(300); }
+      await wait(1500);
+    }
+    if (name === "item-code") {
+      rpc("code.reveal", { id: features.workspace, path: join(features.repo, "src/sync/queue.ts"), startLine: 9, endLine: 14 });
+      await wait(6000);
+    }
+    await page.mouse.move(1590, 990);
+    await shot(name);
+  }
+  // The page, scrolled to its whiteboard and the mini app embedded in it.
+  if (want("item-page-embeds")) {
+    await go(`/plugins/studio/studio/pages/${features.page}`, 9000);
+    await page.getByText("Rollout", { exact: true }).first().scrollIntoViewIfNeeded().catch(() => {});
+    await page.getByText("Rollout", { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+    await wait(3000);
+    await page.mouse.move(1590, 990);
+    await shot("item-page-embeds");
+  }
+}
+
+// ---- Skills, in the Bot's controls ----------------------------------------
+if (want("page-skills")) {
+  await go(`/plugins/studio/studio/bot/${bots.Atlas}/controls#skills`);
+  await page.mouse.move(1590, 990);
+  await shot("page-skills");
+}
+
+// ---- Accounts, opened from the sidebar footer ----------------------------
+if (want("accounts")) {
+  // A taller window, so the panel shows all three accounts.
+  await page.setViewportSize({ width: 1600, height: 1700 });
+  await go(main());
+  await page.getByText("Accounts", { exact: true }).last().click();
+  await wait(2500);
+  // The panel caps its height and scrolls; lift the cap so one shot holds every account.
+  // (Studio's list caps at 70vh; bb's footer disclosure at 20rem with a measured height.)
+  await page.evaluate(() => {
+    let el = document.querySelector("[data-account]");
+    for (let i = 0; el && i < 8; i++, el = el.parentElement) {
+      el.style.maxHeight = "none";
+      if (el.style.height) el.style.height = "auto";
+    }
+  });
+  await wait(800);
+  await page.mouse.move(1590, 1690);
+  await shot("accounts", { x: 40, y: 40, width: 290, height: 1650 });
+  await page.setViewportSize({ width: 1600, height: 1000 });
+}
+
 // ---- Cmd+K ---------------------------------------------------------------
 if (want("cmdk")) {
   approval(false);
@@ -148,15 +247,13 @@ if (want("edit-space")) {
   await shot("edit-space");
 }
 
-// ---- The HUD (a see-through window), captured with no background --------
-if (want("hud")) {
-  const hud = await ctx.newPage();
-  await hud.setViewportSize({ width: 480, height: 600 });
-  await hud.goto(`${ORIGIN}/fork-window/studio/hud?threadId=${ids["atlas-main"]}&bbTransparent=1`, { waitUntil: "domcontentloaded" });
-  await hud.waitForTimeout(7000);
-  await hud.screenshot({ path: join(outDir, "hud.png"), omitBackground: true });
-  console.log("shot hud");
-  await hud.close();
+// ---- The composer: dictation and hands-free voice -----------------------
+if (want("composer")) {
+  approval(false);
+  await go(main());
+  await page.mouse.move(1590, 990);
+  await shot("composer");
+  approval(true);
 }
 
 // ---- The workbench beside Main, split in two panes -----------------------
@@ -166,17 +263,17 @@ if (want("workbench")) {
   await go(main());
   await page.keyboard.press("Meta+k");
   await wait(800);
-  await page.keyboard.type("release notes");
+  await page.keyboard.type("launch plan");
   await wait(1500);
   await page.keyboard.press("Enter");
   await wait(3000);
   await page.keyboard.press("Meta+k");
   await wait(800);
-  await page.keyboard.type("reading");
+  await page.keyboard.type("orbit-web health");
   await wait(1500);
   await page.keyboard.press("Meta+Enter");
   await wait(4000);
-  await page.locator("aside").getByText(/^Release notes/).first().click().catch(() => {});
+  await page.locator("aside").getByText(/launch plan/).first().click().catch(() => {});
   await wait(3000);
   await shot("workbench");
   approval(true);
@@ -213,6 +310,7 @@ if (CLIPS.some((id) => want(`clip-${id}`))) {
     setTheme("Atlas", id);
     const rec = await browser.newContext({ viewport: { width: 1280, height: 800 }, recordVideo: { dir: join(tmp, id), size: { width: 1280, height: 800 } } });
     await rec.addInitScript(STUB);
+    await rec.route("**/api/v1/plugins/studio/rpc/accounts.status", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, result: ACCOUNTS }) }));
     const p = await rec.newPage();
     await p.goto(ORIGIN + main(), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(16000);

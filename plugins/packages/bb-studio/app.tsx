@@ -4,8 +4,10 @@ import { registerCodeApp } from "./src/code/register";
 import { registerSettingsApp } from "./src/settings/ui/sections";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
-import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerNewTabItems, registerPaletteSearch, registerSidebarSection, registerThreadBanner } from "./src/kit/app/host-sdk";
-import { WelcomeBanner, WelcomeLanding } from "./src/ui/bot/WelcomeMessage";
+import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerFirstRun, registerModelPickerGate, registerNewTabItems, registerPaletteSearch, registerSidebarSection } from "./src/kit/app/host-sdk";
+import { WelcomeLanding } from "./src/ui/bot/WelcomeMessage";
+import { ConnectModel } from "./src/ui/onboarding/ConnectModel";
+import { SignInGate } from "./src/ui/onboarding/SignInGate";
 import { EditSpaceHost } from "./src/ui/conversations/EditSpaceHost";
 import { NewTabBridge, STUDIO_NEW_TAB_ITEMS } from "./src/ui/newtab-items";
 import { OpenedTabsRecorder } from "./src/ui/opened-tabs";
@@ -24,13 +26,14 @@ import { registerQuietReplyClassifier } from "./src/kit/quiet-turns";
 import { NewMenuBridge, registerNewMenu } from "./src/ui/new-menu";
 import { BotSidebarList } from "./src/ui/conversations/BotSidebarList";
 import { showBot } from "./src/ui/conversations/show-bot";
-import { registerBotSkillSources } from "./src/ui/bot/skill-sources";
+import { hideBbSkills } from "./src/ui/skills/hide-bb-skills";
 import { askAboutItemHandler } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
 import { FinishedCard } from "./src/ui/conversations/finish";
 import { finishThreadAction } from "./src/ui/conversations/finish-action";
 import { OLDER_SUBPATH, olderBotFromPath } from "./src/ui/conversations/model";
+import { SKILLS_SUBPATH, skillsBotFromPath } from "./src/ui/skills/paths";
 import { newConversationRoute } from "./src/ui/conversations/new-conversation";
 import { NewConversationPage } from "./src/ui/conversations/NewConversation";
 import { LibraryPage } from "./src/ui/library/LibraryPage";
@@ -41,15 +44,12 @@ import { RetireFixedBotTabs } from "./src/ui/bot/retire-fixed-tabs";
 import { ITEM_TAB_ICON } from "./src/ui/item-icons";
 import { registerItemWindows } from "./src/ui/item-window";
 import { registerHostWindow } from "./src/kit/app/windows";
-import { HudBridge } from "./src/hud/ui/HudBridge";
+import { WindowsBridge } from "./src/windows/ui/WindowsBridge";
 import { ThemeLayer } from "./src/theme/ui/ThemeLayer";
 import { PresenceCheckHost } from "./src/presence/ui/PresenceBridge";
 import { THEME_FOOTER_ID, THEME_FOOTER_LABEL, ThemeQuickHost } from "./src/theme/ui/ThemePopover";
 import { themeCommandRegistrations, toggleThemePopover } from "./src/theme/ui/quick";
 import { registerThemeBackdrop } from "./src/theme/backdrop";
-import { popOutHudThreadAction } from "./src/hud/ui/pop-out";
-import { HudWindow } from "./src/hud/ui/Hud";
-import { HUD_WINDOW_ID } from "./src/hud/shared";
 import { registerLauncherItems } from "./src/launcher/items";
 import { LAUNCHER_WINDOW_ID } from "./src/launcher/shared";
 import { LauncherWindow } from "./src/launcher/ui/Launcher";
@@ -89,6 +89,7 @@ import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
 import "./src/dashboards/ui/dashboards.css";
+import "./src/ui/bot/timeline.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
@@ -99,7 +100,7 @@ import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage"
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
-import { BotThreadDirective, ReplyInThreadAction, SIDE_THREAD_ACTION, SideThreadPanel, ThreadIndicators } from "./src/ui/bot/SideThreads";
+import { BotThreadDirective, openThreadBeside, ReplyInThreadAction, SIDE_THREAD_ACTION, SideThreadPanel, ThreadIndicators } from "./src/ui/bot/SideThreads";
 import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
 import { registerForkFromHere } from "./src/ui/conversations/fork-from-here";
 import { canShowBot, openThreadVia, showBotNumber } from "./src/ui/conversations/state";
@@ -179,6 +180,7 @@ const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 const MemoryView = lazy(() => import("./src/memory/ui/MemoryView"));
 /** What the Bot sidebar leaves out, and finished conversations (src/ui/conversations/OlderPage.tsx). */
 const OlderPage = lazy(() => import("./src/ui/conversations/OlderPage"));
+const SkillsPage = lazy(() => import("./src/ui/skills/SkillsPage"));
 
 /** The Studio app: links in it open as Studio tabs (src/ui/studio-open.tsx). */
 function StudioRoot({ subPath }: { subPath: string }) {
@@ -198,6 +200,7 @@ function StudioRootView({ subPath }: { subPath: string }) {
   if (path === MEMORY_SUBPATH || path.startsWith(`${MEMORY_SUBPATH}/`)) return <Suspense fallback={null}><MemoryView botId={memoryBotFromPath(path)} /></Suspense>;
   // The Bot sidebar's "N older conversations" and "N older workers": `conversations` or `conversations/<botId>`.
   if (path === OLDER_SUBPATH || path.startsWith(`${OLDER_SUBPATH}/`)) return <Suspense fallback={null}><OlderPage botId={olderBotFromPath(path)} /></Suspense>;
+  if (path === SKILLS_SUBPATH || path.startsWith(`${SKILLS_SUBPATH}/`)) return <Suspense fallback={null}><SkillsPage botId={skillsBotFromPath(path)} /></Suspense>;
   const entry = /^(automation|todo|record)\/([^/]+)$/.exec(path);
   if (entry) return <EntryView kind={entry[1] as "automation" | "todo" | "record"} id={decodeSegment(entry[2]!)} />;
   // A Bot's + New: BB's new-thread composer on its default model (`new-conversation/<botId>[/<projectId>]`).
@@ -264,6 +267,7 @@ export default definePluginApp((app) => {
   // Studio's settings sections (src/settings/ui), first so they keep their
   // order after BB's API key fields; and push status on BB's Mobile page.
   registerSettingsApp(app);
+  hideBbSkills(app.slots);
   registerCodeApp(app);
   // First, so the overlays below read BB's own route from their first render.
   registerQuietReplyClassifier(app.slots);
@@ -285,23 +289,21 @@ export default definePluginApp((app) => {
   // The workbench tools' side in the window (src/workbench-agent): runs an agent's call on the conversation on screen.
   app.slots.experimental_appOverlay({ id: "workbench-agent", component: WorkbenchAgentBridge });
   // Windows of Studio's own, on a BB that has them (src/kit/app/windows.ts):
-  // the HUD (src/hud), the launcher (src/launcher), and any item popped out into
-  // a window (src/ui/item-window.tsx). The bridge in the main window sets up
-  // their hotkeys and opens what a window asks to show in BB.
-  const hostWindows = registerHostWindow(app.slots, { id: HUD_WINDOW_ID, title: "Bot HUD", component: HudWindow });
-  // The launcher (src/launcher): its window, and Studio's apps and actions in BB's launcher slot.
-  registerLauncherItems(app.slots, hostWindows);
+  // the launcher (src/launcher) and any item popped out into a window
+  // (src/ui/item-window.tsx). The bridge in the main window sets up the
+  // launcher's hotkey and opens what a window asks to show in BB.
+  const hostWindows = registerHostWindow(app.slots, { id: LAUNCHER_WINDOW_ID, title: "BB Studio Launcher", component: LauncherWindow });
+  // Studio's apps and actions in BB's launcher slot.
+  registerLauncherItems(app.slots);
   if (hostWindows) {
-    registerHostWindow(app.slots, { id: LAUNCHER_WINDOW_ID, title: "BB Studio Launcher", component: LauncherWindow });
     registerItemWindows(app.slots, BUILTIN_VIEWS);
-    app.slots.experimental_appOverlay({ id: "windows", component: HudBridge });
-    // "Pop out to HUD" in a conversation's thread menus; its header icon is part of Studio's header decoration.
-    app.slots.experimental_threadAction(popOutHudThreadAction);
+    app.slots.experimental_appOverlay({ id: "windows", component: WindowsBridge });
   }
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   app.slots.experimental_appOverlay({ id: "relogin", component: ReloginHost });
   registerAccountsApp(app);
-  registerThreadBanner(app.slots, { id: "welcome", component: WelcomeBanner });
+  registerFirstRun(app.slots, { id: "connect-model", component: ConnectModel });
+  registerModelPickerGate(app.slots, { id: "sign-in", component: SignInGate });
   app.slots.experimental_appOverlay({ id: "welcome-landing", component: WelcomeLanding });
   app.slots.experimental_appOverlay({ id: "edit-space", component: EditSpaceHost });
   app.slots.experimental_appOverlay({ id: "theme", component: ThemeLayer });
@@ -332,7 +334,6 @@ export default definePluginApp((app) => {
     // row (the Bot's + New is beside Conversations). In the desktop app's title bar layout the traffic lights, back,
     // forward and the sidebar toggle stay in the title bar; in the browser layout back and forward move to the start
     // of the main view's header and the toggle stays.
-    registerBotSkillSources(app.slots);
     const sidebarStyle: object = { experimental_hideSidebarHeader: true };
     app.slots.experimental_threadList({ id: UNIFIED_LIST_ID, title: "Bot (Studio)", component: BotSidebarList, ...sidebarStyle });
   }
@@ -391,7 +392,7 @@ export default definePluginApp((app) => {
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel, ...OFF_NEW_TAB });
   registerForkFromHere(app.slots, {
     call: async (method, input) => (await post(method, input)) as { threadId: string },
-    open: openThreadVia((threadId) => openPathFromRoute(`/threads/${encodeURIComponent(threadId)}`)),
+    open: (threadId, sourceThreadId) => { void openThreadBeside(sourceThreadId, threadId, openThreadVia((id) => openPathFromRoute(`/threads/${encodeURIComponent(id)}`))); },
   });
   app.slots.experimental_messageMetadata({ id: "reply-in-thread", placement: "actionRow", component: ReplyInThreadAction });
   app.slots.experimental_appOverlay({ id: "thread-indicators", component: ThreadIndicators });

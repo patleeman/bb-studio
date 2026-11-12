@@ -53,7 +53,6 @@ struct ThreadTranscriptActions {
     var quote: (String) -> Void
     var select: (String) -> Void
     var edit: (String) -> Void
-    var sideChat: ((String) -> Void)?
     var saveFiles: ((Int?) -> Void)?
     var openThread: (String) -> Void
     var replyInThread: (String) -> Void
@@ -187,7 +186,7 @@ struct ThreadTranscriptRowView: View {
                         MessageBubble(
                             row: row, projectId: actions.projectId, react: actions.draftReply,
                             reactionItems: actions.reactionItems, quote: actions.quote, select: actions.select,
-                            sideChat: actions.sideChat, edit: state.editable ? actions.edit : nil,
+                            edit: state.editable ? actions.edit : nil,
                             saveFiles: actions.saveFiles, thread: state.sideThread, replier: actions.replier,
                             replyInThread: actions.messageThread.flatMap { open in ConversationReplies.canThread(row) ? { open(row) } : nil },
                             fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil })

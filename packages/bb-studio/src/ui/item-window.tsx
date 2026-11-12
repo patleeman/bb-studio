@@ -13,7 +13,7 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import { BUILTIN_ROUTES, builtinItemAt, STUDIO_ROOT } from "../builtins";
 import type { rpcContract } from "../contract";
-import type { hudContract } from "../hud/contract";
+import type { windowsContract } from "../windows/contract";
 import { StudioContainerProvider } from "../kit/app/container";
 import { setItemWindowOpener } from "../kit/app/item-window";
 import { setHostNavigator } from "../kit/app/nav";
@@ -109,7 +109,7 @@ function ItemWindow() {
   const target = itemWindowTargetOf(windowParams());
   const href = target ? itemWindowHref(target) : null;
   const rpc = useRpc<typeof rpcContract>();
-  const relay = useRpc<typeof hudContract>();
+  const relay = useRpc<typeof windowsContract>();
   const [title, setTitle] = useState<string | null>(null);
   // The window's item, for as long as it is open.
   useEffect(() => {

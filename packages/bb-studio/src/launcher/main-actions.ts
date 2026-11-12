@@ -2,7 +2,7 @@
 // (`window.openInMain`) instead of opening it: an action that needs the main
 // window's own state, such as VS Code for the thread in view. The code that
 // owns the action registers it; the main window's bridge
-// (src/hud/ui/HudBridge.tsx) looks it up.
+// (src/windows/ui/WindowsBridge.tsx) looks it up.
 const actions = new Map<string, () => void | Promise<void>>();
 
 export function onMainWindowPath(path: string, run: () => void | Promise<void>): void {

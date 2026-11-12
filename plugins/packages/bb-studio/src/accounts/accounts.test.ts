@@ -95,6 +95,19 @@ describe("status mapping", () => {
       ["local:codex", "signed_out", "me@example.test", "provider:codex"],
     ]);
   });
+
+  it("offers every local login that can sign in while nothing is connected", () => {
+    const views = localAccountViews([
+      { providerId: "claude-code", displayName: "Claude Code", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: "claude auth login" },
+      { providerId: "codex", displayName: "Codex", status: "expired", planLabel: null, accountEmail: null, loginCommand: "codex login --device-auth" },
+      { providerId: "acp-omp", displayName: "omp", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: null },
+      { providerId: "acp-cursor", displayName: "Cursor", status: "not_installed", planLabel: null, accountEmail: null, loginCommand: "cursor login" },
+    ], new Set(), (id) => id, true);
+    expect(views.map((view) => [view.key, view.state, view.signIn])).toEqual([
+      ["local:claude-code", "signed_out", "provider:claude-code"],
+      ["local:codex", "signed_out", "provider:codex"],
+    ]);
+  });
 });
 
 function view(overrides: Partial<AccountView> & { key: string }): AccountView {

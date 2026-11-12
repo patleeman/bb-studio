@@ -880,3 +880,83 @@ it("a Bot's default model starts as its Main's, once; setting it switches no thr
   await expect(x.bots.setDefaultModel({ botId: scout.id, providerId: "grok", model: "grok-4" })).rejects.toThrow(/Studio's tools/);
   await expect(x.bots.setDefaultModel({ botId: scout.id, providerId: "nope", model: "m" })).rejects.toThrow(/isn't an agent provider/);
 });
+
+it("searches only the calling Bot's skills, ranked by title, then description, then body", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  x.bots.writeSkill({ name: "deploy-check", description: "Before a release: verify the build", body: "Run the smoke tests." });
+  x.bots.writeSkill({ name: "weekly-review", description: "Fridays: a deploy summary for the week", body: "Read the threads." });
+  x.bots.writeSkill({ name: "inbox-sweep", description: "Sort mail", body: "Archive newsletters. Flag anything about a deploy window." });
+  x.bots.writeSkill({ name: "old-deploy", description: "Retired deploy steps", body: "deploy deploy deploy" });
+  x.bots.setSkillState("old-deploy", "archived");
+  x.bots.writeSkill({ name: "deploy-watch", description: "Watch release deploys", body: "Scout's own." }, scout);
+
+  expect(x.bots.searchSkills("deploy").map((hit) => hit.name)).toEqual(["deploy-check", "weekly-review", "inbox-sweep"]);
+  expect(x.bots.searchSkills("deploy")[2]).toMatchObject({ fields: ["body"], snippet: expect.stringContaining("deploy window") });
+  expect(x.bots.searchSkills("smoke tests").map((hit) => hit.name)).toEqual(["deploy-check"]);
+  expect(x.bots.searchSkills("newsletter").map((hit) => hit.name)).toEqual(["inbox-sweep"]);
+  expect(x.bots.searchSkills("kubernetes")).toEqual([]);
+  expect(x.bots.searchSkills("deploy", 1)).toHaveLength(1);
+  expect(x.bots.searchSkills("deploy", 10, scout).map((hit) => hit.name)).toEqual(["deploy-watch"]);
+  expect(x.bots.searchSkills("smoke", 10, scout)).toEqual([]);
+  expect(x.bots.searchSkills("own").map((hit) => hit.name)).toEqual([]);
+});
+
+it("lists eight skills in the Bot's instructions, pinned and recent first, and points at skill_search for the rest", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  for (let n = 0; n < 10; n += 1) x.bots.writeSkill({ name: `task-${n}`, description: `Task ${n}`, body: "b" });
+  x.bots.pinSkill("task-0", true);
+  const text = x.bots.instructions(x.bots.forThread("bot1")!);
+  expect(text).toContain("find one with skill_search");
+  expect(text).toContain("- task-0: Task 0");
+  expect(text.match(/^- task-/gm)).toHaveLength(8);
+  expect(text).toContain("2 more: find them with skill_search.");
+});
+
+it("keeps one skill's history apart, reverts to an old version and restores a deleted skill", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.bots.writeSkill({ name: "deploy-check", description: "d", body: "v1" });
+  x.bots.writeSkill({ name: "deploy-check", description: "d", body: "v2" });
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "Steps" });
+  const history = x.bots.skillHistory(undefined, undefined, "deploy-check");
+  expect(history.map((version) => version.body)).toEqual(["v2", "v1"]);
+  expect(history[0]!.diff).toBe("- v1\n+ v2");
+  x.bots.revertSkill(history[1]!.id);
+  expect(x.bots.skill("deploy-check")?.body).toBe("v1");
+  expect(x.bots.deleteSkill("inbox")).toBe(true);
+  const deleted = x.bots.skillHistory(undefined, undefined, "inbox")[0]!;
+  expect(deleted.body).toBeNull();
+  x.bots.revertSkill(x.bots.skillHistory(undefined, undefined, "inbox")[1]!.id);
+  expect(x.bots.skill("inbox")?.body).toBe("Steps");
+  expect(x.bots.skillHistory().length).toBeGreaterThan(x.bots.skillHistory(undefined, undefined, "inbox").length);
+});
+
+it("leaves the harnesses' own skill folders alone while a Bot writes, searches, reverts and deletes its skills", async () => {
+  const { mkdir, writeFile, readdir, stat } = await import("node:fs/promises");
+  const home = await mkdtemp(join(tmpdir(), "harness-home-"));
+  const folders = [join(home, ".claude", "skills", "native-one"), join(home, ".agents", "skills", "native-two")];
+  for (const folder of folders) { await mkdir(folder, { recursive: true }); await writeFile(join(folder, "SKILL.md"), "---\nname: native\ndescription: d\n---\nbody\n"); }
+  const snapshot = async () => Promise.all(folders.map(async (folder) => ({ files: await readdir(folder), mtime: (await stat(join(folder, "SKILL.md"))).mtimeMs, text: await readFile(join(folder, "SKILL.md"), "utf8") })));
+  const before = await snapshot();
+  vi.stubEnv("HOME", home);
+  try {
+    const x = await setup();
+    x.add({ id: "bot1" });
+    await x.bots.setThread("bot1");
+    x.bots.writeSkill({ name: "native-one", description: "Same name as a harness skill", body: "v1" });
+    x.bots.writeSkill({ name: "native-one", description: "Same name as a harness skill", body: "v2" });
+    expect(x.bots.searchSkills("harness").map((hit) => hit.name)).toEqual(["native-one"]);
+    x.bots.revertSkill(x.bots.skillHistory(undefined, undefined, "native-one")[1]!.id);
+    x.bots.deleteSkill("native-one");
+    expect(await snapshot()).toEqual(before);
+    expect(await readdir(join(home, ".claude", "skills"))).toEqual(["native-one"]);
+    expect(await readdir(join(home, ".agents", "skills"))).toEqual(["native-two"]);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});

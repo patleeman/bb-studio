@@ -11,6 +11,9 @@ import type {
   ExperimentalNewTabItemsRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalFirstRunRegistration,
+  ExperimentalModelPickerGateRegistration,
+  ExperimentalHideHostEntriesRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
@@ -42,6 +45,9 @@ export interface ForkSlotRegistrations {
   mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
+  firstRuns: ExperimentalFirstRunRegistration[];
+  modelPickerGates: ExperimentalModelPickerGateRegistration[];
+  hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
   panelTabActions: ExperimentalPanelTabActionRegistration[];
@@ -65,6 +71,9 @@ export const FORK_SLOT_KINDS = [
   "mainHeaders",
   "threadBanners",
   "modelLoadNotices",
+  "firstRuns",
+  "modelPickerGates",
+  "hiddenHostEntries",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -89,6 +98,9 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     mainHeaders: [],
     threadBanners: [],
     modelLoadNotices: [],
+    firstRuns: [],
+    modelPickerGates: [],
+    hiddenHostEntries: [],
     threadHeaders: [],
     forkMessageActions: [],
     panelTabActions: [],
@@ -116,6 +128,9 @@ export function forkSlotMethods(
     mainHeader: new Set<string>(),
     threadBanner: new Set<string>(),
     modelLoadNotice: new Set<string>(),
+    firstRun: new Set<string>(),
+    modelPickerGate: new Set<string>(),
+    hiddenHostEntries: new Set<string>(),
     threadHeader: new Set<string>(),
     messageAction: new Set<string>(),
     panelTabAction: new Set<string>(),
@@ -303,6 +318,48 @@ export function forkSlotMethods(
       collected.modelLoadNotices.push({
         id,
         component: requireComponent(kind, registration.component),
+      });
+    },
+    experimental_firstRun(registration) {
+      const kind = "slots.experimental_firstRun";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.firstRun, id);
+      collected.firstRuns.push(
+        registration.component === undefined
+          ? { id }
+          : { id, component: requireComponent(kind, registration.component) },
+      );
+    },
+    experimental_modelPickerGate(registration) {
+      const kind = "slots.experimental_modelPickerGate";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.modelPickerGate, id);
+      collected.modelPickerGates.push({
+        id,
+        component: requireComponent(kind, registration.component),
+      });
+    },
+    experimental_hideHostEntries(registration) {
+      const kind = "slots.experimental_hideHostEntries";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.hiddenHostEntries, id);
+      const list = <T extends string>(field: string, value: unknown): T[] => {
+        if (value === undefined) return [];
+        if (
+          !Array.isArray(value) ||
+          value.some((entry) => typeof entry !== "string" || entry === "")
+        ) {
+          throw new Error(
+            `${kind} "${id}": ${field} must be an array of non-empty strings`,
+          );
+        }
+        return [...value] as T[];
+      };
+      collected.hiddenHostEntries.push({
+        id,
+        navigation: list("navigation", registration.navigation),
+        pages: list("pages", registration.pages),
+        settings: list("settings", registration.settings),
       });
     },
     experimental_threadHeader(registration) {

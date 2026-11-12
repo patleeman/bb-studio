@@ -98,7 +98,7 @@ final class BotShellTests: XCTestCase {
 
     // MARK: Rows
 
-    func testThreadsAndForksNestUnderTheirParent() throws {
+    func testForksHaveNoRowsOfTheirOwn() throws {
         let view = try Self.view("bot_a", [
             Self.conversation("thr_a_main", "Main", main: true),
             Self.conversation("thr_other", "Other"),
@@ -107,10 +107,8 @@ final class BotShellTests: XCTestCase {
             Self.conversation("thr_orphan", "Orphan", parent: "thr_gone", parentTitle: "Gone"),
         ])
         let lines = BotShell.lines(view)
-        XCTAssertEqual(lines.map(\.threadId), ["thr_a_main", "thr_reply", "thr_deep", "thr_other", "thr_orphan"])
-        XCTAssertEqual(lines.map(\.depth), [0, 1, 2, 0, 0])
-        XCTAssertEqual(lines[1].forkedFrom, "Main", "labelled ⑂ Main")
-        XCTAssertNil(lines[4].forkedFrom, "a fork whose parent isn't listed is top level")
+        XCTAssertEqual(lines.map(\.depth), [0, 0, 0, 0, 0], "Studio leaves forks out; any it sends are plain rows")
+        XCTAssertTrue(lines.allSatisfy { $0.forkedFrom == nil }, "no ⑂ label")
     }
 
     func testNeedsYouRowShowsTheReasonOnLineTwo() throws {

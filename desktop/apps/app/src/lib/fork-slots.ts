@@ -9,6 +9,9 @@ import type {
   ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalFirstRunRegistration,
+  ExperimentalModelPickerGateRegistration,
+  ExperimentalHideHostEntriesRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
@@ -54,6 +57,15 @@ export interface PluginThreadBannerSlot
 export interface PluginModelLoadNoticeSlot
   extends ExperimentalModelLoadNoticeRegistration, ForkSlotBase {}
 
+export interface PluginFirstRunSlot
+  extends ExperimentalFirstRunRegistration, ForkSlotBase {}
+
+export interface PluginModelPickerGateSlot
+  extends ExperimentalModelPickerGateRegistration, ForkSlotBase {}
+
+export interface PluginHiddenHostEntriesSlot
+  extends ExperimentalHideHostEntriesRegistration, ForkSlotBase {}
+
 export interface PluginThreadHeaderSlot
   extends ExperimentalThreadHeaderRegistration, ForkSlotBase {}
 
@@ -96,6 +108,9 @@ export interface ForkRegistrationSet {
   mainHeaders?: readonly ExperimentalMainHeaderRegistration[];
   threadBanners?: readonly ExperimentalThreadBannerRegistration[];
   modelLoadNotices?: readonly ExperimentalModelLoadNoticeRegistration[];
+  firstRuns?: readonly ExperimentalFirstRunRegistration[];
+  modelPickerGates?: readonly ExperimentalModelPickerGateRegistration[];
+  hiddenHostEntries?: readonly ExperimentalHideHostEntriesRegistration[];
   threadHeaders?: readonly ExperimentalThreadHeaderRegistration[];
   forkMessageActions?: readonly ExperimentalMessageActionRegistration[];
   contextCardRows?: readonly ExperimentalContextCardRowRegistration[];
@@ -119,6 +134,9 @@ export interface ForkSlotSnapshot {
   mainHeaders: readonly PluginMainHeaderSlot[];
   threadBanners: readonly PluginThreadBannerSlot[];
   modelLoadNotices: readonly PluginModelLoadNoticeSlot[];
+  firstRuns: readonly PluginFirstRunSlot[];
+  modelPickerGates: readonly PluginModelPickerGateSlot[];
+  hiddenHostEntries: readonly PluginHiddenHostEntriesSlot[];
   threadHeaders: readonly PluginThreadHeaderSlot[];
   forkMessageActions: readonly PluginMessageActionMenuSlot[];
   contextCardRows: readonly PluginContextCardRowSlot[];
@@ -141,6 +159,9 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   mainHeaders: [],
   threadBanners: [],
   modelLoadNotices: [],
+  firstRuns: [],
+  modelPickerGates: [],
+  hiddenHostEntries: [],
   threadHeaders: [],
   forkMessageActions: [],
   panelTabActions: [],
@@ -164,6 +185,9 @@ export const FORK_SLOT_KINDS = [
   "mainHeaders",
   "threadBanners",
   "modelLoadNotices",
+  "firstRuns",
+  "modelPickerGates",
+  "hiddenHostEntries",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -193,6 +217,9 @@ export function stampForkSlots(
     mainHeaders: stamp(set.mainHeaders),
     threadBanners: stamp(set.threadBanners),
     modelLoadNotices: stamp(set.modelLoadNotices),
+    firstRuns: stamp(set.firstRuns),
+    modelPickerGates: stamp(set.modelPickerGates),
+    hiddenHostEntries: stamp(set.hiddenHostEntries),
     threadHeaders: stamp(set.threadHeaders),
     forkMessageActions: stamp(set.forkMessageActions),
     panelTabActions: stamp(set.panelTabActions),

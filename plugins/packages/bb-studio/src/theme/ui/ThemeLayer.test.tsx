@@ -57,8 +57,8 @@ afterEach(() => {
   frames = [];
 });
 
-it("in the HUD, recolors the window itself from the shown Bot's theme, crossfading on a switch, with no scene", () => {
-  act(() => root.render(<ThemeLayer surface="hud" />));
+it("in a plugin window, recolors the window itself from the shown Bot's theme, crossfading on a switch, with no scene", () => {
+  act(() => root.render(<ThemeLayer surface="window" />));
   expect(html().getAttribute("data-studio-theme")).toBe("grid");
   expect(html().style.getPropertyValue("color-scheme")).toBe("dark");
   expect(document.querySelector("[data-studio-scene-layer]")).toBeNull();
@@ -80,9 +80,9 @@ it("in the HUD, recolors the window itself from the shown Bot's theme, crossfadi
   expect(html().style.getPropertyValue("--canvas")).toBe("");
 });
 
-it("in the HUD, previews Edit space's draft for the Bot being edited", () => {
+it("in a plugin window, previews Edit space's draft for the Bot being edited", () => {
   state.spaces = { currentBotId: "cos", bots: [bot("cos", null)] };
-  act(() => root.render(<ThemeLayer surface="hud" />));
+  act(() => root.render(<ThemeLayer surface="window" />));
   expect(html().hasAttribute("data-studio-theme")).toBe(false);
   act(() => setAppearanceDraft("cos", defaultAppearance(NORD)));
   expect(html().getAttribute("data-studio-theme")).toBe("nord");

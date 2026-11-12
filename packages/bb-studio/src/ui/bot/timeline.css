@@ -1,0 +1,3 @@
+[data-timeline-row-id*=":op:thread-provisioning:"] {
+  display: none !important;
+}

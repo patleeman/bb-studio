@@ -61,7 +61,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         app.buttons["replyThreadDone"].tap()
     }
 
-    func testForkOpensItsOwnConversationAndFinishes() {
+    func testForkOpensBesideItsConversationWithNoRow() {
         launch("list")
         let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'draft the approval note'")).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15))
@@ -73,25 +73,11 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Reply in thread"].exists, "Reply in thread is in the menu too")
         XCTAssertFalse(app.buttons["Side Chat"].exists, "side chat is gone from conversations")
         fork.tap()
-        XCTAssertTrue(app.staticTexts["Fork of Main"].waitForExistence(timeout: 15), "the fork opens as its own conversation")
+        XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the fork opens in a sheet over its conversation")
+        app.buttons["replyThreadDone"].tap()
         back()
-        let row = app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_fork1"]
-        XCTAssertTrue(row.waitForExistence(timeout: 15))
-        XCTAssertTrue(row.label.contains("Forked from Main"), row.label)
-        app.collectionViews["BotSpaceList"].buttons["conversation-thr_botdemo01"].tap()
-        XCTAssertTrue(app.buttons["replies-m5"].waitForExistence(timeout: 15), "it records the parent message")
-
-        back()
-        row.tap()
-        XCTAssertTrue(app.staticTexts["Fork of Main"].waitForExistence(timeout: 15))
-        app.navigationBars.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5), "Model is in the ··· menu")
-        let finish = app.buttons["menuFinish"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 5))
-        shot("more-menu")
-        finish.tap()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15), "Finish returns to the list")
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_fork1"].waitForNonExistence(timeout: 15))
+        XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_fork1"].exists, "a fork has no row of its own")
     }
 
     func testMainHasNoFinish() {

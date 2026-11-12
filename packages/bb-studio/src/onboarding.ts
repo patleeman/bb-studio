@@ -1,16 +1,13 @@
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { BOT_ID } from "./bot";
-import { PERSONAL_PROJECT_ID } from "./project-lead";
-import { WELCOME_BOT_NAME, WELCOME_TITLE } from "./onboarding-message";
+import { STARTER_BOT, STARTER_PROVIDER_ORDER, starterFirstChatPrompt } from "./starter-bot";
 
 export const ONBOARDING_FILE = join("plugins", "studio", "onboarding.json");
-const FAR_FUTURE_MS = 10 * 365 * 24 * 60 * 60_000;
 
 export type OnboardingReason = "ran" | "bots" | "import" | "threads";
 
-export interface OnboardingFlag {
+export interface OnboardingDone {
   version: 1;
   state: "done";
   reason: OnboardingReason;
@@ -20,12 +17,39 @@ export interface OnboardingFlag {
   opened: boolean;
 }
 
+export interface OnboardingWaiting {
+  version: 1;
+  state: "waiting";
+  at: number;
+}
+
+export interface OnboardingSeeded {
+  version: 1;
+  state: "seeded";
+  at: number;
+  botId: string;
+  welcomeThreadId: string;
+  opened: boolean;
+}
+
+export type OnboardingFlag = OnboardingDone | OnboardingWaiting | OnboardingSeeded;
+
+export interface OnboardingProviderState {
+  providerId: string;
+  status: string;
+  loginCommand?: string | null;
+}
+
+interface UiPreference {
+  value: unknown;
+  revision: number;
+}
+
 export interface OnboardingSdk {
-  threads: {
-    spawn(args: Record<string, unknown>): Promise<{ id: string }>;
-    queuedMessages: {
-      list(args: { threadId: string }): Promise<readonly { id: string }[]>;
-      delete(args: { threadId: string; queuedMessageId: string }): Promise<unknown>;
+  system?: {
+    uiPreferences?: {
+      list(): Promise<{ preferences: Record<string, UiPreference | undefined> }>;
+      set(input: { key: string; value: unknown; expectedRevision: number }): Promise<unknown>;
     };
   };
 }
@@ -34,20 +58,38 @@ export interface OnboardingDeps {
   dataDir: string;
   db: Database.Database;
   sdk: OnboardingSdk;
-  createBot(input: { name: string; avatar: string; threadId: string }): Promise<{ id: string }>;
-  recordConversation(threadId: string, botId: string): void;
+  providers(): Promise<readonly OnboardingProviderState[]>;
+  seedBot(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }>;
+  startFirstChat(input: { botId: string; providerId: string; prompt: string }): Promise<string | null>;
   now?(): number;
 }
 
 const flagPath = (dataDir: string) => join(dataDir, ONBOARDING_FILE);
 
-export function readOnboarding(dataDir: string): OnboardingFlag | null {
+export const THREAD_LIST_KEY = "sidebar.threadListProvider";
+export const BOT_SIDEBAR_LIST = "studio/everything";
+
+export async function showBotSidebar(sdk: OnboardingSdk): Promise<boolean> {
+  const preferences = sdk.system?.uiPreferences;
+  if (!preferences) return false;
+  const current = (await preferences.list()).preferences[THREAD_LIST_KEY];
+  if (!current || current.value !== "__automatic__") return false;
+  await preferences.set({ key: THREAD_LIST_KEY, value: BOT_SIDEBAR_LIST, expectedRevision: current.revision });
+  return true;
+}
+
+export function readFlag(dataDir: string): OnboardingFlag | null {
   try {
     const value = JSON.parse(readFileSync(flagPath(dataDir), "utf8")) as Partial<OnboardingFlag>;
-    return value.version === 1 && value.state === "done" ? value as OnboardingFlag : null;
+    return value.version === 1 && (value.state === "done" || value.state === "waiting" || value.state === "seeded") ? value as OnboardingFlag : null;
   } catch {
     return null;
   }
+}
+
+export function readOnboarding(dataDir: string): OnboardingDone | null {
+  const flag = readFlag(dataDir);
+  return flag?.state === "done" ? flag : null;
 }
 
 export function writeOnboarding(dataDir: string, flag: OnboardingFlag): void {
@@ -79,55 +121,64 @@ export function existingData(dataDir: string, db: Database.Database): Exclude<On
   return null;
 }
 
-async function turnlessThread(sdk: OnboardingSdk, title: string, pluginMetadata: Record<string, string>, now: number): Promise<string> {
-  const thread = await sdk.threads.spawn({
-    projectId: PERSONAL_PROJECT_ID,
-    title,
-    environment: { type: "project-default" },
-    pluginMetadata,
-    input: [{ type: "text", text: title, mentions: [] }],
-    sendAt: now + FAR_FUTURE_MS,
-  });
-  for (const row of await sdk.threads.queuedMessages.list({ threadId: thread.id })) {
-    await sdk.threads.queuedMessages.delete({ threadId: thread.id, queuedMessageId: row.id });
-  }
-  return thread.id;
+export function decideOnboarding(dataDir: string, db: Database.Database, now = Date.now()): OnboardingFlag {
+  const before = readFlag(dataDir);
+  if (before) return before;
+  const existing = existingData(dataDir, db);
+  const flag: OnboardingFlag = existing
+    ? { version: 1, state: "done", reason: existing, at: now, botId: null, welcomeThreadId: null, opened: true }
+    : { version: 1, state: "waiting", at: now };
+  writeOnboarding(dataDir, flag);
+  return flag;
 }
 
-let running: Promise<OnboardingFlag> | null = null;
+export function readyProvider(states: readonly OnboardingProviderState[]): string | null {
+  const ready = states.filter((state) => state.status === "ready" && !!state.loginCommand).map((state) => state.providerId);
+  return STARTER_PROVIDER_ORDER.find((id) => ready.includes(id)) ?? ready[0] ?? null;
+}
+
+const running = new WeakMap<Database.Database, Promise<OnboardingFlag>>();
 
 export function runOnboarding(deps: OnboardingDeps): Promise<OnboardingFlag> {
-  running ??= onboard(deps).finally(() => { running = null; });
-  return running;
+  const current = running.get(deps.db);
+  if (current) return current;
+  const next = onboard(deps).finally(() => running.delete(deps.db));
+  running.set(deps.db, next);
+  return next;
 }
 
 async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
   const now = (deps.now ?? Date.now)();
-  const before = readOnboarding(deps.dataDir);
-  if (before) return before;
-  const existing = existingData(deps.dataDir, deps.db);
-  if (existing) {
-    const flag: OnboardingFlag = { version: 1, state: "done", reason: existing, at: now, botId: null, welcomeThreadId: null, opened: true };
+  let flag = decideOnboarding(deps.dataDir, deps.db, now);
+  if (flag.state === "done" || !deps.db.open) return flag;
+  if (flag.state === "waiting") {
+    if (existingData(deps.dataDir, deps.db) === "bots") {
+      const done: OnboardingDone = { version: 1, state: "done", reason: "bots", at: now, botId: null, welcomeThreadId: null, opened: true };
+      writeOnboarding(deps.dataDir, done);
+      return done;
+    }
+    const bot = await deps.seedBot({ name: STARTER_BOT.name, avatar: STARTER_BOT.avatar });
+    await showBotSidebar(deps.sdk).catch(() => false);
+    flag = { version: 1, state: "seeded", at: now, botId: bot.id, welcomeThreadId: bot.threadId, opened: false };
     writeOnboarding(deps.dataDir, flag);
-    return flag;
   }
-  const mainId = await turnlessThread(deps.sdk, WELCOME_BOT_NAME, { bot: BOT_ID }, now);
-  const bot = await deps.createBot({ name: WELCOME_BOT_NAME, avatar: "🤖", threadId: mainId });
-  const welcomeId = await turnlessThread(deps.sdk, WELCOME_TITLE, { botConversation: bot.id }, now);
-  deps.recordConversation(welcomeId, bot.id);
-  const flag: OnboardingFlag = { version: 1, state: "done", reason: "ran", at: now, botId: bot.id, welcomeThreadId: welcomeId, opened: false };
-  writeOnboarding(deps.dataDir, flag);
-  return flag;
+  const providerId = readyProvider(await deps.providers());
+  if (!providerId || !deps.db.open) return flag;
+  const threadId = await deps.startFirstChat({ botId: flag.botId, providerId, prompt: starterFirstChatPrompt(STARTER_BOT.name) });
+  const done: OnboardingDone = { version: 1, state: "done", reason: "ran", at: now, botId: flag.botId, welcomeThreadId: threadId ?? flag.welcomeThreadId, opened: flag.opened };
+  writeOnboarding(deps.dataDir, done);
+  return done;
 }
 
 export function welcomeThreadOf(dataDir: string): { threadId: string; botId: string; opened: boolean } | null {
-  const flag = readOnboarding(dataDir);
-  return flag?.reason === "ran" && flag.welcomeThreadId && flag.botId ? { threadId: flag.welcomeThreadId, botId: flag.botId, opened: flag.opened } : null;
+  const flag = readFlag(dataDir);
+  if (flag?.state === "seeded") return { threadId: flag.welcomeThreadId, botId: flag.botId, opened: flag.opened };
+  return flag?.state === "done" && flag.reason === "ran" && flag.welcomeThreadId && flag.botId ? { threadId: flag.welcomeThreadId, botId: flag.botId, opened: flag.opened } : null;
 }
 
 export function markWelcomeOpened(dataDir: string): boolean {
-  const flag = readOnboarding(dataDir);
-  if (!flag || flag.opened) return false;
+  const flag = readFlag(dataDir);
+  if (!flag || flag.state === "waiting" || flag.opened) return false;
   writeOnboarding(dataDir, { ...flag, opened: true });
   return true;
 }

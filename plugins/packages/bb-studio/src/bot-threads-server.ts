@@ -14,7 +14,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
-import { isWorkerApproval, viewOf, waitingOn, type Interaction } from "./worker-approvals";
+import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
+import { PERSONAL_PROJECT_ID } from "./project-lead";
 import { isFinishing } from "./bot-finish";
 import { kindOf, type BotChange } from "./bot-signal";
 import type { BotChangeKind } from "./bot-threads-contract";
@@ -327,6 +328,28 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
    * workers active in the last week are asked (a pending interaction marks
    * the worker active when it arrives), and only those BB says wait.
    */
+  const pushIds = (threadId: string): { botId?: string; conversationId?: string; workerId?: string } => {
+    const rec = store.get(threadId);
+    if (!rec) return {};
+    if (rec.kind === "conversation") return { botId: rec.botId, conversationId: rec.threadId };
+    const owner = rec.ownerConversationId ? store.get(rec.ownerConversationId) : null;
+    const conversationId = owner && owner.archivedAt === null ? owner.threadId : deps.bots().find((bot) => bot.id === rec.botId)?.threadId ?? null;
+    return conversationId ? { botId: rec.botId, conversationId, workerId: rec.threadId } : { botId: rec.botId };
+  };
+  const approvalPush = async (thread: { id: string; projectId?: string | null }, interaction: Interaction): Promise<WorkerApprovalPush | null> => {
+    if (!interaction.id || (interaction.status !== undefined && interaction.status !== "pending") || !isWorkerApproval(interaction)) return null;
+    const { botId, conversationId, workerId } = pushIds(thread.id);
+    if (!botId || !conversationId || !workerId) return null;
+    const threads = await facts([conversationId, workerId]);
+    const title = titleFrom(threads);
+    return workerApprovalPush({
+      botId, botName: deps.bots().find((bot) => bot.id === botId)?.name ?? "Bot",
+      conversationId, conversationTitle: title(conversationId),
+      workerId, workerTitle: title(workerId),
+      projectId: threads.get(workerId)?.projectId ?? thread.projectId ?? PERSONAL_PROJECT_ID,
+      interaction,
+    });
+  };
   const conversationApprovals = async (threadId: string) => {
     const rec = store.get(threadId);
     if (!rec || rec.kind !== "conversation" || rec.archivedAt !== null) return { approvals: [] };
@@ -356,6 +379,11 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   const messageThreads = new MessageThreads({
     sdk: bb.sdk, sides,
     source: async (threadId) => store.get(threadId) ?? await info(threadId).then(() => store.get(threadId)),
+    title: async (threadId) => {
+      const rec = store.get(threadId);
+      const thread = rec?.isMain ? null : await bb.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
+      return rec ? conversationTitle(rec, thread) : thread?.title?.trim() || "Conversation";
+    },
     recordFork: (threadId, botId, from) => { store.recordFork(threadId, botId, from); },
     defaultModel: (botId) => deps.defaultModel(botId),
     changed: (threadId) => threadChanged(threadId),
@@ -435,6 +463,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     },
     bot_worker_ask: ({ threadId, text }: { threadId: string; text: string }) => askAboutWorker(threadId, text),
     bot_conversation_approvals: ({ threadId }: { threadId: string }) => conversationApprovals(threadId),
+    bot_push_ids: ({ threadId }: { threadId: string }) => pushIds(threadId),
     bot_thread_update: ({ threadId, title, archived }: { threadId: string; title?: string | null; archived?: boolean }) => {
       store.update(threadId, { ...(title !== undefined ? { title } : {}), ...(archived !== undefined ? { archived } : {}) });
       return { ok: true };
@@ -534,5 +563,5 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     return { classified, linked: linked.length };
   };
 
-  return { store, rpc, start, reconcile, threadChanged, catchUp, messageThreads, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
+  return { store, rpc, start, reconcile, threadChanged, catchUp, messageThreads, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
 }

@@ -1,14 +1,15 @@
 // The Bot sidebar (round 7, "the Bot as a space"): one Bot per sidebar.
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
 //   status (running count, Paused), a ··· menu (Edit space…, Default model
-//   with bb's model picker, Archive: the older page, Show HUD, New Bot), and
+//   with bb's model picker, Archive: the older page, New Bot), and
 //   its pages as rows (Memory, Library, Automations, Todos). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
 //   BB has none.
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on
 //   a Studio page, seeded with the Bot's default model): two-line rows, the title and
 //   its time, then the latest reply (a spinner while it works), or, amber
-//   and outlined, why it needs Patrick. A fork names its source (⑂ name).
+//   and outlined, why it needs Patrick. A fork made at a message has no row:
+//   it shows at that message, and its work and needs-you show on its parent's row.
 // - Workers: the running ones and those needing Patrick, one line each, a
 //   status glyph, the title, the repo it runs in
 //   and a short time. The five newest finished (the server's view; a run of
@@ -32,8 +33,6 @@ import { dragSourceProps, refDragItem, threadDragItem, writeDragItem } from "../
 import { NoDragStyle } from "../../kit/ui/no-drag";
 import { buttonVariants } from "../../kit/ui/button";
 import { cn } from "../../kit/ui/utils";
-import { hasHostWindows } from "../../kit/app/windows";
-import { showHud } from "../../hud/ui/HudBridge";
 import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
@@ -41,13 +40,13 @@ import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingT
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
+import { skillsPagePath } from "../skills/paths";
 import { loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { EditSpace } from "./EditSpace";
 import { setLinkActionHandler } from "../../links/actions";
 import { useMainViewRect } from "./EditSpaceStage";
 import { DefaultModelDialog } from "../bot/DefaultModel";
 import { newConversationPath } from "./new-conversation";
-import { rememberBots } from "../bot/skill-sources";
 import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHeader";
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
@@ -90,7 +89,6 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
           <span data-testid="conversation-title" className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-foreground">{row.title}</span>
-          {row.forkedFrom ? <small data-testid="forked-from" className="max-w-[45%] shrink-0 truncate text-xs font-normal text-muted-foreground" aria-label={`Forked from ${row.forkedFrom.title}`}>⑂ {row.forkedFrom.title}</small> : null}
         </span>
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
       </span>
@@ -183,8 +181,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const spaces = useLive("bot_spaces", {}, { pollMs: 60_000 });
   const bots = spaces.data?.bots ?? NO_BOTS;
   const bot = shownBot(bots, chosen, spaces.data?.currentBotId ?? null);
-  // BB's Skills page lists each Bot's skills under its name (src/ui/bot/skill-sources.ts).
-  useEffect(() => { if (spaces.data) rememberBots(spaces.data.bots); }, [spaces.data]);
   const view = useLive("bot_threads_view", bot ? { botId: bot.id } : {}, { enabled: !!bot, pollMs: 15_000 });
   const sidebar = experimental_useSidebarThreads();
   const pathname = usePathname();
@@ -334,6 +330,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const openPage = (next: SpacePage) => {
     if (!bot) return;
     if (next === "memory") toPanel(`${MEMORY_SUBPATH}/${encodeURIComponent(bot.id)}`);
+    else if (next === "skills") toPanel(skillsPagePath(bot.id));
     else if (next === "library") toPanel();
     else if (next === "automations") { navigate.toPluginPanel("automations"); onNavigate(); }
     else openAppPathTo(loopsPath(bot.id));
@@ -359,7 +356,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           editSpace: () => { if (bot) setEditing(bot.id); },
           defaultModel: () => { if (bot) setPickingModel(bot.id); },
           archive: () => { if (bot) toPanel(olderPath(bot.id)); },
-          showHud: hasHostWindows ? () => void showHud() : null,
           newBot: () => toPanel("bot/new"),
         }} />
       {editingBot ? <EditSpace key={editingBot.id} bot={editingBot} bots={bots} stage={stage} onClose={() => setEditing(null)} /> : null}

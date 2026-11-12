@@ -33,6 +33,7 @@ as it).
 | Recording | added | added | n/a [1] | added | had |
 | Visual Chat board | had | had | n/a [2] | added | had |
 | Memory | added | added | added | added | had |
+| Skills | added | added | added | added | added |
 | Library | added | added | added | added | had |
 | Automations | added | added | added | added | had |
 | Todos | added | added | added | added | had |

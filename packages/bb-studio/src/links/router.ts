@@ -10,7 +10,7 @@ export const LINK_HOWS: readonly LinkHow[] = ["workbench", "secondPane", "window
 
 export interface LinkModifiers { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean }
 
-export type LinkSource = "transcript" | "card" | "page" | "whiteboard" | "design" | "mini" | "file" | "artifact" | "palette" | "launcher" | "agent" | "hud" | "window" | "gesture" | "botPage";
+export type LinkSource = "transcript" | "card" | "page" | "whiteboard" | "design" | "mini" | "file" | "artifact" | "palette" | "launcher" | "agent" | "window" | "gesture" | "botPage";
 
 export const LINK_ACTIONS = ["accounts", "edit-space"] as const;
 export type LinkAction = (typeof LINK_ACTIONS)[number];

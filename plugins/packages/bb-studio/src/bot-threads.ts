@@ -83,6 +83,11 @@ export const WORKER_LIMIT = 30;
 /** At most this many finished (done or failed) rows under them, the newest, same titles folded into one. */
 export const WORKER_FINISHED_SHOWN = 5;
 const BUSY = new Set(["starting", "active", "stopping", "pending", "provisioning"]);
+
+export function threadRunning(thread: { status?: string | null; queuedMessageCount?: number } | null | undefined): boolean {
+  if (!thread || !BUSY.has(thread.status ?? "")) return false;
+  return !(thread.status === "pending" && !((thread.queuedMessageCount ?? 0) > 0));
+}
 const LATEST_MAX = 160;
 
 /** A fork's source conversation, and where it was cut: a reply's message id (side threads) or the last copied turn (BB's forks), when known. */
@@ -147,6 +152,7 @@ export interface ThreadFacts {
   titleFallback?: string | null;
   projectId?: string | null;
   status?: string;
+  queuedMessageCount?: number;
   hasPendingInteraction?: boolean;
   environmentName?: string | null;
   environmentBranchName?: string | null;
@@ -303,10 +309,10 @@ export function forkUndecided(fork: ThreadFacts): boolean {
 
 export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 
-export function workerStatus(thread: Pick<ThreadFacts, "status" | "hasPendingInteraction"> | null | undefined): WorkerStatus {
+export function workerStatus(thread: Pick<ThreadFacts, "status" | "hasPendingInteraction" | "queuedMessageCount"> | null | undefined): WorkerStatus {
   if (!thread) return "done";
   if (thread.hasPendingInteraction) return "needs-you";
-  if (BUSY.has(thread.status ?? "")) return "running";
+  if (threadRunning(thread)) return "running";
   if (thread.status === "error") return "failed";
   return "done";
 }
@@ -471,10 +477,11 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
         threadId: rec.threadId, title: conversationTitle(rec, thread), isMain: rec.isMain,
         forkedFrom: rec.forkedFrom ? { ...rec.forkedFrom, title: name(rec.forkedFrom.threadId) ?? "a conversation" } : null,
         projectId: thread?.projectId ?? null, updatedAt: at(rec), latest: rec.latest?.text ?? null,
-        running: BUSY.has(thread?.status ?? ""), needsYou: needsYouOf(rec, thread), mirrored: !!thread?.mirroredPending,
+        running: threadRunning(thread), needsYou: needsYouOf(rec, thread), mirrored: !!thread?.mirroredPending,
       };
     });
   const rank: Record<WorkerStatus, number> = { "needs-you": 0, running: 1, failed: 2, done: 3 };
+  const listed = foldForks(conversations, byId);
   const all = mine.filter((rec) => rec.kind === "worker").map((rec): WorkerView => {
     const thread = threads.get(rec.threadId);
     const tag = repoTag(thread);
@@ -484,7 +491,32 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
       updatedAt: at(rec), tag: tag?.tag ?? null, branch: tag?.branch ?? null, mirrored: !!thread?.mirroredPending, sameTitle: 1,
     };
   }).sort((a, b) => rank[a.status] - rank[b.status] || b.updatedAt - a.updatedAt);
-  return { conversations, workers: all };
+  return { conversations: listed, workers: all };
+}
+
+/**
+ * A fork made at a message (Reply in thread, Fork conversation) has no row of
+ * its own: it lives at that message. Its row's work and needs-you show on the
+ * conversation it was forked from (through a chain of forks), else on Main.
+ */
+export function foldForks(conversations: readonly ConversationView[], byId: ReadonlyMap<string, Pick<BotThreadRecord, "forkedFrom" | "isMain">>): ConversationView[] {
+  const isFork = (row: Pick<ConversationView, "isMain" | "forkedFrom">) => !row.isMain && !!row.forkedFrom?.messageId;
+  const kept = new Map(conversations.filter((row) => !isFork(row)).map((row) => [row.threadId, { ...row }]));
+  const main = [...kept.values()].find((row) => row.isMain);
+  for (const fork of conversations.filter(isFork)) {
+    let at: string | null = fork.forkedFrom!.threadId;
+    const seen = new Set([fork.threadId]);
+    while (at && !kept.has(at) && !seen.has(at)) {
+      seen.add(at);
+      at = byId.get(at)?.forkedFrom?.threadId ?? null;
+    }
+    const root = (at ? kept.get(at) : undefined) ?? main;
+    if (!root) { kept.set(fork.threadId, { ...fork }); continue; }
+    root.running ||= fork.running;
+    root.needsYou ??= fork.needsYou;
+    root.updatedAt = Math.max(root.updatedAt, fork.updatedAt);
+  }
+  return [...kept.values()].sort((a, b) => Number(b.isMain) - Number(a.isMain) || b.updatedAt - a.updatedAt);
 }
 
 /**
@@ -493,9 +525,9 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
  * that, BB's record (whose updated_at the fork's importer moves) and
  * Studio's own times.
  */
-export function activityOf(rec: Pick<BotThreadRecord, "activityAt" | "latest" | "needsYou" | "createdAt">, thread: Pick<ThreadFacts, "updatedAt" | "status"> | null | undefined): number {
+export function activityOf(rec: Pick<BotThreadRecord, "activityAt" | "latest" | "needsYou" | "createdAt">, thread: Pick<ThreadFacts, "updatedAt" | "status" | "queuedMessageCount"> | null | undefined): number {
   // A thread in a turn right now is active now, whatever was read before.
-  const live = BUSY.has(thread?.status ?? "") ? thread?.updatedAt ?? 0 : 0;
+  const live = threadRunning(thread) ? thread?.updatedAt ?? 0 : 0;
   if (rec.activityAt !== null) return Math.max(rec.activityAt, rec.needsYou?.at ?? 0, live);
   return Math.max(thread?.updatedAt ?? 0, rec.latest?.at ?? 0, rec.needsYou?.at ?? 0, rec.createdAt);
 }
@@ -539,7 +571,7 @@ export function botNeedsYou(botId: string, records: readonly BotThreadRecord[], 
 export function botActivity(botId: string, records: readonly BotThreadRecord[], threads: ReadonlyMap<string, ThreadFacts>): { turn: boolean; workers: number } {
   const mine = records.filter((rec) => rec.botId === botId && rec.archivedAt === null);
   return {
-    turn: mine.some((rec) => rec.kind === "conversation" && BUSY.has(threads.get(rec.threadId)?.status ?? "")),
+    turn: mine.some((rec) => rec.kind === "conversation" && threadRunning(threads.get(rec.threadId))),
     workers: mine.filter((rec) => rec.kind === "worker" && workerStatus(threads.get(rec.threadId)) === "running").length,
   };
 }

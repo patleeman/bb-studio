@@ -188,7 +188,7 @@ export function registerSidebarNewItem(slots: object, registration: SidebarNewIt
  * `customization` with items for the row under the composer's input
  * (`experimental_footer`). A BB without that row ignores the field.
  */
-export function withComposerFooter<Customization extends { id: string }>(customization: Customization, items: readonly { id: string; component: () => ReactNode }[]): Customization {
+export function withComposerFooter<Customization extends { id: string }>(customization: Customization, items: readonly { id: string; component: () => ReactNode; placement?: "context" }[]): Customization {
   const footer: object = { experimental_footer: items };
   return { ...customization, ...footer };
 }
@@ -230,6 +230,30 @@ export interface ThreadBannerRegistration {
   id: string;
   /** Drawn under the thread's header, above its transcript, for the thread it is in; null takes no room. */
   component: (props: { threadId: string }) => ReactNode;
+}
+
+export interface FirstRunRegistration {
+  id: string;
+  component?: ComponentType<{ finish(): void }>;
+}
+
+export function registerFirstRun(slots: object, registration: FirstRunRegistration): boolean {
+  const slot = member(slots, "experimental_firstRun");
+  if (typeof slot !== "function") return false;
+  (slot as (registration: FirstRunRegistration) => void).call(slots, registration);
+  return true;
+}
+
+export interface ModelPickerGateRegistration {
+  id: string;
+  component: ComponentType<{ hasSelectedModel: boolean; children: ReactNode }>;
+}
+
+export function registerModelPickerGate(slots: object, registration: ModelPickerGateRegistration): boolean {
+  const slot = member(slots, "experimental_modelPickerGate");
+  if (typeof slot !== "function") return false;
+  (slot as (registration: ModelPickerGateRegistration) => void).call(slots, registration);
+  return true;
 }
 
 /** Adds a row under every thread's header (`slots.experimental_threadBanner`); false on a BB without it. */

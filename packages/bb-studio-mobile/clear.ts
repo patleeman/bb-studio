@@ -52,3 +52,19 @@ export function partition(
 export function clearPayload(threadIds: string[], serverId?: string): string {
   return JSON.stringify({ aps: { "content-available": 1 }, clearThreadIds: threadIds, ...(serverId ? { serverId } : {}) });
 }
+
+export type NotifiedWorkers = Record<string, string[]>;
+
+export function noteWorkers(workers: NotifiedWorkers, entries: ReadonlyArray<{ threadId: string; workerId?: string }>): NotifiedWorkers {
+  const next = { ...workers };
+  for (const { threadId, workerId } of entries) {
+    if (!workerId) continue;
+    const known = next[threadId] ?? [];
+    if (!known.includes(workerId)) next[threadId] = [...known, workerId];
+  }
+  return next;
+}
+
+export function keptWorkers(workers: NotifiedWorkers, keep: Notified): NotifiedWorkers {
+  return Object.fromEntries(Object.entries(workers).filter(([threadId]) => threadId in keep));
+}

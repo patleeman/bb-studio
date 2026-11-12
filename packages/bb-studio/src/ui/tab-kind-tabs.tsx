@@ -32,6 +32,7 @@ const showInMain = (href: string) => openFrom(null, { href }, { target: "main" }
 
 const MemoryView = lazy(() => import("../memory/ui/MemoryView"));
 const OlderPage = lazy(() => import("./conversations/OlderPage"));
+const SkillsPage = lazy(() => import("./skills/SkillsPage"));
 
 const botOf = (params: JsonValue | null): string | null => {
   if (typeof params !== "object" || params === null || Array.isArray(params)) return null;
@@ -45,6 +46,7 @@ function Frame({ children }: { children: ReactNode }) {
 /** The Bot-page tabs, by registry kind: the component each shows. */
 export const BOT_PAGE_TABS: readonly { kind: TabKindId; component: ComponentType<{ params: JsonValue | null }> }[] = [
   { kind: "memory", component: ({ params }) => <Frame><MemoryView botId={botOf(params) ?? currentBot()} /></Frame> },
+  { kind: "skills", component: ({ params }) => <Frame><SkillsPage botId={botOf(params) ?? currentBot()} /></Frame> },
   { kind: "library", component: () => <Frame><LibraryPage /></Frame> },
   { kind: "automations", component: () => <Frame><AutomationsPanel /></Frame> },
   { kind: "archive", component: ({ params }) => <Frame><OlderPage botId={botOf(params) ?? currentBot()} /></Frame> },

@@ -986,6 +986,63 @@ export interface ExperimentalModelLoadNoticeRegistration {
 }
 
 /**
+ * Props for a `slots.experimental_firstRun` component. `finish()` marks bb's
+ * first run done (the same setting bb's own setup screens set) and shows the
+ * app. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalFirstRunProps {
+  finish(): void;
+}
+
+/**
+ * Registration for `slots.experimental_firstRun`: the plugin takes over bb's
+ * first run. On a data dir whose first run is not done, bb waits for plugin
+ * frontends to settle; when a plugin registered this slot, bb draws its
+ * `component` full-window instead of bb's setup screens, or, with no
+ * component, marks the first run done at once and shows the app. The first
+ * registration in plugin-id order wins. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalFirstRunRegistration {
+  id: string;
+  component?: ComponentType<ExperimentalFirstRunProps>;
+}
+
+/**
+ * Props for a `slots.experimental_modelPickerGate` component: `children` is
+ * bb's model picker, and `hasSelectedModel` says whether it shows a model.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalModelPickerGateProps {
+  hasSelectedModel: boolean;
+  children: ReactNode;
+}
+
+/**
+ * Registration for `slots.experimental_modelPickerGate`: a component bb draws
+ * in place of every model picker in the composer and elsewhere. It returns
+ * `children` to keep bb's picker, or its own node instead (a "Sign in"
+ * button while no provider can run a turn). The first registration in
+ * plugin-id order wins; one that throws falls back to bb's picker.
+ * Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalModelPickerGateRegistration {
+  id: string;
+  component: ComponentType<ExperimentalModelPickerGateProps>;
+}
+
+export type ExperimentalHostPage = "skills";
+
+export type ExperimentalHostSetting = "cli-skills";
+
+export interface ExperimentalHideHostEntriesRegistration {
+  id: string;
+  navigation?: readonly string[];
+  pages?: readonly ExperimentalHostPage[];
+  settings?: readonly ExperimentalHostSetting[];
+}
+
+/**
  * Slots the fork adds beside `PluginAppSlots`.
  */
 export interface ForkPluginAppSlots {
@@ -1026,6 +1083,23 @@ export interface ForkPluginAppSlots {
    */
   experimental_modelLoadNotice(
     registration: ExperimentalModelLoadNoticeRegistration,
+  ): void;
+  /**
+   * Take over bb's first run (see
+   * {@link ExperimentalFirstRunRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_firstRun(registration: ExperimentalFirstRunRegistration): void;
+  /**
+   * Stand in for bb's model picker (see
+   * {@link ExperimentalModelPickerGateRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_modelPickerGate(
+    registration: ExperimentalModelPickerGateRegistration,
+  ): void;
+  experimental_hideHostEntries(
+    registration: ExperimentalHideHostEntriesRegistration,
   ): void;
   /**
    * Change the title text and add a node after it in each thread's header
@@ -1216,9 +1290,16 @@ export interface ForkComposerCustomization {
    * the session, permission and context-window controls. Each component
    * draws one compact chip, at most one line tall, and returns null to take
    * no space. The row is hidden while the composer is collapsed, and only
-   * the `thread` scope has one. Experimental: see docs/api_to_audit.md.
+   * the `thread` scope has one. `placement: "context"` draws the item right
+   * before the context-window ring, as one control with it (a click should
+   * open the context popover); otherwise it goes before the session and
+   * permission controls. Experimental: see docs/api_to_audit.md.
    */
-  experimental_footer?: readonly { id: string; component: ComponentType }[];
+  experimental_footer?: readonly {
+    id: string;
+    component: ComponentType;
+    placement?: "context";
+  }[];
   /**
    * Draw something else where an existing thread's composer box goes, for
    * threads nobody should type into directly (a read-only worker, a mirrored

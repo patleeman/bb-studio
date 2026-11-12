@@ -22,11 +22,11 @@ import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
 import { PushSection } from "./PushSection";
+import { SkillsRegistrySection } from "./SkillsRegistrySection";
 import { useStudioSettings } from "./use-settings";
 import { takeVoiceSectionRequest, VOICE_SECTION_ANCHOR } from "./voice-anchor";
 import { hasHostWindows, useHostWindows } from "../../kit/app/windows";
-import { HOTKEY_ALTERNATIVES, hotkeyWords, sameHotkey, useWindowHotkey } from "../../hud/hotkey";
-import { hotkeyHint, HUD_WINDOW_ID, hudWindowOptions } from "../../hud/shared";
+import { HOTKEY_ALTERNATIVES, hotkeyHint, hotkeyWords, sameHotkey, useWindowHotkey } from "../../windows/hotkey";
 import { LAUNCHER_WINDOW_ID, launcherWindowOptions } from "../../launcher/shared";
 
 type Rpc = { call(method: string, input: unknown): Promise<unknown> };
@@ -146,7 +146,7 @@ function ThreadsSection() {
 }
 
 /** What the system made of a window's shortcut, under its field: accepted, the alternate in use, or taken, with other shortcuts to set in one click. */
-function HotkeyStatus({ k, held }: { k: "launcherHotkey" | "hudHotkey"; held: ReturnType<typeof useWindowHotkey> }) {
+function HotkeyStatus({ k, held }: { k: "launcherHotkey"; held: ReturnType<typeof useWindowHotkey> }) {
   const { values, set } = useStudioSettings();
   const windows = useHostWindows();
   const wanted = (values?.[k] ?? "").trim();
@@ -168,16 +168,13 @@ function HotkeyStatus({ k, held }: { k: "launcherHotkey" | "hudHotkey"; held: Re
   );
 }
 
-/** The launcher (src/launcher) and the HUD (src/hud): their shortcuts, what the system made of them, and buttons to show each now. */
+/** The launcher (src/launcher): its shortcut, what the system made of it, and a button to show it now. */
 function WindowsSection() {
   const { values } = useStudioSettings();
   const windows = useHostWindows();
-  const on = values?.hudEnabled !== false;
-  // The shortcuts BB holds, which are not the settings' when another app has those.
+  // The shortcut BB holds, which is not the setting's when another app has that one.
   const launcher = useWindowHotkey("launcher", values?.launcherHotkey ?? "");
-  const hud = useWindowHotkey("hud", values?.hudHotkey ?? "");
   const launcherHint = hotkeyHint(launcher.inUse);
-  const hudHint = hotkeyHint(hud.inUse);
   return (
     <SectionState>
       <Card>
@@ -185,13 +182,6 @@ function WindowsSection() {
         <Row label="Open the launcher" description={windows.native ? (launcherHint ? `${launcherHint} opens it from any app.` : "It has no shortcut: set one above.") : "In a browser it opens as a plain window."} testId="setting-launcher-show" indent>
           <Button type="button" size="sm" variant="outline" onClick={() => void windows.open(LAUNCHER_WINDOW_ID, launcherWindowOptions(launcher.inUse))}>Open launcher</Button>
         </Row>
-        <SettingRow k="hudEnabled" />
-        {on ? <SettingRow k="hudHotkey" indent description={<>{STUDIO_SETTINGS.hudHotkey.description}<HotkeyStatus k="hudHotkey" held={hud} /></>} /> : null}
-        {on ? (
-          <Row label="Show the HUD" description={windows.native ? `${hudHint ? `${hudHint} shows and hides it, and so does` : "Click"} “bb” in the menu bar.` : "In a browser it opens as a plain window."} testId="setting-hud-show" indent>
-            <Button type="button" size="sm" variant="outline" onClick={() => void windows.open(HUD_WINDOW_ID, hudWindowOptions({ hotkey: hud.inUse, screen: window.screen }))}>Show HUD</Button>
-          </Row>
-        ) : null}
       </Card>
     </SectionState>
   );
@@ -238,5 +228,6 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
     if (group.id === "windows" && !windows) continue;
     app.slots.settingsSection({ id: `settings-${group.id}`, title: group.title, component: SECTIONS[group.id] });
   }
+  app.slots.settingsSection({ id: "skills-registry", title: "Skill registry", component: SkillsRegistrySection });
   app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", component: PushSection });
 }

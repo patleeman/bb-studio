@@ -19,9 +19,14 @@ mkdir -p "$SCRATCH/src"
 git -C "$REPO" archive HEAD plugins | tar -x -C "$SCRATCH/src"
 (cd "$SCRATCH/src/plugins" && pnpm install --frozen-lockfile --prefer-offline >/dev/null)
 (cd "$SCRATCH/src/plugins/packages/bb-studio" && "$S" bb plugin build . >/dev/null)
+(cd "$SCRATCH/src/plugins/packages/bb-studio-visual-chat" && "$S" bb plugin build . >/dev/null)
 
+# Studio's first run would make its own "Assistant" as the primary Bot; mark it done.
+mkdir -p "$SCRATCH/data/plugins/studio"
+printf '{"version":1,"state":"done","reason":"bots","at":0,"botId":null,"welcomeThreadId":null,"opened":true}\n' > "$SCRATCH/data/plugins/studio/onboarding.json"
 "$S" start
 "$S" bb plugin install "$SCRATCH/src/plugins/packages/bb-studio" --yes >/dev/null
+"$S" bb plugin install "$SCRATCH/src/plugins/packages/bb-studio-visual-chat" --yes >/dev/null
 "$S" stop
 sleep 2
 
@@ -33,3 +38,5 @@ node "$HERE/fixups.mjs" "$SCRATCH/ids.json"
 "$S" bb plugin reload studio >/dev/null
 sleep 12
 node "$HERE/fixups.mjs" "$SCRATCH/ids.json"
+# Pages, a whiteboard, a design, a dashboard, a mini app, artifacts, a recording and a Visual Chat board.
+node "$HERE/seed-features.mjs" "$SCRATCH/ids.json"

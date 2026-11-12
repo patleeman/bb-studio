@@ -8,13 +8,17 @@ export const SIDE_CHAT_SEED_PREFIX = "Replying to this earlier message in the co
 export const BOT_THREAD_DIRECTIVE = "bot-thread";
 
 const MAX_PAGES = 500;
+const TRANSCRIPT_PAGES = 40;
 const PAGE_SEGMENTS = "100";
 
 export type ReplyRole = "user" | "assistant";
+export type SideKind = "reply" | "fork";
+
+const WORKING = new Set(["active", "starting"]);
 
 interface SideRow {
   thread_id: string; bot_id: string; source_thread_id: string; message_id: string;
-  replies: number; last_reply_at: number | null; last_reply_role: ReplyRole | null; created_at: number;
+  replies: number; last_reply_at: number | null; last_reply_role: ReplyRole | null; created_at: number; kind: SideKind;
 }
 
 export interface SideThreadView {
@@ -25,6 +29,8 @@ export interface SideThreadView {
   lastReplyAt: number | null;
   lastReplyRole: ReplyRole | null;
   working: boolean;
+  kind: SideKind;
+  conversations: number;
 }
 
 export interface BotSideThreadView {
@@ -63,7 +69,7 @@ export function isReply(row: TimelineRow): boolean {
   if (row.kind !== undefined && row.kind !== "conversation") return false;
   if (!row.text?.trim()) return false;
   if (row.role === "assistant") return true;
-  return row.role === "user" && (row.initiator === undefined || row.initiator === "user") && !row.id.includes(":user-seed:");
+  return row.role === "user" && (row.initiator === undefined || row.initiator === "user") && !row.text.trimStart().startsWith(SIDE_CHAT_SEED_PREFIX.trim());
 }
 
 export function afterFork(row: TimelineRow, since: number | null): boolean {
@@ -103,20 +109,23 @@ export class SideThreads {
   async list(sourceThreadId: string): Promise<SideThreadView[]> {
     if (this.isChat(sourceThreadId)) await this.discover(sourceThreadId).catch(() => undefined);
     const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? ORDER BY created_at, rowid").all(sourceThreadId) as SideRow[];
-    const live = await this.live(rows);
+    const live = (await this.live(rows)).filter(({ row, thread }) => row.replies > 0 || WORKING.has(thread.status ?? ""));
     const byMessage = new Map<string, SideThreadView>();
     for (const { row, thread } of live) {
-      const seen = byMessage.get(row.message_id);
-      const newer = !seen || (row.last_reply_at ?? 0) >= (seen.lastReplyAt ?? 0);
-      byMessage.set(row.message_id, {
-        messageId: row.message_id, threadId: row.thread_id, botId: row.bot_id,
+      const kind = row.kind ?? "reply";
+      const key = `${row.message_id}\n${kind}`;
+      const seen = byMessage.get(key);
+      const newer = !seen || (row.last_reply_at ?? row.created_at) >= (seen.lastReplyAt ?? 0);
+      byMessage.set(key, {
+        messageId: row.message_id, threadId: newer ? row.thread_id : seen!.threadId, botId: row.bot_id,
         replies: (seen?.replies ?? 0) + row.replies,
         lastReplyAt: Math.max(seen?.lastReplyAt ?? 0, row.last_reply_at ?? 0) || null,
         lastReplyRole: newer ? row.last_reply_role ?? seen?.lastReplyRole ?? null : seen!.lastReplyRole,
-        working: (seen?.working ?? false) || thread.status === "active",
+        working: (seen?.working ?? false) || WORKING.has(thread.status ?? ""),
+        kind, conversations: (seen?.conversations ?? 0) + 1,
       });
     }
-    return [...byMessage.values()];
+    return [...byMessage.values()].sort((a, b) => Number(a.kind === "fork") - Number(b.kind === "fork"));
   }
 
   threadIds(): string[] {
@@ -143,7 +152,7 @@ export class SideThreads {
   }
 
   async newest(sourceThreadId: string, messageId: string): Promise<string | null> {
-    const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? AND message_id = ? ORDER BY created_at DESC, rowid DESC").all(sourceThreadId, messageId) as SideRow[];
+    const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? AND message_id = ? AND kind = 'reply' ORDER BY created_at DESC, rowid DESC").all(sourceThreadId, messageId) as SideRow[];
     return (await this.live(rows))[0]?.row.thread_id ?? null;
   }
 
@@ -151,13 +160,26 @@ export class SideThreads {
     return await this.findRow(threadId, (row) => row.id === messageId);
   }
 
+  async transcript(threadId: string, upToSeq: number): Promise<TimelineRow[]> {
+    const pages: TimelineRow[][] = [];
+    let cursor: { anchorSeq: number; anchorId: string } | null | undefined;
+    for (let page = 0; page < TRANSCRIPT_PAGES; page++) {
+      const result = await this.page(threadId, cursor);
+      pages.unshift(result.rows ?? []);
+      cursor = result.timelinePage?.olderCursor;
+      if (!cursor) break;
+    }
+    return pages.flat().filter((row) => (row.kind === undefined || row.kind === "conversation") && (row.role === "user" || row.role === "assistant")
+      && !!row.text?.trim() && (row.sourceSeqEnd === undefined || row.sourceSeqEnd <= upToSeq));
+  }
+
   isChat(threadId: string): boolean {
     return this.deps.botFor(threadId) !== null;
   }
 
-  record(threadId: string, botId: string, sourceThreadId: string, messageId: string, createdAt = Date.now()): boolean {
-    const result = this.deps.db.prepare("INSERT OR IGNORE INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(threadId, botId, sourceThreadId, messageId, createdAt);
+  record(threadId: string, botId: string, sourceThreadId: string, messageId: string, createdAt = Date.now(), kind: SideKind = "reply"): boolean {
+    const result = this.deps.db.prepare("INSERT OR IGNORE INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at, kind) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(threadId, botId, sourceThreadId, messageId, createdAt, kind);
     if (result.changes) this.deps.changed();
     return result.changes > 0;
   }
