@@ -1,3 +1,4 @@
+import { useForkHostSettingHidden } from "@/components/fork/ForkHiddenHostEntries";
 import { useMemo, useState } from "react";
 import type { Host } from "@bb/domain";
 import type {
@@ -112,6 +113,7 @@ export function CliSkillsSettingsSection() {
     [hostsQuery.data],
   );
   const statuses = statusByHostId(statusQuery.data);
+  if (useForkHostSettingHidden("cli-skills")) return null;
 
   return (
     <>
