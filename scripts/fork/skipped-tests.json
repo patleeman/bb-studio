@@ -671,6 +671,14 @@
     {
       "file": "apps/app/src/components/secondary-panel/sidebarSplitLayout.test.ts",
       "title": "rejects persisted layouts that exceed the shared pane cap"
+    },
+    {
+      "file": "apps/app/src/components/settings/useSettingsSearchConditions.test.tsx",
+      "title": "meets no condition in a plain browser on localhost without plugins"
+    },
+    {
+      "file": "apps/app/src/components/settings/useSettingsSearchConditions.test.tsx",
+      "title": "meets the conditions the server, the address, and plugins satisfy"
     }
   ],
   "removeLines": [
