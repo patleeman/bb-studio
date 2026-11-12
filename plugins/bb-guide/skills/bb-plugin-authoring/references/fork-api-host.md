@@ -163,3 +163,21 @@ not remount, and they return to the bar when the host or the flag goes.
 - Under `cards`, bb's page, transcript and list scrollers reserve no
   scrollbar gutter and show a thin overlay thumb on hover and scroll. Mark
   your own scroller `data-fork-overlay-scroll` for the same.
+
+## The workbench of your own page
+
+A nav-panel page has the same side panel as a thread. Reach it with
+`useBbNavigate().experimental_workbench("page:<pluginId>/<panelId>")`, where
+`panelId` is the id you registered the nav panel with. It is null while that
+page is not on screen, and for a page of another plugin.
+
+- `list`, `open`, `close`, `focus`, `layout`, `arrange` and `isTyping` work
+  as for a thread, panes included: `open(spec, { pane: 2 })`,
+  `open(spec, { pane: "new" })`, `arrange({ panes: 2 })`.
+- `open({ kind: "tab", tab: { id } })` opens your tab registered for that
+  page (`context: { kind: "nav-panel", panelId }`). Another plugin's tab is
+  declined.
+- `arrange` declines `widthPercent` and `conversation`, and `popOut`
+  resolves false: a page's panel has no conversation beside it and no window
+  of its own.
+- `experimental_workbench()` with no argument never returns a page's panel.
