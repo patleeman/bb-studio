@@ -5975,6 +5975,7 @@ public enum Studio {
     case recording
     case board
     case memory
+    case skills
     case library
     case automations
     case todos
@@ -6005,6 +6006,7 @@ public enum Studio {
       case "recording": self = .recording
       case "board": self = .board
       case "memory": self = .memory
+      case "skills": self = .skills
       case "library": self = .library
       case "automations": self = .automations
       case "todos": self = .todos
@@ -6037,6 +6039,7 @@ public enum Studio {
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")
       case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
       case .library: try container.encode("library")
       case .automations: try container.encode("automations")
       case .todos: try container.encode("todos")
@@ -6116,6 +6119,7 @@ public enum Studio {
     case recording
     case board
     case memory
+    case skills
     case library
     case automations
     case todos
@@ -6146,6 +6150,7 @@ public enum Studio {
       case "recording": self = .recording
       case "board": self = .board
       case "memory": self = .memory
+      case "skills": self = .skills
       case "library": self = .library
       case "automations": self = .automations
       case "todos": self = .todos
@@ -6178,6 +6183,7 @@ public enum Studio {
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")
       case .memory: try container.encode("memory")
+      case .skills: try container.encode("skills")
       case .library: try container.encode("library")
       case .automations: try container.encode("automations")
       case .todos: try container.encode("todos")
@@ -14271,10 +14277,12 @@ public enum Studio {
   public struct BotSkillHistoryInput: Sendable, Hashable, Codable {
     public var botId: String?
     public var before: Int?
+    public var name: String?
 
-    public init(botId: String? = nil, before: Int? = nil) {
+    public init(botId: String? = nil, before: Int? = nil, name: String? = nil) {
       self.botId = botId
       self.before = before
+      self.name = name
     }
   }
 
