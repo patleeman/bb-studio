@@ -317,14 +317,14 @@
       "budget": 6
     },
     "apps/desktop/src/main.ts": {
-      "seam": "approvals, windows",
-      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts).",
-      "budget": 4
+      "seam": "approvals, windows, studio-release",
+      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion).",
+      "budget": 7
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process.",
-      "budget": 9
+      "seam": "approvals, windows, studio-release",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts).",
+      "budget": 11
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
@@ -430,6 +430,26 @@
       "seam": "app-backdrop",
       "intent": "Every Pierre diff and file view gets the fork's shadow-root CSS: usePierreStrictModeRecoveryOptions passes its options through withForkPierreCSS (lib/fork-pierre-css.ts), which prepends FORK_PIERRE_CSS to unsafeCSS, and its TOptions accepts unsafeCSS. The CSS gives the line-number gutter its own fill, --fork-diffs-gutter-bg, defaulting to the diff's background. The fork import sits at the top of the file.",
       "budget": 5
+    },
+    "apps/desktop/scripts/build.mjs": {
+      "seam": "studio-release",
+      "intent": "The esbuild defines end with studioBuildDefines(readStudioBuild(process.env)) (scripts/studio-release.fork.mjs): BB_DESKTOP_VERSION is the Studio version and BB_STUDIO_BUILD carries the bb base and the update feed.",
+      "budget": 2
+    },
+    "apps/desktop/scripts/run-electron-builder.mjs": {
+      "seam": "studio-release",
+      "intent": "After the publish config is set, applyStudioBuilderConfig(config, readStudioBuild(env)) (scripts/studio-release.fork.mjs) sets extraMetadata.version to the Studio version and publish to the Studio feed, so the packaged app's version is the one electron-updater compares.",
+      "budget": 2
+    },
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx": {
+      "seam": "studio-release",
+      "intent": "RowName draws <ForkStudioBase version={current} /> (ForkStudioBase.tsx) after the versions: a row showing the Studio build's version gets \"based on bb <version> @ <sha>\". In BbAppUpdateRows, forkStudioReleaseLink replaces the Changelog toggle in a Studio build (a link to BB Studio's releases once a release was found, nothing before), and the release check control's labels go through forkStudioCheckLabel (\"Check\" in a Studio build). The fork import sits at the top of the file.",
+      "budget": 9
+    },
+    "apps/server/src/services/system/desktop-app-update.ts": {
+      "seam": "studio-release",
+      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not. An update records the desktop's version as its start, and at startup a pending update counts as done when its target is the server's version or the desktop's (desktopVersionIfPending), so a Studio update is not reported as failed. The fetch-failed message is STUDIO_NO_RELEASE_MESSAGE (desktop-app-update.fork.ts), imported at the top of the file.",
+      "budget": 15
     }
   }
 }
