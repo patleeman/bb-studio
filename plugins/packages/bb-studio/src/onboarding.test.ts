@@ -19,7 +19,9 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function studio(threadList: string = "__automatic__") {
+async function studio(threadList: string = "__automatic__", options: { hostDownFor?: number; noProvider?: boolean } = {}) {
+  let hostDown = options.hostDownFor ?? 0;
+  const sleeps: number[] = [];
   const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
   dispose.push(() => rmSync(dataDir, { recursive: true, force: true }));
@@ -41,6 +43,8 @@ async function studio(threadList: string = "__automatic__") {
     },
     threads: {
       spawn: (async (args: Record<string, unknown>) => {
+        if (hostDown > 0) { hostDown--; throw Object.assign(new Error("Host is not connected"), { code: "host_unavailable" }); }
+        if (options.noProvider && args.model === undefined) throw Object.assign(new Error("Unable to load acp-hermes-agent models to resolve the default."), { code: "model_catalog_unavailable" });
         spawns.push(args);
         const id = `thr_${spawns.length}`;
         const thread = makeThreadResponse({ id, projectId: String(args.projectId), title: String(args.title), status: "pending" });
@@ -69,8 +73,9 @@ async function studio(threadList: string = "__automatic__") {
     createBot: async (input) => (await bots.create(input)).bot!,
     recordConversation: (threadId, botId) => { store.recordConversation(threadId, botId); },
     now: () => 1_000,
+    sleep: async (ms) => { sleeps.push(ms); },
   });
-  return { dataDir, db, bots, store, leads, run, spawns, turns, queued, prefs };
+  return { dataDir, db, bots, store, leads, run, spawns, turns, queued, prefs, sleeps };
 }
 
 function bbDatabase(dataDir: string, threadIds: string[]) {
@@ -104,6 +109,18 @@ describe("first-run onboarding", () => {
     expect(markWelcomeOpened(env.dataDir)).toBe(false);
     expect(welcomeThreadOf(env.dataDir)?.opened).toBe(true);
     expect(env.prefs.get("sidebar.threadListProvider")).toEqual({ value: "studio/everything", revision: 2 });
+  });
+
+  it("waits for the host to connect, and starts on Claude Code's default model when no provider can name one", async () => {
+    const env = await studio("__automatic__", { hostDownFor: 3, noProvider: true });
+    const flag = await env.run();
+    expect(flag).toMatchObject({ reason: "ran", welcomeThreadId: "thr_2" });
+    expect(env.sleeps).toEqual([5_000, 5_000, 5_000]);
+    expect(env.spawns.map((each) => [each.title, each.providerId, each.model])).toEqual([
+      [WELCOME_BOT_NAME, "claude-code", "default"],
+      [WELCOME_TITLE, "claude-code", "default"],
+    ]);
+    expect(env.turns).toEqual([]);
   });
 
   it("leaves a thread list the user chose", async () => {

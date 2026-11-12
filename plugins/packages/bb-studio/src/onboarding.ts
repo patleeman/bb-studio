@@ -7,6 +7,19 @@ import { WELCOME_BOT_NAME, WELCOME_TITLE } from "./onboarding-message";
 
 export const ONBOARDING_FILE = join("plugins", "studio", "onboarding.json");
 const FAR_FUTURE_MS = 10 * 365 * 24 * 60 * 60_000;
+export const NO_PROVIDER_MODEL = { providerId: "claude-code", model: "default" } as const;
+const WAIT_CODES = new Set(["host_unavailable", "host_not_ready", "host_offline"]);
+const NO_MODEL_CODES = new Set(["model_catalog_unavailable", "model_required"]);
+
+function errorCode(error: unknown): string | null {
+  const value = error as { code?: unknown; body?: { code?: unknown } } | null;
+  const code = value?.code ?? value?.body?.code;
+  if (typeof code === "string") return code;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/host is not connected/i.test(message)) return "host_unavailable";
+  if (/unable to load .* models to resolve the default|pick a model/i.test(message)) return "model_catalog_unavailable";
+  return null;
+}
 
 export type OnboardingReason = "ran" | "bots" | "import" | "threads";
 
@@ -48,6 +61,9 @@ export interface OnboardingDeps {
   createBot(input: { name: string; avatar: string; threadId: string }): Promise<{ id: string }>;
   recordConversation(threadId: string, botId: string): void;
   now?(): number;
+  sleep?(ms: number): Promise<void>;
+  waitMs?: number;
+  attempts?: number;
 }
 
 const flagPath = (dataDir: string) => join(dataDir, ONBOARDING_FILE);
@@ -102,8 +118,27 @@ export function existingData(dataDir: string, db: Database.Database): Exclude<On
   return null;
 }
 
-async function turnlessThread(sdk: OnboardingSdk, title: string, pluginMetadata: Record<string, string>, now: number): Promise<string> {
-  const thread = await sdk.threads.spawn({
+async function spawnWhenReady(deps: OnboardingDeps, args: Record<string, unknown>): Promise<{ id: string }> {
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const attempts = deps.attempts ?? 120;
+  let model: Record<string, unknown> = {};
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await deps.sdk.threads.spawn({ ...args, ...model });
+    } catch (error) {
+      const code = errorCode(error);
+      if (code && NO_MODEL_CODES.has(code) && !("model" in model)) {
+        model = { ...NO_PROVIDER_MODEL };
+        continue;
+      }
+      if (!code || !WAIT_CODES.has(code) || attempt >= attempts) throw error;
+      await sleep(deps.waitMs ?? 5_000);
+    }
+  }
+}
+
+async function turnlessThread(deps: OnboardingDeps, title: string, pluginMetadata: Record<string, string>, now: number): Promise<string> {
+  const thread = await spawnWhenReady(deps, {
     projectId: PERSONAL_PROJECT_ID,
     title,
     environment: { type: "project-default" },
@@ -111,8 +146,8 @@ async function turnlessThread(sdk: OnboardingSdk, title: string, pluginMetadata:
     input: [{ type: "text", text: title, mentions: [] }],
     sendAt: now + FAR_FUTURE_MS,
   });
-  for (const row of await sdk.threads.queuedMessages.list({ threadId: thread.id })) {
-    await sdk.threads.queuedMessages.delete({ threadId: thread.id, queuedMessageId: row.id });
+  for (const row of await deps.sdk.threads.queuedMessages.list({ threadId: thread.id })) {
+    await deps.sdk.threads.queuedMessages.delete({ threadId: thread.id, queuedMessageId: row.id });
   }
   return thread.id;
 }
@@ -134,9 +169,9 @@ async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
     writeOnboarding(deps.dataDir, flag);
     return flag;
   }
-  const mainId = await turnlessThread(deps.sdk, WELCOME_BOT_NAME, { bot: BOT_ID }, now);
+  const mainId = await turnlessThread(deps, WELCOME_BOT_NAME, { bot: BOT_ID }, now);
   const bot = await deps.createBot({ name: WELCOME_BOT_NAME, avatar: "🤖", threadId: mainId });
-  const welcomeId = await turnlessThread(deps.sdk, WELCOME_TITLE, { botConversation: bot.id }, now);
+  const welcomeId = await turnlessThread(deps, WELCOME_TITLE, { botConversation: bot.id }, now);
   deps.recordConversation(welcomeId, bot.id);
   await showBotSidebar(deps.sdk).catch(() => false);
   const flag: OnboardingFlag = { version: 1, state: "done", reason: "ran", at: now, botId: bot.id, welcomeThreadId: welcomeId, opened: false };
