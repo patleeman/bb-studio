@@ -30,6 +30,11 @@ targets:
         basedOnDependencyAnalysis: false
     sources:
       - path: iOS
+        excludes:
+          - "Look/Resources/**"
+      # Desktop's look runtime, built by scripts/build-look.mjs.
+      - path: iOS/Look/Resources
+        buildPhase: resources
       - path: Shared
       - path: LiveActivity
       # Attention Router push buttons, shared with the notification extension.

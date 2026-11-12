@@ -300,6 +300,46 @@ Tapping the mic in any composer dictates inline the same way (see the
 composer row above); here in New thread, the words streaming in after what
 was typed:
 
+## Look
+
+Settings → Look picks the phone's theme: On Air (graphite, design 10a; the
+default), desktop's 8 Classic themes and its 9 scene themes. "Follow each
+Bot's theme" uses the theme a Bot wears on the Mac (`appearance.themeId`).
+Colors, glass opacity and the halo come from desktop's own `resolveLook`:
+`scripts/build-look.mjs` writes them to `Shared/Look/looks.json`, and bundles
+desktop's scene engine, its six scene drivers, the 8 presence forms and the
+presence sandbox (`plugins/packages/bb-studio/src/{theme,presence}`, plus
+`Look/web/`) into `iOS/Look/Resources/look.js`. Both outputs are committed;
+run `node scripts/build-look.mjs` after a desktop theme or presence change
+(`--check` fails when they are stale). It needs `plugins/node_modules`.
+
+- **Scenes.** A scene shows as a still behind the Bot's list, never behind a
+  conversation. The still is rendered on the phone by desktop's renderer at the
+  theme's `still` time, once per theme, mode and size (and once an hour for the
+  clock- and weather-driven ones), then cached (`SceneStills`). It shifts with
+  tilt through a system motion effect, so an idle still costs the app nothing.
+  "Live scene" is opt-in: foreground only, never in Low Power Mode, at serious
+  thermal state or with Reduce Motion, at most 30 frames a second. A driver's
+  chosen mode (Tonight's Sky by day) switches the look, as on desktop.
+- **Glass.** Liquid Glass (`glassEffect`) tinted by the theme's surface color at
+  desktop's glass opacity; bare text over a scene gets desktop's halo.
+- **Presence.** All 8 forms and agent-made ones (their code from
+  `presences_list`). A Bot shows a cached still while idle and its form live
+  while it thinks, works (a satellite per worker) or needs you (amber), unless
+  motion isn't allowed. Light themes get desktop's halo. Each Bot's four state
+  stills go to the app group (`Look/presence/<hash of bot id>/<state>.png`)
+  for widgets and the Live Activity.
+- **Sandbox.** `LookWebView` loads only `bblook://look/…` from the bundle, a
+  content rule list blocks http(s), ws(s), ftp and file loads, the presence page's
+  CSP has `connect-src 'none'`, agent-made code runs in desktop's own Worker
+  sandbox (fetch, XMLHttpRequest, WebSocket and the rest removed), storage is
+  non-persistent, and the scene page may reach only `theme.weather` and
+  `theme.sky`, which the app forwards read-only.
+- **Tests.** `LookTests` renders every scene and every form and state, checks the
+  sandbox has no network API, and measures idle CPU with a still on screen and
+  the live scene's frame cap (`LOOK-PERF` lines). `LookUITests`
+  (`-qaLookTheme <id>`, `TEST_RUNNER_LOOK_OUT`) screenshots each theme.
+
 ## Connection
 
 The app talks to the BB server you give it, such as

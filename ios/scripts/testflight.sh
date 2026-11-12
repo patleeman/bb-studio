@@ -34,6 +34,8 @@ log="$out/xcodebuild-$build_number.log"
 
 mkdir -p "$out"
 xcodegen generate --quiet
+# The look resources are committed; refuse to ship stale ones when they can be checked.
+if [[ -d ../plugins/node_modules ]]; then node scripts/build-look.mjs --check; fi
 
 auth=()
 env_file="$HOME/.config/bbgo/testflight.env"

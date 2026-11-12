@@ -103,6 +103,16 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section {
+                NavigationLink { LookSettingsView() } label: {
+                    LabeledContent {
+                        Text(LookStore.shared.theme(for: nil).name)
+                    } label: {
+                        Label("Look", systemImage: "paintpalette")
+                    }
+                }
+                .accessibilityIdentifier("SettingsLook")
+            }
             ScrollLogSection()
             Section("Action button") {
                 Text(
