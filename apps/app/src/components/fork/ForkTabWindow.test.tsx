@@ -222,7 +222,10 @@ describe("a popped-out tab window", () => {
   it("adds a tab dropped on its tab strip, follows the selected tab in its title and gives that tab the toolbar", async () => {
     renderWindow();
     await screen.findByTestId("probe-memory");
+    const root = document.querySelector("[data-fork-tab-window]");
+    expect(root?.getAttribute("data-fork-tab-window-tabs")).toBe("one");
     await dropPageTab("Roadmap", "p1");
+    expect(root?.getAttribute("data-fork-tab-window-tabs")).toBe("many");
     expect(storedTabIds(PANEL_STATE_ID)).toHaveLength(2);
     expect(document.title).toBe("Roadmap");
     expect(screen.getByTestId("probe-page").textContent).toBe("Roadmap");
