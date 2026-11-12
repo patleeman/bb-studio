@@ -13,7 +13,8 @@ The fork is kept in sync with upstream by an agent, every day. Everything below 
 5. **No formatter churn on upstream lines.** Run `oxfmt` only on fork-owned files. Never run it on an upstream file the fork edits, and never re-indent or re-wrap lines you did not mean to change.
 6. **Generated changes are scripted.** Removing plugins, the app identity and the rebrand are produced by `scripts/fork/strip-plugins.mjs`, `identity.mjs` and `rebrand.mjs`. Their output is committed at the tip with a `Fork-Generated:` trailer. Never edit that output by hand and never rebase those commits: drop them and run the scripts again. A build or test run can rewrite the tracked file `apps/web/src/routeTree.gen.ts`; restore it (`git checkout -- apps/web/src/routeTree.gen.ts`) before committing, and never stage with `git add -A` without reading `git status` first.
 7. **Tests the fork breaks on purpose are skipped by list.** Add them to `scripts/fork/skipped-tests.json`. Do not edit the test source.
-8. **Never push. Nothing goes upstream.** The branch is local only. Do not push it, do not open pull requests or issues, and do not prepare changes for upstream.
+8. **Push only to `origin`, the BB Studio repository (`scripts/git-hooks/pre-push` on `main` names it). Nothing goes upstream.** The pushed refs are `main`, `desktop` (with `--force-with-lease`) and `v*` tags. Never push to `get-bb/bb` or `patleeman/bb`; no pull requests or issues upstream; nothing is prepared for upstream.
+9. **`desktop/` on `main` is generated.** `scripts/import-desktop.mjs` on `main` writes it from the tree of the `desktop` branch; never edit it there. Work on the fork in the worktree that has `desktop` checked out (`~/workingdir/bb-studio-app-desktop`), then import.
 
 ## UI text
 
@@ -25,7 +26,7 @@ Never commit screenshots, captures or review evidence; they go in `~/workingdir/
 
 ## Building the Studio plugin bundles
 
-Build plugin bundles only with `node scripts/fork/build-plugins.mjs [plugin dir ...]`. It rebuilds this checkout's CLI first and then builds each plugin with it, in a clean environment. A bundle built with an older CLI silently loses every SDK hook added since (the launcher once listed no apps for this reason). With no arguments it builds the plugins named in `~/.bb-studio-import.json`.
+Build plugin bundles only with `node scripts/fork/build-plugins.mjs [plugin dir ...]`. It rebuilds this checkout's CLI first and then builds each plugin with it, in a clean environment. A bundle built with an older CLI silently loses every SDK hook added since (the launcher once listed no apps for this reason). With no arguments it builds the plugins named in `~/.bb-studio-import.json`, or, without that file, every package in the monorepo's `plugins/packages`.
 
 ## Installing a build
 
@@ -42,7 +43,7 @@ Tooling and notes, then seams, then features, then the generated commits at the 
 
 ## Syncing
 
-`node scripts/fork/sync.mjs --fetch` replays the fork onto `upstream/main` in a throwaway worktree, regenerates, runs the checks and moves the local branch `exp/studio-native-candidate`. It never touches `exp/studio-native`. `scripts/fork/sync-agent.md` is the brief for the agent that runs it. `STUDIO_FORK.md` has the details.
+`node scripts/fork/sync.mjs --fetch` replays the fork onto `upstream/main` in a throwaway worktree, regenerates, runs the checks and moves the local branch `desktop-candidate`. It never touches `desktop`. `scripts/fork/sync-agent.md` is the brief for the agent that runs it. `STUDIO_FORK.md` has the details. After a clean sync: `git reset --hard desktop-candidate` on `desktop` (clean tree), `node scripts/import-desktop.mjs` on `main`, then `git push origin main && git push --force-with-lease origin desktop`.
 
 ## Resolving a conflict
 
