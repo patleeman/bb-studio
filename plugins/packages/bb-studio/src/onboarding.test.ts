@@ -123,6 +123,15 @@ describe("first-run onboarding", () => {
     expect(env.turns).toEqual([]);
   });
 
+  it("stops waiting when Studio stops, without making anything", async () => {
+    const env = await studio("__automatic__", { hostDownFor: 2 });
+    const first = env.run().catch((error: Error) => error);
+    env.db.close();
+    expect(await first).toBeInstanceOf(Error);
+    expect(env.spawns).toEqual([]);
+    expect(readOnboarding(env.dataDir)).toBeNull();
+  });
+
   it("leaves a thread list the user chose", async () => {
     const env = await studio("thread-list/thread-list");
     await env.run();

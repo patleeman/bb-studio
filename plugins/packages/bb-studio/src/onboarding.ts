@@ -123,6 +123,7 @@ async function spawnWhenReady(deps: OnboardingDeps, args: Record<string, unknown
   const attempts = deps.attempts ?? 120;
   let model: Record<string, unknown> = {};
   for (let attempt = 1; ; attempt++) {
+    if (!deps.db.open) throw new Error("Studio stopped before onboarding finished.");
     try {
       return await deps.sdk.threads.spawn({ ...args, ...model });
     } catch (error) {
@@ -152,11 +153,14 @@ async function turnlessThread(deps: OnboardingDeps, title: string, pluginMetadat
   return thread.id;
 }
 
-let running: Promise<OnboardingFlag> | null = null;
+const running = new WeakMap<Database.Database, Promise<OnboardingFlag>>();
 
 export function runOnboarding(deps: OnboardingDeps): Promise<OnboardingFlag> {
-  running ??= onboard(deps).finally(() => { running = null; });
-  return running;
+  const current = running.get(deps.db);
+  if (current) return current;
+  const next = onboard(deps).finally(() => running.delete(deps.db));
+  running.set(deps.db, next);
+  return next;
 }
 
 async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
