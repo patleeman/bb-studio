@@ -253,7 +253,7 @@ html[data-fork-cards] {
   --fork-cards-page-bleed: 40px;
   --fork-cards-page-lead: 40px;
   --fork-cards-wide-column: 1032px;
-  --fork-cards-scroll-gutter: 12px;
+  --fork-cards-scroll-gutter: 0px;
   --fork-popover: var(
     --fork-surface-popover-background,
     color-mix(in oklab, var(--canvas) 76%, transparent)
@@ -265,6 +265,7 @@ html[data-fork-cards] {
   --fork-popover-hover: color-mix(in oklab, var(--primary) 24%, transparent);
   --fork-popover-active: color-mix(in oklab, var(--primary) 34%, transparent);
   --fork-cards-fade: 2rem;
+  --fork-cards-composer-filter: blur(18px);
   --fork-cards-shadow: 0 14px 40px -14px
     color-mix(in oklab, var(--ink) 12%, transparent);
   --fork-cards-composer-backing: linear-gradient(
@@ -319,6 +320,8 @@ html[data-fork-cards]
   [data-testid="app-layout-root"][data-framed]
   [data-sidebar="inset"] {
   margin-top: calc(-1 * var(--bb-window-title-bar-height));
+  margin-right: calc(var(--fork-cards-gap) - var(--bb-window-frame-lip));
+  padding-inline: 0;
   height: calc(
     100% + var(--bb-window-title-bar-height) - var(--fork-cards-gap)
   );
@@ -541,6 +544,18 @@ html[data-fork-cards]
   border-bottom-left-radius: var(--fork-cards-radius);
   border-bottom-right-radius: var(--fork-cards-radius);
   background-image: var(--fork-cards-composer-backing);
+  -webkit-backdrop-filter: var(--fork-cards-composer-filter);
+  backdrop-filter: var(--fork-cards-composer-filter);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fork-cards-fade)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fork-cards-fade)
+  );
   pointer-events: none;
 }
 
@@ -807,4 +822,159 @@ html[data-fork-cards]
     [role="option"]
   ):focus-visible {
   outline: none;
+}
+
+:where([data-fork-title-host="page"], [data-fork-title-host="tools"]):empty {
+  display: none;
+}
+
+html[data-fork-title-rows] {
+  --fork-title-row-height: 44px;
+  --fork-title-row-tail: 10px;
+  --fork-title-row-background: color-mix(
+    in oklab,
+    var(--canvas) 80%,
+    transparent
+  );
+  --fork-title-row-filter: blur(18px);
+}
+
+html[data-fork-title-rows]
+  :is([data-fork-title-host="page"], [data-fork-title-host="tools"]) {
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--fork-title-row-height);
+}
+
+html[data-fork-title-rows] [data-fork-title-host="page"] {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  align-self: center;
+  width: min(100cqw, calc(100% + 2 * var(--fork-cards-page-bleed)));
+  padding-inline: calc(
+    (min(100cqw, calc(100% + 2 * var(--fork-cards-page-bleed))) - 100%) / 2
+  );
+  border-radius: var(--fork-cards-radius) var(--fork-cards-radius) 0 0;
+  margin-bottom: 12px;
+}
+
+html[data-fork-title-rows] [data-fork-title-host="page"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 calc(-1 * var(--fork-title-row-tail)) 0;
+  border-radius: inherit;
+  background: var(--fork-title-row-background);
+  -webkit-backdrop-filter: var(--fork-title-row-filter);
+  backdrop-filter: var(--fork-title-row-filter);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--fork-title-row-tail)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--fork-title-row-tail)),
+    transparent
+  );
+  pointer-events: none;
+  opacity: 0;
+  animation: fork-title-backing linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0 32px;
+}
+
+@keyframes fork-title-backing {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html[data-fork-title-rows]
+  [data-page-scroll-viewport]
+  > div:has(> [data-fork-title-host="page"]:not(:empty)) {
+  padding-top: 0;
+}
+
+html[data-fork-title-rows]
+  [data-sidebar="inset"]
+  :is(.box-border.h-full.w-full, .relative.h-full.overflow-hidden):has(
+    > [data-fork-title-host="tools"]:not(:empty)
+  ) {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+}
+
+html[data-fork-title-rows]
+  [data-sidebar="inset"]
+  :is(.box-border.h-full.w-full, .relative.h-full.overflow-hidden):has(
+    > [data-fork-title-host="tools"]:not(:empty)
+  )
+  > :not([data-fork-title-host], .absolute) {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+html[data-fork-title-rows]
+  [data-fork-title-host]
+  [data-fork-header-group="title"] {
+  flex: 1;
+  max-width: none;
+  padding-inline: 0;
+  border-radius: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-fork-cards]
+  :is(
+    [data-page-scroll-viewport],
+    [data-resource-collection-viewport],
+    [data-fork-overlay-scroll],
+    [data-sidebar="inset"]
+      .relative.h-full.overflow-hidden
+      > .h-full.overflow-y-auto
+  ) {
+  scrollbar-width: none;
+}
+
+[data-fork-scroll-thumb] {
+  position: fixed;
+  z-index: 40;
+  width: 5px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--ink) 26%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+[data-fork-scroll-thumb][data-visible] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+[data-fork-scroll-thumb]:is(:hover, [data-dragging]) {
+  background: color-mix(in oklab, var(--ink) 52%, transparent);
+}
+
+@media (width >= 48rem) {
+  html[data-fork-title-rows]
+    [data-sidebar="inset"]
+    .box-border.h-full.w-full
+    > [data-fork-title-host="tools"] {
+    max-width: min(calc(100% - 0.75rem), 64rem);
+    margin-inline: max(0px, calc((100% - 0.75rem - 64rem) / 2)) auto;
+  }
 }
