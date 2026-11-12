@@ -56,9 +56,15 @@ function parseComposerFooter(
     const entryKind = `${kind}[${index}]`;
     try {
       const entry = raw as Record<string, unknown> | null;
+      if (entry?.placement !== undefined && entry.placement !== "context") {
+        throw new Error(`${entryKind}: "placement" must be "context" when set`);
+      }
       const item: ForkComposerFooterItem = {
         id: requireSlotId(entryKind, entry?.id),
         component: requireComponent(entryKind, entry?.component),
+        ...(entry?.placement === "context"
+          ? { placement: "context" as const }
+          : {}),
       };
       requireUniqueId(entryKind, seenIds, item.id);
       parsed.push(item);
