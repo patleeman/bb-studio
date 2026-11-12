@@ -47,10 +47,6 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
   ],
   "thread-list": [
     "PluginThreadListRegistration.experimental_hideSidebarHeader",
-    "PluginAppSlots.experimental_sidebarNewItem",
-    "ExperimentalSidebarNewItemRegistration",
-    "ExperimentalSidebarNewItem",
-    "experimental_useSidebarNewItems",
     "ExperimentalPaletteSearchResult.experimental_onModSelect",
     "PluginAppSlots.experimental_sidebarSection",
     "ExperimentalSidebarSectionRegistration",

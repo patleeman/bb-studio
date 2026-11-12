@@ -15,7 +15,6 @@ import type {
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
-  ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
   ExperimentalWindowRegistration,
 } from "@get-bb/plugin-sdk";
@@ -25,8 +24,6 @@ interface ForkSlotBase {
   generation: number;
 }
 
-export interface PluginSidebarNewItemSlot
-  extends ExperimentalSidebarNewItemRegistration, ForkSlotBase {}
 export interface PluginSidebarSectionSlot
   extends ExperimentalSidebarSectionRegistration, ForkSlotBase {}
 export interface PluginPaletteSearchSlot
@@ -99,7 +96,6 @@ export interface ForkRegistrationSet {
   replyClassifiers?: readonly ExperimentalReplyClassifierRegistration[];
   paletteSearches?: readonly ExperimentalPaletteSearchRegistration[];
   sidebarSections?: readonly ExperimentalSidebarSectionRegistration[];
-  sidebarNewItems?: readonly ExperimentalSidebarNewItemRegistration[];
 }
 
 export interface ForkSlotSnapshot {
@@ -121,7 +117,6 @@ export interface ForkSlotSnapshot {
   replyClassifiers: readonly PluginReplyClassifierSlot[];
   paletteSearches: readonly PluginPaletteSearchSlot[];
   sidebarSections: readonly PluginSidebarSectionSlot[];
-  sidebarNewItems: readonly PluginSidebarNewItemSlot[];
 }
 
 export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
@@ -143,13 +138,11 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   replyClassifiers: [],
   paletteSearches: [],
   sidebarSections: [],
-  sidebarNewItems: [],
 };
 
 export const FORK_SLOT_KINDS = [
   "paletteSearches",
   "sidebarSections",
-  "sidebarNewItems",
   "replyClassifiers",
   "linkHandlers",
   "windows",
@@ -177,7 +170,6 @@ export function stampForkSlots(
   return {
     paletteSearches: stamp(set.paletteSearches),
     sidebarSections: stamp(set.sidebarSections),
-    sidebarNewItems: stamp(set.sidebarNewItems),
     replyClassifiers: stamp(set.replyClassifiers),
     linkHandlers: stamp(set.linkHandlers),
     windows: stamp(set.windows),

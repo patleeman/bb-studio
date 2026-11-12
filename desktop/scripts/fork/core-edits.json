@@ -223,7 +223,7 @@
     },
     "packages/plugin-sdk/src/app.ts": {
       "seam": "sdk-tables",
-      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, sidebar New items, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, two project menus, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
+      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
       "budget": 1
     },
     "packages/plugin-sdk/src/backend-contract.ts": {

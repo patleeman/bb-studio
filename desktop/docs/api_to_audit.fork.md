@@ -152,30 +152,6 @@ Docs: `frontend-renderer-slots.md`.
 4. The thread view menu's lifecycle and sort controls do not apply to plugin
    groups.
 
-## Sidebar New menu (`experimental_sidebarNewItem`, `experimental_useSidebarNewItems`)
-
-`slots.experimental_sidebarNewItem({ id, title, icon, group?, run })` adds a
-row to a New menu that a plugin draws. Rows keep registration order;
-neighbours with the same `group` share one divider.
-`experimental_useSidebarNewItems()` returns every plugin's rows as
-`{ key, pluginId, id, title, icon, group, run }` for the plugin that draws
-the menu.
-
-**Core callers.** None: since the rail is upstream's again, bb's rail header
-is its own New thread button and draws no New menu. The host side is
-`lib/fork-sidebar-new-items.ts`; a plugin that draws its own sidebar header
-(`experimental_hideSidebarHeader`) reads the rows. bb's own New thread row
-is not a registered row.
-
-Docs: `frontend-renderer-slots.md`.
-
-**Audit before stabilizing.**
-
-1. Decide whether New thread should be a registered row, so one list drives
-   the menu.
-2. A row has no disabled state, shortcut or project context; add them only
-   with a caller that needs them.
-
 ## Palette row Mod action (`ExperimentalPaletteSearchResult.experimental_onModSelect`)
 
 A plugin palette row may carry `experimental_onModSelect()`. Mod+Enter or a
