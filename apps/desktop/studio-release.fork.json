@@ -1,0 +1,8 @@
+{
+  "version": "1.0.1",
+  "updates": {
+    "provider": "github",
+    "owner": "patleeman",
+    "repo": "bb-studio"
+  }
+}
