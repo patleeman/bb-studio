@@ -1,7 +1,6 @@
 // Windows of a plugin's own, on a BB that has them (the BB Studio fork):
 // `slots.experimental_window` offers a component BB shows in a window with no
-// BB chrome, `experimental_useWindows()` opens it,
-// `slots.experimental_sidebarNewItem` adds a row to BB's New menu, and
+// BB chrome, `experimental_useWindows()` opens it, and
 // `slots.experimental_launcherItem` offers an app to a launcher. This
 // plugin builds against stable BB's SDK, so each is read by name and is
 // missing on stable BB, where Visual Chat is only its page in BB's rail.
@@ -60,11 +59,6 @@ function callSlot<Registration>(slots: object, name: string, registration: Regis
 /** Offers a component as a window; false on a BB without the slot. */
 export function registerHostWindow(slots: object, registration: { id: string; title: string; component: () => ReactNode }): boolean {
   return callSlot(slots, "experimental_window", registration);
-}
-
-/** Adds a row to BB's sidebar New menu; false on a BB without the slot. */
-export function registerNewItem(slots: object, registration: { id: string; title: string; icon: string; group?: string; run(): void | Promise<void> }): boolean {
-  return callSlot(slots, "experimental_sidebarNewItem", registration);
 }
 
 /**

@@ -23,38 +23,6 @@ export interface ExperimentalSidebarSectionProps {
 }
 
 /**
- * Registration for `slots.experimental_sidebarNewItem`: one thing the
- * sidebar's New menu can create, listed after New thread. Experimental: see
- * docs/api_to_audit.md.
- */
-export interface ExperimentalSidebarNewItemRegistration {
-  /** Unique within the plugin; letters, digits, `-`, `_`. */
-  id: string;
-  /** The menu row, such as "Page". */
-  title: string;
-  icon: string;
-  /** Rows with the same group sit together under one divider. */
-  group?: string;
-  /** Creates the thing and shows it. */
-  run(): void | Promise<void>;
-}
-
-/**
- * One registered New menu row, as `experimental_useSidebarNewItems()`
- * reports it. Experimental: see docs/api_to_audit.md.
- */
-export interface ExperimentalSidebarNewItem {
-  /** Unique across plugins. */
-  key: string;
-  pluginId: string;
-  id: string;
-  title: string;
-  icon: string;
-  group: string | null;
-  run(): void | Promise<void>;
-}
-
-/**
  * Registration for `slots.experimental_sidebarSection`: a section of the
  * plugin's own rows in the sidebar, below the thread list and scrolling with
  * it. The component draws its own heading and rows. Experimental: see
@@ -1014,14 +982,6 @@ export interface ForkPluginAppSlots {
     registration: ExperimentalSidebarSectionRegistration,
   ): void;
   /**
-   * Add a row to the sidebar's New menu (see
-   * {@link ExperimentalSidebarNewItemRegistration}). Experimental: see
-   * docs/api_to_audit.md.
-   */
-  experimental_sidebarNewItem(
-    registration: ExperimentalSidebarNewItemRegistration,
-  ): void;
-  /**
    * List the plugin's own items in bb's search palette (see
    * {@link ExperimentalPaletteSearchRegistration}). Experimental: see
    * docs/api_to_audit.md.
@@ -1489,11 +1449,6 @@ export interface ForkPluginSdkApp {
    * docs/api_to_audit.fork.md.
    */
   experimental_useGlobalTabs(): readonly ExperimentalGlobalTab[];
-  /**
-   * The rows plugins added to the sidebar's New menu, for a plugin that
-   * draws that menu. Experimental: see docs/api_to_audit.md.
-   */
-  experimental_useSidebarNewItems(): readonly ExperimentalSidebarNewItem[];
   /**
    * bb's light or dark mode and a counter that changes with the theme. The
    * calling component renders again when either changes, so a plugin that

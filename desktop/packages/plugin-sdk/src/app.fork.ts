@@ -44,9 +44,6 @@ function runtimeFunction<Name extends ForkFunctionName>(
 export const experimental_useAppRoute = runtimeFunction(
   "experimental_useAppRoute",
 );
-export const experimental_useSidebarNewItems = runtimeFunction(
-  "experimental_useSidebarNewItems",
-);
 export const experimental_useGlobalTabs = runtimeFunction(
   "experimental_useGlobalTabs",
 );

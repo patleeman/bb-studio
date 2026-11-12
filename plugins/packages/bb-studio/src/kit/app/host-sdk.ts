@@ -161,22 +161,6 @@ export function registerSidebarSection(slots: object, registration: SidebarSecti
   return true;
 }
 
-export interface SidebarNewItemRegistration {
-  id: string;
-  title: string;
-  icon: string;
-  group?: string;
-  run(): void | Promise<void>;
-}
-
-/** Adds a row to BB's sidebar New menu (`slots.experimental_sidebarNewItem`); false on a BB without it. */
-export function registerSidebarNewItem(slots: object, registration: SidebarNewItemRegistration): boolean {
-  const slot = member(slots, "experimental_sidebarNewItem");
-  if (typeof slot !== "function") return false;
-  (slot as (registration: SidebarNewItemRegistration) => void).call(slots, registration);
-  return true;
-}
-
 /**
  * `customization` with items for the row under the composer's input
  * (`experimental_footer`). A BB without that row ignores the field.

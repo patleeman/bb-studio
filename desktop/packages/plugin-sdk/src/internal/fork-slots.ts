@@ -16,7 +16,6 @@ import type {
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
-  ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
   ExperimentalWindowRegistration,
   ExperimentalTabRegistration,
@@ -33,7 +32,6 @@ import {
 export interface ForkSlotRegistrations {
   paletteSearches: ExperimentalPaletteSearchRegistration[];
   sidebarSections: ExperimentalSidebarSectionRegistration[];
-  sidebarNewItems: ExperimentalSidebarNewItemRegistration[];
   replyClassifiers: ExperimentalReplyClassifierRegistration[];
   linkHandlers: ExperimentalLinkHandlerRegistration[];
   windows: ExperimentalWindowRegistration[];
@@ -55,7 +53,6 @@ export interface ForkSlotRegistrations {
 export const FORK_SLOT_KINDS = [
   "paletteSearches",
   "sidebarSections",
-  "sidebarNewItems",
   "replyClassifiers",
   "linkHandlers",
   "windows",
@@ -78,7 +75,6 @@ export function emptyForkSlots(): ForkSlotRegistrations {
   return {
     paletteSearches: [],
     sidebarSections: [],
-    sidebarNewItems: [],
     replyClassifiers: [],
     linkHandlers: [],
     windows: [],
@@ -104,7 +100,6 @@ export function forkSlotMethods(
   const seenIds = {
     paletteSearch: new Set<string>(),
     sidebarSection: new Set<string>(),
-    sidebarNewItem: new Set<string>(),
     replyClassifier: new Set<string>(),
     linkHandler: new Set<string>(),
     window: new Set<string>(),
@@ -123,25 +118,6 @@ export function forkSlotMethods(
     appBackdrop: new Set<string>(),
   };
   return {
-    experimental_sidebarNewItem(registration) {
-      const kind = "slots.experimental_sidebarNewItem";
-      const id = requireSlotId(kind, registration?.id);
-      requireUniqueId(kind, seenIds.sidebarNewItem, id);
-      if (typeof registration.run !== "function") {
-        throw new Error(`${kind}: "run" must be a function`);
-      }
-      collected.sidebarNewItems.push({
-        id,
-        title: requireNonEmptyString(kind, "title", registration.title),
-        icon: requireNonEmptyString(kind, "icon", registration.icon),
-        ...(registration.group === undefined
-          ? {}
-          : {
-              group: requireNonEmptyString(kind, "group", registration.group),
-            }),
-        run: registration.run,
-      });
-    },
     experimental_sidebarSection(registration) {
       const kind = "slots.experimental_sidebarSection";
       const id = requireSlotId(kind, registration?.id);

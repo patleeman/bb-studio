@@ -1,7 +1,7 @@
 // Visual Chat as an app window, on a BB that opens plugins in windows
 // (src/host-windows.ts): the page in a window of its own, whose header is
 // the title bar (hidden-inset: the traffic lights sit in it). It opens from
-// BB Studio's launcher, "Visual Chat" in BB's New menu, "Open in window" in
+// BB Studio's launcher, "Open in window" in
 // the page's header (the page stays in BB's rail), the "Visual Chat: Open
 // window" command, or a system-wide shortcut when the user assigned one (the
 // "Window shortcut" setting; none by default).
@@ -11,7 +11,7 @@
 import { lazy, Suspense, useCallback, useEffect } from "react";
 import { useSdk, useSettings, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
-import { inHostWindow, registerHostWindow, registerLauncherItem, registerNewItem, useHostWindows, type HostWindowOptions } from "./host-windows";
+import { inHostWindow, registerHostWindow, registerLauncherItem, useHostWindows, type HostWindowOptions } from "./host-windows";
 import { assignedWindowHotkey, WINDOW_HOTKEY_SETTING } from "./settings";
 import { isMac } from "./ui/shortcuts";
 import { CANVAS_NEW_SEGMENT } from "./shared";
@@ -22,7 +22,6 @@ export const WINDOW_CHAT_PARAM = "chat";
 export const WINDOW_ID = "canvas";
 export const WINDOW_TITLE = "Visual Chat";
 export const WINDOW_COMMAND_ID = "window";
-export const WINDOW_NEW_ITEM_ID = "visual-chat";
 /** The plugin's own icon, as its rail page uses it. */
 export const WINDOW_ICON = "studio-visual-chat/visual-chat";
 /** Sized like an app, not a panel; never smaller than the header and the composer need. */
@@ -114,7 +113,6 @@ export function registerWindowApp(app: Pick<PluginAppBuilder, "slots" | "command
   // The window itself mounts no bridge, so it never registers itself.
   app.slots.experimental_appOverlay({ id: "window-bridge", component: () => (inHostWindow() ? null : <Bridge />) });
   const run = () => open?.();
-  registerNewItem(app.slots, { id: WINDOW_NEW_ITEM_ID, title: WINDOW_TITLE, icon: "GridView", group: "apps", run });
   // The launcher runs this in its own window, where no bridge is mounted: it then asks BB's main window.
   const runAnywhere = () => {
     if (open) { open(); return; }

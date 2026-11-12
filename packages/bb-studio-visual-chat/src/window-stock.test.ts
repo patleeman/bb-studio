@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 vi.mock("@get-bb/plugin-sdk/app", () => ({ definePluginApp: (setup: unknown) => ({ setup }), useSdk: () => ({}), useSettings: () => ({ values: undefined }) }));
 
 const { default: plugin } = await import("../app");
-const { hasHostWindows, registerHostWindow, registerNewItem, useHostWindows } = await import("./host-windows");
+const { hasHostWindows, registerHostWindow, useHostWindows } = await import("./host-windows");
 const { registerWindowApp } = await import("./window-app");
 const { createQuickStore } = await import("./ui/quick-store");
 
@@ -39,7 +39,6 @@ it("finds no window API, and every window call answers false", async () => {
   expect(hasHostWindows).toBe(false);
   expect(registerWindowApp(stockApp().app as never)).toBeNull();
   expect(registerHostWindow({ navPanel() {} }, { id: "canvas", title: "Visual Chat", component: () => null })).toBe(false);
-  expect(registerNewItem({ navPanel() {} }, { id: "visual-chat", title: "Visual Chat", icon: "GridView", run() {} })).toBe(false);
   const windows = useHostWindows();
   expect(windows.native).toBe(false);
   expect(await windows.open("canvas")).toBe(false);

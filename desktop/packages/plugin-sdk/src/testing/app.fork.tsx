@@ -23,8 +23,6 @@ import type {
   ExperimentalHideHostEntriesRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalReplyClassifierRegistration,
-  ExperimentalSidebarNewItem,
-  ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
   ExperimentalTabWindow,
   ExperimentalWindowRegistration,
@@ -86,7 +84,6 @@ export interface ForkSlotEnv {
   appPanes: ExperimentalAppPanes;
   appTheme: ExperimentalAppTheme;
   globalTabs: readonly ExperimentalGlobalTab[];
-  sidebarNewItems: readonly ExperimentalSidebarNewItem[];
   launcherItems: readonly ExperimentalLauncherItem[];
   appCommands: readonly ExperimentalAppCommand[];
   tabWindow: ExperimentalTabWindow | null;
@@ -95,7 +92,6 @@ export interface ForkSlotEnv {
 export interface ForkCapturedPluginApp {
   paletteSearches: ExperimentalPaletteSearchRegistration[];
   sidebarSections: ExperimentalSidebarSectionRegistration[];
-  sidebarNewItems: ExperimentalSidebarNewItemRegistration[];
   replyClassifiers: ExperimentalReplyClassifierRegistration[];
   linkHandlers: ExperimentalLinkHandlerRegistration[];
   windows: ExperimentalWindowRegistration[];
@@ -127,8 +123,6 @@ export interface ForkRenderSlotOptions {
   appTheme?: Partial<ExperimentalAppTheme>;
   /** `experimental_useGlobalTabs()` value; defaults to none. */
   globalTabs?: readonly ExperimentalGlobalTab[];
-  /** `experimental_useSidebarNewItems()` value; defaults to none. */
-  sidebarNewItems?: readonly ExperimentalSidebarNewItem[];
   /** `experimental_useLauncherItems()` value; defaults to none. */
   launcherItems?: readonly ExperimentalLauncherItem[];
   /** `experimental_useAppCommands()` value; defaults to none. */
@@ -145,9 +139,6 @@ export function forkTestHooks(
   return {
     experimental_useAppRoute() {
       return useSlotEnv("experimental_useAppRoute").appRoute;
-    },
-    experimental_useSidebarNewItems() {
-      return useSlotEnv("experimental_useSidebarNewItems").sidebarNewItems;
     },
     experimental_useGlobalTabs() {
       return useSlotEnv("experimental_useGlobalTabs").globalTabs;
@@ -317,7 +308,6 @@ export function forkSlotEnv(
     appRoute: { pathname: "/", search: "", hash: "", ...options.appRoute },
     appTheme: { mode: "light", epoch: 0, ...options.appTheme },
     globalTabs: options.globalTabs ?? [],
-    sidebarNewItems: options.sidebarNewItems ?? [],
     launcherItems: options.launcherItems ?? [],
     appCommands: options.appCommands ?? [],
     tabWindow: options.tabWindow ?? null,

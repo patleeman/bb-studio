@@ -23,7 +23,7 @@ import { LinksBridge } from "./src/links/open";
 import { NotFoundTab } from "./src/links/NotFoundTab";
 import { NOT_FOUND_TAB, NOT_FOUND_TITLE } from "./src/links/router";
 import { registerQuietReplyClassifier } from "./src/kit/quiet-turns";
-import { NewMenuBridge, registerNewMenu } from "./src/ui/new-menu";
+import { NewMenuBridge } from "./src/ui/new-menu";
 import { BotSidebarList } from "./src/ui/conversations/BotSidebarList";
 import { showBot } from "./src/ui/conversations/show-bot";
 import { hideBbSkills } from "./src/ui/skills/hide-bb-skills";
@@ -321,7 +321,7 @@ export default definePluginApp((app) => {
   // and the Studio panel brings its own sidebar; BB's thread list and the
   // user's choice of it are left alone. Elsewhere Studio replaces the list
   // (below) and switches the preference to show it.
-  if (registerNewMenu(app.slots)) app.slots.experimental_appOverlay({ id: "new-menu", component: NewMenuBridge });
+  app.slots.experimental_appOverlay({ id: "new-menu", component: NewMenuBridge });
   const sidebarSections = registerSidebarSection(app.slots, { id: "bots", title: "Bots", component: BotsSidebarSection });
   // The Bot sidebar (src/ui/conversations): a thread list the user picks
   // (Settings, or `bb thread-list`): one Bot's conversations and workers, and
