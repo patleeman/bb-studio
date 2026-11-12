@@ -11,7 +11,7 @@ import type { StudioServices } from "../services";
 // names; and its RPC methods are Studio's `pages.*` (docs/merging-add-ons.md).
 import { createStudioNotifier, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { runtimeFile } from "../kit/server/runtime-file";
 import type { BbPluginApi, PluginCliRegistration } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { studioSchemas } from "../kit/contract";
@@ -165,7 +165,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     MERMAID_PATH,
     async (c) => {
       try {
-        mermaidScript ??= readFile(createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"), "utf8");
+        mermaidScript ??= readFile(runtimeFile("mermaid/dist/mermaid.min.js"), "utf8");
         return new Response(await mermaidScript, {
           headers: {
             "content-type": "text/javascript; charset=utf-8",

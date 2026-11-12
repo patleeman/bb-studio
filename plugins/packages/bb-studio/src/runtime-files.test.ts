@@ -13,14 +13,20 @@ function sources(dir: string): string[] {
   });
 }
 
-it("lists every file the server resolves at run time, so the built-in copy ships it", () => {
-  const resolved = new Set<string>();
-  for (const file of [join(root, "server.ts"), ...sources(join(root, "src"))]) {
-    for (const match of readFileSync(file, "utf8").matchAll(/createRequire\(import\.meta\.url\)\.resolve\("([^"]+)"\)/g)) resolved.add(match[1]!);
+const files = [join(root, "server.ts"), ...sources(join(root, "src"))];
+
+it("lists every file the server reads through runtimeFile, so the built-in copy ships it", () => {
+  const bundled = new Set<string>();
+  for (const file of files) {
+    for (const match of readFileSync(file, "utf8").matchAll(/runtimeFile\("([^"]+)"(?:,\s*"([^"]+)")?\)/g)) bundled.add(match[2] ?? match[1]!);
   }
-  expect(resolved.size).toBeGreaterThan(0);
-  for (const target of resolved) {
-    expect(listed.some((entry) => entry === target || entry.startsWith(`${target}/`)), target).toBe(true);
-  }
+  expect(bundled.size).toBeGreaterThan(0);
+  for (const path of bundled) expect(listed, path).toContain(path);
+  expect(listed).toContain("@excalidraw/excalidraw/dist/prod/fonts");
   for (const entry of listed) expect(existsSync(join(root, "node_modules", entry)), entry).toBe(true);
+});
+
+it("resolves no runtime file from node_modules except through runtimeFile", () => {
+  const direct = files.filter((file) => !file.endsWith("runtime-file.ts") && /createRequire\(import\.meta\.url\)\.resolve\(/.test(readFileSync(file, "utf8")));
+  expect(direct).toEqual([]);
 });
