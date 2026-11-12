@@ -11,6 +11,7 @@ import type {
   ExperimentalModelLoadNoticeRegistration,
   ExperimentalFirstRunRegistration,
   ExperimentalModelPickerGateRegistration,
+  ExperimentalHideHostEntriesRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
@@ -62,6 +63,9 @@ export interface PluginFirstRunSlot
 export interface PluginModelPickerGateSlot
   extends ExperimentalModelPickerGateRegistration, ForkSlotBase {}
 
+export interface PluginHiddenHostEntriesSlot
+  extends ExperimentalHideHostEntriesRegistration, ForkSlotBase {}
+
 export interface PluginThreadHeaderSlot
   extends ExperimentalThreadHeaderRegistration, ForkSlotBase {}
 
@@ -106,6 +110,7 @@ export interface ForkRegistrationSet {
   modelLoadNotices?: readonly ExperimentalModelLoadNoticeRegistration[];
   firstRuns?: readonly ExperimentalFirstRunRegistration[];
   modelPickerGates?: readonly ExperimentalModelPickerGateRegistration[];
+  hiddenHostEntries?: readonly ExperimentalHideHostEntriesRegistration[];
   threadHeaders?: readonly ExperimentalThreadHeaderRegistration[];
   forkMessageActions?: readonly ExperimentalMessageActionRegistration[];
   contextCardRows?: readonly ExperimentalContextCardRowRegistration[];
@@ -131,6 +136,7 @@ export interface ForkSlotSnapshot {
   modelLoadNotices: readonly PluginModelLoadNoticeSlot[];
   firstRuns: readonly PluginFirstRunSlot[];
   modelPickerGates: readonly PluginModelPickerGateSlot[];
+  hiddenHostEntries: readonly PluginHiddenHostEntriesSlot[];
   threadHeaders: readonly PluginThreadHeaderSlot[];
   forkMessageActions: readonly PluginMessageActionMenuSlot[];
   contextCardRows: readonly PluginContextCardRowSlot[];
@@ -155,6 +161,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   modelLoadNotices: [],
   firstRuns: [],
   modelPickerGates: [],
+  hiddenHostEntries: [],
   threadHeaders: [],
   forkMessageActions: [],
   panelTabActions: [],
@@ -180,6 +187,7 @@ export const FORK_SLOT_KINDS = [
   "modelLoadNotices",
   "firstRuns",
   "modelPickerGates",
+  "hiddenHostEntries",
   "threadHeaders",
   "forkMessageActions",
   "panelTabActions",
@@ -211,6 +219,7 @@ export function stampForkSlots(
     modelLoadNotices: stamp(set.modelLoadNotices),
     firstRuns: stamp(set.firstRuns),
     modelPickerGates: stamp(set.modelPickerGates),
+    hiddenHostEntries: stamp(set.hiddenHostEntries),
     threadHeaders: stamp(set.threadHeaders),
     forkMessageActions: stamp(set.forkMessageActions),
     panelTabActions: stamp(set.panelTabActions),
