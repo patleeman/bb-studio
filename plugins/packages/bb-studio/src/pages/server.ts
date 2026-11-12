@@ -164,8 +164,8 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     "GET",
     MERMAID_PATH,
     async (c) => {
-      mermaidScript ??= readFile(createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"), "utf8");
       try {
+        mermaidScript ??= readFile(createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js"), "utf8");
         return new Response(await mermaidScript, {
           headers: {
             "content-type": "text/javascript; charset=utf-8",
