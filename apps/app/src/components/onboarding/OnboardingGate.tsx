@@ -1,3 +1,4 @@
+import { ForkFirstRun, useForkFirstRun } from "@/components/fork/ForkFirstRun";
 import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
 import { useUpdateGeneralSettings } from "@/hooks/mutations/settings-mutations";
@@ -45,6 +46,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
 
   const settings = configQuery.data?.generalSettings;
   const completedAt = settings?.onboardingCompletedAt;
+  const forkFirstRun = useForkFirstRun(completedAt === null && !firstRunClosed);
   const setupGuideQuery = useSetupGuideAssignment({
     enabled: completedAt === null,
   });
@@ -74,6 +76,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
   }
 
   const firstRun = settings.onboardingCompletedAt === null && !firstRunClosed;
+  if (firstRun && forkFirstRun !== null) return <ForkFirstRun state={forkFirstRun} />;
   const keepClosedGuideMounted =
     firstRunClosed && setupGuideQuery.data?.variant === "new";
   if (!firstRun && !keepClosedGuideMounted) return children;
