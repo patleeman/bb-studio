@@ -13,6 +13,7 @@ import {
   type ForkThemeMode,
 } from "@/lib/fork-theme-mode";
 import { usePluginSlots } from "@/lib/plugin-slots";
+import { FORK_TITLE_ROWS_ATTRIBUTE } from "./ForkTitleHost";
 
 export const FORK_BACKDROP_ATTRIBUTE = "data-fork-backdrop";
 export const FORK_SURFACE_EDGE_ATTRIBUTE = "data-fork-surface-edge";
@@ -46,6 +47,7 @@ const MAX_CARDS_RADIUS = 28;
 export interface ForkCardsLayout {
   gap: number;
   radius: number;
+  titleRow: boolean;
 }
 
 export interface ForkAppearance {
@@ -76,7 +78,7 @@ function cleanCards(layout: unknown): ForkCardsLayout | null {
   const gap = clampPixels(layout.cards.gap, MAX_CARDS_GAP);
   const radius = clampPixels(layout.cards.radius, MAX_CARDS_RADIUS);
   if (gap === null || radius === null) return null;
-  return { gap, radius };
+  return { gap, radius, titleRow: layout.cards.titleRow === true };
 }
 
 export function cleanAppearance(value: unknown): ForkAppearance {
@@ -128,6 +130,9 @@ export function applyAppearance(
     properties.set(FORK_CARDS_GAP_PROPERTY, `${appearance.cards.gap}px`);
     properties.set(FORK_CARDS_RADIUS_PROPERTY, `${appearance.cards.radius}px`);
     root.setAttribute(FORK_CARDS_ATTRIBUTE, "");
+    if (appearance.cards.titleRow) {
+      root.setAttribute(FORK_TITLE_ROWS_ATTRIBUTE, "");
+    }
   }
   for (const [name, value] of properties) {
     previous.set(name, [
@@ -144,6 +149,7 @@ export function applyAppearance(
     setForkThemeModeOverride(null);
     root.removeAttribute(FORK_SURFACE_EDGE_ATTRIBUTE);
     root.removeAttribute(FORK_CARDS_ATTRIBUTE);
+    root.removeAttribute(FORK_TITLE_ROWS_ATTRIBUTE);
     for (const [name, [value, priority]] of previous) {
       if (value === "") root.style.removeProperty(name);
       else root.style.setProperty(name, value, priority);
