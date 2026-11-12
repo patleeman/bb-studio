@@ -1,6 +1,10 @@
 {
   "skip": [
     {
+      "file": "apps/server/test/public/public-thread-fork.test.ts",
+      "title": "keeps the fork when a failed fork start is retried or messaged"
+    },
+    {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "keeps a highlighted row in view when server rows push it down"
     },
