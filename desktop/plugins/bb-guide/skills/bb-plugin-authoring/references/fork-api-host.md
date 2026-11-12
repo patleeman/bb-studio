@@ -164,6 +164,35 @@ not remount, and they return to the bar when the host or the flag goes.
   scrollbar gutter and show a thin overlay thumb on hover and scroll. Mark
   your own scroller `data-fork-overlay-scroll` for the same.
 
+## bb's first run
+
+- `app.slots.experimental_firstRun({ id, component? })` → takes over bb's
+  setup screens on a data dir whose first run is not done. bb waits for
+  plugin frontends to load, then draws `component` full-window with
+  `{ finish }`; `finish()` marks the first run done and shows the app. With
+  no component bb finishes at once. The first registration by plugin id
+  wins; without one bb shows its own screens.
+- `app.slots.experimental_modelPickerGate({ id, component })` → drawn in
+  place of bb's model picker with `{ hasSelectedModel, children }`;
+  `children` is bb's picker. Return it to keep the picker. The first by
+  plugin id wins; a throw falls back to the picker.
+
+## Hide bb's own entries
+
+- `app.slots.experimental_hideHostEntries({ id, navigation?, pages?,
+settings? })` → takes bb's own entries out of the app: sidebar navigation
+  keys (`__bb__/skills`, `__bb__/extensions`, … or `<pluginId>/<panelId>`),
+  pages (`"skills"`: its address goes home) and settings sections
+  (`"cli-skills"`, also left out of settings search). UI only.
+
+## The skill registry
+
+- Backend: `bb.experimental_hooks.experimental_skillsRegistryPolicy(({
+operation }) => ({ allowed: true } | { allowed: false, message }))`. bb asks
+  it before serving any skills.sh request (`search`, `read`, `install`) from
+  the app, the CLI, the SDK or an agent. A refusal, a throw or no answer in
+  5 s refuses with a 403 carrying the message. One policy per plugin.
+
 ## The workbench of your own page
 
 A nav-panel page has the same side panel as a thread. Reach it with

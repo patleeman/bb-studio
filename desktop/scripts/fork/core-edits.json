@@ -37,9 +37,9 @@
       "budget": 7
     },
     "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
-      "seam": "composer-labels",
-      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page.",
-      "budget": 8
+      "seam": "composer-labels, model-picker-gate",
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready).",
+      "budget": 13
     },
     "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
       "seam": "new-tab-items",
@@ -68,8 +68,8 @@
     },
     "apps/app/src/components/promptbox/FollowUpPromptBox.tsx": {
       "seam": "composer-footer",
-      "intent": "Renders PluginComposerFooter (ForkComposerFooter.tsx, which resolves the slots' experimental_footer items itself) in the row under an existing thread's input, before bb's own controls.",
-      "budget": 6
+      "intent": "Renders PluginComposerFooter (ForkComposerFooter.tsx, which resolves the slots' experimental_footer items itself) in the row under an existing thread's input, before bb's own controls. The context-window ring sits in a data-fork-context-control wrapper with PluginComposerFooter placement=\"context\" before it, so a plugin item (Studio's prompt-cache clock) and the ring read as one control.",
+      "budget": 10
     },
     "apps/app/src/components/secondary-panel/SecondaryPanelTabStrip.tsx": {
       "seam": "workbench, item-drag",
@@ -172,18 +172,23 @@
       "budget": 4
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp.",
-      "budget": 4
+      "seam": "import-sync, approvals, skills-registry-policy",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts).",
+      "budget": 6
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events.",
-      "budget": 10
+      "seam": "quiet-turns, plugin-events, bundled-studio",
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio and Visual Chat reconcile as built-ins when their bundles are in the app; an existing install of the same id from another source (a path install) is left alone.",
+      "budget": 13
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
       "seam": "import-sync",
       "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message.",
+      "budget": 4
+    },
+    "apps/server/src/services/threads/thread-lifecycle.ts": {
+      "seam": "fork-transcript",
+      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork; otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {
@@ -192,9 +197,9 @@
       "budget": 2
     },
     "apps/server/src/services/threads/thread-create.ts": {
-      "seam": "import-sync",
-      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine.",
-      "budget": 2
+      "seam": "import-sync, idle-thread",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message.",
+      "budget": 6
     },
     "apps/server/src/start-server.ts": {
       "seam": "import-sync",
@@ -422,9 +427,9 @@
       "budget": 2
     },
     "apps/app/src/views/ToolsView.tsx": {
-      "seam": "app-backdrop",
-      "intent": "One fork import at the top of the file and two lines in ResourceScrollPage: <ForkTitleHost kind=\"tools\" /> is the first child of the fill-viewport wrapper (box-border h-full w-full) and of the scrolling wrapper (relative h-full overflow-hidden, before the scroller, which must stay a direct child for fork.css's card rule). Empty and not displayed unless an app backdrop asks for layout.cards.titleRow.",
-      "budget": 3
+      "seam": "app-backdrop, host-entries",
+      "intent": "One fork import at the top of the file and two lines in ResourceScrollPage: <ForkTitleHost kind=\"tools\" /> is the first child of the fill-viewport wrapper (box-border h-full w-full) and of the scrolling wrapper (relative h-full overflow-hidden, before the scroller, which must stay a direct child for fork.css's card rule). Empty and not displayed unless an app backdrop asks for layout.cards.titleRow. A second fork import at the top, and two lines at the start of SkillsView after useLocation: useForkHiddenHostPage(\"skills\") and returning its redirect when a plugin hides the Skills page.",
+      "budget": 6
     },
     "apps/app/src/lib/pierre-strict-mode-recovery.ts": {
       "seam": "app-backdrop",
@@ -443,13 +448,43 @@
     },
     "apps/app/src/components/settings/UpdatesSettingsSection.tsx": {
       "seam": "studio-release",
-      "intent": "RowName draws <ForkStudioBase version={current} /> (ForkStudioBase.tsx) after the versions: a row showing the Studio build's version gets \"based on bb <version> @ <sha>\".",
-      "budget": 2
+      "intent": "RowName draws <ForkStudioBase version={current} /> (ForkStudioBase.tsx) after the versions: a row showing the Studio build's version gets \"based on bb <version> @ <sha>\". In BbAppUpdateRows, forkStudioReleaseLink replaces the Changelog toggle in a Studio build (a link to BB Studio's releases once a release was found, nothing before), and the release check control's labels go through forkStudioCheckLabel (\"Check\" in a Studio build). The fork import sits at the top of the file.",
+      "budget": 9
     },
     "apps/server/src/services/system/desktop-app-update.ts": {
       "seam": "studio-release",
-      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not.",
+      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not. The fetch-failed message is STUDIO_NO_RELEASE_MESSAGE (desktop-app-update.fork.ts), imported at the top of the file.",
+      "budget": 5
+    },
+    "apps/app/src/components/onboarding/OnboardingGate.tsx": {
+      "seam": "first-run",
+      "intent": "OnboardingGate asks useForkFirstRun (components/fork/ForkFirstRun.tsx, imported at the top of the file) while bb's first run is not done; when it answers (a plugin's slots.experimental_firstRun, or a wait while plugin frontends load) the gate draws <ForkFirstRun> instead of bb's setup screens. Without a plugin's first run, bb's flow is unchanged.",
+      "budget": 3
+    },
+    "packages/server-contract/src/api/threads.ts": {
+      "seam": "idle-thread",
+      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread.",
       "budget": 2
+    },
+    "apps/app/src/components/sidebar/SidebarNavigationModel.tsx": {
+      "seam": "host-entries",
+      "intent": "One fork import at the top; SidebarNavigationModelProvider names upstream's memoized createSidebarNavigationRows result allRows and passes it through useForkVisibleNavigationRows, so rows (and everything built from it: the arrangement, rowsById, badges, the active item) leave out navigation keys a plugin hides.",
+      "budget": 4
+    },
+    "apps/app/src/components/settings/CliSkillsSettingsSection.tsx": {
+      "seam": "host-entries",
+      "intent": "One fork import at the top; CliSkillsSettingsSection returns null after its hooks when a plugin hides the \"cli-skills\" settings section.",
+      "budget": 2
+    },
+    "apps/app/src/components/settings/settings-search.ts": {
+      "seam": "host-entries",
+      "intent": "Adds the \"cliSkills\" search condition and makes the \"bb CLI skills\" entry need it, so settings search leaves it out while the section is hidden.",
+      "budget": 7
+    },
+    "apps/app/src/components/settings/useSettingsSearchConditions.ts": {
+      "seam": "host-entries",
+      "intent": "One fork import at the top; the cliSkills condition is met unless a plugin hides the \"cli-skills\" settings section (useForkHostSettingHidden), listed with the other conditions and in the memo's dependencies.",
+      "budget": 4
     }
   }
 }

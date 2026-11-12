@@ -10,8 +10,12 @@ its own file so upstream changes to `docs/api_to_audit.md` never conflict.
 `app.composer.customize({ id, scopes: ["thread"], experimental_footer: [{
 id, component }] })` places a small status item in the row under an
 existing thread's input, before the session-options, permission and
-context-window controls. A component returning null takes no space. Other
-scopes have no footer row and ignore the field.
+context-window controls. An item with `placement: "context"` is drawn right
+before the context-window ring instead, in one wrapper with it
+(`data-fork-context-control`), so the two read as one control; a click on it
+should open the context popover (Studio's prompt-cache clock and minutes
+left). A component returning null takes no space. Other scopes have no
+footer row and ignore the field.
 
 **Core callers.** None; core's own items in that row (`SessionOptionsMenu`,
 the permission control, `ThreadContextWindowIndicator`) are passed in as
@@ -644,6 +648,48 @@ Sign in, instead of leaving only the pooler's HTTP 429.
    should be passed.
 2. The composer's send-blocking message (`formatModelLoadErrorText`) is text
    and draws no notice.
+
+## The model picker's stand-in (`slots.experimental_modelPickerGate`)
+
+A plugin's component is drawn wherever bb draws its model picker, with bb's
+picker as `children` and `hasSelectedModel`. It returns `children` to keep
+the picker or its own node instead. The first registration by plugin id,
+then registration id, wins; one that throws falls back to bb's picker.
+Studio is the caller: "Sign in", opening Accounts, while no agent provider
+is ready.
+
+**Core callers.** `components/fork/ForkModelPickerGate.tsx`
+(`forkModelPickerGate`), around the picker in
+`pickers/ModelReasoningPicker.tsx`.
+
+**Audit before stabilizing.**
+
+1. Every picker gets it, Settings' default-model pickers included; decide
+   whether the gate should know where it is drawn.
+
+## bb's first run (`slots.experimental_firstRun`)
+
+A plugin takes over bb's first run, the setup screens shown while
+`generalSettings.onboardingCompletedAt` is null. While it is null, bb holds
+the screen blank until the plugin list has loaded and, when any enabled
+plugin has an app, until plugin frontends settle. Then the first
+registration in plugin-id order wins: its `component` is drawn full-window
+with `finish()`, which sets `onboardingCompletedAt` as bb's own screens do;
+a registration with no component is finished at once. A component that
+crashes finishes too. With no registration bb's own screens show. Studio is
+the caller: "Connect a model", provider sign-in cards with Skip for now; once a
+provider is ready its onboarding makes the Assistant Bot and starts its first
+chat on Main.
+
+**Core callers.** `components/fork/ForkFirstRun.tsx` (`useForkFirstRun`,
+`ForkFirstRun`), drawn by `onboarding/OnboardingGate.tsx`.
+
+**Audit before stabilizing.**
+
+1. The wait has no time limit of its own; it ends when plugin frontends
+   settle, which has a 15 s floor.
+2. Settings, "Replay setup guide" clears the setting and shows the plugin's
+   first run again, not bb's.
 
 ## A thread header's title and a node after it (`slots.experimental_threadHeader`)
 
@@ -1550,3 +1596,48 @@ tooltip and a dialog with an opaque body in the real `AppLayout`.
    and plugin panels too. Stabilize once Studio's themes have
    shipped on it, both window kinds pass a live check, and the selectors
    are covered by an upstream-owned attribute.
+
+## Hiding bb's own entries (`slots.experimental_hideHostEntries`)
+
+A plugin lists bb's own sidebar navigation keys, pages and settings sections
+to take out of the app. The sidebar leaves hidden rows out, a hidden page's
+address goes to the home view, and a hidden settings section is neither drawn
+nor offered by settings search. Registrations add up across plugins. BB Studio
+hides the Skills row, the Skills page and General's "bb CLI skills".
+
+**Core callers.** `components/fork/ForkHiddenHostEntries.tsx` reads the
+registrations. `SidebarNavigationModel.tsx` filters its rows,
+`ToolsView.tsx`'s `SkillsView` redirects, `CliSkillsSettingsSection.tsx`
+draws nothing, and `useSettingsSearchConditions.ts` drops the `cliSkills`
+search entry.
+
+**Audit before stabilizing.**
+
+1. Only one page (`skills`) and one settings section (`cli-skills`) are
+   named. Decide whether pages and sections get stable ids bb maintains.
+2. Hiding is UI only. Pair it with a server policy where the entry's routes
+   matter (the skill registry has `experimental_skillsRegistryPolicy`).
+3. The sidebar's stored order keeps a hidden key; it shows again where it
+   was once the plugin is off.
+
+## The skill registry policy (`experimental_skillsRegistryPolicy`)
+
+A backend plugin registers one policy on `bb.experimental_hooks`. bb asks
+every policy before it serves any `/skills-registry` request: `search` (the
+list and search), `read` (an entry, its detail, its repository stars) and
+`install` (installs and install jobs). One refusal answers 403
+`skills_registry_refused` with its message, so the app, the CLI (`bb skill
+search`, `bb skill registry detail`, `bb skill install`), the SDK and agents
+all see the same message. A throw or no answer within 5 seconds refuses too.
+BB Studio refuses all three until a person turns the registry on in Settings
+(an approval only a person can answer).
+
+**Core callers.** `services/skills/registry-policy.fork.ts` is the registry
+and the middleware; `server.ts` mounts it before the registry routes.
+
+**Audit before stabilizing.**
+
+1. The policy is not told who is asking (the app, the CLI, an agent); decide
+   whether it should be.
+2. Skills installed outside bb (a harness's own installer, a shell command)
+   are not covered.

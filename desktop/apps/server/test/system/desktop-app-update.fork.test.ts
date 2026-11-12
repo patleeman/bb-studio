@@ -68,4 +68,24 @@ describe("desktop-owned server update status in BB Studio", () => {
     expect(status.current.version).toBe("1.0.0");
     expect(status.available?.version).toBe("1.0.1");
   });
+
+  it("says no BB Studio release was found while the feed has none", async () => {
+    const service = await serviceFor(
+      {
+        supported: true,
+        version: "1.0.0",
+        latestVersion: null,
+        pendingVersion: null,
+        updateAvailable: false,
+        updateDownloaded: false,
+        downloadState: "idle",
+      },
+      "0.49.0",
+    );
+    const status = await service.getStatus({ forceRefresh: false });
+    expect(status.blocked).toEqual({
+      reason: "fetch-failed",
+      message: "No BB Studio release found.",
+    });
+  });
 });
