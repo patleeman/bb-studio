@@ -44,7 +44,7 @@ function webpSize(path) {
   return { width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff };
 }
 function theme(name, title, text) {
-  const alt = `BB Studio with the ${title} theme on the Main conversation of the Bot Atlas.`;
+  const alt = `BB Studio with the ${title} theme on the Main conversation with Atlas.`;
   return `<figure class="shot theme">
       ${pic(name, alt, "(min-width: 1100px) 350px, (min-width: 900px) 45vw, 94vw")}
       <figcaption><strong>${esc(title)}</strong>${text ? esc(text) : ""}</figcaption>

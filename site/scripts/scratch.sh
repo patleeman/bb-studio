@@ -1,6 +1,6 @@
 #!/bin/sh
 # Start, stop or call a SCRATCH BB Studio server for the site's screenshots.
-# It has its own data dir, port and HOME, imports nothing from ~/.bb, and has
+# It has its own data dir and port, imports nothing from ~/.bb, has Pi off and
 # no provider CLI on its PATH, so no real agent turn can start.
 #
 #   scratch.sh start | stop | bb <cli args...> | wipe
@@ -22,11 +22,14 @@ esac
 
 case "${1:-}" in
   start)
-    mkdir -p "$DATA" "$SCRATCH/home"
-    nohup env -i HOME="$SCRATCH/home" PATH="/usr/bin:/bin:$NODE_PATH_DIR" \
+    mkdir -p "$DATA"
+    # HOME stays the real one (it has a keychain); BB_DATA_DIR keeps every
+    # write in the scratch dir, and Pi is off because it writes its sessions
+    # under ~/.bb whatever the data dir is.
+    nohup env -i HOME="$HOME" PATH="/usr/bin:/bin:$NODE_PATH_DIR" \
       BB_DATA_DIR="$DATA" BB_SERVER_PORT=$PORT BB_HOST_DAEMON_PORT=$DAEMON_PORT \
-      BB_STUDIO_IMPORT_FROM=off BB_SKIP_ONBOARDING=1 \
-      node "$DESKTOP/packages/bb-app/dist/bb-app.js" > "$SCRATCH/server.log" 2>&1 &
+      BB_STUDIO_IMPORT_FROM=off BB_SKIP_ONBOARDING=1 BB_PI_BRIDGE_COMMAND=/usr/bin/false \
+      node "$DESKTOP/packages/bb-app/dist/bb-app.js" --bundled --no-in-app-updates > "$SCRATCH/server.log" 2>&1 &
     for _ in $(seq 1 60); do
       curl -sf "http://127.0.0.1:$PORT/api/v1/health" >/dev/null 2>&1 && break
       sleep 1
@@ -34,13 +37,13 @@ case "${1:-}" in
     tail -n 12 "$SCRATCH/server.log"
     ;;
   stop)
-    env -i HOME="$SCRATCH/home" PATH="/usr/bin:/bin:$NODE_PATH_DIR" \
+    env -i HOME="$HOME" PATH="/usr/bin:/bin:$NODE_PATH_DIR" \
       node "$DESKTOP/packages/bb-app/dist/bb-app.js" stop --data-dir "$DATA"
     ;;
   bb)
     shift
     exec env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin \
-      BB_DATA_DIR="$DATA" BB_SERVER_URL="http://127.0.0.1:$PORT" \
+      BB_DATA_DIR="$DATA" BB_SERVER_URL="http://127.0.0.1:$PORT" BB_PI_BRIDGE_COMMAND=/usr/bin/false \
       node "$BB_CLI" "$@"
     ;;
   wipe)

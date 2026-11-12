@@ -31,23 +31,33 @@ const SHOTS = {
   "theme-deep-sea": { widths: [800, 1600] },
   "theme-github-light": { widths: [800, 1600] },
   "theme-catppuccin-mocha": { widths: [800, 1600] },
-  "main-with-approval": { widths: [800, 1600, 2400] },
   approval: { widths: [820, 1640] },
   sidebar: { widths: [290, 580] },
-  worker: { widths: [800, 1600] },
-  "page-memory": { crop: [0, 0, 3200, 1100], widths: [800, 1600] },
-  "page-library": { crop: [0, 0, 3200, 1100], widths: [800, 1600] },
-  "page-todos": { crop: [0, 0, 3200, 1100], widths: [800, 1600] },
-  "page-automations": { crop: [0, 0, 3200, 1100], widths: [800, 1600] },
+  "page-memory": { widths: [800, 1600] },
+  "page-todos": { widths: [800, 1600] },
+  "page-automations": { widths: [800, 1600] },
   "page-skills": { crop: [840, 100, 1800, 1040], widths: [800, 1600] },
   accounts: { crop: [0, 1860, 580, 1440], widths: [290, 580] },
   workbench: { widths: [800, 1600, 2400] },
   cmdk: { crop: [700, 40, 2300, 1200], widths: [800, 1600] },
   "edit-space": { widths: [800, 1600] },
-  hud: { widths: [480, 960] },
-  replies: { crop: [690, 930, 1240, 180], widths: [620, 1240] },
   "replies-open": { widths: [800, 1600, 2400] },
   "presence-sheet": { widths: [600, 1200] },
+  "item-page": { widths: [800, 1600, 2400] },
+  "item-page-embeds": { widths: [800, 1600] },
+  "item-design": { crop: [1500, 720, 1700, 820], widths: [850, 1700] },
+  "item-whiteboard": { widths: [800, 1600] },
+  "item-dashboard": { widths: [800, 1600, 2400] },
+  "item-mini": { crop: [0, 0, 3200, 1300], widths: [800, 1600] },
+  "item-artifact": { crop: [0, 0, 3200, 1200], widths: [800, 1600] },
+  "item-recording": { widths: [800, 1600] },
+  "item-collection": { crop: [0, 0, 3200, 1200], widths: [800, 1600] },
+  "item-canvas": { widths: [800, 1600, 2400] },
+  "item-code": { widths: [800, 1600, 2400] },
+  composer: { crop: [1180, 1520, 1500, 420], widths: [750, 1500] },
+  "ios-bot-chat": { widths: [400, 800] },
+  "ios-bot-approval": { widths: [400, 800] },
+  "ios-widgets": { widths: [400, 800] },
 };
 
 for (const [name, spec] of Object.entries(SHOTS)) {
@@ -62,7 +72,7 @@ for (const [name, spec] of Object.entries(SHOTS)) {
   for (const width of spec.widths) {
     const png = join(tmp, `${name}-${width}.png`);
     run("sips", ["-s", "format", "png", "--resampleWidth", String(width), input, "--out", png]);
-    const alpha = name === "hud";
+    const alpha = false;
     run("avifenc", ["-q", "60", "-s", "6", ...(alpha ? [] : []), png, join(out, "img", `${name}-${width}.avif`)]);
     run("cwebp", ["-quiet", "-q", "78", ...(alpha ? ["-exact", "-alpha_q", "90"] : []), png, "-o", join(out, "img", `${name}-${width}.webp`)]);
   }

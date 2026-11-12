@@ -6,7 +6,7 @@
 //   node capture.mjs <ids.json> <out-dir> [shot ...]
 // Needs `playwright` resolvable (see README: npm i in a tools dir, NODE_PATH).
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,7 +80,7 @@ const ACCOUNTS = {
   dismissed: [],
 };
 
-const browser = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
+const browser = await chromium.launch({ args: ["--use-mock-keychain", "--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2, reducedMotion: "no-preference" });
 await ctx.addInitScript(STUB);
 await ctx.route("**/api/v1/plugins/studio/rpc/accounts.status", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, result: ACCOUNTS }) }));
@@ -125,7 +125,7 @@ setTheme("Atlas", "miami-1985");
 if (want("approval")) {
   approval(true);
   await go(main());
-  await shot("approval", { x: 560, y: 40, width: 820, height: 200 });
+  await shot("approval", { x: 560, y: 40, width: 820, height: 178 });
   await shot("main-with-approval");
 }
 
@@ -152,6 +152,47 @@ for (const [name, path] of Object.entries(PAGES)) {
   if (!want(name)) continue;
   await go(path);
   await shot(name);
+}
+
+// ---- Studio items: each in its own tab ------------------------------------
+const features = existsSync(join(dirname(idsFile), "features.json")) ? JSON.parse(readFileSync(join(dirname(idsFile), "features.json"), "utf8")) : null;
+if (features) {
+  const ITEMS = {
+    "item-page": `/plugins/studio/studio/pages/${features.page}`,
+    "item-design": `/plugins/studio/studio/designs/${features.design}`,
+    "item-whiteboard": `/plugins/studio/studio/drawings/${features.whiteboard}`,
+    "item-dashboard": `/plugins/studio/studio/dashboards/${features.dashboard}`,
+    "item-mini": `/plugins/studio/studio/minis/${features.mini}`,
+    "item-artifact": `/plugins/studio/studio/artifacts/${features.artifacts["release-timeline.svg"]}`,
+    "item-recording": `/plugins/studio/studio/recordings/${features.recording}`,
+    "item-collection": `/plugins/studio/studio`,
+    "item-canvas": `/plugins/studio-visual-chat/canvas/${features.canvasThread}`,
+    "item-code": `/plugins/studio/studio/workspaces/${features.workspace}`,
+  };
+  for (const [name, path] of Object.entries(ITEMS)) {
+    if (!want(name)) continue;
+    await go(path, name === "item-code" ? 15000 : 9000);
+    if (name === "item-design") {
+      // Zoom out until the round's three screens fit.
+      for (let i = 0; i < 5; i++) { await page.getByRole("button", { name: "Zoom out" }).first().click().catch(() => {}); await wait(300); }
+      await wait(1500);
+    }
+    if (name === "item-code") {
+      rpc("code.reveal", { id: features.workspace, path: join(features.repo, "src/sync/queue.ts"), startLine: 9, endLine: 14 });
+      await wait(6000);
+    }
+    await page.mouse.move(1590, 990);
+    await shot(name);
+  }
+  // The page, scrolled to its whiteboard and the mini app embedded in it.
+  if (want("item-page-embeds")) {
+    await go(`/plugins/studio/studio/pages/${features.page}`, 9000);
+    await page.getByText("Rollout", { exact: true }).first().scrollIntoViewIfNeeded().catch(() => {});
+    await page.getByText("Rollout", { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+    await wait(3000);
+    await page.mouse.move(1590, 990);
+    await shot("item-page-embeds");
+  }
 }
 
 // ---- Skills, in the Bot's controls ----------------------------------------
@@ -206,15 +247,13 @@ if (want("edit-space")) {
   await shot("edit-space");
 }
 
-// ---- The HUD (a see-through window), captured with no background --------
-if (want("hud")) {
-  const hud = await ctx.newPage();
-  await hud.setViewportSize({ width: 480, height: 600 });
-  await hud.goto(`${ORIGIN}/fork-window/studio/hud?threadId=${ids["atlas-main"]}&bbTransparent=1`, { waitUntil: "domcontentloaded" });
-  await hud.waitForTimeout(7000);
-  await hud.screenshot({ path: join(outDir, "hud.png"), omitBackground: true });
-  console.log("shot hud");
-  await hud.close();
+// ---- The composer: dictation and hands-free voice -----------------------
+if (want("composer")) {
+  approval(false);
+  await go(main());
+  await page.mouse.move(1590, 990);
+  await shot("composer");
+  approval(true);
 }
 
 // ---- The workbench beside Main, split in two panes -----------------------
@@ -224,17 +263,17 @@ if (want("workbench")) {
   await go(main());
   await page.keyboard.press("Meta+k");
   await wait(800);
-  await page.keyboard.type("release notes");
+  await page.keyboard.type("launch plan");
   await wait(1500);
   await page.keyboard.press("Enter");
   await wait(3000);
   await page.keyboard.press("Meta+k");
   await wait(800);
-  await page.keyboard.type("reading");
+  await page.keyboard.type("orbit-web health");
   await wait(1500);
   await page.keyboard.press("Meta+Enter");
   await wait(4000);
-  await page.locator("aside").getByText(/^Release notes/).first().click().catch(() => {});
+  await page.locator("aside").getByText(/launch plan/).first().click().catch(() => {});
   await wait(3000);
   await shot("workbench");
   approval(true);
