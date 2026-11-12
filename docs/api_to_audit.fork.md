@@ -645,6 +645,29 @@ Sign in, instead of leaving only the pooler's HTTP 429.
 2. The composer's send-blocking message (`formatModelLoadErrorText`) is text
    and draws no notice.
 
+## bb's first run (`slots.experimental_firstRun`)
+
+A plugin takes over bb's first run, the setup screens shown while
+`generalSettings.onboardingCompletedAt` is null. While it is null, bb holds
+the screen blank until the plugin list has loaded and, when any enabled
+plugin has an app, until plugin frontends settle. Then the first
+registration in plugin-id order wins: its `component` is drawn full-window
+with `finish()`, which sets `onboardingCompletedAt` as bb's own screens do;
+a registration with no component is finished at once. A component that
+crashes finishes too. With no registration bb's own screens show. Studio is
+the caller: no component; its onboarding makes the Assistant Bot and the
+Welcome conversation and lands the first window there.
+
+**Core callers.** `components/fork/ForkFirstRun.tsx` (`useForkFirstRun`,
+`ForkFirstRun`), drawn by `onboarding/OnboardingGate.tsx`.
+
+**Audit before stabilizing.**
+
+1. The wait has no time limit of its own; it ends when plugin frontends
+   settle, which has a 15 s floor.
+2. Settings, "Replay setup guide" clears the setting and shows the plugin's
+   first run again, not bb's.
+
 ## A thread header's title and a node after it (`slots.experimental_threadHeader`)
 
 A plugin's `useDecoration({ threadId })` hook runs in every thread header
