@@ -164,6 +164,12 @@ Names: `ExperimentalMainHeaderRegistration`.
 
 Names: `ExperimentalThreadBannerRegistration`, `ExperimentalThreadBannerProps`.
 
+- `app.slots.experimental_modelLoadNotice({ id, component })` → drawn under
+  "Could not load models for …" in the model picker. Props `{ providerLabel,
+  code, detail }`; return null to add nothing.
+
+Names: `ExperimentalModelLoadNoticeRegistration`, `ExperimentalModelLoadNoticeProps`.
+
 - `app.slots.experimental_threadHeader({ id, useDecoration })` → changes
   each thread's header row. `useDecoration({ threadId })` is a hook bb calls
   in the main thread view and in every split pane; return `{ title?, after?

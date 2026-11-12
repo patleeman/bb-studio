@@ -1,3 +1,4 @@
+import { forkModelLoadNotice } from "@/components/fork/ForkModelLoadNotices";
 import { ExpandableText } from "@bb/shared-ui/expandable-text";
 import type { ReactNode } from "react";
 import type { SystemExecutionOptionsModelLoadError } from "@bb/server-contract";
@@ -71,6 +72,7 @@ export function ModelLoadErrorMessage({
       <span className="block">
         {formatModelLoadErrorSummary({ providerLabel })}
       </span>
+      {forkModelLoadNotice({ providerLabel, error })}
       {reason === null ? null : (
         <ExpandableText expandLabel="Show details" className="mt-1 opacity-80">
           {helpUrl === undefined ? (
