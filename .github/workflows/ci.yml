@@ -1,3 +1,4 @@
+# See docs/MONOREPO.md, "CI and the stable branch".
 name: CI
 
 on:
