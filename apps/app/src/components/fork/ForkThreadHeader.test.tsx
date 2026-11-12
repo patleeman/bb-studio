@@ -100,6 +100,7 @@ function header(threadId: string, threadTitle: string) {
   return (
     <ThreadDetailHeader
       actionsMenu={null}
+      environmentId={null}
       isSecondaryPanelOpen={false}
       onToggleSecondaryPanel={vi.fn()}
       thread={target(threadId)}
