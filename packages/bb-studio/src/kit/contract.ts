@@ -1,0 +1,364 @@
+// The Studio provider contract: the RPC methods every Studio add-on registers
+// so the Studio plugin can list, search, create, move, and delete its items.
+//
+// Nothing here imports zod at runtime. The kit is bundled from outside each
+// plugin's directory, where the plugin's own zod isn't resolvable, so callers
+// pass their `z` in.
+import type { z as Zod } from "zod";
+import type { NewThreadRequest } from "@get-bb/plugin-sdk";
+import { untitled } from "./format";
+
+export function conversationRequestSchema(z: typeof Zod) {
+  return z.object({
+    projectId: z.string().min(1),
+    providerId: z.string().min(1),
+    model: z.string(),
+    reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]),
+    permissionMode: z.enum(["accept-edits", "auto", "full"]),
+    serviceTier: z.string().min(1).optional(),
+    executionInputSources: z.object({
+      model: z.enum(["client-preference", "explicit"]).optional(),
+      permissionMode: z.enum(["client-preference", "explicit"]).optional(),
+      providerId: z.enum(["client-preference", "explicit"]).optional(),
+      reasoningLevel: z.enum(["client-preference", "explicit"]).optional(),
+      serviceTier: z.enum(["client-preference", "explicit"]).optional(),
+    }),
+    environment: z.record(z.string(), z.json()).transform(value => value as NewThreadRequest["environment"]),
+    input: z.array(z.record(z.string(), z.json())).min(1).transform(value => value as NewThreadRequest["input"]),
+    sendAt: z.number().int().positive().optional(),
+  });
+}
+
+export const STUDIO_PLUGIN_ID = "studio";
+/** Studio's nav panel path: the collection lives at /plugins/studio/studio. */
+export const STUDIO_PANEL_PATH = "studio";
+/** The RPC an add-on calls on Studio when its items change. */
+export const STUDIO_CHANGED_METHOD = "studio_changed";
+export const STUDIO_CHANGED_MAX_IDS = 500;
+/** Studio's realtime channel; payload `{ pluginId, ids?, removed? }`. */
+export const STUDIO_REALTIME_CHANNEL = "studio-changed";
+/** Studio's RPC that finds the item a path opens, or an item by id. */
+export const STUDIO_ITEM_AT_METHOD = "itemAt";
+
+/**
+ * Kinds built into Studio, by the plugin id they had as add-ons (their item
+ * namespace). Their provider methods are Studio's: call them through Studio's
+ * `provider.call` (see callProvider in ./server), not the old plugin.
+ */
+export const STUDIO_BUILTINS: readonly string[] = ["pages", "artifacts", "excalidraw", "design", "talk", "dashboards", "minis", "studio-code"];
+/** Studio's method that runs a built-in kind's `studio_*` provider method. */
+export const STUDIO_PROVIDER_CALL_METHOD = "provider.call";
+
+export type StudioTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
+
+export interface StudioFact {
+  /** Matches a column the kind declares, e.g. "length". */
+  id: string;
+  /** Display text, e.g. "12 min". */
+  value: string;
+  /** Sort value for the column; null sorts last. */
+  sort: number | null;
+}
+
+export interface StudioBadge {
+  label: string;
+  tone: StudioTone;
+}
+
+export interface StudioItem {
+  id: string;
+  /** A kind id declared by the provider, e.g. "page", "recording". */
+  kind: string;
+  /**
+   * Studio's two kinds of thing: "page" (documents) or "app" (things that
+   * run). Studio sets it, with `type`, on what it returns; providers leave
+   * both out, and so do kinds outside the two (recordings, add-ons' kinds).
+   */
+  family?: "page" | "app";
+  /** Which page or app: "doc", "design", "whiteboard", "mini", "dashboard" or "artifact". */
+  type?: string;
+  /** Empty for an untitled item; the UI shows "Untitled". */
+  title: string;
+  /** An emoji the user picked, or null for the kind's icon. */
+  icon: string | null;
+  projectId: string | null;
+  /** Nesting within the same provider, e.g. a sub-page. */
+  parentId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  /** Who made the last change. */
+  updatedBy: "user" | "agent" | null;
+  /** One line of text, or null. */
+  preview: string | null;
+  facts: StudioFact[];
+  badge: StudioBadge | null;
+  /** A small image shown in place of the icon, served by the provider. */
+  thumbnailUrl: string | null;
+  /** App path that opens the item, e.g. /plugins/studio/studio/pages/pg_x. */
+  href: string;
+  archived: boolean;
+  /** A reusable source item. */
+  template?: boolean;
+}
+
+export interface StudioColumn {
+  /** The fact id this column shows. */
+  id: string;
+  label: string;
+}
+
+export interface StudioAction {
+  id: string;
+  /** Button label; `{count}` is replaced with the number of items it applies to. */
+  label: string;
+  icon: string;
+  /** "copy" puts the action's returned text on the clipboard. */
+  result: "toast" | "copy";
+}
+
+export const STUDIO_CAPABILITIES = ["create", "move", "archive", "delete", "rename", "duplicate", "export", "comments", "versions", "links"] as const;
+export type StudioCapability = (typeof STUDIO_CAPABILITIES)[number];
+export type StudioCapabilities = Record<StudioCapability, boolean> & { templates?: boolean };
+
+export interface StudioKind {
+  id: string;
+  /** "Page" */
+  label: string;
+  /** "Pages" */
+  plural: string;
+  /** BB icon name, e.g. "FileText" or "talk/talk". */
+  icon: string;
+  /** Kind-specific columns the list shows when filtered to this kind. */
+  columns: StudioColumn[];
+  /** Kind-specific bulk actions, offered when every selected item is this kind. */
+  actions: StudioAction[];
+  /**
+   * How "New" makes one: "rpc" calls studio_create; "event" dispatches
+   * `createEvent` on window for the add-on's frontend to handle; null means
+   * the kind can't be created from Studio.
+   */
+  create: { mode: "rpc" } | { mode: "event"; event: string } | null;
+  canArchive: boolean;
+  /** v2: actions available for this kind. */
+  capabilities?: StudioCapabilities;
+  /** v2: item prefix used by BB mentions. */
+  mentionProviderId?: string | null;
+  /** Empty-state copy for this kind. */
+  blurb: string;
+  /**
+   * How an agent reads and edits one, e.g. "Read it with pages_read and edit
+   * it with pages_edit." Studio Chat tells the agent this when the item is on
+   * screen.
+   */
+  agentHint?: string;
+  /** The item owns its conversation UI; Studio Chat must not add an automatic chat. */
+  hasOwnChat?: boolean;
+  /**
+   * Kept out of the way: the collection's All view and Studio Home skip
+   * these items, while the kind's own filter and search still find them.
+   */
+  background?: boolean;
+  /**
+   * The id of a kind built into Studio ("page", "drawing", "recording",
+   * "artifact", "design") that this kind can stand in for. Studio then offers
+   * it under Setup → Kinds as "Open and create with" for that kind; when
+   * chosen (or when it's the only replacement), Studio's New menus and agent
+   * hints create this kind instead. Items already made with the built-in
+   * keep opening in the built-in.
+   */
+  replaces?: string;
+}
+
+export interface StudioProviderInfo {
+  pluginId: string;
+  /** Contract version, for future changes. */
+  version: 2;
+  /** The add-on's own nav panel, which Studio offers to hide from the sidebar. */
+  panel: string | null;
+  kinds: StudioKind[];
+}
+
+export interface StudioCreateEventDetail {
+  projectId: string | null;
+  /**
+   * The add-on calls this with the new item's href once it exists, and the
+   * New menu that asked opens it, as it opens an item made over RPC. Older
+   * menus leave it out; the add-on then opens the item in the main pane itself.
+   */
+  opened?(href: string): void;
+}
+
+/** The tag RPC schemas shared by Studio and optional tag clients. */
+export function studioTagSchemas(z: typeof Zod) {
+  const tag = z.object({ id: z.string(), name: z.string(), color: z.string() });
+  const tagId = z.string().min(1).max(100);
+  const tagName = z.string().min(1).max(100);
+  const itemRef = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
+  return {
+    tag,
+    tagId,
+    tagName,
+    itemRef,
+    createTag: { input: z.object({ name: tagName }), output: z.object({ tag }) },
+    tagItems: {
+      input: z.object({ items: z.array(itemRef).min(1).max(500), add: z.array(tagId).max(50), remove: z.array(tagId).max(50) }),
+      output: z.object({ ok: z.boolean() }),
+    },
+  };
+}
+
+/** Zod schemas for the contract, built from the caller's zod. */
+export function studioSchemas(z: typeof Zod) {
+  const tone = z.enum(["neutral", "live", "progress", "warning", "danger", "success"]);
+  const item = z.object({
+    id: z.string(),
+    kind: z.string(),
+    family: z.enum(["page", "app"]).optional(),
+    type: z.string().max(50).optional(),
+    title: z.string(),
+    icon: z.string().nullable(),
+    projectId: z.string().nullable(),
+    parentId: z.string().nullable(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    updatedBy: z.enum(["user", "agent"]).nullable(),
+    preview: z.string().nullable(),
+    facts: z.array(z.object({ id: z.string(), value: z.string(), sort: z.number().nullable() })),
+    badge: z.object({ label: z.string(), tone }).nullable(),
+    thumbnailUrl: z.string().nullable(),
+    href: z.string(),
+    archived: z.boolean(),
+    template: z.boolean().optional(),
+  });
+  const kind = z.object({
+    id: z.string(),
+    label: z.string(),
+    plural: z.string(),
+    icon: z.string(),
+    columns: z.array(z.object({ id: z.string(), label: z.string() })),
+    actions: z.array(
+      z.object({ id: z.string(), label: z.string(), icon: z.string(), result: z.enum(["toast", "copy"]) }),
+    ),
+    create: z
+      .discriminatedUnion("mode", [
+        z.object({ mode: z.literal("rpc") }),
+        z.object({ mode: z.literal("event"), event: z.string() }),
+      ])
+      .nullable(),
+    canArchive: z.boolean(),
+    capabilities: z.object(Object.fromEntries(STUDIO_CAPABILITIES.map((key) => [key, z.boolean()])) as Record<StudioCapability, ReturnType<typeof z.boolean>>).extend({ templates: z.boolean().optional() }).optional(),
+    mentionProviderId: z.string().nullable().optional(),
+    blurb: z.string(),
+    agentHint: z.string().max(500).optional(),
+    hasOwnChat: z.boolean().optional(),
+    background: z.boolean().optional(),
+    replaces: z.string().min(1).max(100).optional(),
+  });
+  const info = z.object({ pluginId: z.string(), version: z.literal(2), panel: z.string().nullable(), kinds: z.array(kind) });
+  const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
+  const projectId = z.string().min(1).max(200).nullable();
+  const results = z.object({
+    done: z.array(z.string()),
+    failed: z.array(z.object({ id: z.string(), error: z.string() })),
+  });
+  return {
+    item,
+    kind,
+    info,
+    results,
+    /** The methods an add-on registers with `bb.rpc.register`. */
+    provider: {
+      studio_describe: { input: z.null(), output: info },
+      /**
+       * Every item, archived ones included. An add-on that caps its list sets
+       * `truncated` when it hit the cap, so Studio keeps the tags and tabs of
+       * items it didn't see.
+       */
+      studio_list: { input: z.null(), output: z.object({ items: z.array(item), truncated: z.boolean().optional() }) },
+      /**
+       * Ids of items whose content matches; Studio matches titles itself.
+       * `snippets` has the matching text by id, for as many as the add-on
+       * cares to excerpt (see `snippet` in the kit's format module).
+       */
+      studio_get: { input: z.object({ ids }), output: z.object({ items: z.array(item) }) },
+      studio_read: { input: z.object({ id: z.string().min(1).max(200), format: z.enum(["markdown", "text"]) }), output: z.object({ content: z.string().nullable() }) },
+      studio_search: {
+        input: z.object({ query: z.string().min(1).max(200) }),
+        output: z.object({ ids: z.array(z.string()), snippets: z.record(z.string(), z.string()).optional() }),
+      },
+      studio_create: {
+        input: z.object({ kind: z.string(), projectId }),
+        output: z.object({ item }),
+      },
+      studio_move: { input: z.object({ ids, projectId }), output: results },
+      studio_archive: { input: z.object({ ids, archived: z.boolean() }), output: results },
+      studio_delete: { input: z.object({ ids }), output: results },
+      studio_rename: { input: z.object({ id: z.string().min(1).max(200), title: z.string().trim().min(1).max(200) }), output: results },
+      studio_action: {
+        input: z.object({ action: z.string(), ids }),
+        output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
+      },
+      studio_duplicate: { input: z.object({ id: z.string().min(1).max(200), projectId, includeChildren: z.boolean().optional() }), output: z.object({ item }) },
+      studio_template: { input: z.object({ id: z.string().min(1).max(200), template: z.boolean() }), output: z.object({ item }) },
+      studio_instantiate: { input: z.object({ id: z.string().min(1).max(200), projectId, variables: z.record(z.string(), z.string()).default({}) }), output: z.object({ item }) },
+      studio_export: { input: z.object({ id: z.string().min(1).max(200), format: z.string().min(1).max(30) }), output: z.object({ files: z.array(z.object({ name: z.string(), mime: z.string(), data: z.string() })).min(1) }) },
+    },
+    /** Studio's method that finds an item and its kind, by the path that opens it or by id. */
+    itemAt: {
+      // `{ id }` alone finds a page or an app by its id, whatever its type.
+      input: z.union([z.object({ path: z.string().min(1).max(2000) }), z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) }), z.object({ id: z.string().min(1).max(200) })]),
+      output: z.object({ item: item.extend({ pluginId: z.string() }).nullable(), kind: kind.nullable() }),
+    },
+    /** Studio's own method add-ons call when their items change. */
+    changed: {
+      input: z.object({ pluginId: z.string().min(1).max(100), ids: z.array(z.string().min(1).max(200)).max(STUDIO_CHANGED_MAX_IDS).optional(), removed: z.array(z.string().min(1).max(200)).max(STUDIO_CHANGED_MAX_IDS).optional() }),
+      output: z.object({ ok: z.boolean() }),
+    },
+  };
+}
+
+export type StudioSchemas = ReturnType<typeof studioSchemas>;
+
+/** Runs `work` for each id and reports which succeeded. */
+export async function eachId(
+  ids: readonly string[],
+  work: (id: string) => unknown,
+): Promise<{ done: string[]; failed: { id: string; error: string }[] }> {
+  const done: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  for (const id of ids) {
+    try {
+      await work(id);
+      done.push(id);
+    } catch (error) {
+      failed.push({ id, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { done, failed };
+}
+
+/** The item whose view is at `path`: the longest `href` that is the path or a parent of it. */
+export function itemAtPath<T extends { href: string }>(items: readonly T[], path: string): T | null {
+  const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  let best: T | null = null;
+  let bestLength = 0;
+  for (const item of items) {
+    const href = item.href.split(/[?#]/)[0]!.replace(/\/+$/, "");
+    if (!href.startsWith("/")) continue;
+    // Compare the cleaned hrefs: a query on a parent's href mustn't outrank a deeper item.
+    if ((clean === href || clean.startsWith(`${href}/`)) && href.length > bestLength) {
+      best = item;
+      bestLength = href.length;
+    }
+  }
+  return best;
+}
+
+/** A composer prompt that links each item, so the agent can read them. */
+export function mentionPrompt(items: readonly { title: string; href: string }[]): string {
+  return `${items.map((item) => `[${untitled(item.title).replace(/[[\]]/g, "")}](${item.href})`).join(" ")} `;
+}
+
+export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
+
+export { parseStudioItemHref, parseStudioMentionReference, studioTextReferences, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";

@@ -1,0 +1,136 @@
+import { describe, expect, it } from "vitest";
+import { RECORDING_KINDS } from "./talk/server/studio";
+import { studioSidebarModel } from "./ui/studio-sidebar-model";
+import { compileQuery, describeFilter, facetCounts, formatQuery, parseQuery, suggest, toggleFilter, type QueryVocabulary } from "./query";
+
+const vocabulary: QueryVocabulary = {
+  kinds: [
+    { id: "page", label: "Page", plural: "Pages" },
+    { id: "dictation", label: "Dictation", plural: "Dictations", background: true },
+  ],
+  projects: [{ id: "proj_a", name: "bb-studio" }, { id: "proj_b", name: "Q4 launch" }],
+  tags: [{ id: "tag_x", name: "Explore" }],
+};
+
+const page = { kind: "page", projectId: "proj_a", archived: false, tags: ["tag_x"] };
+const global = { kind: "page", projectId: null, archived: false };
+const old = { kind: "page", projectId: "proj_b", archived: true };
+const dictation = { kind: "dictation", projectId: null, archived: false };
+
+describe("query", () => {
+  it("parses filters, exclusions, quotes and words", () => {
+    expect(parseQuery('kind:page -tag:Explore project:"Q4 launch" release notes "exact phrase" foo:bar')).toEqual({
+      filters: [
+        { field: "kind", value: "page" },
+        { field: "tag", value: "Explore", negate: true },
+        { field: "project", value: "Q4 launch" },
+      ],
+      text: "release notes exact phrase foo:bar",
+    });
+    expect(parseQuery("kind: ").filters).toEqual([]);
+  });
+
+  it("formats back to the same query", () => {
+    const text = 'kind:page -tag:Explore project:"Q4 launch" notes';
+    expect(formatQuery(parseQuery(text))).toBe(text);
+  });
+
+  it("matches any value of a field and every field", () => {
+    const query = compileQuery(parseQuery("project:bb-studio project:global kind:Pages"), vocabulary);
+    expect([page, global, old].map((item) => query.test(item))).toEqual([true, true, false]);
+    expect(compileQuery(parseQuery("-tag:explore"), vocabulary).test(page)).toBe(false);
+    expect(compileQuery(parseQuery("tag:none"), vocabulary).test(global)).toBe(true);
+  });
+
+  it("shows archived items only when asked", () => {
+    expect(compileQuery(parseQuery(""), vocabulary).test(old)).toBe(false);
+    expect(compileQuery(parseQuery("is:archived"), vocabulary).test(old)).toBe(true);
+    expect(compileQuery(parseQuery("is:archived"), vocabulary).test(page)).toBe(false);
+  });
+
+  it("hides background kinds unless asked for or searched", () => {
+    expect(compileQuery(parseQuery(""), vocabulary).test(dictation)).toBe(false);
+    expect(compileQuery(parseQuery("kind:dictation"), vocabulary).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery("words"), vocabulary).test(dictation)).toBe(true);
+  });
+
+  it("keeps Talk's dictations out of All items, but not out of their sidebar entry, kind filter or search", () => {
+    const kinds = RECORDING_KINDS.map((kind) => ({ ...kind }));
+    const real = { ...vocabulary, kinds };
+    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [], views: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
+    expect(compileQuery(parseQuery(""), real).test(dictation)).toBe(false);
+    expect(compileQuery(parseQuery("project:bb-studio"), real).test({ ...dictation, projectId: "proj_a" })).toBe(false);
+    expect(compileQuery(parseQuery(entry.query), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery("kind:Dictations"), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery("standup"), real).test(dictation)).toBe(true);
+    expect(compileQuery(parseQuery(""), real).test({ ...dictation, kind: "recording" })).toBe(true);
+  });
+
+  it("matches nothing for a value that names nothing", () => {
+    const query = compileQuery(parseQuery("tag:missing"), vocabulary);
+    expect(query.unknown).toEqual([{ field: "tag", value: "missing" }]);
+    expect(query.test(page)).toBe(false);
+    expect(compileQuery(parseQuery("-tag:missing"), vocabulary).test(page)).toBe(true);
+  });
+
+  it("counts each field's values without its own filters", () => {
+    const counts = facetCounts([page, global, old, dictation], compileQuery(parseQuery("kind:page project:bb-studio"), vocabulary));
+    expect(counts.kind).toEqual(new Map([["page", 1]]));
+    expect(counts.project).toEqual(new Map([["proj_a", 1], ["", 1]]));
+    expect(counts.archived).toBe(0);
+    expect(facetCounts([page, global, old], compileQuery(parseQuery(""), vocabulary)).archived).toBe(1);
+  });
+
+  it("toggles a filter and swaps its opposite", () => {
+    const start = parseQuery("kind:page");
+    expect(formatQuery(toggleFilter(start, { field: "kind", value: "page" }))).toBe("");
+    expect(formatQuery(toggleFilter(start, { field: "kind", value: "page", negate: true }))).toBe("-kind:page");
+    expect(formatQuery(toggleFilter(start, { field: "tag", value: "Explore" }))).toBe("kind:page tag:Explore");
+  });
+
+  it("suggests fields and values", () => {
+    expect(suggest("pro", vocabulary)[0]).toEqual({ type: "field", field: "project", negate: false });
+    expect(suggest("project:q4", vocabulary)).toEqual([{ type: "value", negate: false, field: "project", value: "Q4 launch", label: "Q4 launch" }]);
+    expect(suggest("-kind:dict", vocabulary)[0]).toMatchObject({ value: "dictation", negate: true });
+    expect(suggest("expl", vocabulary)).toEqual([{ type: "value", negate: false, field: "tag", value: "Explore", label: "Explore" }]);
+    expect(describeFilter({ field: "kind", value: "page" }, vocabulary)).toEqual({ field: "Kind", value: "Pages" });
+  });
+});
+
+describe("pages and apps in the query", () => {
+  const kinds: QueryVocabulary = {
+    ...vocabulary,
+    kinds: [
+      { id: "page", label: "Page", plural: "Pages" }, { id: "drawing", label: "Whiteboard", plural: "Whiteboards" }, { id: "design", label: "Design", plural: "Designs" },
+      { id: "mini", label: "App", plural: "Apps" }, { id: "dashboard", label: "Dashboard", plural: "Dashboards" }, { id: "artifact", label: "Artifact", plural: "Artifacts" },
+      { id: "recording", label: "Recording", plural: "Recordings" },
+    ],
+  };
+  const make = (kind: string, family?: string, type?: string) => ({ kind, family, type, projectId: null, archived: false });
+  const items = [make("page", "page", "doc"), make("drawing", "page", "whiteboard"), make("design", "page", "design"), make("mini", "app", "mini"), make("dashboard", "app", "dashboard"), make("artifact", "app", "artifact"), make("recording")];
+  const matching = (text: string) => { const compiled = compileQuery(parseQuery(text), kinds); expect(compiled.unknown).toEqual([]); return items.filter((item) => compiled.test(item)).map((item) => item.kind); };
+
+  it("filters by family and by type", () => {
+    expect(matching("family:page")).toEqual(["page", "drawing", "design"]);
+    expect(matching("family:apps")).toEqual(["mini", "dashboard", "artifact"]);
+    expect(matching("type:design type:dashboard")).toEqual(["design", "dashboard"]);
+    expect(matching("family:app -type:artifact")).toEqual(["mini", "dashboard"]);
+    expect(matching("type:doc")).toEqual(["page"]);
+    expect(compileQuery(parseQuery("family:files"), kinds).unknown).toEqual([{ field: "family", value: "files" }]);
+  });
+
+  it("keeps a filter saved with an older kind name showing what it showed", () => {
+    for (const kind of ["design", "dashboard", "artifact", "mini", "drawing", "page"]) expect(matching(`kind:${kind}`)).toEqual([kind]);
+    expect(matching("kind:Designs kind:Dashboards")).toEqual(["design", "dashboard"]);
+    // The older names read as types too.
+    expect(matching("type:drawing")).toEqual(["drawing"]);
+    expect(matching("type:page")).toEqual(["page"]);
+    expect(matching("type:Whiteboards")).toEqual(["drawing"]);
+  });
+
+  it("describes and suggests the new fields", () => {
+    expect(describeFilter({ field: "family", value: "apps" }, kinds)).toEqual({ field: "Family", value: "Apps" });
+    expect(describeFilter({ field: "type", value: "drawing" }, kinds)).toEqual({ field: "Type", value: "Whiteboards" });
+    expect(suggest("family:", kinds).map((each) => each.type === "value" && each.value)).toEqual(["page", "app"]);
+  });
+});

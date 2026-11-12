@@ -1,0 +1,50 @@
+import { describe, expect, it } from "vitest";
+import { linkEmbed, referenceMention, referenceContent } from "./links";
+
+const ORIGIN = "http://127.0.0.1:38886";
+
+describe("linkEmbed", () => {
+  it("makes a bookmark of a web link", () => {
+    expect(linkEmbed("  https://example.com/post?id=1 \n", ORIGIN)).toEqual({ kind: "bookmark", target: "https://example.com/post?id=1" });
+  });
+
+  it("makes page and thread cards of BB links", () => {
+    expect(linkEmbed(`${ORIGIN}/plugins/pages/pages/pg_0123456789ab`, ORIGIN)).toEqual({ kind: "page", target: "pg_0123456789ab" });
+    expect(linkEmbed(`${ORIGIN}/plugins/pages/pages/pg_0123456789abcdef`, ORIGIN)).toEqual({ kind: "page", target: "pg_0123456789abcdef" });
+    expect(linkEmbed(`${ORIGIN}/projects/proj_a/threads/thr_abc123`, ORIGIN)).toEqual({ kind: "thread", target: "thr_abc123" });
+  });
+
+  it("makes Studio cards of add-on item links", () => {
+    expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/drawings/drw_1`, ORIGIN)).toEqual({ kind: "drawing", target: "drw_1" });
+    expect(linkEmbed(`${ORIGIN}/plugins/artifacts/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
+    expect(linkEmbed(`${ORIGIN}/plugins/studio/studio/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
+    expect(linkEmbed(`${ORIGIN}/plugins/talk/recordings/rec_1/`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
+    expect(linkEmbed(`${ORIGIN}/plugins/studio/studio/recordings/rec_1`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
+    // Another app's link, or an unknown panel, stays a bookmark.
+    expect(linkEmbed("https://other.dev/plugins/excalidraw/drawings/drw_1", ORIGIN)?.kind).toBe("bookmark");
+    expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/settings/x`, ORIGIN)?.kind).toBe("bookmark");
+  });
+
+  it("leaves text, other schemes and several links alone", () => {
+    expect(linkEmbed("see https://example.com", ORIGIN)).toBeNull();
+    expect(linkEmbed("https://a.com https://b.com", ORIGIN)).toBeNull();
+    expect(linkEmbed("mailto:me@example.com", ORIGIN)).toBeNull();
+    expect(linkEmbed("example.com", ORIGIN)).toBeNull();
+  });
+});
+
+it("turns a pasted reference into a page or item mention", () => {
+  const items = [{ pluginId: "notes", id: "nt_1", href: "/plugins/notes/notes/nt_1" }];
+  expect(referenceMention("/plugins/pages/pages/pg_0123456789ab", items)).toEqual({ kind: "page", target: "pg_0123456789ab" });
+  expect(referenceMention("/plugins/notes/notes/nt_1", items)).toEqual({ kind: "item", target: "notes:nt_1" });
+  expect(referenceMention("/plugins/feed/feed/p_1", items)).toBeNull();
+});
+
+it("builds reference paste content synchronously without item discovery", () => {
+  expect(referenceContent({ href: "/plugins/studio/studio/pages/pg_0123456789abcdef", title: "Plan" })).toEqual([
+    { type: "mention", props: { kind: "item", target: "pages:pg_0123456789abcdef", label: "Plan" } }, " ",
+  ]);
+  expect(referenceContent({ href: "/plugins/custom/items/id", title: "Other" })).toEqual([
+    { type: "link", href: "/plugins/custom/items/id", content: "Other" }, " ",
+  ]);
+});

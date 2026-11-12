@@ -1,0 +1,304 @@
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+import { afterEach, expect, it, vi } from "vitest";
+import { BotMaintenance, archiveAge, finished, maintenanceDefaults, maintenanceDryRun, memoryNeedsTidy, pullRequestMerged, readWorkspaceStatus, workspaceBlock } from "./bot-maintenance";
+import { MIGRATIONS } from "./migrations";
+import { testScheduler } from "./test/scheduler-fixture";
+import { SkillLearning, type SkillState } from "./skill-learning";
+const DAY = 86_400_000;
+const now = 200 * DAY;
+const dispose: (() => Promise<void>)[] = [];
+afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
+function thread(id = "child", days = 8) {
+  return { ...makeThreadResponse({ id, status: "idle", updatedAt: now - days * DAY, parentThreadId: "main", environmentId: null }), environmentBranchName: "bb/child", hasPendingInteraction: false, queuedWork: "none", activity: { activeBackgroundAgentCount: 0, activeBackgroundCommandCount: 0, activeGoalCount: 0, activePlanModeCount: 0, activeWorkflowCount: 0 }, environmentPath: null };
+}
+const clean = () => ({ outcome: "available", workspace: { checkout: { kind: "branch", branchName: "bb/child" }, workingTree: { state: "clean", hasUncommittedChanges: false, files: [] as { path: string; status: string }[] }, mergeBase: { mergeBaseBranch: "origin/bb/child", baseRef: "4f2a0930f358881edf6a22ce40d56212f8432f40", aheadCount: 0, hasCommittedUnmergedChanges: false, files: [] as { path: string; status: string }[] } } });
+async function setup() {
+  const rows = [thread()];
+  const targets: Record<string, unknown>[] = [];
+  const interactions: { status: string }[] = [];
+  const events: Record<string, unknown>[] = [];
+  const archive = vi.fn(async () => ({ ok: true }));
+  const send = vi.fn(async () => ({ ok: true }));
+  const status = vi.fn(async (_input: unknown) => clean());
+  const pullRequests = vi.fn(async (_input: unknown): Promise<Record<string, unknown>> => ({}));
+  const rpcCalls: { method: string; input: unknown }[] = [];
+  const pause = vi.fn(async () => {}), del = vi.fn(async () => {}), curate = vi.fn(async () => ({ result: "Nothing to retire" })), alert = vi.fn(async () => {}), refreshOwned = vi.fn(async () => {});
+  const runs: { status: string; output: string }[] = [];
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
+    threads: { listRunning: async () => [], get: (async ({ threadId }: { threadId: string }) => { const t = rows.find((t) => t.id === threadId); if (!t) throw Object.assign(new Error("Not found"), { status: 404 }); return t; }) as never, list: (async ({ offset }: { offset?: number }) => offset ? [] : rows) as never, archive: archive as never, send: send as never, interactions: { list: (async () => interactions) as never }, events: { list: (async () => events) as never } },
+    plugins: { callRpc: (async ({ pluginId, method, input }: { pluginId: string; method: string; input: unknown }) => {
+      rpcCalls.push({ method, input });
+      if (pluginId === "bb--git" && method === "workspaceStatus") return status(input);
+      if (pluginId === "bb--github-pr-status" && method === "pullRequests") return pullRequests(input);
+      return method === "automations_overview" ? { automations: targets } : { runs };
+    }) as never },
+  } });
+  dispose.push(() => harness.lifecycle.dispose());
+  const db = bb.storage.database(); bb.storage.migrate(db, MIGRATIONS);
+  const bot = { id: "bot", state: "active", threadId: "main" };
+  let memory: { id: string; markdown: string; updatedAt: number } | null = null;
+  const owned = new Set(["child"]);
+  const { engine, scheduler } = testScheduler(db, bb.sdk);
+  const maintenance = new BotMaintenance({ db, sdk: bb.sdk, scheduler, changed: () => {}, bots: () => [bot], owned: () => owned, refreshOwned, memory: () => memory, curate, automationPause: pause, automationDelete: del, adoptable: async () => [], alert });
+  const enable = async () => { await maintenance.set("bot", { enabled: true }, now - DAY); archive.mockClear(); curate.mockClear(); };
+  const local = (id: string, kind: string, state = "active", age = 1, target = "main", instruction = "report") => db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, state, schedule_json, project_id, created_at, updated_at, target, instruction, bb_ids) VALUES (?, 'bot', ?, ?, ?, '{}', 'proj', 0, ?, ?, ?, '[\"a\"]')").run(id, kind, id, state, now - age * DAY, target, instruction);
+  return { engine, scheduler, bb, harness, db, bot, maintenance, rows, owned, targets, interactions, events, archive, send, status, pullRequests, rpcCalls, pause, del, curate, alert, refreshOwned, runs, enable, local, memory: (m: typeof memory) => { memory = m; } };
+}
+it("defaults off and waits one day before going live", () => {
+  const s = maintenanceDefaults(); expect(s.enabled).toBe(false); expect(s.memoryWords).toBe(8000);
+  expect(maintenanceDryRun(s, now)).toBe(true); s.enabled = true; s.enabledAt = now;
+  expect(maintenanceDryRun(s, now + DAY - 1)).toBe(true); expect(maintenanceDryRun(s, now + DAY)).toBe(false);
+});
+it("drops the retired runtime rule from saved settings", async () => {
+  const x = await setup();
+  x.db.prepare("INSERT INTO bot_maintenance_settings (bot_id, at, settings) VALUES ('bot', ?, ?)").run(now, JSON.stringify({
+    enabled: true, enabledAt: now, memoryWords: 1200,
+    rules: { threads: false, workers: true, automations: true, runtimes: false, memory: true, skills: false, adopt: true },
+  }));
+  const settings = x.maintenance.view("bot").settings;
+  expect(settings.rules).toEqual({ threads: false, workers: true, automations: true, memory: true, skills: false, adopt: true });
+  expect(settings).not.toHaveProperty("runtimes");
+});
+it("distinguishes finished threads from running, queued, pending and open plans", () => {
+  const t = thread(); expect(finished(t as never, false, [])).toBe(true);
+  for (const patch of [{ status: "active" }, { queuedWork: "waiting" }, { hasPendingInteraction: true }, { activity: { activePlanModeCount: 1 } }]) expect(finished({ ...t, ...patch } as never, false, [])).toBe(false);
+  expect(finished(t as never, true, [])).toBe(false); expect(finished(t as never, false, [{ status: "pending" }])).toBe(false);
+});
+it("uses captured results and owner replies for retention", () => {
+  expect(archiveAge(false, true, false)).toBe(3 * DAY); expect(archiveAge(false, false, false)).toBe(7 * DAY);
+  expect(archiveAge(true, false, true)).toBe(DAY); expect(archiveAge(true, false, false)).toBe(3 * DAY);
+});
+it("blocks only tracked uncommitted changes and unpushed commits", () => {
+  expect(workspaceBlock(clean() as never)).toBeNull();
+  const dirty = clean(); dirty.workspace.workingTree.files.push({ path: "src/a.ts", status: "M" }); expect(workspaceBlock(dirty as never)).toBe("Uncommitted changes to 1 tracked file.");
+  const ahead = clean(); ahead.workspace.mergeBase.aheadCount = 2; ahead.workspace.mergeBase.files.push({ path: "src/a.ts", status: "M" }); expect(workspaceBlock(ahead as never)).toBe("2 unpushed commits.");
+  const scratch = clean(); scratch.workspace.workingTree.state = "untracked"; scratch.workspace.workingTree.hasUncommittedChanges = true; scratch.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); expect(workspaceBlock(scratch as never)).toBeNull();
+  const detached = clean(); detached.workspace.checkout.kind = "detached"; detached.workspace.mergeBase.aheadCount = 1; detached.workspace.mergeBase.files.push({ path: "a", status: "M" }); expect(workspaceBlock(detached as never)).toBeNull();
+  for (const s of [{ outcome: "not_applicable" }, { outcome: "unavailable" }]) expect(workspaceBlock(s as never)).toBeNull();
+  // A status call that failed (null) fails closed: real work may be there.
+  expect(workspaceBlock(null)).toBe("Couldn't read the workspace's git status.");
+});
+it("checks Memory word budget and old entries", () => {
+  expect(memoryNeedsTidy("one two three", 2, now, now)).toBe(true);
+  expect(memoryNeedsTidy("one two", 2, now, now)).toBe(false);
+  expect(memoryNeedsTidy("remember this", 8000, now - 61 * DAY, now)).toBe(true);
+  expect(memoryNeedsTidy("2020-01-01 old fact", 8000, Date.now(), Date.now())).toBe(true);
+  expect(memoryNeedsTidy("", 8000, 0, now)).toBe(false);
+});
+it("archives only owned, finished threads; records a single run", async () => {
+  const x = await setup(); x.rows.push(thread("user")); await x.enable();
+  const result = await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledExactlyOnceWith({ threadId: "child" }); expect(result?.dryRun).toBe(false); expect(x.maintenance.view("bot").runs).toHaveLength(2); expect(x.alert).not.toHaveBeenCalled();
+});
+it("words the summary in the singular for one, and says Dry run only once", async () => {
+  const x = await setup(); await x.enable();
+  const result = await x.maintenance.run("bot", { now, dryRun: true });
+  expect(result?.summary).toMatch(/^Dry run: would archive 1 finished thread, 0 workers;/);
+  expect(result?.summary).not.toMatch(/Skills: Dry run:/);
+});
+it("does nothing while off, paused, or in the initial dry-run day", async () => {
+  const x = await setup(); await x.maintenance.tick(now); expect(x.maintenance.view("bot").runs).toHaveLength(0);
+  await x.maintenance.set("bot", { enabled: true }, now); expect(x.maintenance.view("bot").runs[0]?.dryRun).toBe(true); expect(x.archive).not.toHaveBeenCalled(); expect(x.refreshOwned).not.toHaveBeenCalled();
+  x.bot.state = "paused"; expect(await x.maintenance.run("bot", { now: now + DAY })).toBeNull();
+});
+it("dry run leaves threads, automations, Memory and skills alone", async () => {
+  const x = await setup(); await x.enable(); x.local("done", "reminder", "done", 15); x.memory({ id: "mem", markdown: "word ".repeat(8001), updatedAt: now });
+  const result = await x.maintenance.run("bot", { dryRun: true, now }); expect(result?.actions).toContain("Delete done reminder: done"); expect(x.archive).not.toHaveBeenCalled(); expect(x.del).not.toHaveBeenCalled(); expect(x.send).not.toHaveBeenCalled(); expect(x.curate).toHaveBeenCalledWith("bot", true);
+});
+it("protects BB automation targets, pending interactions and open plans", async () => {
+  const x = await setup(); await x.enable(); x.targets.push({ automation: { id: "external", enabled: true, execution: { targetThreadId: "child" }, trigger: {} }, project: { id: "p" } });
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); x.targets.length = 0;
+  x.interactions.push({ status: "pending" }); await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); x.interactions.length = 0;
+  x.events.push({ data: { plan: [{ status: "in_progress" }] } }); await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+});
+it.each(["dirty", "ahead"])("sends a %s workspace to Needs your call", async (mode) => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  const s = clean(); if (mode === "dirty") s.workspace.workingTree.files.push({ path: "src/a.ts", status: "M" }); else { s.workspace.mergeBase.aheadCount = 1; s.workspace.mergeBase.files.push({ path: "src/a.ts", status: "M" }); }
+  x.status.mockResolvedValue(s);
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall).toHaveLength(1); expect(x.alert).toHaveBeenCalledOnce();
+});
+it("does not archive when the workspace status can't be read (fails closed)", async () => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  x.status.mockRejectedValue(new Error("offline"));
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  expect(r?.needsCall).toEqual([expect.objectContaining({ reason: "Couldn't read the workspace's git status." })]);
+});
+it.each(["not_applicable", "scratch"])("archives a %s workspace that holds no real work", async (mode) => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  if (mode === "not_applicable") x.status.mockResolvedValue({ outcome: "not_applicable" } as never);
+  else { const s = clean(); s.workspace.workingTree.files.push({ path: "notes.txt", status: "??" }); x.status.mockResolvedValue(s); }
+  const r = await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce(); expect(r?.needsCall).toHaveLength(0);
+});
+it("archives captured threads at 3 days, otherwise waits 7", async () => {
+  const x = await setup(); await x.enable(); x.rows[0]!.updatedAt = now - 4 * DAY;
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  x.db.prepare("INSERT INTO item_threads VALUES ('child', 'studio', 'item', 'created', 'active', 0, 0, '{}')").run();
+  await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce();
+});
+it("waits for the owner to reply before archiving a one-day worker", async () => {
+  const x = await setup(); await x.enable(); Object.assign(x.rows[0]!, { visibility: "hidden", lifecycleOwnerThreadId: "main", updatedAt: now - 2 * DAY }); x.rows.push(thread("main", 0));
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  x.events.push({ createdAt: now, data: {} }); await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce();
+});
+it("deletes only done reminders after 14 days and folds finished check-ins", async () => {
+  const x = await setup(); await x.enable(); x.local("old", "reminder", "done", 15); x.local("young", "reminder", "done", 13); x.local("check", "checkin", "ended", 15); x.local("paused", "checkin", "paused", 31);
+  const r = await x.maintenance.run("bot", { now }); expect(x.del).toHaveBeenCalledExactlyOnceWith("old", "bot"); expect(x.db.prepare("SELECT state FROM bot_automations WHERE id = 'check'").get()).toEqual({ state: "done" }); expect(r?.suggestions.some((s) => s.text.includes("Suggest delete: paused"))).toBe(true);
+});
+it("pauses stale watchers and duplicate recurring instructions", async () => {
+  const x = await setup(); await x.enable(); x.rows.push(thread("main")); x.local("watch", "watcher", "active", 1, "retired"); x.local("first", "checkin"); x.local("second", "checkin");
+  await x.maintenance.run("bot", { now }); expect(x.pause).toHaveBeenCalledWith("watch", "bot"); expect(x.pause).toHaveBeenCalledWith("second", "bot"); expect(x.pause).not.toHaveBeenCalledWith("first", "bot");
+});
+it("lists ten empty successful runs without pausing them", async () => {
+  const x = await setup(); await x.enable(); x.rows.push(thread("main")); x.local("report", "checkin"); x.runs.push(...Array.from({ length: 10 }, () => ({ status: "succeeded", output: "[PASS]" })));
+  const r = await x.maintenance.run("bot", { now }); expect(r?.suggestions.some((s) => s.text.includes("no useful output"))).toBe(true); expect(x.pause).not.toHaveBeenCalled();
+});
+it("asks for Memory maintenance in one agent-only message", async () => {
+  const x = await setup(); await x.enable(); x.memory({ id: "mem", markdown: "word ".repeat(8001), updatedAt: now });
+  await x.maintenance.run("bot", { now }); expect(x.send).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ input: [expect.objectContaining({ visibility: "agent-only", text: expect.stringContaining("8000 words") })] }));
+});
+it("runs at 4 AM local and deduplicates heartbeat runs that day", async () => {
+  const x = await setup(); const at = new Date(2026, 9, 21, 4).getTime(); await x.maintenance.set("bot", { enabled: true }, at - 2 * DAY);
+  await x.maintenance.tick(at); const count = x.maintenance.view("bot").runs.length;
+  await x.maintenance.tick(at + 1000, "bot"); await x.maintenance.tick(at + 2000); expect(x.maintenance.view("bot").runs).toHaveLength(count);
+  await x.maintenance.tick(at + DAY); expect(x.maintenance.view("bot").runs).toHaveLength(count + 1);
+});
+it("treats commits ahead of a local or other branch's base as unconfirmed, not unpushed", () => {
+  const s = clean(); s.workspace.mergeBase.aheadCount = 1; s.workspace.mergeBase.files.push({ path: "a", status: "M" });
+  expect(workspaceBlock(s as never)).not.toBeNull();
+  s.workspace.mergeBase.mergeBaseBranch = "main"; expect(workspaceBlock(s as never)).toBeNull();
+  s.workspace.mergeBase.mergeBaseBranch = "origin/other"; expect(workspaceBlock(s as never)).toBeNull();
+});
+it("keeps a parent while a child thread is still open, since archiving cascades", async () => {
+  const x = await setup(); await x.enable();
+  x.rows.push({ ...thread("kid"), parentThreadId: "child", environmentId: "env" }); x.owned.add("kid");
+  const s = clean(); s.workspace.workingTree.files.push({ path: "README.md", status: "M" }); x.status.mockResolvedValue(s);
+  const r = await x.maintenance.run("bot", { now });
+  expect(x.archive).not.toHaveBeenCalled(); expect(r?.needsCall.map((n) => n.threadId)).toEqual(["kid"]);
+  x.status.mockResolvedValue(clean()); await x.maintenance.run("bot", { now: now + 1 });
+  expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid"]);
+  x.rows.splice(1, 1); await x.maintenance.run("bot", { now: now + 2 });
+  expect((x.archive.mock.calls as unknown as [{ threadId: string }][]).map(([input]) => input.threadId)).toEqual(["kid", "child"]);
+});
+it("reads git status through the Git plugin, and null (fails closed) when it can't", async () => {
+  const call = vi.fn(async () => clean());
+  expect(await readWorkspaceStatus({ callRpc: call as never }, "env", "origin/bb/child")).toMatchObject({ outcome: "available" });
+  expect(call).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "bb--git", method: "workspaceStatus", input: { environmentId: "env", mergeBaseBranch: "origin/bb/child" } }));
+  expect(await readWorkspaceStatus({ callRpc: (() => { throw new Error("plugin off"); }) as never }, "env")).toBeNull();
+  expect(await readWorkspaceStatus({ callRpc: (async () => ({ outcome: "something new" })) as never }, "env")).toBeNull();
+  expect(workspaceBlock(await readWorkspaceStatus({ callRpc: (async () => { throw new Error("offline"); }) as never }, "env"))).toBe("Couldn't read the workspace's git status.");
+});
+it("reads a merged pull request through the GitHub PR plugin, and none when it can't", async () => {
+  const merged = { env: { outcome: "available", pullRequest: { attention: "merged" } } };
+  expect(await pullRequestMerged({ callRpc: (async () => merged) as never }, "env")).toBe(true);
+  expect(await pullRequestMerged({ callRpc: (async () => ({ env: { outcome: "absent" } })) as never }, "env")).toBe(false);
+  expect(await pullRequestMerged({ callRpc: (() => { throw new Error("sync boom"); }) as never }, "env")).toBe(false);
+});
+it("archives a merged pull request's thread at 3 days", async () => {
+  const x = await setup(); await x.enable(); Object.assign(x.rows[0]!, { environmentId: "env", updatedAt: now - 4 * DAY });
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+  x.pullRequests.mockResolvedValue({ env: { outcome: "available", pullRequest: { attention: "merged" } } });
+  await x.maintenance.run("bot", { now }); expect(x.archive).toHaveBeenCalledOnce();
+  expect(x.pullRequests).toHaveBeenCalledWith({ keys: ["env"] });
+});
+it("allows a confirmed clean, pushed workspace", async () => {
+  const x = await setup(); await x.enable(); x.rows[0]!.environmentId = "env";
+  await x.maintenance.run("bot", { now }); expect(x.status).toHaveBeenCalledWith({ environmentId: "env", mergeBaseBranch: "origin/bb/child" }); expect(x.archive).toHaveBeenCalledOnce();
+});
+it("calls the Automations overview with its null input contract", async () => {
+  const x = await setup(); await x.enable();
+  expect(x.rpcCalls.find((call) => call.method === "automations_overview")?.input).toBeNull();
+});
+it("protects Studio automation and runner targets", async () => {
+  const x = await setup(); await x.enable(); x.local("target", "checkin"); x.db.prepare("UPDATE bot_automations SET target_thread_id = 'child'").run();
+  await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled();
+});
+it("honors per-rule toggles", async () => {
+  const x = await setup(); await x.enable(); await x.maintenance.set("bot", { rules: { threads: false, skills: false, memory: false, automations: false } }, now);
+  x.curate.mockClear(); await x.maintenance.run("bot", { now }); expect(x.archive).not.toHaveBeenCalled(); expect(x.curate).not.toHaveBeenCalled();
+});
+it("folds completed one-shot reminders without deleting them immediately", async () => {
+  const x = await setup(); await x.enable(); x.local("once", "reminder"); x.targets.push({ automation: { id: "a", enabled: false, lastRunAt: now - DAY, lastRunStatus: "succeeded", nextRunAt: null, execution: {}, trigger: {} }, project: { id: "proj" } });
+  await x.maintenance.run("bot", { now }); expect(x.db.prepare("SELECT state FROM bot_automations WHERE id = 'once'").get()).toEqual({ state: "done" }); expect(x.del).not.toHaveBeenCalled();
+});
+it("does not run twice when an early check-in is followed by 4 AM", async () => {
+  const x = await setup(); const at = new Date(2026, 9, 21, 2).getTime(); await x.maintenance.set("bot", { enabled: true }, at - 2 * DAY);
+  await x.maintenance.tick(at, "bot"); const count = x.maintenance.view("bot").runs.length;
+  await x.maintenance.tick(at + 2 * 3_600_000); expect(x.maintenance.view("bot").runs).toHaveLength(count);
+});
+it("settings and run records reject updates and deletes", async () => {
+  const x = await setup(); await x.enable();
+  for (const table of ["bot_maintenance_settings", "bot_maintenance_runs"]) {
+    expect(() => x.db.prepare(`UPDATE ${table} SET at = 0`).run()).toThrow(/append-only/);
+    expect(() => x.db.prepare(`DELETE FROM ${table}`).run()).toThrow(/append-only/);
+  }
+});
+it("fails closed and records a run when the automation overview is unavailable", async () => {
+  const x = await setup(); await x.enable();
+  x.harness.sdk.stub("plugins.callRpc", async () => { throw new Error("overview unavailable"); });
+  const run = await x.maintenance.run("bot", { now }); expect(run?.summary).toContain("stopped: overview unavailable"); expect(x.archive).not.toHaveBeenCalled();
+});
+
+it("runs when the automations plugin is confirmed off, and still fails closed when it is on but not answering", async () => {
+  const x = await setup(); await x.enable();
+  x.harness.sdk.stub("plugins.callRpc", async () => { throw new Error("overview unavailable"); });
+  x.harness.sdk.stub("plugins.list", async () => ({ plugins: [{ id: "automations", enabled: false }] }) as never);
+  expect((await x.maintenance.run("bot", { now }))?.summary).not.toContain("stopped");
+  x.harness.sdk.stub("plugins.list", async () => ({ plugins: [{ id: "automations", enabled: true }] }) as never);
+  expect((await x.maintenance.run("bot", { now: now + 86_400_000 }))?.summary).toContain("stopped: overview unavailable");
+});
+
+it("keeps same-prompt local check-ins at different times", async () => {
+  const x = await setup(); await x.enable(); x.rows.push(thread("main"));
+  x.local("morning", "checkin"); x.local("evening", "checkin");
+  x.db.prepare("UPDATE bot_automations SET schedule_json = ? WHERE id = ?").run(JSON.stringify({ type: "cron", cron: "0 9 * * *" }), "morning");
+  x.db.prepare("UPDATE bot_automations SET schedule_json = ? WHERE id = ?").run(JSON.stringify({ type: "cron", cron: "0 18 * * *" }), "evening");
+  await x.maintenance.run("bot", { now });
+  expect(x.pause).not.toHaveBeenCalled();
+});
+it("pauses only external schedules with the same project, trigger and execution", async () => {
+  const x = await setup(); await x.enable();
+  const add = (id: string, project: string, cron: string, model = "model") => x.targets.push({ project: { id: project }, automation: { id, enabled: true, createdByThreadId: "main", execution: { prompt: "report", mode: "agent", model }, trigger: { cron, timezone: "UTC" } } });
+  add("morning", "p", "0 9 * * *"); add("evening", "p", "0 18 * * *"); add("other-project", "q", "0 9 * * *"); add("other-model", "p", "0 9 * * *", "different"); add("duplicate", "p", "0 9 * * *");
+  await x.maintenance.run("bot", { now });
+  expect(x.rpcCalls.filter((c) => c.method === "automations_pause").map((c) => c.input)).toEqual([{ projectId: "p", automationId: "duplicate" }]);
+});
+
+it("uses Maintenance's Skills rule for real curation, ignoring legacy curator Pause data", async () => {
+  const x = await setup();
+  const skill = { name: "old", description: "Old skill", body: "Old steps", state: "active" as SkillState, pinned: false, usedAt: 0, updatedAt: 0 };
+  const bot = { ...x.bot, name: "Dot" };
+  const learning = new SkillLearning({ db: x.db, sdk: x.bb.sdk, changed: () => {}, bots: () => [bot], bot: () => bot, memoryPage: () => null, skills: () => [skill], setState: (_bot, _name, state) => { skill.state = state; } });
+  await learning.view("bot");
+  x.db.prepare("UPDATE bot_learning SET curator_paused = 1 WHERE bot_id = 'bot'").run();
+  const maintenance = new BotMaintenance({ ...(x.maintenance as unknown as { deps: ConstructorParameters<typeof BotMaintenance>[0] }).deps, curate: (id, dryRun) => learning.curate(id, { dryRun, now }) });
+  await maintenance.tick(now);
+  expect(skill.state).toBe("active");
+  await maintenance.set("bot", { enabled: true, rules: { skills: false } }, now - DAY);
+  await maintenance.run("bot", { now });
+  expect(skill.state).toBe("active");
+  await maintenance.set("bot", { rules: { skills: true } });
+  await maintenance.run("bot", { now });
+  expect(skill.state).toBe("archived");
+  expect(x.db.prepare("SELECT curator_paused FROM bot_learning WHERE bot_id = 'bot'").get()).toEqual({ curator_paused: 1 });
+});
+it("reads check-ins and reminders on Studio's scheduler from it, not from BB automations", async () => {
+  const x = await setup(); await x.enable(); x.rows.push(thread("main"));
+  x.local("report", "checkin"); x.local("once", "reminder"); x.local("pending", "reminder");
+  for (const id of ["report", "once", "pending"]) x.db.prepare("UPDATE bot_automations SET bb_ids = ? WHERE id = ?").run(JSON.stringify([`trg_automation_${id}`]), id);
+  const run = x.db.prepare("INSERT INTO trigger_runs (trigger_id, thread_id, status, reason, scheduled_for, started_at, finished_at, output) VALUES (?, 'main', 'succeeded', 'time', ?, ?, ?, ?)");
+  for (let i = 0; i < 10; i++) run.run("trg_automation_report", i, i, i + 1, "[PASS]");
+  // One reminder ran (its trigger is done); the other is still ahead.
+  x.scheduler.ensure({ owner: "automation", ownerId: "once" }, { schedule: { type: "once", at: Date.now() - 1000 }, timeZone: "UTC" }, true);
+  run.run("trg_automation_once", 1, 1, 2, "Reminded.");
+  x.scheduler.ensure({ owner: "automation", ownerId: "pending" }, { schedule: { type: "once", at: Date.now() + DAY }, timeZone: "UTC" }, true);
+  x.rpcCalls.length = 0;
+  const r = await x.maintenance.run("bot", { now });
+  expect(r?.suggestions.map((s) => s.text)).toContain("Review report: no useful output in its last 10 runs");
+  expect(x.db.prepare("SELECT id, state FROM bot_automations WHERE kind = 'reminder' ORDER BY id").all()).toEqual([{ id: "once", state: "done" }, { id: "pending", state: "active" }]);
+  expect(x.rpcCalls.some((call) => call.method === "automations_runs")).toBe(false);
+});
+it("keeps a lead a project heartbeat wakes out of the idle-thread cleanup", async () => {
+  const x = await setup(); await x.enable();
+  x.db.prepare("INSERT INTO project_runs (project_id, enabled, cadence, time, automation_id, lead_thread_id) VALUES ('p', 1, 'daily', '09:00', 'trg_heartbeat_p', 'child')").run();
+  await x.maintenance.run("bot", { now });
+  expect(x.archive).not.toHaveBeenCalled();
+});

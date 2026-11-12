@@ -1,0 +1,27 @@
+/* Canvas (prototype): the board's whiteboard ground and the caption's
+   "working" pulse. Imported by app.tsx; only the canvas page uses these. */
+.canvas-scroll {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--muted-foreground, #71717a) 22%, transparent) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+  /* The board fades into the chat line below it instead of running under it. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.canvas-tile { will-change: transform; }
+@keyframes canvas-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+.canvas-pulse { animation: canvas-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .canvas-pulse { animation: none; }
+}
+/* Talk's dictation controls take the field's dock while dictating into it
+   (Studio's src/talk/ui/fields.ts), in place of the mic and hands-free. */
+[data-talk-field-dock]:empty { display: none; }
+[data-talk-field-dock]:not(:empty) ~ [data-canvas-voice] { display: none; }
+/* The quick card (src/ui/quick-card.tsx): while it's dragged or resized,
+   its frames don't take the pointer, so the move never stalls over the board. */
+[data-canvas-card][data-moving] iframe { pointer-events: none; }
+[data-canvas-card][data-moving] { user-select: none; }
+/* The window's header is its title bar (src/ui/top-bar.tsx): the row drags
+   the window, and everything that can be clicked in it does not. */
+.canvas-titlebar { -webkit-app-region: drag; app-region: drag; }
+.canvas-titlebar :where(button, input, textarea, a, [role="dialog"], [role="menu"], [data-canvas-menu], [data-canvas-model-picker]) { -webkit-app-region: no-drag; app-region: no-drag; }

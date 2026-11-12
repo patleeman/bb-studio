@@ -1,0 +1,219 @@
+import { errorMessage as errorText } from "./kit/format";
+export { errorText };
+// Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
+// publish `studio_describe` for discovery.
+import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "./kit/contract";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type StudioProviderHandlers } from "./kit/server/index";
+import type { z } from "zod";
+import type { ProviderView } from "./contract";
+import { schemas } from "./contract";
+import { familyAndType, ITEM_TYPES, type ItemFamily, type ItemType } from "./item-model";
+
+const typeOfPlugin = (pluginId: string) => ITEM_TYPES.some((each) => each.pluginId === pluginId);
+
+/**
+ * A kind built into Studio. It answers to the plugin id it had as an add-on
+ * and implements the same provider methods, which the hub calls in-process
+ * instead of over RPC. An installed plugin with the same id (an old copy of
+ * the add-on) is not discovered: the built-in owns its items.
+ */
+export interface BuiltinProvider {
+  pluginId: string;
+  name: string;
+  handlers: StudioProviderHandlers;
+}
+const CALL_TIMEOUT_MS = 10_000;
+const LIVE_STATES = new Set(["running", "degraded", "starting"]);
+
+interface PluginEntry {
+  id: string;
+  name: string | null;
+  enabled: boolean;
+  status: string;
+  statusDetail: string | null;
+  version: string;
+  updatedAt?: string;
+}
+
+export interface HubSdk {
+  plugins: {
+    list(): Promise<{ plugins: readonly PluginEntry[] }>;
+    experimental_discoverRpc(args?: { method?: string }): Promise<readonly { pluginId: string }[]>;
+    callRpc<T>(args: { pluginId: string; method: string; input?: never; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T>;
+  };
+}
+
+type ProviderMethods = typeof schemas.provider;
+export type HubItem = StudioItem & { pluginId: string };
+
+export class StudioHub {
+  private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
+  private inventory: Map<string, string> | null = null;
+
+  private readonly builtins: ReadonlyMap<string, BuiltinProvider>;
+
+  /**
+   * `builtinOn` leaves a built-in kind the user turned off out entirely: it
+   * isn't listed, searched or called. `route` adjusts the providers Studio
+   * shows (src/kinds.ts: who offers New for each built-in kind).
+   */
+  constructor(
+    private readonly sdk: HubSdk,
+    builtins: readonly BuiltinProvider[] = [],
+    private readonly options: {
+      builtinOn?(pluginId: string): boolean;
+      route?(providers: ProviderView[]): ProviderView[];
+      /** The family and type of a namespace's indexed items, by id (src/item-index.ts); read once per listing. */
+      itemTypes?(pluginId: string): ReadonlyMap<string, { family: ItemFamily; type: ItemType }>;
+    } = {},
+  ) {
+    this.builtins = new Map(builtins.map((builtin) => [builtin.pluginId, builtin]));
+  }
+
+  /**
+   * Adds Studio's `family` and `type` to a provider's items: the index's for
+   * an indexed item, else what the kind maps to (src/item-model.ts). Only
+   * built-in kinds have them; an add-on's item never does.
+   */
+  private classified(pluginId: string, items: readonly StudioItem[]): HubItem[] {
+    const builtin = this.builtins.has(pluginId);
+    let indexed: ReadonlyMap<string, { family: ItemFamily; type: ItemType }> | null = null;
+    if (builtin && typeOfPlugin(pluginId)) { try { indexed = this.options.itemTypes?.(pluginId) ?? null; } catch { indexed = null; } }
+    return items.map(({ family: _family, type: _type, ...item }) => ({
+      ...item,
+      ...(builtin ? indexed?.get(item.id) ?? familyAndType(pluginId, item.kind) : {}),
+      pluginId,
+    }));
+  }
+
+  /** A provider method's output with its one `item` (a create, a copy) classified like listed ones. */
+  private classifiedOutput<T>(pluginId: string, output: T): T {
+    const item = output && typeof output === "object" && "item" in output ? (output as { item: unknown }).item : null;
+    if (!item || typeof item !== "object" || typeof (item as StudioItem).kind !== "string") return output;
+    const { pluginId: _pluginId, ...classified } = this.classified(pluginId, [item as StudioItem])[0]!;
+    return { ...output, item: classified };
+  }
+
+  private builtinOn(pluginId: string): boolean {
+    return this.options.builtinOn?.(pluginId) ?? true;
+  }
+
+  private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
+    return new Map(plugins.filter(plugin => plugin.enabled && plugin.id !== STUDIO_PLUGIN_ID)
+      .map(plugin => [plugin.id, JSON.stringify([plugin.status, plugin.version, plugin.updatedAt ?? ""])]));
+  }
+
+  /** Cheap lifecycle detection on stable hosts, which expose no plugin event hook. */
+  async inventoryChanges(): Promise<Set<string>> {
+    const next = this.inventoryMap((await this.sdk.plugins.list()).plugins);
+    const previous = this.inventory;
+    this.inventory = next;
+    return new Set(previous ? [...new Set([...previous.keys(), ...next.keys()])].filter(id => previous.get(id) !== next.get(id)) : []);
+  }
+
+  call<M extends keyof ProviderMethods>(
+    pluginId: string,
+    method: M,
+    input: z.input<ProviderMethods[M]["input"]>,
+  ): Promise<z.output<ProviderMethods[M]["output"]>> {
+    if (pluginId === STUDIO_PLUGIN_ID) return Promise.reject(new Error("Studio isn't a provider."));
+    const builtin = this.builtins.get(pluginId);
+    if (builtin && !this.builtinOn(pluginId)) return Promise.reject(new Error(`${builtin.name} are turned off in Studio (Setup → Kinds).`));
+    if (builtin) {
+      // The same parsing an RPC call gets, so built-ins and add-ons behave alike.
+      const schema = schemas.provider[method];
+      const handler = builtin.handlers[method] as (input: unknown) => unknown;
+      return Promise.resolve()
+        .then(() => handler(schema.input.parse(input)))
+        .then((output) => this.classifiedOutput(pluginId, schema.output.parse(output)) as z.output<ProviderMethods[M]["output"]>);
+    }
+    return this.sdk.plugins.callRpc({
+      pluginId,
+      method,
+      input: input as never,
+      outputSchema: schemas.provider[method].output as unknown as z.ZodType<z.output<ProviderMethods[M]["output"]>>,
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    });
+  }
+
+  /** Every installed, enabled provider, ready or not. */
+  async providers(): Promise<ProviderView[]> {
+    return (await this.providerSnapshot()).providers;
+  }
+
+  private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
+    const builtinIds = [...this.builtins.keys()];
+    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", exclude: [STUDIO_PLUGIN_ID, ...builtinIds] });
+    this.inventory ??= this.inventoryMap(snapshot.installed);
+    const builtins: PluginEntry[] = [...this.builtins.values()].filter((builtin) => this.builtinOn(builtin.pluginId)).map((builtin) => ({ id: builtin.pluginId, name: builtin.name, enabled: true, status: "running", statusDetail: null, version: "builtin" }));
+    const installed = new Set([...snapshot.installed.map((entry) => entry.id), ...builtinIds.filter((id) => this.builtinOn(id))]);
+    for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
+    const candidates = [...snapshot.providers.filter((entry) => !this.builtins.has(entry.id)), ...builtins].filter((entry) => !only || only.has(entry.id));
+    const described = await Promise.all(candidates.map((entry) => this.describe(entry)));
+    return { providers: this.options.route ? this.options.route(described) : described, discoveryComplete: snapshot.complete, installed };
+  }
+
+  private async describe(entry: PluginEntry): Promise<ProviderView> {
+    const base = { pluginId: entry.id, name: entry.name ?? entry.id, panel: null, kinds: [] };
+    if (!LIVE_STATES.has(entry.status)) {
+      this.described.delete(entry.id);
+      return { ...base, state: "offline", detail: entry.statusDetail ?? `${base.name} isn't running (${entry.status}).` };
+    }
+    const revision = `${entry.version}:${entry.updatedAt ?? ""}`;
+    const cached = this.described.get(entry.id);
+    if (cached?.revision === revision && cached.expiresAt > Date.now() && entry.status !== "starting") return { ...base, state: "ready", detail: null, panel: cached.info.panel, kinds: cached.info.kinds };
+    try {
+      const info = await this.call(entry.id, "studio_describe", null);
+      if (info.version !== 2) throw new Error(`Unsupported Studio provider version: ${info.version}`);
+      if (info.kinds.some((kind) => !kind.capabilities || kind.mentionProviderId === undefined)) throw new Error("Studio provider is missing capabilities or a mention provider id.");
+      this.described.set(entry.id, { revision, expiresAt: Date.now() + 30_000, info });
+      return { ...base, state: "ready", detail: null, panel: info.panel, kinds: info.kinds };
+    } catch (error) {
+      return { ...base, state: "offline", detail: errorText(error) };
+    }
+  }
+
+  /**
+   * Providers and every ready provider's items; a provider that fails to list
+   * goes offline. `truncated` names the providers that listed only some.
+   */
+  async overview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
+    const { providers, discoveryComplete } = await this.providerSnapshot(only);
+    const lists = await fanOutProviders(
+      providers,
+      async (provider) => {
+        if (provider.state !== "ready") return { provider, items: [] as HubItem[], truncated: false };
+        const result = await loadProviderItems(() => this.call(provider.pluginId, "studio_list", null));
+        if (result.status !== "ready") return { provider: { ...provider, state: "offline" as const, detail: result.status === "unavailable" ? result.error : null }, items: [] as HubItem[], truncated: false };
+        return { provider, items: this.classified(provider.pluginId, result.items), truncated: !result.complete };
+      },
+      (provider, error) => ({ provider: { ...provider, state: "offline" as const, detail: errorText(error) }, items: [] as HubItem[], truncated: false }),
+    );
+    return {
+      providers: lists.map((list) => list.provider),
+      items: lists.flatMap((list) => list.items),
+      truncated: new Set(lists.filter((list) => list.truncated).map((list) => list.provider.pluginId)),
+      discoveryComplete,
+    };
+  }
+
+  async itemsResult(pluginId: string, ids?: string[]): Promise<ProviderItems<HubItem>> {
+    if (ids?.length === 0) return { status: "ready", items: [], complete: true };
+    if (pluginId === STUDIO_PLUGIN_ID) return { status: "absent" };
+    const snapshot = await this.providerSnapshot(new Set([pluginId])).catch(() => null);
+    if (!snapshot) return { status: "unavailable", error: "Provider inventory is unavailable." };
+    const info = snapshot.providers.find((provider) => provider.pluginId === pluginId);
+    if (!info) return snapshot.discoveryComplete || !snapshot.installed.has(pluginId)
+      ? { status: "absent" } : { status: "unavailable", error: "Provider discovery is unavailable." };
+    if (info.state !== "ready") return { status: "unavailable", error: info.detail ?? "Provider unavailable." };
+    const result = await loadProviderItems(() => ids ? this.call(pluginId, "studio_get", { ids }) : this.call(pluginId, "studio_list", null));
+    return result.status === "ready" ? { ...result, items: this.classified(pluginId, result.items.filter((item) => !ids || ids.includes(item.id))) } : result;
+  }
+
+  async get(pluginId: string, ids: string[]): Promise<HubItem[]> {
+    const result = await this.itemsResult(pluginId, ids);
+    if (result.status === "unavailable") throw new Error(result.error);
+    return result.status === "ready" ? result.items : [];
+  }
+
+}

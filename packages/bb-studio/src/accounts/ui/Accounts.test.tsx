@@ -1,0 +1,164 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
+import type { AccountView, AccountsStatus, Warning } from "../contract";
+
+vi.mock("../../kit/ui/hooks/use-compact-viewport.js", () => ({ useIsCompactViewport: () => false }));
+vi.mock("../../kit/ui/hooks/use-pointer-coarse.js", () => ({ usePointerCoarse: () => false }));
+vi.mock("../../ui/live", () => ({ useCall: () => async () => ({}), useLive: () => ({ data: null, refresh: () => {} }) }));
+
+const { AccountsPanel, needsSignIn, signInLabel } = await import("./AccountsPanel");
+const { WarningList, actionLabel, freshWarnings, warningsWindowOptions } = await import("./Warnings");
+const { pooledFamily, signedOutPoolAccount } = await import("./notices");
+const { accountNeeds } = await import("../../auth/ui/needs");
+const { openAccounts, setAccountsFooter, useSigningIn } = await import("./store");
+const { closeRelogin, useReloginTarget } = await import("../../auth/ui/relogin-store");
+
+installTestPluginRuntime();
+
+const RESET = Date.UTC(2026, 10, 16, 9, 0);
+const NOW = Date.UTC(2026, 10, 12, 16, 0);
+
+function account(over: Partial<AccountView> & { key: string }): AccountView {
+  const [source, id] = over.key.split(":") as [AccountView["source"], string];
+  return { id, source, provider: "claude", name: "Claude", label: "Patrick", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: source === "local" ? null : `${source === "studio" ? "pool" : "bb"}:${id}`, ...over };
+}
+
+const STATUS: AccountsStatus = {
+  checkedAt: NOW,
+  sources: [{ source: "studio", name: "BB Studio", state: "on" }, { source: "bb", name: "bb", state: "on" }, { source: "local", name: "This Mac", state: "on" }],
+  accounts: [
+    account({ key: "studio:a", state: "signed_out", message: "Refresh refused", windows: [{ id: "secondary", label: "7d", percent: 97, resetAt: RESET, rejected: false }], models: [{ id: "fable", label: "Fable", percent: 100, resetAt: RESET, rejected: true }], pinned: [{ threadId: "thr_1", title: "Fix the sync" }] }),
+    account({ key: "bb:a", windows: [{ id: "primary", label: "5h", percent: 12, resetAt: RESET, rejected: false }] }),
+    account({ key: "bb:c", provider: "codex", name: "Codex", state: "error", message: "HTTP 500" }),
+    account({ key: "local:claude-code", name: "Claude Code", label: "Account Pooler", signIn: "provider:claude-code" }),
+  ],
+  warnings: [],
+  dismissed: [],
+};
+
+const warning = (over: Partial<Warning> & { id: string }): Warning => ({ accountKey: "studio:a", source: "studio", kind: "signed_out", title: "Claude signed out", detail: "BB Studio · Patrick", action: "sign_in", target: "pool:a", ...over });
+
+let root: Root | null = null;
+const container = () => document.body.lastElementChild as HTMLElement;
+async function render(node: React.ReactNode) {
+  const host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => { root!.render(node); });
+}
+
+beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });
+afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.body.replaceChildren(); vi.unstubAllGlobals(); closeRelogin(); setAccountsFooter(null); });
+
+const api = { start: vi.fn(async () => { throw new Error("no"); }), poll: vi.fn(), complete: vi.fn(), cancel: vi.fn(async () => ({})) };
+
+describe("Accounts panel", () => {
+  it("shows each source, state, quota with reset times and pinned threads, and labels the bb sign-in", async () => {
+    const onSignIn = vi.fn();
+    const onOpenThread = vi.fn();
+    await render(<AccountsPanel status={STATUS} error={null} signingIn={null} onSignIn={onSignIn} onSignInDone={() => {}} onOpenThread={onOpenThread} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    const root = container();
+    expect([...root.querySelectorAll("[data-accounts-source]")].map((node) => node.getAttribute("data-accounts-source"))).toEqual(["studio", "bb", "local"]);
+    const studio = root.querySelector('[data-account="studio:a"]')!;
+    expect(studio.querySelector('[data-testid="account-state"]')?.textContent).toBe("Signed out");
+    expect(studio.textContent).toContain("97%");
+    expect(studio.textContent).toContain("Fable");
+    expect(studio.textContent).toContain("rejected");
+    expect(studio.textContent).toMatch(/resets Nov 16/);
+    expect(studio.textContent).toContain("Refresh refused");
+    await act(async () => { (studio.querySelector("li button") as HTMLButtonElement).click(); });
+    expect(onOpenThread).toHaveBeenCalledWith("thr_1");
+    await act(async () => { (studio.querySelector('[data-testid="account-sign-in"]') as HTMLButtonElement).click(); });
+    expect(onSignIn).toHaveBeenCalledWith(expect.objectContaining({ key: "studio:a" }));
+    expect(root.querySelector('[data-account="bb:c"] [data-testid="account-sign-in"]')?.textContent).toBe("Sign in to bb");
+    expect(root.querySelector('[data-account="bb:a"] [data-testid="account-sign-in"]')).toBeNull();
+    expect(root.querySelector('[data-account="local:claude-code"]')?.textContent).toContain("Account Pooler");
+  });
+
+  it("runs the sign-in inline in the account's row", async () => {
+    await render(<AccountsPanel status={STATUS} error={null} signingIn="studio:a" onSignIn={() => {}} onSignInDone={() => {}} onOpenThread={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    await act(async () => { await Promise.resolve(); });
+    expect(api.start).toHaveBeenCalledWith("pool:a");
+    expect(container().querySelector('[data-account="studio:a"] [data-testid="relogin"]')).not.toBeNull();
+  });
+
+  it("offers Sign in only for signed-out or failing accounts with a sign-in", () => {
+    expect(needsSignIn(account({ key: "studio:a", state: "signed_out" }))).toBe(true);
+    expect(needsSignIn(account({ key: "studio:a", state: "limited" }))).toBe(false);
+    expect(needsSignIn(account({ key: "studio:a", state: "signed_out", signIn: null }))).toBe(false);
+    expect(signInLabel({ source: "bb" })).toBe("Sign in to bb");
+    expect(signInLabel({ source: "studio" })).toBe("Sign in");
+  });
+});
+
+describe("warnings", () => {
+  it("names the problem with one action and a dismiss", async () => {
+    const run = vi.fn();
+    const dismiss = vi.fn();
+    const list = [
+      warning({ id: "studio:a:signed_out" }),
+      warning({ id: "bb:a:model:fable:rejected", source: "bb", accountKey: "bb:a", kind: "model", title: "Fable at 100%", detail: "bb · Patrick · resets Nov 16, 09:00", action: "switch_model" }),
+      warning({ id: "studio:b:window:secondary:high", accountKey: "studio:b", kind: "window", title: "Claude 7d at 92%", action: "use_other" }),
+    ];
+    await render(<WarningList warnings={list} actions={{ run, dismiss }} />);
+    const cards = [...container().querySelectorAll("[data-warning]")];
+    expect(cards.map((card) => [card.querySelector("span.font-medium")?.textContent, card.querySelector('[data-testid="warning-action"]')?.textContent])).toEqual([
+      ["Claude signed out", "Sign in"],
+      ["Fable at 100%", "Switch model"],
+      ["Claude 7d at 92%", "Use other account"],
+    ]);
+    await act(async () => { (cards[1]!.querySelector('[data-testid="warning-action"]') as HTMLButtonElement).click(); });
+    expect(run).toHaveBeenCalledWith(list[1]);
+    await act(async () => { (cards[0]!.querySelector('[data-testid="warning-dismiss"]') as HTMLButtonElement).click(); });
+    expect(dismiss).toHaveBeenCalledWith(list[0]);
+    expect(actionLabel(warning({ id: "bb:a:signed_out", source: "bb" }))).toBe("Sign in to bb");
+  });
+
+  it("opens the toast window in the top right, sized to its cards, only for warnings not shown yet", () => {
+    expect(warningsWindowOptions(2, { availLeft: 0, availTop: 25, availWidth: 1512 })).toMatchObject({ x: 1512 - 360 - 32, y: 37, width: 376, alwaysOnTop: true, transparent: true, frame: false });
+    expect(warningsWindowOptions(9, { availWidth: 1000 }).height).toBe(warningsWindowOptions(4, { availWidth: 1000 }).height);
+    expect(freshWarnings([warning({ id: "a" }), warning({ id: "b" })], new Set(["a"])).map((each) => each.id)).toEqual(["b"]);
+  });
+
+  it("puts each warning in Needs you, with its action, dismiss and Accounts", () => {
+    const run = vi.fn();
+    const dismiss = vi.fn();
+    const open = vi.fn();
+    const needs = accountNeeds({ warnings: [warning({ id: "studio:a:signed_out" })] }, { run, dismiss }, open);
+    expect(needs.map((need) => [need.key, need.title, need.action.label])).toEqual([["account:studio:a:signed_out", "Claude signed out", "Sign in"]]);
+    needs[0]!.action.run();
+    needs[0]!.dismiss!();
+    needs[0]!.open!();
+    expect(run).toHaveBeenCalledOnce();
+    expect(dismiss).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledOnce();
+  });
+});
+
+describe("signed-out notices and opening", () => {
+  it("states Signed out under a model list that failed through a signed-out pool", () => {
+    expect(pooledFamily("Claude Code", "Listing Claude models from http://127.0.0.1:38986/api/v1/plugins/account-pool/http/claude/v1/models failed with HTTP 429.")).toBe("claude");
+    expect(pooledFamily("Claude Code", "Timed out")).toBeNull();
+    expect(signedOutPoolAccount(STATUS.accounts, "claude")?.key).toBe("studio:a");
+    expect(signedOutPoolAccount([...STATUS.accounts, account({ key: "studio:b" })], "claude")).toBeNull();
+  });
+
+  it("opens Accounts on the account's inline sign-in, or the sign-in dialog when BB has no footer item", async () => {
+    let seen: string | null = null;
+    let dialog: string | null = null;
+    function Probe() { seen = useSigningIn(); dialog = useReloginTarget()?.id ?? null; return null; }
+    await render(<Probe />);
+    const target = { id: "pool:a", name: "Claude", detail: null };
+    await act(async () => { openAccounts({ key: "studio:a", target }); });
+    expect(dialog).toBe("pool:a");
+    const footer = { open: vi.fn(), close: vi.fn(), toggle: vi.fn() };
+    setAccountsFooter(footer);
+    closeRelogin();
+    await act(async () => { openAccounts({ key: "studio:a", target }); });
+    expect(footer.open).toHaveBeenCalledOnce();
+    expect(seen).toBe("studio:a");
+  });
+});

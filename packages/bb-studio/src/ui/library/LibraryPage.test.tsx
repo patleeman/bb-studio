@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+import { act, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { LibraryItem } from "../../bot-threads-contract";
+
+const NOW = new Date("2026-11-10T15:00:00").getTime();
+const HOUR = 3_600_000;
+const state = vi.hoisted(() => ({ items: [] as unknown[], open: vi.fn(), toThread: vi.fn(), openLink: vi.fn(async (_link: string, _options: unknown) => ({ via: "workbench" })) }));
+vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toThread: state.toThread }) }));
+vi.mock("../live", () => ({
+  useLive: (method: string) => ({ data: method === "bot_library" ? { items: state.items } : method === "bot_spaces" ? { bots: [{ id: "bot_main", name: "Chief of Staff", mainThreadId: null }], currentBotId: "bot_main" } : null, error: null, refresh: () => {} }),
+}));
+vi.mock("../../kit/app/nav", () => ({ openAppPath: state.open }));
+vi.mock("../../kit/ui/icon", () => ({ Icon: ({ name }: { name: string }) => <i data-icon={name} /> }));
+vi.mock("../../kit/app/index", () => ({
+  Icon: ({ name }: { name: string }) => <i data-icon={name} />, openAppPath: state.open,
+  StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DropdownMenu: ({ children }: { children?: ReactNode }) => <div>{children}</div>, DropdownMenuTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onSelect }: { children?: ReactNode; onSelect?(): void }) => <button type="button" role="menuitem" onClick={() => onSelect?.()}>{children}</button>,
+}));
+
+const { LibraryPage } = await import("./LibraryPage");
+const item = (id: string, title: string, kind: LibraryItem["kind"], hoursAgo: number, madeIn: LibraryItem["madeIn"] = null): LibraryItem => ({ pluginId: "studio", id, title, kind, type: null, href: `/plugins/studio/studio/pages/${id}`, updatedAt: NOW - hoursAgo * HOUR, createdAt: null, madeIn });
+const prep = { threadId: "thr_prep", title: "Launch prep", kind: "conversation" as const, conversationId: "thr_prep", conversationTitle: "Launch prep" };
+const lead = { threadId: "thr_lead", title: "Fable lead", kind: "worker" as const, conversationId: "thr_prep", conversationTitle: "Launch prep" };
+
+let root: Root, container: HTMLDivElement;
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  try { localStorage.removeItem("studio.library.group"); } catch { /* none */ }
+  state.open.mockClear(); state.toThread.mockClear(); state.openLink.mockClear();
+  state.items = [item("pg_0123456789abcdef", "Study plan", "page", 2, prep), item("wb_grid", "Grid sketch", "whiteboard", 5, lead), item("pg_mine", "Groceries", "page", 30)];
+  container = document.createElement("div"); document.body.append(container); root = createRoot(container);
+});
+afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); });
+
+it("is the Library on the Bot-page template: its header, Kind pills, conversation groups and one line per file", () => {
+  act(() => root.render(<LibraryPage />));
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Library·Chief of Staff");
+  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App", "Artifact"]);
+  const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
+  expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Launch prep", "Made by you"]);
+  const rows = [...groups[0]!.querySelectorAll<HTMLElement>("[data-testid=library-row]")];
+  // In its conversation's group, a file says its kind and age; a worker's says who made it.
+  expect(rows.map((row) => row.querySelector("[data-testid=bot-page-row-meta]")?.textContent)).toEqual(["Page · 2h", "Whiteboard · by Fable lead · 5h"]);
+  // The group's title opens the conversation; a row opens the file.
+  act(() => groups[0]!.querySelector<HTMLButtonElement>("h2 button")!.click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_prep");
+  act(() => rows[0]!.querySelector<HTMLButtonElement>("[data-testid=bot-page-row-open]")!.click());
+  expect(state.openLink).toHaveBeenLastCalledWith("bb://page/pg_0123456789abcdef", { source: "botPage", title: "Study plan", modifiers: { meta: false, ctrl: false, shift: false } });
+  expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://page/pg_0123456789abcdef");
+  expect(rows[0]!.dataset.selected).toBe("true");
+  expect(state.toThread).toHaveBeenCalledTimes(1);
+  act(() => { rows[0]!.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true, metaKey: true })); });
+  expect(state.openLink).toHaveBeenLastCalledWith("bb://page/pg_0123456789abcdef", { source: "botPage", title: "Study plan", modifiers: { meta: true, ctrl: false, shift: false } });
+  act(() => { rows[0]!.querySelector("button")!.dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true })); });
+  expect(state.openLink).toHaveBeenLastCalledWith("bb://page/pg_0123456789abcdef", { source: "botPage", title: "Study plan", modifiers: { meta: false, ctrl: false, shift: true } });
+  expect(state.open).not.toHaveBeenCalled();
+  act(() => rows[1]!.querySelector<HTMLButtonElement>("[data-testid=bot-page-row-open]")!.click());
+  expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/pages/wb_grid");
+  expect(state.openLink).toHaveBeenCalledTimes(3);
+  act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Whiteboard")!.click());
+  expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
+});

@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest";
+import { pickComposer, pickThreadComposer } from "./composer";
+
+const main = { name: "main", scope: { kind: "new-thread", projectId: null } } as const;
+const floated = { name: "floated", scope: { kind: "thread", threadId: "thr_a" } } as const;
+const other = { name: "other", scope: { kind: "thread", threadId: "thr_b" } } as const;
+const queued = { name: "queued", scope: { kind: "queued-message", threadId: "thr_c", queuedMessageId: "q" } } as const;
+
+describe("pickComposer", () => {
+  it("drafts into the composer for the message's thread, not the newest one", () => {
+    expect(pickComposer([floated, main], "thr_a")).toBe(floated);
+    expect(pickComposer([floated, other], "thr_a")).toBe(floated);
+  });
+
+  it("matches a queued-message composer by its thread", () => {
+    expect(pickComposer([queued, other], "thr_c")).toBe(queued);
+  });
+
+  it("falls back to a new-thread composer, but never another thread's", () => {
+    expect(pickComposer([other, main], "thr_z")).toBe(main);
+    expect(pickComposer([main, other], "thr_z")).toBe(main);
+  });
+
+  it("returns null when only other threads' composers are mounted", () => {
+    expect(pickComposer([other, floated], "thr_z")).toBeNull();
+  });
+
+  it("returns null when no composer is mounted", () => {
+    expect(pickComposer([], "thr_a")).toBeNull();
+  });
+});
+
+describe("pickThreadComposer", () => {
+  it("takes only the thread's own composer: no new-thread or queued-message fallback", () => {
+    expect(pickThreadComposer([floated, main], "thr_a")).toBe(floated);
+    expect(pickThreadComposer([main, other], "thr_z")).toBeNull();
+    expect(pickThreadComposer([queued], "thr_c")).toBeNull();
+  });
+});

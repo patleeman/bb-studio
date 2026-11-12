@@ -1,0 +1,951 @@
+// The BB bridge: a VS Code extension Studio Code installs into every
+// workspace. It reports what the user has in front of them to the plugin,
+// and does what the agent asks (show these lines). It talks over the Unix
+// socket named in STUDIO_CODE_BRIDGE, which the plugin sets per workspace.
+// The source is plain JavaScript (no build), kept here as text so the
+// bundled plugin can write it out.
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+
+/** Raise with every change to the extension, so workspaces get the new one. */
+export const BRIDGE_VERSION = "0.7.0";
+const NAME = "studio-bridge";
+const PUBLISHER = "bb";
+export const BRIDGE_ID = `${PUBLISHER}.${NAME}`;
+
+/**
+ * BB's app-level shortcuts, passed from VS Code to BB when VS Code has the
+ * keyboard: getting around BB works from inside the editor. Editing keys,
+ * VS Code's own palettes (⌘P, ⇧⌘P) and tab handling stay with VS Code. ⌘K
+ * is not here: it starts VS Code's chords (⌘K ⌘S, ⌘K ⌘C). BB's search is
+ * ⌘K ⌘K, or "BB: Search" in the command palette (SEARCH_KEY).
+ */
+export const PASSED_KEYS: { mac: string; other: string; key: string; code: string; shift: boolean; does: string }[] = [
+  { mac: "cmd+shift+o", other: "ctrl+shift+o", key: "O", code: "KeyO", shift: true, does: "new thread" },
+  { mac: "cmd+\\", other: "ctrl+\\", key: "\\", code: "Backslash", shift: false, does: "toggle the sidebar" },
+  { mac: "cmd+j", other: "ctrl+j", key: "j", code: "KeyJ", shift: false, does: "toggle the right panel" },
+  { mac: "cmd+shift+c", other: "ctrl+shift+c", key: "C", code: "KeyC", shift: true, does: "focus the chat composer" },
+  ...Array.from({ length: 9 }, (_, index) => ({ mac: `cmd+${index + 1}`, other: `ctrl+${index + 1}`, key: String(index + 1), code: `Digit${index + 1}`, shift: false, does: `jump to thread ${index + 1}` })),
+];
+
+/** BB's search shortcut, replayed on BB's page by "BB: Search" (⌘K ⌘K in the editor). */
+export const SEARCH_KEY = { key: "k", code: "KeyK", shift: false };
+/** The chord that opens BB's search from inside VS Code. */
+export const SEARCH_CHORD = { mac: "cmd+k cmd+k", other: "ctrl+k ctrl+k" };
+
+const MANIFEST = {
+  name: NAME,
+  publisher: PUBLISHER,
+  displayName: "BB Studio bridge",
+  description: "Shares what you're looking at with BB's agent, and lets it point you at code.",
+  version: BRIDGE_VERSION,
+  engines: { vscode: "^1.80.0" },
+  main: "./extension.js",
+  activationEvents: ["onStartupFinished"],
+  contributes: {
+    commands: [
+      { command: "bbStudio.copyForChat", title: "Copy for BB chat", category: "BB" },
+      { command: "bbStudio.toggleFollow", title: "Follow the agent", category: "BB" },
+      { command: "bbStudio.askAbout", title: "Ask About This", category: "BB" },
+      { command: "bbStudio.newThread", title: "New Thread from Selection", category: "BB" },
+      { command: "bbStudio.showInBb", title: "Show in BB", category: "BB" },
+      { command: "bbStudio.search", title: "Search", category: "BB" },
+      // Review comments (src/server/comments.ts).
+      { command: "bbStudio.submitReview", title: "Submit Review to the Agent", category: "BB", icon: "$(send)" },
+      { command: "bbStudio.addComment", title: "Add Comment", category: "BB" },
+      { command: "bbStudio.reply", title: "Reply", category: "BB" },
+      { command: "bbStudio.editComment", title: "Edit", category: "BB", icon: "$(edit)" },
+      { command: "bbStudio.deleteComment", title: "Delete", category: "BB", icon: "$(trash)" },
+      { command: "bbStudio.saveComment", title: "Save", category: "BB" },
+      { command: "bbStudio.cancelEdit", title: "Cancel", category: "BB" },
+      { command: "bbStudio.resolveThread", title: "Resolve", category: "BB", icon: "$(check)" },
+      { command: "bbStudio.reopenThread", title: "Reopen", category: "BB", icon: "$(discard)" },
+    ],
+    menus: {
+      "editor/context": [
+        // With no selection, "this" is the line the cursor is on.
+        { command: "bbStudio.askAbout", when: "resourceScheme == file", group: "0_bb@1" },
+        { command: "bbStudio.newThread", when: "editorHasSelection && resourceScheme == file", group: "0_bb@2" },
+        { command: "bbStudio.showInBb", when: "resourceScheme == file", group: "0_bb@3" },
+        { command: "bbStudio.copyForChat", when: "editorHasSelection", group: "9_cutcopypaste@9" },
+      ],
+      "comments/commentThread/context": [
+        { command: "bbStudio.addComment", group: "inline@1", when: "commentController == bb-review && commentThreadIsEmpty" },
+        { command: "bbStudio.reply", group: "inline@1", when: "commentController == bb-review && !commentThreadIsEmpty" },
+      ],
+      "comments/commentThread/title": [
+        { command: "bbStudio.submitReview", group: "navigation@1", when: "commentController == bb-review && bbStudio.reviewPending" },
+        { command: "bbStudio.resolveThread", group: "navigation@2", when: "commentController == bb-review && !commentThreadIsEmpty && commentThread != resolved" },
+        { command: "bbStudio.reopenThread", group: "navigation@2", when: "commentController == bb-review && commentThread == resolved" },
+      ],
+      "comments/comment/title": [
+        { command: "bbStudio.editComment", group: "inline@1", when: "commentController == bb-review && comment == pending" },
+        { command: "bbStudio.deleteComment", group: "inline@2", when: "commentController == bb-review && comment == pending" },
+      ],
+      "comments/comment/context": [
+        { command: "bbStudio.saveComment", group: "inline@1", when: "commentController == bb-review" },
+        { command: "bbStudio.cancelEdit", group: "inline@2", when: "commentController == bb-review" },
+      ],
+      // These take the comment they're on; only Submit makes sense from the palette.
+      commandPalette: ["addComment", "reply", "editComment", "deleteComment", "saveComment", "cancelEdit", "resolveThread", "reopenThread"]
+        .map((name) => ({ command: "bbStudio." + name, when: "false" })),
+    },
+    keybindings: [
+      ...PASSED_KEYS.map((each) => ({
+        key: each.other,
+        mac: each.mac,
+        command: "bbStudio.passKey",
+        args: { key: each.key, code: each.code, mod: true, shift: each.shift, alt: false },
+      })),
+      { key: SEARCH_CHORD.other, mac: SEARCH_CHORD.mac, command: "bbStudio.search" },
+    ],
+  },
+};
+
+const EXTENSION = String.raw`"use strict";
+const vscode = require("vscode");
+const http = require("node:http");
+
+const fs = require("node:fs");
+
+const SOCKET = process.env.STUDIO_CODE_BRIDGE;
+// Named when connecting, so the plugin knows which commands this copy understands.
+const VERSION = ${JSON.stringify(BRIDGE_VERSION)};
+// This run's secret, from a 0600 file beside the socket (never the
+// environment, which every task and terminal inherits). Read each time the
+// bridge connects, since a new run writes a new one.
+function token() {
+  try { return require("node:fs").readFileSync(SOCKET.replace(/\.sock$/, "") + ".token", "utf8").trim(); } catch (error) { return ""; }
+}
+const MAX_SELECTION = 8000;
+// This window, among others open on the same workspace: the agent talks to
+// the one used last.
+const WINDOW = Math.random().toString(36).slice(2, 12);
+
+function post(path, body) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const req = http.request({ socketPath: SOCKET, path, method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW, authorization: "Bearer " + token() } }, (res) => { res.resume(); res.on("end", resolve); });
+    req.on("error", resolve);
+    req.end(data);
+  });
+}
+
+function fileOf(document) {
+  return document && document.uri.scheme === "file" ? document.uri.fsPath : null;
+}
+
+function snapshot() {
+  const editor = vscode.window.activeTextEditor;
+  let activeFile = null;
+  const path = editor && fileOf(editor.document);
+  if (editor && path) {
+    const selection = editor.selection;
+    const text = editor.document.getText(selection);
+    const visible = editor.visibleRanges[0];
+    const problems = vscode.languages.getDiagnostics(editor.document.uri)
+      .filter((d) => d.severity <= vscode.DiagnosticSeverity.Warning)
+      .slice(0, 20)
+      .map((d) => ({ line: d.range.start.line + 1, severity: d.severity === vscode.DiagnosticSeverity.Error ? "error" : "warning", message: String(d.message).slice(0, 400) }));
+    activeFile = {
+      path,
+      language: editor.document.languageId,
+      selection: { startLine: selection.start.line + 1, startColumn: selection.start.character + 1, endLine: selection.end.line + 1, endColumn: selection.end.character + 1 },
+      selectedText: text.length > MAX_SELECTION ? text.slice(0, MAX_SELECTION) + "\n…" : text,
+      visible: visible ? { startLine: visible.start.line + 1, endLine: visible.end.line + 1 } : null,
+      problems,
+    };
+  }
+  const open = [];
+  for (const group of vscode.window.tabGroups.all) for (const tab of group.tabs) {
+    const uri = tab.input && tab.input.uri;
+    if (uri && uri.scheme === "file" && !open.includes(uri.fsPath)) open.push(uri.fsPath);
+  }
+  const unsaved = vscode.workspace.textDocuments.filter((d) => d.isDirty && fileOf(d)).map((d) => d.uri.fsPath);
+  return { focused: vscode.window.state.focused, activeFile, openFiles: open.slice(0, 50), unsavedFiles: unsaved.slice(0, 50) };
+}
+
+let timer = null;
+function report() {
+  clearTimeout(timer);
+  timer = setTimeout(() => post("/state", snapshot()), 300);
+}
+
+const highlight = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  backgroundColor: new vscode.ThemeColor("editor.findMatchHighlightBackground"),
+  overviewRulerColor: new vscode.ThemeColor("editorOverviewRuler.findMatchForeground"),
+  overviewRulerLane: vscode.OverviewRulerLane.Center,
+});
+let clearHighlight = null;
+
+async function show(command) {
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(command.path));
+  const last = Math.max(document.lineCount, 1);
+  const start = Math.min(Math.max(command.startLine, 1), last) - 1;
+  const end = Math.min(Math.max(command.endLine, command.startLine), last) - 1;
+  const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: false });
+  const range = new vscode.Range(start, 0, end, document.lineAt(end).text.length);
+  editor.selection = new vscode.Selection(range.start, range.end);
+  editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  editor.setDecorations(highlight, [range]);
+  if (clearHighlight) clearHighlight.dispose();
+  // The highlight stays until the user moves on.
+  clearHighlight = vscode.window.onDidChangeTextEditorSelection((event) => {
+    if (event.kind !== vscode.TextEditorSelectionChangeKind.Command) {
+      editor.setDecorations(highlight, []);
+      if (clearHighlight) { clearHighlight.dispose(); clearHighlight = null; }
+    }
+  });
+  vscode.window.setStatusBarMessage("$(sparkle) BB showed you " + vscode.workspace.asRelativePath(document.uri) + ":" + (start + 1) + (end > start ? "–" + (end + 1) : ""), 6000);
+}
+
+// ---- Live edits: the agent types into the open buffer ----
+
+const caret = vscode.window.createTextEditorDecorationType({
+  after: { contentText: "BB", color: new vscode.ThemeColor("editorCursor.foreground"), fontWeight: "600", margin: "0 0 0 1px", textDecoration: "none; font-size: 0.75em; vertical-align: super" },
+  borderColor: new vscode.ThemeColor("editorCursor.foreground"),
+  borderStyle: "solid",
+  borderWidth: "0 2px 0 0",
+});
+const typed = vscode.window.createTextEditorDecorationType({ backgroundColor: new vscode.ThemeColor("diffEditor.insertedTextBackground") });
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Edits are typed in steps for at most this long each, however long the text.
+const TYPING_MS = 3000;
+const STEP_MS = 16;
+
+function locate(text, change, name) {
+  if (!change.oldText) return [text.length, text.length];
+  const at = text.indexOf(change.oldText);
+  if (at < 0) throw new Error("Couldn't find the text to replace in " + name + ": " + JSON.stringify(change.oldText.slice(0, 80)));
+  if (text.indexOf(change.oldText, at + 1) >= 0) throw new Error("The text to replace appears more than once in " + name + "; include more around it.");
+  return [at, at + change.oldText.length];
+}
+
+// The part of a replacement that actually changes: the old and new text often
+// share a start or an end ("add a comment above this line" keeps the line),
+// and only the middle needs deleting and typing.
+function narrow(oldText, newText) {
+  let skip = 0;
+  while (skip < oldText.length && skip < newText.length && oldText[skip] === newText[skip]) skip++;
+  let tail = 0;
+  while (tail < oldText.length - skip && tail < newText.length - skip && oldText[oldText.length - 1 - tail] === newText[newText.length - 1 - tail]) tail++;
+  return { skip, remove: oldText.length - skip - tail, text: newText.slice(skip, newText.length - tail) };
+}
+
+// The last edit this extension made, so the change listener can tell it
+// apart from the user's typing.
+let mine = null;
+async function apply(editor, from, to, text, stops) {
+  const document = editor.document;
+  const range = new vscode.Range(document.positionAt(from), document.positionAt(to));
+  mine = { offset: from, length: to - from, text };
+  const ok = await editor.edit((builder) => { if (from === to) builder.insert(range.start, text); else builder.replace(range, text); }, { undoStopBefore: stops, undoStopAfter: false });
+  if (!ok) throw new Error("VS Code didn't accept the edit.");
+}
+
+// This extension host outlives a closed tab for a while; with no screen,
+// showing a document never finishes. Give up quickly and say so.
+const SCREEN_MS = 5000;
+function onScreen(promise, what) {
+  return Promise.race([promise, sleep(SCREEN_MS).then(() => {
+    const error = new Error("No VS Code window is showing this workspace right now, so nothing was " + what + ".");
+    error.noWindow = true;
+    throw error;
+  })]);
+}
+
+async function edit(command) {
+  const document = await vscode.workspace.openTextDocument(vscode.Uri.file(command.path));
+  const name = vscode.workspace.asRelativePath(document.uri);
+  // Text that changes on disk while it's unsaved here would be lost on save:
+  // leave saving to the user when they have unsaved work in it.
+  const hadUnsaved = document.isDirty;
+  const editor = await onScreen(vscode.window.showTextDocument(document, { preview: false, preserveFocus: true }), "changed");
+  // Check every edit first, so a bad one changes nothing.
+  const original = editor.document.getText();
+  let check = original;
+  for (const change of command.edits) {
+    const [start, end] = locate(check, change, name);
+    check = check.slice(0, start) + change.newText + check.slice(end);
+  }
+  let first = true;
+  // The user typed in the file while this ran: their keystrokes start a new
+  // undo step (so ⌘Z on the agent's edit leaves them), and the file isn't saved.
+  let userTyped = false;
+  let stopNext = false;
+  let offset = 0;
+  const follow = vscode.workspace.onDidChangeTextDocument((event) => {
+    if (event.document !== editor.document) return;
+    for (const c of event.contentChanges) {
+      if (mine && c.rangeOffset === mine.offset && c.rangeLength === mine.length && c.text === mine.text) { mine = null; continue; }
+      userTyped = true;
+      stopNext = true;
+      // Keep our place when they type above it.
+      if (c.rangeOffset <= offset) offset += c.text.length - c.rangeLength;
+    }
+  });
+  const step = async (from, to, text) => {
+    // Taken before applying: typing during this change marks the next one.
+    const stops = first || stopNext;
+    first = false;
+    stopNext = false;
+    await apply(editor, from, to, text, stops);
+  };
+  const inserted = [];
+  try {
+    for (const change of command.edits) {
+      const [found] = locate(editor.document.getText(), change, name);
+      const part = narrow(change.oldText, change.newText);
+      const start = found + part.skip;
+      const end = start + part.remove;
+      offset = start;
+      if (end > start) await step(start, end, "");
+      const text = part.text;
+      const steps = Math.max(1, Math.min(Math.ceil(text.length / 2), Math.floor(TYPING_MS / STEP_MS)));
+      const size = Math.ceil(text.length / steps);
+      for (let i = 0; i < text.length; i += size) {
+        const piece = text.slice(i, i + size);
+        await step(offset, offset, piece);
+        offset += piece.length;
+        const at = editor.document.positionAt(offset);
+        editor.setDecorations(caret, [new vscode.Range(at, at)]);
+        editor.revealRange(new vscode.Range(at, at), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        await sleep(STEP_MS);
+      }
+      inserted.push([offset - text.length, offset]);
+    }
+  } catch (error) {
+    editor.setDecorations(caret, []);
+    // Put the file back as it was, unless the user typed meanwhile: then their
+    // text is mixed in, and ⌘Z is the safe way back.
+    if (!userTyped) {
+      const doc = editor.document;
+      mine = { offset: 0, length: doc.getText().length, text: original };
+      let restored = false;
+      try {
+        restored = await editor.edit((builder) => builder.replace(new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), original), { undoStopBefore: true, undoStopAfter: true });
+      } catch { /* Report the partial edit below. */ }
+      if (!restored) throw new Error((error && error.message || String(error)) + " Rollback failed; a partial edit remains in " + name + "; inspect the file before retrying.");
+      throw new Error((error && error.message || String(error)) + " The edit stopped partway and was rolled back; " + name + " is as it was.");
+    }
+    throw new Error((error && error.message || String(error)) + " The edit stopped partway while the user was typing in " + name + ", so the partial edit was left in place; ⌘Z undoes it.");
+  } finally {
+    follow.dispose();
+  }
+  // Close the agent's undo step.
+  await editor.edit(() => undefined, { undoStopBefore: false, undoStopAfter: true });
+  editor.setDecorations(caret, []);
+  const doc = editor.document;
+  editor.setDecorations(typed, inserted.map(([a, b]) => new vscode.Range(doc.positionAt(a), doc.positionAt(b))));
+  setTimeout(() => editor.setDecorations(typed, []), 4000);
+  const save = !hadUnsaved && !userTyped;
+  if (save) await doc.save();
+  vscode.window.setStatusBarMessage("$(sparkle) BB edited " + name + (save ? "" : " (not saved: your changes are in it too)"), 6000);
+  const count = command.edits.length;
+  const done = "Typed " + count + (count === 1 ? " edit" : " edits") + " into " + name + " in the user's VS Code";
+  if (save) return done + ", and saved it.";
+  if (userTyped) return done + ". The user typed in the file meanwhile, so it's left unsaved: the file on disk doesn't have your edit yet.";
+  return done + ". The file had their unsaved changes, so it's left unsaved: the file on disk doesn't have your edit yet.";
+}
+
+// ---- Watching the agent work: what it reads and changes, live ----
+
+const readMark = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  backgroundColor: new vscode.ThemeColor("editor.wordHighlightBackground"),
+});
+const editMark = vscode.window.createTextEditorDecorationType({
+  isWholeLine: true,
+  // A tint across the line, and the accent bar: visible at a glance.
+  backgroundColor: new vscode.ThemeColor("diffEditor.insertedLineBackground"),
+  borderColor: new vscode.ThemeColor("editorCursor.foreground"),
+  borderStyle: "solid",
+  borderWidth: "0 0 0 3px",
+  overviewRulerColor: new vscode.ThemeColor("editorCursor.foreground"),
+  overviewRulerLane: vscode.OverviewRulerLane.Left,
+});
+const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+status.command = "bbStudio.toggleFollow";
+let follow = true;
+let memento = null;
+// Lines each file had changed this turn: path -> line numbers (0-based).
+const changed = new Map();
+let reading = null;
+let lastUser = 0;
+let statusTimer = null;
+// Following never moves the editor while the user is working in it.
+const USER_PAUSE_MS = 4000;
+
+function base(path) { return path.split("/").pop(); }
+
+function setStatus(text, tooltip, ttl) {
+  clearTimeout(statusTimer);
+  status.text = text + (follow ? "  $(eye)" : "  $(eye-closed)");
+  status.tooltip = (tooltip ? tooltip + "\n\n" : "") + (follow ? "Following the agent: click to stop" : "Not following: click to follow the agent");
+  status.show();
+  if (ttl) statusTimer = setTimeout(() => status.hide(), ttl);
+}
+
+function editorsOf(path) {
+  return vscode.window.visibleTextEditors.filter((editor) => editor.document.uri.scheme === "file" && editor.document.uri.fsPath === path);
+}
+
+function paint(editor) {
+  const path = editor.document.uri.fsPath;
+  const lines = changed.get(path);
+  editor.setDecorations(editMark, lines ? [...lines].filter((n) => n < editor.document.lineCount).map((n) => new vscode.Range(n, 0, n, 0)) : []);
+  editor.setDecorations(readMark, reading && reading.path === path && reading.start !== undefined
+    ? [new vscode.Range(reading.start, 0, Math.min(reading.end, editor.document.lineCount - 1), 0)] : []);
+}
+function repaint() { for (const editor of vscode.window.visibleTextEditors) paint(editor); }
+
+async function go(path, line) {
+  if (!follow || Date.now() - lastUser < USER_PAUSE_MS) return;
+  try {
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path));
+    const editor = await onScreen(vscode.window.showTextDocument(document, { preview: true, preserveFocus: true }), "shown");
+    const at = Math.min(Math.max(line || 0, 0), Math.max(document.lineCount - 1, 0));
+    editor.revealRange(new vscode.Range(at, 0, at, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  } catch (error) { /* A file it can't open, or no screen: nothing to follow. */ }
+}
+
+// The lines a change added, found in the file once VS Code has reloaded it.
+async function markEdit(path, added) {
+  const wanted = added.map((line) => line.trim()).filter((line) => line.length > 2);
+  for (const delay of [150, 600, 1500]) {
+    await sleep(delay);
+    let document;
+    try { document = await vscode.workspace.openTextDocument(vscode.Uri.file(path)); } catch (error) { return null; }
+    const lines = new Set(changed.get(path) || []);
+    let found = 0;
+    let from = 0;
+    for (const text of wanted) {
+      for (let n = from; n < document.lineCount; n++) {
+        if (document.lineAt(n).text.trim() === text) { lines.add(n); from = n + 1; found++; break; }
+      }
+    }
+    if (found || !wanted.length) {
+      changed.set(path, lines);
+      repaint();
+      return lines.size ? Math.min(...[...lines]) : 0;
+    }
+  }
+  return null;
+}
+
+async function watch(command) {
+  const activity = command.activity;
+  if (activity.kind === "turn") {
+    if (activity.state === "working") {
+      changed.clear(); reading = null; repaint();
+      setStatus("$(sparkle) " + command.by + " is working", command.by + " started a turn.");
+    } else {
+      reading = null; repaint();
+      const files = changed.size;
+      setStatus("$(check) " + command.by + (files ? ": changed " + files + (files === 1 ? " file" : " files") : " is done"), "", 8000);
+    }
+    return;
+  }
+  if (activity.kind === "read") {
+    const start = activity.startLine ? activity.startLine - 1 : undefined;
+    reading = { path: activity.path, start, end: activity.endLine ? activity.endLine - 1 : start };
+    setStatus("$(eye) " + command.by + ": reading " + base(activity.path) + (activity.startLine ? ":" + activity.startLine + "–" + activity.endLine : ""), activity.path);
+    await go(activity.path, start);
+    repaint();
+    return;
+  }
+  if (activity.kind === "edit") {
+    reading = null;
+    setStatus("$(edit) " + command.by + ": editing " + base(activity.path), activity.path);
+    // A reload of the same file marks its changed lines first.
+    if (refreshing.has(activity.path)) await refreshing.get(activity.path);
+    const first = await markEdit(activity.path, activity.added);
+    await go(activity.path, first === null ? 0 : first);
+    repaint();
+  }
+}
+
+// ---- Files an agent changed on disk: reload the clean ones, tint what changed ----
+
+const MAX_KEPT = 2 * 1024 * 1024;
+const MAX_TINT = 5000;
+// Each open file's text as last opened or saved, to tell what a change touched.
+const lastText = new Map();
+function remember(document) {
+  const path = fileOf(document);
+  if (!path || document.isDirty) return;
+  const text = document.getText();
+  lastText.delete(path);
+  if (text.length > MAX_KEPT) return;
+  lastText.set(path, text);
+  while (lastText.size > 200) lastText.delete(lastText.keys().next().value);
+}
+
+// The lines of the new text that differ (0-based): what sits between the
+// lines both texts share at the start and at the end.
+function changedLines(before, after) {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head++;
+  let tail = 0;
+  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+  const lines = [];
+  for (let n = head; n < b.length - tail && lines.length < MAX_TINT; n++) lines.push(n);
+  return lines;
+}
+
+// Reloads an open file from disk after an agent changed it. A file with
+// unsaved edits is never touched: the user's text wins, and they're told.
+async function refreshNow(path) {
+  const document = vscode.workspace.textDocuments.find((each) => fileOf(each) === path);
+  if (!document) return "closed";
+  const unsaved = () => {
+    vscode.window.setStatusBarMessage("$(warning) BB changed " + base(path) + " on disk. Your unsaved edits are kept.", 8000);
+    return "unsaved";
+  };
+  if (document.isDirty) return unsaved();
+  const before = lastText.has(path) ? lastText.get(path) : document.getText();
+  let disk;
+  try { disk = await fs.promises.readFile(path, "utf8"); } catch (error) { return "gone"; }
+  // VS Code reloads a clean file itself once it sees the change: wait for that.
+  for (const delay of [0, 150, 400, 900]) {
+    if (delay) await sleep(delay);
+    if (document.isDirty) return unsaved();
+    if (document.getText() === disk) break;
+  }
+  if (document.getText() !== disk) {
+    // It didn't. Reload the file ourselves where the command reaches it: on screen, in the active editor.
+    const active = vscode.window.activeTextEditor;
+    if (document.isDirty) return unsaved();
+    if (active && active.document === document) {
+      try { await vscode.commands.executeCommand("workbench.action.files.revert"); } catch (error) { /* Marked below as it stands. */ }
+    }
+  }
+  if (document.isDirty) return unsaved();
+  const lines = new Set(changed.get(path) || []);
+  for (const n of changedLines(before, document.getText())) lines.add(n);
+  changed.set(path, lines);
+  remember(document);
+  repaint();
+  return "reloaded";
+}
+
+// Reloads in flight, by path: following the edit waits for its file's.
+const refreshing = new Map();
+function refresh(command) {
+  const run = refreshNow(command.path).catch(() => "failed");
+  refreshing.set(command.path, run);
+  run.then(() => { if (refreshing.get(command.path) === run) refreshing.delete(command.path); });
+  return run;
+}
+
+// ---- BB's theme, applied in place: no reload ----
+
+async function applyTheme(command) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const config = vscode.workspace.getConfiguration();
+      const target = vscode.ConfigurationTarget.Global;
+      if (config.get("window.autoDetectColorScheme") !== false) await config.update("window.autoDetectColorScheme", false, target);
+      if (config.get("workbench.colorTheme") !== command.base) await config.update("workbench.colorTheme", command.base, target);
+      await config.update("workbench.colorCustomizations", command.colors, target);
+      return true;
+    } catch (error) { await sleep(500); }
+  }
+  return false;
+}
+
+let stopped = false;
+function listen() {
+  if (stopped) return;
+  const req = http.get({ socketPath: SOCKET, path: "/events?window=" + WINDOW + "&v=" + VERSION, headers: { authorization: "Bearer " + token() } }, (res) => {
+    res.setEncoding("utf8");
+    let buffer = "";
+    res.on("data", (chunk) => {
+      buffer += chunk;
+      let end;
+      while ((end = buffer.indexOf("\n\n")) >= 0) {
+        const event = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        for (const line of event.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          let command;
+          try { command = JSON.parse(line.slice(6)); } catch { continue; }
+          if (command && command.type === "show") show(command).catch((error) => vscode.window.showWarningMessage("BB couldn't show that: " + error.message));
+          if (command && command.type === "activity") watch(command);
+          if (command && command.type === "comments") sync();
+          if (command && command.type === "refresh" && typeof command.path === "string") refresh(command);
+          if (command && command.type === "theme" && command.colors) applyTheme(command);
+          if (command && command.type === "edit") {
+            edit(command).then(
+              (detail) => post("/result", { requestId: command.requestId, ok: true, detail }),
+              (error) => post("/result", Object.assign({ requestId: command.requestId, ok: false, detail: String(error && error.message || error) }, error && error.noWindow ? { code: "no-window" } : {})),
+            );
+          }
+        }
+      }
+    });
+    // A fresh connection tells the plugin what's on screen now, and shows its comments.
+    report();
+    sync();
+  });
+  // However the stream ends (closed, reset, the plugin reloading), try again.
+  let again = false;
+  const retry = () => { if (again) return; again = true; setTimeout(listen, 2000); };
+  req.on("error", retry);
+  req.on("close", retry);
+}
+
+// ---- Review comments: the user comments, submits, and the agent answers ----
+
+// A request that answers: the plugin's reply, or its error message thrown.
+function call(input) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(input);
+    const req = http.request({ socketPath: SOCKET, path: "/call", method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data), "x-window": WINDOW, authorization: "Bearer " + token() } }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => {
+        let parsed = null;
+        try { parsed = JSON.parse(body); } catch (error) { /* Not an answer. */ }
+        if (parsed && parsed.ok) resolve(parsed.result);
+        else reject(new Error(parsed && parsed.error || "BB couldn't do that."));
+      });
+    });
+    req.on("error", () => reject(new Error("BB isn't reachable right now.")));
+    req.end(data);
+  });
+}
+
+let review = null;
+// Each comment thread on screen, by its id in the plugin.
+const threads = new Map();
+const reviewStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+reviewStatus.command = "bbStudio.submitReview";
+
+function linesOf(document, start, end) {
+  return document.getText(new vscode.Range(start, 0, end, document.lineAt(end).text.length));
+}
+
+// Where a thread's lines are now: where they were, or the nearest place their
+// text moved to after edits above them.
+function placeOf(document, thread) {
+  const span = thread.endLine - thread.startLine;
+  const last = Math.max(document.lineCount - 1, 0);
+  const was = Math.min(thread.startLine - 1, last);
+  const matches = (start) => start >= 0 && start + span <= last && linesOf(document, start, start + span) === thread.lineText;
+  if (thread.lineText && !matches(was)) {
+    for (let distance = 1; distance <= last; distance++) {
+      if (matches(was - distance)) return was - distance;
+      if (matches(was + distance)) return was + distance;
+    }
+  }
+  return was;
+}
+
+function asComment(each, thread) {
+  return {
+    body: new vscode.MarkdownString(each.body),
+    mode: vscode.CommentMode.Preview,
+    author: { name: each.author === "agent" ? "Agent" : "You" },
+    label: each.pending ? "Pending" : undefined,
+    contextValue: each.pending ? "pending" : "sent",
+    // Ours, for the commands: which comment and thread this is.
+    reviewId: each.id,
+    reviewThread: thread.id,
+    text: each.body,
+  };
+}
+
+let syncing = Promise.resolve();
+function sync() {
+  syncing = syncing.then(syncNow, syncNow);
+  return syncing;
+}
+
+async function syncNow() {
+  if (!review) return;
+  let answer;
+  try { answer = await call({ method: "list" }); } catch (error) { return; }
+  const seen = new Set();
+  for (const thread of answer.threads) {
+    let document;
+    try { document = await vscode.workspace.openTextDocument(vscode.Uri.file(thread.path)); } catch (error) { continue; }
+    seen.add(thread.id);
+    const start = placeOf(document, thread);
+    const end = Math.min(start + thread.endLine - thread.startLine, Math.max(document.lineCount - 1, 0));
+    const range = new vscode.Range(start, 0, end, document.lineCount ? document.lineAt(end).text.length : 0);
+    const pending = thread.comments.some((each) => each.pending);
+    let shown = threads.get(thread.id);
+    const wasCount = shown ? shown.comments.length : 0;
+    if (!shown) {
+      shown = review.createCommentThread(document.uri, range, []);
+      shown.reviewThread = thread.id;
+      shown.collapsibleState = thread.resolved ? vscode.CommentThreadCollapsibleState.Collapsed : vscode.CommentThreadCollapsibleState.Expanded;
+      threads.set(thread.id, shown);
+    } else {
+      shown.range = range;
+    }
+    shown.comments = thread.comments.map((each) => asComment(each, thread));
+    // A new answer from the agent opens its thread.
+    const last = thread.comments[thread.comments.length - 1];
+    if (wasCount && thread.comments.length > wasCount && last && last.author === "agent") shown.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    shown.contextValue = thread.resolved ? "resolved" : pending ? "pending" : "open";
+    shown.label = thread.resolved ? "Resolved" : pending ? "Pending: submit the review to send it" : "Sent to the agent";
+    shown.state = thread.resolved ? vscode.CommentThreadState.Resolved : vscode.CommentThreadState.Unresolved;
+    shown.canReply = true;
+  }
+  for (const [id, shown] of threads) if (!seen.has(id)) { shown.dispose(); threads.delete(id); }
+  const count = answer.threads.reduce((sum, thread) => sum + thread.comments.filter((each) => each.pending).length, 0);
+  vscode.commands.executeCommand("setContext", "bbStudio.reviewPending", count > 0);
+  if (!count) { reviewStatus.hide(); return; }
+  reviewStatus.text = "$(comment-discussion) Submit review (" + count + ")";
+  reviewStatus.tooltip = answer.target ? "Send your " + (count === 1 ? "comment" : count + " comments") + " to " + answer.target : "Open this workspace beside a chat to send your comments there";
+  reviewStatus.show();
+}
+
+// The comment box's Add Comment or Reply: a new thread on the lines it's on,
+// or a reply in one of ours. VS Code's own empty thread gives way to ours.
+async function comment(reply) {
+  const thread = reply.thread;
+  const body = (reply.text || "").trim();
+  if (!body) return;
+  if (thread.reviewThread) {
+    await call({ method: "reply", threadId: thread.reviewThread, body });
+  } else {
+    const document = await vscode.workspace.openTextDocument(thread.uri);
+    const range = thread.range || new vscode.Range(0, 0, 0, 0);
+    const start = range.start.line;
+    const end = Math.max(range.end.line, start);
+    await call({ method: "add", path: thread.uri.fsPath, startLine: start + 1, endLine: end + 1, lineText: linesOf(document, start, end), body });
+    thread.dispose();
+  }
+  await sync();
+}
+
+async function submitReview() {
+  const answer = await call({ method: "submit" });
+  await sync();
+  vscode.window.showInformationMessage("Sent " + (answer.sent === 1 ? "your comment" : answer.sent + " comments") + " to " + answer.sentTo + ".");
+}
+
+function editing(target, mode) {
+  const shown = threads.get(target.reviewThread);
+  if (!shown) return;
+  shown.comments = shown.comments.map((each) => each.reviewId === target.reviewId ? Object.assign({}, each, { mode, body: mode === vscode.CommentMode.Editing ? each.text : each.body }) : each);
+}
+
+async function saveComment(target) {
+  const body = typeof target.body === "string" ? target.body : target.body.value;
+  await call({ method: "edit", commentId: target.reviewId, body: body.trim() });
+  await sync();
+}
+
+// A command's error, said in VS Code.
+const guarded = (fn) => async (...args) => {
+  try { await fn(...args); } catch (error) { vscode.window.showWarningMessage("BB: " + (error && error.message || String(error))); }
+};
+
+function startReview(context) {
+  review = vscode.comments.createCommentController("bb-review", "BB review");
+  review.commentingRangeProvider = {
+    provideCommentingRanges: (document) => document.uri.scheme === "file" ? [new vscode.Range(0, 0, Math.max(document.lineCount - 1, 0), 0)] : [],
+  };
+  review.options = { prompt: "Comment for the agent" };
+  context.subscriptions.push(
+    review,
+    reviewStatus,
+    vscode.commands.registerCommand("bbStudio.addComment", guarded(comment)),
+    vscode.commands.registerCommand("bbStudio.reply", guarded(comment)),
+    vscode.commands.registerCommand("bbStudio.submitReview", guarded(submitReview)),
+    vscode.commands.registerCommand("bbStudio.editComment", (target) => editing(target, vscode.CommentMode.Editing)),
+    vscode.commands.registerCommand("bbStudio.cancelEdit", (target) => editing(target, vscode.CommentMode.Preview)),
+    vscode.commands.registerCommand("bbStudio.saveComment", guarded(saveComment)),
+    vscode.commands.registerCommand("bbStudio.deleteComment", guarded(async (target) => { await call({ method: "delete", commentId: target.reviewId }); await sync(); })),
+    vscode.commands.registerCommand("bbStudio.resolveThread", guarded(async (thread) => { await call({ method: "resolve", threadId: thread.reviewThread, resolved: true }); await sync(); })),
+    vscode.commands.registerCommand("bbStudio.reopenThread", guarded(async (thread) => { await call({ method: "resolve", threadId: thread.reviewThread, resolved: false }); await sync(); })),
+  );
+}
+
+async function copyForChat() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.selection.isEmpty) return;
+  const { start, end } = editor.selection;
+  const text = editor.document.getText(editor.selection);
+  const fence = text.includes("` + "```" + String.raw`") ? "` + "````" + String.raw`" : "` + "```" + String.raw`";
+  const where = vscode.workspace.asRelativePath(editor.document.uri) + (start.line === end.line ? ":" + (start.line + 1) : ":" + (start.line + 1) + "–" + (end.line + 1));
+  await vscode.env.clipboard.writeText(where + "\n" + fence + editor.document.languageId + "\n" + text + "\n" + fence + "\n");
+  vscode.window.setStatusBarMessage("$(check) Copied " + where + " for BB chat. The agent already sees your selection, too.", 5000);
+}
+
+// ---- Asking BB about code, from the editor ----
+
+// What "this" is: the selection, or the cursor's line with none. Lines are 1-based.
+function pointedAt() {
+  const editor = vscode.window.activeTextEditor;
+  const path = editor && fileOf(editor.document);
+  if (!editor || !path) return null;
+  const selection = editor.selection;
+  const start = selection.start.line;
+  // A selection that ends at the start of a line doesn't take that line.
+  const end = !selection.isEmpty && selection.end.character === 0 && selection.end.line > start ? selection.end.line - 1 : selection.end.line;
+  const text = selection.isEmpty ? editor.document.lineAt(start).text : editor.document.getText(selection);
+  return {
+    path,
+    startLine: start + 1,
+    endLine: end + 1,
+    text: text.length > MAX_SELECTION ? text.slice(0, MAX_SELECTION) + "\n…" : text,
+    language: editor.document.languageId,
+    where: vscode.workspace.asRelativePath(editor.document.uri) + ":" + (start + 1) + (end > start ? "–" + (end + 1) : ""),
+  };
+}
+
+async function askAbout() {
+  const at = pointedAt();
+  if (!at) return;
+  const question = await vscode.window.showInputBox({ title: "Ask BB about " + at.where, placeHolder: "What does this do?" });
+  if (!question || !question.trim()) return;
+  const answer = await call({ method: "ask", path: at.path, startLine: at.startLine, endLine: at.endLine, text: at.text, language: at.language, question: question.trim() });
+  vscode.window.setStatusBarMessage("$(check) Sent to " + answer.sentTo, 5000);
+}
+
+async function newThread() {
+  const at = pointedAt();
+  if (!at) return;
+  const question = await vscode.window.showInputBox({ title: "New BB thread from " + at.where, prompt: "What should the new thread do with this code?", placeHolder: "Refactor this" });
+  if (!question || !question.trim()) return;
+  await call({ method: "newThread", path: at.path, startLine: at.startLine, endLine: at.endLine, text: at.text, language: at.language, question: question.trim() });
+  vscode.window.setStatusBarMessage("$(check) Started a new thread in BB", 5000);
+}
+
+async function showInBb() {
+  const editor = vscode.window.activeTextEditor;
+  const path = editor && fileOf(editor.document);
+  if (!editor || !path) return;
+  await call({ method: "showInBb", path, line: editor.selection.active.line + 1 });
+}
+
+exports.activate = (context) => {
+  memento = context.globalState;
+  follow = memento.get("bbStudio.follow", true);
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.copyForChat", copyForChat));
+  // BB's shortcuts pressed in VS Code: hand them to BB's page (src/panel.tsx).
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.passKey", (key) => { if (SOCKET && key) post("/key", key); }));
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.toggleFollow", () => {
+    follow = !follow;
+    memento.update("bbStudio.follow", follow);
+    setStatus(follow ? "$(eye) Following the agent" : "$(eye-closed) Not following the agent", "", 4000);
+  }));
+  context.subscriptions.push(status);
+  // BB's search: ⌘K itself stays with VS Code, for its chords.
+  context.subscriptions.push(vscode.commands.registerCommand("bbStudio.search", () => { if (SOCKET) post("/key", { key: "k", code: "KeyK", mod: true, shift: false, alt: false }); }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("bbStudio.askAbout", guarded(askAbout)),
+    vscode.commands.registerCommand("bbStudio.newThread", guarded(newThread)),
+    vscode.commands.registerCommand("bbStudio.showInBb", guarded(showInBb)),
+  );
+  if (!SOCKET) return;
+  startReview(context);
+  for (const document of vscode.workspace.textDocuments) remember(document);
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument(remember),
+    vscode.workspace.onDidSaveTextDocument(remember),
+    vscode.workspace.onDidCloseTextDocument((document) => { const path = fileOf(document); if (path) lastText.delete(path); }),
+  );
+  // The user's own typing and clicks pause following for a moment.
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection((event) => { if (event.kind === vscode.TextEditorSelectionChangeKind.Keyboard || event.kind === vscode.TextEditorSelectionChangeKind.Mouse) lastUser = Date.now(); }),
+    vscode.window.onDidChangeVisibleTextEditors(repaint),
+  );
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(report),
+    vscode.window.onDidChangeTextEditorSelection(report),
+    vscode.window.onDidChangeTextEditorVisibleRanges(report),
+    vscode.window.onDidChangeWindowState(report),
+    vscode.window.tabGroups.onDidChangeTabs(report),
+    vscode.workspace.onDidChangeTextDocument((event) => { if (event.document.isDirty !== undefined) report(); }),
+    vscode.workspace.onDidSaveTextDocument(report),
+    vscode.languages.onDidChangeDiagnostics(report),
+    { dispose: () => { stopped = true; } },
+  );
+  listen();
+};
+exports.deactivate = () => { stopped = true; };
+exports.narrow = narrow;
+exports.edit = edit;
+exports.changedLines = changedLines;
+exports.refresh = refreshNow;
+exports.remember = remember;
+exports.applyTheme = applyTheme;
+exports.pointedAt = pointedAt;
+`;
+
+type RegistryEntry = { identifier?: { id?: string }; version?: string; [key: string]: unknown };
+
+async function readJson<T>(file: string, fallback: T): Promise<T> {
+  try { return JSON.parse(await readFile(file, "utf8")) as T; } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return fallback;
+    throw error;
+  }
+}
+
+/**
+ * Writes the bridge into the shared extensions folder and registers it.
+ * VS Code keeps its own list of installed extensions (extensions.json): a
+ * folder missing from an existing list is taken as uninstalled and marked
+ * for removal (.obsolete), so the bridge adds its entry and clears that
+ * mark. Older versions are removed.
+ */
+const installations = new Map<string, Promise<void>>();
+
+export function installBridge(extensionsDir: string): Promise<void> {
+  const dir = resolve(extensionsDir);
+  const pending = (installations.get(dir) ?? Promise.resolve()).catch(() => {}).then(() => install(dir));
+  installations.set(dir, pending);
+  return pending.finally(() => { if (installations.get(dir) === pending) installations.delete(dir); });
+}
+
+async function writeJson(file: string, value: unknown): Promise<void> {
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value));
+    await rename(temporary, file);
+  } finally { await rm(temporary, { force: true }); }
+}
+
+async function install(extensionsDir: string): Promise<void> {
+  const name = `${BRIDGE_ID}-${BRIDGE_VERSION}`;
+  const folder = join(extensionsDir, name);
+  await mkdir(extensionsDir, { recursive: true });
+  for (const entry of await readdir(extensionsDir)) {
+    if (entry.startsWith(`${BRIDGE_ID}-`) && entry !== name) await rm(join(extensionsDir, entry), { recursive: true, force: true });
+  }
+  const current = existsSync(join(folder, "extension.js")) && (await readFile(join(folder, "extension.js"), "utf8")) === EXTENSION;
+  if (!current) {
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, "package.json"), `${JSON.stringify(MANIFEST, null, 2)}\n`);
+    await writeFile(join(folder, "extension.js"), EXTENSION);
+  }
+  const registryFile = join(extensionsDir, "extensions.json");
+  const registry = await readJson<RegistryEntry[]>(registryFile, []);
+  if (!Array.isArray(registry) || registry.some((entry) => !entry || typeof entry !== "object")) throw new Error("Invalid extension registry; left it unchanged.");
+  const others = registry.filter((entry) => entry.identifier?.id !== BRIDGE_ID);
+  const ours = { identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION, location: { $mid: 1, path: folder, scheme: "file" }, relativeLocation: name, metadata: { installedTimestamp: Date.now(), source: "resource" } };
+  const kept = registry.find((entry) => entry.identifier?.id === BRIDGE_ID && entry.version === BRIDGE_VERSION);
+  if (!kept || registry.length !== others.length + 1) await writeJson(registryFile, [...others, kept ?? ours]);
+  const obsoleteFile = join(extensionsDir, ".obsolete");
+  const obsolete = await readJson<Record<string, boolean>>(obsoleteFile, {});
+  if (Object.keys(obsolete).some((key) => key.startsWith(`${BRIDGE_ID}-`))) {
+    const rest = Object.fromEntries(Object.entries(obsolete).filter(([key]) => !key.startsWith(`${BRIDGE_ID}-`)));
+    if (Object.keys(rest).length) await writeJson(obsoleteFile, rest);
+    else await rm(obsoleteFile, { force: true });
+  }
+}
+
+/** For tests: the extension's source. */
+export const BRIDGE_SOURCE = EXTENSION;

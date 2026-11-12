@@ -1,0 +1,882 @@
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+import { afterEach, expect, it, vi } from "vitest";
+import { MIGRATIONS } from "./migrations";
+import { defaultAppearance } from "./theme/appearance";
+import { NORD } from "./theme/builtin/classic";
+import { GRID } from "./theme/builtin/grid";
+import { testScheduler } from "./test/scheduler-fixture";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupPrompt, spawnedBy, startedBy } from "./bot";
+import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
+
+const dispose: (() => Promise<void>)[] = [];
+afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
+
+const BOTS = MIGRATIONS.findIndex((statement) => statement.includes("CREATE TABLE bots"));
+const request = {
+  projectId: "elsewhere", providerId: "codex", model: "model", reasoningLevel: "high" as const, permissionMode: "accept-edits" as const,
+  executionInputSources: {}, environment: { type: "project-default" }, input: [{ type: "text", text: "Carry on", mentions: [] }],
+} as never;
+type Thread = ReturnType<typeof makeThreadResponse>;
+
+async function setup(migrations = MIGRATIONS) {
+  const threads = new Map<string, Thread>();
+  let count = 0;
+  const add = (fields: Partial<Thread> & { id: string }) => { const thread = makeThreadResponse({ projectId: "p", providerId: "codex", updatedAt: 1000 + ++count, ...fields }); threads.set(thread.id, thread); return thread; };
+  // What each thread runs with, as BB resolves it (threads.defaultExecutionOptions).
+  const execution = new Map<string, { model: string; reasoningLevel: string; permissionMode: string }>();
+  const spawn = vi.fn(async (args: { projectId: string; title?: string; providerId?: string; model?: string; reasoningLevel?: string; permissionMode?: string }) => {
+    const thread = add({ id: `t${count + 1}`, projectId: args.projectId, title: args.title ?? null, providerId: args.providerId ?? "codex" });
+    execution.set(thread.id, { model: args.model ?? "model", reasoningLevel: args.reasoningLevel ?? "high", permissionMode: args.permissionMode ?? "accept-edits" });
+    return thread;
+  });
+  const get = vi.fn(async ({ threadId }: { threadId: string }) => {
+    const thread = threads.get(threadId);
+    if (!thread) throw Object.assign(new Error("Not found"), { status: 404 });
+    return thread;
+  });
+  // Like BB: hidden threads (runners, Bot-owned work, review forks) are listed only with includeHidden.
+  const list = vi.fn(async (args: { sourceThreadId?: string; parentThreadId?: string; includeHidden?: boolean } = {}) => [...threads.values()].filter((thread) => (args.includeHidden || thread.visibility !== "hidden") &&
+    (!args.sourceThreadId || thread.sourceThreadId === args.sourceThreadId) && (!args.parentThreadId || thread.parentThreadId === args.parentThreadId)));
+  const stop = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, status: "idle" }); return {}; });
+  const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 5 }); return { ok: true }; });
+  const automations: Record<string, unknown>[] = [];
+  // Each thread's interactions (threads.interactions.list).
+  const pending = new Map<string, { id: string; status: string }[]>();
+  const replies = new Map<string, { at: number; text: string }[]>();
+  const callRpc = vi.fn(async ({ method, input }: { method: string; input: Record<string, unknown> }) => {
+    if (method === "automations_list") return automations;
+    if (method === "automations_create") { const made = { id: `a${automations.length + 1}`, name: input.name, enabled: false, trigger: input.trigger, execution: input.execution, nextRunAt: 99 }; automations.push(made); return made; }
+    if (method === "automations_update") { const row = automations.find((a) => a.id === input.automationId); if (row) Object.assign(row, { trigger: input.trigger, execution: input.execution }); return {}; }
+    if (method === "automations_resume" || method === "automations_pause") { const row = automations.find((a) => a.id === input.automationId); if (row) row.enabled = method === "automations_resume"; return {}; }
+    if (method === "automations_delete") { const at = automations.findIndex((a) => a.id === input.automationId); if (at >= 0) automations.splice(at, 1); return {}; }
+    return {};
+  });
+  const providers = [
+    { id: "codex", capabilities: { permissionModes: ["accept-edits", "auto", "full"] } },
+    { id: "claude", capabilities: { permissionModes: ["accept-edits", "auto", "full"] } },
+    { id: "hermes", capabilities: { permissionModes: ["accept-edits", "full"] } },
+    { id: "grok", capabilities: { permissionModes: ["full"] } },
+  ];
+  const update = vi.fn(async ({ threadId, ...fields }: { threadId: string; model?: string; reasoningLevel?: string }) => { execution.set(threadId, { ...execution.get(threadId)!, ...fields }); return {}; });
+  const send = vi.fn(async (_args: { threadId: string; mode: string; input: { text: string }[] }) => ({}));
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
+    threads: {
+      send: send as never, spawn: spawn as never, get: get as never, archive: archive as never, list: list as never, stop: stop as never,
+      unpin: async () => ({}) as never, update: update as never, output: async () => ({ output: "All quiet." }),
+      interactions: { list: (async ({ threadId }: { threadId: string }) => pending.get(threadId) ?? []) as never } as never,
+      // The Bot's replies (item/completed agentMessage events), newest first.
+      events: { list: (async ({ threadId }: { threadId: string }) => [...(replies.get(threadId) ?? [])].reverse().map(({ at, text }) => ({ type: "item/completed", createdAt: at, data: { item: { type: "agentMessage", text } } }))) as never } as never,
+      search: (async ({ query }: { query: string }) => {
+        const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
+        return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
+      }) as never,
+      defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => execution.get(threadId) ?? { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
+    },
+    plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
+    providers: { list: (async () => providers) as never },
+  } });
+  dispose.push(() => harness.lifecycle.dispose());
+  const db = bb.storage.database();
+  bb.storage.migrate(db, migrations);
+  const bots = { current: null as Bots | null };
+  const clock = { now: Date.now() };
+  const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
+  const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: () => {}, personalPrompt: () => bots.current!.prompt(), botPrompt: (key) => bots.current!.promptFor(key) });
+  const pages = new Map<string, { title: string; markdown: string }>();
+  let made = 0;
+  const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
+  const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
+  bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
+  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies };
+}
+
+/** What each check-in on Studio's scheduler sends when it runs: its key, the thread it wakes and the prompt after the marker. */
+async function checkins(x: Awaited<ReturnType<typeof setup>>) {
+  x.send.mockClear();
+  const keys = x.engine.list("heartbeat").filter((trigger) => trigger.state === "on").map((trigger) => trigger.ownerId);
+  for (const ownerId of keys) await x.scheduler.runNow({ owner: "heartbeat", ownerId });
+  return x.send.mock.calls.map(([arg], i) => ({ key: keys[i]!, threadId: arg.threadId, prompt: arg.input[0]!.text.replace(`[bb automation due:trg_heartbeat_${keys[i]}]\n\n`, "") }));
+}
+const prompts = async (x: Awaited<ReturnType<typeof setup>>) => (await checkins(x)).map((each) => each.prompt);
+
+it("turns an existing Chief of Staff into the Bot, keeping its thread and heartbeat", async () => {
+  const x = await setup(MIGRATIONS.slice(0, BOTS));
+  x.add({ id: "thr_chief" });
+  x.db.prepare("INSERT INTO project_leads VALUES (?, ?, 1, 2)").run(PERSONAL_PROJECT_ID, "thr_chief");
+  x.db.prepare("INSERT INTO project_runs VALUES (?, 1, 'daily', '08:00', NULL, 'a0', ?)").run(PERSONAL_PROJECT_ID, "p");
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(await x.bots.get()).toMatchObject({ bot: { id: BOT_ID, name: "Chief of Staff", state: "active", threadId: "thr_chief" }, run: { enabled: true, cadence: "daily", time: "08:00" } });
+});
+
+it("makes no Bot when there was no Chief of Staff", async () => {
+  const x = await setup();
+  expect(await x.bots.get()).toEqual({ bot: null, run: null });
+});
+
+it("creates a Bot with a new chat in the personal project and names it in the heartbeat", async () => {
+  const x = await setup();
+  const view = await x.bots.create({ name: "Dot", avatar: "🟣", prompt: "Watch my inbox" });
+  // Its instructions come from agents.configure, so its only message is the user's, and the title isn't the instructions.
+  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Dot", pluginMetadata: { bot: BOT_ID }, input: [expect.objectContaining({ text: "Watch my inbox" })] }));
+  expect(view.bot).toMatchObject({ name: "Dot", avatar: "🟣", threadId: "t1" });
+  await x.bots.setRun({ enabled: true, cadence: "hourly" });
+  expect(await prompts(x)).toEqual([botHeartbeat("Dot")]);
+  // The prompt is read when the check-in runs, so a new name needs no rescheduling.
+  await x.bots.set({ name: "Penny" });
+  expect(await prompts(x)).toEqual([botHeartbeat("Penny")]);
+  expect(x.callRpc.mock.calls.filter(([arg]) => String(arg.method).startsWith("automations_"))).toEqual([]);
+});
+
+it("reads the primary thread from project leads without writing the Bot row", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const before = x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID);
+  x.add({ id: "thr_reconciled" });
+  x.db.prepare("UPDATE project_leads SET lead_thread_id = ? WHERE project_id = ?").run("thr_reconciled", PERSONAL_PROJECT_ID);
+
+  expect((await x.bots.get()).bot?.threadId).toBe("thr_reconciled");
+  expect(x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID)).toEqual(before);
+});
+
+it("the first-time flow's setup becomes a first message that has the Bot set its own profile", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Chief of Staff", avatar: "🤖", setup: "Watch my PRs" });
+  const text = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text;
+  expect(text).toContain("I'd like help with: Watch my PRs");
+  expect(text).toContain("bot_profile_update");
+  expect(setupPrompt("  ")).toContain("haven't decided");
+  // A prompt still wins.
+  await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Hi", setup: "ignored" });
+  expect((x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text).toBe("Hi");
+});
+
+it("makes a second Bot with its own thread, check-in, memory, skills and handoff, the first staying primary", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const two = await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Watch releases" });
+  const id = two.bot!.id;
+  expect(id).not.toBe(BOT_ID);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id } }));
+  expect(two.bot).toMatchObject({ name: "Scout", threadId: "t2", primary: false });
+  // The primary stays the personal project's lead; the new Bot isn't a lead.
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  expect(x.bots.list().map((bot) => [bot.name, bot.primary])).toEqual([["Dot", true], ["Scout", false]]);
+  expect((await x.bots.get()).bot?.name).toBe("Dot");
+  expect(x.bots.forThread("t2")?.id).toBe(id);
+  expect(x.bots.instructions(x.bots.forThread("t2")!)).toContain("one of the user's Bots");
+  // Its check-in is its own schedule on its thread, with its name; not a project in project_leads.
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  expect(await checkins(x)).toEqual([{ key: `bot:${id}`, threadId: "t2", prompt: botHeartbeat("Scout") }]);
+  expect(x.automations).toEqual([]);
+  expect((await x.bots.get(id)).run).toMatchObject({ enabled: true, cadence: "daily", time: "07:30" });
+  expect((await x.bots.get()).run).toBeNull();
+  expect(x.leads.list().map((lead) => lead.projectId)).toEqual([PERSONAL_PROJECT_ID]);
+  expect((await x.bots.activity(id)).scheduled).toEqual([expect.objectContaining({ kind: "heartbeat", enabled: true })]);
+  // Memory and skills are its own.
+  expect(x.bots.memoryPage(id)).not.toBe(x.bots.memoryPage());
+  x.bots.writeSkill({ name: "release-watch", description: "d", body: "b" }, id);
+  expect(x.bots.skills(id).map((s) => s.name)).toEqual(["release-watch"]);
+  expect(x.bots.skills()).toEqual([]);
+  // Pausing it leaves the primary alone and turns only its check-in off.
+  await x.bots.pause(id);
+  expect(x.bots.stored(id)?.state).toBe("paused");
+  expect(x.bots.stored()?.state).toBe("active");
+  expect(x.engine.list("heartbeat")).toEqual([]);
+  await x.bots.resume(id);
+  expect(x.engine.list("heartbeat").map((trigger) => [trigger.ownerId, trigger.state])).toEqual([[`bot:${id}`, "on"]]);
+  // A handoff moves it to the new thread, check-in included.
+  const { threadId } = await x.leads.handoff("t2", request);
+  await x.bots.handedOff("t2", threadId);
+  expect(x.bots.stored(id)?.threadId).toBe(threadId);
+  expect(x.bots.chain(id)).toEqual(["t2", threadId]);
+  expect((await checkins(x)).map((each) => each.threadId)).toEqual([threadId]);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  await expect(x.bots.setThread(threadId)).rejects.toThrow(/Scout/);
+});
+
+it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {
+  const x = await setup();
+  const view = await x.bots.create({ name: "Dot", avatar: "🤖", shape: "blob", color: "#5b8def" });
+  expect(view.bot).toMatchObject({ avatar: "🤖", shape: "blob", color: "#5b8def", role: null });
+  const set = await x.bots.set({ shape: "hexagon", color: "#e5484d", role: "  You are my chief of staff.  " });
+  expect(set.bot).toMatchObject({ shape: "hexagon", color: "#e5484d", role: "You are my chief of staff." });
+  expect(x.bots.instructions(set.bot!)).toContain("Your role, in the user's words: You are my chief of staff.");
+  expect((await x.bots.set({ role: "" })).bot?.role).toBeNull();
+});
+
+it("reads a Bot row that still has the old sidebar tint: the tint is ignored, the row is left alone, and the Bot keeps working", async () => {
+  const x = await setup();
+  const view = await x.bots.create({ name: "Dot", avatar: "🤖" });
+  const id = view.bot!.id;
+  const old = JSON.stringify({ colors: ["#4f7df2", "#ec4899"], mode: "dark", grain: 0.3 });
+  x.db.prepare("UPDATE bots SET theme_json = ? WHERE id = ?").run(old, id);
+  const listed = x.bots.list().find((bot) => bot.id === id)!;
+  expect(listed).not.toHaveProperty("theme");
+  expect(listed.name).toBe("Dot");
+  expect(listed.appearance).toBeNull();
+  expect((await x.bots.get(id)).bot).not.toHaveProperty("theme");
+  x.db.prepare("UPDATE bots SET theme_json = ? WHERE id = ?").run("{not json", id);
+  expect(x.bots.list().find((bot) => bot.id === id)?.name).toBe("Dot");
+  const set = await x.bots.setAppearance({ botId: id, appearance: defaultAppearance(GRID) });
+  expect(set.bot?.appearance?.themeId).toBe("grid");
+  expect(set.bot).not.toHaveProperty("theme");
+  expect((x.db.prepare("SELECT theme_json FROM bots WHERE id = ?").get(id) as { theme_json: string }).theme_json).toBe("{not json");
+  expect(x.bots).not.toHaveProperty("setTheme");
+});
+
+it("keeps each Bot's own theme and its settings, two Bots on two themes, and takes it off with null", async () => {
+  const x = await setup();
+  const dot = (await x.bots.create({ name: "Dot", avatar: "🤖" })).bot!;
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🦉" })).bot!;
+  expect(dot.appearance).toBeNull();
+  const grid = { ...defaultAppearance(GRID), intensity: 0.3, effects: { workers: true, finished: false, needsYou: true, error: true } };
+  await x.bots.setAppearance({ botId: dot.id, appearance: grid });
+  await x.bots.setAppearance({ botId: scout.id, appearance: defaultAppearance(NORD) });
+  const listed = new Map(x.bots.list().map((bot) => [bot.id, bot.appearance]));
+  expect(listed.get(dot.id)).toEqual(grid);
+  expect(listed.get(scout.id)?.themeId).toBe("nord");
+  expect((await x.bots.setAppearance({ botId: dot.id, appearance: null })).bot?.appearance).toBeNull();
+  expect(x.bots.list().find((bot) => bot.id === scout.id)?.appearance?.themeId).toBe("nord");
+  await expect(x.bots.setAppearance({ botId: "nope", appearance: grid })).rejects.toThrow();
+});
+
+it("keeps the Bot across a handoff, and counts threads its old thread started", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "w1", sourceThreadId: "bot1", status: "active" });
+  const { threadId } = await x.leads.handoff("bot1", request);
+  expect((await x.bots.get()).bot).toMatchObject({ name: "Bot", threadId });
+  x.add({ id: "w2", parentThreadId: threadId, status: "idle" });
+  const activity = await x.bots.activity();
+  expect(activity.inProgress.map((t) => t.id)).toEqual(["w1"]);
+  expect(activity.completed.map((t) => t.id)).toEqual(["w2"]);
+  // Its chat reads the chain as one conversation, oldest first.
+  expect(x.bots.chain()).toEqual(["bot1", threadId]);
+  // With titles read by id, since chain threads are hidden: title, then titleFallback, then "Untitled".
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, title: null, titleFallback: "Relay", visibility: "hidden" });
+  x.threads.set(threadId, { ...x.threads.get(threadId)!, title: "  ", titleFallback: null });
+  expect(await x.bots.chainThreads()).toEqual([{ id: "bot1", title: "Relay" }, { id: threadId, title: "Untitled" }]);
+  x.threads.set(threadId, { ...x.threads.get(threadId)!, title: "Today" });
+  expect((await x.bots.chainThreads()).map((t) => t.title)).toEqual(["Relay", "Today"]);
+});
+
+it("keeps hidden runner threads under the Bot: out of BB's list and Activity's thread lists; its chat isn't the runners' to hide", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "run_t", visibility: "hidden", title: "Inbox · Runner", status: "idle" });
+  x.add({ id: "run_quiet", visibility: "hidden", title: "Feeds · Runner", status: "idle" });
+  x.add({ id: "w1", parentThreadId: "bot1", status: "idle" });
+  const runnerThreads = new Set(["run_t", "run_quiet"]);
+  (x.bots as unknown as { deps: { runners: unknown } }).deps.runners = { threads: () => runnerThreads, pauseAll: async () => [], restore: async () => true };
+  const activity = await x.bots.activity();
+  expect(activity.attention).toBeNull();
+  expect([...activity.inProgress, ...activity.waiting, ...activity.completed].map((t) => t.id)).toEqual(["w1"]);
+  expect(x.threads.get("bot1")?.visibility).toBe("visible");
+  expect(x.update).not.toHaveBeenCalled();
+});
+
+it("hides the Bot's chain from BB's list as it gets a thread: made, set or handed off", async () => {
+  const x = await setup();
+  const claimed: string[][] = [];
+  (x.bots as unknown as { deps: { claimChains(): Promise<unknown> } }).deps.claimChains = async () => { claimed.push(x.bots.list().flatMap((bot) => x.bots.chain(bot.id))); };
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  expect(claimed.at(-1)).toEqual(["t1"]);
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  expect(claimed.at(-1)).toEqual(["t1", scout.threadId]);
+  x.add({ id: "mine" });
+  await x.bots.setThread("mine");
+  expect(claimed.at(-1)).toContain("mine");
+  const moved = await x.bots.switchModel(scout.threadId!, { providerId: "claude", model: "sonnet" });
+  // Claimed once the Bot has moved to its new thread.
+  expect(claimed.at(-1)).toEqual(expect.arrayContaining([scout.threadId, moved.threadId]));
+  const count = claimed.length;
+  // A handoff of a thread that is no Bot's claims nothing.
+  x.add({ id: "plain", providerId: "codex" });
+  await x.bots.switchModel("plain", { providerId: "claude", model: "opus" });
+  expect(claimed.length).toBe(count);
+  // A failure never fails the Bot: the sweep retries.
+  (x.bots as unknown as { deps: { claimChains(): Promise<unknown> } }).deps.claimChains = async () => { throw new Error("busy"); };
+  await expect(x.bots.create({ name: "Third", avatar: "3️⃣" })).resolves.toBeTruthy();
+});
+
+it("the Bot's attention: a question in its hidden chat, until it's answered", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", visibility: "hidden", status: "idle" });
+  await x.bots.setThread("bot1");
+  x.pending.set("bot1", [{ id: "q1", status: "pending", payload: { kind: "user_question" } } as never]);
+  // Past BB's recent list: Studio fetches it, and its interactions say it waits on you.
+  x.list.mockImplementation(async () => []);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "Asked you a question", count: 1 });
+  expect(await x.bots.botAttention()).toMatchObject({ reason: "Asked you a question", count: 1 });
+  expect(await x.bots.attentionView()).toMatchObject({ attention: { reason: "Asked you a question" }, hasBot: true });
+  x.pending.set("bot1", [{ id: "q1", status: "resolved" } as never]);
+  expect((await x.bots.activity()).attention).toBeNull();
+});
+
+it("bot_attention says when there's no Bot, so widgets fall back to BB's own count", async () => {
+  const x = await setup();
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: false, working: false });
+  expect(await x.bots.attentionView("bot_gone")).toEqual({ attention: null, hasBot: false, working: false });
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  expect(await x.bots.attentionView()).toEqual({ attention: null, hasBot: true, working: false });
+});
+
+it("bot_attention says when the Bot's hidden chat is busy, which BB's sidebar view leaves out", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", visibility: "hidden", status: "active" });
+  await x.bots.setThread("bot1");
+  expect(await x.bots.attentionView()).toMatchObject({ hasBot: true, working: true });
+  x.add({ id: "bot1", visibility: "hidden", status: "starting" });
+  expect((await x.bots.attentionView()).working).toBe(true);
+  x.add({ id: "bot1", visibility: "hidden", status: "idle" });
+  expect((await x.bots.attentionView()).working).toBe(false);
+  x.add({ id: "bot1", visibility: "hidden", status: "error" });
+  expect((await x.bots.attentionView()).working).toBe(false);
+});
+
+it("the Bot's attention: its replies the user hasn't read, not [PASS], until the chat is read", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle", lastReadAt: 100 });
+  await x.bots.setThread("bot1");
+  x.replies.set("bot1", [{ at: 90, text: "Morning: nothing new." }, { at: 150, text: "[PASS]" }, { at: 200, text: "Deploy watch: staging is down since build 419. Roll back?" }]);
+  expect((await x.bots.activity()).attention).toEqual({ reason: "1", count: 1, since: 200, unread: 1 });
+  x.replies.set("bot1", [...x.replies.get("bot1")!, { at: 300, text: "Also: the lease payment failed." }]);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "2", count: 2 });
+  // An approval in its chat comes first.
+  x.pending.set("bot1", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
+  expect((await x.bots.activity()).attention).toMatchObject({ reason: "Waiting for approval", count: 3 });
+  x.pending.set("bot1", []);
+  x.threads.set("bot1", { ...x.threads.get("bot1")!, lastReadAt: 300 });
+  expect((await x.bots.activity()).attention).toBeNull();
+});
+
+it("a thread the Bot started that waits on an approval runs under Running, saying so; it's the Bot's, not the user's", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", status: "idle" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "deploy", parentThreadId: "bot1", status: "active", hasPendingInteraction: true } as never);
+  x.pending.set("deploy", [{ id: "p1", status: "pending", payload: { kind: "approval" } } as never]);
+  const activity = await x.bots.activity();
+  expect(activity.inProgress).toEqual([expect.objectContaining({ id: "deploy", waitingFor: "Waiting for approval" })]);
+  expect(activity.attention).toBeNull();
+});
+
+it("lists the threads a Bot owns in Activity though they're hidden from BB's list, but not hidden forks", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "child", parentThreadId: "bot1", visibility: "hidden", status: "active" });
+  x.add({ id: "grandchild", parentThreadId: "child", visibility: "hidden", status: "idle" });
+  // An automation the child made: its run is top-level; src/bot-owned.ts knows it's the Bot's.
+  x.add({ id: "run", originPluginId: "automations", visibility: "hidden", status: "idle" });
+  x.add({ id: "run_sub", parentThreadId: "run", visibility: "hidden", status: "idle" });
+  x.add({ id: "side_chat", sourceThreadId: "bot1", originKind: "fork", visibility: "hidden", status: "idle" });
+  x.add({ id: "user_fork", sourceThreadId: "bot1", originKind: "fork", status: "idle" });
+  // BB's side-chat makes the chat its fork's lifecycle owner: still the user's side chat, not the Bot's work.
+  x.add({ id: "bb_side_chat", sourceThreadId: "bot1", lifecycleOwnerThreadId: "bot1", originKind: "fork", originPluginId: "side-chat", visibility: "hidden", status: "active" });
+  (x.bots as unknown as { deps: { ownedThreads(botId: string): ReadonlySet<string> } }).deps.ownedThreads = () => new Set(["run"]);
+  const activity = await x.bots.activity();
+  expect(activity.inProgress.map((t) => t.id)).toEqual(["child"]);
+  expect(activity.completed.map((t) => t.id).sort()).toEqual(["grandchild", "run", "run_sub", "user_fork"]);
+  expect(activity.completed.find((t) => t.id === "run_sub")?.parentId).toBe("run");
+  // Stop reaches the hidden work it spawned.
+  expect((await x.bots.stop()).stoppedThreadIds).toEqual(["child"]);
+});
+
+it("keeps the Bot's side threads out of Activity, Studio's own forks included", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  // With side-chat off, Studio forks the chat itself: the chat owns the fork, so only the side threads table says it's one.
+  x.add({ id: "studio_side", sourceThreadId: "bot1", lifecycleOwnerThreadId: "bot1", originKind: "fork", originPluginId: "studio", visibility: "hidden", status: "active" });
+  x.add({ id: "child", parentThreadId: "bot1", visibility: "hidden", status: "active" });
+  const deps = (x.bots as unknown as { deps: { hiddenThreads(): ReadonlySet<string> } }).deps;
+  expect((await x.bots.activity()).inProgress.map((t) => t.id).sort()).toEqual(["child", "studio_side"]);
+  deps.hiddenThreads = () => new Set(["studio_side"]);
+  expect((await x.bots.activity()).inProgress.map((t) => t.id)).toEqual(["child"]);
+});
+
+it("applies check-in presets: one schedule and one Memory line each; Off turns check-ins off", async () => {
+  const x = await setup();
+  const lines: string[] = [];
+  (x.bots as unknown as { deps: { memory: { addCheckin(pageId: string, line: string): boolean } } }).deps.memory.addCheckin = (_pageId, line) => { lines.push(line); return true; };
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const morning = await x.bots.checkinPreset("morning");
+  expect(morning.run).toMatchObject({ enabled: true, cadence: "weekdays", time: "08:00" });
+  const working = await x.bots.checkinPreset("working");
+  expect(working.run).toMatchObject({ enabled: true, cadence: "custom", cron: "0 9-17/2 * * 1-5" });
+  expect(lines).toEqual([CHECKIN_PRESETS.morning.line, CHECKIN_PRESETS.working.line]);
+  expect((await x.bots.checkinPreset("off")).run?.enabled).toBe(false);
+  expect(lines).toHaveLength(2);
+});
+
+it("pauses, resumes and stops", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  await x.bots.setRun({ enabled: true, cadence: "daily" });
+  x.automations.push({ id: "other", name: "Inbox sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" }, nextRunAt: 50 });
+  x.add({ id: "w1", lifecycleOwnerThreadId: "bot1", status: "active" });
+  x.add({ id: "mine", status: "active" });
+
+  expect(await x.bots.pause()).toMatchObject({ bot: { state: "paused" }, run: { enabled: false } });
+  await expect(x.bots.setRun({ enabled: true, cadence: "daily" })).rejects.toThrow(/paused/);
+  expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+
+  const stopped = await x.bots.stop();
+  expect(stopped).toMatchObject({ bot: { state: "stopped" }, run: { enabled: false }, stoppedThreadIds: ["w1"], pausedAutomationIds: ["other"] });
+  expect(x.stop).toHaveBeenCalledTimes(1);
+  expect(x.threads.get("mine")!.status).toBe("active");
+  expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+});
+
+it("Stop stops only threads the Bot spawned, not forks or continuations of its chat", async () => {
+  const x = await setup();
+  x.add({ id: "bot0", status: "idle" });
+  x.add({ id: "bot1" });
+  x.db.prepare("INSERT INTO project_thread_handoffs (old_thread_id, new_thread_id, project_id, lead, archived) VALUES ('bot0', 'bot1', NULL, 0, 0)").run();
+  await x.bots.setThread("bot1");
+  x.add({ id: "child", parentThreadId: "bot1", status: "active" });
+  x.add({ id: "owned", lifecycleOwnerThreadId: "bot0", status: "active" });
+  x.add({ id: "fork", sourceThreadId: "bot1", originKind: "fork", status: "active" });
+  x.add({ id: "continued", sourceThreadId: "bot0", originKind: "fork", status: "active" });
+  expect(spawnedBy({ parentThreadId: null, lifecycleOwnerThreadId: null }, new Set(["bot1"]))).toBe(false);
+  const stopped = await x.bots.stop();
+  expect(stopped.stoppedThreadIds.sort()).toEqual(["child", "owned"]);
+  expect(x.threads.get("fork")!.status).toBe("active");
+  expect(x.threads.get("continued")!.status).toBe("active");
+});
+
+it("Resume turns back on only the automations and runners Stop paused", async () => {
+  const x = await setup();
+  const runnerStates = new Map([["run_on", "active"], ["run_off", "paused"]]);
+  const restore = vi.fn(async (id: string) => { if (!runnerStates.has(id)) return false; runnerStates.set(id, "active"); return true; });
+  const runners = {
+    threads: () => new Set<string>(),
+    pauseAll: async (_botId?: string, onPaused?: (id: string) => void) => {
+      const paused = [...runnerStates].filter(([, state]) => state === "active").map(([id]) => id);
+      for (const id of paused) { runnerStates.set(id, "paused"); onPaused?.(id); }
+      return paused;
+    },
+    restore,
+  };
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, runners });
+  x.add({ id: "bot1" });
+  await bots.setThread("bot1");
+  x.automations.push(
+    { id: "on", name: "Inbox sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" } },
+    { id: "gone", name: "Old sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" } },
+    { id: "off", name: "Weekly", enabled: false, trigger: { cron: "0 9 * * 1" }, execution: { targetThreadId: "bot1" } },
+  );
+  expect((await bots.stop()).pausedAutomationIds).toEqual(["on", "gone"]);
+  x.automations.splice(x.automations.findIndex((a) => a.id === "gone"), 1);
+  // One re-enable fails: the Bot stays stopped and keeps what's left to restore.
+  const real = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_resume" && args.input.automationId === "on") throw new Error("down"); return real(args); });
+  await expect(bots.resume()).rejects.toThrow("down");
+  expect((await bots.get()).bot?.state).toBe("stopped");
+  expect(runnerStates.get("run_on")).toBe("active");
+  x.callRpc.mockImplementation(real);
+  expect(await bots.resume()).toMatchObject({ bot: { state: "active" } });
+  expect(x.automations.map((a) => [a.id, a.enabled])).toEqual([["on", true], ["off", false]]);
+  expect(runnerStates.get("run_off")).toBe("paused");
+  expect(restore.mock.calls.map(([id]) => id)).toEqual(["run_on"]);
+  expect(x.db.prepare("SELECT COUNT(*) AS n FROM bot_stop_paused").get()).toEqual({ n: 0 });
+});
+
+it("lists heartbeat and automations aimed at the Bot as Scheduled", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "07:00" });
+  x.automations.push({ id: "other", name: "Inbox sweep", enabled: true, trigger: { cron: "0 9 * * *" }, execution: { targetThreadId: "bot1" }, nextRunAt: 50 });
+  x.automations.push({ id: "else", name: "Not mine", enabled: true, trigger: {}, execution: { targetThreadId: "zz" } });
+  const { scheduled } = await x.bots.activity();
+  // The check-in comes from Studio's scheduler, with its next run; the user's own BB automation from BB's list.
+  const next = x.engine.get("heartbeat", PERSONAL_PROJECT_ID)!.nextAt;
+  expect(scheduled).toEqual([
+    { id: `trg_heartbeat_${PERSONAL_PROJECT_ID}`, kind: "heartbeat", name: "Check-in (heartbeat)", cron: "0 7 * * *", enabled: true, nextRunAt: next },
+    { id: "other", kind: "automation", name: "Inbox sweep", cron: "0 9 * * *", enabled: true, nextRunAt: 50 },
+  ]);
+  // The Bot's check-ins and reminders (src/automations.ts) are listed from Studio's scheduler too, and the list holds with the automations plugin off.
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, automations: { pauseAll: async () => [], restore: async () => true, follow: async () => {}, scheduled: () => [{ id: "trg_automation_aut_1", name: "Dot · Brief", cron: null, enabled: true, nextRunAt: 20 }] } });
+  x.callRpc.mockRejectedValue(new Error("Plugin automations is disabled"));
+  expect((await bots.activity()).scheduled.map((each) => [each.kind, each.id, each.nextRunAt])).toEqual([["heartbeat", `trg_heartbeat_${PERSONAL_PROJECT_ID}`, next], ["automation", "trg_automation_aut_1", 20]]);
+});
+
+it("classifies activity: running (a thread held by a question is the Bot's, so it's running), then completed threads it started", () => {
+  const t = (id: string, { hasPendingInteraction = false, ...fields }: Partial<Thread> & { hasPendingInteraction?: boolean }) => ({ ...makeThreadResponse({ id, projectId: "p", providerId: "codex", ...fields }), hasPendingInteraction });
+  const result = classifyActivity([
+    t("bot", { status: "active", updatedAt: 9 }),
+    t("ask", { status: "active", hasPendingInteraction: true, updatedAt: 1 }),
+    t("run", { status: "starting", updatedAt: 2 }),
+    t("old", { status: "idle", updatedAt: 3 }),
+    t("err", { status: "error", updatedAt: 4 }),
+    t("gone", { status: "idle", archivedAt: 1 }),
+  ], "bot");
+  expect(result).not.toHaveProperty("needsYou");
+  expect(result.inProgress.map((each) => [each.id, each.relation, each.waitingFor ?? null])).toEqual([["bot", "self", null], ["run", "started", null], ["ask", "started", "Waiting for an answer"]]);
+  expect(result.completed.map((each) => each.id)).toEqual(["err", "old"]);
+  expect(startedBy({ sourceThreadId: null, parentThreadId: null, lifecycleOwnerThreadId: "b" }, new Set(["b"]))).toBe(true);
+  expect(startedBy({ sourceThreadId: null, parentThreadId: null, lifecycleOwnerThreadId: null }, new Set(["b"]))).toBe(false);
+});
+
+it("keeps the chief_of_staff view in step with the Bot (deprecated aliases)", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  expect(await x.leads.chief()).toEqual({ threadId: "bot1", run: null });
+  expect((await x.bots.get()).bot?.threadId).toBe("bot1");
+});
+
+it("knows its new thread by spawn metadata before it becomes the lead", async () => {
+  const x = await setup();
+  x.db.prepare("INSERT INTO bots (id, name, avatar, state, created_at, updated_at) VALUES (?, 'Dot', '🟣', 'active', 1, 1)").run(BOT_ID);
+  expect(x.bots.forThread("t9", { bot: BOT_ID })).toMatchObject({ name: "Dot", threadId: "t9" });
+  expect(x.bots.forThread("t9", {})).toBeNull();
+  x.add({ id: "bot1" });
+  await x.leads.setLead(PERSONAL_PROJECT_ID, "bot1");
+  expect(x.bots.forThread("t9", { bot: BOT_ID })).toBeNull();
+});
+
+it("makes one Memory page on first need and points the Bot at it briefly", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  const bot = x.bots.forThread("bot1")!;
+  const text = x.bots.instructions(bot);
+  expect(x.pages.size).toBe(1);
+  expect(x.pages.get("pg1")).toMatchObject({ title: "Bot's Memory", markdown: MEMORY_TEMPLATE, botName: "Bot" });
+  expect(MEMORY_TEMPLATE.startsWith("## Check-in")).toBe(true);
+  // Memory (the core profile and records) is told by src/memory, not here.
+  expect(text).not.toContain("pages_edit");
+  expect(text.length).toBeLessThan(800);
+  x.bots.instructions(bot);
+  expect(x.pages.size).toBe(1);
+  expect((await x.bots.get()).bot?.memoryPageId).toBe("pg1");
+  // Deleted: a new one next time.
+  x.pages.delete("pg1");
+  expect(x.bots.memoryPage()).toBe("pg2");
+  expect(botHeartbeat("Dot")).toMatch(/Memory page/);
+  expect(botHeartbeat("Dot")).toMatch(/reply exactly \[PASS\]: no "✓"/);
+  expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/finished fine.*no "✓"/);
+  expect(botInstructions({ name: "Dot", state: "active" })).toMatch(/You triage: reports, alerts and your threads. questions come to you/);
+  expect(botInstructions({ name: "Dot", state: "paused", memoryPageId: "pg1" })).not.toContain("pg1");
+});
+
+it("keeps skills to the Bot until shared into BB's user skills, and deletes them", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  expect(() => x.bots.writeSkill({ name: "Bad Name", description: "d", body: "b" })).toThrow(/lowercase/);
+  x.bots.writeSkill({ name: "weekly-review", description: "Fridays: sum up the week", body: "1. Read threads" });
+  x.bots.writeSkill({ name: "inbox", description: "Sort mail", body: "Steps" });
+  expect(x.bots.skills().map((skill) => skill.name)).toEqual(["inbox", "weekly-review"]);
+  expect(x.bots.instructions(x.bots.forThread("bot1")!)).toContain("- inbox: Sort mail\n- weekly-review: Fridays: sum up the week");
+  // Archived skills are hidden from the Bot until restored; loading a stale one makes it active; pins stick.
+  expect(x.bots.setSkillState("inbox", "archived")).toBe(true);
+  expect(x.bots.instructions(x.bots.forThread("bot1")!)).not.toContain("inbox: Sort");
+  x.bots.setSkillState("inbox", "active");
+  expect(x.bots.skill("inbox")).toMatchObject({ state: "active", pinned: false, usedAt: expect.any(Number) });
+  x.bots.setSkillState("weekly-review", "stale");
+  x.bots.touchSkill("weekly-review");
+  expect(x.bots.skill("weekly-review")?.state).toBe("active");
+  expect(x.bots.pinSkill("weekly-review", true)).toBe(true);
+  expect(x.bots.skills().find((skill) => skill.name === "weekly-review")?.pinned).toBe(true);
+  const { path } = await x.bots.shareSkill("weekly-review");
+  expect(path).toBe(join(x.userSkillsDir, "weekly-review", "SKILL.md"));
+  expect(await readFile(path, "utf8")).toBe('---\nname: weekly-review\ndescription: "Fridays: sum up the week"\n---\n\n1. Read threads\n');
+  expect(x.bots.skills().map((skill) => skill.name)).toEqual(["inbox"]);
+  x.bots.writeSkill({ name: "weekly-review", description: "again", body: "b" });
+  await expect(x.bots.shareSkill("weekly-review")).rejects.toThrow(/already shared/);
+  expect(x.bots.deleteSkill("inbox")).toBe(true);
+  expect(x.bots.deleteSkill("inbox")).toBe(false);
+});
+
+it("searches only its own threads", async () => {
+  const x = await setup();
+  x.add({ id: "bot1", title: "Bot chat" });
+  await x.bots.setThread("bot1");
+  x.add({ id: "w1", sourceThreadId: "bot1", title: "Worker" });
+  x.add({ id: "other", title: "Someone else's" });
+  const hits = await x.bots.historySearch("invoice");
+  expect(hits.map((hit) => hit.threadId).sort()).toEqual(["bot1", "w1"]);
+  expect(hits[0]!.text).toContain("invoice");
+});
+
+it("puts queued threads under Waiting to start, not In progress", () => {
+  const t = (id: string, { queuedWork = "none", ...fields }: Partial<Thread> & { queuedWork?: "none" | "waiting" }) => ({ ...makeThreadResponse({ id, projectId: "p", providerId: "codex", ...fields }), queuedWork });
+  const result = classifyActivity([
+    t("queued", { status: "pending" }),
+    t("later", { status: "idle", queuedWork: "waiting" }),
+    t("run", { status: "active", queuedWork: "waiting" }),
+  ], "bot");
+  expect(result.waiting.map((each) => each.id).sort()).toEqual(["later", "queued"]);
+  expect(result.inProgress.map((each) => each.id)).toEqual(["run"]);
+  expect(result.completed).toEqual([]);
+});
+
+it("keeps the Bot paused, and the heartbeat remembered, when resuming fails to restore it", async () => {
+  const x = await setup();
+  x.add({ id: "thr_bot" });
+  await x.bots.create({ name: "Ada", avatar: "A", threadId: "thr_bot" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await x.bots.pause();
+  vi.spyOn(x.scheduler, "ensure").mockImplementationOnce(() => { throw new Error("down"); });
+  await expect(x.bots.resume()).rejects.toThrow("down");
+  expect((await x.bots.get()).bot?.state).toBe("paused");
+  expect(await x.bots.resume()).toMatchObject({ bot: { state: "active" }, run: { enabled: true } });
+  expect(x.engine.get("heartbeat", PERSONAL_PROJECT_ID)?.state).toBe("on");
+});
+
+it("threads its threads started count too, nested by parentId", () => {
+  const row = (id: string, parentThreadId: string | null, sourceThreadId: string | null = null) => ({ id, parentThreadId, sourceThreadId, lifecycleOwnerThreadId: null });
+  const recent = [row("grand", "child"), row("child", null, "top"), row("stranger", "elsewhere"), row("top", "bot")];
+  expect(descendants(recent, new Set(["top"])).map((thread) => thread.id)).toEqual(["child", "grand"]);
+  const base = { title: "x", titleFallback: null, status: "idle", projectId: null, updatedAt: 1, archivedAt: null };
+  const result = classifyActivity([
+    { ...base, id: "bot" },
+    { ...base, id: "top", parentThreadId: "bot" },
+    { ...base, id: "child", sourceThreadId: "top" },
+  ] as never, "bot");
+  expect(Object.fromEntries(result.completed.map((thread) => [thread.id, thread.parentId]))).toEqual({ top: null, child: "top" });
+});
+
+it("imports an external bot: its thread runs on the provider and model, and Studio-local features are off", async () => {
+  const x = await setup();
+  await expect(x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } })).rejects.toThrow(/first bot/);
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  await expect(x.bots.create({ name: "X", avatar: "🤖", external: { providerId: "codex", model: "m" } })).rejects.toThrow(/isn't an external/);
+  const made = await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "hermes-agent" } });
+  expect(made.bot).toMatchObject({ kind: "external", providerId: "hermes", model: "hermes-agent", primary: false });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "hermes", model: "hermes-agent", reasoningLevel: "none", permissionMode: "accept-edits", pluginMetadata: { bot: made.bot!.id } });
+  expect(x.bots.memoryPage(made.bot!.id)).toBeNull();
+  expect(() => x.bots.requireStudio(made.bot!.id, "skills")).toThrow("Herm has no Studio skills. Runs on Hermes — its memory and tools live there.");
+  expect(() => x.bots.requireStudio(undefined, "skills")).not.toThrow();
+  const told = x.bots.instructions(made.bot!);
+  expect(told).toContain("check-in message");
+  expect(told).not.toMatch(/bot_skill|runner_create|pages_read/);
+  // Check-ins still work: a schedule that messages its thread.
+  await x.bots.setRun({ botId: made.bot!.id, enabled: true, cadence: "daily", time: "09:00" });
+  const checkin = (await checkins(x)).at(-1)!;
+  expect(checkin.threadId).toBe(made.bot!.threadId);
+  expect(checkin.prompt).not.toContain("Memory page");
+  expect((await x.bots.pause(made.bot!.id)).bot!.state).toBe("paused");
+});
+
+it("resolves the Bot a thread acts for: own thread or handoff chain, its runners, threads it started; else none", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  x.add({ id: "run_t" });
+  x.add({ id: "child", parentThreadId: "t2" });
+  x.add({ id: "grandchild", sourceThreadId: "child" });
+  x.add({ id: "runner_child", lifecycleOwnerThreadId: "run_t" });
+  x.add({ id: "loose" });
+  const runnerBot = (id: string) => id === "run_t" ? scout : null;
+  expect(await x.bots.actingFor("t2", runnerBot)).toEqual({ botId: scout, via: "own" });
+  expect(await x.bots.actingFor("run_t", runnerBot)).toEqual({ botId: scout, via: "runner" });
+  expect(await x.bots.actingFor("grandchild", runnerBot)).toEqual({ botId: scout, via: "started" });
+  expect(await x.bots.actingFor("runner_child", runnerBot)).toEqual({ botId: scout, via: "started" });
+  expect(await x.bots.actingFor("loose", runnerBot)).toBeNull();
+  const { threadId } = await x.leads.handoff("t2", request);
+  await x.bots.handedOff("t2", threadId);
+  expect(await x.bots.actingFor("t2", runnerBot)).toEqual({ botId: scout, via: "own" });
+  expect(await x.bots.actingFor(threadId, runnerBot)).toEqual({ botId: scout, via: "own" });
+});
+
+it("imports with the permission picked, falling back to what the provider supports", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  await x.bots.create({ name: "Herm", avatar: "🤖", external: { providerId: "hermes", model: "h", permissionMode: "full" } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
+  // Grok runs with full access only.
+  await x.bots.create({ name: "G", avatar: "🤖", external: { providerId: "grok", model: "g" } });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ permissionMode: "full" });
+});
+
+it("derives a bot's kind from its current provider, and fills it in from its thread", async () => {
+  const { botKind, pickPermission, modelChange } = await import("./bot");
+  expect(botKind("hermes")).toBe("external");
+  expect(botKind("codex")).toBe("studio");
+  expect(botKind(null)).toBe("studio");
+  expect(pickPermission(["accept-edits", "full"])).toBe("accept-edits");
+  expect(pickPermission(["full"], "accept-edits")).toBe("full");
+  expect(pickPermission(["accept-edits", "auto", "full"], "auto")).toBe("auto");
+  const x = await setup();
+  const made = await x.bots.create({ name: "Dot", avatar: "🟣" });
+  // A bot's provider and model are its current thread's.
+  expect(made.bot).toMatchObject({ kind: "studio", providerId: "codex", model: "model" });
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "sonnet" })).toBe("in-place");
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "codex", model: "gpt" })).toBe("handoff");
+  expect(modelChange({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "opus" })).toBe("unchanged");
+  expect(modelChange({ providerId: null, model: null }, { providerId: "claude", model: "opus" })).toBe("in-place");
+});
+
+it("switches a thread's model in place on the same provider, and hands a bot's thread off to another provider", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  const first = scout.threadId!;
+  expect(await x.bots.switchModel(first, { providerId: "codex", model: "model" })).toEqual({ change: "unchanged", threadId: first });
+  expect(await x.bots.switchModel(first, { providerId: "codex", model: "faster", reasoning: "low" })).toEqual({ change: "in-place", threadId: first });
+  expect(x.update).toHaveBeenCalledWith({ threadId: first, model: "faster", reasoningLevel: "low" });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ model: "faster" });
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "09:00" });
+  const moved = await x.bots.switchModel(first, { providerId: "claude", model: "sonnet", reasoning: "medium" });
+  expect(moved.change).toBe("handoff");
+  expect(moved.threadId).not.toBe(first);
+  // The thread's permission is carried forward.
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ projectId: PERSONAL_PROJECT_ID, providerId: "claude", model: "sonnet", permissionMode: "accept-edits", pluginMetadata: { handoffFrom: first } });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ threadId: moved.threadId, providerId: "claude", model: "sonnet", kind: "studio" });
+  expect(x.bots.chain(scout.id)).toEqual([first, moved.threadId]);
+  expect((await checkins(x)).at(-1)).toMatchObject({ threadId: moved.threadId });
+  // The new thread's first turn is the bot's, before it moves.
+  expect(x.bots.forThread("t99", { handoffFrom: moved.threadId })).toMatchObject({ id: scout.id });
+  // Onto an external provider: its kind follows the thread, so Studio's Memory, skills and runners are off.
+  const external = await x.bots.switchModel(moved.threadId, { providerId: "grok", model: "grok-4" });
+  expect(x.spawn.mock.calls.at(-1)![0]).toMatchObject({ providerId: "grok", reasoningLevel: "none", permissionMode: "full" });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ threadId: external.threadId, kind: "external", providerId: "grok" });
+  expect(() => x.bots.requireStudio(scout.id, "skills")).toThrow(/Runs on Grok/);
+  // Any thread works, not only a bot's.
+  x.add({ id: "plain", providerId: "codex" });
+  expect((await x.bots.switchModel("plain", { providerId: "claude", model: "opus" })).change).toBe("handoff");
+  // The primary bot leads with Studio's tools.
+  const primary = (await x.bots.get()).bot!.threadId!;
+  await expect(x.bots.switchModel(primary, { providerId: "hermes", model: "h" })).rejects.toThrow(/personal project/);
+  await expect(x.bots.switchModel(primary, { providerId: "nope", model: "h" })).rejects.toThrow(/isn't an agent provider/);
+});
+
+it("Pause and Stop turn the Bot's own automations off; Resume turns back on only those", async () => {
+  const x = await setup();
+  const states = new Map([["aut_on", "active"], ["aut_off", "paused"]]);
+  const automations = {
+    pauseAll: async (_botId: string, onPaused?: (id: string) => void) => {
+      const paused = [...states].filter(([, state]) => state === "active").map(([id]) => id);
+      for (const id of paused) { states.set(id, "paused"); onPaused?.(id); }
+      return paused;
+    },
+    restore: vi.fn(async (id: string) => { states.set(id, "active"); return true; }),
+    follow: vi.fn(async () => {}),
+  };
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, automations });
+  x.add({ id: "bot1" });
+  await bots.setThread("bot1");
+  await bots.pause();
+  expect(states.get("aut_on")).toBe("paused");
+  await bots.stop();
+  await bots.resume();
+  expect(automations.restore.mock.calls.map(([id]) => id)).toEqual(["aut_on"]);
+  expect([...states.values()]).toEqual(["active", "paused"]);
+});
+
+
+it("applies skill saves immediately, preserves diffs and warnings, and reverts without losing history", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  x.bots.writeSkill({ name: "deploy", description: "Before deploying", body: "old step" });
+  const first = x.bots.skillHistory()[0]!;
+  x.bots.writeSkill({ name: "deploy", description: "Before deploying", body: "Yesterday we tried PR #482" });
+  expect(x.bots.skill("deploy")?.body).toBe("Yesterday we tried PR #482");
+  const second = x.bots.skillHistory()[0]!;
+  expect(second.diff).toBe("- old step\n+ Yesterday we tried PR #482");
+  expect(second.warnings[0]).toMatch(/log of one session/);
+  x.bots.lintSkillVersion(second.id, ["Check the deployment target."]);
+  expect(x.bots.skillHistory()[0]!.warnings).toContain("Check the deployment target.");
+  expect(x.bots.skill("deploy")?.body).toBe(second.body);
+  x.bots.revertSkill(first.id);
+  expect(x.bots.skill("deploy")?.body).toBe("old step");
+  expect(x.bots.skillHistory()).toHaveLength(3);
+  x.bots.deleteSkill("deploy");
+  expect(x.bots.skillHistory()[0]!.body).toBeNull();
+  x.bots.revertSkill(second.id);
+  expect(x.bots.skill("deploy")?.body).toBe(second.body);
+  expect(() => x.bots.revertSkill(first.id, "other-bot")).toThrow();
+  expect(() => x.db.prepare("UPDATE bot_skill_versions SET body = 'changed'").run()).toThrow(/append-only/);
+  expect(() => x.db.prepare("DELETE FROM bot_skill_versions").run()).toThrow(/append-only/);
+  expect(() => x.db.prepare("DELETE FROM bot_skill_lints").run()).toThrow(/append-only/);
+});
+
+it("migrates pending writes and deletes as approved once, preserving prior and applied versions", async () => {
+  const skillHistoryMigration = MIGRATIONS.findIndex((sql) => sql.includes("CREATE TABLE bot_skill_versions"));
+  expect(skillHistoryMigration).toBeGreaterThan(0);
+  const x = await setup(MIGRATIONS.slice(0, skillHistoryMigration));
+  x.add({ id: "bot1" });
+  await x.bots.setThread("bot1");
+  const insert = x.db.prepare("INSERT INTO bot_skills(bot_id, name, description, body, created_at, updated_at) VALUES ('bot_main', ?, 'd', ?, 1, 1)");
+  insert.run("deploy", "old"); insert.run("retired", "keep in history");
+  const pending = x.db.prepare("INSERT INTO bot_skill_pending(id, bot_id, name, action, description, body, created_at) VALUES (?, 'bot_main', ?, ?, 'new description', ?, 2)");
+  pending.run("p1", "deploy", "write", "new"); pending.run("p2", "retired", "delete", null); pending.run("p3", "inbox", "write", "sort mail");
+  x.db.prepare("INSERT INTO bot_learning(bot_id, approval) VALUES ('bot_main', 1)").run();
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.bots.skill("deploy")).toMatchObject({ body: "new", description: "new description" });
+  expect(x.bots.skill("inbox")?.body).toBe("sort mail");
+  expect(x.bots.skill("retired")).toBeNull();
+  expect(x.bots.skillHistory().find((v) => v.name === "deploy")?.diff).toBe("- old\n+ new");
+  expect(x.bots.skillHistory().filter((v) => v.name === "retired").map((v) => v.body)).toEqual([null, "keep in history"]);
+  expect(x.db.prepare("SELECT * FROM bot_skill_pending").all()).toEqual([]);
+  expect(x.db.prepare("SELECT approval FROM bot_learning").get()).toEqual({ approval: 0 });
+  x.bb.storage.migrate(x.db, MIGRATIONS);
+  expect(x.bots.skillHistory()).toHaveLength(5);
+});
+
+it("pages skill history without preventing reverts or lint on older versions", async () => {
+  const x = await setup();
+  x.add({ id: "bot1" }); await x.bots.setThread("bot1");
+  x.bots.writeSkill({ name: "deploy", description: "d", body: "first" });
+  const first = x.bots.skillHistory()[0]!;
+  for (let i = 0; i < 50; i++) x.bots.writeSkill({ name: "deploy", description: "d", body: `step ${i}` });
+  const recent = x.bots.skillHistory();
+  expect(recent).toHaveLength(50);
+  expect(x.bots.skillHistory(undefined, recent[49]!.id).map((v) => v.id)).toEqual([first.id]);
+  x.bots.lintSkillVersion(first.id, ["Historical warning"]);
+  expect(x.bots.skillHistory(undefined, recent[49]!.id)[0]!.warnings).toEqual(["Historical warning"]);
+  x.bots.revertSkill(first.id);
+  expect(x.bots.skill("deploy")?.body).toBe("first");
+});
+
+it("remembers an enabled heartbeat across a failed Pause and retry", async () => {
+  const x = await setup();
+  const pauseAll = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, automations: { pauseAll, restore: async () => true, follow: async () => {} } });
+  x.add({ id: "retry_bot" });
+  await bots.setThread("retry_bot");
+  await bots.setRun({ enabled: true, cadence: "daily", time: "09:00" });
+  await expect(bots.pause()).rejects.toThrow("offline");
+  expect(x.leads.runs.get(PERSONAL_PROJECT_ID)?.enabled).toBe(false);
+  expect(bots.stored()?.state).toBe("active");
+  await bots.pause();
+  await bots.resume();
+  expect(x.leads.runs.get(PERSONAL_PROJECT_ID)?.enabled).toBe(true);
+});
+
+it("a Bot's default model starts as its Main's, once; setting it switches no thread, and a thread's model is its own", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Bot", avatar: "🤖" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  // Filled from Main's model the first time the Bot is read.
+  expect(scout.defaultModel).toMatchObject({ providerId: "codex", model: "model", reasoningLevel: "high" });
+  // Main moves on (BB's composer): the default stays what it was.
+  await x.bots.switchModel(scout.threadId!, { providerId: "codex", model: "faster", reasoning: "low" });
+  expect((await x.bots.get(scout.id)).bot).toMatchObject({ model: "faster", defaultModel: { model: "model" } });
+  x.update.mockClear();
+  // Patrick sets the default: no thread changes, Main included.
+  const set = await x.bots.setDefaultModel({ botId: scout.id, providerId: "claude", model: "sonnet", reasoning: "medium" });
+  expect(set.bot).toMatchObject({ model: "faster", defaultModel: { providerId: "claude", model: "sonnet", reasoningLevel: "medium" } });
+  expect(x.bots.defaultModel(scout.id)).toEqual({ providerId: "claude", model: "sonnet", reasoning: "medium" });
+  expect(x.update).not.toHaveBeenCalled();
+  expect(await x.bots.threadModel(scout.threadId!)).toMatchObject({ providerId: "codex", model: "faster", reasoningLevel: "low" });
+  // A conversation on another model reads as its own.
+  x.add({ id: "conv", providerId: "claude" });
+  await x.bots.switchModel("conv", { providerId: "claude", model: "haiku", reasoning: "low" });
+  expect(await x.bots.threadModel("conv")).toMatchObject({ providerId: "claude", model: "haiku", modelName: expect.any(String) });
+  await expect(x.bots.setDefaultModel({ botId: scout.id, providerId: "grok", model: "grok-4" })).rejects.toThrow(/Studio's tools/);
+  await expect(x.bots.setDefaultModel({ botId: scout.id, providerId: "nope", model: "m" })).rejects.toThrow(/isn't an agent provider/);
+});

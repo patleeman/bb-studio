@@ -1,0 +1,55 @@
+{
+  "name": "@bb-studio/studio-visual-chat",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
+  "engines": {
+    "bb": ">=0.48.1",
+    "bbPluginSdk": ">=0.6.104"
+  },
+  "bb": {
+    "name": "BB Studio Visual Chat",
+    "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
+    "branding": {
+      "icon": "GridView",
+      "experimental_icons": {
+        "visual-chat": "./icons/visual-chat.svg"
+      }
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build ."
+  },
+  "dependencies": {
+    "react-dom": "19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.104",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "better-sqlite3": "^12.11.1",
+    "clsx": "^2.1.1",
+    "esbuild": "0.28.2",
+    "jsdom": "29.0.1",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "react": "19.2.4",
+    "recharts": "3.10.1",
+    "sonner": "^1.7.4",
+    "tailwind-merge": "^3.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "4.1.1"
+  }
+}
