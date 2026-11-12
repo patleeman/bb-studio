@@ -20,7 +20,18 @@ export interface OnboardingFlag {
   opened: boolean;
 }
 
+interface UiPreference {
+  value: unknown;
+  revision: number;
+}
+
 export interface OnboardingSdk {
+  system?: {
+    uiPreferences?: {
+      list(): Promise<{ preferences: Record<string, UiPreference | undefined> }>;
+      set(input: { key: string; value: unknown; expectedRevision: number }): Promise<unknown>;
+    };
+  };
   threads: {
     spawn(args: Record<string, unknown>): Promise<{ id: string }>;
     queuedMessages: {
@@ -40,6 +51,18 @@ export interface OnboardingDeps {
 }
 
 const flagPath = (dataDir: string) => join(dataDir, ONBOARDING_FILE);
+
+export const THREAD_LIST_KEY = "sidebar.threadListProvider";
+export const BOT_SIDEBAR_LIST = "studio/everything";
+
+export async function showBotSidebar(sdk: OnboardingSdk): Promise<boolean> {
+  const preferences = sdk.system?.uiPreferences;
+  if (!preferences) return false;
+  const current = (await preferences.list()).preferences[THREAD_LIST_KEY];
+  if (!current || current.value !== "__automatic__") return false;
+  await preferences.set({ key: THREAD_LIST_KEY, value: BOT_SIDEBAR_LIST, expectedRevision: current.revision });
+  return true;
+}
 
 export function readOnboarding(dataDir: string): OnboardingFlag | null {
   try {
@@ -115,6 +138,7 @@ async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
   const bot = await deps.createBot({ name: WELCOME_BOT_NAME, avatar: "🤖", threadId: mainId });
   const welcomeId = await turnlessThread(deps.sdk, WELCOME_TITLE, { botConversation: bot.id }, now);
   deps.recordConversation(welcomeId, bot.id);
+  await showBotSidebar(deps.sdk).catch(() => false);
   const flag: OnboardingFlag = { version: 1, state: "done", reason: "ran", at: now, botId: bot.id, welcomeThreadId: welcomeId, opened: false };
   writeOnboarding(deps.dataDir, flag);
   return flag;

@@ -232,6 +232,13 @@ export interface ThreadBannerRegistration {
   component: (props: { threadId: string }) => ReactNode;
 }
 
+export function registerFirstRun(slots: object, registration: { id: string }): boolean {
+  const slot = member(slots, "experimental_firstRun");
+  if (typeof slot !== "function") return false;
+  (slot as (registration: { id: string }) => void).call(slots, registration);
+  return true;
+}
+
 /** Adds a row under every thread's header (`slots.experimental_threadBanner`); false on a BB without it. */
 export function registerThreadBanner(slots: object, registration: ThreadBannerRegistration): boolean {
   const slot = member(slots, "experimental_threadBanner");

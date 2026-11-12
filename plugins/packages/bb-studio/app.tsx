@@ -4,7 +4,7 @@ import { registerCodeApp } from "./src/code/register";
 import { registerSettingsApp } from "./src/settings/ui/sections";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
-import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerNewTabItems, registerPaletteSearch, registerSidebarSection, registerThreadBanner } from "./src/kit/app/host-sdk";
+import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerFirstRun, registerNewTabItems, registerPaletteSearch, registerSidebarSection, registerThreadBanner } from "./src/kit/app/host-sdk";
 import { WelcomeBanner, WelcomeLanding } from "./src/ui/bot/WelcomeMessage";
 import { EditSpaceHost } from "./src/ui/conversations/EditSpaceHost";
 import { NewTabBridge, STUDIO_NEW_TAB_ITEMS } from "./src/ui/newtab-items";
@@ -302,6 +302,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "relogin", component: ReloginHost });
   registerAccountsApp(app);
   registerThreadBanner(app.slots, { id: "welcome", component: WelcomeBanner });
+  registerFirstRun(app.slots, { id: "welcome" });
   app.slots.experimental_appOverlay({ id: "welcome-landing", component: WelcomeLanding });
   app.slots.experimental_appOverlay({ id: "edit-space", component: EditSpaceHost });
   app.slots.experimental_appOverlay({ id: "theme", component: ThemeLayer });

@@ -19,7 +19,8 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function studio() {
+async function studio(threadList: string = "__automatic__") {
+  const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
   dispose.push(() => rmSync(dataDir, { recursive: true, force: true }));
   const threads = new Map<string, Thread>();
@@ -27,6 +28,17 @@ async function studio() {
   const spawns: Record<string, unknown>[] = [];
   const turns: string[] = [];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
+    system: {
+      uiPreferences: {
+        list: (async () => ({ preferences: Object.fromEntries(prefs) })) as never,
+        set: (async ({ key, value, expectedRevision }: { key: string; value: unknown; expectedRevision: number }) => {
+          const current = prefs.get(key);
+          if (current && current.revision !== expectedRevision) throw new Error("stale revision");
+          prefs.set(key, { value, revision: expectedRevision + 1 });
+          return {};
+        }) as never,
+      },
+    },
     threads: {
       spawn: (async (args: Record<string, unknown>) => {
         spawns.push(args);
@@ -58,7 +70,7 @@ async function studio() {
     recordConversation: (threadId, botId) => { store.recordConversation(threadId, botId); },
     now: () => 1_000,
   });
-  return { dataDir, db, bots, store, leads, run, spawns, turns, queued };
+  return { dataDir, db, bots, store, leads, run, spawns, turns, queued, prefs };
 }
 
 function bbDatabase(dataDir: string, threadIds: string[]) {
@@ -91,6 +103,13 @@ describe("first-run onboarding", () => {
     expect(markWelcomeOpened(env.dataDir)).toBe(true);
     expect(markWelcomeOpened(env.dataDir)).toBe(false);
     expect(welcomeThreadOf(env.dataDir)?.opened).toBe(true);
+    expect(env.prefs.get("sidebar.threadListProvider")).toEqual({ value: "studio/everything", revision: 2 });
+  });
+
+  it("leaves a thread list the user chose", async () => {
+    const env = await studio("thread-list/thread-list");
+    await env.run();
+    expect(env.prefs.get("sidebar.threadListProvider")?.value).toBe("thread-list/thread-list");
   });
 
   it("does nothing on a second start", async () => {
@@ -113,6 +132,7 @@ describe("first-run onboarding", () => {
       expect(env.bots.list()).toEqual([]);
       expect(readOnboarding(env.dataDir)?.reason).toBe("import");
       expect(welcomeThreadOf(env.dataDir)).toBeNull();
+      expect(env.prefs.get("sidebar.threadListProvider")?.value).toBe("__automatic__");
     }
   });
 
