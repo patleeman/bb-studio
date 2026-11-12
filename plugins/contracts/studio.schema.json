@@ -14971,6 +14971,16 @@
                 },
                 "working": {
                   "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "reply",
+                    "fork"
+                  ]
+                },
+                "conversations": {
+                  "type": "number"
                 }
               },
               "required": [
@@ -14980,7 +14990,9 @@
                 "replies",
                 "lastReplyAt",
                 "lastReplyRole",
-                "working"
+                "working",
+                "kind",
+                "conversations"
               ],
               "additionalProperties": false
             }

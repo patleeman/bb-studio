@@ -13312,6 +13312,30 @@ public enum Studio {
     }
   }
 
+  public enum BotSideThreadsOutputThreadsItemKind: Sendable, Hashable, Codable {
+    case reply
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "reply": self = .reply
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .reply: try container.encode("reply")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSideThreadsOutputThreadsItem: Sendable, Hashable, Codable {
     public var messageId: String?
     public var threadId: String?
@@ -13320,8 +13344,10 @@ public enum Studio {
     public var lastReplyAt: Double?
     public var lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole?
     public var working: Bool?
+    public var kind: BotSideThreadsOutputThreadsItemKind?
+    public var conversations: Double?
 
-    public init(messageId: String? = nil, threadId: String? = nil, botId: String? = nil, replies: Double? = nil, lastReplyAt: Double? = nil, lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole? = nil, working: Bool? = nil) {
+    public init(messageId: String? = nil, threadId: String? = nil, botId: String? = nil, replies: Double? = nil, lastReplyAt: Double? = nil, lastReplyRole: BotSideThreadsOutputThreadsItemLastReplyRole? = nil, working: Bool? = nil, kind: BotSideThreadsOutputThreadsItemKind? = nil, conversations: Double? = nil) {
       self.messageId = messageId
       self.threadId = threadId
       self.botId = botId
@@ -13329,6 +13355,8 @@ public enum Studio {
       self.lastReplyAt = lastReplyAt
       self.lastReplyRole = lastReplyRole
       self.working = working
+      self.kind = kind
+      self.conversations = conversations
     }
   }
 

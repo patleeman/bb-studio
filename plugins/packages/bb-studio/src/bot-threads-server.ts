@@ -379,6 +379,11 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   const messageThreads = new MessageThreads({
     sdk: bb.sdk, sides,
     source: async (threadId) => store.get(threadId) ?? await info(threadId).then(() => store.get(threadId)),
+    title: async (threadId) => {
+      const rec = store.get(threadId);
+      const thread = rec?.isMain ? null : await bb.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
+      return rec ? conversationTitle(rec, thread) : thread?.title?.trim() || "Conversation";
+    },
     recordFork: (threadId, botId, from) => { store.recordFork(threadId, botId, from); },
     defaultModel: (botId) => deps.defaultModel(botId),
     changed: (threadId) => threadChanged(threadId),

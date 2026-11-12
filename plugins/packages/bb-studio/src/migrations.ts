@@ -1079,4 +1079,5 @@ export const MIGRATIONS = [
        id TEXT PRIMARY KEY,
        dismissed_at INTEGER NOT NULL
      );`,
+  `ALTER TABLE bot_side_threads ADD COLUMN kind TEXT NOT NULL DEFAULT 'reply';`,
 ];

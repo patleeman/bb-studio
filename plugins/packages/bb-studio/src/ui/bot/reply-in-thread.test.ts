@@ -11,7 +11,7 @@ const page = `
   <aside><div data-timeline-row-id="thr_side:assistant:s1"><div class="group/message w-full text-sm" data-message-column></div></div></aside>`;
 const shown = (id: string) => (document.getElementById(id) as HTMLElement).style.display !== "none";
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
-const thread = (fields: Partial<SideThreadView> = {}): SideThreadView => ({ messageId: "thr_bot:assistant:a1", threadId: "fork1", botId: "dot", replies: 2, lastReplyAt: Date.now() - 5 * 60_000, lastReplyRole: "assistant", working: false, ...fields });
+const thread = (fields: Partial<SideThreadView> = {}): SideThreadView => ({ messageId: "thr_bot:assistant:a1", threadId: "fork1", botId: "dot", replies: 2, lastReplyAt: Date.now() - 5 * 60_000, lastReplyRole: "assistant", working: false, kind: "reply", conversations: 1, ...fields });
 afterEach(() => { document.body.replaceChildren(); history.replaceState(null, "", "/"); });
 
 it("finds the thread in BB's paths", () => {
@@ -20,11 +20,16 @@ it("finds the thread in BB's paths", () => {
   expect(threadInPath("/plugins/studio/bot")).toBeNull();
 });
 
-it("labels a side thread by its replies", () => {
+it("labels a reply thread by its count and the last reply's time, and a fork by its conversations", () => {
+  const now = new Date(2026, 10, 12, 18, 0).getTime();
+  expect(sideThreadLabel(thread({ lastReplyAt: new Date(2026, 10, 12, 16, 13).getTime() }), now, "en-US")).toBe("2 replies · Last reply 4:13 PM");
+  expect(sideThreadLabel(thread({ replies: 1, lastReplyAt: new Date(2026, 10, 3, 9, 0).getTime() }), now, "en-US")).toBe("1 reply · Last reply Nov 3");
   expect(sideThreadLabel(thread({ replies: 1, lastReplyAt: null }))).toBe("1 reply");
-  expect(sideThreadLabel(thread({ replies: 0 }))).toBe("Thread");
-  expect(sideThreadLabel(thread({ replies: 0, working: true }))).toBe("Working…");
-  expect(sideThreadLabel(thread({ working: true }))).toBe("2 replies · working…");
+  expect(sideThreadLabel(thread({ replies: 0 }))).toBeNull();
+  expect(sideThreadLabel(thread({ replies: 0, working: true }))).toBe("Replying…");
+  expect(sideThreadLabel(thread({ working: true }))).toBe("Replying…");
+  expect(sideThreadLabel(thread({ kind: "fork", conversations: 1 }))).toBe("Forked here · 1 conversation");
+  expect(sideThreadLabel(thread({ kind: "fork", conversations: 2 }))).toBe("Forked here · 2 conversations");
 });
 
 it("tells this chat's replies from your messages, other rows and a side thread's own chat", () => {
@@ -54,7 +59,7 @@ it("hands a footer under each reply with threads to the indicator, and takes the
   let footers: readonly ThreadFooter[] = [];
   mountSideThreadRows(controller.signal, load, (next) => { footers = next; });
   await settle();
-  expect(footers.map((each) => [each.key, each.sourceThreadId, each.thread.threadId])).toEqual([["thr_bot:assistant:a1", "thr_bot", "fork1"]]);
+  expect(footers.map((each) => [each.key, each.sourceThreadId, each.threads[0]!.threadId])).toEqual([["thr_bot:assistant:a1", "thr_bot", "fork1"]]);
   expect(footers[0]!.host.closest("[data-timeline-row-id]")?.getAttribute("data-timeline-row-id")).toBe("thr_bot:assistant:a1");
   expect([shown("reply"), shown("mine"), shown("other")]).toEqual([true, true, true]);
   const before = footers;
@@ -68,4 +73,16 @@ it("hands a footer under each reply with threads to the indicator, and takes the
   expect(footers).toEqual([]);
   expect(document.querySelector("[data-studio-thread-footer]")).toBeNull();
   controller.abort();
+});
+
+it("hides bb's Provisioned thread row and keeps the conversation's own rows", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const style = document.createElement("style");
+  style.textContent = readFileSync(join(__dirname, "timeline.css"), "utf8");
+  document.head.append(style);
+  document.body.innerHTML = `<div id="prov" data-timeline-row-id="thr_bot:op:thread-provisioning:3"></div><div id="msg" data-timeline-row-id="thr_bot:assistant:a1"></div>`;
+  expect(getComputedStyle(document.getElementById("prov")!).display).toBe("none");
+  expect(getComputedStyle(document.getElementById("msg")!).display).not.toBe("none");
+  style.remove();
 });

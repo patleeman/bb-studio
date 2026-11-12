@@ -266,7 +266,7 @@ const botCacheState = z.object({
 });
 export type BotCacheStateView = z.infer<typeof botCacheState>;
 /** A side thread on one of a Bot's replies (src/bot-side-threads.ts). */
-const sideThread = z.object({ messageId: z.string(), threadId: z.string(), botId: z.string(), replies: z.number(), lastReplyAt: z.number().nullable(), lastReplyRole: z.enum(["user", "assistant"]).nullable(), working: z.boolean() });
+const sideThread = z.object({ messageId: z.string(), threadId: z.string(), botId: z.string(), replies: z.number(), lastReplyAt: z.number().nullable(), lastReplyRole: z.enum(["user", "assistant"]).nullable(), working: z.boolean(), kind: z.enum(["reply", "fork"]), conversations: z.number() });
 export type SideThreadView = z.infer<typeof sideThread>;
 const botSideThread = z.object({
   threadId: z.string(), sourceThreadId: z.string(), messageId: z.string(), title: z.string(), replies: z.number(), working: z.boolean(), updatedAt: z.number(),

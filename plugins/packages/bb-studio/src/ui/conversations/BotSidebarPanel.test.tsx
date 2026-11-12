@@ -108,7 +108,7 @@ it("draws the current Bot: its name, conversations in two lines with the needs-y
   expect(rows[1]!.querySelector('[data-testid="conversation-line"]')?.getAttribute("data-tone")).toBe("running");
   expect(rows[2]!.hasAttribute("data-needs-you")).toBe(true);
   expect(rows[2]!.querySelector('[data-testid="conversation-line"]')?.textContent).toBe("Needs you: cut titles at the end or the middle?");
-  expect(rows[2]!.querySelector('[data-testid="forked-from"]')?.textContent).toBe("⑂ Fork redesign");
+  expect(rows[2]!.querySelector('[data-testid="forked-from"]')).toBeNull();
   expect(rows[0]!.textContent).toContain("4m");
   const workers = $$('[data-testid="worker-row"]');
   expect(workers.map((row) => [row.dataset.status, row.querySelector('[data-testid="worker-tag"]')?.textContent ?? null])).toEqual([["running", "bb-studio-native"]]);

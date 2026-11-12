@@ -45,7 +45,8 @@ export function ReplyInThreadAction({ message }: ExperimentalMessageMetadataProp
       const opened = await call("bot_thread_reply", { threadId: message.threadId, messageId: message.id, turnId: message.turnId });
       await openThreadBeside(message.threadId, opened.threadId, (threadId) => navigate.toThread(threadId));
     } catch (cause) {
-      toast.error(errorMessage(cause) || "Couldn't open the thread.");
+      console.warn("Reply in thread failed", errorMessage(cause));
+      toast.error("Couldn't open the thread.");
     } finally {
       setBusy(false);
     }
@@ -73,11 +74,13 @@ export function Replier({ thread }: { thread: Pick<SideThreadView, "lastReplyRol
 }
 
 export function ThreadIndicator({ thread, onOpen, now = Date.now() }: { thread: SideThreadView; onOpen(): void; now?: number }) {
+  const label = sideThreadLabel(thread, now);
+  if (!label) return null;
   return (
-    <button type="button" data-studio-side-thread="" data-thread={thread.threadId} onClick={onOpen}
-      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-state-hover">
-      <Replier thread={thread} />
-      <span>{`💬 ${sideThreadLabel(thread, now)}`}</span>
+    <button type="button" data-studio-side-thread="" data-kind={thread.kind} data-thread={thread.threadId} onClick={onOpen}
+      className="inline-flex cursor-pointer items-center gap-1.5 bg-transparent p-0 text-xs font-medium text-primary hover:underline focus-visible:underline focus-visible:outline-none">
+      {thread.kind === "reply" && !thread.working ? <Replier thread={thread} /> : null}
+      <span>{label}</span>
     </button>
   );
 }
@@ -94,7 +97,7 @@ export function ThreadIndicators() {
   return (
     <>
       {footers.map((footer) => createPortal(
-        <ThreadIndicator thread={footer.thread} onOpen={() => void openThreadBeside(footer.sourceThreadId, footer.thread.threadId, (threadId) => navigate.toThread(threadId))} />,
+        <>{footer.threads.map((thread) => <ThreadIndicator key={thread.kind} thread={thread} onOpen={() => void openThreadBeside(footer.sourceThreadId, thread.threadId, (threadId) => navigate.toThread(threadId))} />)}</>,
         footer.host, footer.key,
       ))}
     </>

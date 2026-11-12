@@ -510,8 +510,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   `/plugins/studio/studio/new-conversation/<botId>/<projectId>`, seeded with
   the Bot's default model and Main's project; pick any other model before
   sending; `bot_conversation_start` makes the thread this Bot's): Main first, then the others
-  by last activity, two lines each: the title (13px, medium; a fork adds
-  "⑂ source" in small muted text) and its age; then its latest reply (12px,
+  by last activity, two lines each: the title (13px, medium) and its age; then its latest reply (12px,
   the ink at 55%), with a spinner while
   it works. The conversation that needs you is outlined in amber, with
   "Needs you: <reason>" on its second line. The row on screen is
@@ -3397,34 +3396,46 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `src/ui/bot/SideThreads.tsx`, `src/ui/bot/reply-in-thread.ts`; table
   `bot_side_threads`; `bot_thread_reply`, `bot_fork_conversation`,
   `bot_side_threads`, `bot_side_threads_for_bot`, `bot_side_thread_open`).
-  A thread and a fork are one object: a conversation of the same Bot at the
-  same level, forked after a message and linked back to it (its
-  `bot_threads` row has `forked_from_message_id`, and `bot_side_threads`
-  records the message). `MessageThreads` is the one path that makes them.
+  A reply thread and a fork are both a conversation of the same Bot, forked
+  after a message and linked back to it (its `bot_threads` row has
+  `forked_from_message_id`; `bot_side_threads` records the message and the
+  kind, `reply` or `fork`). `MessageThreads` is the one path that makes them.
+  Neither gets a row in Conversations: each lives at its message.
   - **Reply in thread**: on a Bot's replies, a small icon in the message's
     action row, shown on hover (`slots.experimental_messageMetadata` with
-    `placement: "actionRow"`). It opens the message's newest thread, or makes
-    one (`bot_thread_reply`, which finds the fork point from the timeline),
-    and opens it as a Conversation tab in the conversation's side panel
-    (the workbench, through `openTabRef`; the main view where there is
-    none). iOS's **Reply in thread** (`bot_side_thread_open`) takes the
-    same path.
+    `placement: "actionRow"`), the only way in until it has replies. It
+    opens the message's newest reply thread, or makes one
+    (`bot_thread_reply`, which finds the fork point from the timeline), and
+    opens it as a Conversation tab in the conversation's side panel (the
+    workbench, through `openTabRef`; the main view where there is none).
+    iOS's **Reply in thread** (`bot_side_thread_open`) takes the same path.
   - **Fork conversation from here** in a message's **···** menu
     (`src/ui/conversations/fork-from-here.ts`, `bot_fork_conversation`,
     where BB has the fork's `slots.experimental_messageAction`) always makes
-    a new fork and opens it in the main view. It records the message too.
-  - **The row under the message**: "💬 2 replies · 5m ago" with the last
-    replier: the Bot's presence for its replies, your mark for yours. It
-    counts your messages and the Bot's turns in all the message's threads,
-    only those after the fork: the history a fork copies keeps its original
-    times, so rows older than the thread itself don't count. It is recounted
-    from each thread's timeline when it starts or finishes a turn, and for
-    every thread when the plugin starts, and opens the newest in the side
-    panel. An app overlay draws it
-    into a footer under the message (`ThreadIndicators`), in any of a Bot's
-    conversations.
-  - **The sidebar** lists each thread under Conversations as a child of its
-    source ("⑂ Main").
+    a new fork and opens it in the side panel too; it opens full size from
+    there.
+  - Titles: "Main · thread" for a reply thread, "Main · fork" for a fork
+    (the parent conversation's title).
+  - **Under the message**, an app overlay (`ThreadIndicators`) draws quiet
+    links in the theme's accent color, no emoji, pill or border: "2 replies
+    · Last reply 4:13 PM" (Intl time today, the date before) with the last
+    replier (the Bot's presence, or your mark), "Replying…" while it works,
+    and "Forked here · 1 conversation" for forks. An empty or failed thread
+    shows nothing. Replies count your messages and the Bot's turns, only
+    those after the fork: the history a fork copies keeps its original
+    times. They are recounted when a thread starts or finishes a turn, and
+    for every thread when the plugin starts. A link opens the newest thread
+    of its kind in the side panel.
+  - **The sidebar**: a fork's work and needs-you show on the row of the
+    conversation it was forked from (through a chain of forks), else on
+    Main (`foldForks` in `src/bot-threads.ts`).
+  - **A parent BB can't fork** (no provider session to copy, a turn not
+    finished): the thread starts from the transcript instead, a new thread
+    on the parent's provider, model and environment seeded with the
+    conversation up to the message as agent-only context
+    (`startedOnBehalfOf`), so it waits idle for the first message. The fork
+    core restarts a fork whose session copy fails at its first start the
+    same way (`fork-start-fallback.fork.ts`). No raw error reaches the user.
   - Side chats bb's side-chat plugin made (mirrored from bb) are matched to
     the message they quote and count the same way.
   It starts on the Bot's default model when that is on the fork's provider

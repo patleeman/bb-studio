@@ -224,7 +224,7 @@ const rec = (over: Partial<ReturnType<BotThreads["get"]> & object> & { threadId:
   finishedSummary: null, needsYou: null, latest: null, activityAt: null as number | null, source: "backfill" as const, createdAt: 0, updatedAt: 0, ...over,
 });
 
-it("draws the sidebar: Main first, conversations by activity, the needs-you reason, the fork's source, workers by status", () => {
+it("draws the sidebar: Main first, conversations by activity, the needs-you reason, a fork's state on its parent, workers by status", () => {
   const now = 100 * HOUR;
   const records = [
     rec({ threadId: "main", isMain: true }),
@@ -250,12 +250,11 @@ it("draws the sidebar: Main first, conversations by activity, the needs-you reas
     ["w4", { id: "w4", status: "idle", updatedAt: 1 * HOUR, title: "Ancient" }],
   ]);
   const view = threadsView("bot_dot", records, threads, now);
-  expect(view.conversations.map((each) => each.threadId)).toEqual(["main", "redesign", "fork", "asks", "old"]);
+  expect(view.conversations.map((each) => each.threadId)).toEqual(["main", "redesign", "asks", "old"]);
   expect(view.conversations[0]).toMatchObject({ title: "Main", isMain: true });
-  expect(view.conversations[1]).toMatchObject({ title: "Fork redesign", running: true });
-  expect(view.conversations[2]).toMatchObject({ title: "Tree truncation", forkedFrom: { threadId: "redesign", title: "Fork redesign" }, needsYou: { reason: "Cut titles at the end or the middle?" } });
-  expect(view.conversations[3]!.needsYou?.reason).toBe("Asked you a question");
-  expect(view.conversations[4]).toMatchObject({ latest: "Return window ends Nov 15", needsYou: null });
+  expect(view.conversations[1]).toMatchObject({ title: "Fork redesign", running: true, needsYou: { reason: "Cut titles at the end or the middle?" } });
+  expect(view.conversations[2]!.needsYou?.reason).toBe("Asked you a question");
+  expect(view.conversations[3]).toMatchObject({ latest: "Return window ends Nov 15", needsYou: null });
   // Running first, then the finished ones by recency; done ones older than two days are counted, not shown.
   expect(view.workers.map((each) => [each.threadId, each.status])).toEqual([["w1", "running"], ["w3", "done"], ["w2", "failed"]]);
   expect(view.workers[0]).toMatchObject({ tag: "bb-studio-native", branch: "exp/studio-native", ownerTitle: "Fork redesign" });

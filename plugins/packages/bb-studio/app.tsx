@@ -89,6 +89,7 @@ import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
 import "./src/dashboards/ui/dashboards.css";
+import "./src/ui/bot/timeline.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
@@ -99,7 +100,7 @@ import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage"
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
-import { BotThreadDirective, ReplyInThreadAction, SIDE_THREAD_ACTION, SideThreadPanel, ThreadIndicators } from "./src/ui/bot/SideThreads";
+import { BotThreadDirective, openThreadBeside, ReplyInThreadAction, SIDE_THREAD_ACTION, SideThreadPanel, ThreadIndicators } from "./src/ui/bot/SideThreads";
 import { BOT_THREAD_DIRECTIVE } from "./src/bot-side-threads";
 import { registerForkFromHere } from "./src/ui/conversations/fork-from-here";
 import { canShowBot, openThreadVia, showBotNumber } from "./src/ui/conversations/state";
@@ -391,7 +392,7 @@ export default definePluginApp((app) => {
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel, ...OFF_NEW_TAB });
   registerForkFromHere(app.slots, {
     call: async (method, input) => (await post(method, input)) as { threadId: string },
-    open: openThreadVia((threadId) => openPathFromRoute(`/threads/${encodeURIComponent(threadId)}`)),
+    open: (threadId, sourceThreadId) => { void openThreadBeside(sourceThreadId, threadId, openThreadVia((id) => openPathFromRoute(`/threads/${encodeURIComponent(id)}`))); },
   });
   app.slots.experimental_messageMetadata({ id: "reply-in-thread", placement: "actionRow", component: ReplyInThreadAction });
   app.slots.experimental_appOverlay({ id: "thread-indicators", component: ThreadIndicators });

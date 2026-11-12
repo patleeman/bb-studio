@@ -7,7 +7,7 @@ import type { ConversationLine } from "./model";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-it("keeps a fork's ⑂ parent label outside the truncated title, so a long title cannot cut it off", async () => {
+it("draws no ⑂ parent label on a row", async () => {
   const row = {
     threadId: "thr_demo000025", title: "Chief of Staff · Fable restarted the app six times to ship these one at a ti…", isMain: false,
     forkedFrom: { threadId: "thr_demo000022", messageId: "thr_demo000022:user-seed:131424", turnId: null, title: "Main" },
@@ -17,12 +17,9 @@ it("keeps a fork's ⑂ parent label outside the truncated title, so a long title
   const root = createRoot(host);
   await act(async () => { root.render(<ConversationRowView row={row} now={Date.now()} onOpen={() => {}} menuTarget={null} />); });
   const title = host.querySelector<HTMLElement>('[data-testid="conversation-title"]')!;
-  const label = host.querySelector<HTMLElement>('[data-testid="forked-from"]')!;
-  expect(label.textContent).toBe("⑂ Main");
   expect(title.textContent).toBe(row.title);
-  expect(title.contains(label)).toBe(false);
-  expect(label.className.split(" ")).toContain("shrink-0");
-  expect(label.closest(".truncate")).toBe(label);
+  expect(host.querySelector('[data-testid="forked-from"]')).toBeNull();
+  expect(host.textContent).not.toContain("⑂");
   act(() => root.unmount());
   host.remove();
 });

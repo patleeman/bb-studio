@@ -481,6 +481,7 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
       };
     });
   const rank: Record<WorkerStatus, number> = { "needs-you": 0, running: 1, failed: 2, done: 3 };
+  const listed = foldForks(conversations, byId);
   const all = mine.filter((rec) => rec.kind === "worker").map((rec): WorkerView => {
     const thread = threads.get(rec.threadId);
     const tag = repoTag(thread);
@@ -490,7 +491,32 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
       updatedAt: at(rec), tag: tag?.tag ?? null, branch: tag?.branch ?? null, mirrored: !!thread?.mirroredPending, sameTitle: 1,
     };
   }).sort((a, b) => rank[a.status] - rank[b.status] || b.updatedAt - a.updatedAt);
-  return { conversations, workers: all };
+  return { conversations: listed, workers: all };
+}
+
+/**
+ * A fork made at a message (Reply in thread, Fork conversation) has no row of
+ * its own: it lives at that message. Its row's work and needs-you show on the
+ * conversation it was forked from (through a chain of forks), else on Main.
+ */
+export function foldForks(conversations: readonly ConversationView[], byId: ReadonlyMap<string, Pick<BotThreadRecord, "forkedFrom" | "isMain">>): ConversationView[] {
+  const isFork = (row: Pick<ConversationView, "isMain" | "forkedFrom">) => !row.isMain && !!row.forkedFrom?.messageId;
+  const kept = new Map(conversations.filter((row) => !isFork(row)).map((row) => [row.threadId, { ...row }]));
+  const main = [...kept.values()].find((row) => row.isMain);
+  for (const fork of conversations.filter(isFork)) {
+    let at: string | null = fork.forkedFrom!.threadId;
+    const seen = new Set([fork.threadId]);
+    while (at && !kept.has(at) && !seen.has(at)) {
+      seen.add(at);
+      at = byId.get(at)?.forkedFrom?.threadId ?? null;
+    }
+    const root = (at ? kept.get(at) : undefined) ?? main;
+    if (!root) { kept.set(fork.threadId, { ...fork }); continue; }
+    root.running ||= fork.running;
+    root.needsYou ??= fork.needsYou;
+    root.updatedAt = Math.max(root.updatedAt, fork.updatedAt);
+  }
+  return [...kept.values()].sort((a, b) => Number(b.isMain) - Number(a.isMain) || b.updatedAt - a.updatedAt);
 }
 
 /**

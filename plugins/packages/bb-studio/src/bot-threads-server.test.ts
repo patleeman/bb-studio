@@ -281,7 +281,8 @@ it("forks a conversation from a message: BB forks after it, and the fork is the 
   await server.store.created(threads.get("fork_5")!);
   expect(server.store.get("fork_5")).toMatchObject({ botId: "dot", kind: "conversation", forkedFrom: { threadId: "redesign", messageId: "msg_7", turnId: "turn_3" }, source: "user" });
   const view = await server.rpc.bot_threads_view({});
-  expect(view.conversations.find((each) => each.threadId === "fork_5")?.forkedFrom).toMatchObject({ threadId: "redesign", title: "Fork redesign" });
+  expect(view.conversations.map((each) => each.threadId)).not.toContain("fork_5");
+  expect(view.conversations.map((each) => each.threadId)).toContain("redesign");
   await expect(server.rpc.bot_fork_conversation({ threadId: "nope", messageId: "m", turnId: null, sourceSeqEnd: 1 })).rejects.toThrow(/isn't one of a Bot's/);
 });
 

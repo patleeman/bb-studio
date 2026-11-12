@@ -8,7 +8,8 @@
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on
 //   a Studio page, seeded with the Bot's default model): two-line rows, the title and
 //   its time, then the latest reply (a spinner while it works), or, amber
-//   and outlined, why it needs Patrick. A fork names its source (⑂ name).
+//   and outlined, why it needs Patrick. A fork made at a message has no row:
+//   it shows at that message, and its work and needs-you show on its parent's row.
 // - Workers: the running ones and those needing Patrick, one line each, a
 //   status glyph, the title, the repo it runs in
 //   and a short time. The five newest finished (the server's view; a run of
@@ -88,7 +89,6 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
           <span data-testid="conversation-title" className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-foreground">{row.title}</span>
-          {row.forkedFrom ? <small data-testid="forked-from" className="max-w-[45%] shrink-0 truncate text-xs font-normal text-muted-foreground" aria-label={`Forked from ${row.forkedFrom.title}`}>⑂ {row.forkedFrom.title}</small> : null}
         </span>
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
       </span>
