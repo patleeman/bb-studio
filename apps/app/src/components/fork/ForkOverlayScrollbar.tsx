@@ -22,12 +22,38 @@ export interface ForkScrollThumbBox {
   range: number;
 }
 
+const CARD = '[data-fork-card="main"]';
+const PSEUDO_CARD_HOSTS =
+  ".box-border.h-full.w-full, .relative.h-full.overflow-hidden";
+
+export function forkScrollCardRight(scroller: HTMLElement): number {
+  const edge = scroller.getBoundingClientRect().right;
+  const card = scroller.querySelector(CARD) ?? scroller.closest(CARD);
+  if (card !== null) return Math.min(edge, card.getBoundingClientRect().right);
+  const view = scroller.ownerDocument.defaultView;
+  if (view === null) return edge;
+  for (const host of [
+    scroller.firstElementChild,
+    scroller.closest(PSEUDO_CARD_HOSTS),
+  ]) {
+    if (!(host instanceof HTMLElement)) continue;
+    const backing = view.getComputedStyle(host, "::before");
+    if (backing.content === "none" || backing.content === "normal") continue;
+    const width = Number.parseFloat(backing.width);
+    if (!Number.isFinite(width) || width <= 0) continue;
+    const box = host.getBoundingClientRect();
+    return Math.min(edge, box.left + (box.width + width) / 2);
+  }
+  return edge;
+}
+
 export function forkScrollThumbBox(
   scroller: Pick<
     HTMLElement,
     "scrollTop" | "scrollHeight" | "clientHeight" | "getBoundingClientRect"
   >,
   thumbWidth: number,
+  right?: number,
 ): ForkScrollThumbBox | null {
   const range = scroller.scrollHeight - scroller.clientHeight;
   if (range <= 1 || scroller.clientHeight <= 0) return null;
@@ -42,7 +68,7 @@ export function forkScrollThumbBox(
   const progress = Math.min(1, Math.max(0, scroller.scrollTop / range));
   return {
     top: rect.top + EDGE_INSET + travel * progress,
-    left: rect.right - EDGE_INSET - thumbWidth,
+    left: (right ?? rect.right) - EDGE_INSET - thumbWidth,
     height,
     travel,
     range,
@@ -80,7 +106,11 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
   };
   const show = (scroller: HTMLElement) => {
     if (!doc.documentElement.hasAttribute(FORK_CARDS_ATTRIBUTE)) return hide();
-    const box = forkScrollThumbBox(scroller, thumb.offsetWidth || 6);
+    const box = forkScrollThumbBox(
+      scroller,
+      thumb.offsetWidth || 6,
+      forkScrollCardRight(scroller),
+    );
     if (box === null) {
       if (current === scroller) hide();
       return;
