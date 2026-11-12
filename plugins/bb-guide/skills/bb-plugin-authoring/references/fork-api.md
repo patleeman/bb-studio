@@ -304,8 +304,8 @@ Names: `ExperimentalPanelTabActionRegistration`,
 
 - `useBbNavigate().experimental_workbench(threadId?)` → the side panel of a
   thread view on screen in this window, for code outside that view (an agent
-  tool's handler in an always-mounted component), or null when that thread
-  is not on screen. Leave `threadId` out for the thread in the main view.
+  tool's handler), or null when that thread is not on screen. No `threadId`:
+  the thread in the main view. Your own page's panel: `fork-api-host.md`.
   It returns `{ threadId, list, open, close, focus, layout, arrange,
 isTyping }`:
   - `list()` → `{ open, selectedKey, tabs }`, every open tab (files, the
