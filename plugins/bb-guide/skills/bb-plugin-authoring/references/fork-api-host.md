@@ -172,6 +172,10 @@ not remount, and they return to the bar when the host or the flag goes.
   `{ finish }`; `finish()` marks the first run done and shows the app. With
   no component bb finishes at once. The first registration by plugin id
   wins; without one bb shows its own screens.
+- `app.slots.experimental_modelPickerGate({ id, component })` → drawn in
+  place of bb's model picker with `{ hasSelectedModel, children }`;
+  `children` is bb's picker. Return it to keep the picker. The first by
+  plugin id wins; a throw falls back to the picker.
 
 ## The workbench of your own page
 
