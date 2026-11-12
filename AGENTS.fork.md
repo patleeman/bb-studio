@@ -27,6 +27,15 @@ Never commit screenshots, captures or review evidence; they go in `~/workingdir/
 
 Build plugin bundles only with `node scripts/fork/build-plugins.mjs [plugin dir ...]`. It rebuilds this checkout's CLI first and then builds each plugin with it, in a clean environment. A bundle built with an older CLI silently loses every SDK hook added since (the launcher once listed no apps for this reason). With no arguments it builds the plugins named in `~/.bb-studio-import.json`.
 
+## Installing a build
+
+Iterate without signing; notarize only when asked, or once at the end of a day's batch.
+
+- A change that touches only the Studio plugins (CSS, themes, plugin UI) ships as a plugin bundle: build it with `node scripts/fork/build-plugins.mjs`, then quit and reopen BB Studio. No app rebuild, no signing.
+- A fork or core change needs a local app build (`pnpm build`, then `pnpm run package` in `apps/desktop`). Install it as built, with the Developer ID signature when `CSC_NAME` is set or ad-hoc (`codesign -s - --force --deep`) otherwise. A locally built app is not quarantined, so Gatekeeper does not block it. Do not wait on Apple before installing or taking screenshots.
+- Notarize and staple (`xcrun notarytool submit … --keychain-profile bbstudio-notary --wait`, then `xcrun stapler staple`) only on request or for the day's last build. If the keychain profile cannot be read, the Mac is probably locked: retry later, do not ask for it to be recreated.
+- If an unsigned or ad-hoc build loses keychain or permission access (microphone, accessibility, notifications), say which one.
+
 ## Stack order
 
 Tooling and notes, then seams, then features, then the generated commits at the tip. New work goes below the generated commits, as a new commit or folded into the commit for its area.
