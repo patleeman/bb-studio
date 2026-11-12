@@ -1,3 +1,4 @@
+import { STUDIO_NO_RELEASE_MESSAGE, desktopVersionIfPending } from "./desktop-app-update.fork.js";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -62,12 +63,12 @@ export function createDesktopAppUpdateService(args: {
     }
   };
   let lastResult: SystemAppUpdateStatus["lastResult"] = null;
-  const initialized = mutateManagedJsonFile({
+  const initialized = desktopVersionIfPending(readState, args.channel).then((running) => mutateManagedJsonFile({
     path,
     read: readState,
     mutate: (state) => {
       if (state.pending === null) return state;
-      const updated = state.pending.to.version === args.currentVersion;
+      const updated = state.pending.to.version === args.currentVersion || state.pending.to.version === running;
       return {
         ...state,
         pending: null,
@@ -76,13 +77,13 @@ export function createDesktopAppUpdateService(args: {
           finishedAt: new Date().toISOString(),
           message: updated
             ? null
-            : `bb started ${args.currentVersion} instead of ${state.pending.to.version}.`,
+            : `bb started ${running ?? args.currentVersion} instead of ${state.pending.to.version}.`,
           outcome: updated ? ("updated" as const) : ("failed" as const),
           phase: updated ? null : ("startup" as const),
         },
       };
     },
-  }).then((state) => {
+  })).then((state) => {
     lastResult = state.lastResult;
   });
   void initialized.catch((error: unknown) => {
@@ -120,7 +121,7 @@ export function createDesktopAppUpdateService(args: {
         ? { desktopUpdateSupported: true as const }
         : {}),
       support: { kind: "unsupported", reason: "desktop" },
-      current: { commit: null, version: args.currentVersion },
+      current: { commit: null, version: info?.version ?? args.currentVersion },
       available:
         info?.updateAvailable === true && version !== null
           ? {
@@ -136,7 +137,7 @@ export function createDesktopAppUpdateService(args: {
         info?.supported === true && (updaterUnavailable || version === null)
           ? {
               reason: "fetch-failed",
-              message: "Couldn't check for a newer bb release.",
+              message: STUDIO_NO_RELEASE_MESSAGE,
             }
           : null,
       activity,
@@ -190,7 +191,7 @@ export function createDesktopAppUpdateService(args: {
     const result = {
       acknowledged: false,
       finishedAt: new Date().toISOString(),
-      from: { commit: null, version: args.currentVersion },
+      from: { commit: null, version: info?.version ?? args.currentVersion },
       id: randomUUID(),
       logTail: [],
       message: null,
