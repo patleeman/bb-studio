@@ -1,3 +1,4 @@
+import { useForkVisibleFooterItems } from "@/components/fork/ForkHiddenHostEntries";
 import { type RefObject, useLayoutEffect } from "react";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { observeSharedResize } from "@bb/shared-ui/lib/shared-resize-observer";
@@ -68,7 +69,7 @@ export function useSidebarFooterPreferences() {
   const [hidden, setHidden] = useAtom(sidebarFooterHiddenAtom);
   const capacity = useAtomValue(sidebarFooterCapacityAtom);
   const hasRail = useSidebarNavigationPlacement() === "rail";
-  const items: FooterItem[] = [
+  const items: FooterItem[] = useForkVisibleFooterItems([
     ...(hasRail ? [] : [SETTINGS_FOOTER_ITEM]),
     {
       kind: "builtin",
@@ -91,7 +92,7 @@ export function useSidebarFooterPreferences() {
       label: "Report a bug",
       icon: "Bug",
     },
-  ];
+  ]);
   const { ordered, normalizedOrder } = arrangeByStoredOrder({
     items,
     storedOrder: order,

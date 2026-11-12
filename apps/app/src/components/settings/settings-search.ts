@@ -9,6 +9,7 @@ import {
 export type SettingsSearchCondition =
   | "markdownRendererChoices"
   | "cliCommand"
+  | "cliSkills"
   | "composers"
   | "desktopBrowser"
   | "desktopQuitConfirmation"
@@ -101,7 +102,11 @@ export const SETTINGS_SEARCH_INDEX: Record<
         keywords: ["command line", "terminal", "path", "install"],
         when: "cliCommand",
       },
-      { title: "bb CLI skills", keywords: ["agents", "install"] },
+      {
+        title: "bb CLI skills",
+        keywords: ["agents", "install"],
+        when: "cliSkills",
+      },
       {
         title: "Microphone",
         keywords: ["voice input", "audio", "dictation", "speech"],
