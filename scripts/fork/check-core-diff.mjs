@@ -33,6 +33,12 @@ const git = (...argv) =>
     maxBuffer: 1 << 28,
   }).trim();
 
+if (!args.includes("--cwd") && git("rev-parse", "--show-prefix") !== "") {
+  console.error(
+    "Run check-core-diff.mjs in the desktop worktree, not in main's desktop/.",
+  );
+  process.exit(1);
+}
 const head = git("rev-parse", option("--head", "HEAD"));
 const base = git("merge-base", head, option("--base", "upstream/main"));
 const isGenerated = (commit) =>
