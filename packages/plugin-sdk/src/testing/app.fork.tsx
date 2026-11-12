@@ -21,6 +21,7 @@ import type {
   ExperimentalMessageActionRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
+  ExperimentalModelLoadNoticeRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalReplyClassifierRegistration,
   ExperimentalSidebarNewItem,
@@ -103,6 +104,7 @@ export interface ForkCapturedPluginApp {
   contextCardRows: ExperimentalContextCardRowRegistration[];
   mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
+  modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
   panelTabActions: ExperimentalPanelTabActionRegistration[];
