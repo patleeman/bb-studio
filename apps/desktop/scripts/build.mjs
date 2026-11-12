@@ -1,3 +1,4 @@
+import { readStudioBuild, studioBuildDefines } from "./studio-release.fork.mjs";
 import { execFileSync } from "node:child_process";
 import { readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -84,6 +85,7 @@ const commonOptions = {
       desktopReleaseChannel,
     ),
     "process.env.BB_DESKTOP_VERSION": JSON.stringify(desktopVersion),
+    ...studioBuildDefines(readStudioBuild(process.env)),
   },
   legalComments: "none",
   platform: "node",
