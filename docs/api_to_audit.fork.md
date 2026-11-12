@@ -627,6 +627,24 @@ drawn first in the thread window of `ThreadScreen.tsx`'s page presentation.
 2. Several plugins' rows stack in plugin-id order with no priority or
    height limit.
 
+## A notice under a model list failure (`slots.experimental_modelLoadNotice`)
+
+A plugin draws a line under "Could not load models for …" in the model
+picker, with the provider's label, the failure code and the server's message.
+Studio's Accounts is the caller: when the model list failed through an
+Account Pooler whose accounts are signed out, it states "Signed out" with
+Sign in, instead of leaving only the pooler's HTTP 429.
+
+**Core callers.** `components/fork/ForkModelLoadNotices.tsx`
+(`forkModelLoadNotice`), drawn in `pickers/model-load-error-message.tsx`.
+
+**Audit before stabilizing.**
+
+1. The props carry the provider's label, not its id; decide whether the id
+   should be passed.
+2. The composer's send-blocking message (`formatModelLoadErrorText`) is text
+   and draws no notice.
+
 ## A thread header's title and a node after it (`slots.experimental_threadHeader`)
 
 A plugin's `useDecoration({ threadId })` hook runs in every thread header
