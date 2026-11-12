@@ -11,10 +11,8 @@ const state = vi.hoisted(() => ({
   navigate: { toThread: vi.fn(), toCompose: vi.fn(), toPluginPanel: vi.fn() },
   windows: false,
   loopsOn: false,
-  showHud: vi.fn(async () => true),
 }));
 vi.mock("../../kit/app/windows", () => ({ get hasHostWindows() { return state.windows; } }));
-vi.mock("../../hud/ui/HudBridge", () => ({ showHud: state.showHud }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => state.navigate,
   experimental_useSidebarThreads: () => ({ threads: state.sidebarThreads, projects: [] }),
@@ -272,14 +270,12 @@ it("rows carry no native tooltip of their own", async () => {
   }
 });
 
-it("offers Show HUD in the Bot menu where BB has plugin windows", async () => {
+it("has the same Bot menu where BB has plugin windows", async () => {
   state.windows = true;
   try {
     await mount();
     const items = $$('[data-testid="menu"] [role="menuitem"]');
-    expect(items.map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "Show HUD", "New Bot"]);
-    act(() => (items.find((item) => item.textContent === "Show HUD") as HTMLElement).click());
-    expect(state.showHud).toHaveBeenCalledTimes(1);
+    expect(items.map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "New Bot"]);
   } finally { state.windows = false; }
 });
 

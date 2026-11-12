@@ -8,15 +8,15 @@ import { errorMessage } from "../../kit/format";
 import { useCall, useLive } from "../../ui/live";
 import { useAppCommandList } from "../../launcher/ui/omnibar-data";
 import { inMainWindow } from "../../links/open";
-import { HudTheme } from "../../theme/ui/ThemeLayer";
-import { HUD_PAGE_CSS } from "../../hud/ui/hud-style";
-import type { hudContract } from "../../hud/contract";
+import { WindowTheme } from "../../theme/ui/ThemeLayer";
+import type { windowsContract } from "../../windows/contract";
 import type { AccountsStatus, Warning } from "../contract";
 import { ACCOUNTS_CHANNEL, WARNINGS_WINDOW_ID } from "../shared";
 import { reloginTarget, signInLabel } from "./AccountsPanel";
 import { openAccounts } from "./store";
 
 export const SWITCH_MODEL_COMMAND = "app:modelPicker.toggle";
+const SEE_THROUGH_PAGE_CSS = "html, body, #root { background: transparent !important; }";
 const CARD_WIDTH = 360;
 const CARD_HEIGHT = 108;
 const MAX_CARDS = 4;
@@ -155,7 +155,7 @@ function MainWatch() {
 export function WarningsWindow() {
   const live = useLive("accounts.status", {}, { pollMs: 60_000 });
   const call = useCall();
-  const relay = useRpc<typeof hudContract>();
+  const relay = useRpc<typeof windowsContract>();
   const windows = useHostWindows();
   const warnings = live.data?.warnings ?? [];
   const empty = !!live.data && !warnings.length;
@@ -180,8 +180,8 @@ export function WarningsWindow() {
   };
   return (
     <div data-testid="account-warnings-window" className="h-dvh w-full overflow-hidden p-2 text-sm text-foreground">
-      <style>{windows.native ? HUD_PAGE_CSS : ""}</style>
-      <HudTheme />
+      <style>{windows.native ? SEE_THROUGH_PAGE_CSS : ""}</style>
+      <WindowTheme />
       <WarningList warnings={warnings} actions={actions} />
     </div>
   );

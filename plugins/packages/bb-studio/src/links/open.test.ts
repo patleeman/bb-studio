@@ -16,7 +16,7 @@ afterEach(() => { setLinkRuntime(null); vi.clearAllMocks(); window.history.repla
 describe("where the rule runs", () => {
   it("is the main window unless this is a plugin window or a popped-out route", () => {
     expect(inMainWindow({ pathname: "/threads/thr_1", search: "" })).toBe(true);
-    expect(inMainWindow({ pathname: "/fork-window/studio/hud", search: "" })).toBe(false);
+    expect(inMainWindow({ pathname: "/fork-window/studio/launcher", search: "" })).toBe(false);
     expect(inMainWindow({ pathname: "/fork-window/_bb/tab", search: "?bbBare=1" })).toBe(false);
     expect(inMainWindow({ pathname: "/threads/thr_1", search: "?bbBare=1" })).toBe(false);
     expect(inMainWindow({ pathname: "/plugins/studio/studio", search: "?bbBare=0" })).toBe(true);

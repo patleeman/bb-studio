@@ -31,10 +31,10 @@ has a canonical link that parses back to itself and opens through the router.
   workbench API (`experimental_workbench` answers for threads only), so
   beside a page ⌘-click opens a tab like a click does; beside a conversation
   it opens the second pane.
-- In the HUD, the launcher, a popped-out item or tab, or any other window of
+- In the launcher, a popped-out item or tab, or any other window of
   Studio's, the same rule runs in bb's main window: the window relays the link
   and the rule (`window.runInMain { kind: "link", link, how }`), and the main
-  window's bridge (`src/hud/ui/HudBridge.tsx`) opens it.
+  window's bridge (`src/windows/ui/WindowsBridge.tsx`) opens it.
 - A target that no longer exists (deleted, gone from the index, a thread or
   Bot that isn't there) opens a Not found tab (`link-not-found`, title
   "Not found") with the kind, the id and the link as typed. Existence is one
@@ -89,33 +89,33 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 **routes** means the source hands the link to the router, which opens it by
 the rule above; **n/a** says why it can't.
 
-| Kind | Transcript link | Mod/Shift-click | Chat card | Link in a page | Link on a whiteboard | Link in a design | Mini app bb.open | Cmd+K | Launcher | workbench_open | HUD | Popped-out window | Bot page row |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Conversation | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Worker | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Bot | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Page | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Whiteboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Design | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| App | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Dashboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Artifact | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Recording | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Visual Chat board | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Memory | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Automations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Todos | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Archive | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Todo | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | routes |
-| VS Code | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes | n/a [3] |
-| File (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | routes | n/a [3] |
-| Diff (bb) | n/a [6] | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | routes | n/a [3] |
-| Browser (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | routes | n/a [3] |
-| Terminal (bb) | n/a [7] | n/a [7] | n/a [7] | n/a [7] | n/a [7] | n/a [1] | n/a [7] | n/a [7] | n/a [7] | n/a [8] | n/a [7] | n/a [7] | n/a [7] |
-| Workflow run (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | routes | n/a [3] |
+| Kind | Transcript link | Mod/Shift-click | Chat card | Link in a page | Link on a whiteboard | Link in a design | Mini app bb.open | Cmd+K | Launcher | workbench_open | Popped-out window | Bot page row |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Conversation | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Worker | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Bot | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Page | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Whiteboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Design | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| App | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Dashboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Artifact | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Recording | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Visual Chat board | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Memory | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Automations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Todos | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Archive | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Todo | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| VS Code | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| File (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
+| Diff (bb) | n/a [6] | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
+| Browser (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
+| Terminal (bb) | n/a [7] | n/a [7] | n/a [7] | n/a [7] | n/a [7] | n/a [1] | n/a [7] | n/a [7] | n/a [7] | n/a [8] | n/a [7] | n/a [7] |
+| Workflow run (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |
 
 [1] A design's screens are sandboxed frames; a link in one opens as the frame's popup. The design's card and header go through the router.
 [2] No card names one.
@@ -140,7 +140,6 @@ the rule above; **n/a** says why it can't.
 | Cmd+K | src/launcher/ui/CommandPalette.tsx run | src/launcher/ui/CommandPalette.test.tsx |
 | Launcher | src/launcher/ui/Launcher.tsx run | src/launcher/ui/Launcher.test.tsx |
 | workbench_open | src/workbench-agent/server.ts linkedInput | src/workbench-agent/workbench-agent.test.ts |
-| HUD | src/hud/ui/HudBridge.tsx runRelayed (window.runInMain link) | src/hud/ui/HudBridge.test.ts; src/hud/hud.test.ts; src/links/router.test.ts (relay) |
 | Popped-out window | src/links/open.ts inMainWindow, LinksBridge in each window | src/links/open.test.ts; src/links/router.test.ts (relay) |
 | Bot page row | src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Archive) | src/ui/bot-page/open-row.test.tsx; each page's test |
 

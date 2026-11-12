@@ -4,7 +4,7 @@
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
 // menu (Edit space…, Default model: what its new conversations start on,
-// Archive: the older page, Show HUD, New Bot); then the Bot's pages as rows: Memory, Library,
+// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Library,
 // Automations and Todos (the primary Bot's, with Todos on; the count is what
 // needs Patrick now). The row of the page on screen is selected.
 import type { ReactNode } from "react";
@@ -55,7 +55,6 @@ export interface SpaceMenu {
   defaultModel(): void;
   /** The Bot's older and finished conversations and workers (the older page). */
   archive(): void;
-  showHud: (() => void) | null;
   newBot(): void;
 }
 
@@ -95,7 +94,6 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
             <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>Edit space…</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.defaultModel}>Default model</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.archive}>Archive</DropdownMenuItem>
-            {menu.showHud ? <DropdownMenuItem onSelect={menu.showHud}>Show HUD</DropdownMenuItem> : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={menu.newBot}>New Bot</DropdownMenuItem>
           </DropdownMenuContent>

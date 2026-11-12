@@ -4,7 +4,7 @@ import { askText, launcherKey, launcherRows, MATCH, matchScore, MAX_DOCUMENTS, s
 const entry = (title: string, section: LauncherEntry["section"], extra: Partial<LauncherEntry> = {}): LauncherEntry => ({ key: `studio/${title.toLowerCase().replace(/\s+/g, "-")}`, title, icon: "AppWindow", section, ...extra });
 const ENTRIES = [
   entry("BB Studio", "apps", { order: 10, keywords: ["main window"] }),
-  entry("HUD", "apps", { order: 20, keywords: ["bot", "chat"] }),
+  entry("Notes", "apps", { order: 20, keywords: ["bot", "chat"] }),
   entry("Visual Chat", "apps", { order: 30 }),
   entry("VS Code", "apps", { order: 40, keywords: ["editor"] }),
   entry("New thread", "actions", { order: 10 }),
@@ -28,13 +28,13 @@ it("ranks a prefix over a word start over a substring over a keyword", () => {
 
 it("with nothing typed in commands mode, lists every app and action in their order, then the newest conversations and files, then commands and settings", () => {
   const documents = Array.from({ length: 12 }, (_, index) => doc(`Doc ${index}`, index));
-  const all = [...ENTRIES, entry("Rename thread", "commands"), entry("HUD", "settings", { key: "studio:setting:hudEnabled", detail: "On" })];
+  const all = [...ENTRIES, entry("Rename thread", "commands"), entry("Todos", "settings", { key: "studio:setting:loopsEnabled", detail: "On" })];
   const rows = launcherRows({ query: "", entries: all, documents, botName: "Dot" });
-  expect(titles(rows).slice(0, 7)).toEqual(["BB Studio", "HUD", "Visual Chat", "VS Code", "New thread", "New page", "Open Activity"]);
+  expect(titles(rows).slice(0, 7)).toEqual(["BB Studio", "Notes", "Visual Chat", "VS Code", "New thread", "New page", "Open Activity"]);
   const recent = rows.filter((row) => row.section === "documents");
   expect(recent).toHaveLength(MAX_DOCUMENTS);
   expect(titles(recent).slice(0, 3)).toEqual(["Doc 11", "Doc 10", "Doc 9"]);
-  expect(titles(rows).slice(-2)).toEqual(["Rename thread", "HUD"]);
+  expect(titles(rows).slice(-2)).toEqual(["Rename thread", "Todos"]);
   expect(labels(rows, false)).toEqual(["Apps", "Actions", "Recent", "Commands", "Settings"]);
   expect(rows.some((row) => row.type === "ask")).toBe(false);
 });
@@ -69,7 +69,7 @@ it("mixes an entity, a command and Ask for one query, the group with the best ma
 
 it("puts better matches first inside a section, and finds documents Studio's search found by their text", () => {
   const rows = launcherRows({ query: "chat", entries: ENTRIES, documents: [doc("Chatbot ideas", 1), doc("Group chat notes", 9), doc("Unrelated", 99)], botName: null });
-  expect(titles(rows)).toEqual(["Chatbot ideas", "Group chat notes", "Visual Chat", "HUD"]);
+  expect(titles(rows)).toEqual(["Chatbot ideas", "Group chat notes", "Visual Chat", "Notes"]);
   expect(titles(launcherRows({ query: "new", entries: ENTRIES, documents: [], botName: null }))).toEqual(["New thread", "New page"]);
   const found = doc("Quarterly plan", 50, { found: true });
   expect(titles(launcherRows({ query: "budget", entries: [], documents: [found, doc("Budget 2026", 1), { ...found, key: "again" }], botName: null }))).toEqual(["Budget 2026", "Quarterly plan"]);

@@ -75,33 +75,28 @@ describe("Studio's settings sections", () => {
     expect(sections.get("mobile-push")!.experimental_page).toBeUndefined();
   });
 
-  it("Windows: only on a BB with plugin windows, after Threads: the launcher's shortcut, then the HUD switch and its optional shortcut", async () => {
+  it("Windows: only on a BB with plugin windows, after Threads: the launcher's shortcut", async () => {
     expect(order).not.toContain("settings-windows");
     const withWindows: string[] = [];
     registerSettingsApp({ slots: { settingsSection: (section: { id: string; component: ComponentType }) => { withWindows.push(section.id); sections.set(section.id, section); } } } as unknown as PluginAppBuilder, true);
     expect(withWindows.slice(3, 5)).toEqual(["settings-threads", "settings-windows"]);
-    // Option+Space is the launcher's; the HUD has no shortcut unless one is set.
     expect(values().launcherHotkey).toBe("Alt+Space");
-    expect(values().hudHotkey).toBe("");
+    expect(values()).not.toHaveProperty("hudHotkey");
+    expect(values()).not.toHaveProperty("hudEnabled");
     await render("settings-windows");
     expect($("setting-launcherHotkey")).not.toBeNull();
     expect($("setting-launcher-show")).not.toBeNull();
-    expect($("setting-hudEnabled")).not.toBeNull();
-    expect($("setting-hudHotkey")).not.toBeNull();
     expect($("setting-launcherHotkey-status")).toBeNull();
-    expect($("setting-hudHotkey-status")).toBeNull();
-    state.values = values({ hudEnabled: false });
-    await render("settings-windows");
+    expect($("setting-hudEnabled")).toBeNull();
     expect($("setting-hudHotkey")).toBeNull();
     expect($("setting-hud-show")).toBeNull();
-    expect($("setting-launcherHotkey")).not.toBeNull();
   });
 
   it("Windows: says whether the system accepted the launcher's shortcut, and offers others in one click when it didn't", async () => {
     registerSettingsApp({ slots: { settingsSection: (section: { id: string; component: ComponentType }) => { sections.set(section.id, section); } } } as unknown as PluginAppBuilder, true);
     const windows = await import("../../kit/app/windows");
     const native = vi.spyOn(windows, "useHostWindows").mockReturnValue({ ...windows.NO_HOST_WINDOWS, native: true });
-    const { noteWindowHotkey } = await import("../../hud/hotkey");
+    const { noteWindowHotkey } = await import("../../windows/hotkey");
     try {
       await render("settings-windows");
       await act(async () => { noteWindowHotkey("launcher", { wanted: "Alt+Space", inUse: "Alt+Space", status: "ok" }); });
@@ -117,13 +112,8 @@ describe("Studio's settings sections", () => {
       await act(async () => { noteWindowHotkey("launcher", { wanted: "Alt+Space", inUse: "", status: "taken" }); });
       expect($("setting-launcherHotkey-note")?.textContent).toBe("Option+Space is taken by another app. Pick another shortcut.");
       expect($("setting-launcher-show")?.textContent).toContain("It has no shortcut");
-      // The HUD's own shortcut, when set and taken, says so in its row.
-      state.values = values({ hudHotkey: "Control+Shift+H" });
-      await render("settings-windows");
-      await act(async () => { noteWindowHotkey("hud", { wanted: "Control+Shift+H", inUse: "", status: "taken" }); });
-      expect($("setting-hudHotkey-note")?.textContent).toBe("Control+Shift+H is taken by another app. Pick another shortcut.");
     } finally {
-      await act(async () => { noteWindowHotkey("launcher", null); noteWindowHotkey("hud", null); });
+      await act(async () => { noteWindowHotkey("launcher", null); });
       native.mockRestore();
     }
   });

@@ -194,7 +194,7 @@ ${TITLE_BOXES} > * { pointer-events: auto; }
 ${RESERVED_ROW} ${TITLE_BOXES} { padding-left: max(var(--studio-title-inset), calc(${CONTROLS_END} - max(0px, (100cqw - var(--studio-title-width)) / 2))); }
 ${TITLE_BOX} [data-fork-header-group="title"] { flex: 1; min-width: 0; max-width: none; padding: 0; align-items: center; ${BARE} }
 ${TITLE_BOX} [data-fork-thread-header-after], ${TITLE_BOX} [data-fork-thread-header-after] > .studio-root { flex: 1; }
-${TITLE_BOX} [data-fork-thread-header-after] [data-testid="hud-pop-out"], ${TITLE_BOX} [data-fork-header-group="title"] > span:last-child { margin-left: auto; }
+${TITLE_BOX} [data-fork-header-group="title"] > span:last-child { margin-left: auto; }
 ${GLASS} [data-testid="edit-space-title-row"] { ${BAR_HALO} }
 ${GLASS} [data-testid="edit-space-pane"] [data-testid="theme-picker-actions"] { background: var(--studio-title-row-glass); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border-top-color: transparent; }
 ${GLASS} :is([data-fork-header-group], [data-sidebar="trigger"]) { ${BARE} }

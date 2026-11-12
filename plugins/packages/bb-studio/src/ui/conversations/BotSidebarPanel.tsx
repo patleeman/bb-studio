@@ -1,7 +1,7 @@
 // The Bot sidebar (round 7, "the Bot as a space"): one Bot per sidebar.
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
 //   status (running count, Paused), a ··· menu (Edit space…, Default model
-//   with bb's model picker, Archive: the older page, Show HUD, New Bot), and
+//   with bb's model picker, Archive: the older page, New Bot), and
 //   its pages as rows (Memory, Library, Automations, Todos). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
 //   BB has none.
@@ -32,8 +32,6 @@ import { dragSourceProps, refDragItem, threadDragItem, writeDragItem } from "../
 import { NoDragStyle } from "../../kit/ui/no-drag";
 import { buttonVariants } from "../../kit/ui/button";
 import { cn } from "../../kit/ui/utils";
-import { hasHostWindows } from "../../kit/app/windows";
-import { showHud } from "../../hud/ui/HudBridge";
 import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
@@ -359,7 +357,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           editSpace: () => { if (bot) setEditing(bot.id); },
           defaultModel: () => { if (bot) setPickingModel(bot.id); },
           archive: () => { if (bot) toPanel(olderPath(bot.id)); },
-          showHud: hasHostWindows ? () => void showHud() : null,
           newBot: () => toPanel("bot/new"),
         }} />
       {editingBot ? <EditSpace key={editingBot.id} bot={editingBot} bots={bots} stage={stage} onClose={() => setEditing(null)} /> : null}

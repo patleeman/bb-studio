@@ -43,15 +43,12 @@ import { RetireFixedBotTabs } from "./src/ui/bot/retire-fixed-tabs";
 import { ITEM_TAB_ICON } from "./src/ui/item-icons";
 import { registerItemWindows } from "./src/ui/item-window";
 import { registerHostWindow } from "./src/kit/app/windows";
-import { HudBridge } from "./src/hud/ui/HudBridge";
+import { WindowsBridge } from "./src/windows/ui/WindowsBridge";
 import { ThemeLayer } from "./src/theme/ui/ThemeLayer";
 import { PresenceCheckHost } from "./src/presence/ui/PresenceBridge";
 import { THEME_FOOTER_ID, THEME_FOOTER_LABEL, ThemeQuickHost } from "./src/theme/ui/ThemePopover";
 import { themeCommandRegistrations, toggleThemePopover } from "./src/theme/ui/quick";
 import { registerThemeBackdrop } from "./src/theme/backdrop";
-import { popOutHudThreadAction } from "./src/hud/ui/pop-out";
-import { HudWindow } from "./src/hud/ui/Hud";
-import { HUD_WINDOW_ID } from "./src/hud/shared";
 import { registerLauncherItems } from "./src/launcher/items";
 import { LAUNCHER_WINDOW_ID } from "./src/launcher/shared";
 import { LauncherWindow } from "./src/launcher/ui/Launcher";
@@ -287,18 +284,15 @@ export default definePluginApp((app) => {
   // The workbench tools' side in the window (src/workbench-agent): runs an agent's call on the conversation on screen.
   app.slots.experimental_appOverlay({ id: "workbench-agent", component: WorkbenchAgentBridge });
   // Windows of Studio's own, on a BB that has them (src/kit/app/windows.ts):
-  // the HUD (src/hud), the launcher (src/launcher), and any item popped out into
-  // a window (src/ui/item-window.tsx). The bridge in the main window sets up
-  // their hotkeys and opens what a window asks to show in BB.
-  const hostWindows = registerHostWindow(app.slots, { id: HUD_WINDOW_ID, title: "Bot HUD", component: HudWindow });
-  // The launcher (src/launcher): its window, and Studio's apps and actions in BB's launcher slot.
-  registerLauncherItems(app.slots, hostWindows);
+  // the launcher (src/launcher) and any item popped out into a window
+  // (src/ui/item-window.tsx). The bridge in the main window sets up the
+  // launcher's hotkey and opens what a window asks to show in BB.
+  const hostWindows = registerHostWindow(app.slots, { id: LAUNCHER_WINDOW_ID, title: "BB Studio Launcher", component: LauncherWindow });
+  // Studio's apps and actions in BB's launcher slot.
+  registerLauncherItems(app.slots);
   if (hostWindows) {
-    registerHostWindow(app.slots, { id: LAUNCHER_WINDOW_ID, title: "BB Studio Launcher", component: LauncherWindow });
     registerItemWindows(app.slots, BUILTIN_VIEWS);
-    app.slots.experimental_appOverlay({ id: "windows", component: HudBridge });
-    // "Pop out to HUD" in a conversation's thread menus; its header icon is part of Studio's header decoration.
-    app.slots.experimental_threadAction(popOutHudThreadAction);
+    app.slots.experimental_appOverlay({ id: "windows", component: WindowsBridge });
   }
   app.slots.experimental_appOverlay({ id: "chat", component: ChatOverlay });
   app.slots.experimental_appOverlay({ id: "relogin", component: ReloginHost });

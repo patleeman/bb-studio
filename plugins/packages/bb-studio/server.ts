@@ -32,7 +32,7 @@ import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
-import { registerHud } from "./src/hud/server";
+import { registerWindowRelay } from "./src/windows/server";
 import { MeetingLive } from "./src/voice/meeting/meeting";
 import { registerMeeting } from "./src/voice/meeting/register";
 import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
@@ -1813,8 +1813,7 @@ export default async function plugin(bb: BbPluginApi) {
     warn: (message) => bb.log.warn(message),
   });
   registerVoiceLive(bb, voiceLive);
-  // The HUD window (src/hud): the primary Bot's last lines, a send to its chat, and "Open in BB" from a plugin window.
-  registerHud(bb, () => bots.stored());
+  registerWindowRelay(bb);
   // Meeting mode (src/voice/meeting): a named voice participant in an in-person
   // meeting. Each lookup is its own back-office thread, under the Bot like voice threads.
   const meeting = new MeetingLive({

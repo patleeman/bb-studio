@@ -1,5 +1,5 @@
 // A window's system-wide shortcut as BB actually holds it, for the launcher
-// (src/launcher) and the HUD. A system-wide shortcut belongs to one app at a
+// (src/launcher). A system-wide shortcut belongs to one app at a
 // time, and Option+Space is often taken (ChatGPT and Claude use it), so after
 // registering a window Studio asks BB whether the shortcut took
 // (`hotkeyRegistered`). When it didn't, the launcher tries one alternate; a
@@ -13,13 +13,10 @@ import { useSyncExternalStore } from "react";
 import type { HostWindowOptions, HostWindows } from "../kit/app/windows";
 
 /** Tried when another app holds the launcher's shortcut. */
-export const HUD_ALTERNATE_HOTKEY = "Control+Alt+Space";
+export const ALTERNATE_HOTKEY = "Control+Alt+Space";
 /** What settings offer in one click when a shortcut is taken: ⌃⌥Space, ⌥⇧Space, ⌘⇧Space. */
-export const HOTKEY_ALTERNATIVES: readonly string[] = [HUD_ALTERNATE_HOTKEY, "Alt+Shift+Space", "Command+Shift+Space"];
-/** The HUD's default shortcut before the launcher took Option+Space. */
-export const OLD_HUD_HOTKEY = "Alt+Space";
-
-export interface HudHotkey {
+export const HOTKEY_ALTERNATIVES: readonly string[] = [ALTERNATE_HOTKEY, "Alt+Shift+Space", "Command+Shift+Space"];
+export interface WindowHotkey {
   /** The shortcut in Studio's settings; empty for none. */
   wanted: string;
   /** The shortcut BB holds for the window; empty for none. */
@@ -50,6 +47,15 @@ export const sameHotkey = (a: string, b: string) => {
 
 const KEY_WORDS: Record<string, string> = { alt: "Option", control: "Control", command: "Command", shift: "Shift" };
 
+const KEY_SIGNS: Record<string, string> = {
+  alt: "⌥", option: "⌥", shift: "⇧", control: "⌃", ctrl: "⌃", command: "⌘", cmd: "⌘", meta: "⌘", super: "⌘", commandorcontrol: "⌘", cmdorctrl: "⌘",
+};
+
+/** A hotkey as a Mac shows it: `Alt+Space` is ⌥Space. Empty for no hotkey. */
+export function hotkeyHint(hotkey: string): string {
+  return hotkey.split("+").map((part) => part.trim()).filter(Boolean).map((part) => KEY_SIGNS[part.toLowerCase()] ?? part).join("");
+}
+
 /** A hotkey in words, as a Mac names the keys: `Alt+Space` is Option+Space. */
 export function hotkeyWords(hotkey: string): string {
   return hotkey.split("+").map((part) => part.trim()).filter(Boolean).map((part) => KEY_WORDS[KEY_NAMES[part.toLowerCase()] ?? part.toLowerCase()] ?? part).join("+");
@@ -60,7 +66,7 @@ export function hotkeyWords(hotkey: string): string {
  * that it took; falls back to the alternate (null: there is none), then to no
  * hotkey. A BB without the check is taken at its word.
  */
-export async function registerWithHotkey(windows: HostWindows, windowId: string, wanted: string, options: (hotkey: string) => HostWindowOptions, alternate: string | null = HUD_ALTERNATE_HOTKEY): Promise<HudHotkey> {
+export async function registerWithHotkey(windows: HostWindows, windowId: string, wanted: string, options: (hotkey: string) => HostWindowOptions, alternate: string | null = ALTERNATE_HOTKEY): Promise<WindowHotkey> {
   const key = wanted.trim();
   await windows.register(windowId, options(key));
   if (!key) return { wanted: key, inUse: "", status: "none" };
@@ -76,26 +82,26 @@ export async function registerWithHotkey(windows: HostWindows, windowId: string,
 }
 
 /** What to tell the user when their shortcut isn't the one in use; null when it is. */
-export function hotkeyNote(hotkey: HudHotkey | null): string | null {
+export function hotkeyNote(hotkey: WindowHotkey | null): string | null {
   if (hotkey?.status === "alternate") return `${hotkeyWords(hotkey.wanted)} is taken by another app. Using ${hotkeyWords(hotkey.inUse)}.`;
   if (hotkey?.status === "taken") return `${hotkeyWords(hotkey.wanted)} is taken by another app. Pick another shortcut.`;
   return null;
 }
 
 /** The windows whose shortcut Studio tracks. */
-export type HotkeyWindow = "hud" | "launcher";
-const STORE_KEYS: Record<HotkeyWindow, string> = { hud: "studio.hud.hotkey", launcher: "studio.launcher.hotkey" };
+export type HotkeyWindow = "launcher";
+const STORE_KEYS: Record<HotkeyWindow, string> = { launcher: "studio.launcher.hotkey" };
 const listeners = new Set<() => void>();
-const cached: Partial<Record<HotkeyWindow, { raw: string | null; value: HudHotkey | null }>> = {};
+const cached: Partial<Record<HotkeyWindow, { raw: string | null; value: WindowHotkey | null }>> = {};
 
-function read(name: HotkeyWindow): HudHotkey | null {
+function read(name: HotkeyWindow): WindowHotkey | null {
   let raw: string | null = null;
   try { raw = localStorage.getItem(STORE_KEYS[name]); } catch { /* private mode */ }
   const last = cached[name];
   if (last && raw === last.raw) return last.value;
-  let value: HudHotkey | null = null;
+  let value: WindowHotkey | null = null;
   try {
-    const parsed = raw ? JSON.parse(raw) as Partial<HudHotkey> | null : null;
+    const parsed = raw ? JSON.parse(raw) as Partial<WindowHotkey> | null : null;
     if (parsed && typeof parsed.wanted === "string" && typeof parsed.inUse === "string" && (parsed.status === "ok" || parsed.status === "alternate" || parsed.status === "taken" || parsed.status === "none")) value = { wanted: parsed.wanted, inUse: parsed.inUse, status: parsed.status };
   } catch { /* not ours */ }
   cached[name] = { raw, value };
@@ -103,7 +109,7 @@ function read(name: HotkeyWindow): HudHotkey | null {
 }
 
 /** Notes what registering `name` came to (null: the window is off), for every window. */
-export function noteWindowHotkey(name: HotkeyWindow, hotkey: HudHotkey | null): void {
+export function noteWindowHotkey(name: HotkeyWindow, hotkey: WindowHotkey | null): void {
   try {
     if (hotkey) localStorage.setItem(STORE_KEYS[name], JSON.stringify(hotkey));
     else localStorage.removeItem(STORE_KEYS[name]);
@@ -123,7 +129,7 @@ export interface HotkeyInUse {
   inUse: string;
   note: string | null;
   /** Null until BB has answered for `wanted`. */
-  status: HudHotkey["status"] | null;
+  status: WindowHotkey["status"] | null;
 }
 
 /** The shortcut in use for `name` and what to say about it. Until BB has answered for `wanted`, that is `wanted` itself. */
@@ -132,6 +138,3 @@ export function useWindowHotkey(name: HotkeyWindow, wanted: string): HotkeyInUse
   const key = wanted.trim();
   return known && known.wanted === key ? { inUse: known.inUse, note: hotkeyNote(known), status: known.status } : { inUse: key, note: null, status: null };
 }
-
-export const noteHudHotkey = (hotkey: HudHotkey | null) => noteWindowHotkey("hud", hotkey);
-export const useHudHotkey = (wanted: string) => useWindowHotkey("hud", wanted);
