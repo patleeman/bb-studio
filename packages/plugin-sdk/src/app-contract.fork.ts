@@ -1276,9 +1276,16 @@ export interface ForkComposerCustomization {
    * the session, permission and context-window controls. Each component
    * draws one compact chip, at most one line tall, and returns null to take
    * no space. The row is hidden while the composer is collapsed, and only
-   * the `thread` scope has one. Experimental: see docs/api_to_audit.md.
+   * the `thread` scope has one. `placement: "context"` draws the item right
+   * before the context-window ring, as one control with it (a click should
+   * open the context popover); otherwise it goes before the session and
+   * permission controls. Experimental: see docs/api_to_audit.md.
    */
-  experimental_footer?: readonly { id: string; component: ComponentType }[];
+  experimental_footer?: readonly {
+    id: string;
+    component: ComponentType;
+    placement?: "context";
+  }[];
   /**
    * Draw something else where an existing thread's composer box goes, for
    * threads nobody should type into directly (a read-only worker, a mirrored
