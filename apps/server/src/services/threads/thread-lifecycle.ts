@@ -1,3 +1,4 @@
+import { restartForkFromTranscript } from "./fork-start-fallback.fork.js";
 import {
   advanceEnvironmentProvisioning,
   providerEnvironmentHasPendingWork,
@@ -300,6 +301,8 @@ function turnRequestAnswer(
 export function settleThreadStartCommandResult(
   args: SettleCommandResultArgs<ThreadStartCommand, "thread.start">,
 ): CommandResultSideEffectsResult {
+  const forkRestart = restartForkFromTranscript(args);
+  if (forkRestart !== null) return forkRestart;
   const { command, deps, report } = args;
   const answer: TurnRequestAnswer = report.ok
     ? {
