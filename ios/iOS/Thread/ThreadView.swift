@@ -1440,8 +1440,7 @@ struct ThreadView: View {
         Task {
             do {
                 let id = try await client.forkConversation(threadId: threadId, messageId: row.id, sourceSeqEnd: seq)
-                shell?.refresh()
-                shell?.openConversation(id)
+                showThread(id)
             } catch {
                 model.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL)
             }

@@ -93,15 +93,12 @@ enum BotShell {
         guard let view else { return [] }
         var out: [BotConversationLine] = []
         var seen: Set<String> = []
-        func add(_ conversation: BotConversation, depth: Int) {
-            guard seen.insert(conversation.threadId).inserted else { return }
+        for conversation in view.conversations where seen.insert(conversation.threadId).inserted {
             let line = secondLine(conversation)
             out.append(BotConversationLine(threadId: conversation.threadId, title: conversation.title.isEmpty ? "Untitled" : conversation.title,
-                                           forkedFrom: depth > 0 ? conversation.forkedFrom?.title : nil, depth: depth,
+                                           forkedFrom: nil, depth: 0,
                                            updatedAt: conversation.updatedAt, tone: line.tone, text: line.text))
-            for child in view.threads(of: conversation.threadId) { add(child, depth: depth + 1) }
         }
-        for conversation in view.topLevel { add(conversation, depth: 0) }
         return out
     }
 

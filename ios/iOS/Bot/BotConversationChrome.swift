@@ -79,13 +79,13 @@ struct ConversationReplyRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(ConversationReplies.replyTitle)
             .accessibilityIdentifier("reply-in-thread-\(messageId)")
-            if let thread {
+            if let thread, ConversationReplies.indicator(thread) != nil {
                 Button(action: open) {
                     TimelineView(.periodic(from: .now, by: 60)) { context in
                         HStack(spacing: 6) {
-                            replier(thread)
+                            if !thread.working { replier(thread) }
                             Text(ConversationReplies.indicator(thread, now: context.date) ?? "")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(Color.accentColor)
                                 .monospacedDigit()
                         }

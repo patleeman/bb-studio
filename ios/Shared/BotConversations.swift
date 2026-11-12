@@ -31,9 +31,17 @@ public enum ConversationReplies {
         return seq.isFinite && seq >= 0
     }
 
+    /// "2 replies · Last reply 4:13 PM", "Replying…" while it works; nothing for an empty or failed thread.
     public static func indicator(_ thread: BotSideThread?, now: Date = .now) -> String? {
         guard let thread else { return nil }
-        return "💬 " + thread.compactLabel(now: now)
+        if thread.working { return "Replying…" }
+        guard thread.replies > 0 else { return nil }
+        let count = thread.replies == 1 ? "1 reply" : "\(thread.replies) replies"
+        guard let lastReplyAt = thread.lastReplyAt else { return count }
+        let at = Date(timeIntervalSince1970: lastReplyAt / 1000)
+        let time = Calendar.current.isDate(at, inSameDayAs: now) ? at.formatted(date: .omitted, time: .shortened)
+            : at.formatted(.dateTime.month(.abbreviated).day())
+        return "\(count) · Last reply \(time)"
     }
 
     public enum Replier: Equatable, Sendable { case bot, you }

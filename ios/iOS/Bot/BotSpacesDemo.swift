@@ -158,7 +158,7 @@ enum BotSpacesDemo {
         func viewJSON(_ botId: String) -> Data {
             lock.withLock {
                 let now = Self.now
-                let list = (conversations[botId] ?? []).filter { !finished.contains($0.id) }.map { conversation -> [String: Any] in
+                let list = (conversations[botId] ?? []).filter { !finished.contains($0.id) && $0.parent == nil }.map { conversation -> [String: Any] in
                     [
                         "threadId": conversation.id, "title": conversation.title, "isMain": conversation.main,
                         "forkedFrom": conversation.parent.map { ["threadId": $0.threadId, "messageId": $0.messageId, "title": $0.title] } ?? NSNull(),
@@ -214,7 +214,8 @@ enum BotSpacesDemo {
                 return lock.withLock {
                     let list = sides.filter { $0.sourceThreadId == threadId }.map { side -> [String: Any] in
                         ["messageId": side.messageId, "threadId": side.threadId, "botId": "bot_juniper", "replies": side.replies,
-                         "lastReplyAt": side.lastReplyAt ?? NSNull(), "lastReplyRole": side.lastReplyRole ?? NSNull(), "working": false]
+                         "lastReplyAt": side.lastReplyAt ?? NSNull(), "lastReplyRole": side.lastReplyRole ?? NSNull(), "working": false,
+                         "kind": side.threadId.hasPrefix("thr_demo_fork") ? "fork" : "reply", "conversations": 1]
                     }
                     return ok(["chat": true, "threads": list])
                 }
@@ -237,9 +238,9 @@ enum BotSpacesDemo {
                     let id = "thr_demo_fork\(made)"
                     sides.append(Side(threadId: id, sourceThreadId: threadId, messageId: messageId, replies: 0, lastReplyAt: nil, lastReplyRole: nil))
                     let parentTitle = conversations.values.flatMap { $0 }.first { $0.id == threadId }?.title ?? "Main"
-                    threads[id] = Thread(title: "Fork of \(parentTitle)", rows: [source(threadId, messageId, id: "\(id)-src")])
+                    threads[id] = Thread(title: "\(parentTitle) · fork", rows: [source(threadId, messageId, id: "\(id)-src")])
                     conversations["bot_juniper", default: []].insert(
-                        Conversation(id: id, title: "Fork of \(parentTitle)", at: Self.now, latest: "Forked here", parent: (threadId, messageId, parentTitle)), at: 1)
+                        Conversation(id: id, title: "\(parentTitle) · fork", at: Self.now, latest: "Forked here", parent: (threadId, messageId, parentTitle)), at: 1)
                     return ok(["threadId": id, "projectId": "proj_personal"])
                 }
             case "bot_conversation_start":

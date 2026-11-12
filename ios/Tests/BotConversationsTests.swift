@@ -51,12 +51,17 @@ final class BotConversationsTests: XCTestCase {
         let now = Date()
         var side = BotSideThread(messageId: "m", threadId: "t", replies: 2, lastReplyAt: (now.timeIntervalSince1970 - 300) * 1000, working: false)
         side.lastReplyRole = "assistant"
-        XCTAssertEqual(ConversationReplies.indicator(side, now: now), "💬 2 replies · 5m")
+        let label = try XCTUnwrap(ConversationReplies.indicator(side, now: now))
+        XCTAssertTrue(label.hasPrefix("2 replies · Last reply "), label)
+        XCTAssertFalse(label.contains("💬"))
+        side.working = true
+        XCTAssertEqual(ConversationReplies.indicator(side, now: now), "Replying…")
+        side.working = false
         XCTAssertEqual(ConversationReplies.replier(side), .bot)
         side.lastReplyRole = "user"
         XCTAssertEqual(ConversationReplies.replier(side), .you)
         let fresh = BotSideThread(messageId: "m", threadId: "t", replies: 0, lastReplyAt: nil, working: false)
-        XCTAssertEqual(ConversationReplies.indicator(fresh, now: now), "💬 Thread")
+        XCTAssertNil(ConversationReplies.indicator(fresh, now: now), "an empty thread shows nothing")
         XCTAssertNil(ConversationReplies.replier(fresh))
         XCTAssertNil(ConversationReplies.indicator(nil))
         let decoded = try JSONDecoder().decode(BotSideThread.self, from: Data(#"{"messageId":"m","threadId":"t","botId":"bot_a","replies":1,"lastReplyAt":null,"lastReplyRole":"user","working":false}"#.utf8))

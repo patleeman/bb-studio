@@ -29,7 +29,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         let main = list.buttons["conversation-thr_botdemo01"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         XCTAssertTrue(main.label.contains("Push bb-studio-native to origin?"), "the needs-you reason is on line 2: \(main.label)")
-        XCTAssertTrue(list.buttons["conversation-thr_demo_thread"].label.contains("Forked from Main"), "a thread sits under its parent")
+        XCTAssertFalse(list.buttons["conversation-thr_demo_thread"].exists, "a thread lives at its message, not in the list")
         XCTAssertTrue(list.buttons["worker-thr_demo_w2"].exists, "a running worker")
         XCTAssertTrue(app.buttons["space-dot-bot_home"].label.contains("needs you"), "Home's dot is amber")
         shot("list-needs")
