@@ -66,19 +66,9 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "bb-ai",
-    pluginId: "bb-ai",
-    defaultEnabled: true,
-  },
-  {
     name: "connect",
     pluginId: "connect",
     defaultEnabled: true,
-  },
-  {
-    name: "connect-next",
-    pluginId: "bb--connect-next",
-    defaultEnabled: false,
   },
   {
     name: "environment-project-checkout",
@@ -94,26 +84,6 @@ export const BUILTIN_PLUGINS = [
     name: "environment-personal-workspace",
     pluginId: "environment-personal-workspace",
     defaultEnabled: true,
-  },
-  {
-    name: "custom-instructions",
-    pluginId: "custom-instructions",
-    defaultEnabled: true,
-  },
-  {
-    name: "plugin-api-tester",
-    pluginId: "plugin-api-tester",
-    defaultEnabled: false,
-  },
-  {
-    name: "inline-vis",
-    pluginId: "inline-vis",
-    defaultEnabled: true,
-  },
-  {
-    name: "monaco-editor",
-    pluginId: "monaco-editor",
-    defaultEnabled: false,
   },
   {
     name: "pdf-preview",
@@ -196,16 +166,6 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "prompt-library",
-    pluginId: "bb--prompt-library",
-    defaultEnabled: false,
-  },
-  {
-    name: "mcp",
-    pluginId: "bb--mcp",
-    defaultEnabled: false,
-  },
-  {
     name: "scheduled-send",
     pluginId: "scheduled-send",
     defaultEnabled: true,
@@ -221,11 +181,6 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "side-chat",
-    pluginId: "side-chat",
-    defaultEnabled: true,
-  },
-  {
     name: "workflows",
     pluginId: "workflows",
     defaultEnabled: false,
@@ -235,11 +190,6 @@ export const BUILTIN_PLUGINS = [
     pluginId: "bb--composer",
     defaultEnabled: true,
   },
-  {
-    name: "github-star",
-    pluginId: "bb--github-star",
-    defaultEnabled: true,
-  },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,
   autoInstall: true,
@@ -247,39 +197,9 @@ export const BUILTIN_PLUGINS = [
 
 export const OFFICIAL_PLUGINS = [
   {
-    name: "environment-modal-sandbox",
-    pluginId: "environment-modal-sandbox",
-    defaultEnabled: true,
-  },
-  {
     name: "browser-automation",
     pluginId: "browser-automation",
     defaultEnabled: false,
-  },
-  {
-    name: "github",
-    pluginId: "github",
-    defaultEnabled: true,
-  },
-  {
-    name: "docs",
-    pluginId: "simple-notes",
-    defaultEnabled: true,
-  },
-  {
-    name: "memory",
-    pluginId: "memory",
-    defaultEnabled: true,
-  },
-  {
-    name: "tasks",
-    pluginId: "tasks",
-    defaultEnabled: true,
-  },
-  {
-    name: "theme-preview",
-    pluginId: "theme-preview",
-    defaultEnabled: true,
   },
 ].map((plugin): BundledPluginDefinition => ({
   ...plugin,
