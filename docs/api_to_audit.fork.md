@@ -1417,6 +1417,45 @@ card are not touched. Scrollers in the main view other than the thread's
 hide their idle thumb. A plugin page marks its own column card with
 `data-fork-card="main"`.
 
+**Title rows in cards.** `layout.cards.titleRow: true` (only the boolean
+`true`) sets `data-fork-title-rows` on `<html>` with the card layout.
+`ForkHeaderTitle` (`ForkTitleHost.tsx`) wraps the title group in
+`AppPageHeader.tsx`: it renders the group through a portal into one
+`display: contents` box it owns and appends that box to the first
+`[data-fork-title-host]` under the header's parent element, or to its own
+place in the bar when the flag is off or there is no host. A
+`MutationObserver` on that parent follows hosts that mount and unmount, so
+the title's React subtree never remounts (a rename in progress survives)
+and the box leaves a host when the header unmounts. bb's hosts are
+`ForkTitleHost`: `kind="page"` as the first child of a static `PageShell`'s
+column (sticky at the top of the scroller, the card's width and top
+corners, the column's top padding removed, 12px above the content) and
+`kind="tools"` as the first child of both `ToolsView` wrappers (a row above
+the scroller, in the wide column's box). A page row's backing is a
+`::before`: `--fork-title-row-background` (80% `--canvas`) with
+`--fork-title-row-filter` (`blur(18px)`), 10px taller than the row and
+masked to fade out below it, at opacity 0 until the scroller has moved
+(a scroll-driven animation over the first 32px), so a card at rest has no
+band and scrolled text does not show through. A plugin's host is any
+element it marks; Studio marks one inside its thread row, which gives bb's
+thread title, its double-click rename and its menu the card. The core
+callers are bb's own Settings, Skills and Plugins headers and every thread
+header: all go through `AppPageHeader`. `ForkTitleHost.test.tsx` covers the
+move, the return and the scoping, framed and unframed, and the row's rules.
+
+**Overlay scrollbars.** Under `data-fork-cards`,
+`[data-page-scroll-viewport]`, `[data-resource-collection-viewport]`, the
+`ToolsView` detail scroller and any `[data-fork-overlay-scroll]` element
+get `scrollbar-width: none`, so a classic scrollbar reserves no gutter and
+the gap beside a card is the card gap. `ForkOverlayScrollbarHost`
+(`ForkLayoutHosts`) keeps one fixed `[data-fork-scroll-thumb]` on `<body>`:
+it listens for `scroll` in the capture phase and `pointermove`, places the
+thumb 2px inside the scroller's right edge, hides it 900ms after the last
+scroll unless the pointer is over the scroller, and scrolls on drag. The
+framed inset's 1px side padding is removed under cards, and its right
+margin is the gap less the window lip. `ForkOverlayScrollbar.test.tsx`
+covers the thumb's box, the selectors and the drag.
+
 **Tables wider than the column.** bb lets a markdown table break out of the
 760px column (`MarkdownTable` in `markdown-preview.tsx`: an outer `div` up to
 1100px wide, centered on the column, holding the table's scroller). Under
@@ -1475,6 +1514,9 @@ tooltip and a dialog with an opaque body in the real `AppLayout`.
    drawer, the side panel shelf and the framed title bar band. Decide
    whether the gap and radius should be tokens of the theme rather than a
    layout option, and whether `data-fork-card` should become a public slot
-   wrapper instead of an attribute. Stabilize once Studio's themes have
+   wrapper instead of an attribute. `data-fork-title-host` finds its host
+   by the header's parent element; decide whether a header should name its
+   host instead, and whether the overlay thumb should serve the side panel
+   and plugin panels too. Stabilize once Studio's themes have
    shipped on it, both window kinds pass a live check, and the selectors
    are covered by an upstream-owned attribute.
