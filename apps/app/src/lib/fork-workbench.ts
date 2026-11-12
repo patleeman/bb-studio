@@ -36,6 +36,7 @@ type JotaiStore = ReturnType<typeof createStore>;
 export interface WorkbenchSurface {
   threadId: string;
   panelStateId: string;
+  page?: { pluginId: string; panelId: string };
   panel: AppPanelController;
   openFilePreview(intent: AppFilePreviewIntent): boolean;
   openTerminal(session: TerminalSession): boolean;
@@ -50,6 +51,12 @@ export const WORKBENCH_MAX_WIDTH_PERCENT = 80;
 const PANEL_TAB_GROUP_SELECTOR =
   '[data-sidebar-split-tab-group], [data-testid="secondary-panel-tab-strip"], [data-testid="thread-secondary-panel-top-chrome"]';
 const PANEL_DRAWER_SELECTOR = '[data-testid="secondary-panel-shelf"]';
+
+const PAGE_KEY_PREFIX = "page:";
+
+export function pageWorkbenchKey(pluginId: string, panelId: string): string {
+  return `${PAGE_KEY_PREFIX}${pluginId}/${panelId}`;
+}
 
 const surfaces: (() => WorkbenchSurface | null)[] = [];
 
@@ -74,7 +81,9 @@ export function findSurface(
     const surface = surfaces[index]?.() ?? null;
     if (
       surface !== null &&
-      (threadId === undefined || surface.threadId === threadId)
+      (threadId === undefined
+        ? surface.page === undefined
+        : surface.threadId === threadId)
     ) {
       return surface;
     }
@@ -197,7 +206,10 @@ async function startOpen(
         {
           tab: {
             id: spec.tab.id,
-            context: { kind: "thread" },
+            context:
+              surface.page === undefined
+                ? { kind: "thread" }
+                : { kind: "nav-panel", panelId: surface.page.panelId },
             availability: "action",
           },
           ...(spec.params === undefined ? {} : { params: spec.params }),
@@ -363,6 +375,12 @@ function arrange(
     return false;
   }
   if (
+    surface.page !== undefined &&
+    (widthPercent !== undefined || conversation !== undefined)
+  ) {
+    return false;
+  }
+  if (
     (panes !== undefined || paneWidths !== undefined) &&
     !arrangePanes(workbenchSplitsFor(surface.panelStateId), panes, paneWidths)
   ) {
@@ -449,6 +467,7 @@ export function workbenchFor(
 ): ExperimentalWorkbench | null {
   const found = findSurface(threadId);
   if (found === null) return null;
+  if (found.page !== undefined && found.page.pluginId !== pluginId) return null;
   const current = () => findSurface(found.threadId) ?? found;
   return {
     threadId: found.threadId,
@@ -460,6 +479,7 @@ export function workbenchFor(
       const owner = workbenchTabOwner(pluginId, spec);
       if (
         owner === null ||
+        (surface.page !== undefined && owner !== pluginId) ||
         placement === null ||
         !placementFits(splits, placement)
       ) {
@@ -494,6 +514,9 @@ export function workbenchFor(
     layout: () => readLayout(current()),
     arrange: (layout) => arrange(current(), layout),
     isTyping: () => isTypingInSidePanel(),
-    popOut: (key) => popOutWorkbenchTab(current(), key),
+    popOut: (key) =>
+      current().page === undefined
+        ? popOutWorkbenchTab(current(), key)
+        : Promise.resolve(false),
   };
 }

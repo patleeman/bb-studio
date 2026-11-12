@@ -982,6 +982,18 @@ pane 2 or a new pane, at an index in that pane's tab row), close or select
 any tab, read and set the panel's layout (its panes and their widths
 included), and tell whether the user is typing in the panel.
 
+A plugin page's side panel is a workbench too, keyed by the page instead of a
+thread: `experimental_workbench("page:<pluginId>/<panelId>")`
+(`pageWorkbenchKey` in `lib/fork-workbench.ts`). `PluginPanelRightPanelHost`
+mounts the same `ForkWorkbenchSurface` a thread view does, with the page's
+panel state id, so pane placement runs through the one `workbenchFor` path.
+Only the page's own plugin gets it, tabs open in the page's `nav-panel`
+context, `arrange` declines the conversation's settings, `popOut` resolves
+false, and a call with no argument still means a thread. Caller: Studio's link
+router, which opens a Cmd-clicked Bot page row in the second pane. Stabilize
+with the rest of the workbench API; decide then whether the key should be an
+object instead of a string.
+
 The side panel has one pane, or two side by side, each with its own tab row
 and New Tab button: bb's own split code (`SidebarSplitContainer`,
 `sidebarSplitLayout.ts`) with the rules in
