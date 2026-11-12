@@ -3,10 +3,6 @@ import { usePluginLauncherItems } from "@/lib/fork-launcher-items";
 import { usePluginContextCard } from "@/components/thread/timeline/ForkContextCard";
 import { usePluginWindows } from "@/lib/fork-windows";
 import { readDragItem, writeDragItem } from "@/lib/fork-item-drag";
-import {
-  PluginProjectActionsContextMenu,
-  PluginProjectActionsMenu,
-} from "@/components/project/ForkProjectMenus";
 import { usePluginAppCommands } from "@/components/commands/ForkCommandPalette";
 import { useAppPanes } from "./fork-app-panes";
 import { usePluginTabWindow } from "./fork-tab-window";
@@ -28,6 +24,4 @@ export const forkPluginSdkAppImplementation = {
   experimental_useContextCard: usePluginContextCard,
   experimental_writeDragItem: writeDragItem,
   experimental_readDragItem: readDragItem,
-  experimental_ProjectActionsMenu: PluginProjectActionsMenu,
-  experimental_ProjectActionsContextMenu: PluginProjectActionsContextMenu,
 } satisfies ForkPluginSdkApp;

@@ -16,7 +16,6 @@ import {
   ContextMenuSeparator,
 } from "@bb/shared-ui/context-menu";
 import { useAppCommandHandler } from "@/components/commands/AppCommandProvider";
-import { PluginItemIcon } from "@/components/plugin/PluginIcon";
 import {
   globalPanelTabAppliesTo,
   globalPanelTabsAtom,
@@ -24,8 +23,6 @@ import {
 } from "@/lib/fork-global-panel-tabs";
 import { canPopOutTab, popOutWorkbenchTab } from "@/lib/fork-tab-popout";
 import { findSurface } from "@/lib/fork-workbench";
-import { getBbDesktopInfo } from "@/lib/bb-desktop";
-import { closeFallbackHandled } from "@/lib/fork-close-fallback";
 import {
   beginPointerItemDrag,
   PANEL_TAB_STRIP_SELECTOR,
@@ -34,11 +31,6 @@ import {
   type PointerItemDrag,
 } from "@/lib/fork-item-drag";
 import { beginPanelTabDrag, endPanelTabDrag } from "@/lib/fork-tab-move";
-import {
-  availablePanelTabActions,
-  panelTabActionTarget,
-  runPanelTabAction,
-} from "@/lib/fork-panel-tab-actions";
 import { usePluginSlots } from "@/lib/plugin-slots";
 import type { SecondaryPanelRenderableTab } from "./secondaryPanelTab";
 import { workbenchSplitsFor } from "./workbenchSplits.fork";
@@ -132,22 +124,8 @@ export function usePinnedFixedPanelTabs(
 
 export function useFixedPanelTabDisplay(tab: SecondaryPanelRenderableTab): {
   isFixed: boolean;
-  compact: boolean;
 } {
-  const registeredTabs = usePluginSlots().tabs;
-  const isFixed = isFixedPanelTab(tab);
-  const state = tab.tab;
-  const compact =
-    isFixed &&
-    state.kind === "plugin-panel" &&
-    registeredTabs.some(
-      (slot) =>
-        slot.pluginId === state.pluginId &&
-        slot.id === state.actionId &&
-        slot.availability === "action" &&
-        slot.experimental_compactWhenFixed === true,
-    );
-  return { isFixed, compact };
+  return { isFixed: isFixedPanelTab(tab) };
 }
 
 function TabGroupDivider({ name }: { name: string }) {
@@ -191,7 +169,6 @@ export function PanelTabActionMenuItems({
   const popOutThreadId = popOutThreadFor(panelStateId, tab);
   return (
     <>
-      <PluginPanelTabActionItems tab={tab} />
       {paneMove === null ? null : (
         <ContextMenuItem
           data-workbench-pane-move=""
@@ -245,41 +222,6 @@ function popOutThreadFor(
   if (panelStateId === null || tab.isPinned === true) return null;
   const threadId = threadIdOfPanelState(panelStateId);
   return threadId !== null && canPopOutTab(tab.tab) ? threadId : null;
-}
-
-function PluginPanelTabActionItems({
-  tab,
-}: {
-  tab: SecondaryPanelRenderableTab;
-}) {
-  const panelStateId = useContext(WorkbenchPanelContext);
-  const actions = usePluginSlots().panelTabActions;
-  if (actions.length === 0) return null;
-  const target = panelTabActionTarget(tab.tab, panelStateId);
-  if (target === null) return null;
-  const available = availablePanelTabActions(actions, target);
-  if (available.length === 0) return null;
-  return (
-    <>
-      {available.map((action) => (
-        <ContextMenuItem
-          key={`${action.pluginId}/${action.id}`}
-          data-panel-tab-action={`${action.pluginId}/${action.id}`}
-          onSelect={() => runPanelTabAction(action, target)}
-        >
-          {action.icon === undefined ? null : (
-            <PluginItemIcon
-              pluginId={action.pluginId}
-              icon={action.icon}
-              className="size-3.5"
-            />
-          )}
-          {action.title}
-        </ContextMenuItem>
-      ))}
-      <ContextMenuSeparator />
-    </>
-  );
 }
 
 function dragPoint(
@@ -343,20 +285,6 @@ export function PanelTabItemDragSource({
     },
   });
   return null;
-}
-
-const FORK_CLOSE_FALLBACK_COMMAND_PRIORITY = 100;
-
-export function useWorkbenchForkCommands(): void {
-  useAppCommandHandler(
-    "panel.close",
-    closeFallbackHandled,
-    FORK_CLOSE_FALLBACK_COMMAND_PRIORITY,
-  );
-  useEffect(
-    () => getBbDesktopInfo()?.onCloseWindowRequest?.(closeFallbackHandled),
-    [],
-  );
 }
 
 export function useForkCloseFileTabCommand(

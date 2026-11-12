@@ -1,4 +1,4 @@
-export { experimental_useAppRoute, experimental_useSidebarNewItems, experimental_useGlobalTabs, experimental_useAppTheme, experimental_useAppPanes, experimental_useLauncherItems, experimental_writeDragItem, experimental_readDragItem, experimental_useContextCard, experimental_useWindows, experimental_ProjectActionsMenu, experimental_ProjectActionsContextMenu, experimental_useAppCommands, experimental_useTabWindow } from "./app.fork.js";
+export { experimental_useAppRoute, experimental_useSidebarNewItems, experimental_useGlobalTabs, experimental_useAppTheme, experimental_useAppPanes, experimental_useLauncherItems, experimental_writeDragItem, experimental_readDragItem, experimental_useContextCard, experimental_useWindows, experimental_useAppCommands, experimental_useTabWindow } from "./app.fork.js";
 export { experimental_PluginRpcCallError } from "./rpc-contract.js";
 import type { PluginSdkApp } from "./app-contract.js";
 
