@@ -1,3 +1,4 @@
+import { useForkHiddenHostPage } from "@/components/fork/ForkHiddenHostEntries";
 import { ForkTitleHost } from "@/components/fork/ForkTitleHost";
 import { AppPanelTabsPublisher } from "@/lib/app-panel-tabs";
 import { AppNavigationHostProvider } from "@/lib/app-navigation-host";
@@ -740,6 +741,8 @@ export function PluginsView({ detailKey }: { detailKey?: string } = {}) {
 
 export function SkillsView() {
   const location = useLocation();
+  const hiddenPage = useForkHiddenHostPage("skills");
+  if (hiddenPage) return hiddenPage;
   const isCollection =
     matchPath(SKILLS_ROUTE_PATH, location.pathname) !== null ||
     location.pathname === REGISTRY_SKILLS_ROUTE_PATH;

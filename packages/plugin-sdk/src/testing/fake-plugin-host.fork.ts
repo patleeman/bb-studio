@@ -30,6 +30,7 @@ export function forkFakeHooks(): ForkPluginHooks {
     experimental_classifyTurns() {},
     experimental_beforeThreadDelete() {},
     experimental_turnContext() {},
+    experimental_skillsRegistryPolicy() {},
     experimental_threadForkPoint: () => Promise.resolve(null),
     experimental_requestApproval: () =>
       Promise.resolve({ approved: false, picked: [] }),
