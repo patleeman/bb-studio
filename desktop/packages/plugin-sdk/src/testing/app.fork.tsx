@@ -1,8 +1,6 @@
-import { createElement } from "react";
 import type {
   ExperimentalAppBackdropRegistration,
   ExperimentalAppCommand,
-  ExperimentalCloseFallbackRegistration,
   ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
   ExperimentalDragItem,
@@ -14,10 +12,8 @@ import type {
   ExperimentalGlobalTab,
   ExperimentalLinkHandlerRegistration,
   ExperimentalPaletteSearchRegistration,
-  ExperimentalPanelTabActionRegistration,
   ExperimentalLauncherItem,
   ExperimentalLauncherItemRegistration,
-  ExperimentalMainHeaderRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
@@ -30,7 +26,6 @@ import type {
   ExperimentalSidebarNewItem,
   ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
-  ExperimentalSkillSourceRegistration,
   ExperimentalTabWindow,
   ExperimentalWindowRegistration,
   ExperimentalWorkbench,
@@ -105,7 +100,6 @@ export interface ForkCapturedPluginApp {
   linkHandlers: ExperimentalLinkHandlerRegistration[];
   windows: ExperimentalWindowRegistration[];
   contextCardRows: ExperimentalContextCardRowRegistration[];
-  mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   firstRuns: ExperimentalFirstRunRegistration[];
@@ -113,11 +107,8 @@ export interface ForkCapturedPluginApp {
   hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
-  panelTabActions: ExperimentalPanelTabActionRegistration[];
   launcherItems: ExperimentalLauncherItemRegistration[];
   itemDrops: ExperimentalItemDropRegistration[];
-  closeFallbacks: ExperimentalCloseFallbackRegistration[];
-  skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
   appBackdrops: ExperimentalAppBackdropRegistration[];
@@ -196,20 +187,7 @@ export function forkTestHooks(
       toggle: () => Promise.resolve(false),
       close: () => Promise.resolve(false),
       hotkeyRegistered: () => Promise.resolve(false),
-      setClickThrough: () => Promise.resolve(false),
     }),
-    experimental_ProjectActionsMenu: ({ projectId }) =>
-      createElement("button", {
-        type: "button",
-        "data-test-project-actions": projectId,
-        "aria-label": "Project actions",
-      }),
-    experimental_ProjectActionsContextMenu: ({ projectId, children }) =>
-      createElement(
-        "div",
-        { "data-test-project-context-menu": projectId },
-        children,
-      ),
   };
 }
 

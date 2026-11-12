@@ -22,8 +22,8 @@
       "budget": 6
     },
     "apps/app/src/components/layout/AppLayout.tsx": {
-      "seam": "narrow-window, workbench, approvals, main-header, item-drag, pop-out, app-backdrop",
-      "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window, and useWorkbenchForkCommands is mounted there (panel.close and the desktop close request go to slots.experimental_closeFallback first). ForkLayoutHosts is the first child of the content shell: ForkAppBackdropHost (slots.experimental_appBackdrop: the backdrop portaled behind the layout, its appearance on <html>), ForkMainHeader (slots.experimental_mainHeader rows above the header and main view), ForkApprovalHost (pending approvals to the desktop dialog or bb's own) ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop) and ForkSidebarStyleHost (runs the sidebar thread list's experimental_useSidebarStyle). In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader.",
+      "seam": "narrow-window, workbench, approvals, item-drag, pop-out, app-backdrop",
+      "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window. ForkLayoutHosts is the first child of the content shell: ForkAppBackdropHost (slots.experimental_appBackdrop: the backdrop portaled behind the layout, its appearance on <html>), ForkApprovalHost (pending approvals to the desktop dialog or bb's own), ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop), ForkTabReturnHost, ForkOverlayScrollbarHost and the tooltip dismiss. In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader.",
       "budget": 10
     },
     "apps/app/src/components/pickers/model-load-error-message.tsx": {
@@ -73,7 +73,7 @@
     },
     "apps/app/src/components/secondary-panel/SecondaryPanelTabStrip.tsx": {
       "seam": "workbench, item-drag",
-      "intent": "One row of tabs, with every rule in workbenchFork.tsx: fixedPanelTabsFirst sorts fixed plugin tabs to the front, useFixedPanelTabDisplay turns off dragging for them and draws them icon-only when the registration sets experimental_compactWhenFixed (title as tooltip and aria-label), FixedPanelTabGroupEnd draws the divider after the last fixed tab, and PanelTabActionMenuItems is the one line that puts plugins' slots.experimental_panelTabAction items first in a tab's context menu. Tabs shrink instead of scrolling early, and the active tab always shows its close button. Every non-fixed tab is a native drag source: usePanelTabNativeDrag returns the draggable/onDragStart/onDragEnd props spread on the tab's wrapper (after dnd-kit's listeners), and when it does, the wrapper's onPointerDown skips bb's pane drag (onBeginTabDrag); the mouse sensor is InertMouseSensor so the mouse never starts dnd-kit's sort, while touch keeps dnd-kit's sensor, the sort and PanelTabItemDragSource (one line inside the DndContext, sending the item payload to whatever is under the pointer outside the strip).",
+      "intent": "One row of tabs, with every rule in workbenchFork.tsx: fixedPanelTabsFirst sorts fixed plugin tabs to the front, useFixedPanelTabDisplay turns off dragging for them, FixedPanelTabGroupEnd draws the divider after the last fixed tab, and PanelTabActionMenuItems is the one line that puts the fork's pane move and pop-out items first in a tab's context menu. Tabs shrink instead of scrolling early, and the active tab always shows its close button. Every non-fixed tab is a native drag source: usePanelTabNativeDrag returns the draggable/onDragStart/onDragEnd props spread on the tab's wrapper (after dnd-kit's listeners), and when it does, the wrapper's onPointerDown skips bb's pane drag (onBeginTabDrag); the mouse sensor is InertMouseSensor so the mouse never starts dnd-kit's sort, while touch keeps dnd-kit's sensor, the sort and PanelTabItemDragSource (one line inside the DndContext, sending the item payload to whatever is under the pointer outside the strip).",
       "budget": 45
     },
     "apps/app/src/components/secondary-panel/SidebarSplitContainer.tsx": {
@@ -92,8 +92,8 @@
       "budget": 3
     },
     "apps/app/src/components/sidebar/AppSidebar.tsx": {
-      "seam": "sidebar, sidebar-style",
-      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx) under the thread list, and spreads useForkSidebarStyle() (ForkSidebarStyle.tsx) onto bb's Sidebar so a thread list's experimental_useSidebarStyle reaches the sidebar panel as CSS variables and data attributes; both imported at the top of the file. Nothing else: the rail and the sidebar footer are upstream's.",
+      "seam": "sidebar",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list. Nothing else: the rail and the sidebar footer are upstream's.",
       "budget": 5
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
@@ -237,8 +237,8 @@
       "budget": 2
     },
     "packages/plugin-sdk/src/internal/plugin-app-registration-collector.ts": {
-      "seam": "sdk-tables, file-opener-handle, sidebar-header, sidebar-style",
-      "intent": "The collector takes the fork's slots and fields from internal/fork-slots.ts (imported at the top of the file): the collected type extends ForkSlotRegistrations; spreads add the empty lists (first in the literal), the slot methods (first in slots) and the action-tab fields; the fileOpener registration spreads forkFileOpenerFields first (experimental_handleOpen); the experimental_threadList registration is wrapped in withForkThreadListFields (experimental_hideSidebarHeader, experimental_useSidebarStyle).",
+      "seam": "sdk-tables, file-opener-handle, sidebar-header",
+      "intent": "The collector takes the fork's slots and fields from internal/fork-slots.ts (imported at the top of the file): the collected type extends ForkSlotRegistrations; spreads add the empty lists (first in the literal), the slot methods (first in slots) and the action-tab fields; the fileOpener registration spreads forkFileOpenerFields first (experimental_handleOpen); the experimental_threadList registration is wrapped in withForkThreadListFields (experimental_hideSidebarHeader).",
       "budget": 18
     },
     "packages/plugin-sdk/src/testing/app.tsx": {
@@ -390,16 +390,6 @@
       "seam": "message-menu",
       "intent": "Plugin actions keyed as fork menu items (forkMessageActions.ts) are left out of the inline candidates (forkInlineMessageActions) and added to the ··· menu after Add to chat and before Fork (forkMenuMessageActions). bb's own Fork item is left out when forkKeepsThreadFork(pluginActions) is false: a plugin item on that message declared experimental_replaces: \"thread.fork\".",
       "budget": 6
-    },
-    "apps/app/src/lib/bb-desktop.ts": {
-      "seam": "close-fallback",
-      "intent": "getBbDesktopInfo returns the desktop API through withForkCloseGuard (bb-desktop.fork.ts), so every onCloseWindowRequest listener first asks the close fallback (fork-close-fallback.ts installs closeFallbackHandled as the guard) and only runs when no plugin took the close. This is why ThreadDetailView, RootComposeView and ToolsView carry no close guard; panel.close reaches the fallback first through useWorkbenchForkCommands' priority-100 handler.",
-      "budget": 3
-    },
-    "apps/app/src/components/tools/SkillsCollection.tsx": {
-      "seam": "skill-sources",
-      "intent": "SkillsOverview calls useForkSkillSources (components/tools/ForkSkillSources.tsx, imported at the top of the file) after visibleSkills with the normalized query, whether bb's Type or Provider filter is set, and whether bb's list has rows or is loading or failed; its filterGroups are spread last into the filter menu's groups, and its body(libraryBody) replaces the band div around the library body, adding each slots.experimental_skillSource's rows under bb's list.",
-      "budget": 5
     },
     "apps/app/src/components/secondary-panel/sidebarSplitLayout.ts": {
       "seam": "workbench-panes",

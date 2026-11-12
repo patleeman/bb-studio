@@ -1,13 +1,11 @@
 import type {
   ExperimentalAppBackdropRegistration,
-  ExperimentalCloseFallbackRegistration,
   ExperimentalCommandPaletteRegistration,
   ExperimentalContextCardRowRegistration,
   ExperimentalItemDropRegistration,
   ForkPluginAppSlots,
   ExperimentalLauncherItemRegistration,
   ExperimentalLinkHandlerRegistration,
-  ExperimentalMainHeaderRegistration,
   ExperimentalNewTabItemsRegistration,
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
@@ -17,11 +15,9 @@ import type {
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
-  ExperimentalPanelTabActionRegistration,
   ExperimentalReplyClassifierRegistration,
   ExperimentalSidebarNewItemRegistration,
   ExperimentalSidebarSectionRegistration,
-  ExperimentalSkillSourceRegistration,
   ExperimentalWindowRegistration,
   ExperimentalTabRegistration,
   ForkFileOpenerFields,
@@ -42,7 +38,6 @@ export interface ForkSlotRegistrations {
   linkHandlers: ExperimentalLinkHandlerRegistration[];
   windows: ExperimentalWindowRegistration[];
   contextCardRows: ExperimentalContextCardRowRegistration[];
-  mainHeaders: ExperimentalMainHeaderRegistration[];
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   firstRuns: ExperimentalFirstRunRegistration[];
@@ -50,11 +45,8 @@ export interface ForkSlotRegistrations {
   hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
   forkMessageActions: ExperimentalMessageActionRegistration[];
-  panelTabActions: ExperimentalPanelTabActionRegistration[];
   launcherItems: ExperimentalLauncherItemRegistration[];
   itemDrops: ExperimentalItemDropRegistration[];
-  closeFallbacks: ExperimentalCloseFallbackRegistration[];
-  skillSources: ExperimentalSkillSourceRegistration[];
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
   appBackdrops: ExperimentalAppBackdropRegistration[];
@@ -68,7 +60,6 @@ export const FORK_SLOT_KINDS = [
   "linkHandlers",
   "windows",
   "contextCardRows",
-  "mainHeaders",
   "threadBanners",
   "modelLoadNotices",
   "firstRuns",
@@ -76,11 +67,8 @@ export const FORK_SLOT_KINDS = [
   "hiddenHostEntries",
   "threadHeaders",
   "forkMessageActions",
-  "panelTabActions",
   "launcherItems",
   "itemDrops",
-  "closeFallbacks",
-  "skillSources",
   "newTabItems",
   "commandPalettes",
   "appBackdrops",
@@ -95,7 +83,6 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     linkHandlers: [],
     windows: [],
     contextCardRows: [],
-    mainHeaders: [],
     threadBanners: [],
     modelLoadNotices: [],
     firstRuns: [],
@@ -103,11 +90,8 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     hiddenHostEntries: [],
     threadHeaders: [],
     forkMessageActions: [],
-    panelTabActions: [],
     launcherItems: [],
     itemDrops: [],
-    closeFallbacks: [],
-    skillSources: [],
     newTabItems: [],
     commandPalettes: [],
     appBackdrops: [],
@@ -125,7 +109,6 @@ export function forkSlotMethods(
     linkHandler: new Set<string>(),
     window: new Set<string>(),
     contextCardRow: new Set<string>(),
-    mainHeader: new Set<string>(),
     threadBanner: new Set<string>(),
     modelLoadNotice: new Set<string>(),
     firstRun: new Set<string>(),
@@ -133,11 +116,8 @@ export function forkSlotMethods(
     hiddenHostEntries: new Set<string>(),
     threadHeader: new Set<string>(),
     messageAction: new Set<string>(),
-    panelTabAction: new Set<string>(),
     launcherItem: new Set<string>(),
     itemDrop: new Set<string>(),
-    closeFallback: new Set<string>(),
-    skillSource: new Set<string>(),
     newTabItems: new Set<string>(),
     commandPalette: new Set<string>(),
     appBackdrop: new Set<string>(),
@@ -255,15 +235,6 @@ export function forkSlotMethods(
         drop: registration.drop,
       });
     },
-    experimental_closeFallback(registration) {
-      const kind = "slots.experimental_closeFallback";
-      const id = requireSlotId(kind, registration?.id);
-      requireUniqueId(kind, seenIds.closeFallback, id);
-      if (typeof registration.close !== "function") {
-        throw new Error(`${kind} "${id}": close must be a function`);
-      }
-      collected.closeFallbacks.push({ id, close: registration.close });
-    },
     experimental_commandPalette(registration) {
       const kind = "slots.experimental_commandPalette";
       const id = requireSlotId(kind, registration?.id);
@@ -291,15 +262,6 @@ export function forkSlotMethods(
         id,
         component,
         useAppearance: registration.useAppearance,
-      });
-    },
-    experimental_mainHeader(registration) {
-      const kind = "slots.experimental_mainHeader";
-      const id = requireSlotId(kind, registration?.id);
-      requireUniqueId(kind, seenIds.mainHeader, id);
-      collected.mainHeaders.push({
-        id,
-        component: requireComponent(kind, registration.component),
       });
     },
     experimental_threadBanner(registration) {
@@ -402,44 +364,6 @@ export function forkSlotMethods(
           : {}),
       });
     },
-    experimental_panelTabAction(registration) {
-      const kind = "slots.experimental_panelTabAction";
-      const id = requireSlotId(kind, registration?.id);
-      requireUniqueId(kind, seenIds.panelTabAction, id);
-      if (typeof registration.run !== "function") {
-        throw new Error(`${kind} "${id}": run must be a function`);
-      }
-      if (
-        registration.isAvailable !== undefined &&
-        typeof registration.isAvailable !== "function"
-      ) {
-        throw new Error(`${kind} "${id}": isAvailable must be a function`);
-      }
-      collected.panelTabActions.push({
-        id,
-        title: requireNonEmptyString(kind, "title", registration.title),
-        ...(registration.icon === undefined
-          ? {}
-          : { icon: requireNonEmptyString(kind, "icon", registration.icon) }),
-        ...(registration.isAvailable === undefined
-          ? {}
-          : { isAvailable: registration.isAvailable }),
-        run: registration.run,
-      });
-    },
-    experimental_skillSource(registration) {
-      const kind = "slots.experimental_skillSource";
-      const id = requireSlotId(kind, registration?.id);
-      requireUniqueId(kind, seenIds.skillSource, id);
-      if (typeof registration.useSkills !== "function") {
-        throw new Error(`${kind} "${id}": useSkills must be a function`);
-      }
-      collected.skillSources.push({
-        id,
-        label: requireNonEmptyString(kind, "label", registration.label),
-        useSkills: registration.useSkills,
-      });
-    },
     experimental_newTabItems(registration) {
       const kind = "slots.experimental_newTabItems";
       const id = requireSlotId(kind, registration?.id);
@@ -482,7 +406,6 @@ export function forkSlotMethods(
 type ForkTabFields = Pick<
   ExperimentalTabRegistration,
   | "experimental_instanceIcon"
-  | "experimental_compactWhenFixed"
   | "experimental_showInNewTab"
   | "experimental_newTabGroup"
   | "experimental_openableByPlugins"
@@ -518,9 +441,6 @@ export function forkTabFields(registration: ForkTabFields): ForkTabFields {
     ...(typeof registration.experimental_instanceIcon === "function"
       ? { experimental_instanceIcon: registration.experimental_instanceIcon }
       : {}),
-    ...(registration.experimental_compactWhenFixed === true
-      ? { experimental_compactWhenFixed: true }
-      : {}),
     ...(showInNewTab === false ? { experimental_showInNewTab: false } : {}),
   };
 }
@@ -534,23 +454,7 @@ export function withForkThreadListFields<T>(
     ...(registration.experimental_hideSidebarHeader === true
       ? { experimental_hideSidebarHeader: true }
       : {}),
-    ...(registration.experimental_useSidebarStyle === undefined
-      ? {}
-      : {
-          experimental_useSidebarStyle: requireFunction(
-            "slots.experimental_threadList",
-            "experimental_useSidebarStyle",
-            registration.experimental_useSidebarStyle,
-          ),
-        }),
   };
-}
-
-function requireFunction<T>(kind: string, field: string, value: unknown): T {
-  if (typeof value !== "function") {
-    throw new Error(`${kind}: "${field}" must be a function`);
-  }
-  return value as T;
 }
 
 export function forkFileOpenerFields(
@@ -566,4 +470,11 @@ export function forkFileOpenerFields(
           registration.experimental_handleOpen,
         ),
       };
+}
+
+function requireFunction<T>(kind: string, field: string, value: unknown): T {
+  if (typeof value !== "function") {
+    throw new Error(`${kind}: "${field}" must be a function`);
+  }
+  return value as T;
 }

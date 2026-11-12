@@ -9,7 +9,7 @@ export const LAUNCHER_WINDOW_ID = "launcher";
 export const LAUNCHER_WIDTH = 640;
 export const LAUNCHER_HEIGHT = 420;
 
-/** The launcher's window: mid-screen, over every app, gone when it loses focus. No menu bar entry; no hotkey when `hotkey` is empty. */
+/** The launcher's window: mid-screen, over every app, gone when it loses focus. No hotkey when `hotkey` is empty. */
 export function launcherWindowOptions(hotkey: string): HostWindowOptions {
   const key = hotkey.trim();
   return {

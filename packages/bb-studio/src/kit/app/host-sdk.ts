@@ -83,14 +83,6 @@ const appTheme = member(sdkApp, "experimental_useAppTheme");
 export const useHostAppTheme = isHook<AppTheme>(appTheme) ? appTheme : null;
 export const useHostAppPanes = isHook<AppPanes>(appPanes) ? appPanes : null;
 
-/** `useBbNavigate().experimental_toAppPath`, or null on a BB without it. */
-const projectMenu = member(sdkApp, "experimental_ProjectActionsMenu");
-const projectContextMenu = member(sdkApp, "experimental_ProjectActionsContextMenu");
-/** BB's own project menu behind a "more" button, or null on a BB without it. */
-export const HostProjectActionsMenu = (projectMenu ?? null) as ComponentType<{ projectId: string; className?: string }> | null;
-/** BB's own project menu as a context menu around one child, or null on a BB without it. */
-export const HostProjectActionsContextMenu = (projectContextMenu ?? null) as ComponentType<{ projectId: string; children: ReactNode }> | null;
-
 export type RenameTab = (options: { tab: { id: string }; params?: unknown; title: string }) => boolean;
 
 /** BB's "rename an open tab" (`experimental_renameTab`), or null on a BB without it. */
@@ -99,6 +91,7 @@ export function renameTabOf(navigate: object): RenameTab | null {
   return typeof method === "function" ? (options) => (method as RenameTab).call(navigate, options) : null;
 }
 
+/** `useBbNavigate().experimental_toAppPath`, or null on a BB without it. */
 export function toAppPathOf(navigate: object): ToAppPath | null {
   const method = member(navigate, "experimental_toAppPath");
   return isToAppPath(method) ? (path, options) => method(path, options) : null;

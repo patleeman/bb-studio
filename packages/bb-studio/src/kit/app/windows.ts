@@ -19,8 +19,6 @@ export interface HostWindowOptions {
   frame?: boolean;
   /** Floats over other apps and every Space. */
   alwaysOnTop?: boolean;
-  /** Clicks go to the app below; the window can't be clicked at all. */
-  clickThrough?: boolean;
   resizable?: boolean;
   minWidth?: number;
   minHeight?: number;
@@ -34,43 +32,21 @@ export interface HostWindowOptions {
   hideOnBlur?: boolean;
   /** A system-wide shortcut in Electron's form, such as `Alt+Space`, that shows or hides the window. */
   hotkey?: string;
-  /** Short text for a macOS menu bar entry that shows or hides the window. */
-  menuBarTitle?: string;
-  vibrancy?: "hud" | "under-window";
   /** The window's query string. */
   params?: Record<string, string>;
 }
 
 export interface HostWindows {
-  /** True in the desktop app. In a browser a window is a plain popup, and styling, hotkey and menu bar are ignored. */
+  /** True in the desktop app. In a browser a window is a plain popup, and styling and hotkey are ignored. */
   native: boolean;
-  /** Sets up the hotkey and menu bar entry without showing the window. */
+  /** Sets up the hotkey without showing the window. */
   register(windowId: string, options?: HostWindowOptions): Promise<boolean>;
   open(windowId: string, options?: HostWindowOptions): Promise<boolean>;
   toggle(windowId: string, options?: HostWindowOptions): Promise<boolean>;
   close(windowId: string): Promise<boolean>;
   /** Whether the window's hotkey took; false when another app holds it. Newer BBs only (src/windows/hotkey.ts reads it by name). */
   hotkeyRegistered?(windowId: string): Promise<boolean>;
-  /**
-   * Switches click-through on an open window. While it is on, the window's
-   * hotkey and menu bar entry turn it off instead of hiding the window, and
-   * the window's page gets a CLICK_THROUGH_EVENT. Newer BBs only.
-   */
-  setClickThrough?(windowId: string, on: boolean, how?: { hold?: boolean }): Promise<boolean>;
 }
-
-/**
- * Whether this BB's `setClickThrough` has the hold mode (`{ hold: true }`:
- * pause or resume passing clicks while click-through stays on). BB has no
- * flag for it, so this reads how many arguments the function takes: the
- * BB that has the mode declares the third.
- */
-export function hasClickThroughHold(windows: Pick<HostWindows, "setClickThrough">): boolean {
-  return typeof windows.setClickThrough === "function" && windows.setClickThrough.length >= 3;
-}
-
-/** The DOM event (on `window`, `detail.on`) a window's page gets when its click-through changes. */
-export const CLICK_THROUGH_EVENT = "bb-fork-window-click-through";
 
 export interface HostWindowRegistration {
   id: string;

@@ -76,7 +76,7 @@ export async function registerWithHotkey(windows: HostWindows, windowId: string,
     await windows.register(windowId, options(alternate));
     if (await check(windowId)) return { wanted: key, inUse: alternate, status: "alternate" };
   }
-  // Nothing took: the window stays registered (its menu bar entry, if any), with no shortcut.
+  // Nothing took: the window stays registered, with no shortcut.
   await windows.register(windowId, options(""));
   return { wanted: key, inUse: "", status: "taken" };
 }
