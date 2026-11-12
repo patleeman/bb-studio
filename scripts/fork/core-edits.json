@@ -192,9 +192,9 @@
       "budget": 2
     },
     "apps/server/src/services/threads/thread-create.ts": {
-      "seam": "import-sync",
-      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine.",
-      "budget": 2
+      "seam": "import-sync, idle-thread",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread and startsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued and keeps its sessionOptions: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message.",
+      "budget": 6
     },
     "apps/server/src/start-server.ts": {
       "seam": "import-sync",
@@ -455,6 +455,11 @@
       "seam": "first-run",
       "intent": "OnboardingGate asks useForkFirstRun (components/fork/ForkFirstRun.tsx, imported at the top of the file) while bb's first run is not done; when it answers (a plugin's slots.experimental_firstRun, or a wait while plugin frontends load) the gate draws <ForkFirstRun> instead of bb's setup screens. Without a plugin's first run, bb's flow is unchanged.",
       "budget": 3
+    },
+    "packages/server-contract/src/api/threads.ts": {
+      "seam": "idle-thread",
+      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread.",
+      "budget": 2
     }
   }
 }
