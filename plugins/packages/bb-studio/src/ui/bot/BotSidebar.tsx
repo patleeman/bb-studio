@@ -23,7 +23,7 @@ import { runningCount, statusLabel } from "./BotHome";
 import { BOT_STYLES, botProvider, colorForName } from "./BotAvatar";
 import { BotFace } from "../../presence/ui/BotFace";
 import { Elapsed, ProviderStatusMark, runningLabel, threadStatusTone, type ProviderCatalogEntry } from "./ProviderStatusMark";
-import { isBotPath, isStudioPath, noteBotThread, restoreThreadList, syncThreadList, threadIdForPath } from "./threadListSwitch";
+import { EVERYTHING_LIST_PROVIDER, isBotPath, isStudioPath, noteBotThread, restoreThreadList, syncThreadList, threadIdForPath } from "./threadListSwitch";
 import type { SidebarSectionProps } from "../../kit/app/host-sdk";
 import { forgetUnifiedSidebar, useUnifiedSidebarShown } from "../unified-sidebar-shown";
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
@@ -95,7 +95,7 @@ export function BotsSidebarSection({ onNavigate, activeThreadId }: SidebarSectio
   const sdk = useSdk();
   const pathname = usePathname();
   const unified = useUnifiedSidebarShown();
-  useEffect(() => { void restoreThreadList(sdk); }, [sdk]);
+  useEffect(() => { void restoreThreadList(sdk, EVERYTHING_LIST_PROVIDER); }, [sdk]);
   useEffect(() => { noteBotThread(isStudioPath(pathname) ? "studio" : "bots", pathname); }, [pathname]);
   const threadId = isBotPath(pathname) ? null : threadIdForPath(pathname);
   // The unified sidebar lists Bots itself, on top.
