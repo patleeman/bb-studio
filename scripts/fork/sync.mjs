@@ -16,8 +16,8 @@ const flag = (name) => args.includes(name);
 if (flag("--help")) {
   console.log(`Replay the fork onto a newer upstream commit, in a throwaway worktree.
 
-  node scripts/fork/sync.mjs [--onto upstream/main] [--source exp/studio-native]
-                             [--candidate exp/studio-native-candidate]
+  node scripts/fork/sync.mjs [--onto upstream/main] [--source desktop]
+                             [--candidate desktop-candidate]
                              [--fetch] [--checks none|quick|full] [--keep]
                              [--continue <worktree>]
 
@@ -27,13 +27,15 @@ files there, run "git cherry-pick --continue", then rerun with
 --continue <worktree>. Conflicts that only touch import lines are resolved by
 the script (upstream's imports plus the ones the fork commit added); typecheck
 is the safety net. git rerere is off: no recorded resolution is replayed.
-Nothing is pushed.`);
+Nothing is pushed. Run it in the desktop worktree, not in main's desktop/.
+Worktrees and reports go to ../.bb-studio-fork-sync (BB_STUDIO_SYNC_DIR
+overrides it).`);
   process.exit(0);
 }
 
-const SOURCE = option("--source", "exp/studio-native");
+const SOURCE = option("--source", "desktop");
 const ONTO = option("--onto", "upstream/main");
-const CANDIDATE = option("--candidate", "exp/studio-native-candidate");
+const CANDIDATE = option("--candidate", "desktop-candidate");
 const CHECKS = option("--checks", "quick");
 const resumeDir = option("--continue", undefined);
 const TRAILER = "Fork-Generated";
@@ -44,6 +46,9 @@ const git = (cwd, ...argv) =>
 const tryGit = (cwd, ...argv) =>
   spawnSync("git", argv, { cwd, encoding: "utf8" });
 
+if (git(root, "rev-parse", "--show-prefix") !== "") {
+  fail("Run sync.mjs in the desktop worktree, not in main's desktop/.");
+}
 const sourceRef = git(root, "rev-parse", "--verify", SOURCE);
 if (CANDIDATE === SOURCE) {
   fail(`The candidate branch must not be the source branch (${SOURCE}).`);
@@ -55,7 +60,8 @@ function fail(message) {
 }
 
 const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-const syncRoot = resolve(root, "..", ".bb-studio-fork-sync");
+const syncRoot =
+  process.env.BB_STUDIO_SYNC_DIR ?? resolve(root, "..", ".bb-studio-fork-sync");
 mkdirSync(syncRoot, { recursive: true });
 const worktree = resumeDir ? resolve(resumeDir) : join(syncRoot, stamp);
 const reportPath = join(syncRoot, `report-${stamp}.md`);
