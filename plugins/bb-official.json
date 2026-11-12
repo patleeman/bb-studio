@@ -22,32 +22,8 @@
     "category": "cloud-and-remote",
     "screenshots": []
   },
-  "bb-ai": {
-    "category": "cloud-and-remote",
-    "screenshots": []
-  },
   "connect": {
     "category": "cloud-and-remote",
-    "screenshots": []
-  },
-  "connect-next": {
-    "category": "cloud-and-remote",
-    "screenshots": []
-  },
-  "custom-instructions": {
-    "category": "memory-and-context",
-    "screenshots": []
-  },
-  "plugin-api-tester": {
-    "category": "plugin-development",
-    "screenshots": []
-  },
-  "inline-vis": {
-    "category": "thread-content",
-    "screenshots": []
-  },
-  "monaco-editor": {
-    "category": "file-viewers-and-editors",
     "screenshots": []
   },
   "pdf-preview": {
@@ -71,10 +47,6 @@
     "screenshots": []
   },
   "keep-awake": {
-    "category": "utilities",
-    "screenshots": []
-  },
-  "github-star": {
     "category": "utilities",
     "screenshots": []
   },
@@ -122,16 +94,8 @@
     "category": "tasks-and-workflows",
     "screenshots": []
   },
-  "side-chat": {
-    "category": "thread-content",
-    "screenshots": []
-  },
   "workflows": {
     "category": "tasks-and-workflows",
-    "screenshots": []
-  },
-  "github": {
-    "category": "code-and-reviews",
     "screenshots": []
   },
   "git": {
@@ -140,29 +104,6 @@
   },
   "github-pr-status": {
     "category": "code-and-reviews",
-    "screenshots": []
-  },
-  "docs": {
-    "category": "file-viewers-and-editors",
-    "screenshots": [
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-21ddb6757-inline-review-desktop.png",
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-f4957b72f-inline-editing-desktop.png",
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-f4957b72f-ask-mobile.png",
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-63b536e70-workspace-desktop.png",
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-21ddb6757-html-desktop.png",
-      "https://getbb.app/marketplace/v2/screenshots/docs/docs-21ddb6757-vault-desktop.png"
-    ]
-  },
-  "memory": {
-    "category": "memory-and-context",
-    "screenshots": []
-  },
-  "tasks": {
-    "category": "tasks-and-workflows",
-    "screenshots": []
-  },
-  "theme-preview": {
-    "category": "themes-and-appearance",
     "screenshots": []
   },
   "push-notifications": {
@@ -187,18 +128,6 @@
   },
   "bb-guide": {
     "category": "memory-and-context",
-    "screenshots": []
-  },
-  "environment-modal-sandbox": {
-    "category": "cloud-and-remote",
-    "screenshots": []
-  },
-  "prompt-library": {
-    "category": "memory-and-context",
-    "screenshots": []
-  },
-  "mcp": {
-    "category": "cloud-and-remote",
     "screenshots": []
   },
   "storage-retention": {
