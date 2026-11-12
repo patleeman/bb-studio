@@ -1,3 +1,4 @@
+import { useForkSettingsSectionHidden, useForkVisibleSettingsSections } from "@/components/fork/ForkHiddenHostEntries";
 import { useMemo } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 import { useHostDaemon, useLocalHostDaemonAccess } from "@/hooks/useHostDaemon";
@@ -92,7 +93,7 @@ export function useSettingsNavSections(
   const { hasDaemon } = useHostDaemon();
   const { accessState } = useLocalHostDaemonAccess();
 
-  return useMemo(
+  return useForkVisibleSettingsSections(useMemo(
     () =>
       filterSettingsNavSections({
         hasDaemon,
@@ -100,7 +101,7 @@ export function useSettingsNavSections(
         fileOpenerCount: fileOpeners.length,
       }),
     [accessState, fileOpeners.length, hasDaemon],
-  );
+  ));
 }
 
 export function useSettingsNavState(): SettingsNavState {
@@ -111,6 +112,7 @@ export function useSettingsNavState(): SettingsNavState {
 
   const { activePluginId, activeSection, hasUnknownSection } =
     resolveSettingsRoute(location);
+  const forkHiddenSection = useForkSettingsSectionHidden(activeSection);
 
   const installedPlugins = pluginListQuery.data?.plugins ?? [];
   const pluginEntries = buildPluginSettingsEntries({
@@ -121,7 +123,7 @@ export function useSettingsNavState(): SettingsNavState {
   return {
     activePluginId,
     activeSection,
-    hasUnknownSection,
+    hasUnknownSection: hasUnknownSection || forkHiddenSection,
     pluginEntries,
     sections,
   };
