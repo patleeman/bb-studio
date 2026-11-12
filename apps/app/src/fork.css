@@ -985,3 +985,9 @@ html[data-fork-cards]
     padding-right: 0;
   }
 }
+
+[data-fork-tab-window-tabs="one"]
+  [data-testid="secondary-panel-tab-strip"]
+  [data-secondary-panel-tab-content] {
+  visibility: hidden;
+}
