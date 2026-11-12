@@ -1276,6 +1276,13 @@ describe("bb's layout as cards over an app backdrop", () => {
     expect(paint("width")).toBe("min(100%, var(--fork-cards-column))");
     expect(paint("margin-inline")).toBe("auto");
     expect(paint("inset-block")).toBe("calc(-1 * var(--fork-cards-fade)) 0");
+    expect(paint("backdrop-filter")).toBe("var(--fork-cards-composer-filter)");
+    expect(
+      forkCascade(document.documentElement, "--fork-cards-composer-filter"),
+    ).toBe("blur(18px)");
+    expect(paint("mask-image")).toBe(
+      "linear-gradient( to bottom, transparent, #000 var(--fork-cards-fade) )",
+    );
     expect(paint("border-bottom-left-radius")).toBe("var(--fork-cards-radius)");
     expect(paint("border-bottom-right-radius")).toBe(
       "var(--fork-cards-radius)",
@@ -1433,7 +1440,7 @@ describe("bb's pages as column cards over an app backdrop", () => {
       '<div className="box-border h-full w-full pb-4 pt-3 md:pt-4">',
     );
     expect(TOOLS_VIEW).toContain(
-      '<div className="relative h-full overflow-hidden">\n      <div ref={scrollRef} className="h-full overflow-y-auto">',
+      '<div className="relative h-full overflow-hidden">\n      <ForkTitleHost kind="tools" />\n      <div ref={scrollRef} className="h-full overflow-y-auto">',
     );
     expect(RESOURCE_COLLECTION).toContain("data-resource-collection-viewport");
     expect(RESOURCE_COLLECTION).toContain("md:pr-3");
