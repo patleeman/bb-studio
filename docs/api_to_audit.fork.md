@@ -10,8 +10,12 @@ its own file so upstream changes to `docs/api_to_audit.md` never conflict.
 `app.composer.customize({ id, scopes: ["thread"], experimental_footer: [{
 id, component }] })` places a small status item in the row under an
 existing thread's input, before the session-options, permission and
-context-window controls. A component returning null takes no space. Other
-scopes have no footer row and ignore the field.
+context-window controls. An item with `placement: "context"` is drawn right
+before the context-window ring instead, in one wrapper with it
+(`data-fork-context-control`), so the two read as one control; a click on it
+should open the context popover (Studio's prompt-cache clock and minutes
+left). A component returning null takes no space. Other scopes have no
+footer row and ignore the field.
 
 **Core callers.** None; core's own items in that row (`SessionOptionsMenu`,
 the permission control, `ThreadContextWindowIndicator`) are passed in as
