@@ -109,6 +109,48 @@ describe.each([
     expect(mounts.count).toBe(1);
   });
 
+  it("under a card layout with no title rows the bar itself is the title row: the sibling above the page in the page's own container, its title in a box that is a child of the bar's row, as tall as the title bar in the framed layout, and placed by no fixed or anchored rule", async () => {
+    desktop.framed = framed;
+    root.setAttribute("data-fork-cards", "");
+    render(
+      <Page>
+        <PageShell>
+          <span data-testid="content">Threads</span>
+        </PageShell>
+      </Page>,
+    );
+    const main = document.querySelector("main") as HTMLElement;
+    expect(header().parentElement).toBe(main.parentElement);
+    expect(header().nextElementSibling).toBe(main);
+    expect(header().contains(group())).toBe(true);
+    expect(host().childElementCount).toBe(0);
+    const row = header().querySelector(
+      '[data-testid="app-page-header-content-row"]',
+    ) as HTMLElement;
+    const home = header().querySelector("[data-fork-title-home]");
+    expect(home?.parentElement?.parentElement).toBe(row);
+    expect(home?.parentElement?.className.split(" ")).toEqual(
+      expect.arrayContaining(["min-w-0", "flex-1"]),
+    );
+    expect(header().className.split(" ")).toContain("@container/page-header");
+    expect(
+      header().className.includes("h-(--bb-window-title-bar-height)"),
+    ).toBe(framed);
+    expect(row.className.includes("h-(--bb-window-title-bar-height)")).toBe(
+      framed,
+    );
+    const css = readFileSync(join(here, "../../fork.css"), "utf8");
+    expect(css).not.toMatch(/anchor-name|position-anchor|anchor\(/);
+    const titleRules = css
+      .split("}")
+      .filter((rule) => rule.includes('[data-fork-header-group="title"]'));
+    expect(titleRules.length).toBeGreaterThan(0);
+    for (const rule of titleRules)
+      expect(rule).not.toMatch(
+        /position:\s*(fixed|absolute)|translate|(?:^|[\s;{])(?:top|left|right):\s*-?\d/,
+      );
+  });
+
   it("keeps the title in the bar on a page with no host, finds a host that mounts later, and returns when it goes", async () => {
     desktop.framed = framed;
     root.setAttribute(FORK_TITLE_ROWS_ATTRIBUTE, "");
