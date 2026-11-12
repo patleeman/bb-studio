@@ -1596,3 +1596,69 @@ tooltip and a dialog with an opaque body in the real `AppLayout`.
    and plugin panels too. Stabilize once Studio's themes have
    shipped on it, both window kinds pass a live check, and the selectors
    are covered by an upstream-owned attribute.
+
+## Hiding bb's own entries (`slots.experimental_hideHostEntries`)
+
+A plugin lists bb's own sidebar navigation keys, pages, settings, Settings
+pages and sidebar footer items to take out of the app. The sidebar leaves
+hidden rows out, a hidden page's address goes to the home view, a hidden
+setting is neither drawn nor offered by settings search, a hidden Settings
+page (`settingsSections`) leaves the Settings list, the command palette and
+settings search and its address goes to General, and a hidden footer item
+(`footer`, by its preference key: `builtin:<id>` or
+`plugin:<pluginId>/<itemId>`) leaves the footer, its More menu and
+Customize. Registrations add up across plugins. BB Studio hides the Skills
+row, the Skills page, General's "bb CLI skills", the Mobile page (bb's
+TestFlight and APK downloads; the server address stays in Machines), bb's
+Mobile apps and Report a bug footer items and Provider usage's footer item.
+
+**Core callers.** `components/fork/ForkHiddenHostEntries.tsx` reads the
+registrations. `SidebarNavigationModel.tsx` filters its rows,
+`ToolsView.tsx`'s `SkillsView` redirects, `CliSkillsSettingsSection.tsx`
+draws nothing, `useSettingsSearchConditions.ts` drops the `cliSkills`
+search entry, `settings-nav.tsx` filters the Settings pages and treats a
+hidden one's address as unknown, and `sidebarFooterPreferences.ts` filters
+the footer items.
+
+**Audit before stabilizing.**
+
+1. Only one page (`skills`), one setting (`cli-skills`) and one Settings
+   page (`mobile`) are named. Decide whether pages and sections get stable
+   ids bb maintains. Footer keys are bb's own preference keys.
+2. Hiding is UI only. Pair it with a server policy where the entry's routes
+   matter (the skill registry has `experimental_skillsRegistryPolicy`).
+3. The sidebar's stored order keeps a hidden key; it shows again where it
+   was once the plugin is off.
+
+## The skill registry policy (`experimental_skillsRegistryPolicy`)
+
+A backend plugin registers one policy on `bb.experimental_hooks`. bb asks
+every policy before it serves any `/skills-registry` request: `search` (the
+list and search), `read` (an entry, its detail, its repository stars) and
+`install` (installs and install jobs). One refusal answers 403
+`skills_registry_refused` with its message, so the app, the CLI (`bb skill
+search`, `bb skill registry detail`, `bb skill install`), the SDK and agents
+all see the same message. A throw or no answer within 5 seconds refuses too.
+BB Studio refuses all three until a person turns the registry on in Settings
+(an approval only a person can answer).
+
+The request carries `caller`: `{ kind: "agent", threadId }` when it names a
+calling thread (the CLI sends `x-bb-caller-thread` from `BB_THREAD_ID`),
+`{ kind: "cli" }` for the CLI otherwise, `{ kind: "app" }` for anything else.
+It is what the request says, not an authenticated identity.
+
+The gate fails closed: registering a policy records the plugin as a policy
+owner (`plugin_kv`, key `bb.fork.skillsRegistryPolicy`), and while an owner is
+installed and enabled but has no live policy (starting, crashed, failed to
+load) every registry request is refused. A person who disables or removes the
+owner lifts it.
+
+**Core callers.** `services/skills/registry-policy.fork.ts` is the registry
+and the middleware; `server.ts` mounts it before the registry routes.
+
+**Audit before stabilizing.**
+
+1. `caller` is self-reported by the request; a local agent can send the
+   app's shape. Only the fork's approval dialog proves a person.
+2. Skills installed outside bb (a harness's own installer, a shell command)
+   are not covered.
