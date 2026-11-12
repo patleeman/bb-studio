@@ -124,10 +124,13 @@ export function poolAccountView(summary: PoolSummary, source: Exclude<AccountSou
   };
 }
 
-export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string): AccountView[] {
-  return states.filter((state) => state.status === "ready" || signedOut.has(state.providerId)).map((state) => {
+const SIGN_IN_STATES = new Set(["unauthenticated", "expired"]);
+
+export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string, offerSignIn = false): AccountView[] {
+  const offered = (state: ProviderState) => offerSignIn && !!state.loginCommand && SIGN_IN_STATES.has(state.status);
+  return states.filter((state) => state.status === "ready" || signedOut.has(state.providerId) || offered(state)).map((state) => {
     const proxied = state.status === "ready" && state.planLabel === "Proxied";
-    const out = signedOut.has(state.providerId);
+    const out = signedOut.has(state.providerId) || offered(state);
     return {
       key: `local:${state.providerId}`,
       id: state.providerId,

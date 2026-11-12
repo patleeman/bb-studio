@@ -84,7 +84,8 @@ export class AccountsService {
       for (const summary of live.value.accounts) accounts.push(poolAccountView(summary, "bb", { pins: pins.get(summary.id) ?? [], now }));
     }
     const signedOut = new Set(auth.entries.filter((entry) => entry.source === "provider" && entry.signedOut).map((entry) => entry.id.slice("provider:".length)));
-    accounts.push(...localAccountViews(providers, signedOut, providerFamily));
+    const connected = accounts.some((account) => account.state === "ready" || account.state === "limited") || providers.some((state) => state.status === "ready" && !!state.loginCommand);
+    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected));
     const all = computeWarnings(accounts, now, this.deps.timeZone);
     const settled = new Set(accounts.filter((account) => sources.find((source) => source.source === account.source)?.state === "on").map((account) => account.key));
     this.deps.store.keepOnly(new Set(all.map((warning) => warning.id)), settled);
