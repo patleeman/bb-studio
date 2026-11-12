@@ -1,3 +1,4 @@
+import { useForkHostSettingHidden } from "@/components/fork/ForkHiddenHostEntries";
 import { useMemo, useState } from "react";
 import {
   useCliCommandStatus,
@@ -41,11 +42,13 @@ export function useSettingsSearchConditions(): ReadonlySet<SettingsSearchConditi
   const hasThreadHeaderTitles = choiceLabels.has("Thread header title");
   const hasThreadRailOutlines = choiceLabels.has("Thread outline");
   const hasFilePreferences = accessState !== "unavailable";
+  const cliSkillsShown = !useForkHostSettingHidden("cli-skills");
 
   return useMemo(() => {
     const conditions: [SettingsSearchCondition, boolean][] = [
       ["markdownRendererChoices", hasMarkdownRendererChoices],
       ["cliCommand", cliCommandSupported],
+      ["cliSkills", cliSkillsShown],
       ["composers", hasComposers],
       ["desktopBrowser", desktopBrowserAvailable],
       ["desktopQuitConfirmation", desktopQuitConfirmationAvailable],
@@ -66,6 +69,7 @@ export function useSettingsSearchConditions(): ReadonlySet<SettingsSearchConditi
     );
   }, [
     cliCommandSupported,
+    cliSkillsShown,
     hasMarkdownRendererChoices,
     hasFileOpeners,
     desktopBrowserAvailable,
