@@ -2,7 +2,9 @@ import {
   getLatestThreadSequence,
   getThread,
   listStoredEventRows,
+  threads,
 } from "@bb/db";
+import { eq } from "drizzle-orm";
 import { threadResponseSchema } from "@bb/server-contract";
 import { describe, expect, it } from "vitest";
 import {
@@ -24,6 +26,7 @@ import {
 } from "../helpers/seed.js";
 import { withTestHarness, type TestAppHarness } from "../helpers/test-app.js";
 import { turnScope } from "@bb/domain";
+import { isSessionCopyFailure } from "../../src/services/threads/fork-start-fallback.fork.js";
 
 const PATH = "/tmp/fork-start-fallback";
 const SESSION = "22ac1ae2-e9ed-418f-ae36-2e9729236382";
@@ -202,5 +205,83 @@ describe("a fork whose parent session can't be copied", () => {
       ).toBeGreaterThanOrEqual(1);
       expect(getThread(harness.db, created.id)?.status).not.toBe("error");
     });
+  });
+
+  async function forkWithInput(harness: TestAppHarness, parentId: string) {
+    const response = await harness.app.request("/api/v1/threads/fork", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sourceThreadId: parentId,
+        visibility: "visible",
+        input: textInput("Carry on"),
+      }),
+    });
+    expect(response.status).toBe(201);
+    const created = threadResponseSchema.parse(await readJson(response));
+    const start = await waitForQueuedCommand(
+      harness,
+      ({ command }) =>
+        command.type === "thread.start" && command.threadId === created.id,
+    );
+    return { created, start };
+  }
+
+  it("does not restart a fork whose start failed for another reason, and shows the failure", async () => {
+    await withTestHarness(async (harness) => {
+      const { parent } = seedParent(harness);
+      const { created, start } = await forkWithInput(harness, parent.id);
+      await reportQueuedCommandError(harness, start, {
+        errorCode: "command_timeout",
+        errorMessage: "The host did not answer in time",
+      });
+      await new Promise((settle) => setTimeout(settle, 50));
+      expect(
+        listQueuedThreadCommands(harness, "thread.start", created.id).filter(
+          (command) => command !== start.command,
+        ),
+      ).toEqual([]);
+      expect(getThread(harness.db, created.id)?.status).toBe("error");
+    });
+  });
+
+  it("does not restart a fork that was stopped while it started", async () => {
+    await withTestHarness(async (harness) => {
+      const { parent } = seedParent(harness);
+      const { created, start } = await forkWithInput(harness, parent.id);
+      harness.db
+        .update(threads)
+        .set({ status: "stopping" })
+        .where(eq(threads.id, created.id))
+        .run();
+      await reportQueuedCommandError(harness, start, {
+        errorCode: "provider_error",
+        errorMessage: `Session ${SESSION} not found`,
+      });
+      await new Promise((settle) => setTimeout(settle, 50));
+      expect(
+        listQueuedThreadCommands(harness, "thread.start", created.id).filter(
+          (command) => command !== start.command,
+        ),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("isSessionCopyFailure", () => {
+  it("is true only for a failure that names the source session", () => {
+    expect(isSessionCopyFailure(`Session ${SESSION} not found`, SESSION)).toBe(
+      true,
+    );
+    expect(
+      isSessionCopyFailure(
+        `Claude session fork worker exited before forking ${SESSION}`,
+        SESSION,
+      ),
+    ).toBe(true);
+    expect(isSessionCopyFailure("Session other not found", SESSION)).toBe(
+      false,
+    );
+    expect(isSessionCopyFailure("Turn interrupted", SESSION)).toBe(false);
   });
 });

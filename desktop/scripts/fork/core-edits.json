@@ -198,7 +198,7 @@
     },
     "apps/server/src/services/threads/thread-create.ts": {
       "seam": "import-sync, idle-thread",
-      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message.",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread and startsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued and keeps its sessionOptions: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message.",
       "budget": 6
     },
     "apps/server/src/start-server.ts": {

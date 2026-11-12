@@ -56,6 +56,12 @@
       }
     ]
   },
+  "studioRuntimeFiles": [
+    "mermaid/dist/mermaid.min.js",
+    "@resvg/resvg-wasm/index_bg.wasm",
+    "@excalidraw/excalidraw/dist/prod/index.js",
+    "@excalidraw/excalidraw/dist/prod/fonts"
+  ],
   "dependencies": {
     "@blocknote/core": "0.55.0",
     "@blocknote/react": "0.55.0",
