@@ -428,6 +428,21 @@ enum BotSpacesDemo {
                     }
                     return ok(["ok": true])
                 }
+            case "links.resolve":
+                let kind = input["kind"] as? String ?? ""
+                let id = input["id"] as? String ?? ""
+                return lock.withLock {
+                    switch kind {
+                    case "conversation", "worker":
+                        let title = threads[id]?.title ?? conversations.values.flatMap { $0 }.first { $0.id == id }?.title
+                        return ok(["found": title != nil, "title": title ?? NSNull(), "spec": NSNull()])
+                    case "record":
+                        let record = memory.first { $0["id"] as? String == id }
+                        return ok(["found": record != nil, "title": record?["topic"] ?? NSNull(), "spec": NSNull()])
+                    default:
+                        return ok(["found": true, "title": NSNull(), "spec": NSNull()])
+                    }
+                }
             case "bot_get":
                 return ok(["bot": ["defaultModel": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high"]]])
             default:

@@ -471,11 +471,11 @@ struct ThreadView: View {
                 openingFile = OpenFile(path: path)
                 return .handled
             }
-            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
-                return .systemAction
+            if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
+                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
+                return .handled
             }
-            if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
-            return .handled
+            return followLink(url)
         })
         .modifier(BotChromeToolbar(chrome: botChrome, status: botStatus, shortStatus: botShortStatus, working: model.thread?.isRunning == true))
         .navigationTitle(botChrome != nil ? "" : model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
@@ -1405,6 +1405,21 @@ struct ThreadView: View {
         if let shell { shell.push(route) } else { app.path.append(route) }
     }
 
+    private func followLink(_ url: URL) -> OpenURLAction.Result {
+        guard let target = Links.parse(url.absoluteString, origin: client.baseURL) else { return .systemAction }
+        switch target {
+        case .external:
+            return .systemAction
+        case .entity(let ref) where (ref.kind == .file || ref.kind == .diff) && ref.id != nil:
+            openingFile = OpenFile(path: ref.id ?? "")
+        case .entity(let ref) where ref.kind == .conversation && botChrome != nil:
+            botChrome?.openThread(ref.id ?? "")
+        default:
+            app.openLink(target, threadId: model.threadId) { open($0) }
+        }
+        return .handled
+    }
+
     private func push(_ route: Route) {
         if let shell { shell.push(route) } else { app.push(route) }
     }
@@ -2054,11 +2069,11 @@ extension ThreadView {
                 openingFile = OpenFile(path: path)
                 return .handled
             }
-            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
-                return .systemAction
+            if AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first {
+                if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
+                return .handled
             }
-            if let botChrome { botChrome.openThread(id) } else { open(.thread(id: id)) }
-            return .handled
+            return followLink(url)
         }
     }
 

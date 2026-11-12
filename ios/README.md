@@ -91,6 +91,7 @@ are unchanged, and old `bbgo://` links still open.
 | Spotlight indexes open threads and Studio pages, recordings, whiteboards, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
 | URL scheme `bbstudio://thread/<id>`, `reply/<id>` (opens the thread and its reply), `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`), `drawing[/<id>]` (also `drawings`; both open Studio on Whiteboards, and an id opens that whiteboard), `artifact/<id>`, `design/<id>`, `recording/<id>`, `new`, `capture`, `dictate`, `record`, `write`, `handsfree` (hands-free voice), `bots` (the list), `bot[/<id>]` (also `chief`, and the old `web`, for the primary bot), `bot-talk` (also `chief-talk`; opens hands-free voice and starts it, or ends it), `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
+| BB links (`bb://<kind>/<id>`, desktop's router ported to Swift, `iOS/App/Links.swift`): in replies, pages and cards, `bb://`, `::page{…}`-style directives, `page:`/`thread:` references and BB's own addresses open natively, checked first with `links.resolve` ("Not found: …" when gone). `bbstudio://<kind>/<id>` is the same link for every kind (conversation, worker, bot, the five Bot pages, automation, todo, record, page, whiteboard, design, app, dashboard, artifact, recording, board); with the Bot's list as home they open in it, threads included. Files and diffs open from their thread, browser links in Safari; VS Code, terminals and workflow runs say where they open. `bb` itself isn't registered with iOS, so it never clashes with BB's own app | `iOS/App/Links.swift`, `iOS/App/AppModel.swift` |
 | A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads and pages; open a page, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
@@ -483,6 +484,11 @@ and `bot_worker_approval_resolve`): the card in Main, Approve settling it and
 the worker running again, and the waiting worker's marker opening Main.
 `-qaNoDemoApprovals` leaves the card out (`ConversationsUITests`).
 `TEST_RUNNER_STEP7_OUT` keeps its PNGs.
+
+`LinksUITests` opens `bbstudio://` links offline in the Bot's list
+(`-qaSpacesDemo list`; `BotSpacesDemo.State` answers `links.resolve`): a Bot
+page, a worker, a memory record, and a conversation that's gone ("Not
+found"). `TEST_RUNNER_STEP9_OUT` keeps its PNGs.
 
 `StudioPagingUITests` swipes Studio between its kinds and drags an item row
 partway open (`/tmp/qa-studio-paging-*.png`).

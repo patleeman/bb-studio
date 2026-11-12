@@ -848,6 +848,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/App/Links.swift",
+      "plugin": "studio",
+      "method": "links.resolve",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
       "method": "memory.overview",

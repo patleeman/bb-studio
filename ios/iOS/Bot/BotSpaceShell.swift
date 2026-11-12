@@ -17,10 +17,15 @@ struct BotSpacesRoot: View {
             .environment(\.botConversation, context)
             .id(shell.selection)
         }
-        .onChange(of: shell.selection) { _, _ in shell.detailPath = [] }
+        .onChange(of: shell.selection) { _, _ in shell.detailPath = shell.takePendingPush() }
         .onAppear { shell.land(store) }
         .onChange(of: store.spaces) { _, _ in shell.land(store) }
         .onChange(of: store.views) { _, _ in shell.land(store) }
+        .onChange(of: app.shellLink, initial: true) { _, link in
+            guard let link, store.spaces != nil else { return }
+            app.shellLink = nil
+            shell.follow(link, store: store)
+        }
         .onChange(of: app.botRoute, initial: true) { _, route in
             guard let route, store.spaces != nil else { return }
             app.botRoute = nil

@@ -165,6 +165,35 @@ final class BotShellModel: ObservableObject {
         compactColumn = .detail
     }
 
+    private var pendingPush: Route?
+
+    func takePendingPush() -> [Route] {
+        defer { pendingPush = nil }
+        return pendingPush.map { [$0] } ?? []
+    }
+
+    func follow(_ link: BotShellLink, store: BotSpacesStore) {
+        switch link {
+        case .thread(let id, let worker):
+            open(worker ? .worker(id) : .conversation(id))
+        case .page(let page, let botId):
+            if let botId, botId != BotShell.shownBot(store.spaces, chosen: shownBotId)?.id, store.spaces?.bots.contains(where: { $0.id == botId }) == true {
+                show(botId, store: store, compact: true)
+            }
+            open(.page(page))
+        case .push(let route):
+            landed = true
+            compactColumn = .detail
+            if selection == nil, let bot = BotShell.shownBot(store.spaces, chosen: shownBotId),
+               let main = BotShell.mainThreadId(bot, view: store.view(for: bot.id)) {
+                pendingPush = route
+                selection = .conversation(main)
+            } else {
+                detailPath.append(route)
+            }
+        }
+    }
+
     func showList() {
         detailPath = []
         selection = nil

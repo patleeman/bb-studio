@@ -655,3 +655,30 @@ struct FinishedConversationScreen: View {
         } catch { self.error = "It didn't reopen: " + BBClient.describe(error) }
     }
 }
+
+struct MemoryRecordLoader: View {
+    let id: String
+    @EnvironmentObject private var app: AppModel
+    @State private var record: MemoryRecord?
+    @State private var error: String?
+    @State private var loaded = false
+
+    var body: some View {
+        Group {
+            if let record {
+                MemoryRecordScreen(record: record, topics: [], open: { item in
+                    if case .conversation(let threadId) = item { app.follow(.thread(threadId, worker: false)) }
+                }) {}
+            } else if loaded {
+                ContentUnavailableView(error == nil ? "Record not found" : "Couldn't load the record", systemImage: "brain",
+                                       description: error.map(Text.init))
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            do { record = try await app.client.memoryRecord(id: id) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            loaded = true
+        }
+    }
+}
