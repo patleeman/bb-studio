@@ -19,6 +19,7 @@ import {
 import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 import {
   isTypingInSidePanel,
+  pageWorkbenchKey,
   registerWorkbenchSurface,
   resetWorkbenchSurfacesForTest,
   workbenchFor,
@@ -268,6 +269,59 @@ describe("workbench seam", () => {
     expect(isTypingInSidePanel()).toBe(false);
     focus("composer");
     expect(isTypingInSidePanel()).toBe(false);
+  });
+});
+
+describe("a plugin page's workbench", () => {
+  const key = pageWorkbenchKey("studio", "library");
+  const pageSurface = (panel: AppPanelController): WorkbenchSurface => ({
+    ...surface(panel, key),
+    panelStateId: "plugin-page:studio:library",
+    page: { pluginId: "studio", panelId: "library" },
+  });
+
+  it("is found only by its key and only by the page's own plugin", () => {
+    const fake = fakePanel({ open: false, selectedKey: null, tabs: [] });
+    registerWorkbenchSurface(() => pageSurface(fake.panel));
+
+    expect(workbenchFor("studio", undefined)).toBeNull();
+    expect(workbenchFor("studio", key)?.threadId).toBe(key);
+    expect(workbenchFor("other", key)).toBeNull();
+  });
+
+  it("opens the caller's tab as a tab of that page's panel", async () => {
+    const fake = fakePanel({ open: false, selectedKey: null, tabs: [] });
+    registerWorkbenchSurface(() => pageSurface(fake.panel));
+
+    const opened = await workbenchFor("studio", key)?.open({
+      kind: "tab",
+      tab: { id: "page" },
+      params: { page: "plan" },
+    });
+
+    expect(opened).toBe("studio-page-plan");
+    expect(fake.opened[0]).toMatchObject({
+      tab: { ownerId: "plugin:studio:library", tabId: "page" },
+      availability: "action",
+    });
+  });
+
+  it("declines a pane it cannot make, the conversation's arrangement and a pop-out", async () => {
+    const fake = fakePanel({ open: true, selectedKey: "info", tabs: [INFO] });
+    registerWorkbenchSurface(() => pageSurface(fake.panel));
+    const workbench = workbenchFor("studio", key);
+
+    expect(
+      await workbench?.open(
+        { kind: "tab", tab: { id: "page" }, params: { page: "plan" } },
+        { pane: 2 },
+      ),
+    ).toBeNull();
+    expect(fake.opened).toEqual([]);
+    expect(workbench?.arrange({ widthPercent: 40 })).toBe(false);
+    expect(workbench?.arrange({ conversation: "collapsed" })).toBe(false);
+    expect(workbench?.arrange({ panel: "closed" })).toBe(true);
+    expect(await workbench?.popOut("info")).toBe(false);
   });
 });
 
