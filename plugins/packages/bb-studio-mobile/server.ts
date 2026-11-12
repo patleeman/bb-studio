@@ -32,6 +32,7 @@ import {
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { isQuietCompletion } from "./notifications.js";
+import { StudioApprovals } from "./studio-approvals.js";
 import { activityTokenSchema, botIdSchema, deviceIdSchema, liveActivityPayload, liveActivityPriority, liveActivityPushSchema, LiveActivityTokens, MOBILE_MIGRATIONS, tokenKindSchema } from "./live-activities.js";
 import { describeMobileMigration, LEGACY_KEY_PATH_KEY, LEGACY_MOBILE_SETTINGS, migrateMobileSettings, MOBILE_MIGRATED_KEY, MOBILE_SETTINGS, mobileConstants } from "./settings.js";
 
@@ -276,19 +277,23 @@ export default async function plugin(bb: BbPluginApi) {
     );
   }
 
+  const studioApprovals = new StudioApprovals();
+
   async function sentByStudio(message: ExpoMessage, lookups: Lookups, owners: Map<string, Promise<boolean>>): Promise<boolean> {
     const data = message.data;
     const threadId = data?.threadId;
     if (data?.kind !== "pending-interaction" || typeof threadId !== "string" || data.workerId !== undefined) return false;
-    const details = await interactionDetails(lookups, threadId, undefined);
-    if (details?.interactionKind !== "approval" || details.subjectKind === "plan") return false;
+    const details = await interactionDetails(lookups, threadId, typeof data.interactionId === "string" ? data.interactionId : undefined);
+    if (details?.interactionKind !== "approval" || details.subjectKind === "plan" || typeof details.interactionId !== "string") return false;
+    const interactionId = details.interactionId;
     if (!owners.has(threadId)) {
       owners.set(threadId, bb.sdk.plugins.callRpc({
         pluginId: STUDIO_PLUGIN_ID, method: "bot_push_ids", input: { threadId } as never, outputSchema: pushIdsOutput,
         signal: AbortSignal.timeout(5_000),
       }).then((ids) => typeof ids.workerId === "string" && ids.workerId === threadId && typeof ids.conversationId === "string", () => false));
     }
-    return owners.get(threadId)!;
+    if (!(await owners.get(threadId)!)) return false;
+    return studioApprovals.reached(interactionId, message.to);
   }
 
   async function deliver(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
@@ -411,7 +416,13 @@ export default async function plugin(bb: BbPluginApi) {
         throw error;
       });
       if (!thread) return null;
-      const lists = await Promise.all([threadId, ...workers].map((id) => bb.sdk.threads.interactions.list({ threadId: id })));
+      const lists = await Promise.all([
+        bb.sdk.threads.interactions.list({ threadId }),
+        ...workers.map((id) => bb.sdk.threads.interactions.list({ threadId: id }).catch((error: unknown) => {
+          if (error && typeof error === "object" && ("status" in error && error.status === 404 || "statusCode" in error && error.statusCode === 404)) return [];
+          throw error;
+        })),
+      ]);
       readWarnings.delete(threadId);
       return { ...thread, hasPendingInteraction: lists.some((interactions) => interactions.some((interaction) => interaction.status === "pending")) };
     } catch (error) {
@@ -529,12 +540,18 @@ export default async function plugin(bb: BbPluginApi) {
       const data = input.threadId
         ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}), ...bot }
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}), ...bot };
-      const tickets = devices.length > 0
-        ? await deliver(devices.map((to) => ({
-            to, title: input.title, body: input.body, sound: "default", data: {...data, ...(input.category ? {category:input.category,loopId:input.loopId,actions:input.actions,...(input.loopKind?{loopKind:input.loopKind}:{}),...(input.options?.length?{options:input.options}:{})} : {})},
-            ...(input.coalesceKey ? { collapseId: input.coalesceKey } : {}),
-          })))
-        : [];
+      const approval = input.kind === "pending-interaction" && input.workerId && input.interactionId ? input.interactionId : null;
+      let tickets: ExpoTicket[] = [];
+      try {
+        tickets = devices.length > 0
+          ? await deliver(devices.map((to) => ({
+              to, title: input.title, body: input.body, sound: "default", data: {...data, ...(input.category ? {category:input.category,loopId:input.loopId,actions:input.actions,...(input.loopKind?{loopKind:input.loopKind}:{}),...(input.options?.length?{options:input.options}:{})} : {})},
+              ...(input.coalesceKey ? { collapseId: input.coalesceKey } : {}),
+            })))
+          : [];
+      } finally {
+        if (approval) studioApprovals.finish(approval, devices.filter((_to, index) => tickets[index]?.status === "ok"));
+      }
       const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
       const sent = tickets.filter((ticket, index) => ticket.status === "ok" &&
         !(devices[index]!.startsWith(APNS_TOKEN_PREFIX) && [input.threadId, input.workerId].some((id) => id && muted.has(id)))).length;
